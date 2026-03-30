@@ -605,6 +605,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
       <StoresInventoryStatusReport
         onBack={() => setSelectedReport(embedded ? selectedReportId : null)}
         vesselId={effectiveVesselId}
+        embedded={embedded}
       />
     );
   }
@@ -614,6 +615,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
       <ChemicalsExpiryReport
         onBack={() => setSelectedReport(embedded ? selectedReportId : null)}
         vesselId={effectiveVesselId}
+        embedded={embedded}
       />
     );
   }
@@ -624,6 +626,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         onBack={() => setSelectedReport(embedded ? selectedReportId : null)}
         vesselId={effectiveVesselId}
         source="stores"
+        embedded={embedded}
       />
     );
   }
@@ -633,6 +636,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
       <ConsumptionPatternReport
         onBack={() => setSelectedReport(embedded ? selectedReportId : null)}
         vesselId={effectiveVesselId}
+        embedded={embedded}
       />
     );
   }

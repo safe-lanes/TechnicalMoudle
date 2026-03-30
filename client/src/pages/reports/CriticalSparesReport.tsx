@@ -71,12 +71,13 @@ interface CriticalSparesResponse {
 interface CriticalSparesReportProps {
   onBack: () => void;
   vesselId?: string;
+  embedded?: boolean;
 }
 
 type SortField = 'partCode' | 'partName' | 'rob' | 'shortageQty' | 'stockStatus' | 'criticalityLevel';
 type SortDirection = 'asc' | 'desc';
 
-const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, vesselId: propVesselId }) => {
+const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, vesselId: propVesselId, embedded }) => {
   const { vesselId: contextVesselId } = useVessel();
   const effectiveVesselId = propVesselId || contextVesselId;
   const { toast } = useToast();
@@ -291,13 +292,15 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
 
   if (!effectiveVesselId) {
     return (
-      <div className="p-6 bg-white min-h-screen">
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="ghost" onClick={onBack} data-testid="button-back-critical-spares">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
-          </Button>
-          <h1 className="text-2xl font-bold text-gray-900">Critical Spares Report</h1>
-        </div>
+      <div className={embedded ? "p-4" : "p-6 bg-white min-h-screen"}>
+        {!embedded && (
+          <div className="flex items-center gap-4 mb-6">
+            <Button variant="ghost" onClick={onBack} data-testid="button-back-critical-spares">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
+            </Button>
+            <h1 className="text-2xl font-bold text-gray-900">Critical Spares Report</h1>
+          </div>
+        )}
         <div className="text-center py-16">
           <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-700 mb-2">Select a Vessel</h3>
@@ -308,37 +311,39 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
   }
 
   return (
-    <div className="p-6 bg-white min-h-screen">
-      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={onBack} data-testid="button-back-critical-spares">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Critical Spares Report</h1>
-            <p className="text-sm text-gray-500">Status of critical and essential spare parts inventory</p>
+    <div className={embedded ? "p-4" : "p-6 bg-white min-h-screen"}>
+      {!embedded && (
+        <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={onBack} data-testid="button-back-critical-spares">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Critical Spares Report</h1>
+              <p className="text-sm text-gray-500">Status of critical and essential spare parts inventory</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={handleExportPdf}
+              disabled={generatingPdf || isLoading}
+              data-testid="button-export-pdf-critical"
+            >
+              {generatingPdf ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+              Export PDF
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleExportExcel}
+              disabled={isLoading || generatingExcel}
+              data-testid="button-export-excel-critical"
+            >
+              <Download className="h-4 w-4 mr-2" /> {generatingExcel ? 'Generating...' : 'Export Excel'}
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            onClick={handleExportPdf}
-            disabled={generatingPdf || isLoading}
-            data-testid="button-export-pdf-critical"
-          >
-            {generatingPdf ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-            Export PDF
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleExportExcel}
-            disabled={isLoading || generatingExcel}
-            data-testid="button-export-excel-critical"
-          >
-            <Download className="h-4 w-4 mr-2" /> {generatingExcel ? 'Generating...' : 'Export Excel'}
-          </Button>
-        </div>
-      </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
@@ -353,44 +358,46 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card data-testid="card-total-critical-spares">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Package className="w-4 h-4 text-blue-500" />
-                  Total Critical Spares
-                </CardDescription>
-                <CardTitle className="text-3xl">{meta?.totalSpares || 0}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card data-testid="card-critical-equipment-spares">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <ShieldAlert className="w-4 h-4 text-red-500" />
-                  Critical Equipment Spares
-                </CardDescription>
-                <CardTitle className="text-3xl text-red-600">{meta?.totalLinkedCriticalEquip || 0}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card data-testid="card-out-of-stock">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <XCircle className="w-4 h-4 text-red-500" />
-                  Out of Stock Critical Parts
-                </CardDescription>
-                <CardTitle className="text-3xl text-red-600">{meta?.totalZeroStock || 0}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card data-testid="card-low-stock">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <ShieldCheck className="w-4 h-4 text-amber-500" />
-                  Low Stock Critical Parts
-                </CardDescription>
-                <CardTitle className="text-3xl text-amber-600">{meta?.totalLowStock || 0}</CardTitle>
-              </CardHeader>
-            </Card>
-          </div>
+          {!embedded && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <Card data-testid="card-total-critical-spares">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <Package className="w-4 h-4 text-blue-500" />
+                    Total Critical Spares
+                  </CardDescription>
+                  <CardTitle className="text-3xl">{meta?.totalSpares || 0}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card data-testid="card-critical-equipment-spares">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <ShieldAlert className="w-4 h-4 text-red-500" />
+                    Critical Equipment Spares
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-red-600">{meta?.totalLinkedCriticalEquip || 0}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card data-testid="card-out-of-stock">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <XCircle className="w-4 h-4 text-red-500" />
+                    Out of Stock Critical Parts
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-red-600">{meta?.totalZeroStock || 0}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card data-testid="card-low-stock">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <ShieldCheck className="w-4 h-4 text-amber-500" />
+                    Low Stock Critical Parts
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-amber-600">{meta?.totalLowStock || 0}</CardTitle>
+                </CardHeader>
+              </Card>
+            </div>
+          )}
 
           <div className="flex items-center gap-3 mb-4 flex-wrap">
             <div className="relative flex-1 min-w-[200px] max-w-sm">

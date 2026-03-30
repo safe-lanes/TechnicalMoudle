@@ -94,6 +94,7 @@ interface ChemicalsExpiryResponse {
 interface ChemicalsExpiryReportProps {
   onBack: () => void;
   vesselId?: string;
+  embedded?: boolean;
 }
 
 type SortField = 'itemCode' | 'itemName' | 'batchNumber' | 'manufactureDate' | 'expiryDate' | 'daysUntilExpiry' | 'rob' | 'min' | 'stockStatus' | 'locationA' | 'hazardClassification' | 'hasSds';
@@ -166,7 +167,7 @@ function getExpiryDateColor(item: ChemicalItem): string {
   return 'text-gray-900';
 }
 
-const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, vesselId: propVesselId }) => {
+const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, vesselId: propVesselId, embedded }) => {
   const { vesselId: contextVesselId } = useVessel();
   const effectiveVesselId = propVesselId || contextVesselId;
   const { toast } = useToast();
@@ -382,13 +383,15 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
 
   if (!effectiveVesselId) {
     return (
-      <div className="p-6 bg-white min-h-screen">
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="ghost" onClick={onBack} data-testid="button-back-chemicals">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
-          </Button>
-          <h1 className="text-2xl font-bold text-gray-900">Chemicals Inventory & Expiry Report</h1>
-        </div>
+      <div className={embedded ? "p-4" : "p-6 bg-white min-h-screen"}>
+        {!embedded && (
+          <div className="flex items-center gap-4 mb-6">
+            <Button variant="ghost" onClick={onBack} data-testid="button-back-chemicals">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
+            </Button>
+            <h1 className="text-2xl font-bold text-gray-900">Chemicals Inventory & Expiry Report</h1>
+          </div>
+        )}
         <div className="text-center py-16">
           <Beaker className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-700 mb-2">Select a Vessel</h3>
@@ -399,29 +402,31 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
   }
 
   return (
-    <div className="p-6 bg-white min-h-screen">
-      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={onBack} data-testid="button-back-chemicals">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Chemicals Inventory & Expiry Report</h1>
-            <p className="text-sm text-gray-500">Track chemical inventory, expiry dates, and SDS compliance</p>
+    <div className={embedded ? "p-4" : "p-6 bg-white min-h-screen"}>
+      {!embedded && (
+        <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={onBack} data-testid="button-back-chemicals">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Chemicals Inventory & Expiry Report</h1>
+              <p className="text-sm text-gray-500">Track chemical inventory, expiry dates, and SDS compliance</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={handleExportPdf}
+              disabled={generatingPdf || isLoading}
+              data-testid="button-export-pdf"
+            >
+              {generatingPdf ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+              Export PDF
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            onClick={handleExportPdf}
-            disabled={generatingPdf || isLoading}
-            data-testid="button-export-pdf"
-          >
-            {generatingPdf ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-            Export PDF
-          </Button>
-        </div>
-      </div>
+      )}
 
       <div className="flex items-center gap-3 mb-6 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -488,44 +493,46 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card className="bg-purple-50 border-purple-200" data-testid="card-total-chemicals">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <FlaskConical className="w-4 h-4 text-purple-500" />
-                  Total Chemicals
-                </CardDescription>
-                <CardTitle className="text-3xl">{summary.totalChemicals}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card className="bg-red-50 border-red-200" data-testid="card-expired">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4 text-red-500" />
-                  Expired
-                </CardDescription>
-                <CardTitle className="text-3xl text-red-600">{summary.expiredCount}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card className="bg-orange-50 border-orange-200" data-testid="card-expiring-soon">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Clock className="w-4 h-4 text-orange-500" />
-                  Expiring Soon
-                </CardDescription>
-                <CardTitle className="text-3xl text-orange-600">{summary.expiringSoonCount}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card className="bg-blue-50 border-blue-200" data-testid="card-sds-compliance">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <ShieldAlert className="w-4 h-4 text-blue-500" />
-                  SDS Compliance
-                </CardDescription>
-                <CardTitle className="text-3xl text-blue-600">{summary.sdsCompliancePercent}%</CardTitle>
-              </CardHeader>
-            </Card>
-          </div>
+          {!embedded && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <Card className="bg-purple-50 border-purple-200" data-testid="card-total-chemicals">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <FlaskConical className="w-4 h-4 text-purple-500" />
+                    Total Chemicals
+                  </CardDescription>
+                  <CardTitle className="text-3xl">{summary.totalChemicals}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card className="bg-red-50 border-red-200" data-testid="card-expired">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <AlertTriangle className="w-4 h-4 text-red-500" />
+                    Expired
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-red-600">{summary.expiredCount}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card className="bg-orange-50 border-orange-200" data-testid="card-expiring-soon">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <Clock className="w-4 h-4 text-orange-500" />
+                    Expiring Soon
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-orange-600">{summary.expiringSoonCount}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card className="bg-blue-50 border-blue-200" data-testid="card-sds-compliance">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <ShieldAlert className="w-4 h-4 text-blue-500" />
+                    SDS Compliance
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-blue-600">{summary.sdsCompliancePercent}%</CardTitle>
+                </CardHeader>
+              </Card>
+            </div>
+          )}
 
           {expiredItems.length > 0 && (
             <Card className="mb-6 border-red-300 bg-red-50/30" data-testid="section-expired-alert">

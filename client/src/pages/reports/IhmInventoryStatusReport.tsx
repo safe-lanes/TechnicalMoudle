@@ -72,12 +72,13 @@ interface IhmInventoryStatusResponse {
 interface IhmInventoryStatusReportProps {
   onBack: () => void;
   vesselId?: string;
+  embedded?: boolean;
 }
 
 type SortField = 'itemCode' | 'itemName' | 'itemType' | 'componentOrCategory' | 'ihmStatus' | 'evidenceType' | 'currentROB' | 'location';
 type SortDirection = 'asc' | 'desc';
 
-const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onBack, vesselId: propVesselId }) => {
+const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onBack, vesselId: propVesselId, embedded }) => {
   const { vesselId: contextVesselId, vessels } = useVessel();
   const effectiveVesselId = propVesselId || contextVesselId;
   const { toast } = useToast();
@@ -298,13 +299,15 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
 
   if (!effectiveVesselId) {
     return (
-      <div className="p-6 bg-white min-h-screen">
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="ghost" onClick={onBack} data-testid="button-back-ihm-inventory">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
-          </Button>
-          <h1 className="text-2xl font-bold text-gray-900">IHM Inventory Status Report</h1>
-        </div>
+      <div className={embedded ? "p-4" : "p-6 bg-white min-h-screen"}>
+        {!embedded && (
+          <div className="flex items-center gap-4 mb-6">
+            <Button variant="ghost" onClick={onBack} data-testid="button-back-ihm-inventory">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
+            </Button>
+            <h1 className="text-2xl font-bold text-gray-900">IHM Inventory Status Report</h1>
+          </div>
+        )}
         <div className="text-center py-16">
           <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-700 mb-2" data-testid="text-select-vessel">Select a Vessel</h3>
@@ -315,38 +318,40 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
   }
 
   return (
-    <div className="p-6 bg-white min-h-screen">
-      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={onBack} data-testid="button-back-ihm-inventory">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900" data-testid="text-report-title">IHM Inventory Status Report</h1>
-            <p className="text-sm text-gray-500">Confirmed hazardous materials present on board</p>
+    <div className={embedded ? "p-4" : "p-6 bg-white min-h-screen"}>
+      {!embedded && (
+        <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={onBack} data-testid="button-back-ihm-inventory">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900" data-testid="text-report-title">IHM Inventory Status Report</h1>
+              <p className="text-sm text-gray-500">Confirmed hazardous materials present on board</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={handleExportPdf}
+              disabled={generatingPdf || isLoading}
+              data-testid="button-export-pdf"
+            >
+              {generatingPdf ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+              Export PDF
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleExportExcel}
+              disabled={exportingExcel || isLoading}
+              data-testid="button-export-excel"
+            >
+              {exportingExcel ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              Export Excel
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            onClick={handleExportPdf}
-            disabled={generatingPdf || isLoading}
-            data-testid="button-export-pdf"
-          >
-            {generatingPdf ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-            Export PDF
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleExportExcel}
-            disabled={exportingExcel || isLoading}
-            data-testid="button-export-excel"
-          >
-            {exportingExcel ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-            Export Excel
-          </Button>
-        </div>
-      </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16" data-testid="loading-spinner">
@@ -364,35 +369,37 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <Card className="border-l-4 border-l-red-500 bg-white" data-testid="card-total-items">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4 text-red-500" />
-                  Total IHM Items
-                </CardDescription>
-                <CardTitle className="text-3xl text-red-600">{summary.totalItems}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card className="border-l-4 border-l-blue-500 bg-white" data-testid="card-spares">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Package className="w-4 h-4 text-blue-500" />
-                  Spares with IHM
-                </CardDescription>
-                <CardTitle className="text-3xl text-blue-600">{categoryCounts.spares}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card className="border-l-4 border-l-purple-500 bg-white" data-testid="card-stores">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Package className="w-4 h-4 text-purple-500" />
-                  Stores with IHM
-                </CardDescription>
-                <CardTitle className="text-3xl text-purple-600">{categoryCounts.stores}</CardTitle>
-              </CardHeader>
-            </Card>
-          </div>
+          {!embedded && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <Card className="border-l-4 border-l-red-500 bg-white" data-testid="card-total-items">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4 text-red-500" />
+                    Total IHM Items
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-red-600">{summary.totalItems}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card className="border-l-4 border-l-blue-500 bg-white" data-testid="card-spares">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <Package className="w-4 h-4 text-blue-500" />
+                    Spares with IHM
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-blue-600">{categoryCounts.spares}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card className="border-l-4 border-l-purple-500 bg-white" data-testid="card-stores">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <Package className="w-4 h-4 text-purple-500" />
+                    Stores with IHM
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-purple-600">{categoryCounts.stores}</CardTitle>
+                </CardHeader>
+              </Card>
+            </div>
+          )}
 
           <div className="flex items-center gap-4 mb-4 flex-wrap">
             <div className="relative flex-1 min-w-[200px]">

@@ -82,6 +82,7 @@ interface StoresLedger {
 interface StoresInventoryStatusReportProps {
   onBack: () => void;
   vesselId?: string;
+  embedded?: boolean;
 }
 
 type SortField = 'itemCode' | 'itemName' | 'category' | 'rob' | 'min' | 'status' | 'consumption' | 'trend' | 'daysUntilStockout' | 'priority';
@@ -109,7 +110,7 @@ function getLocation(item: StoresItem): string {
   return a || b || '-';
 }
 
-const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = ({ onBack, vesselId: propVesselId }) => {
+const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = ({ onBack, vesselId: propVesselId, embedded }) => {
   const { vesselId: contextVesselId } = useVessel();
   const effectiveVesselId = propVesselId || contextVesselId;
   const { toast } = useToast();
@@ -532,13 +533,15 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
 
   if (!effectiveVesselId) {
     return (
-      <div className="p-6 bg-white min-h-screen">
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="ghost" onClick={onBack} data-testid="button-back-stores-inventory">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
-          </Button>
-          <h1 className="text-2xl font-bold text-gray-900">Stores Inventory Status Report</h1>
-        </div>
+      <div className={embedded ? "p-4" : "p-6 bg-white min-h-screen"}>
+        {!embedded && (
+          <div className="flex items-center gap-4 mb-6">
+            <Button variant="ghost" onClick={onBack} data-testid="button-back-stores-inventory">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
+            </Button>
+            <h1 className="text-2xl font-bold text-gray-900">Stores Inventory Status Report</h1>
+          </div>
+        )}
         <div className="text-center py-16">
           <Store className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-700 mb-2">Select a Vessel</h3>
@@ -549,37 +552,39 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
   }
 
   return (
-    <div className="p-6 bg-white min-h-screen">
-      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={onBack} data-testid="button-back-stores-inventory">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Stores Inventory Status Report</h1>
-            <p className="text-sm text-gray-500">Comprehensive overview of all store items with stock levels, consumption trends, and reorder requirements</p>
+    <div className={embedded ? "p-4" : "p-6 bg-white min-h-screen"}>
+      {!embedded && (
+        <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={onBack} data-testid="button-back-stores-inventory">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Reports
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Stores Inventory Status Report</h1>
+              <p className="text-sm text-gray-500">Comprehensive overview of all store items with stock levels, consumption trends, and reorder requirements</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={handleExportPdf}
+              disabled={generatingPdf || isLoading}
+              data-testid="button-export-pdf"
+            >
+              {generatingPdf ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+              Export PDF
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleExportExcel}
+              disabled={generatingPdf || isLoading}
+              data-testid="button-export-excel"
+            >
+              <Download className="h-4 w-4 mr-2" /> Export Excel
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            onClick={handleExportPdf}
-            disabled={generatingPdf || isLoading}
-            data-testid="button-export-pdf"
-          >
-            {generatingPdf ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-            Export PDF
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleExportExcel}
-            disabled={generatingPdf || isLoading}
-            data-testid="button-export-excel"
-          >
-            <Download className="h-4 w-4 mr-2" /> Export Excel
-          </Button>
-        </div>
-      </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
@@ -594,44 +599,46 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card className="border-l-4 border-l-purple-500 bg-white" data-testid="card-total-items">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Store className="w-4 h-4 text-purple-500" />
-                  Total Items
-                </CardDescription>
-                <CardTitle className="text-3xl">{totalItems}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card className="border-l-4 border-l-red-500 bg-white" data-testid="card-low-stock">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4 text-red-500" />
-                  Low Stock
-                </CardDescription>
-                <CardTitle className="text-3xl text-red-600">{lowStockCount}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card className="border-l-4 border-l-blue-500 bg-white" data-testid="card-lubricants">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Droplets className="w-4 h-4 text-blue-500" />
-                  Lubricants
-                </CardDescription>
-                <CardTitle className="text-3xl text-blue-600">{lubricantsCount}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card className="border-l-4 border-l-green-500 bg-white" data-testid="card-chemicals">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Beaker className="w-4 h-4 text-green-500" />
-                  Chemicals
-                </CardDescription>
-                <CardTitle className="text-3xl text-green-600">{chemicalsCount}</CardTitle>
-              </CardHeader>
-            </Card>
-          </div>
+          {!embedded && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <Card className="border-l-4 border-l-purple-500 bg-white" data-testid="card-total-items">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <Store className="w-4 h-4 text-purple-500" />
+                    Total Items
+                  </CardDescription>
+                  <CardTitle className="text-3xl">{totalItems}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card className="border-l-4 border-l-red-500 bg-white" data-testid="card-low-stock">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <AlertTriangle className="w-4 h-4 text-red-500" />
+                    Low Stock
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-red-600">{lowStockCount}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card className="border-l-4 border-l-blue-500 bg-white" data-testid="card-lubricants">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <Droplets className="w-4 h-4 text-blue-500" />
+                    Lubricants
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-blue-600">{lubricantsCount}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card className="border-l-4 border-l-green-500 bg-white" data-testid="card-chemicals">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <Beaker className="w-4 h-4 text-green-500" />
+                    Chemicals
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-green-600">{chemicalsCount}</CardTitle>
+                </CardHeader>
+              </Card>
+            </div>
+          )}
 
           <div className="flex items-center gap-3 mb-4 flex-wrap">
             <div className="relative flex-1 min-w-[200px] max-w-sm">

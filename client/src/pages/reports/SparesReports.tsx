@@ -483,6 +483,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         onBack={() => setActiveDetailReport(embedded ? selectedReportId : null)}
         vesselId={effectiveVesselId}
         source="spares"
+        embedded={embedded}
       />
     );
   }
@@ -492,6 +493,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
       <CriticalSparesReport
         onBack={() => setActiveDetailReport(embedded ? selectedReportId : null)}
         vesselId={effectiveVesselId}
+        embedded={embedded}
       />
     );
   }
@@ -503,6 +505,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         vesselId={effectiveVesselId}
         initialDateFrom={categoryFilters.dateRange.from}
         initialDateTo={categoryFilters.dateRange.to}
+        embedded={embedded}
       />
     );
   }

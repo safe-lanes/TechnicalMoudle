@@ -84,6 +84,7 @@ interface LowStockAlertReportProps {
   onBack: () => void;
   vesselId?: string;
   source?: 'spares' | 'stores';
+  embedded?: boolean;
 }
 
 type SortField = 'priority' | 'itemCode' | 'itemName' | 'itemType' | 'category' | 'rob' | 'minStock' | 'deficit' | 'deficitPercent' | 'uom' | 'avgMonthlyConsumption' | 'daysUntilStockout' | 'estimatedCost' | 'supplier' | 'leadTime';
@@ -129,7 +130,7 @@ function getDaysUntilStockoutDisplay(days: number | null) {
   return <span className="text-green-600">{days} days</span>;
 }
 
-const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesselId: propVesselId, source = 'stores' }) => {
+const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesselId: propVesselId, source = 'stores', embedded }) => {
   const { vesselId: contextVesselId, vessels } = useVessel();
   const effectiveVesselId = propVesselId || contextVesselId;
   const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels?.find((v: any) => v.id === effectiveVesselId)?.name || effectiveVesselId);
@@ -502,13 +503,15 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
 
   if (!effectiveVesselId) {
     return (
-      <div className="p-6 bg-white min-h-screen">
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="ghost" onClick={onBack} data-testid="button-back-low-stock">
-            <ArrowLeft className="h-4 w-4 mr-2" /> {isSpares ? 'Back to Spares Reports' : 'Back to Stores Reports'}
-          </Button>
-          <h1 className="text-2xl font-bold text-gray-900">{isSpares ? 'Spares Low Stock Alert Report' : 'Low Stock Alert Report'}</h1>
-        </div>
+      <div className={embedded ? "p-4" : "p-6 bg-white min-h-screen"}>
+        {!embedded && (
+          <div className="flex items-center gap-4 mb-6">
+            <Button variant="ghost" onClick={onBack} data-testid="button-back-low-stock">
+              <ArrowLeft className="h-4 w-4 mr-2" /> {isSpares ? 'Back to Spares Reports' : 'Back to Stores Reports'}
+            </Button>
+            <h1 className="text-2xl font-bold text-gray-900">{isSpares ? 'Spares Low Stock Alert Report' : 'Low Stock Alert Report'}</h1>
+          </div>
+        )}
         <div className="text-center py-16">
           <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-700 mb-2">Select a Vessel</h3>
@@ -521,40 +524,42 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
   const totalForBars = Math.max(summary.storesCount + summary.lubesCount + summary.chemicalsCount, 1);
 
   return (
-    <div className="p-6 bg-white min-h-screen">
-      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={onBack} data-testid="button-back-low-stock">
-            <ArrowLeft className="h-4 w-4 mr-2" /> {isSpares ? 'Back to Spares Reports' : 'Back to Stores Reports'}
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{isSpares ? 'Spares Low Stock Alert Report' : 'Low Stock Alert Report'}</h1>
-            <p className="text-sm text-gray-500">{isSpares ? 'Spare parts below minimum stock levels requiring attention' : 'Items below minimum stock levels requiring attention'}</p>
+    <div className={embedded ? "p-4" : "p-6 bg-white min-h-screen"}>
+      {!embedded && (
+        <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={onBack} data-testid="button-back-low-stock">
+              <ArrowLeft className="h-4 w-4 mr-2" /> {isSpares ? 'Back to Spares Reports' : 'Back to Stores Reports'}
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">{isSpares ? 'Spares Low Stock Alert Report' : 'Low Stock Alert Report'}</h1>
+              <p className="text-sm text-gray-500">{isSpares ? 'Spare parts below minimum stock levels requiring attention' : 'Items below minimum stock levels requiring attention'}</p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            onClick={handlePdfExport}
-            disabled={generatingPdf || isLoading}
-            data-testid="button-export-pdf"
-          >
-            {generatingPdf ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-            Export PDF
-          </Button>
-          {!isSpares && (
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               variant="outline"
-              onClick={handleExcelExport}
-              disabled={generatingExcel || isLoading}
-              data-testid="button-export-excel"
+              onClick={handlePdfExport}
+              disabled={generatingPdf || isLoading}
+              data-testid="button-export-pdf"
             >
-              {generatingExcel ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
-              Export Excel
+              {generatingPdf ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+              Export PDF
             </Button>
-          )}
+            {!isSpares && (
+              <Button
+                variant="outline"
+                onClick={handleExcelExport}
+                disabled={generatingExcel || isLoading}
+                data-testid="button-export-excel"
+              >
+                {generatingExcel ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
+                Export Excel
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex items-center gap-3 mb-6 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -606,46 +611,48 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-            <Card className="bg-red-50 border-red-200" data-testid="card-total-low-stock">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4 text-red-500" />
-                  Total Low Stock
-                </CardDescription>
-                <CardTitle className="text-3xl text-red-600">{summary.totalLowStock}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card className="bg-red-50 border-red-200" data-testid="card-critical-items">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4 text-red-500" />
-                  Critical
-                </CardDescription>
-                <CardTitle className="text-3xl text-red-600">{summary.criticalItems}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card className="bg-orange-50 border-orange-200" data-testid="card-high-priority">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4 text-orange-500" />
-                  High Priority
-                </CardDescription>
-                <CardTitle className="text-3xl text-orange-600">{summary.highPriorityItems}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card className="bg-yellow-50 border-yellow-200" data-testid="card-medium-priority">
-              <CardHeader className="pb-2">
-                <CardDescription className="flex items-center gap-1">
-                  <Clock className="w-4 h-4 text-yellow-500" />
-                  Medium Priority
-                </CardDescription>
-                <CardTitle className="text-3xl text-yellow-600">{summary.mediumPriorityItems}</CardTitle>
-              </CardHeader>
-            </Card>
-          </div>
+          {!embedded && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <Card className="bg-red-50 border-red-200" data-testid="card-total-low-stock">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <AlertTriangle className="w-4 h-4 text-red-500" />
+                    Total Low Stock
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-red-600">{summary.totalLowStock}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card className="bg-red-50 border-red-200" data-testid="card-critical-items">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4 text-red-500" />
+                    Critical
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-red-600">{summary.criticalItems}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card className="bg-orange-50 border-orange-200" data-testid="card-high-priority">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <AlertTriangle className="w-4 h-4 text-orange-500" />
+                    High Priority
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-orange-600">{summary.highPriorityItems}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card className="bg-yellow-50 border-yellow-200" data-testid="card-medium-priority">
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <Clock className="w-4 h-4 text-yellow-500" />
+                    Medium Priority
+                  </CardDescription>
+                  <CardTitle className="text-3xl text-yellow-600">{summary.mediumPriorityItems}</CardTitle>
+                </CardHeader>
+              </Card>
+            </div>
+          )}
 
-          {!isSpares && (
+          {!embedded && !isSpares && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <Card className="bg-purple-50 border-purple-200" data-testid="card-stores-count">
                 <CardHeader className="pb-2">

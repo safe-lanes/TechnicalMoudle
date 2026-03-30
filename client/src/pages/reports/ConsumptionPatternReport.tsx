@@ -32,6 +32,7 @@ import { TablePagination, usePagination } from "@/components/reports/TablePagina
 interface ConsumptionPatternReportProps {
   onBack: () => void;
   vesselId: string | null;
+  embedded?: boolean;
 }
 
 type ActiveTab = "trends" | "items" | "categories" | "efficiency" | "forecast";
@@ -40,7 +41,7 @@ type SortDirection = "asc" | "desc";
 
 const PIE_COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16"];
 
-const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onBack, vesselId }) => {
+const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onBack, vesselId, embedded }) => {
   const { toast } = useToast();
 
   const [startDate, setStartDate] = useState("");
@@ -221,36 +222,40 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
 
   if (!vesselId) {
     return (
-      <div className="bg-white min-h-screen p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-2xl font-bold text-gray-900">Consumption Pattern Analysis</h1>
-        </div>
+      <div className={embedded ? "p-4" : "bg-white min-h-screen p-6"}>
+        {!embedded && (
+          <div className="flex items-center gap-3 mb-6">
+            <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-2xl font-bold text-gray-900">Consumption Pattern Analysis</h1>
+          </div>
+        )}
         <Card><CardHeader><CardTitle>Please select a specific vessel</CardTitle><CardDescription>This report requires a specific vessel to be selected.</CardDescription></CardHeader></Card>
       </div>
     );
   }
 
   return (
-    <div className="bg-white min-h-screen p-6 space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-2xl font-bold text-gray-900">Consumption Pattern Analysis</h1>
+    <div className={embedded ? "p-4 space-y-6" : "bg-white min-h-screen p-6 space-y-6"}>
+      {!embedded && (
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-2xl font-bold text-gray-900">Consumption Pattern Analysis</h1>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" onClick={handleExportPdf} disabled={!data || generatingPdf || (summary?.totalConsumptionEvents ?? 0) === 0} data-testid="button-export-pdf">
+              {generatingPdf ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />} PDF
+            </Button>
+            <Button variant="outline" onClick={handleExportExcel} disabled={!data || generatingExcel || (summary?.totalConsumptionEvents ?? 0) === 0} data-testid="button-export-excel">
+              {generatingExcel ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />} Excel
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={handleExportPdf} disabled={!data || generatingPdf || (summary?.totalConsumptionEvents ?? 0) === 0} data-testid="button-export-pdf">
-            {generatingPdf ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />} PDF
-          </Button>
-          <Button variant="outline" onClick={handleExportExcel} disabled={!data || generatingExcel || (summary?.totalConsumptionEvents ?? 0) === 0} data-testid="button-export-excel">
-            {generatingExcel ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />} Excel
-          </Button>
-        </div>
-      </div>
+      )}
 
       <div className="flex flex-wrap items-end gap-3">
         <div>
@@ -304,44 +309,46 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
             </Card>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card data-testid="card-items-consumed">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <div>
-                  <CardDescription>Items Consumed</CardDescription>
-                  <CardTitle className="text-2xl">{summary?.totalItemsConsumed ?? 0} <span className="text-sm font-normal text-gray-500">/ {summary?.totalInventoryItems ?? 0}</span></CardTitle>
-                </div>
-                <Package className="h-8 w-8 text-blue-500" />
-              </CardHeader>
-            </Card>
-            <Card data-testid="card-total-qty">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <div>
-                  <CardDescription>Total Qty Consumed</CardDescription>
-                  <CardTitle className="text-2xl">{Number(summary?.totalQuantityConsumed ?? 0).toLocaleString()}</CardTitle>
-                </div>
-                <TrendingDown className="h-8 w-8 text-red-500" />
-              </CardHeader>
-            </Card>
-            <Card data-testid="card-events">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <div>
-                  <CardDescription>Consumption Events</CardDescription>
-                  <CardTitle className="text-2xl">{summary?.totalConsumptionEvents ?? 0}</CardTitle>
-                </div>
-                <Activity className="h-8 w-8 text-purple-500" />
-              </CardHeader>
-            </Card>
-            <Card data-testid="card-data-period">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <div>
-                  <CardDescription>Data Period</CardDescription>
-                  <CardTitle className="text-2xl">{summary?.dataQuality?.daysOfData ?? 0} <span className="text-sm font-normal text-gray-500">days</span></CardTitle>
-                </div>
-                <Calendar className="h-8 w-8 text-green-500" />
-              </CardHeader>
-            </Card>
-          </div>
+          {!embedded && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card data-testid="card-items-consumed">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <div>
+                    <CardDescription>Items Consumed</CardDescription>
+                    <CardTitle className="text-2xl">{summary?.totalItemsConsumed ?? 0} <span className="text-sm font-normal text-gray-500">/ {summary?.totalInventoryItems ?? 0}</span></CardTitle>
+                  </div>
+                  <Package className="h-8 w-8 text-blue-500" />
+                </CardHeader>
+              </Card>
+              <Card data-testid="card-total-qty">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <div>
+                    <CardDescription>Total Qty Consumed</CardDescription>
+                    <CardTitle className="text-2xl">{Number(summary?.totalQuantityConsumed ?? 0).toLocaleString()}</CardTitle>
+                  </div>
+                  <TrendingDown className="h-8 w-8 text-red-500" />
+                </CardHeader>
+              </Card>
+              <Card data-testid="card-events">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <div>
+                    <CardDescription>Consumption Events</CardDescription>
+                    <CardTitle className="text-2xl">{summary?.totalConsumptionEvents ?? 0}</CardTitle>
+                  </div>
+                  <Activity className="h-8 w-8 text-purple-500" />
+                </CardHeader>
+              </Card>
+              <Card data-testid="card-data-period">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <div>
+                    <CardDescription>Data Period</CardDescription>
+                    <CardTitle className="text-2xl">{summary?.dataQuality?.daysOfData ?? 0} <span className="text-sm font-normal text-gray-500">days</span></CardTitle>
+                  </div>
+                  <Calendar className="h-8 w-8 text-green-500" />
+                </CardHeader>
+              </Card>
+            </div>
+          )}
 
           <div className="border-b border-gray-200">
             <div className="flex gap-0 overflow-x-auto">
