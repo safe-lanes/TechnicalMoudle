@@ -186,45 +186,6 @@ class PDFReportGenerator {
     this.doc.text(`Generated: ${format(new Date(), 'dd MMM yyyy HH:mm')}`, pageWidth - margin, 20, { align: 'right' });
   }
 
-  private addSummarySection(
-    summaryData: { label: string; value: string | number }[],
-    startY: number,
-    margin: number
-  ): number {
-    if (!this.doc) return startY;
-
-    this.doc.setTextColor(...PDF_COLORS.textDark);
-    this.doc.setFontSize(12);
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.text('Summary', margin, startY);
-
-    startY += 8;
-    const boxWidth = 50;
-    const boxHeight = 20;
-    const gap = 5;
-    
-    summaryData.forEach((item, index) => {
-      const x = margin + (index % 5) * (boxWidth + gap);
-      const y = startY + Math.floor(index / 5) * (boxHeight + gap);
-
-      this.doc!.setFillColor(...PDF_COLORS.bgLight);
-      this.doc!.roundedRect(x, y, boxWidth, boxHeight, 2, 2, 'F');
-
-      this.doc!.setFontSize(8);
-      this.doc!.setFont('helvetica', 'normal');
-      this.doc!.setTextColor(...PDF_COLORS.textLight);
-      this.doc!.text(item.label, x + 5, y + 7);
-
-      this.doc!.setFontSize(14);
-      this.doc!.setFont('helvetica', 'bold');
-      this.doc!.setTextColor(...PDF_COLORS.textDark);
-      this.doc!.text(String(item.value), x + 5, y + 15);
-    });
-
-    const rows = Math.ceil(summaryData.length / 5);
-    return startY + rows * (boxHeight + gap) + 10;
-  }
-
   private addDataTable(
     columns: TableColumn[],
     data: any[],
