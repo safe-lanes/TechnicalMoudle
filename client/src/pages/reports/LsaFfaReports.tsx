@@ -436,174 +436,178 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
         </div>
       )}
 
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mt-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500 dark:text-muted-foreground">Equipment Type:</span>
-            <Select value={equipmentTypeFilter} onValueChange={setEquipmentTypeFilter}>
-              <SelectTrigger className="w-[150px]" data-testid="select-equipment-type-filter">
-                <SelectValue placeholder="All" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="LSA">LSA</SelectItem>
-                <SelectItem value="FFA">FFA</SelectItem>
-              </SelectContent>
-            </Select>
+      {!embedded && (
+        <>
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mt-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500 dark:text-muted-foreground">Equipment Type:</span>
+                <Select value={equipmentTypeFilter} onValueChange={setEquipmentTypeFilter}>
+                  <SelectTrigger className="w-[150px]" data-testid="select-equipment-type-filter">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="LSA">LSA</SelectItem>
+                    <SelectItem value="FFA">FFA</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500 dark:text-muted-foreground">Status:</span>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[170px]" data-testid="select-status-filter">
+                    <SelectValue placeholder="All Statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="overdue">Overdue</SelectItem>
+                    <SelectItem value="due-soon">Due Soon</SelectItem>
+                    <SelectItem value="on-schedule">On Schedule</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500 dark:text-muted-foreground">Status:</span>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[170px]" data-testid="select-status-filter">
-                <SelectValue placeholder="All Statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-                <SelectItem value="due-soon">Due Soon</SelectItem>
-                <SelectItem value="on-schedule">On Schedule</SelectItem>
-              </SelectContent>
-            </Select>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-1">
+                  <Layers className="w-4 h-4 text-blue-500" />
+                  Total Items
+                </CardDescription>
+                <CardTitle className="text-3xl text-blue-600" data-testid="text-total-items">
+                  {anyLoading ? '...' : (scheduleSummary.total ?? masterSummary.total ?? 0)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4 text-red-500" />
+                  Overdue
+                </CardDescription>
+                <CardTitle className="text-3xl text-red-600" data-testid="text-overdue-count">
+                  {anyLoading ? '...' : (scheduleSummary.overdue ?? 0)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-1">
+                  <Clock className="w-4 h-4 text-amber-500" />
+                  Due Soon
+                </CardDescription>
+                <CardTitle className="text-3xl text-amber-600" data-testid="text-due-soon-count">
+                  {anyLoading ? '...' : (scheduleSummary.dueSoon ?? 0)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-1">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  On Schedule
+                </CardDescription>
+                <CardTitle className="text-3xl text-green-600" data-testid="text-on-schedule-count">
+                  {anyLoading ? '...' : (scheduleSummary.onSchedule ?? 0)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
           </div>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <Layers className="w-4 h-4 text-blue-500" />
-              Total Items
-            </CardDescription>
-            <CardTitle className="text-3xl text-blue-600" data-testid="text-total-items">
-              {anyLoading ? '...' : (scheduleSummary.total ?? masterSummary.total ?? 0)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <AlertTriangle className="w-4 h-4 text-red-500" />
-              Overdue
-            </CardDescription>
-            <CardTitle className="text-3xl text-red-600" data-testid="text-overdue-count">
-              {anyLoading ? '...' : (scheduleSummary.overdue ?? 0)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <Clock className="w-4 h-4 text-amber-500" />
-              Due Soon
-            </CardDescription>
-            <CardTitle className="text-3xl text-amber-600" data-testid="text-due-soon-count">
-              {anyLoading ? '...' : (scheduleSummary.dueSoon ?? 0)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <CheckCircle className="w-4 h-4 text-green-500" />
-              On Schedule
-            </CardDescription>
-            <CardTitle className="text-3xl text-green-600" data-testid="text-on-schedule-count">
-              {anyLoading ? '...' : (scheduleSummary.onSchedule ?? 0)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
+          {!masterListData && !scheduleData && !anyLoading && (
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg" data-testid="text-error-message">
+              <p className="text-red-700 dark:text-red-300 text-sm">Failed to load report data. Please try again.</p>
+            </div>
+          )}
 
-      {!masterListData && !scheduleData && !anyLoading && (
-        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg" data-testid="text-error-message">
-          <p className="text-red-700 dark:text-red-300 text-sm">Failed to load report data. Please try again.</p>
-        </div>
-      )}
+          <div className="rounded-lg border border-gray-200 dark:border-border overflow-hidden bg-white dark:bg-card">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-muted/50 border-b border-gray-200 dark:border-border">
+                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Report Name</th>
+                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Frequency</th>
+                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Priority</th>
+                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Est. Time</th>
+                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-border">
+                {filteredReports.map((report) => (
+                  <tr
+                    key={report.id}
+                    className="hover-elevate cursor-pointer"
+                    data-testid={`lsa-ffa-report-row-${report.id}`}
+                  >
+                    <td className="py-3 px-4">
+                      <div>
+                        <div className="font-medium text-gray-900 dark:text-foreground">{report.name}</div>
+                        <div className="text-sm text-gray-500 dark:text-muted-foreground">{report.description}</div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge variant="outline">{report.frequency}</Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge className={getPriorityColor(report.priority)}>
+                        {report.priority.toUpperCase()}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="text-xs text-gray-500 dark:text-muted-foreground">{report.estimatedTime}</span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Preview"
+                          onClick={() => handlePreviewReport(report.id)}
+                          disabled={anyLoading}
+                          data-testid={`button-preview-${report.id}`}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Download PDF"
+                          onClick={() => handleGenerateReport(report.id, 'PDF')}
+                          disabled={generatingReports.has(`${report.id}-PDF`) || anyLoading}
+                          data-testid={`button-pdf-${report.id}`}
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        {report.outputs.includes('Excel') && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            title="Download Excel"
+                            onClick={() => handleGenerateReport(report.id, 'Excel')}
+                            disabled={generatingReports.has(`${report.id}-Excel`) || anyLoading}
+                            data-testid={`button-excel-${report.id}`}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-      <div className="rounded-lg border border-gray-200 dark:border-border overflow-hidden bg-white dark:bg-card">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-50 dark:bg-muted/50 border-b border-gray-200 dark:border-border">
-              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Report Name</th>
-              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Frequency</th>
-              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Priority</th>
-              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Est. Time</th>
-              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-border">
-            {filteredReports.map((report) => (
-              <tr
-                key={report.id}
-                className="hover-elevate cursor-pointer"
-                data-testid={`lsa-ffa-report-row-${report.id}`}
-              >
-                <td className="py-3 px-4">
-                  <div>
-                    <div className="font-medium text-gray-900 dark:text-foreground">{report.name}</div>
-                    <div className="text-sm text-gray-500 dark:text-muted-foreground">{report.description}</div>
-                  </div>
-                </td>
-                <td className="py-3 px-4">
-                  <Badge variant="outline">{report.frequency}</Badge>
-                </td>
-                <td className="py-3 px-4">
-                  <Badge className={getPriorityColor(report.priority)}>
-                    {report.priority.toUpperCase()}
-                  </Badge>
-                </td>
-                <td className="py-3 px-4">
-                  <span className="text-xs text-gray-500 dark:text-muted-foreground">{report.estimatedTime}</span>
-                </td>
-                <td className="py-3 px-4">
-                  <div className="flex items-center gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      title="Preview"
-                      onClick={() => handlePreviewReport(report.id)}
-                      disabled={anyLoading}
-                      data-testid={`button-preview-${report.id}`}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      title="Download PDF"
-                      onClick={() => handleGenerateReport(report.id, 'PDF')}
-                      disabled={generatingReports.has(`${report.id}-PDF`) || anyLoading}
-                      data-testid={`button-pdf-${report.id}`}
-                    >
-                      <FileText className="h-4 w-4" />
-                    </Button>
-                    {report.outputs.includes('Excel') && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        title="Download Excel"
-                        onClick={() => handleGenerateReport(report.id, 'Excel')}
-                        disabled={generatingReports.has(`${report.id}-Excel`) || anyLoading}
-                        data-testid={`button-excel-${report.id}`}
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {filteredReports.length === 0 && (
-        <div className="text-center py-12">
-          <LifeBuoy className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-700 dark:text-foreground mb-2">No reports found</h3>
-          <p className="text-gray-500 dark:text-muted-foreground">Try adjusting your search criteria</p>
-        </div>
+          {filteredReports.length === 0 && (
+            <div className="text-center py-12">
+              <LifeBuoy className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-700 dark:text-foreground mb-2">No reports found</h3>
+              <p className="text-gray-500 dark:text-muted-foreground">Try adjusting your search criteria</p>
+            </div>
+          )}
+        </>
       )}
 
       {embedded && previewData && (

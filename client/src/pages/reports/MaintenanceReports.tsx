@@ -1475,137 +1475,141 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card className="border-l-4 border-l-blue-500 bg-white">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <FileText className="w-4 h-4 text-blue-500" />
-              Total Reports
-            </CardDescription>
-            <CardTitle className="text-3xl" data-testid="text-maintenance-total-reports">10</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="border-l-4 border-l-red-500 bg-white">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <AlertTriangle className="w-4 h-4 text-red-500" />
-              High Priority
-            </CardDescription>
-            <CardTitle className="text-3xl text-red-600" data-testid="text-maintenance-high-priority">{highPriorityCount}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="border-l-4 border-l-green-500 bg-white">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <Calendar className="w-4 h-4 text-green-500" />
-              Daily Reports
-            </CardDescription>
-            <CardTitle className="text-3xl text-green-600" data-testid="text-maintenance-daily-reports">{dailyReportsCount}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="border-l-4 border-l-purple-500 bg-white">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <TrendingUp className="w-4 h-4 text-purple-500" />
-              {isDateRangeActive ? "Work Orders (Filtered)" : "Work Orders"}
-            </CardDescription>
-            <CardTitle className="text-3xl text-purple-600" data-testid="text-maintenance-work-orders">{filteredWorkOrders.length}</CardTitle>
-            {isDateRangeActive && (
-              <p className="text-xs text-blue-600 mt-1">Filtered by date range</p>
-            )}
-          </CardHeader>
-        </Card>
-      </div>
+      {!embedded && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <Card className="border-l-4 border-l-blue-500 bg-white">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-1">
+                  <FileText className="w-4 h-4 text-blue-500" />
+                  Total Reports
+                </CardDescription>
+                <CardTitle className="text-3xl" data-testid="text-maintenance-total-reports">10</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="border-l-4 border-l-red-500 bg-white">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4 text-red-500" />
+                  High Priority
+                </CardDescription>
+                <CardTitle className="text-3xl text-red-600" data-testid="text-maintenance-high-priority">{highPriorityCount}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="border-l-4 border-l-green-500 bg-white">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-1">
+                  <Calendar className="w-4 h-4 text-green-500" />
+                  Daily Reports
+                </CardDescription>
+                <CardTitle className="text-3xl text-green-600" data-testid="text-maintenance-daily-reports">{dailyReportsCount}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="border-l-4 border-l-purple-500 bg-white">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-1">
+                  <TrendingUp className="w-4 h-4 text-purple-500" />
+                  {isDateRangeActive ? "Work Orders (Filtered)" : "Work Orders"}
+                </CardDescription>
+                <CardTitle className="text-3xl text-purple-600" data-testid="text-maintenance-work-orders">{filteredWorkOrders.length}</CardTitle>
+                {isDateRangeActive && (
+                  <p className="text-xs text-blue-600 mt-1">Filtered by date range</p>
+                )}
+              </CardHeader>
+            </Card>
+          </div>
 
-      <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Report Name</th>
-              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Frequency</th>
-              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Priority</th>
-              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Est. Time</th>
-              <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredReports.map((report) => (
-              <tr 
-                key={report.id} 
-                className="hover:bg-gray-50 cursor-pointer"
-                data-testid={`maintenance-report-row-${report.id}`}
-              >
-                <td className="py-3 px-4">
-                  <div>
-                    <div className="font-medium text-gray-900">{report.name}</div>
-                    <div className="text-sm text-gray-500">{report.description}</div>
-                  </div>
-                </td>
-                <td className="py-3 px-4">
-                  <Badge variant="outline">{report.frequency}</Badge>
-                </td>
-                <td className="py-3 px-4">
-                  <Badge className={getPriorityColor(report.priority)}>
-                    {report.priority.toUpperCase()}
-                  </Badge>
-                </td>
-                <td className="py-3 px-4">
-                  <span className="text-xs text-gray-500">{report.estimatedTime}</span>
-                </td>
-                <td className="py-3 px-4">
-                  <div className="flex items-center gap-1">
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      title="Preview"
-                      onClick={() => handlePreviewReport(report.id)}
-                      disabled={generatingReports.has(`${report.id}-PDF`)}
-                      data-testid={`button-preview-${report.id}`}
-                    >
-                      {generatingReports.has(`${report.id}-PDF`) ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                    {report.outputs.includes('PDF') && (
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        title="Download PDF"
-                        onClick={() => handleGenerateReport(report.id, 'PDF')}
-                        disabled={generatingReports.has(`${report.id}-PDF`)}
-                        data-testid={`button-pdf-${report.id}`}
-                      >
-                        <FileText className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {report.outputs.includes('Excel') && (
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        title="Download Excel"
-                        onClick={() => handleGenerateReport(report.id, 'Excel')}
-                        disabled={generatingReports.has(`${report.id}-Excel`)}
-                        data-testid={`button-excel-${report.id}`}
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Report Name</th>
+                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Frequency</th>
+                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Priority</th>
+                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Est. Time</th>
+                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredReports.map((report) => (
+                  <tr 
+                    key={report.id} 
+                    className="hover:bg-gray-50 cursor-pointer"
+                    data-testid={`maintenance-report-row-${report.id}`}
+                  >
+                    <td className="py-3 px-4">
+                      <div>
+                        <div className="font-medium text-gray-900">{report.name}</div>
+                        <div className="text-sm text-gray-500">{report.description}</div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge variant="outline">{report.frequency}</Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge className={getPriorityColor(report.priority)}>
+                        {report.priority.toUpperCase()}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="text-xs text-gray-500">{report.estimatedTime}</span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-1">
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          title="Preview"
+                          onClick={() => handlePreviewReport(report.id)}
+                          disabled={generatingReports.has(`${report.id}-PDF`)}
+                          data-testid={`button-preview-${report.id}`}
+                        >
+                          {generatingReports.has(`${report.id}-PDF`) ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                        {report.outputs.includes('PDF') && (
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            title="Download PDF"
+                            onClick={() => handleGenerateReport(report.id, 'PDF')}
+                            disabled={generatingReports.has(`${report.id}-PDF`)}
+                            data-testid={`button-pdf-${report.id}`}
+                          >
+                            <FileText className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {report.outputs.includes('Excel') && (
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            title="Download Excel"
+                            onClick={() => handleGenerateReport(report.id, 'Excel')}
+                            disabled={generatingReports.has(`${report.id}-Excel`)}
+                            data-testid={`button-excel-${report.id}`}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-      {filteredReports.length === 0 && (
-        <div className="text-center py-12">
-          <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">No reports found</h3>
-          <p className="text-gray-500">Try adjusting your search criteria or filters</p>
-        </div>
+          {filteredReports.length === 0 && (
+            <div className="text-center py-12">
+              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">No reports found</h3>
+              <p className="text-gray-500">Try adjusting your search criteria or filters</p>
+            </div>
+          )}
+        </>
       )}
       {embedded && previewData && (
         <InlineReportPreview reportData={previewData} />
