@@ -9,7 +9,14 @@ function resolveUserId(req: Request): string {
   const user = (req as any).user;
   const bodyUserId = (req.body?.userId as string) || '';
   if (!bodyUserId || PLACEHOLDER_USER_IDS.includes(bodyUserId)) {
-    return user?.fullName || user?.username || bodyUserId || 'system';
+    const name = user?.fullName
+      || [user?.firstname, user?.lastname].filter(Boolean).join(' ')
+      || [user?.first_name, user?.last_name].filter(Boolean).join(' ')
+      || [user?.firstName, user?.lastName].filter(Boolean).join(' ')
+      || user?.username
+      || bodyUserId
+      || 'system';
+    return name;
   }
   return bodyUserId;
 }

@@ -18,6 +18,7 @@ const updateMasterRHSchema = z.object({
   newRHValue: z.number().nonnegative("Running hours must be non-negative"),
   updateSource: z.enum(['MANUAL', 'IMPORT', 'AUTOMATION']).optional().default('MANUAL'),
   userId: z.string().optional().default('system'),
+  userUuid: z.string().optional(),
   userRole: z.string().optional().default('Ship'),
   adminOverride: z.boolean().optional().default(false),
   comments: z.string().optional(),
