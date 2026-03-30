@@ -1096,35 +1096,8 @@ export async function exportSparesConsumptionExcel(
 
   const datePeriod = `${earliestDate.toISOString().slice(0, 10)} to ${latestDate.toISOString().slice(0, 10)}`;
 
-  // Summary sheet
-  const summarySheet = workbook.addWorksheet('Summary');
   const uniqueItems = new Set(consumeEvents.map((h: any) => h.spareId)).size;
   const totalQty = consumeEvents.reduce((sum: number, h: any) => sum + Math.abs(h.qtyChange || 0), 0);
-  const summaryLastCol = getLastColumnLetter(4);
-  applyStandardHeader(summarySheet, 'SPARES CONSUMPTION PATTERN ANALYSIS - SUMMARY', `Data Period: ${datePeriod} (${daysOfData} days)`, vesselName, uniqueItems, summaryLastCol, datePeriod);
-
-  const summaryData = [
-    ['Metric', 'Value'],
-    ['Data Period', datePeriod],
-    ['Days of Data', daysOfData],
-    ['Unique Spares Consumed', uniqueItems],
-    ['Total Quantity Consumed', Math.round(totalQty * 100) / 100],
-    ['Total Consumption Events', consumeEvents.length],
-    ['Total Inventory Spares', allItems.filter((i: any) => !i.deleted && i.isActive !== false).length],
-    ['Confidence Level', daysOfData > 90 ? 'High' : daysOfData >= 30 ? 'Medium' : 'Low'],
-  ];
-  summaryData.forEach((row, idx) => {
-    const r = summarySheet.addRow(row);
-    r.height = 22;
-    r.eachCell((cell) => {
-      cell.font = { name: 'Calibri', size: idx === 0 ? 11 : 10, bold: idx === 0, color: { argb: COLORS.textDark } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: idx === 0 ? COLORS.primary : idx % 2 === 0 ? COLORS.bgWhite : COLORS.bgLight } };
-      if (idx === 0) cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.border = { bottom: { style: 'thin', color: { argb: COLORS.border } }, right: { style: 'thin', color: { argb: COLORS.border } } };
-    });
-  });
-  summarySheet.getColumn(1).width = 30;
-  summarySheet.getColumn(2).width = 30;
 
   // Monthly Trends sheet
   const trendsSheet = workbook.addWorksheet('Monthly Trends');

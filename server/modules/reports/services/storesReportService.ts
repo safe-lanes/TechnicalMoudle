@@ -662,37 +662,10 @@ export async function exportStoresConsumptionExcel(
 
   const datePeriod = `${earliestDate.toISOString().slice(0, 10)} to ${latestDate.toISOString().slice(0, 10)}`;
 
-  // Sheet 1: Summary
-  const summarySheet = workbook.addWorksheet('Summary');
   const uniqueItems = new Set(consumeEvents.map((h: any) => h.itemId)).size;
   const totalQty = consumeEvents.reduce((sum: number, h: any) => sum + Math.abs(parseFloat(String(h.qtyChangeBase)) || 0), 0);
-  const summaryLastCol = getLastColumnLetter(4);
-  applyStandardHeader(summarySheet, 'STORES CONSUMPTION PATTERN ANALYSIS - SUMMARY', `Data Period: ${datePeriod} (${daysOfData} days)`, vesselName, uniqueItems, summaryLastCol, datePeriod);
 
-  const summaryData = [
-    ['Metric', 'Value'],
-    ['Data Period', datePeriod],
-    ['Days of Data', daysOfData],
-    ['Unique Items Consumed', uniqueItems],
-    ['Total Quantity Consumed', Math.round(totalQty * 100) / 100],
-    ['Total Consumption Events', consumeEvents.length],
-    ['Total Inventory Items', allItems.filter((i: any) => !i.deleted && i.isActive !== false).length],
-    ['Confidence Level', daysOfData > 90 ? 'High' : daysOfData >= 30 ? 'Medium' : 'Low'],
-  ];
-  summaryData.forEach((row, idx) => {
-    const r = summarySheet.addRow(row);
-    r.height = 22;
-    r.eachCell((cell) => {
-      cell.font = { name: 'Calibri', size: idx === 0 ? 11 : 10, bold: idx === 0, color: { argb: COLORS.textDark } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: idx === 0 ? COLORS.primary : idx % 2 === 0 ? COLORS.bgWhite : COLORS.bgLight } };
-      if (idx === 0) cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.border = { bottom: { style: 'thin', color: { argb: COLORS.border } }, right: { style: 'thin', color: { argb: COLORS.border } } };
-    });
-  });
-  summarySheet.getColumn(1).width = 30;
-  summarySheet.getColumn(2).width = 30;
-
-  // Sheet 2: Monthly Trends
+  // Sheet 1: Monthly Trends
   const trendsSheet = workbook.addWorksheet('Monthly Trends');
   const monthlyMap: Record<string, { totalQty: number; eventCount: number; stores: number; lubricants: number; chemicals: number; others: number }> = {};
   for (const h of consumeEvents) {
@@ -1446,25 +1419,6 @@ export async function exportStoresLowStockAlertExcel(vesselId: string): Promise<
     row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
     row.alignment = { vertical: 'middle' };
   });
-
-  const summarySheet = workbook.addWorksheet('Summary');
-  summarySheet.addRow(['Low Stock Alert Report Summary']);
-  summarySheet.getRow(1).font = { bold: true, size: 14 };
-  summarySheet.addRow([]);
-  summarySheet.addRow(['Metric', 'Count']);
-  summarySheet.getRow(3).font = { bold: true };
-  summarySheet.addRow(['Total Low Stock Items', lowStockItems.length]);
-  summarySheet.addRow(['Critical (Out of Stock)', lowStockItems.filter((i: any) => i.priority === 'Critical').length]);
-  summarySheet.addRow(['High Priority', lowStockItems.filter((i: any) => i.priority === 'High').length]);
-  summarySheet.addRow(['Medium Priority', lowStockItems.filter((i: any) => i.priority === 'Medium').length]);
-  summarySheet.addRow([]);
-  summarySheet.addRow(['By Type', 'Count']);
-  summarySheet.getRow(9).font = { bold: true };
-  summarySheet.addRow(['Stores', lowStockItems.filter((i: any) => i.itemType === 'stores').length]);
-  summarySheet.addRow(['Lubricants', lowStockItems.filter((i: any) => i.itemType === 'lubes' || i.itemType === 'lubricants').length]);
-  summarySheet.addRow(['Chemicals', lowStockItems.filter((i: any) => i.itemType === 'chemicals').length]);
-  summarySheet.getColumn(1).width = 30;
-  summarySheet.getColumn(2).width = 12;
 
   const buffer = await workbook.xlsx.writeBuffer();
   const filename = 'low-stock-alert-report.xlsx';

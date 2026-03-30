@@ -545,9 +545,6 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
   });
 
   let totalManHours = 0;
-  const deptStats: Record<string, { count: number; manHours: number }> = {};
-  const priorityStats: Record<string, number> = {};
-  const jobTypeStats: Record<string, number> = {};
 
   const completedJobs = filteredJobs.map((wo, index) => {
     const job = jobsMap.get(wo.jobId || '');
@@ -558,16 +555,6 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
     const persons = parseInt(wo.noOfPersons || '1') || 1;
     const manHours = parseFloat(wo.manhours || '0') || (duration * persons);
     totalManHours += manHours;
-
-    const dept = wo.department || 'Unassigned';
-    const priority = wo.jobPriority || 'Normal';
-    const jobType = wo.taskType || wo.maintenanceType || 'Other';
-
-    if (!deptStats[dept]) deptStats[dept] = { count: 0, manHours: 0 };
-    deptStats[dept].count++;
-    deptStats[dept].manHours += manHours;
-    priorityStats[priority] = (priorityStats[priority] || 0) + 1;
-    jobTypeStats[jobType] = (jobTypeStats[jobType] || 0) + 1;
 
     return {
       sNo: index + 1,
@@ -719,51 +706,6 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
     });
     row.height = 18;
   });
-
-  // Summary section
-  const summaryStartRow = dataStartRow + completedJobs.length + 2;
-
-  worksheet.mergeCells(`A${summaryStartRow}:${lastColLetter}${summaryStartRow}`);
-  const summaryTitle = worksheet.getCell(`A${summaryStartRow}`);
-  summaryTitle.value = 'SUMMARY STATISTICS';
-  summaryTitle.font = { bold: true, size: 12, color: { argb: 'FF1E5A8E' } };
-
-  let currentRow = summaryStartRow + 2;
-  worksheet.getCell(`A${currentRow}`).value = 'Jobs by Department:';
-  worksheet.getCell(`A${currentRow}`).font = { bold: true };
-  currentRow++;
-  Object.entries(deptStats).forEach(([dept, stats]) => {
-    worksheet.getCell(`A${currentRow}`).value = `  ${dept}:`;
-    worksheet.getCell(`B${currentRow}`).value = stats.count;
-    worksheet.getCell(`C${currentRow}`).value = `(${stats.manHours.toFixed(1)} man-hrs)`;
-    currentRow++;
-  });
-
-  currentRow++;
-  worksheet.getCell(`A${currentRow}`).value = 'Jobs by Priority:';
-  worksheet.getCell(`A${currentRow}`).font = { bold: true };
-  currentRow++;
-  Object.entries(priorityStats).forEach(([priority, count]) => {
-    worksheet.getCell(`A${currentRow}`).value = `  ${priority}:`;
-    worksheet.getCell(`B${currentRow}`).value = count;
-    currentRow++;
-  });
-
-  currentRow++;
-  worksheet.getCell(`A${currentRow}`).value = 'Jobs by Type:';
-  worksheet.getCell(`A${currentRow}`).font = { bold: true };
-  currentRow++;
-  Object.entries(jobTypeStats).forEach(([jobType, count]) => {
-    worksheet.getCell(`A${currentRow}`).value = `  ${jobType}:`;
-    worksheet.getCell(`B${currentRow}`).value = count;
-    currentRow++;
-  });
-
-  currentRow++;
-  worksheet.getCell(`A${currentRow}`).value = 'Total Man-Hours:';
-  worksheet.getCell(`A${currentRow}`).font = { bold: true };
-  worksheet.getCell(`B${currentRow}`).value = totalManHours.toFixed(1);
-  worksheet.getCell(`B${currentRow}`).font = { bold: true };
 
   worksheet.autoFilter = { from: { row: headerRowNum, column: 1 }, to: { row: headerRowNum, column: totalColumns } };
 
