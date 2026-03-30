@@ -1275,70 +1275,6 @@ const Dashboard = () => {
                     )}
                   </div>
 
-                  <div style={dividerH} className="mt-4" />
-
-                  <div className="mt-4" data-testid="card-overdue-table">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <div style={subTitle}>OVERDUE WORK ORDERS</div>
-                      {workOrderKPIs.overdue > 0 && (
-                        <button
-                          onClick={() => navigateToWorkOrders('Overdue')}
-                          style={{ fontSize: '11px', color: '#1565C0', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
-                          data-testid="button-view-all-overdue"
-                        >
-                          View All ({workOrderKPIs.overdue})
-                        </button>
-                      )}
-                    </div>
-                    {workOrderKPIs.overdue > 0 && (
-                      <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '6px' }}>
-                        Showing top {workOrderKPIs.overdueList.length} of {workOrderKPIs.overdue} total
-                      </div>
-                    )}
-                    <div style={{ overflow: 'hidden', border: '1px solid #f1f5f9', borderRadius: '8px' }}>
-                      {workOrderKPIs.overdueList.length > 0 ? (
-                        <div style={{ overflowX: 'auto', width: '100%' }}>
-                        <table style={{ minWidth: '400px', width: '100%' }} className="text-sm" data-testid="table-overdue-wo">
-                          <thead>
-                            <tr>
-                              <th className="text-left" style={{ ...tableHeaderStyle, minWidth: '140px' }}>Work Order</th>
-                              <th className="text-left" style={{ ...tableHeaderStyle, minWidth: '160px' }}>Equipment</th>
-                              <th className="text-left" style={{ ...tableHeaderStyle, minWidth: '80px' }}>Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {workOrderKPIs.overdueList.map((wo: any, idx: number) => (
-                              <tr
-                                key={wo.id}
-                                className="cursor-pointer"
-                                style={{ background: idx % 2 === 0 ? '#FFFFFF' : '#fafafa', borderBottom: '1px solid #f1f5f9' }}
-                                onMouseEnter={e => (e.currentTarget.style.background = '#E3F2FD')}
-                                onMouseLeave={e => (e.currentTarget.style.background = idx % 2 === 0 ? '#FFFFFF' : '#fafafa')}
-                                onClick={() => navigateToWorkOrder(wo.id)}
-                                data-testid={`row-overdue-wo-${wo.id}`}
-                              >
-                                <td style={{ fontSize: '12px', color: '#374151', fontWeight: 500, padding: '9px 12px', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {wo.workOrderNumber || `WO-${wo.id}`}
-                                </td>
-                                <td style={{ fontSize: '12px', color: '#374151', padding: '9px 12px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {wo.taskDescription || wo.jobTitle || 'No description'}
-                                </td>
-                                <td style={{ padding: '9px 12px' }}>
-                                  <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 500, color: '#dc2626', backgroundColor: '#fee2e2', whiteSpace: 'nowrap' }}>Overdue</span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        </div>
-                      ) : (
-                        <div className="text-center py-6" style={{ color: '#9E9E9E' }}>
-                          <CheckCircle className="w-8 h-8 mx-auto mb-2" style={{ color: '#2E7D32' }} />
-                          <p style={{ fontSize: '12px' }}>No overdue work orders</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -1369,86 +1305,41 @@ const Dashboard = () => {
                       </div>
                     ))}
                   </div>
-                </div>
-              </div>
-            </div>
 
-            {/* ROW 2: Two cards — Spares Stock Status (Graph) + Vessel / Group Analysis */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div style={dividerH} />
 
-              {/* Card: Spares Stock Status */}
-              <div className={cardStyle} data-testid="card-spares-status-chart">
-                <div className="p-4">
-                  <div style={sectionHeaderBar} className="!pt-0">SPARES STOCK STATUS</div>
-                  <div style={{ height: '250px' }}>
-                    {sparesStockChartData.length > 0 ? (
-                      <AgCharts options={{
-                        data: sparesStockChartData,
-                        series: [{
-                          type: 'donut',
-                          angleKey: 'count',
-                          calloutLabelKey: 'status',
-                          sectorLabelKey: 'count',
-                          innerRadiusRatio: 0.82,
-                          fills: sparesStockChartData.map(d => d.color),
-                          strokes: sparesStockChartData.map(d => d.color),
-                          listeners: {
-                            nodeClick: (event: any) => {
-                              navigateToSpares(event.datum.status);
+                  <div className="mt-4" data-testid="card-spares-status-chart">
+                    <div style={subTitle} className="mb-1">SPARES STOCK STATUS</div>
+                    <div style={{ height: '250px' }}>
+                      {sparesStockChartData.length > 0 ? (
+                        <AgCharts options={{
+                          data: sparesStockChartData,
+                          series: [{
+                            type: 'donut',
+                            angleKey: 'count',
+                            calloutLabelKey: 'status',
+                            sectorLabelKey: 'count',
+                            innerRadiusRatio: 0.82,
+                            fills: sparesStockChartData.map(d => d.color),
+                            strokes: sparesStockChartData.map(d => d.color),
+                            listeners: {
+                              nodeClick: (event: any) => {
+                                navigateToSpares(event.datum.status);
+                              }
                             }
-                          }
-                        } as any],
-                        legend: { enabled: true, position: 'bottom' }
-                      } as AgChartOptions} />
-                    ) : (
-                      <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '12px' }}>No spares data</div>
-                    )}
+                          } as any],
+                          legend: { enabled: true, position: 'bottom' }
+                        } as AgChartOptions} />
+                      ) : (
+                        <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '12px' }}>No spares data</div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-
-              {/* Card: Vessel / Group Analysis */}
-              <div className={cardStyle} data-testid="card-dot-matrix">
-                <div className="p-4">
-                  <div style={sectionHeaderBar} className="!pt-0">VESSEL / GROUP ANALYSIS</div>
-                  {dotMatrixVesselData.length > 0 ? (
-                    <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin' as any }}>
-                      <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse', minWidth: '400px' }}>
-                        <thead>
-                          <tr>
-                            <th style={{ textAlign: 'left', padding: '6px 8px', color: '#6b7280', fontWeight: 500, fontSize: '11px', minWidth: '110px' }}>Metric</th>
-                            {dotMatrixVesselData.map(v => (
-                              <th key={v.id} style={{ textAlign: 'center', padding: '6px 4px', color: '#6b7280', fontWeight: 500, fontSize: '11px', minWidth: '55px', maxWidth: '70px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {v.name.length > 8 ? v.name.substring(0, 7) + '..' : v.name}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {['Work Orders', 'Overdue WOs', 'Low Stock', 'Spares', 'Running Hrs'].map(metric => (
-                            <tr key={metric}>
-                              <td style={{ padding: '8px 10px', color: '#374151', fontWeight: 500, whiteSpace: 'nowrap', fontSize: '12px', borderBottom: '1px solid #f1f5f9' }}>{metric}</td>
-                              {dotMatrixVesselData.map((v, vIdx) => {
-                                const dotColor = getDotColor(vIdx, metric);
-                                return (
-                                  <td key={v.id} style={{ textAlign: 'center', padding: '8px 4px', borderBottom: '1px solid #f1f5f9' }}>
-                                    <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', background: dotColor }} title={`${v.name} - ${metric}`} />
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="text-center py-4" style={{ color: '#9E9E9E', fontSize: '12px' }}>No vessel data available for analysis</div>
-                  )}
-                </div>
-              </div>
             </div>
 
-            {/* ROW 3: Compliance Anomaly Detection */}
+            {/* ROW 2: Compliance Anomaly Detection */}
             <ComplianceAnomalyPanel vesselId={vesselId} />
 
             {/* ROW 4: Work Order Anomalies */}
