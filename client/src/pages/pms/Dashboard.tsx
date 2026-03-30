@@ -350,6 +350,7 @@ const Dashboard = () => {
   const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedCriticality, setSelectedCriticality] = useState("");
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isHeadOfDept } = useUIRole();
@@ -510,13 +511,27 @@ const Dashboard = () => {
     return { label: 'OK', isLow: false };
   };
 
-  // Work Order KPIs with computed status
-  // Updated to match new tab semantics:
-  // - Due: items within warning window + Grace P (past due but within tolerance)
-  // - Overdue: only breach items (past tolerance/grace period)
-  // - Planned: includes 'Active' and 'Postponed' items
+  const filteredWorkOrdersData = useMemo(() => {
+    if (!selectedCriticality || selectedCriticality === "all") return workOrdersData;
+    return workOrdersData.filter(wo => {
+      const woCriticality = (wo as any).criticality?.toLowerCase();
+      if (selectedCriticality === "critical") {
+        return woCriticality === "yes";
+      }
+      return woCriticality !== "yes";
+    });
+  }, [workOrdersData, selectedCriticality]);
+
+  const filteredSparesData = useMemo(() => {
+    if (!selectedCriticality || selectedCriticality === "all") return sparesData;
+    if (selectedCriticality === "critical") {
+      return sparesData.filter(spare => spare.critical === 'Critical' || spare.critical === 'Yes');
+    }
+    return sparesData.filter(spare => spare.critical !== 'Critical' && spare.critical !== 'Yes');
+  }, [sparesData, selectedCriticality]);
+
   const workOrderKPIs = useMemo(() => {
-    const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined);
+    const safeWOs = filteredWorkOrdersData.filter(wo => wo !== null && wo !== undefined);
     
     // Due includes warning window items + grace period items
     const due = safeWOs.filter(wo => 
@@ -549,7 +564,7 @@ const Dashboard = () => {
       completed: completed.length,
       active: planned.length  // Keep 'active' property name for backwards compatibility
     };
-  }, [workOrdersData]);
+  }, [filteredWorkOrdersData]);
 
   // Approve single work order mutation (for Head of Dept quick actions)
   const approveMutation = useMutation({
@@ -588,13 +603,12 @@ const Dashboard = () => {
     }
   });
 
-  // Spares KPIs
   const sparesKPIs = useMemo(() => {
-    const lowStockSpares = sparesData.filter(spare => {
+    const lowStockSpares = filteredSparesData.filter(spare => {
       const status = getStockStatus(spare.rob, spare.min);
       return status.isLow;
     });
-    const criticalSpares = sparesData.filter(spare => 
+    const criticalSpares = filteredSparesData.filter(spare => 
       spare.critical === 'Critical' || spare.critical === 'Yes'
     );
     const criticalLowStock = lowStockSpares.filter(spare => 
@@ -602,14 +616,14 @@ const Dashboard = () => {
     );
 
     return {
-      total: sparesData.length,
+      total: filteredSparesData.length,
       lowStock: lowStockSpares.length,
       lowStockList: lowStockSpares.slice(0, 5),
       critical: criticalSpares.length,
       criticalLowStock: criticalLowStock.length,
       criticalLowStockList: criticalLowStock.slice(0, 5)
     };
-  }, [sparesData]);
+  }, [filteredSparesData]);
 
   // Stores KPIs
   const storesKPIs = useMemo(() => {
@@ -651,16 +665,16 @@ const Dashboard = () => {
 
   // Spares Stock Status chart data
   const sparesStockChartData = useMemo(() => {
-    const ok = sparesData.filter(s => getStockStatus(s.rob, s.min).label === 'OK').length;
-    const atMin = sparesData.filter(s => getStockStatus(s.rob, s.min).label === 'At Min').length;
-    const low = sparesData.filter(s => getStockStatus(s.rob, s.min).label === 'Low').length;
+    const ok = filteredSparesData.filter(s => getStockStatus(s.rob, s.min).label === 'OK').length;
+    const atMin = filteredSparesData.filter(s => getStockStatus(s.rob, s.min).label === 'At Min').length;
+    const low = filteredSparesData.filter(s => getStockStatus(s.rob, s.min).label === 'Low').length;
     
     return [
       { status: 'OK', count: ok, color: '#2E7D32' },
       { status: 'At Min', count: atMin, color: '#F57C00' },
       { status: 'Low', count: low, color: '#E53935' }
     ].filter(d => d.count > 0);
-  }, [sparesData]);
+  }, [filteredSparesData]);
 
   // Helper to parse dates in both ISO (YYYY-MM-DD) and legacy (DD-MMM-YYYY) formats
   const parseFlexibleDate = (dateStr: string | null | undefined): Date | null => {
@@ -689,7 +703,7 @@ const Dashboard = () => {
 
   // Outstanding Tasks as Percentage of Monthly Planned Maintenance Tasks
   const outstandingTasksChartData = useMemo(() => {
-    const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined);
+    const safeWOs = filteredWorkOrdersData.filter(wo => wo !== null && wo !== undefined);
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -733,10 +747,10 @@ const Dashboard = () => {
       completedCount,
       outstandingPercent
     };
-  }, [workOrdersData]);
+  }, [filteredWorkOrdersData]);
 
   const maintenanceTrendData = useMemo(() => {
-    const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined);
+    const safeWOs = filteredWorkOrdersData.filter(wo => wo !== null && wo !== undefined);
     const now = new Date();
     const months: { month: string; monthShort: string; completedPercent: number; outstandingPercent: number; overduePercent: number; totalPlanned: number; completed: number; outstanding: number; overdue: number }[] = [];
 
@@ -777,7 +791,7 @@ const Dashboard = () => {
     const delta = currentOutstanding - prevOutstanding;
 
     return { months, delta };
-  }, [workOrdersData]);
+  }, [filteredWorkOrdersData]);
 
   const runningHoursKPIs = useMemo(() => {
     const totalTracked = rhParentsData.length;
@@ -1136,6 +1150,28 @@ const Dashboard = () => {
               </SelectContent>
             </Select>
           </div>
+
+          <Select value={selectedCriticality} onValueChange={setSelectedCriticality}>
+            <SelectTrigger className="w-32" data-testid="select-criticality">
+              <SelectValue placeholder="Criticality" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="critical">Critical</SelectItem>
+              <SelectItem value="non-critical">Non-Critical</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="outline"
+            className="text-gray-600"
+            onClick={() => {
+              setSelectedCriticality("");
+            }}
+            data-testid="button-clear-dashboard-filters"
+          >
+            Clear
+          </Button>
         </div>
         )}
       </div>
