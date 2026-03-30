@@ -1019,7 +1019,7 @@ const RunningHours = () => {
 
         {/* Filters - Single Row - Main Tab */}
         {activeTab === 'main' && (
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap pt-[9px] pb-[9px]">
             {(isSailAdmin || isClientAdmin) && (
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-gray-600">Vessel:</span>
@@ -1145,7 +1145,6 @@ const RunningHours = () => {
           </div>
         )}
       </div>
-
       {/* History Tab - Component List (Step 1) */}
       {activeTab === 'history' && !selectedHistoryComponent && (
         <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-lg border border-gray-200">
@@ -1203,7 +1202,6 @@ const RunningHours = () => {
           </div>
         </div>
       )}
-
       {/* History Tab - Individual Component History (Step 2) */}
       {activeTab === 'history' && selectedHistoryComponent && (
         <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-lg border border-gray-200">
@@ -1333,7 +1331,6 @@ const RunningHours = () => {
           )}
         </div>
       )}
-
       {/* Main Table - Scrollable */}
       {activeTab === 'main' && (<>
       <div className="flex-1 overflow-y-auto bg-white rounded-lg border border-gray-200">
@@ -1504,7 +1501,6 @@ const RunningHours = () => {
           : `Showing ${runningHoursData.length} components`}
       </div>
       </>)}
-
       {/* Update Running Hours Dialog */}
       <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
         <DialogContent className="max-w-md">
@@ -1693,7 +1689,6 @@ const RunningHours = () => {
           </div>
         </DialogContent>
       </Dialog>
-
       {/* Bulk Update Dialog */}
       <Dialog open={isBulkUpdateOpen} onOpenChange={(open) => { if (!open) handleBulkUpdateClose(); }}>
         <DialogContent className="w-[90vw] max-w-none h-[90vh] flex flex-col" onEscapeKeyDown={(e) => { if (showDiscardConfirm) e.preventDefault(); }}>
@@ -1845,7 +1840,6 @@ const RunningHours = () => {
           </div>
         </DialogContent>
       </Dialog>
-
       {/* Unsaved Changes Confirmation Dialog */}
       <Dialog open={showDiscardConfirm} onOpenChange={(open) => { if (!open) handleKeepEditing(); }}>
         <DialogContent className="max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
@@ -1880,7 +1874,6 @@ const RunningHours = () => {
           </div>
         </DialogContent>
       </Dialog>
-
       {/* Child RH Popup - View and edit children's running hours */}
       <Dialog open={isChildRHOpen} onOpenChange={(open) => {
         if (!open) {
@@ -2014,7 +2007,6 @@ const RunningHours = () => {
           </div>
         </DialogContent>
       </Dialog>
-
       {/* Zero RH Renewal Confirmation Dialog */}
       {pendingZeroRHUpdate && (
         <ZeroRHConfirmationDialog
@@ -2027,7 +2019,6 @@ const RunningHours = () => {
           onConfirm={handleZeroRHConfirm}
         />
       )}
-
       {/* Meter Replaced Confirmation Dialog */}
       {selectedComponent && (
         <MeterReplacedConfirmationDialog
@@ -2039,7 +2030,6 @@ const RunningHours = () => {
           onConfirm={handleMeterReplacedConfirm}
         />
       )}
-
       {/* Modify Mode Sticky Footer */}
       {isModifyMode && (
         <ModifyStickyFooter
