@@ -46,13 +46,24 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Ship, Anchor, Building2, ArrowLeft, Copy, CheckCircle2, AlertTriangle, ChevronsUpDown, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, Ship, Anchor, Building2, ArrowLeft, Copy, CheckCircle2, AlertTriangle, ChevronsUpDown, Check, GripVertical, FolderOpen, Layers } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import type { Fleet, Vessel } from "@shared/schema";
+import type { Fleet, Vessel, FleetClass } from "@shared/schema";
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragStartEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 
 interface VesselWithFleet extends Vessel {
   fleetName?: string;
@@ -85,6 +96,224 @@ const vesselAssignmentSchema = z.object({
 
 type VesselAssignmentData = z.infer<typeof vesselAssignmentSchema>;
 
+function DraggableVesselRow({ vessel, onEdit }: { vessel: VesselWithFleet; onEdit: (v: Vessel) => void }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `vessel-${vessel.vuuid}`,
+    data: { type: "vessel", vessel },
+  });
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    opacity: isDragging ? 0.4 : 1,
+  } : undefined;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex items-center gap-2 px-3 py-2 border rounded-md bg-white hover:bg-gray-50 transition-colors group",
+        isDragging && "shadow-lg ring-2 ring-blue-300"
+      )}
+      data-testid={`draggable-vessel-${vessel.vuuid}`}
+    >
+      <div
+        {...listeners}
+        {...attributes}
+        className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 touch-none"
+        data-testid={`drag-handle-${vessel.vuuid}`}
+      >
+        <GripVertical className="h-4 w-4" />
+      </div>
+      <Ship className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <span className="text-sm font-medium truncate">{vessel.name}</span>
+        <span className="text-xs text-gray-500 ml-2">{vessel.code}</span>
+      </div>
+      {vessel.vesselType && (
+        <Badge variant="outline" className="text-xs hidden sm:inline-flex">{vessel.vesselType}</Badge>
+      )}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={() => onEdit(vessel)}
+        data-testid={`button-edit-vessel-${vessel.vuuid}`}
+      >
+        <Pencil className="h-3 w-3" />
+      </Button>
+    </div>
+  );
+}
+
+function DroppableClassZone({
+  id,
+  label,
+  children,
+  vesselCount,
+  isActive,
+  onRename,
+  onDelete,
+  isUnclassified,
+}: {
+  id: string;
+  label: string;
+  children: React.ReactNode;
+  vesselCount: number;
+  isActive: boolean;
+  onRename?: () => void;
+  onDelete?: () => void;
+  isUnclassified?: boolean;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "rounded-lg border-2 border-dashed p-3 transition-colors min-h-[60px]",
+        isOver && "border-blue-400 bg-blue-50/50",
+        !isOver && isActive && "border-gray-200 bg-gray-50/30",
+        !isOver && !isActive && "border-gray-200"
+      )}
+      data-testid={`droppable-zone-${id}`}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          {isUnclassified ? (
+            <FolderOpen className="h-3.5 w-3.5 text-gray-400" />
+          ) : (
+            <Layers className="h-3.5 w-3.5 text-indigo-500" />
+          )}
+          <span className={cn("text-sm font-medium", isUnclassified ? "text-gray-500" : "text-gray-700")}>{label}</span>
+          <Badge variant="secondary" className="text-xs h-5">{vesselCount}</Badge>
+        </div>
+        {!isUnclassified && (
+          <div className="flex gap-1">
+            {onRename && (
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onRename} data-testid={`button-rename-class-${id}`}>
+                <Pencil className="h-3 w-3" />
+              </Button>
+            )}
+            {onDelete && (
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:text-red-700" onClick={onDelete} data-testid={`button-delete-class-${id}`}>
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="space-y-1.5">
+        {children}
+        {vesselCount === 0 && (
+          <div className="text-xs text-gray-400 text-center py-2 italic">
+            {isOver ? "Drop vessel here" : "Drag vessels here"}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FleetClassesContent({
+  fleet,
+  fleetVessels,
+  onEditVessel,
+  onCreateClass,
+  onRenameClass,
+  onDeleteClass,
+}: {
+  fleet: Fleet;
+  fleetVessels: VesselWithFleet[];
+  onEditVessel: (v: Vessel) => void;
+  onCreateClass: (fleetFuuid: string) => void;
+  onRenameClass: (fc: FleetClass) => void;
+  onDeleteClass: (fc: FleetClass) => void;
+}) {
+  const { data: classes = [] } = useQuery<FleetClass[]>({
+    queryKey: ["/technical/api/fleets", fleet.fuuid, "classes"],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/fleets/${fleet.fuuid}/classes`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!fleet.fuuid,
+  });
+
+  const unclassifiedVessels = fleetVessels.filter(v => !v.classId || !classes.some(c => c.fcuuid === v.classId));
+  const hasClasses = classes.length > 0;
+
+  if (!hasClasses) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs text-gray-400">
+            {fleetVessels.length} vessel{fleetVessels.length !== 1 ? "s" : ""} — no classes defined
+          </span>
+          {fleet.fuuid && (
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onCreateClass(fleet.fuuid!)} data-testid={`button-add-class-${fleet.id}`}>
+              <Plus className="h-3 w-3 mr-1" />
+              Add Class
+            </Button>
+          )}
+        </div>
+        <DroppableClassZone
+          id={`unclassified-${fleet.id}`}
+          label="All Vessels"
+          vesselCount={fleetVessels.length}
+          isActive={false}
+          isUnclassified
+        >
+          {fleetVessels.map(vessel => (
+            <DraggableVesselRow key={vessel.vuuid} vessel={vessel} onEdit={onEditVessel} />
+          ))}
+        </DroppableClassZone>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-end px-1">
+        {fleet.fuuid && (
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onCreateClass(fleet.fuuid!)} data-testid={`button-add-class-${fleet.id}`}>
+            <Plus className="h-3 w-3 mr-1" />
+            Add Class
+          </Button>
+        )}
+      </div>
+      {classes.map(fc => {
+        const classVessels = fleetVessels.filter(v => v.classId === fc.fcuuid);
+        return (
+          <DroppableClassZone
+            key={fc.fcuuid}
+            id={`class-${fleet.id}-${fc.fcuuid}`}
+            label={fc.name}
+            vesselCount={classVessels.length}
+            isActive={true}
+            onRename={() => onRenameClass(fc)}
+            onDelete={() => onDeleteClass(fc)}
+          >
+            {classVessels.map(vessel => (
+              <DraggableVesselRow key={vessel.vuuid} vessel={vessel} onEdit={onEditVessel} />
+            ))}
+          </DroppableClassZone>
+        );
+      })}
+      <DroppableClassZone
+        id={`unclassified-${fleet.id}`}
+        label="Unclassified"
+        vesselCount={unclassifiedVessels.length}
+        isActive={false}
+        isUnclassified
+      >
+        {unclassifiedVessels.map(vessel => (
+          <DraggableVesselRow key={vessel.vuuid} vessel={vessel} onEdit={onEditVessel} />
+        ))}
+      </DroppableClassZone>
+    </div>
+  );
+}
+
 export default function FleetVesselManager({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const [isFleetDialogOpen, setIsFleetDialogOpen] = useState(false);
@@ -99,6 +328,12 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
   const [copyModules, setCopyModules] = useState({ components: true, jobs: true, spares: true, stores: true });
   const [copyStep, setCopyStep] = useState<"select" | "confirm" | "result">("select");
   const [copyResult, setCopyResult] = useState<{ components: number; jobs: number; spares: number; stores: number } | null>(null);
+  const [isClassDialogOpen, setIsClassDialogOpen] = useState(false);
+  const [editingClass, setEditingClass] = useState<FleetClass | null>(null);
+  const [classFleetId, setClassFleetId] = useState<string>("");
+  const [classFormName, setClassFormName] = useState("");
+  const [classFormDescription, setClassFormDescription] = useState("");
+  const [activeVessel, setActiveVessel] = useState<VesselWithFleet | null>(null);
 
   const fleetForm = useForm<FleetFormData>({
     resolver: zodResolver(fleetFormSchema),
@@ -136,6 +371,8 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
   const { data: vessels = [], isLoading: isVesselsLoading } = useQuery<VesselWithFleet[]>({
     queryKey: ["/technical/api/vessels-with-fleets"],
   });
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const createFleetMutation = useMutation({
     mutationFn: async (data: FleetFormData) => {
@@ -246,6 +483,140 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
       toast({ title: "Error copying vessel data", description: error.message, variant: "destructive" });
     },
   });
+
+  const createClassMutation = useMutation({
+    mutationFn: async ({ fleetFuuid, name, description }: { fleetFuuid: string; name: string; description?: string }) => {
+      return await apiRequest("POST", `/technical/api/fleets/${fleetFuuid}/classes`, { name, description });
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleets", variables.fleetFuuid, "classes"] });
+      toast({ title: "Class created successfully" });
+      setIsClassDialogOpen(false);
+      setClassFormName("");
+      setClassFormDescription("");
+    },
+    onError: (error: any) => {
+      toast({ title: "Error creating class", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateClassMutation = useMutation({
+    mutationFn: async ({ fcuuid, name, description }: { fcuuid: string; name: string; description?: string }) => {
+      return await apiRequest("PUT", `/technical/api/fleet-classes/${fcuuid}`, { name, description });
+    },
+    onSuccess: () => {
+      fleets.forEach(f => {
+        if (f.fuuid) queryClient.invalidateQueries({ queryKey: ["/technical/api/fleets", f.fuuid, "classes"] });
+      });
+      toast({ title: "Class renamed successfully" });
+      setIsClassDialogOpen(false);
+      setEditingClass(null);
+      setClassFormName("");
+      setClassFormDescription("");
+    },
+    onError: (error: any) => {
+      toast({ title: "Error renaming class", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteClassMutation = useMutation({
+    mutationFn: async (fcuuid: string) => {
+      return await apiRequest("DELETE", `/technical/api/fleet-classes/${fcuuid}`);
+    },
+    onSuccess: () => {
+      fleets.forEach(f => {
+        if (f.fuuid) queryClient.invalidateQueries({ queryKey: ["/technical/api/fleets", f.fuuid, "classes"] });
+      });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/vessels-with-fleets"] });
+      toast({ title: "Class deleted successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error deleting class", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const assignVesselClassMutation = useMutation({
+    mutationFn: async ({ vesselId, classId }: { vesselId: string; classId: string | null }) => {
+      return await apiRequest("PUT", `/technical/api/vessels/${vesselId}/class`, { classId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/vessels-with-fleets"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error assigning vessel to class", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const vessel = event.active.data.current?.vessel as VesselWithFleet;
+    if (vessel) setActiveVessel(vessel);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveVessel(null);
+    const { active, over } = event;
+    if (!over) return;
+    const vessel = active.data.current?.vessel as VesselWithFleet;
+    if (!vessel) return;
+    const dropId = over.id as string;
+    let newClassId: string | null = null;
+    if (dropId.startsWith("class-")) {
+      const parts = dropId.split("-");
+      const dropFleetId = parts[1];
+      const fcuuid = parts.slice(2).join("-");
+      if (String(dropFleetId) !== String(vessel.fleetId)) {
+        toast({ title: "Cannot move vessel to a different fleet's class", variant: "destructive" });
+        return;
+      }
+      newClassId = fcuuid;
+    } else if (dropId.startsWith("unclassified-")) {
+      const dropFleetId = dropId.replace("unclassified-", "");
+      if (String(dropFleetId) !== String(vessel.fleetId)) {
+        toast({ title: "Cannot move vessel to a different fleet's class", variant: "destructive" });
+        return;
+      }
+      newClassId = null;
+    } else {
+      return;
+    }
+    if (vessel.classId === newClassId || (!vessel.classId && newClassId === null)) return;
+    assignVesselClassMutation.mutate({ vesselId: vessel.vuuid, classId: newClassId });
+  };
+
+  const handleDragCancel = () => {
+    setActiveVessel(null);
+  };
+
+  const handleCreateClass = (fleetFuuid: string) => {
+    setEditingClass(null);
+    setClassFleetId(fleetFuuid);
+    setClassFormName("");
+    setClassFormDescription("");
+    setIsClassDialogOpen(true);
+  };
+
+  const handleRenameClass = (fc: FleetClass) => {
+    setEditingClass(fc);
+    setClassFleetId(fc.fleetId);
+    setClassFormName(fc.name);
+    setClassFormDescription(fc.description || "");
+    setIsClassDialogOpen(true);
+  };
+
+  const handleDeleteClass = (fc: FleetClass) => {
+    if (window.confirm(`Delete class "${fc.name}"? Vessels in this class will become unclassified.`)) {
+      deleteClassMutation.mutate(fc.fcuuid);
+    }
+  };
+
+  const handleClassSubmit = () => {
+    if (!classFormName.trim()) return;
+    if (editingClass) {
+      updateClassMutation.mutate({ fcuuid: editingClass.fcuuid, name: classFormName, description: classFormDescription || undefined });
+    } else {
+      createClassMutation.mutate({ fleetFuuid: classFleetId, name: classFormName, description: classFormDescription || undefined });
+    }
+  };
 
   const handleOpenCopyDialog = () => {
     setCopySourceVessel("");
@@ -401,166 +772,152 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Anchor className="h-5 w-5 text-rose-600" />
-                Fleets ({fleets.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {fleets.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Anchor className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                  <p>No fleets created yet</p>
-                  <p className="text-sm">Create a fleet to organize your vessels</p>
-                </div>
-              ) : (
-                <Accordion type="multiple" className="w-full">
-                  {fleets.map((fleet) => {
-                    const fleetVessels = getVesselsForFleet(fleet.id);
-                    return (
-                      <AccordionItem key={fleet.id} value={fleet.id}>
-                        <AccordionTrigger className="hover:no-underline">
-                          <div className="flex items-center justify-between w-full pr-4">
-                            <div className="flex items-center gap-3">
-                              <Building2 className="h-4 w-4 text-rose-600" />
-                              <div className="text-left">
-                                <div className="font-medium">{fleet.name}</div>
-                                <div className="text-sm text-gray-500">Code: {fleet.code}</div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Anchor className="h-5 w-5 text-rose-600" />
+                  Fleets ({fleets.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {fleets.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Anchor className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                    <p>No fleets created yet</p>
+                    <p className="text-sm">Create a fleet to organize your vessels</p>
+                  </div>
+                ) : (
+                  <Accordion type="multiple" className="w-full">
+                    {fleets.map((fleet) => {
+                      const fleetVessels = getVesselsForFleet(fleet.id);
+                      return (
+                        <AccordionItem key={fleet.id} value={fleet.id}>
+                          <AccordionTrigger className="hover:no-underline">
+                            <div className="flex items-center justify-between w-full pr-4">
+                              <div className="flex items-center gap-3">
+                                <Building2 className="h-4 w-4 text-rose-600" />
+                                <div className="text-left">
+                                  <div className="font-medium">{fleet.name}</div>
+                                  <div className="text-sm text-gray-500">Code: {fleet.code}</div>
+                                </div>
+                              </div>
+                              <Badge variant="secondary" className="mr-2">
+                                {fleetVessels.length} vessel{fleetVessels.length !== 1 ? 's' : ''}
+                              </Badge>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="pt-2 space-y-3">
+                              {fleet.description && (
+                                <p className="text-sm text-gray-600 px-4">{fleet.description}</p>
+                              )}
+                              <div className="flex gap-2 px-4">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditFleet(fleet)}
+                                  data-testid={`button-edit-fleet-${fleet.id}`}
+                                >
+                                  <Pencil className="h-3 w-3 mr-1" />
+                                  Edit Fleet
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleCreateVessel(fleet.id)}
+                                  data-testid={`button-add-vessel-to-fleet-${fleet.id}`}
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Add Vessel
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteFleet(fleet)}
+                                  className="text-red-600 hover:text-red-700"
+                                  data-testid={`button-delete-fleet-${fleet.id}`}
+                                >
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Delete
+                                </Button>
+                              </div>
+                              <div className="px-4">
+                                <FleetClassesContent
+                                  fleet={fleet}
+                                  fleetVessels={fleetVessels}
+                                  onEditVessel={handleEditVessel}
+                                  onCreateClass={handleCreateClass}
+                                  onRenameClass={handleRenameClass}
+                                  onDeleteClass={handleDeleteClass}
+                                />
                               </div>
                             </div>
-                            <Badge variant="secondary" className="mr-2">
-                              {fleetVessels.length} vessel{fleetVessels.length !== 1 ? 's' : ''}
-                            </Badge>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="pt-2 space-y-3">
-                            {fleet.description && (
-                              <p className="text-sm text-gray-600 px-4">{fleet.description}</p>
-                            )}
-                            <div className="flex gap-2 px-4">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEditFleet(fleet)}
-                                data-testid={`button-edit-fleet-${fleet.id}`}
-                              >
-                                <Pencil className="h-3 w-3 mr-1" />
-                                Edit Fleet
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleCreateVessel(fleet.id)}
-                                data-testid={`button-add-vessel-to-fleet-${fleet.id}`}
-                              >
-                                <Plus className="h-3 w-3 mr-1" />
-                                Add Vessel
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDeleteFleet(fleet)}
-                                className="text-red-600 hover:text-red-700"
-                                data-testid={`button-delete-fleet-${fleet.id}`}
-                              >
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                Delete
-                              </Button>
-                            </div>
-                            {fleetVessels.length > 0 ? (
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Vessel Code</TableHead>
-                                    <TableHead>Vessel Name</TableHead>
-                                    <TableHead>IMO Number</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead className="w-24">Actions</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {fleetVessels.map((vessel) => (
-                                    <TableRow key={vessel.id}>
-                                      <TableCell className="font-mono">{vessel.code}</TableCell>
-                                      <TableCell>{vessel.name}</TableCell>
-                                      <TableCell>{vessel.imoNumber || "-"}</TableCell>
-                                      <TableCell>{vessel.vesselType || "-"}</TableCell>
-                                      <TableCell>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => handleEditVessel(vessel)}
-                                          data-testid={`button-edit-vessel-${vessel.id}`}
-                                        >
-                                          <Pencil className="h-3 w-3" />
-                                        </Button>
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            ) : (
-                              <div className="text-center py-4 text-gray-500 text-sm">
-                                No vessels assigned to this fleet
-                              </div>
-                            )}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    );
-                  })}
-                </Accordion>
-              )}
-            </CardContent>
-          </Card>
+                          </AccordionContent>
+                        </AccordionItem>
+                      );
+                    })}
+                  </Accordion>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Ship className="h-5 w-5 text-blue-600" />
+                  Unassigned Vessels ({getUnassignedVessels().length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {getUnassignedVessels().length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Ship className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                    <p className="text-sm">All vessels are assigned to fleets</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {getUnassignedVessels().map((vessel) => (
+                      <div
+                        key={vessel.id}
+                        className="p-3 border rounded-lg flex items-center justify-between hover:bg-gray-50"
+                      >
+                        <div>
+                          <div className="font-medium">{vessel.name}</div>
+                          <div className="text-sm text-gray-500">Code: {vessel.code}</div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditVessel(vessel)}
+                          data-testid={`button-assign-vessel-${vessel.id}`}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Ship className="h-5 w-5 text-blue-600" />
-                Unassigned Vessels ({getUnassignedVessels().length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {getUnassignedVessels().length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Ship className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                  <p className="text-sm">All vessels are assigned to fleets</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {getUnassignedVessels().map((vessel) => (
-                    <div
-                      key={vessel.id}
-                      className="p-3 border rounded-lg flex items-center justify-between hover:bg-gray-50"
-                    >
-                      <div>
-                        <div className="font-medium">{vessel.name}</div>
-                        <div className="text-sm text-gray-500">Code: {vessel.code}</div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditVessel(vessel)}
-                        data-testid={`button-assign-vessel-${vessel.id}`}
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+        <DragOverlay>
+          {activeVessel && (
+            <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-white shadow-xl ring-2 ring-blue-300 opacity-90">
+              <GripVertical className="h-4 w-4 text-gray-400" />
+              <Ship className="h-3.5 w-3.5 text-blue-500" />
+              <span className="text-sm font-medium">{activeVessel.name}</span>
+              <span className="text-xs text-gray-500">{activeVessel.code}</span>
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
 
       <Dialog open={isFleetDialogOpen} onOpenChange={setIsFleetDialogOpen}>
         <DialogContent>
@@ -828,6 +1185,46 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
               </form>
             </Form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isClassDialogOpen} onOpenChange={setIsClassDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingClass ? "Rename Class" : "Create New Class"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="class-name">Class Name</Label>
+              <Input
+                id="class-name"
+                value={classFormName}
+                onChange={(e) => setClassFormName(e.target.value)}
+                placeholder="e.g., Tanker Class"
+                data-testid="input-class-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="class-description">Description (Optional)</Label>
+              <Textarea
+                id="class-description"
+                value={classFormDescription}
+                onChange={(e) => setClassFormDescription(e.target.value)}
+                placeholder="Enter class description..."
+                data-testid="input-class-description"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsClassDialogOpen(false)} data-testid="button-cancel-class">Cancel</Button>
+            <Button
+              onClick={handleClassSubmit}
+              disabled={!classFormName.trim() || createClassMutation.isPending || updateClassMutation.isPending}
+              data-testid="button-submit-class"
+            >
+              {createClassMutation.isPending || updateClassMutation.isPending ? "Saving..." : (editingClass ? "Rename" : "Create")}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -1,5 +1,5 @@
 import { storage } from '../../../storage';
-import type { Fleet, InsertFleet, Vessel, InsertVessel, PmsVesselSettings, InsertPmsVesselSettings } from '@shared/schema';
+import type { Fleet, InsertFleet, Vessel, InsertVessel, PmsVesselSettings, InsertPmsVesselSettings, FleetClass, InsertFleetClass } from '@shared/schema';
 
 // ── Fleet methods ──
 
@@ -47,6 +47,28 @@ export async function createVessel(data: InsertVessel): Promise<Vessel> {
 
 export async function assignVesselToFleet(vesselId: string, fleetId: string | null): Promise<Vessel> {
   return storage.assignVesselToFleet(vesselId, fleetId);
+}
+
+// ── Fleet Class methods ──
+
+export async function getFleetClasses(fleetId: string): Promise<FleetClass[]> {
+  return storage.getFleetClasses(fleetId);
+}
+
+export async function createFleetClass(data: InsertFleetClass): Promise<FleetClass> {
+  return storage.createFleetClass(data);
+}
+
+export async function updateFleetClass(fcuuid: string, data: Partial<FleetClass>): Promise<FleetClass> {
+  return storage.updateFleetClass(fcuuid, data);
+}
+
+export async function deleteFleetClass(fcuuid: string): Promise<void> {
+  return storage.deleteFleetClass(fcuuid);
+}
+
+export async function assignVesselToClass(vesselId: string, classId: string | null): Promise<Vessel> {
+  return storage.assignVesselToClass(vesselId, classId);
 }
 
 // ── PMS Vessel Settings methods ──

@@ -34,6 +34,35 @@ export async function getVesselsByFleet(req: Request, res: Response) {
   res.json(vessels);
 }
 
+// ── Fleet Class controllers ──
+
+export async function getFleetClasses(req: Request, res: Response) {
+  const classes = await service.getFleetClasses(req.params.fleetId);
+  res.json(classes);
+}
+
+export async function createFleetClass(req: Request, res: Response) {
+  const fleetClass = await service.createFleetClass(req.params.fleetId, req.body);
+  res.status(201).json(fleetClass);
+}
+
+export async function updateFleetClass(req: Request, res: Response) {
+  const { name, description, updatedByUuid } = req.body;
+  const fleetClass = await service.updateFleetClass(req.params.fcuuid, { name, description, updatedByUuid });
+  res.json(fleetClass);
+}
+
+export async function deleteFleetClass(req: Request, res: Response) {
+  await service.deleteFleetClass(req.params.fcuuid);
+  res.json({ success: true });
+}
+
+export async function assignVesselToClass(req: Request, res: Response) {
+  const { classId } = req.body;
+  const vessel = await service.assignVesselToClass(req.params.id, classId ?? null);
+  res.json(vessel);
+}
+
 // ── Vessel controllers ──
 
 export async function getVessels(_req: Request, res: Response) {

@@ -1,6 +1,7 @@
 import * as repo from '../repositories/vesselRepository';
 import { NotFoundError, ValidationError, ConflictError } from '../../shared/errors';
-import type { Fleet, Vessel, PmsVesselSettings } from '@shared/schema';
+import type { Fleet, Vessel, PmsVesselSettings, FleetClass } from '@shared/schema';
+import { randomUUID } from 'crypto';
 
 // ── Fleet operations ──
 
@@ -24,6 +25,7 @@ export async function createFleet(data: {
   try {
     return await repo.createFleet({
       id: data.id || data.code,
+      fuuid: randomUUID(),
       code: data.code,
       name: data.name,
       description: data.description ?? null,
@@ -120,6 +122,79 @@ export async function assignVesselToFleet(vesselId: string, fleetId: string | nu
   } catch (error: any) {
     if (error.message?.includes('not found')) {
       throw new NotFoundError(error.message);
+    }
+    throw error;
+  }
+}
+
+// ── Fleet Class operations ──
+
+export async function getFleetClasses(fleetId: string): Promise<FleetClass[]> {
+  return repo.getFleetClasses(fleetId);
+}
+
+export async function createFleetClass(fleetId: string, data: {
+  name: string;
+  description?: string | null;
+  createdByUuid?: string | null;
+}): Promise<FleetClass> {
+  try {
+    return await repo.createFleetClass({
+      fcuuid: randomUUID(),
+      fleetId,
+      name: data.name,
+      description: data.description ?? null,
+      createdByUuid: data.createdByUuid ?? null,
+      updatedByUuid: data.createdByUuid ?? null,
+      isDeleted: false,
+      isSync: false,
+    });
+  } catch (error: any) {
+    if (error.message?.includes('duplicate') || error.message?.includes('unique') || error.code === '23505') {
+      throw new ConflictError(`A class named "${data.name}" already exists in this fleet`);
+    }
+    throw error;
+  }
+}
+
+export async function updateFleetClass(fcuuid: string, data: {
+  name?: string;
+  description?: string | null;
+  updatedByUuid?: string | null;
+}): Promise<FleetClass> {
+  try {
+    return await repo.updateFleetClass(fcuuid, data);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) {
+      throw new NotFoundError(error.message);
+    }
+    if (error.message?.includes('duplicate') || error.message?.includes('unique') || error.code === '23505') {
+      throw new ConflictError(`A class with that name already exists in this fleet`);
+    }
+    throw error;
+  }
+}
+
+export async function deleteFleetClass(fcuuid: string): Promise<void> {
+  try {
+    await repo.deleteFleetClass(fcuuid);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) {
+      throw new NotFoundError(error.message);
+    }
+    throw error;
+  }
+}
+
+export async function assignVesselToClass(vesselId: string, classId: string | null): Promise<Vessel> {
+  try {
+    return await repo.assignVesselToClass(vesselId, classId);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) {
+      throw new NotFoundError(error.message);
+    }
+    if (error.message?.includes('does not belong')) {
+      throw new ValidationError(error.message);
     }
     throw error;
   }

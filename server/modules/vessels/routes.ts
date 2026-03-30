@@ -13,12 +13,20 @@ router.put('/fleets/:id', asyncHandler(ctrl.updateFleet));
 router.delete('/fleets/:id', asyncHandler(ctrl.deleteFleet));
 router.get('/fleets/:id/vessels', asyncHandler(ctrl.getVesselsByFleet));
 
+// ── Fleet Class CRUD ──
+
+router.get('/fleets/:fleetId/classes', asyncHandler(ctrl.getFleetClasses));
+router.post('/fleets/:fleetId/classes', asyncHandler(ctrl.createFleetClass));
+router.put('/fleet-classes/:fcuuid', asyncHandler(ctrl.updateFleetClass));
+router.delete('/fleet-classes/:fcuuid', asyncHandler(ctrl.deleteFleetClass));
+
 // ── Vessel CRUD ──
 
 router.get('/vessels', asyncHandler(ctrl.getVessels));
 router.post('/vessels', asyncHandler(ctrl.createVessel));
 router.get('/vessels-with-fleets', asyncHandler(ctrl.getVesselsWithFleets));
 router.put('/vessels/:id/fleet', asyncHandler(ctrl.assignVesselToFleet));
+router.put('/vessels/:id/class', asyncHandler(ctrl.assignVesselToClass));
 
 // ── PMS Vessel Settings ──
 

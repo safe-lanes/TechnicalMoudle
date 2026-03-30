@@ -40,6 +40,7 @@ export type PublicUser = Omit<User, "password" | "role"> & {
 // Fleets Table - Fleet registry for grouping vessels
 export const fleets = pgTable("fleets", {
   id: text("id").primaryKey(), // Fleet code like FLT001, FLT002
+  fuuid: text("fuuid").notNull().unique(), // Canonical UUID identity — FK target for child tables
   code: text("code").notNull().unique(), // Unique fleet code
   name: text("name").notNull(), // Fleet display name
   description: text("description"), // Optional description
@@ -67,6 +68,7 @@ export const vessels = pgTable("vessels", {
   vesselType: text("vessel_type"), // e.g., Tanker, Bulk Carrier, Container
   flag: text("flag"), // Flag state
   vesselSequence: integer("vessel_sequence"), // Numeric sequence for vessel (1, 2, 3... for defect IDs)
+  classId: text("class_id"), // FK to fleet_classes.fcuuid — vessel class/group within a fleet
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -79,6 +81,32 @@ export const insertVesselSchema = createInsertSchema(vessels).omit({
 
 export type InsertVessel = z.infer<typeof insertVesselSchema>;
 export type Vessel = typeof vessels.$inferSelect;
+
+// Fleet Classes Table - Logical grouping of vessels within a fleet
+export const fleetClasses = pgTable("fleet_classes", {
+  id: serial("id").primaryKey(),
+  fcuuid: text("fcuuid").notNull().unique(),
+  fleetId: text("fleet_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  fleetIdIdx: index("idx_fleet_classes_fleet_id").on(table.fleetId),
+}));
+
+export const insertFleetClassSchema = createInsertSchema(fleetClasses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFleetClass = z.infer<typeof insertFleetClassSchema>;
+export type FleetClass = typeof fleetClasses.$inferSelect;
 
 // Defect Sequences Table - Tracks defect ID counters per vessel per year
 export const defectSequences = pgTable("defect_sequences", {

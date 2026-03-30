@@ -8,6 +8,9 @@ import {
   fleets,
   type Fleet,
   type InsertFleet,
+  fleetClasses,
+  type FleetClass,
+  type InsertFleetClass,
   vessels,
   type Vessel,
   type InsertVessel,
@@ -832,6 +835,12 @@ export interface IStorage {
   assignVesselToFleet(vesselId: string, fleetId: string | null): Promise<Vessel>;
   getVesselsWithFleets(): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>>;
   updateVessel(id: string, data: Partial<Vessel>): Promise<Vessel>;
+
+  getFleetClasses(fleetId: string): Promise<FleetClass[]>;
+  createFleetClass(data: InsertFleetClass): Promise<FleetClass>;
+  updateFleetClass(fcuuid: string, data: Partial<FleetClass>): Promise<FleetClass>;
+  deleteFleetClass(fcuuid: string): Promise<void>;
+  assignVesselToClass(vesselId: string, classId: string | null): Promise<Vessel>;
   
   // Certificate methods for Cert & Surveys module
   getCertificates(): Promise<Certificate[]>;

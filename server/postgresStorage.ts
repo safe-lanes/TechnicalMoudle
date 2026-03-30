@@ -4,6 +4,7 @@ import { getDb } from './db';
 import {
   users,
   fleets,
+  fleetClasses,
   vessels,
   pmsVesselSettings,
   makers,
@@ -55,6 +56,8 @@ import {
   type InsertUser,
   type Fleet,
   type InsertFleet,
+  type FleetClass,
+  type InsertFleetClass,
   type Vessel,
   type InsertVessel,
   type PmsVesselSettings,
@@ -322,6 +325,75 @@ export class PostgresStorage {
   async deleteFleet(id: string): Promise<void> {
     const db = await getDb();
     await db.delete(fleets).where(eq(fleets.id, id));
+  }
+
+  // ============= FLEET CLASSES (Module 1) =============
+
+  async getFleetClasses(fleetId: string): Promise<FleetClass[]> {
+    const db = await getDb();
+    return await db.select().from(fleetClasses)
+      .where(and(eq(fleetClasses.fleetId, fleetId), eq(fleetClasses.isDeleted, false)));
+  }
+
+  async createFleetClass(data: InsertFleetClass): Promise<FleetClass> {
+    const db = await getDb();
+    const result = await db.insert(fleetClasses).values(data).returning();
+    return result[0];
+  }
+
+  async updateFleetClass(fcuuid: string, data: Partial<FleetClass>): Promise<FleetClass> {
+    const db = await getDb();
+    const result = await db.update(fleetClasses)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(fleetClasses.fcuuid, fcuuid), eq(fleetClasses.isDeleted, false)))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Fleet class ${fcuuid} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteFleetClass(fcuuid: string): Promise<void> {
+    const db = await getDb();
+    const existing = await db.select().from(fleetClasses)
+      .where(and(eq(fleetClasses.fcuuid, fcuuid), eq(fleetClasses.isDeleted, false)));
+    if (!existing[0]) {
+      throw new Error(`Fleet class ${fcuuid} not found`);
+    }
+    await db.update(fleetClasses)
+      .set({ isDeleted: true, updatedAt: new Date() })
+      .where(eq(fleetClasses.fcuuid, fcuuid));
+    await db.update(vessels)
+      .set({ classId: null, updatedAt: new Date() })
+      .where(eq(vessels.classId, fcuuid));
+  }
+
+  async assignVesselToClass(vesselId: string, classId: string | null): Promise<Vessel> {
+    const db = await getDb();
+    const vesselResult = await db.select().from(vessels).where(eq(vessels.vuuid, vesselId));
+    if (!vesselResult[0]) {
+      throw new Error(`Vessel ${vesselId} not found`);
+    }
+    const vessel = vesselResult[0];
+
+    if (classId) {
+      const classResult = await db.select().from(fleetClasses)
+        .where(and(eq(fleetClasses.fcuuid, classId), eq(fleetClasses.isDeleted, false)));
+      if (!classResult[0]) {
+        throw new Error(`Fleet class ${classId} not found`);
+      }
+      const fc = classResult[0];
+      const fleetResult = await db.select().from(fleets).where(eq(fleets.fuuid, fc.fleetId));
+      if (!fleetResult[0] || fleetResult[0].id !== vessel.fleetId) {
+        throw new Error(`Class does not belong to the vessel's fleet`);
+      }
+    }
+
+    const result = await db.update(vessels)
+      .set({ classId, updatedAt: new Date() })
+      .where(eq(vessels.vuuid, vesselId))
+      .returning();
+    return result[0];
   }
 
   // ============= VESSELS (Module 1) =============
