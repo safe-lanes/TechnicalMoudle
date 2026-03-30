@@ -1,0 +1,165 @@
+Please update the PMS Reports page again. The left-side tree navigation is fine, so keep that structure. The problem now is that many reports are still rendering a large top summary section inside the right pane before the actual report content. This section usually contains a big report header block, vessel/date/period text, record count chips, and a horizontal strip of summary badges or statistic boxes such as totals, warnings, utilization counts, anomaly counts, stock counts, and similar values. These sections are not required in the redesigned PMS Reports screen and must be removed from all reports consistently.
+
+I want the right pane to behave as a clean report viewer, not as a report summary dashboard. When the user clicks a report from the left tree, the selected report should open directly in view mode with minimal framing. It should not first show a large report summary block or a metric strip before the actual data table/content. The user has already selected the report from the left pane, so we do not need an oversized internal summary section repeating report context again.
+
+In the current implementation, examples such as “Running Hours Anomaly Detection” and “Equipment Utilization Summary” are still showing a large top section before the data table. That large section includes:
+
+a repeated inner report title,
+
+date period/vessel text,
+
+a record count badge,
+
+and a row of summary chips or tiles such as total anomalies, critical, warning, info, logs analyzed, components, total equipment, high utilization, normal utilization, low utilization, average utilization, actual data, estimated, no data, and similar values.
+
+All of that top summary area must be removed from the right pane across all reports unless it is absolutely part of the real final report body that must be preserved for business reasons. In the redesigned PMS Reports browsing experience, these summary strips are visual clutter and are not wanted.
+
+What I want instead
+For every report selected from the left tree, the right pane should contain only:
+
+A simple report title/header if needed.
+
+Two export buttons only: PDF and Excel.
+
+The actual report content directly below that.
+
+No large pre-content summary section.
+
+No chip strip.
+
+No KPI line.
+
+No big top information box.
+
+No repeated context block with vessel/date/record count unless absolutely necessary and kept very minimal.
+
+So the structure should become:
+
+User clicks report name in left tree.
+
+Report opens in right pane.
+
+At the top there may be a small clean header with report name and export buttons.
+
+Immediately below that, show the actual report table/chart/content.
+
+Do not insert a large summary panel between the report title and the main report body.
+
+Remove these kinds of sections from all reports
+Please remove all top summary/report-overview sections like the ones highlighted in the screenshots from every report in the PMS Reports module. This includes any section that behaves like a report intro card or summary dashboard and sits above the main report body.
+
+Examples of what should be removed:
+
+Large inner report summary containers.
+
+A repeated title card inside the right pane if the page header already identifies the report.
+
+Period/date/vessel/record count blocks presented as a big summary section.
+
+Horizontal rows of summary chips/badges.
+
+Counts such as totals, warnings, critical, utilization percentages, stock categories, data source counts, logs analyzed, components, or similar summary stats.
+
+Any report-specific top “overview strip” that appears before the real table/list/chart/report data.
+
+In short, remove the entire “pre-report summary section” pattern from all reports.
+
+Important clarification
+I am not asking you to remove the actual report data. If the report body is a table, chart, list, anomaly table, utilization table, or detailed report view, keep that. I only want to remove the extra wrapper section above the real report content.
+
+So for example:
+
+Keep the actual anomaly table.
+
+Keep the actual utilization table.
+
+Keep the actual report rows and pagination if needed.
+
+Keep actual filters if they are essential to that report body.
+
+Remove the oversized summary band that appears before the actual content.
+
+Global rule for all reports
+Apply one consistent rule across the entire PMS Reports module:
+
+When a report opens in the right pane, it should go straight to the report body, not to a report summary panel.
+
+This should apply to all report types, not just the examples shown in the screenshots. Do not fix only one or two reports manually and leave others unchanged. Search the report viewer implementation and remove this pattern everywhere it appears.
+
+What to keep unchanged
+Do not change:
+
+report logic,
+
+data fetching,
+
+backend behavior,
+
+export logic,
+
+PDF/Excel generation,
+
+report calculations,
+
+permission logic,
+
+left tree structure,
+
+top page filters like vessel/search/date range if they already work.
+
+This is a UI cleanup and simplification task only.
+
+Desired visual behavior
+The final right pane should feel much cleaner and tighter:
+
+selected report name visible,
+
+export buttons visible,
+
+main report content visible immediately,
+
+no large decorative or informative summary band consuming vertical space,
+
+no duplicate report context being repeated unnecessarily.
+
+This is especially important because those large summary sections are wasting space and pushing the actual useful report data downward. The user should see the real report content sooner without needing to scroll past summary blocks.
+
+Apply to all report families
+Please inspect all report categories in the left tree and ensure this cleanup is applied everywhere, including but not limited to:
+
+Maintenance & Work Orders reports,
+
+Running Hours & Condition reports,
+
+Inventory - Spares reports,
+
+Inventory - Stores/Lubes/Chemicals reports,
+
+IHM reports,
+
+Modify PMS reports,
+
+Critical Equipment reports,
+
+LSA/FFA Equipment reports.
+
+Do not assume only the Running Hours reports have this issue. The same large-summary-section pattern may exist in multiple report families and should be removed consistently.
+
+Acceptance criteria
+Do not consider the task complete until all of the following are true:
+
+Clicking any report from the left tree opens it in the right pane.
+
+The right pane no longer shows a big summary/overview section above the real report content.
+
+Summary chips, KPI badges, metric strips, and top report-overview blocks are removed from all reports.
+
+The report body appears directly after a minimal header with export buttons.
+
+PDF and Excel buttons still work as before.
+
+Actual report data remains intact.
+
+The overall UI remains consistent with the PMS application style.
+
+Important: the goal is not to redesign the report content itself. The goal is to remove the unnecessary “big tile / big summary block / lots of info” section that appears before the actual report body in all reports
