@@ -36,6 +36,8 @@ export type PublicUser = Omit<User, "password" | "role"> & {
   crewDesignation?: string;
   userType?: "Office" | "Ship";
   userUuid?: string;
+  firstname?: string;
+  lastname?: string;
 };
 
 // Fleets Table - Fleet registry for grouping vessels
