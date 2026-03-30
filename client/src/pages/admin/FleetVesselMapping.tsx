@@ -566,7 +566,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     const vesselSpareLookup = new Map<string, any>();
     vesselSparesData.forEach((vs: any) => {
       const key = `${vs.fleetEquipmentCode || ""}|${vs.partCode || ""}`;
-      if (vs.fleetEquipmentCode && vs.partCode && !vesselSpareLookup.has(key)) {
+      if (vs.fleetEquipmentCode && vs.partCode) {
         vesselSpareLookup.set(key, vs);
       }
     });
