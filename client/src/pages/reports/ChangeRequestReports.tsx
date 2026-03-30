@@ -98,6 +98,8 @@ interface ChangeRequestReportsProps {
     dateRange: { from: Date | null; to: Date | null };
     priority: string;
   };
+  embedded?: boolean;
+  selectedReportId?: string | null;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -115,7 +117,7 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: 'Rejected',
 };
 
-const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, globalFilters }) => {
+const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, globalFilters, embedded, selectedReportId }) => {
   const [categoryFilters, setCategoryFilters] = useState<CategoryFilterValues>({
     searchQuery: "",
     vessel: globalFilters?.vessel || "all",
@@ -414,42 +416,46 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
   const summary = reportData?.summary;
 
   return (
-    <div className="p-6 bg-white dark:bg-background min-h-screen">
-      <div className="mb-6">
-        <div className="flex items-center gap-4 mb-6 flex-wrap">
-          <Button
-            variant="ghost"
-            onClick={onBack}
-            className="flex items-center gap-2"
-            data-testid="button-back-to-reports"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Reports
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-foreground" data-testid="text-page-title">Change Requests</h1>
-            <p className="text-sm text-gray-500 dark:text-muted-foreground">1 report for change tracking</p>
+    <div className={embedded ? "p-4" : "p-6 bg-white dark:bg-background min-h-screen"}>
+      {!embedded && (
+        <div className="mb-6">
+          <div className="flex items-center gap-4 mb-6 flex-wrap">
+            <Button
+              variant="ghost"
+              onClick={onBack}
+              className="flex items-center gap-2"
+              data-testid="button-back-to-reports"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Reports
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-foreground" data-testid="text-page-title">Change Requests</h1>
+              <p className="text-sm text-gray-500 dark:text-muted-foreground">1 report for change tracking</p>
+            </div>
           </div>
+
+          <CategoryFilters
+            filters={categoryFilters}
+            onFiltersChange={setCategoryFilters}
+            searchPlaceholder="Search change request reports..."
+          />
+
+          {(categoryFilters.dateRange?.from || categoryFilters.dateRange?.to) && (
+            <div className="flex items-center gap-2 px-3 py-2 mt-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-700 dark:text-blue-300">
+              <CalendarIcon className="h-4 w-4 flex-shrink-0" />
+              <span>
+                Date range active: {categoryFilters.dateRange.from ? format(categoryFilters.dateRange.from, "MMM dd, yyyy") : "Start"}
+                {" - "}
+                {categoryFilters.dateRange.to ? format(categoryFilters.dateRange.to, "MMM dd, yyyy") : "End"}
+                {" — applied when generating reports"}
+              </span>
+            </div>
+          )}
         </div>
+      )}
 
-        <CategoryFilters
-          filters={categoryFilters}
-          onFiltersChange={setCategoryFilters}
-          searchPlaceholder="Search change request reports..."
-        />
-
-        {(categoryFilters.dateRange?.from || categoryFilters.dateRange?.to) && (
-          <div className="flex items-center gap-2 px-3 py-2 mt-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-700 dark:text-blue-300">
-            <CalendarIcon className="h-4 w-4 flex-shrink-0" />
-            <span>
-              Date range active: {categoryFilters.dateRange.from ? format(categoryFilters.dateRange.from, "MMM dd, yyyy") : "Start"}
-              {" - "}
-              {categoryFilters.dateRange.to ? format(categoryFilters.dateRange.to, "MMM dd, yyyy") : "End"}
-              {" — applied when generating reports"}
-            </span>
-          </div>
-        )}
-
+      <div className="mb-6">
         <div className="flex items-center gap-3 mt-3 flex-wrap">
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-500 dark:text-muted-foreground">Status:</span>

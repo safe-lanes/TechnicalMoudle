@@ -1,8 +1,6 @@
-import { useState, useCallback } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Marker } from "@/components/Marker";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessel } from "@/contexts/VesselContext";
@@ -17,7 +15,11 @@ import {
   Download,
   Calendar,
   AlertTriangle,
-  LifeBuoy
+  LifeBuoy,
+  ChevronRight,
+  ChevronDown,
+  FileText,
+  FileSpreadsheet,
 } from "lucide-react";
 import MaintenanceReports from "./MaintenanceReports";
 import RunningHoursReports from "./RunningHoursReports";
@@ -30,25 +32,106 @@ import LsaFfaReports from "./LsaFfaReports";
 import MaintenancePlanner from "./MaintenancePlanner";
 import GlobalFilters, { FilterValues } from "@/components/reports/GlobalFilters";
 
-const LIMIT_REPORTS = false;
+interface ReportItem {
+  id: string;
+  name: string;
+}
 
 interface ReportCategory {
   id: string;
   title: string;
-  description: string;
   icon: React.ElementType;
-  reportCount: number;
-  lastGenerated?: string;
-  color: string;
-  iconBg: string;
-  iconBgLight: string;
+  reports: ReportItem[];
 }
 
+const REPORT_CATEGORIES: ReportCategory[] = [
+  {
+    id: "maintenance",
+    title: "Maintenance & Work Orders",
+    icon: ClipboardList,
+    reports: [
+      { id: "due-jobs-7", name: "Due Jobs (7 days)" },
+      { id: "overdue-jobs", name: "Overdue Jobs" },
+      { id: "completed-jobs", name: "Completed Jobs Register" },
+      { id: "monthly-summary", name: "Monthly Maintenance Summary" },
+      { id: "critical-equipment", name: "Critical Equipment Status" },
+      { id: "unplanned-jobs", name: "Unplanned/Breakdown Jobs" },
+      { id: "postponement-log", name: "Job Postponement Log" },
+      { id: "workload-distribution", name: "Crew Workload Distribution" },
+    ],
+  },
+  {
+    id: "running-hours",
+    title: "Running Hours & Condition",
+    icon: Clock,
+    reports: [
+      { id: "rh-utilization-summary", name: "Equipment Utilization Summary" },
+      { id: "rh-anomaly-detection", name: "Running Hours Anomaly Detection" },
+    ],
+  },
+  {
+    id: "spares",
+    title: "Inventory - Spares",
+    icon: Package,
+    reports: [
+      { id: "spares-low-stock", name: "Low Stock Alert Report" },
+      { id: "spares-consumption-analysis", name: "Consumption Pattern Analysis" },
+      { id: "spares-critical-parts", name: "Critical Spares Report" },
+    ],
+  },
+  {
+    id: "stores",
+    title: "Inventory - Stores/Lubes/Chemicals",
+    icon: Store,
+    reports: [
+      { id: "stores-inventory-status", name: "Stores Inventory Status Report" },
+      { id: "lubes-oil-analysis", name: "Lubricants & Oil Analysis Report" },
+      { id: "chemicals-tracking", name: "Chemicals Inventory & Expiry Report" },
+      { id: "low-stock-alert", name: "Low Stock Alert Report" },
+      { id: "stores-consumption-analysis", name: "Consumption Pattern Analysis" },
+    ],
+  },
+  {
+    id: "ihm",
+    title: "IHM (Inventory of Hazardous Materials)",
+    icon: Biohazard,
+    reports: [
+      { id: "ihm-inventory-status", name: "IHM Inventory Status Report" },
+    ],
+  },
+  {
+    id: "change-requests",
+    title: "Modify PMS (Change Requests)",
+    icon: Settings2,
+    reports: [
+      { id: "change-requests-status", name: "Change Requests Status & Tracking" },
+    ],
+  },
+  {
+    id: "critical-equipment",
+    title: "Critical Equipment",
+    icon: AlertTriangle,
+    reports: [
+      { id: "critical-components-list", name: "Critical Components Master List" },
+      { id: "critical-equipment-schedule", name: "Maintenance Schedule & Status" },
+    ],
+  },
+  {
+    id: "lsa-ffa-equipment",
+    title: "LSA/FFA Equipment",
+    icon: LifeBuoy,
+    reports: [
+      { id: "lsa-ffa-master-list", name: "LSA/FFA Equipment Master List" },
+      { id: "lsa-ffa-maintenance-schedule", name: "Maintenance Schedule & Status" },
+    ],
+  },
+];
 
 const ReportsModule = () => {
-  const { isSailAdmin } = useUIRole();
   const { setVesselId } = useVessel();
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [globalFilters, setGlobalFilters] = useState<FilterValues>({
     vessel: "all",
@@ -57,112 +140,24 @@ const ReportsModule = () => {
     priority: "all"
   });
 
-  const reportCategories: ReportCategory[] = [
-    {
-      id: "planner",
-      title: "Maintenance Planner",
-      description: "Consolidated planning view with calendar and RH-based jobs, workload by rank, and exports",
-      icon: Calendar,
-      reportCount: 1,
-      lastGenerated: "Live",
-      color: "border-blue-500",
-      iconBg: "bg-blue-500",
-      iconBgLight: "bg-blue-100 text-blue-600"
-    },
-    {
-      id: "maintenance",
-      title: "Maintenance & Work Orders",
-      description: "Due jobs, overdue tasks, completion summaries, and work performance reports",
-      icon: ClipboardList,
-      reportCount: 10,
-      lastGenerated: "2 hours ago",
-      color: "border-blue-500",
-      iconBg: "bg-blue-500",
-      iconBgLight: "bg-blue-100 text-blue-600"
-    },
-    {
-      id: "running-hours",
-      title: "Running Hours & Condition",
-      description: "Equipment utilization, anomalies, and condition monitoring trends",
-      icon: Clock,
-      reportCount: 2,
-      lastGenerated: "4 hours ago", 
-      color: "border-blue-500",
-      iconBg: "bg-blue-500",
-      iconBgLight: "bg-blue-100 text-blue-600"
-    },
-    {
-      id: "spares",
-      title: "Inventory - Spares",
-      description: "Stock levels, consumption, reorder proposals, and movement analysis",
-      icon: Package,
-      reportCount: 3,
-      lastGenerated: "1 day ago",
-      color: "border-blue-500",
-      iconBg: "bg-blue-500",
-      iconBgLight: "bg-blue-100 text-blue-600"
-    },
-    {
-      id: "stores",
-      title: "Inventory - Stores/Lubes/Chemicals",
-      description: "Stores consumption, lubes tracking, chemical expiry, and non-moving items",
-      icon: Store,
-      reportCount: 5,
-      lastGenerated: "6 hours ago",
-      color: "border-blue-500",
-      iconBg: "bg-blue-500",
-      iconBgLight: "bg-blue-100 text-blue-600"
-    },
-    {
-      id: "ihm",
-      title: "IHM (Inventory of Hazardous Materials)",
-      description: "Hazardous materials tracking and evidence documentation",
-      icon: Biohazard,
-      reportCount: 1,
-      lastGenerated: "3 days ago",
-      color: "border-blue-500",
-      iconBg: "bg-blue-500",
-      iconBgLight: "bg-blue-100 text-blue-600"
-    },
-    {
-      id: "change-requests",
-      title: "Modify PMS (Change Requests)",
-      description: "Change request status and approved changes audit trail",
-      icon: Settings2,
-      reportCount: 1,
-      lastGenerated: "5 hours ago",
-      color: "border-blue-500",
-      iconBg: "bg-blue-500",
-      iconBgLight: "bg-blue-100 text-blue-600"
-    },
-    {
-      id: "critical-equipment",
-      title: "Critical Equipment",
-      description: "Safety-critical components tracking, compliance reports, and maintenance oversight",
-      icon: AlertTriangle,
-      reportCount: 2,
-      color: "border-red-500",
-      iconBg: "bg-red-500",
-      iconBgLight: "bg-red-100 text-red-600"
-    },
-    {
-      id: "lsa-ffa-equipment",
-      title: "LSA/FFA Equipment",
-      description: "Life-saving and fire-fighting equipment tracking, statutory compliance reports, and maintenance schedules",
-      icon: LifeBuoy,
-      reportCount: 2,
-      color: "border-orange-500",
-      iconBg: "bg-orange-500",
-      iconBgLight: "bg-orange-100 text-orange-600"
-    },
-  ];
-
-  const handleCategoryClick = (categoryId: string) => {
-    setSelectedCategory(categoryId);
+  const toggleCategory = (categoryId: string) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
+      } else {
+        next.add(categoryId);
+      }
+      return next;
+    });
   };
 
-  const handleBackToMain = () => {
-    setSelectedCategory(null);
+  const handleReportSelect = (categoryId: string, reportId: string) => {
+    setSelectedCategoryId(categoryId);
+    setSelectedReportId(reportId);
+    if (!expandedCategories.has(categoryId)) {
+      setExpandedCategories(prev => new Set(prev).add(categoryId));
+    }
   };
 
   const handleFiltersChange = useCallback((filters: FilterValues) => {
@@ -186,125 +181,60 @@ const ReportsModule = () => {
     handleFiltersReset();
   };
 
-  const hasActiveFilters = () => {
-    return searchQuery !== "" || 
-           (globalFilters.vessel && globalFilters.vessel !== "all") ||
-           globalFilters.dateRange.from !== null ||
-           globalFilters.dateRange.to !== null;
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery.trim()) return REPORT_CATEGORIES;
+    const q = searchQuery.toLowerCase();
+    return REPORT_CATEGORIES
+      .map(cat => {
+        const matchedReports = cat.reports.filter(r => r.name.toLowerCase().includes(q));
+        const categoryMatches = cat.title.toLowerCase().includes(q);
+        if (categoryMatches) return cat;
+        if (matchedReports.length > 0) return { ...cat, reports: matchedReports };
+        return null;
+      })
+      .filter(Boolean) as ReportCategory[];
+  }, [searchQuery]);
+
+  const selectedReportName = useMemo(() => {
+    if (!selectedCategoryId || !selectedReportId) return null;
+    const cat = REPORT_CATEGORIES.find(c => c.id === selectedCategoryId);
+    return cat?.reports.find(r => r.id === selectedReportId)?.name || null;
+  }, [selectedCategoryId, selectedReportId]);
+
+  const renderCategoryContent = () => {
+    if (!selectedCategoryId) return null;
+
+    const noop = () => {};
+
+    switch (selectedCategoryId) {
+      case "maintenance":
+        return <MaintenanceReports onBack={noop} globalFilters={globalFilters} embedded selectedReportId={selectedReportId} />;
+      case "running-hours":
+        return <RunningHoursReports onBack={noop} globalFilters={globalFilters} embedded selectedReportId={selectedReportId} />;
+      case "spares":
+        return <SparesReports onBack={noop} globalFilters={globalFilters} embedded selectedReportId={selectedReportId} />;
+      case "stores":
+        return <StoresReports onBack={noop} globalFilters={globalFilters} embedded selectedReportId={selectedReportId} />;
+      case "ihm":
+        return <IhmReports onBack={noop} globalFilters={globalFilters} embedded selectedReportId={selectedReportId} />;
+      case "change-requests":
+        return <ChangeRequestReports onBack={noop} globalFilters={globalFilters} embedded selectedReportId={selectedReportId} />;
+      case "critical-equipment":
+        return <CriticalEquipmentReports onBack={noop} globalFilters={globalFilters} embedded selectedReportId={selectedReportId} />;
+      case "lsa-ffa-equipment":
+        return <LsaFfaReports onBack={noop} globalFilters={globalFilters} embedded selectedReportId={selectedReportId} />;
+      default:
+        return null;
+    }
   };
-
-  // Render category-specific views
-  if (selectedCategory === "planner") {
-    return <MaintenancePlanner onBack={handleBackToMain} globalFilters={globalFilters} />;
-  }
-
-  if (selectedCategory === "maintenance") {
-    return <MaintenanceReports onBack={handleBackToMain} globalFilters={globalFilters} />;
-  }
-
-  if (selectedCategory === "running-hours") {
-    return <RunningHoursReports onBack={handleBackToMain} globalFilters={globalFilters} />;
-  }
-
-  if (selectedCategory === "spares") {
-    return <SparesReports onBack={handleBackToMain} globalFilters={globalFilters} />;
-  }
-
-  if (selectedCategory === "stores") {
-    return <StoresReports onBack={handleBackToMain} globalFilters={globalFilters} />;
-  }
-
-  if (selectedCategory === "ihm") {
-    return <IhmReports onBack={handleBackToMain} globalFilters={globalFilters} />;
-  }
-
-  if (selectedCategory === "change-requests") {
-    return <ChangeRequestReports onBack={handleBackToMain} globalFilters={globalFilters} />;
-  }
-
-  if (selectedCategory === "critical-equipment") {
-    return <CriticalEquipmentReports onBack={handleBackToMain} globalFilters={globalFilters} />;
-  }
-
-  if (selectedCategory === "lsa-ffa-equipment") {
-    return <LsaFfaReports onBack={handleBackToMain} globalFilters={globalFilters} />;
-  }
-
-  // TODO: Add other category components when implemented
-
-  const plannerCategory = reportCategories.find(cat => cat.id === "planner")!;
-  const PlannerIcon = plannerCategory.icon;
-
-  if (LIMIT_REPORTS) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800" data-testid="G1"><Marker id="G1" />Reports</h1>
-          {isSailAdmin && (
-            <div className="flex gap-3">
-              <Button variant="outline" className="flex items-center gap-2" data-testid="G5">
-                <Marker id="G5" />
-                <Calendar className="h-4 w-4" />
-                Schedule Reports
-              </Button>
-              <Button variant="outline" className="flex items-center gap-2" data-testid="G6">
-                <Marker id="G6" />
-                <Download className="h-4 w-4" />
-                Export Queue
-              </Button>
-            </div>
-          )}
-        </div>
-
-        <Card 
-          className={`cursor-pointer hover:shadow-md transition-shadow border-l-4 ${plannerCategory.color} max-w-md`}
-          onClick={() => handleCategoryClick(plannerCategory.id)}
-          data-testid="G21"
-        >
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between mb-3">
-              <div className={`p-2 rounded-lg ${plannerCategory.iconBg} text-white`}>
-                <Marker id="G21" />
-                <PlannerIcon className="h-5 w-5" />
-              </div>
-              <Badge variant="secondary">{plannerCategory.reportCount} reports</Badge>
-            </div>
-            <h3 className="font-semibold text-gray-800 mb-2">{plannerCategory.title}</h3>
-            <p className="text-sm text-gray-600 mb-3">{plannerCategory.description}</p>
-            {plannerCategory.lastGenerated && (
-              <p className="text-xs text-gray-500">Last generated: {plannerCategory.lastGenerated}</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <p className="text-lg font-semibold text-gray-800 dark:text-white">Other Reports Coming Soon...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
-      {/* Header - Fixed */}
-      <div className="flex-shrink-0 mb-6">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-800" data-testid="G1"><Marker id="G1" />Reports</h1>
-          {isSailAdmin && (
-            <div className="flex gap-3">
-              <Button variant="outline" className="flex items-center gap-2" data-testid="G5">
-                <Marker id="G5" />
-                <Calendar className="h-4 w-4" />
-                Schedule Reports
-              </Button>
-              <Button variant="outline" className="flex items-center gap-2" data-testid="G6">
-                <Marker id="G6" />
-                <Download className="h-4 w-4" />
-                Export Queue
-              </Button>
-            </div>
-          )}
+      <div className="flex-shrink-0 mb-4">
+        <div className="flex justify-between items-center mb-3">
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-foreground" data-testid="G1"><Marker id="G1" />Reports</h1>
         </div>
 
-        {/* Filters - Single Row */}
         <div className="flex items-center gap-3 flex-wrap">
           <GlobalFilters
             filters={globalFilters}
@@ -313,13 +243,13 @@ const ReportsModule = () => {
             className="border-0 shadow-none bg-transparent p-0 mb-0 flex-shrink-0"
             vesselOnly
           />
-          <div className="relative w-80">
+          <div className="relative w-72">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               placeholder="Search reports..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 h-9"
               data-testid="G3"
             />
           </div>
@@ -342,53 +272,90 @@ const ReportsModule = () => {
         </div>
       </div>
 
-      {/* Content - Scrollable */}
-      <div className="flex-1 overflow-y-auto space-y-6">
+      <div className="flex flex-1 gap-0 overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg">
+        <div
+          className="flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 overflow-y-auto"
+          style={{ width: '300px' }}
+          data-testid="report-tree-panel"
+        >
+          <div className="py-2">
+            {filteredCategories.map((category) => {
+              const Icon = category.icon;
+              const isExpanded = expandedCategories.has(category.id);
+              const isCategorySelected = selectedCategoryId === category.id;
 
-      {/* Report Categories - Full Width Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {reportCategories
-          .filter(category => {
-            if (!searchQuery.trim()) return true;
-            const q = searchQuery.toLowerCase();
-            return category.title.toLowerCase().includes(q) ||
-                   category.description.toLowerCase().includes(q);
-          })
-          .map((category, index) => {
-          const Icon = category.icon;
-          const markerId = `G${21 + index}`;
-          return (
-            <Card 
-              key={category.id}
-              className="cursor-pointer hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-700"
-              onClick={() => handleCategoryClick(category.id)}
-              data-testid={markerId}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <div className={`p-2 rounded ${category.iconBgLight} flex-shrink-0`}>
-                    <Marker id={markerId} />
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1 gap-2">
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
-                        {category.title}
-                      </h3>
-                      <Badge variant="secondary" className="text-xs flex-shrink-0">
-                        {category.reportCount} reports
-                      </Badge>
+              return (
+                <div key={category.id} data-testid={`tree-category-${category.id}`}>
+                  <button
+                    className={`w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                      isCategorySelected && !selectedReportId
+                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                        : 'text-gray-700 dark:text-gray-300'
+                    }`}
+                    onClick={() => toggleCategory(category.id)}
+                    data-testid={`button-toggle-${category.id}`}
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                    )}
+                    <Icon className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">{category.title}</span>
+                    <span className="ml-auto text-xs text-gray-400 flex-shrink-0">{category.reports.length}</span>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="ml-4">
+                      {category.reports.map((report) => {
+                        const isSelected = selectedCategoryId === category.id && selectedReportId === report.id;
+                        return (
+                          <button
+                            key={report.id}
+                            className={`w-full flex items-center gap-2 pl-7 pr-3 py-2 text-left text-sm transition-colors ${
+                              isSelected
+                                ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 font-medium'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200'
+                            }`}
+                            onClick={() => handleReportSelect(category.id, report.id)}
+                            data-testid={`button-report-${report.id}`}
+                          >
+                            <FileText className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span className="truncate">{report.name}</span>
+                          </button>
+                        );
+                      })}
                     </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
-                      {category.description}
-                    </p>
-                  </div>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+              );
+            })}
+
+            {filteredCategories.length === 0 && (
+              <div className="px-4 py-8 text-center text-sm text-gray-500">
+                No reports match your search.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto bg-white dark:bg-background" data-testid="report-viewer-panel">
+          {selectedCategoryId && selectedReportId ? (
+            <div className="h-full flex flex-col">
+              {renderCategoryContent()}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center" data-testid="report-placeholder">
+                <FileText className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-2">Select a Report</h3>
+                <p className="text-sm text-gray-400 dark:text-gray-500 max-w-sm">
+                  Expand a category in the tree on the left and click on a report to view it here.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
