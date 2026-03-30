@@ -11,13 +11,14 @@ import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { secureGetItem } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
 
-function resolveProfileName(profile: Record<string, any>): { fullName: string | null; username: string | null } {
+function resolveProfileName(profile: Record<string, any>): { fullName: string | null; username: string | null; userUuid: string | null } {
   const fullName = profile.fullName
     || profile.full_name
     || profile.name
     || profile.displayName
     || profile.display_name
     || profile.userName
+    || [profile.firstname, profile.lastname].filter(Boolean).join(' ')
     || [profile.first_name, profile.last_name].filter(Boolean).join(' ')
     || [profile.firstName, profile.lastName].filter(Boolean).join(' ')
     || null;
@@ -26,7 +27,12 @@ function resolveProfileName(profile: Record<string, any>): { fullName: string | 
     || profile.userName
     || profile.login
     || null;
-  return { fullName, username };
+  const userUuid = profile.userId
+    || profile.user_id
+    || profile.uuid
+    || profile.userUuid
+    || null;
+  return { fullName, username, userUuid };
 }
 
 const DEFAULT_USER: PublicUser = {
@@ -40,6 +46,7 @@ const DEFAULT_USER: PublicUser = {
   department: null,
   isActive: true,
   crewDesignation: "Marine Manager",
+  userUuid: "00000000-0000-0000-0000-000000000001",
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -86,10 +93,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         displayName: encryptedProfile.displayName,
         userName: encryptedProfile.userName,
         username: encryptedProfile.username,
+        firstname: encryptedProfile.firstname,
+        lastname: encryptedProfile.lastname,
         firstName: encryptedProfile.firstName,
         lastName: encryptedProfile.lastName,
         first_name: encryptedProfile.first_name,
         last_name: encryptedProfile.last_name,
+        userId: encryptedProfile.userId,
       });
     }
 
@@ -115,6 +125,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         department: encryptedProfile.department || null,
         isActive: true,
         crewDesignation: encryptedProfile.crewDesignation || null,
+        userUuid: resolved.userUuid || undefined,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -137,10 +148,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
           displayName: plainProfile.displayName,
           userName: plainProfile.userName,
           username: plainProfile.username,
+          firstname: plainProfile.firstname,
+          lastname: plainProfile.lastname,
           firstName: plainProfile.firstName,
           lastName: plainProfile.lastName,
           first_name: plainProfile.first_name,
           last_name: plainProfile.last_name,
+          userId: plainProfile.userId,
         });
       }
 
@@ -166,6 +180,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           department: plainProfile.department || null,
           isActive: true,
           crewDesignation: plainProfile.crewDesignation || null,
+          userUuid: resolved.userUuid || undefined,
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -235,6 +250,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       department: user.department,
       isActive: user.isActive,
       crewDesignation: user.crewDesignation,
+      userUuid: user.userUuid,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };

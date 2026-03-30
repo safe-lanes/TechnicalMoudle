@@ -368,6 +368,7 @@ const RunningHours = () => {
           dateUpdated: update.dateUpdated,
           comments: update.comments || '',
           userId: currentUser?.fullName || currentUser?.username || 'system',
+          userUuid: currentUser?.userUuid || undefined,
           meterReplaced: update.meterReplaced,
           oldMeterFinal: update.oldMeterFinal,
           newMeterStart: update.newMeterStart
@@ -404,7 +405,8 @@ const RunningHours = () => {
       return await apiRequest('PUT', `/technical/api/running-hours/child/${data.componentId}`, {
         newRHValue: data.newRHValue,
         comments: data.comments || '',
-        userId: currentUser?.fullName || currentUser?.username || 'system'
+        userId: currentUser?.fullName || currentUser?.username || 'system',
+        userUuid: currentUser?.userUuid || undefined
       });
     },
     onSuccess: () => {
@@ -651,6 +653,7 @@ const RunningHours = () => {
       dateUpdated: dateLocal,
       comments: updateForm.comments,
       userId: currentUser?.fullName || currentUser?.username || 'system',
+      userUuid: currentUser?.userUuid || undefined,
       meterReplaced,
       oldMeterFinal: meterReplaced ? updateForm.oldMeterFinal : undefined,
       newMeterStart: meterReplaced ? updateForm.newMeterStart : undefined,
@@ -678,6 +681,7 @@ const RunningHours = () => {
       dateUpdated: pendingZeroRHUpdate.dateLocal,
       comments: pendingZeroRHUpdate.comments,
       userId: currentUser?.fullName || currentUser?.username || 'system',
+      userUuid: currentUser?.userUuid || undefined,
       meterReplaced: true,
       isRenewalReset: true,
       renewalActionType: renewalData.renewalActionType,

@@ -1348,6 +1348,7 @@ export class PostgresStorage {
     newRHValue: number;
     updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION';
     userId: string;
+    userUuid?: string;
     comments?: string;
   }): Promise<{ masterUpdated: Component; inheritedUpdated: number }> {
     const db = await getDb();
@@ -1400,7 +1401,6 @@ export class PostgresStorage {
     // Get all inherited components linked to this master
     const inheritedComponents = await this.getInheritedComponents(component.cuuid, masterVesselId);
 
-    // Create audit entry for the master component update
     await db.insert(runningHoursAudit).values({
       vesselId: masterVesselId,
       componentId: component.cuuid,
@@ -1411,6 +1411,7 @@ export class PostgresStorage {
       dateUpdatedTZ: 'UTC',
       enteredAtUTC: now,
       userId: params.userId,
+      updatedByUuid: params.userUuid || null,
       source: params.updateSource.toLowerCase(),
       notes: params.comments || null,
       meterReplaced: false,
@@ -6266,6 +6267,7 @@ export class PostgresStorage {
     dateUpdated: string;
     comments?: string;
     userId?: string;
+    userUuid?: string;
     meterReplaced?: boolean;
     oldMeterFinal?: string;
     newMeterStart?: string;
@@ -6276,7 +6278,7 @@ export class PostgresStorage {
     renewalEvidenceUrls?: string[];
   }): Promise<{ updatedComponents: number; auditsCreated: number; workOrdersGenerated: number; workOrders: any[] }> {
     const db = await getDb();
-    const { parentComponentId, mode, value, dateUpdated, comments, userId, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
+    const { parentComponentId, mode, value, dateUpdated, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
     const now = new Date();
     
     // First resolve the parent component (dual-lookup: cuuid or legacy id)
@@ -6391,6 +6393,7 @@ export class PostgresStorage {
         dateUpdatedTZ: 'UTC',
         enteredAtUTC: now,
         userId: userId || 'system',
+        updatedByUuid: userUuid || null,
         source: 'cascade',
         notes: meterReplaced 
           ? `Meter replaced. Old meter final: ${oldMeterFinal || currentRH}. New meter start: ${newMeterStart || value}. ${comments || ''}`
@@ -6462,6 +6465,7 @@ export class PostgresStorage {
               dateUpdatedTZ: 'UTC',
               enteredAtUTC: now,
               userId: userId || 'system',
+              updatedByUuid: userUuid || null,
               source: 'inherited_cascade',
               comments: `Inherited delta ${delta} from MASTER ${parent.componentCode || parent.name}`,
             });
@@ -6503,7 +6507,6 @@ export class PostgresStorage {
         .set(childUpdateData)
         .where(eq(components.cuuid, child.cuuid));
       
-      // Log audit for child
       await db.insert(runningHoursAudit).values({
         vesselId: child.vesselId || 'unknown',
         componentId: child.cuuid,
@@ -6514,6 +6517,7 @@ export class PostgresStorage {
         dateUpdatedTZ: 'UTC',
         enteredAtUTC: now,
         userId: userId || 'system',
+        updatedByUuid: userUuid || null,
         source: 'cascade',
         comments: comments,
       });

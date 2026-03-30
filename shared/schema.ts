@@ -33,8 +33,9 @@ export type UserRole = "Ship" | "Office" | "PMS Admin" | "Sail Admin" | "Super A
 
 export type PublicUser = Omit<User, "password" | "role"> & {
   role: UserRole;
-  crewDesignation?: string; // Extended field for crew designation/office position (from external user data)
-  userType?: "Office" | "Ship"; // Extended field for user type (Office = shore-based, Ship = vessel-based)
+  crewDesignation?: string;
+  userType?: "Office" | "Ship";
+  userUuid?: string;
 };
 
 // Fleets Table - Fleet registry for grouping vessels
@@ -149,8 +150,9 @@ export const runningHoursAudit = pgTable("running_hours_audit", {
   renewalReason: text("renewal_reason"), // Mandatory reason when isRenewalReset = true
   renewalReference: text("renewal_reference"), // Optional work order / job ID reference
   renewalEvidenceUrls: json("renewal_evidence_urls"), // Optional array of uploaded file URLs
-  componentCode: text("component_code"), // Component code for reporting
-  componentName: text("component_name"), // Component name for reporting
+  componentCode: text("component_code"),
+  componentName: text("component_name"),
+  updatedByUuid: text("updated_by_uuid"),
 }, (table) => ({
   componentIdIdx: index("idx_component_entered").on(table.componentId, table.enteredAtUTC),
   componentDateIdx: index("idx_component_date").on(table.componentId, table.dateUpdatedLocal),
@@ -180,8 +182,9 @@ export const cascadeRunningHoursSchema = z.object({
   oldMeterFinal: z.string().optional(),
   newMeterStart: z.string().optional(),
   userId: z.string().default('admin'),
-  userRole: z.string().optional().default('Ship'), // User role for validation (Ship, Office, PMS Admin)
-  adminOverride: z.boolean().optional().default(false), // Admin override for exceeding daily limits
+  userUuid: z.string().optional(),
+  userRole: z.string().optional().default('Ship'),
+  adminOverride: z.boolean().optional().default(false),
   // Renewal/Replacement fields (required when value = 0)
   isRenewalReset: z.boolean().optional().default(false),
   renewalActionType: z.enum(RENEWAL_ACTION_TYPES).optional(),
@@ -244,6 +247,7 @@ export const updateMasterRHSchema = z.object({
   newRHValue: z.number().nonnegative(),
   updateSource: z.enum(RH_UPDATE_SOURCES).default('MANUAL'),
   userId: z.string(),
+  userUuid: z.string().optional(),
   comments: z.string().optional(),
 });
 

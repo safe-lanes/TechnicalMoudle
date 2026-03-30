@@ -277,6 +277,7 @@ export interface IStorage {
     dateUpdated: string;
     comments?: string;
     userId?: string;
+    userUuid?: string;
     meterReplaced?: boolean;
     oldMeterFinal?: string;
     newMeterStart?: string;
@@ -309,6 +310,7 @@ export interface IStorage {
     newRHValue: number;
     updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION';
     userId: string;
+    userUuid?: string;
     comments?: string;
   }): Promise<{ 
     masterUpdated: Component;

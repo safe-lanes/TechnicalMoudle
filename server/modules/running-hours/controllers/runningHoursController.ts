@@ -14,6 +14,13 @@ function resolveUserId(req: Request): string {
   return bodyUserId;
 }
 
+function resolveUserUuid(req: Request): string | undefined {
+  const bodyUuid = (req.body?.userUuid as string) || '';
+  if (bodyUuid) return bodyUuid;
+  const user = (req as any).user;
+  return user?.userUuid || undefined;
+}
+
 // ── Running Hours Audits (from routes.ts) ──
 
 export async function getAudits(req: Request, res: Response) {
@@ -24,6 +31,7 @@ export async function getAudits(req: Request, res: Response) {
 export async function createAudit(req: Request, res: Response) {
   try {
     req.body.userId = resolveUserId(req);
+    req.body.updatedByUuid = resolveUserUuid(req);
     const audit = await rhService.createAudit(req.body);
     res.status(201).json(audit);
   } catch (error: any) {
@@ -39,6 +47,7 @@ export async function createAudit(req: Request, res: Response) {
 export async function cascadeUpdate(req: Request, res: Response) {
   try {
     req.body.userId = resolveUserId(req);
+    req.body.userUuid = resolveUserUuid(req);
     const result = await rhService.cascadeUpdate(req.body);
     res.json(result);
   } catch (error: any) {
@@ -85,6 +94,7 @@ export async function listChildren(req: Request, res: Response) {
 export async function updateChildRH(req: Request, res: Response) {
   try {
     req.body.userId = resolveUserId(req);
+    req.body.userUuid = resolveUserUuid(req);
     const result = await rhService.updateChildRH(req.params.componentId, req.body);
     res.json(result);
   } catch (error: any) {
@@ -99,6 +109,7 @@ export async function updateChildRH(req: Request, res: Response) {
 export async function resetChildRH(req: Request, res: Response) {
   try {
     req.body.userId = resolveUserId(req);
+    req.body.userUuid = resolveUserUuid(req);
     const result = await rhService.resetChildRH(req.params.componentId, req.body);
     res.json(result);
   } catch (error: any) {
@@ -148,6 +159,7 @@ export async function updateRHConfig(req: Request, res: Response) {
 export async function updateMasterRH(req: Request, res: Response) {
   try {
     req.body.userId = resolveUserId(req);
+    req.body.userUuid = resolveUserUuid(req);
     const result = await rhService.updateMasterRH(req.params.componentId, req.body);
     res.json(result);
   } catch (error: any) {

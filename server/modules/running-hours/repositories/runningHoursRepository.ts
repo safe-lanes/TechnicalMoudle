@@ -86,6 +86,7 @@ export async function updateMasterRunningHours(params: {
   newRHValue: number;
   updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION';
   userId: string;
+  userUuid?: string;
   comments?: string;
 }): Promise<{
   masterUpdated: Component;

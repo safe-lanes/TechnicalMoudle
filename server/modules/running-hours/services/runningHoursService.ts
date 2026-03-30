@@ -279,11 +279,12 @@ export async function updateChildRH(componentId: string, body: {
   newRHValue: number;
   comments?: string;
   userId?: string;
+  userUuid?: string;
   userRole?: string;
   adminOverride?: boolean;
   dateUpdated?: string;
 }) {
-  const { newRHValue, comments, userId, userRole, adminOverride, dateUpdated } = body;
+  const { newRHValue, comments, userId, userUuid, userRole, adminOverride, dateUpdated } = body;
 
   // Validate newRHValue
   if (typeof newRHValue !== 'number' || newRHValue < 0) {
@@ -341,7 +342,6 @@ export async function updateChildRH(componentId: string, body: {
     lastUpdated: new Date().toISOString()
   });
 
-  // Create audit entry for the update
   await repo.createRunningHoursAudit({
     vesselId: component.vesselId || '',
     componentId: componentId,
@@ -352,6 +352,7 @@ export async function updateChildRH(componentId: string, body: {
     dateUpdatedTZ: 'UTC',
     enteredAtUTC: new Date(),
     userId: userId || 'system',
+    updatedByUuid: userUuid || null,
     source: 'manual',
     notes: comments || 'Manual update of child component RH',
     meterReplaced: false,
@@ -377,9 +378,10 @@ export async function updateChildRH(componentId: string, body: {
 export async function resetChildRH(componentId: string, body: {
   oldMeterFinal?: string;
   userId?: string;
+  userUuid?: string;
   notes?: string;
 }) {
-  const { oldMeterFinal, userId, notes } = body;
+  const { oldMeterFinal, userId, userUuid, notes } = body;
 
   const component = await repo.getComponent(componentId);
   if (!component) {
@@ -395,7 +397,6 @@ export async function resetChildRH(componentId: string, body: {
     lastUpdated: new Date().toISOString()
   });
 
-  // Create audit entry for the reset
   await repo.createRunningHoursAudit({
     vesselId: component.vesselId || '',
     componentId: componentId,
@@ -406,6 +407,7 @@ export async function resetChildRH(componentId: string, body: {
     dateUpdatedTZ: 'UTC',
     enteredAtUTC: new Date(),
     userId: userId || 'system',
+    updatedByUuid: userUuid || null,
     source: 'reset',
     notes: notes || 'Component replaced - RH reset to 0',
     meterReplaced: true,
@@ -566,7 +568,7 @@ export async function updateMasterRH(componentId: string, body: unknown) {
     throw new ValidationError('Invalid request body', { details: parseResult.error.format() });
   }
 
-  const { newRHValue, updateSource, userId, userRole, adminOverride, comments, dateUpdated } = parseResult.data;
+  const { newRHValue, updateSource, userId, userUuid, userRole, adminOverride, comments, dateUpdated } = parseResult.data;
 
   // Verify component exists and is a MASTER type
   const component = await repo.getComponent(componentId);
@@ -610,6 +612,7 @@ export async function updateMasterRH(componentId: string, body: unknown) {
     newRHValue,
     updateSource,
     userId,
+    userUuid,
     comments
   });
 

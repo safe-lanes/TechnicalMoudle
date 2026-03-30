@@ -73,6 +73,7 @@ export const mockAuthMiddleware = (req: AuthenticatedRequest, res: Response, nex
     role: "Sail Admin",
     vesselId: null,
     isActive: true,
+    userUuid: "00000000-0000-0000-0000-000000000001",
     createdAt: new Date(),
     updatedAt: new Date(),
   };
