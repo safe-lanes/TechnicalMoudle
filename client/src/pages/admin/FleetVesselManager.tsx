@@ -160,11 +160,13 @@ function DroppableClassZone({
   children: React.ReactNode;
   vesselCount: number;
   isActive: boolean;
+  fleetId: number | string;
+  classId?: string | null;
   onRename?: () => void;
   onDelete?: () => void;
   isUnclassified?: boolean;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id });
+  const { setNodeRef, isOver } = useDroppable({ id, data: { fleetId, classId: classId ?? null } });
 
   return (
     <div
@@ -261,6 +263,7 @@ function FleetClassesContent({
           label="All Vessels"
           vesselCount={fleetVessels.length}
           isActive={false}
+          fleetId={fleet.id}
           isUnclassified
         >
           {fleetVessels.map(vessel => (
@@ -286,10 +289,12 @@ function FleetClassesContent({
         return (
           <DroppableClassZone
             key={fc.fcuuid}
-            id={`class-${fleet.id}-${fc.fcuuid}`}
+            id={`class-${fc.fcuuid}`}
             label={fc.name}
             vesselCount={classVessels.length}
             isActive={true}
+            fleetId={fleet.id}
+            classId={fc.fcuuid}
             onRename={() => onRenameClass(fc)}
             onDelete={() => onDeleteClass(fc)}
           >
@@ -304,6 +309,7 @@ function FleetClassesContent({
         label="Unclassified"
         vesselCount={unclassifiedVessels.length}
         isActive={false}
+        fleetId={fleet.id}
         isUnclassified
       >
         {unclassifiedVessels.map(vessel => (
@@ -558,27 +564,13 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
     if (!over) return;
     const vessel = active.data.current?.vessel as VesselWithFleet;
     if (!vessel) return;
-    const dropId = over.id as string;
-    let newClassId: string | null = null;
-    if (dropId.startsWith("class-")) {
-      const parts = dropId.split("-");
-      const dropFleetId = parts[1];
-      const fcuuid = parts.slice(2).join("-");
-      if (String(dropFleetId) !== String(vessel.fleetId)) {
-        toast({ title: "Cannot move vessel to a different fleet's class", variant: "destructive" });
-        return;
-      }
-      newClassId = fcuuid;
-    } else if (dropId.startsWith("unclassified-")) {
-      const dropFleetId = dropId.replace("unclassified-", "");
-      if (String(dropFleetId) !== String(vessel.fleetId)) {
-        toast({ title: "Cannot move vessel to a different fleet's class", variant: "destructive" });
-        return;
-      }
-      newClassId = null;
-    } else {
+    const dropData = over.data.current as { fleetId: number | string; classId: string | null } | undefined;
+    if (!dropData) return;
+    if (String(dropData.fleetId) !== String(vessel.fleetId)) {
+      toast({ title: "Cannot move vessel to a different fleet's class", variant: "destructive" });
       return;
     }
+    const newClassId = dropData.classId;
     if (vessel.classId === newClassId || (!vessel.classId && newClassId === null)) return;
     assignVesselClassMutation.mutate({ vesselId: vessel.vuuid, classId: newClassId });
   };
