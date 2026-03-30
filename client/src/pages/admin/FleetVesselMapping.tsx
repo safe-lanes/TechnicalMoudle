@@ -208,7 +208,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const selectedFleetSpareLinkedDetails = useMemo(() => {
     if (!selectedFleetSpare) return [];
     return selectedFleetSpareMappings.map((m) => {
-      const vesselSpare = m.spareId ? vesselSparesData.find((vs: any) => String(vs.id) === String(m.spareId)) : null;
+      const vesselSpare = m.spareId ? vesselSparesData.find((vs: any) => String(vs.suuid) === String(m.spareId)) : null;
       return {
         ...m,
         vesselPartCode: vesselSpare?.partCode || m.spareId || "-",
@@ -274,7 +274,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const selectedFleetJobLinkedDetails = useMemo(() => {
     if (!selectedFleetJob) return [];
     return selectedFleetJobMappings.map((m) => {
-      const vesselJob = m.jobId ? vesselJobsData.find((vj: any) => vj.id === m.jobId) : null;
+      const vesselJob = m.jobId ? vesselJobsData.find((vj: any) => vj.juuid === m.jobId) : null;
       return {
         ...m,
         vesselJobNo: vesselJob?.jobNo || m.jobId || "-",
@@ -523,7 +523,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
       return {
         vesselComponentCode: vc.componentCode || "",
         vesselComponentName: vc.name || "",
-        vesselComponentId: vc.id,
+        vesselComponentId: vc.cuuid,
         fleetEquipmentCode: vcFleetCode,
         fleetEquipmentName: matched ? (fleetCodeToName.get(vcFleetCode) || "") : "",
         matched,
@@ -552,7 +552,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
         componentName: vj.componentName || "",
         jobCode: vjJobCode,
         jobTitle: fleetJob?.woTitle || vj.jobTitle || vj.title || "",
-        vesselJobId: vj.id || "",
+        vesselJobId: vj.juuid || "",
         matched,
       };
     });
@@ -582,7 +582,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
         componentName: fs.fleetEquipmentName || "",
         partCode: fs.partCode,
         partName: fs.partName || "",
-        vesselSpareId: vesselSpare ? String(vesselSpare.id) : "",
+        vesselSpareId: vesselSpare ? String(vesselSpare.suuid) : "",
         matched,
       };
     });
@@ -690,7 +690,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
         await apiRequest("POST", "/technical/api/fleet-admin/fleet-job-mappings", {
           fleetEquipmentCode: selectedFleetJobObj.fleetEquipmentCode,
           jobCode: selectedFleetJobObj.jobCode,
-          jobId: vesselJob.id,
+          jobId: vesselJob.juuid,
           vesselCode: selectedVessel,
           mappedBy: "admin",
           isActive: true,
@@ -731,7 +731,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
           vesselCode: selectedVessel,
           componentCode: vc.componentCode || "",
           componentName: vc.name || "",
-          componentId: vc.id,
+          componentId: vc.cuuid,
           mappedBy: "admin",
           isActive: true,
         });
@@ -803,14 +803,14 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     let failCount = 0;
 
     for (const vesselSpareId of Array.from(selectedVesselSpares)) {
-      const vesselSpare = vesselSparesData.find((vs: any) => String(vs.id) === vesselSpareId);
+      const vesselSpare = vesselSparesData.find((vs: any) => String(vs.suuid) === vesselSpareId);
       if (!vesselSpare) { failCount++; continue; }
 
       try {
         await apiRequest("POST", "/technical/api/fleet-admin/fleet-spare-mappings", {
           fleetEquipmentCode: selectedFleetSpareObj.fleetEquipmentCode,
           partCode: selectedFleetSpareObj.partCode,
-          spareId: String(vesselSpare.id),
+          spareId: String(vesselSpare.suuid),
           vesselCode: selectedVessel,
           mappedBy: "admin",
           isActive: true,
@@ -1691,7 +1691,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                           {[...vesselJobsData].sort((a: any, b: any) => (a.componentCode || "").localeCompare(b.componentCode || "")).map((job: any) => {
                             const vesselJobKey = `${job.jobNo || job.id}|${job.componentCode || ""}`;
                             const isSelected = selectedVesselJobs.has(vesselJobKey);
-                            const isLinked = jobLinkedVesselJobIds.has(job.id);
+                            const isLinked = jobLinkedVesselJobIds.has(job.juuid);
                             return (
                               <tr
                                 key={vesselJobKey}
@@ -1997,22 +1997,22 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                         </thead>
                         <tbody>
                           {filteredSpares.map((spare: any) => {
-                            const spareId = String(spare.id);
-                            const isChecked = selectedVesselSpares.has(spareId);
-                            const isLinked = spareLinkedVesselSpareIds.has(spareId);
+                            const spareUuid = String(spare.suuid);
+                            const isChecked = selectedVesselSpares.has(spareUuid);
+                            const isLinked = spareLinkedVesselSpareIds.has(spareUuid);
                             return (
                               <tr
-                                key={spare.id}
+                                key={spare.suuid}
                                 className={`border-b text-xs cursor-pointer ${isChecked ? "bg-cyan-50 border-l-2 border-l-cyan-500" : isLinked ? "bg-green-50/50 hover:bg-green-50" : "hover:bg-blue-50/50"}`}
                                 onClick={() => {
                                   setSelectedVesselSpares((prev) => {
                                     const next = new Set(prev);
-                                    if (next.has(spareId)) next.delete(spareId);
-                                    else next.add(spareId);
+                                    if (next.has(spareUuid)) next.delete(spareUuid);
+                                    else next.add(spareUuid);
                                     return next;
                                   });
                                 }}
-                                data-testid={`row-vessel-spare-${spare.id}`}
+                                data-testid={`row-vessel-spare-${spare.suuid}`}
                               >
                                 <td className="px-2 py-2 text-center">
                                   <input
@@ -2020,7 +2020,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                                     checked={isChecked}
                                     onChange={() => {}}
                                     className="h-3.5 w-3.5 rounded border-gray-300"
-                                    data-testid={`checkbox-vessel-spare-${spare.id}`}
+                                    data-testid={`checkbox-vessel-spare-${spare.suuid}`}
                                   />
                                 </td>
                                 <td className="px-3 py-2 font-mono text-gray-600">{spare.componentCode || "-"}</td>
