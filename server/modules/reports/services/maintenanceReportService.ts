@@ -653,17 +653,9 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
   worksheet.getCell('M3').value = `Generated: ${formatDateDDMMMYYYY(new Date())}`;
   worksheet.mergeCells(`M3:Q3`);
 
-  worksheet.getCell('A4').value = `Total Jobs Completed: ${completedJobs.length}`;
-  worksheet.getCell('A4').font = { bold: true };
-  worksheet.mergeCells(`A4:E4`);
-
-  worksheet.getCell('F4').value = `Total Man-Hours: ${totalManHours.toFixed(1)}`;
-  worksheet.getCell('F4').font = { bold: true };
-  worksheet.mergeCells(`F4:L4`);
-
+  worksheet.getRow(4).height = 5;
   worksheet.getRow(5).height = 5;
   worksheet.getRow(6).height = 5;
-  worksheet.getRow(7).height = 5;
 
   // Column headers
   const headerRow = worksheet.getRow(headerRowNum);
