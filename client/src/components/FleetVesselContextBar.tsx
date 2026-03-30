@@ -40,30 +40,28 @@ export function FleetVesselContextBar({
             Dashboard
           </h1>
 
-          {!isAllVessels && (
-            <select
-              value={vesselId}
-              onChange={(e) => onVesselChange(e.target.value)}
-              style={{
-                padding: '5px 10px',
-                fontSize: '12px',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                background: '#FFFFFF',
-                color: '#374151',
-                cursor: 'pointer',
-                outline: 'none',
-                height: '32px',
-              }}
-              data-testid="select-context-vessel"
-            >
-              {vessels.map(v => (
-                <option key={v.id} value={v.id} data-testid={`option-vessel-${v.id}`}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-          )}
+          <select
+            value={vesselId}
+            onChange={(e) => onVesselChange(e.target.value)}
+            style={{
+              padding: '5px 10px',
+              fontSize: '12px',
+              border: '1px solid #e2e8f0',
+              borderRadius: '6px',
+              background: '#FFFFFF',
+              color: '#374151',
+              cursor: 'pointer',
+              outline: 'none',
+              height: '32px',
+            }}
+            data-testid="select-context-vessel"
+          >
+            {vessels.map(v => (
+              <option key={v.id} value={v.id} data-testid={`option-vessel-${v.id}`}>
+                {v.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
