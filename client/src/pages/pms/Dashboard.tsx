@@ -514,7 +514,7 @@ const Dashboard = () => {
   const filteredWorkOrdersData = useMemo(() => {
     if (!selectedCriticality || selectedCriticality === "all") return workOrdersData;
     return workOrdersData.filter(wo => {
-      const woCriticality = (wo as any).criticality?.toLowerCase();
+      const woCriticality = ((wo as WorkOrder & { criticality?: string }).criticality ?? '').toLowerCase();
       if (selectedCriticality === "critical") {
         return woCriticality === "yes";
       }
@@ -1167,6 +1167,10 @@ const Dashboard = () => {
             className="text-gray-600"
             onClick={() => {
               setSelectedCriticality("");
+              handleAllVesselsChange(false);
+              if (vessels.length > 0) {
+                handleVesselChange(vessels[0].id);
+              }
             }}
             data-testid="button-clear-dashboard-filters"
           >
