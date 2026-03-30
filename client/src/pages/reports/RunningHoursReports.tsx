@@ -633,7 +633,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
       )}
 
       {embedded && previewData && (
-        <InlineReportPreview reportData={previewData} />
+        <InlineReportPreview reportData={previewData} embedded={embedded} />
       )}
       {!embedded && (
         <ReportPreviewModal

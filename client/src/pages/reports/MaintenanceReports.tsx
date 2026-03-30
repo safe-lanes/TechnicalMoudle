@@ -1612,7 +1612,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         </>
       )}
       {embedded && previewData && (
-        <InlineReportPreview reportData={previewData} />
+        <InlineReportPreview reportData={previewData} embedded={embedded} />
       )}
       {!embedded && (
         <ReportPreviewModal

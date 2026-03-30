@@ -697,7 +697,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
       )}
 
       {embedded && previewData && (
-        <InlineReportPreview reportData={previewData} />
+        <InlineReportPreview reportData={previewData} embedded={embedded} />
       )}
       {!embedded && (
         <ReportPreviewModal

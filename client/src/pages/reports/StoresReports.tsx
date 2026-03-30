@@ -823,7 +823,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
       )}
 
       {embedded && previewData && (
-        <InlineReportPreview reportData={previewData} />
+        <InlineReportPreview reportData={previewData} embedded={embedded} />
       )}
       {!embedded && (
         <ReportPreviewModal

@@ -6,9 +6,10 @@ import type { ReportPreviewData, ReportColumn } from "@/components/reports/Repor
 interface InlineReportPreviewProps {
   reportData: ReportPreviewData | null;
   onClose?: () => void;
+  embedded?: boolean;
 }
 
-const InlineReportPreview: React.FC<InlineReportPreviewProps> = ({ reportData, onClose }) => {
+const InlineReportPreview: React.FC<InlineReportPreviewProps> = ({ reportData, onClose, embedded }) => {
   const { currentPage, pageSize, handlePageChange, handlePageSizeChange, resetPage, paginateItems } = usePagination(50);
 
   useEffect(() => {
@@ -22,21 +23,23 @@ const InlineReportPreview: React.FC<InlineReportPreviewProps> = ({ reportData, o
 
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-background" data-testid="inline-report-preview">
-      <div className="p-4 pb-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-base font-semibold text-gray-900 dark:text-foreground">{title}</h3>
-            {subtitle && <p className="text-sm text-gray-500 dark:text-muted-foreground mt-0.5">{subtitle}</p>}
-            {vessel && <p className="text-xs text-gray-400 dark:text-muted-foreground mt-0.5">Vessel: {vessel}</p>}
-            {reportData.dateRange && <p className="text-xs text-gray-400 dark:text-muted-foreground mt-0.5">Period: {reportData.dateRange}</p>}
+      {!embedded && (
+        <div className="p-4 pb-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900 dark:text-foreground">{title}</h3>
+              {subtitle && <p className="text-sm text-gray-500 dark:text-muted-foreground mt-0.5">{subtitle}</p>}
+              {vessel && <p className="text-xs text-gray-400 dark:text-muted-foreground mt-0.5">Vessel: {vessel}</p>}
+              {reportData.dateRange && <p className="text-xs text-gray-400 dark:text-muted-foreground mt-0.5">Period: {reportData.dateRange}</p>}
+            </div>
+            <Badge variant="secondary" className="flex-shrink-0">
+              {data.length} {data.length === 1 ? 'record' : 'records'}
+            </Badge>
           </div>
-          <Badge variant="secondary" className="flex-shrink-0">
-            {data.length} {data.length === 1 ? 'record' : 'records'}
-          </Badge>
         </div>
-      </div>
+      )}
 
-      {summary && summary.length > 0 && (
+      {!embedded && summary && summary.length > 0 && (
         <div className="flex flex-wrap gap-2 p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/20">
           {summary.map((item, idx) => (
             <div key={idx} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-background border text-sm">

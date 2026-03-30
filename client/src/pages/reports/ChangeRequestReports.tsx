@@ -653,7 +653,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
       )}
 
       {embedded && previewData && (
-        <InlineReportPreview reportData={previewData} />
+        <InlineReportPreview reportData={previewData} embedded={embedded} />
       )}
       {!embedded && (
         <ReportPreviewModal

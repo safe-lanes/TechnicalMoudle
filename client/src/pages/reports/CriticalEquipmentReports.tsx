@@ -611,7 +611,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
       )}
 
       {embedded && previewData && (
-        <InlineReportPreview reportData={previewData} />
+        <InlineReportPreview reportData={previewData} embedded={embedded} />
       )}
       {!embedded && (
         <ReportPreviewModal

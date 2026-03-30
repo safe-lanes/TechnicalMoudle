@@ -611,7 +611,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
       )}
 
       {embedded && previewData && (
-        <InlineReportPreview reportData={previewData} />
+        <InlineReportPreview reportData={previewData} embedded={embedded} />
       )}
       {!embedded && (
         <ReportPreviewModal
