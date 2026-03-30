@@ -128,6 +128,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
         plainProfile = null;
       }
 
+      if (plainProfile && import.meta.env.DEV) {
+        console.log('[AuthContext] plain userProfile keys:', Object.keys(plainProfile));
+        console.log('[AuthContext] plain name-related fields:', {
+          fullName: plainProfile.fullName,
+          full_name: plainProfile.full_name,
+          name: plainProfile.name,
+          displayName: plainProfile.displayName,
+          userName: plainProfile.userName,
+          username: plainProfile.username,
+          firstName: plainProfile.firstName,
+          lastName: plainProfile.lastName,
+          first_name: plainProfile.first_name,
+          last_name: plainProfile.last_name,
+        });
+      }
+
       if (plainUserType && plainProfile?.role) {
         resolvedUserType = mapLoggedRoleToUIRole(
           plainUserType,
