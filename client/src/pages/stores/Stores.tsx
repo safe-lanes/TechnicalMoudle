@@ -1713,7 +1713,7 @@ const Stores: React.FC = () => {
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Header - Fixed */}
-      <div className="flex-shrink-0 space-y-6 mb-4">
+      <div className="flex-shrink-0 space-y-4 pb-4">
         {/* Header with centered module tabs */}
         <div className="flex items-center justify-between relative">
         <div className="flex items-center gap-4">
@@ -1910,7 +1910,7 @@ const Stores: React.FC = () => {
 
       {/* Filters - Show different filters based on view mode */}
       {viewMode === "location" ? (
-      <div className="flex gap-3 items-center mb-4">
+      <div className="flex gap-3 items-center">
         {(isSailAdmin || isClientAdmin || isChangeMode) && (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
@@ -1988,7 +1988,7 @@ const Stores: React.FC = () => {
         </Button>
       </div>
       ) : viewMode === "inventory" ? (
-      <div className="flex gap-3 items-center mb-4">
+      <div className="flex gap-3 items-center">
         {/* Vessel selector - visible for Sail Admin, Client Admin, or in change mode */}
         {(isSailAdmin || isClientAdmin || isChangeMode) && (
           <div className="flex items-center gap-2">
@@ -2064,7 +2064,7 @@ const Stores: React.FC = () => {
       </div>
       ) : (
       /* History Filters */
-      <div className="flex gap-4 mb-6">
+      <div className="flex gap-3">
         <div className="relative w-80">
           <Marker id={getMarkerId(activeTab, "2.9")} />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
