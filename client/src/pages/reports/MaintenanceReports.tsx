@@ -263,6 +263,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
   const filteredReports = reports.filter(report => {
     if ((report as any).hidden) return false;
+    if (embedded && selectedReportId) return report.id === selectedReportId;
     
     const matchesSearch = report.name.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
                          report.description.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
@@ -1587,11 +1588,63 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           <p className="text-gray-500">Try adjusting your search criteria or filters</p>
         </div>
       )}
-      <ReportPreviewModal
-        open={previewOpen}
-        onClose={() => { setPreviewOpen(false); setPreviewData(null); }}
-        reportData={previewData}
-      />
+      {embedded && previewData && (
+        <div className="mt-6 border border-gray-200 rounded-lg p-4 bg-gray-50">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold text-gray-900">{previewData.title} - Preview</h3>
+            <Button variant="ghost" size="sm" onClick={() => { setPreviewOpen(false); setPreviewData(null); }}>
+              Close Preview
+            </Button>
+          </div>
+          <div className="bg-white rounded border p-4 max-h-96 overflow-y-auto">
+            {previewData.sections?.map((section: any, idx: number) => (
+              <div key={idx} className="mb-4">
+                {section.title && <h4 className="font-medium text-gray-800 mb-2">{section.title}</h4>}
+                {section.type === 'table' && section.data && (
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        {section.columns?.map((col: string, i: number) => (
+                          <th key={i} className="text-left py-1.5 px-2 border text-xs font-medium">{col}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {section.data.slice(0, 20).map((row: any, i: number) => (
+                        <tr key={i} className="hover:bg-gray-50">
+                          {section.columns?.map((col: string, j: number) => (
+                            <td key={j} className="py-1 px-2 border text-xs">{row[col] ?? '-'}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                {section.type === 'summary' && section.items && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {section.items.map((item: any, i: number) => (
+                      <div key={i} className="bg-gray-50 p-2 rounded text-center">
+                        <div className="text-lg font-bold">{item.value}</div>
+                        <div className="text-xs text-gray-500">{item.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+            {(!previewData.sections || previewData.sections.length === 0) && (
+              <p className="text-sm text-gray-500">Preview data is being generated...</p>
+            )}
+          </div>
+        </div>
+      )}
+      {!embedded && (
+        <ReportPreviewModal
+          open={previewOpen}
+          onClose={() => { setPreviewOpen(false); setPreviewData(null); }}
+          reportData={previewData}
+        />
+      )}
     </div>
   );
 };

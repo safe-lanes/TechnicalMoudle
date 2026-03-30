@@ -108,6 +108,7 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
   ];
 
   const filteredReports = reports.filter(report => {
+    if (embedded && selectedReportId) return report.id === selectedReportId;
     return report.name.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase()) ||
            report.description.toLowerCase().includes(categoryFilters.searchQuery.toLowerCase());
   });

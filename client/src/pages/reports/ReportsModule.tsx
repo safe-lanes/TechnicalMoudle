@@ -2,7 +2,6 @@ import { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Marker } from "@/components/Marker";
-import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessel } from "@/contexts/VesselContext";
 import {
   ClipboardList,
@@ -12,14 +11,13 @@ import {
   Biohazard,
   Settings2,
   Search,
-  Download,
-  Calendar,
   AlertTriangle,
   LifeBuoy,
   ChevronRight,
   ChevronDown,
   FileText,
-  FileSpreadsheet,
+  Download,
+  Eye,
 } from "lucide-react";
 import MaintenanceReports from "./MaintenanceReports";
 import RunningHoursReports from "./RunningHoursReports";
@@ -29,7 +27,6 @@ import IhmReports from "./IhmReports";
 import ChangeRequestReports from "./ChangeRequestReports";
 import CriticalEquipmentReports from "./CriticalEquipmentReports";
 import LsaFfaReports from "./LsaFfaReports";
-import MaintenancePlanner from "./MaintenancePlanner";
 import GlobalFilters, { FilterValues } from "@/components/reports/GlobalFilters";
 
 interface ReportItem {
@@ -342,7 +339,29 @@ const ReportsModule = () => {
         <div className="flex-1 overflow-y-auto bg-white dark:bg-background" data-testid="report-viewer-panel">
           {selectedCategoryId && selectedReportId ? (
             <div className="h-full flex flex-col">
-              {renderCategoryContent()}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex-shrink-0">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-foreground" data-testid="text-selected-report-name">{selectedReportName}</h2>
+                  <p className="text-xs text-gray-500 dark:text-muted-foreground">{REPORT_CATEGORIES.find(c => c.id === selectedCategoryId)?.title}</p>
+                </div>
+                <div className="flex items-center gap-2" data-testid="report-action-buttons">
+                  <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-report-preview">
+                    <Eye className="h-3.5 w-3.5" />
+                    Preview
+                  </Button>
+                  <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-report-pdf">
+                    <FileText className="h-3.5 w-3.5" />
+                    PDF
+                  </Button>
+                  <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-report-excel">
+                    <Download className="h-3.5 w-3.5" />
+                    Excel
+                  </Button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                {renderCategoryContent()}
+              </div>
             </div>
           ) : (
             <div className="flex items-center justify-center h-full">
