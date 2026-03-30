@@ -972,7 +972,7 @@ const RunningHours = () => {
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Header - Fixed */}
-      <div className="flex-shrink-0 space-y-4">
+      <div className="flex-shrink-0 space-y-4 pb-4">
         <div className="flex items-center justify-between relative">
           <h1 className="text-2xl font-bold text-gray-900" data-testid="D1"><Marker id="D1" />Running Hours</h1>
           <div className="absolute left-1/2 -translate-x-1/2 bg-gray-100 rounded-md p-1 flex items-center gap-1" data-testid="rh-tab-switcher">
@@ -1019,7 +1019,7 @@ const RunningHours = () => {
 
         {/* Filters - Single Row - Main Tab */}
         {activeTab === 'main' && (
-          <div className="flex items-center gap-3 flex-wrap pt-[0px] pb-[0px]">
+          <div className="flex items-center gap-3 flex-wrap">
             {(isSailAdmin || isClientAdmin) && (
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-gray-600">Vessel:</span>
