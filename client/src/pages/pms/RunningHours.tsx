@@ -1019,7 +1019,7 @@ const RunningHours = () => {
 
         {/* Filters - Single Row - Main Tab */}
         {activeTab === 'main' && (
-          <div className="flex items-center gap-3 flex-wrap pt-[9px] pb-[9px]">
+          <div className="flex items-center gap-3 flex-wrap pt-[0px] pb-[0px]">
             {(isSailAdmin || isClientAdmin) && (
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-gray-600">Vessel:</span>
