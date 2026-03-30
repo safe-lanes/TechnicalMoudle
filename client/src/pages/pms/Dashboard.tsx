@@ -26,11 +26,11 @@ import { AgChartOptions } from "ag-charts-community";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { WorkOrder } from "@shared/schema";
 import AnomalyDetectionTile from "./AnomalyDetectionTile";
 import { useVessels } from "@/hooks/useVessels";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
-import { FleetVesselContextBar } from "@/components/FleetVesselContextBar";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
 import { ComplianceAnomalyPanel } from "./ComplianceAnomalyPanel";
 
@@ -1056,609 +1056,527 @@ const Dashboard = () => {
     return GREY;
   };
 
-  const watchListItems = useMemo(() => {
-    const items: { label: string; vessel: string; badge: string; badgeColor: string }[] = [];
-    workOrderKPIs.overdueList.slice(0, 3).forEach((wo: any) => {
-      items.push({
-        label: wo.taskDescription || wo.jobTitle || `WO-${wo.id}`,
-        vessel: currentVessel?.name || '',
-        badge: 'Overdue',
-        badgeColor: '#E53935',
-      });
-    });
-    sparesKPIs.criticalLowStockList?.slice(0, 2).forEach((spare: Spare) => {
-      items.push({
-        label: spare.partName,
-        vessel: currentVessel?.name || '',
-        badge: 'Critical',
-        badgeColor: '#E53935',
-      });
-    });
-    return items.slice(0, 5);
-  }, [workOrderKPIs.overdueList, sparesKPIs.criticalLowStockList, currentVessel]);
+  const cardStyle = "bg-white rounded-lg shadow-sm border border-gray-200";
 
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
-      {/* SUB-HEADER BAR */}
-      <div className="flex-shrink-0 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6">
-        <FleetVesselContextBar
-          isAllVessels={isAllVessels}
-          onAllVesselsChange={handleAllVesselsChange}
-          vesselId={vesselId}
-          onVesselChange={handleVesselChange}
-          vessels={vessels}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-        />
+      {/* HEADER ROW — matches Work Orders pattern, directly on background */}
+      <div className="flex-shrink-0 space-y-4">
+        <div className="flex items-center justify-between relative">
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="text-dashboard-title">
+            Dashboard
+          </h1>
+
+          <div className="absolute left-1/2 -translate-x-1/2 bg-gray-100 rounded-md p-1 flex items-center gap-1">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'overview' ? 'bg-[#52baf3] text-white' : 'text-gray-700 hover:bg-gray-200'
+              }`}
+              data-testid="tab-overview"
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setActiveTab('management')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'management' ? 'bg-[#52baf3] text-white' : 'text-gray-700 hover:bg-gray-200'
+              }`}
+              data-testid="tab-management"
+            >
+              Management
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div style={{ fontSize: '18px', fontWeight: 700, color: '#1a2b4a' }} data-testid="text-current-year">
+              {new Date().getFullYear()}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 flex-wrap" data-testid="bar-fleet-vessel-context">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 font-medium">Vessel:</span>
+            <Select value={vesselId} onValueChange={handleVesselChange}>
+              <SelectTrigger className="w-[180px]" data-testid="select-context-vessel">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {vessels.map(v => (
+                  <SelectItem key={v.id} value={v.id} data-testid={`option-vessel-${v.id}`}>{v.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 font-medium">Scope:</span>
+            <Select value={isAllVessels ? 'all' : 'my'} onValueChange={(val) => handleAllVesselsChange(val === 'all')}>
+              <SelectTrigger className="w-[140px]" data-testid="select-vessel-scope">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" data-testid="toggle-all-vessels">All Vessel</SelectItem>
+                <SelectItem value="my" data-testid="toggle-my-vessel">My Vessel</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 overflow-y-auto" style={{ background: '#f8fafc' }}>
+      <div className="flex-1 overflow-y-auto mt-4" style={{ background: '#f8fafc' }}>
 
         {/* MANAGEMENT TAB: Fleet Benchmarking Table */}
         {activeTab === 'management' && vessels.length > 0 && (
-          <div style={{ padding: '16px' }}>
+          <div className="p-4">
             <FleetView vessels={vessels} onSelectVessel={handleFleetVesselSelect} />
           </div>
         )}
 
-        {/* OVERVIEW TAB: 3-Column Layout */}
+        {/* OVERVIEW TAB: Card-based Grid Layout */}
         {activeTab === 'overview' && (
-          <div
-            className="grid grid-cols-1 lg:grid-cols-[25%_1px_40%_1px_1fr]"
-            style={{ minHeight: '100%' }}
-          >
-            {/* ═══ COLUMN 1: WORK ORDER KPIs ═══ */}
-            <div className="lg:overflow-y-auto" data-testid="column-wo-kpis">
-              <div style={sectionHeaderBar}>WORK ORDER KPIs</div>
+          <div className="p-4 space-y-4">
 
-              <SemiCircleGauge
-                value={workOrderKPIs.overdue}
-                max={workOrderKPIs.total || 10}
-                color="#e74c3c"
-                label="Overdue WOs"
-                displayValue={workOrderKPIs.overdue.toString()}
-                subtitle={`${overduePercent}% of total`}
-                statLine={`Due: ${workOrderKPIs.due} · Pending: ${workOrderKPIs.pendingApproval}`}
-                onClick={() => navigateToWorkOrders('Overdue')}
-                testId="gauge-overdue-wo"
-              />
+            {/* ROW 1: Three cards side by side */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-              <div style={dividerH} />
+              {/* Card 1: Work Order KPIs */}
+              <div className={cardStyle} data-testid="column-wo-kpis">
+                <div className="p-4">
+                  <div style={sectionHeaderBar} className="!pt-0">WORK ORDER KPIs</div>
 
-              <SemiCircleGauge
-                value={workOrderKPIs.completed}
-                max={workOrderKPIs.total || 10}
-                color="#16a34a"
-                label="Completion Rate"
-                displayValue={workOrderKPIs.completed.toString()}
-                subtitle={`${completionRate}% completion rate`}
-                statLine={`Total: ${workOrderKPIs.total} · Active: ${workOrderKPIs.active}`}
-                onClick={() => navigateToWorkOrders('Completed')}
-                testId="gauge-completion-rate"
-              />
+                  <SemiCircleGauge
+                    value={workOrderKPIs.overdue}
+                    max={workOrderKPIs.total || 10}
+                    color="#e74c3c"
+                    label="Overdue WOs"
+                    displayValue={workOrderKPIs.overdue.toString()}
+                    subtitle={`${overduePercent}% of total`}
+                    statLine={`Due: ${workOrderKPIs.due} · Pending: ${workOrderKPIs.pendingApproval}`}
+                    onClick={() => navigateToWorkOrders('Overdue')}
+                    testId="gauge-overdue-wo"
+                  />
 
-              <div style={dividerH} />
+                  <div style={dividerH} />
 
-              <SemiCircleGauge
-                value={outstandingTasksChartData.outstandingCount}
-                max={outstandingTasksChartData.totalMonthly || 10}
-                color="#f59e0b"
-                label="Outstanding Tasks"
-                displayValue={`${outstandingTasksChartData.outstandingPercent}%`}
-                subtitle={`${outstandingTasksChartData.outstandingCount} of ${outstandingTasksChartData.totalMonthly} tasks`}
-                statLine={`Tasks: ${outstandingTasksChartData.outstandingCount}/${outstandingTasksChartData.totalMonthly} · vs last month: ${maintenanceTrendData.delta > 0 ? '+' : ''}${maintenanceTrendData.delta}%`}
-                onClick={() => navigateToWorkOrders('Planned')}
-                testId="gauge-outstanding-tasks"
-              />
-            </div>
+                  <SemiCircleGauge
+                    value={workOrderKPIs.completed}
+                    max={workOrderKPIs.total || 10}
+                    color="#16a34a"
+                    label="Completion Rate"
+                    displayValue={workOrderKPIs.completed.toString()}
+                    subtitle={`${completionRate}% completion rate`}
+                    statLine={`Total: ${workOrderKPIs.total} · Active: ${workOrderKPIs.active}`}
+                    onClick={() => navigateToWorkOrders('Completed')}
+                    testId="gauge-completion-rate"
+                  />
 
-            {/* Vertical Divider 1 */}
-            <div className="hidden lg:block" style={{ background: '#e8e8e8', width: '1px' }} />
+                  <div style={dividerH} />
 
-            {/* ═══ COLUMN 2: WORK ORDER STATUS & TRENDS ═══ */}
-            <div className="lg:overflow-y-auto" data-testid="column-wo-status-trends">
-              <div style={sectionHeaderBar}>WORK ORDER STATUS & TRENDS</div>
-
-              {/* Status Distribution Donut Chart — NO progress bars */}
-              <div style={{ padding: '16px' }}>
-                <div style={subTitle} className="mb-1">Status Distribution</div>
-                <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '8px' }}>Click segments to filter</div>
-                <div style={{ height: '250px', backgroundColor: '#ffffff' }} data-testid="card-wo-status-chart">
-                  {workOrderStatusChartData.length > 0 ? (
-                    <AgCharts options={{
-                      data: workOrderStatusChartData,
-                      series: [{
-                        type: 'donut',
-                        angleKey: 'count',
-                        calloutLabelKey: 'status',
-                        sectorLabelKey: 'count',
-                        innerRadiusRatio: 0.82,
-                        fills: workOrderStatusChartData.map(d => d.color),
-                        strokes: workOrderStatusChartData.map(d => d.color),
-                        listeners: {
-                          nodeClick: (event: any) => {
-                            const status = event.datum.status;
-                            if (status === 'Overdue') navigateToWorkOrders('Overdue');
-                            else if (status === 'Due') navigateToWorkOrders('Due');
-                            else if (status === 'Pending Approval') navigateToWorkOrders('Pending Approval');
-                            else if (status === 'Completed') navigateToWorkOrders('Completed');
-                            else navigateToWorkOrders('Planned');
-                          }
-                        }
-                      } as any],
-                      legend: { enabled: true, position: 'bottom' }
-                    } as AgChartOptions} />
-                  ) : (
-                    <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E' }}>No work orders to display</div>
-                  )}
+                  <SemiCircleGauge
+                    value={outstandingTasksChartData.outstandingCount}
+                    max={outstandingTasksChartData.totalMonthly || 10}
+                    color="#f59e0b"
+                    label="Outstanding Tasks"
+                    displayValue={`${outstandingTasksChartData.outstandingPercent}%`}
+                    subtitle={`${outstandingTasksChartData.outstandingCount} of ${outstandingTasksChartData.totalMonthly} tasks`}
+                    statLine={`Tasks: ${outstandingTasksChartData.outstandingCount}/${outstandingTasksChartData.totalMonthly} · vs last month: ${maintenanceTrendData.delta > 0 ? '+' : ''}${maintenanceTrendData.delta}%`}
+                    onClick={() => navigateToWorkOrders('Planned')}
+                    testId="gauge-outstanding-tasks"
+                  />
                 </div>
               </div>
 
-              <div style={dividerH} />
+              {/* Card 2: Work Order Status & Trends */}
+              <div className={cardStyle} data-testid="column-wo-status-trends">
+                <div className="p-4">
+                  <div style={sectionHeaderBar} className="!pt-0">WORK ORDER STATUS & TRENDS</div>
 
-              {/* 6-Month Maintenance Trend — LINE/AREA chart with zone bands */}
-              <div style={{ padding: '16px' }}>
-                <div style={subTitle} className="mb-1">6-MONTH MAINTENANCE TREND</div>
-                {maintenanceTrendData.months.length > 0 ? (
-                  <div className="flex flex-col gap-2">
-                    <div style={{ height: '220px', backgroundColor: '#ffffff', borderRadius: '8px', padding: '8px 4px' }} data-testid="chart-maintenance-trend">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={maintenanceTrendData.months} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
-                          <XAxis dataKey="monthShort" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={{ stroke: '#e5e7eb' }} tickLine={false} />
-                          <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} width={38} />
-                          <Tooltip
-                            content={({ active, payload }) => {
-                              if (active && payload && payload.length) {
-                                const d = payload[0].payload;
-                                return (
-                                  <div style={{ background: '#FFFFFF', border: '1px solid #E0E0E0', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '8px 12px' }} data-testid="tooltip-trend-line">
-                                    <div className="font-semibold text-xs mb-1" style={{ color: '#212121' }}>{d.month}</div>
-                                    <div className="text-xs" style={{ color: '#616161' }}>Total planned: {d.totalPlanned}</div>
-                                    <div className="text-xs" style={{ color: '#2ecc71' }}>Completed: {d.completedPercent}% ({d.completed})</div>
-                                    <div className="text-xs" style={{ color: '#f39c12' }}>Outstanding: {d.outstandingPercent}% ({d.outstanding})</div>
-                                    <div className="text-xs" style={{ color: '#e74c3c' }}>Overdue: {d.overduePercent}% ({d.overdue})</div>
-                                  </div>
-                                );
+                  <div className="mb-4">
+                    <div style={subTitle} className="mb-1">Status</div>
+                    <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '8px' }}>Click segments to filter</div>
+                    <div style={{ height: '250px' }} data-testid="card-wo-status-chart">
+                      {workOrderStatusChartData.length > 0 ? (
+                        <AgCharts options={{
+                          data: workOrderStatusChartData,
+                          series: [{
+                            type: 'donut',
+                            angleKey: 'count',
+                            calloutLabelKey: 'status',
+                            sectorLabelKey: 'count',
+                            innerRadiusRatio: 0.82,
+                            fills: workOrderStatusChartData.map(d => d.color),
+                            strokes: workOrderStatusChartData.map(d => d.color),
+                            listeners: {
+                              nodeClick: (event: any) => {
+                                const status = event.datum.status;
+                                if (status === 'Overdue') navigateToWorkOrders('Overdue');
+                                else if (status === 'Due') navigateToWorkOrders('Due');
+                                else if (status === 'Pending Approval') navigateToWorkOrders('Pending Approval');
+                                else if (status === 'Completed') navigateToWorkOrders('Completed');
+                                else navigateToWorkOrders('Planned');
                               }
-                              return null;
-                            }}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="completedPercent"
-                            name="Completed %"
-                            stroke="#2ecc71"
-                            strokeWidth={2}
-                            dot={{ r: 4, fill: '#2ecc71', stroke: '#ffffff', strokeWidth: 2 }}
-                            activeDot={{ r: 6, fill: '#2ecc71' }}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="outstandingPercent"
-                            name="Outstanding %"
-                            stroke="#f39c12"
-                            strokeWidth={2}
-                            dot={{ r: 4, fill: '#f39c12', stroke: '#ffffff', strokeWidth: 2 }}
-                            activeDot={{ r: 6, fill: '#f39c12' }}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="overduePercent"
-                            name="Overdue %"
-                            stroke="#e74c3c"
-                            strokeWidth={2}
-                            dot={{ r: 4, fill: '#e74c3c', stroke: '#ffffff', strokeWidth: 2 }}
-                            activeDot={{ r: 6, fill: '#e74c3c' }}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="flex items-center justify-center gap-4 text-xs" style={{ color: '#6b7280' }} data-testid="legend-maintenance-trend">
-                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#2ecc71' }} /><span>Completed %</span></div>
-                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#f39c12' }} /><span>Outstanding %</span></div>
-                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#e74c3c' }} /><span>Overdue %</span></div>
+                            }
+                          } as any],
+                          legend: { enabled: true, position: 'bottom' }
+                        } as AgChartOptions} />
+                      ) : (
+                        <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E' }}>No work orders to display</div>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  <div style={{ height: '180px' }} className="flex items-center justify-center" ><span style={{ color: '#9E9E9E', fontSize: '12px' }}>No trend data available</span></div>
-                )}
-              </div>
 
-              <div style={dividerH} />
+                  <div style={dividerH} />
 
-              {/* Overdue Work Orders Table */}
-              <div style={{ padding: '16px' }} data-testid="card-overdue-table">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <div style={subTitle}>OVERDUE WORK ORDERS</div>
-                  {workOrderKPIs.overdue > 0 && (
-                    <button
-                      onClick={() => navigateToWorkOrders('Overdue')}
-                      style={{ fontSize: '11px', color: '#1565C0', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
-                      data-testid="button-view-all-overdue"
-                    >
-                      View All ({workOrderKPIs.overdue})
-                    </button>
-                  )}
-                </div>
-                {workOrderKPIs.overdue > 0 && (
-                  <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '6px' }}>
-                    Showing top {workOrderKPIs.overdueList.length} of {workOrderKPIs.overdue} total
-                  </div>
-                )}
-                <div style={{ ...contentCard, padding: 0, overflow: 'hidden', border: '1px solid #f1f5f9', borderRadius: '8px' }}>
-                  {workOrderKPIs.overdueList.length > 0 ? (
-                    <div style={{ overflowX: 'auto', width: '100%' }}>
-                    <table style={{ minWidth: '500px', width: '100%' }} className="text-sm" data-testid="table-overdue-wo">
-                      <thead>
-                        <tr>
-                          <th className="text-left" style={{ ...tableHeaderStyle, minWidth: '160px' }}>Work Order</th>
-                          <th className="text-left" style={{ ...tableHeaderStyle, minWidth: '200px' }}>Equipment</th>
-                          <th className="text-left" style={{ ...tableHeaderStyle, minWidth: '90px' }}>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {workOrderKPIs.overdueList.map((wo: any, idx: number) => (
-                          <tr
-                            key={wo.id}
-                            className="cursor-pointer"
-                            style={{ background: idx % 2 === 0 ? '#FFFFFF' : '#fafafa', borderBottom: '1px solid #f1f5f9' }}
-                            onMouseEnter={e => (e.currentTarget.style.background = '#E3F2FD')}
-                            onMouseLeave={e => (e.currentTarget.style.background = idx % 2 === 0 ? '#FFFFFF' : '#fafafa')}
-                            onClick={() => navigateToWorkOrder(wo.id)}
-                            data-testid={`row-overdue-wo-${wo.id}`}
-                          >
-                            <td style={{ fontSize: '12px', color: '#374151', fontWeight: 500, padding: '9px 12px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {wo.workOrderNumber || `WO-${wo.id}`}
-                            </td>
-                            <td style={{ fontSize: '12px', color: '#374151', padding: '9px 12px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {wo.taskDescription || wo.jobTitle || 'No description'}
-                            </td>
-                            <td style={{ padding: '9px 12px' }}>
-                              <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 500, color: '#dc2626', backgroundColor: '#fee2e2', whiteSpace: 'nowrap' }}>Overdue</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    </div>
-                  ) : (
-                    <div className="text-center py-6" style={{ color: '#9E9E9E' }}>
-                      <CheckCircle className="w-8 h-8 mx-auto mb-2" style={{ color: '#2E7D32' }} />
-                      <p style={{ fontSize: '12px' }}>No overdue work orders</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Vertical Divider 2 */}
-            <div className="hidden lg:block" style={{ background: '#e8e8e8', width: '1px' }} />
-
-            {/* ═══ COLUMN 3: INVENTORY & FLEET ANALYSIS ═══ */}
-            <div className="lg:overflow-y-auto" data-testid="column-inventory-fleet">
-              <div style={sectionHeaderBar}>INVENTORY & FLEET ANALYSIS</div>
-
-              {/* Inventory Quick Stats */}
-              <div data-testid="card-quick-stats">
-                {[
-                  { label: 'Total Spares', value: sparesKPIs.total, color: '#1a2b4a', onClick: () => navigateToSpares() },
-                  { label: 'Low Stock', value: sparesKPIs.lowStock, color: '#e74c3c', onClick: () => navigateToSpares('Low') },
-                  { label: 'Critical Low Stock', value: sparesKPIs.criticalLowStock, color: '#e74c3c', onClick: () => navigateToSpares('Low') },
-                  { label: 'Total Components', value: componentsKPIs.total, color: '#1a2b4a', onClick: navigateToComponents },
-                  { label: 'Stores Inventory', value: storesKPIs.total, color: '#1a2b4a', onClick: () => navigateToStores() },
-                ].map((item, idx) => (
-                  <div key={item.label}>
-                    <div
-                      style={statRow}
-                      className="cursor-pointer hover:bg-gray-50 transition-colors"
-                      onClick={item.onClick}
-                      data-testid={`row-stat-${item.label.toLowerCase().replace(/\s/g, '-')}`}
-                    >
-                      <span style={{ fontSize: '13px', color: '#374151', fontWeight: 400 }}>{item.label}</span>
-                      <span style={{
-                        fontSize: '14px',
-                        fontWeight: 700,
-                        color: item.color,
-                      }}>{item.value}</span>
-                    </div>
-                    {idx < 4 && <div style={{ borderBottom: '1px solid #f1f5f9' }} />}
-                  </div>
-                ))}
-              </div>
-
-              <div style={dividerH} />
-
-              {/* Spares Stock Status donut */}
-              <div style={{ padding: '16px' }} data-testid="card-spares-status-chart">
-                <div style={subTitle} className="mb-1">SPARES STOCK STATUS</div>
-                <div style={{ height: '200px', backgroundColor: '#ffffff' }}>
-                  {sparesStockChartData.length > 0 ? (
-                    <AgCharts options={{
-                      data: sparesStockChartData,
-                      series: [{
-                        type: 'donut',
-                        angleKey: 'count',
-                        calloutLabelKey: 'status',
-                        sectorLabelKey: 'count',
-                        innerRadiusRatio: 0.82,
-                        fills: sparesStockChartData.map(d => d.color),
-                        strokes: sparesStockChartData.map(d => d.color),
-                        listeners: {
-                          nodeClick: (event: any) => {
-                            navigateToSpares(event.datum.status);
-                          }
-                        }
-                      } as any],
-                      legend: { enabled: true, position: 'bottom' }
-                    } as AgChartOptions} />
-                  ) : (
-                    <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '12px' }}>No spares data</div>
-                  )}
-                </div>
-              </div>
-
-              <div style={dividerH} />
-
-              {/* Vessel / Fleet Analysis Dot Matrix — with real data colors and column headers */}
-              <div style={{ padding: '16px' }} data-testid="card-dot-matrix">
-                <div style={subTitle} className="mb-2">VESSEL / GROUP ANALYSIS</div>
-                {dotMatrixVesselData.length > 0 ? (
-                  <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin' as any }}>
-                    <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse', minWidth: '500px' }}>
-                      <thead>
-                        <tr>
-                          <th style={{ textAlign: 'left', padding: '6px 8px', color: '#6b7280', fontWeight: 500, fontSize: '11px', minWidth: '110px' }}>Metric</th>
-                          {dotMatrixVesselData.map(v => (
-                            <th key={v.id} style={{
-                              textAlign: 'center',
-                              padding: '6px 4px',
-                              color: '#6b7280',
-                              fontWeight: 500,
-                              fontSize: '11px',
-                              minWidth: '55px',
-                              maxWidth: '70px',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}>
-                              {v.name.length > 8 ? v.name.substring(0, 7) + '..' : v.name}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {['Work Orders', 'Overdue WOs', 'Low Stock', 'Spares', 'Running Hrs'].map(metric => (
-                          <tr key={metric}>
-                            <td style={{ padding: '8px 10px', color: '#374151', fontWeight: 500, whiteSpace: 'nowrap', fontSize: '12px', backgroundColor: '#ffffff', borderBottom: '1px solid #f1f5f9' }}>{metric}</td>
-                            {dotMatrixVesselData.map((v, vIdx) => {
-                              const dotColor = getDotColor(vIdx, metric);
-                              return (
-                                <td key={v.id} style={{ textAlign: 'center', padding: '8px 4px', borderBottom: '1px solid #f1f5f9' }}>
-                                  <span
-                                    style={{
-                                      display: 'inline-block',
-                                      width: '12px',
-                                      height: '12px',
-                                      borderRadius: '50%',
-                                      background: dotColor,
-                                    }}
-                                    title={`${v.name} - ${metric}`}
-                                  />
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-4" style={{ color: '#9E9E9E', fontSize: '12px' }}>
-                    No vessel data available for analysis
-                  </div>
-                )}
-              </div>
-
-              <div style={dividerH} />
-
-              {/* Watch List */}
-              <div style={{ padding: '16px' }} data-testid="card-watch-list">
-                <div style={subTitle} className="mb-2">WATCH LIST</div>
-                {watchListItems.length > 0 ? (
-                  <div>
-                    {watchListItems.map((item, idx) => (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 4px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
-                        <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
-                          <div style={{ fontSize: '12px', color: '#374151', fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</div>
-                          {item.vessel && <div style={{ fontSize: '10px', color: '#9ca3af' }}>{item.vessel}</div>}
+                  <div className="mt-4">
+                    <div style={subTitle} className="mb-1">Completion</div>
+                    {maintenanceTrendData.months.length > 0 ? (
+                      <div className="flex flex-col gap-2">
+                        <div style={{ height: '220px', borderRadius: '8px', padding: '8px 4px' }} data-testid="chart-maintenance-trend">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={maintenanceTrendData.months} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
+                              <XAxis dataKey="monthShort" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={{ stroke: '#e5e7eb' }} tickLine={false} />
+                              <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} width={38} />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                    const d = payload[0].payload;
+                                    return (
+                                      <div style={{ background: '#FFFFFF', border: '1px solid #E0E0E0', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '8px 12px' }} data-testid="tooltip-trend-line">
+                                        <div className="font-semibold text-xs mb-1" style={{ color: '#212121' }}>{d.month}</div>
+                                        <div className="text-xs" style={{ color: '#616161' }}>Total planned: {d.totalPlanned}</div>
+                                        <div className="text-xs" style={{ color: '#2ecc71' }}>Completed: {d.completedPercent}% ({d.completed})</div>
+                                        <div className="text-xs" style={{ color: '#f39c12' }}>Outstanding: {d.outstandingPercent}% ({d.outstanding})</div>
+                                        <div className="text-xs" style={{ color: '#e74c3c' }}>Overdue: {d.overduePercent}% ({d.overdue})</div>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Line type="monotone" dataKey="completedPercent" name="Completed %" stroke="#2ecc71" strokeWidth={2} dot={{ r: 4, fill: '#2ecc71', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#2ecc71' }} />
+                              <Line type="monotone" dataKey="outstandingPercent" name="Outstanding %" stroke="#f39c12" strokeWidth={2} dot={{ r: 4, fill: '#f39c12', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#f39c12' }} />
+                              <Line type="monotone" dataKey="overduePercent" name="Overdue %" stroke="#e74c3c" strokeWidth={2} dot={{ r: 4, fill: '#e74c3c', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#e74c3c' }} />
+                            </LineChart>
+                          </ResponsiveContainer>
                         </div>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0,
-                          color: item.badge === 'Overdue' ? '#dc2626' : '#ea580c',
-                          backgroundColor: item.badge === 'Overdue' ? '#fee2e2' : '#fff7ed',
-                        }}>{item.badge}</span>
+                        <div className="flex items-center justify-center gap-4 text-xs" style={{ color: '#6b7280' }} data-testid="legend-maintenance-trend">
+                          <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#2ecc71' }} /><span>Completed %</span></div>
+                          <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#f39c12' }} /><span>Outstanding %</span></div>
+                          <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#e74c3c' }} /><span>Overdue %</span></div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ height: '180px' }} className="flex items-center justify-center"><span style={{ color: '#9E9E9E', fontSize: '12px' }}>No trend data available</span></div>
+                    )}
+                  </div>
+
+                  <div style={dividerH} className="mt-4" />
+
+                  <div className="mt-4" data-testid="card-overdue-table">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <div style={subTitle}>Outstanding</div>
+                      {workOrderKPIs.overdue > 0 && (
+                        <button
+                          onClick={() => navigateToWorkOrders('Overdue')}
+                          style={{ fontSize: '11px', color: '#1565C0', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
+                          data-testid="button-view-all-overdue"
+                        >
+                          View All ({workOrderKPIs.overdue})
+                        </button>
+                      )}
+                    </div>
+                    {workOrderKPIs.overdue > 0 && (
+                      <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '6px' }}>
+                        Showing top {workOrderKPIs.overdueList.length} of {workOrderKPIs.overdue} total
+                      </div>
+                    )}
+                    <div style={{ overflow: 'hidden', border: '1px solid #f1f5f9', borderRadius: '8px' }}>
+                      {workOrderKPIs.overdueList.length > 0 ? (
+                        <div style={{ overflowX: 'auto', width: '100%' }}>
+                        <table style={{ minWidth: '400px', width: '100%' }} className="text-sm" data-testid="table-overdue-wo">
+                          <thead>
+                            <tr>
+                              <th className="text-left" style={{ ...tableHeaderStyle, minWidth: '140px' }}>Work Order</th>
+                              <th className="text-left" style={{ ...tableHeaderStyle, minWidth: '160px' }}>Equipment</th>
+                              <th className="text-left" style={{ ...tableHeaderStyle, minWidth: '80px' }}>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {workOrderKPIs.overdueList.map((wo: any, idx: number) => (
+                              <tr
+                                key={wo.id}
+                                className="cursor-pointer"
+                                style={{ background: idx % 2 === 0 ? '#FFFFFF' : '#fafafa', borderBottom: '1px solid #f1f5f9' }}
+                                onMouseEnter={e => (e.currentTarget.style.background = '#E3F2FD')}
+                                onMouseLeave={e => (e.currentTarget.style.background = idx % 2 === 0 ? '#FFFFFF' : '#fafafa')}
+                                onClick={() => navigateToWorkOrder(wo.id)}
+                                data-testid={`row-overdue-wo-${wo.id}`}
+                              >
+                                <td style={{ fontSize: '12px', color: '#374151', fontWeight: 500, padding: '9px 12px', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {wo.workOrderNumber || `WO-${wo.id}`}
+                                </td>
+                                <td style={{ fontSize: '12px', color: '#374151', padding: '9px 12px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {wo.taskDescription || wo.jobTitle || 'No description'}
+                                </td>
+                                <td style={{ padding: '9px 12px' }}>
+                                  <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 500, color: '#dc2626', backgroundColor: '#fee2e2', whiteSpace: 'nowrap' }}>Overdue</span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        </div>
+                      ) : (
+                        <div className="text-center py-6" style={{ color: '#9E9E9E' }}>
+                          <CheckCircle className="w-8 h-8 mx-auto mb-2" style={{ color: '#2E7D32' }} />
+                          <p style={{ fontSize: '12px' }}>No overdue work orders</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Inventory & Fleet Analysis */}
+              <div className={cardStyle} data-testid="column-inventory-fleet">
+                <div className="p-4">
+                  <div style={sectionHeaderBar} className="!pt-0">INVENTORY & FLEET ANALYSIS</div>
+
+                  <div data-testid="card-quick-stats">
+                    {[
+                      { label: 'Total Spares', value: sparesKPIs.total, color: '#1a2b4a', onClick: () => navigateToSpares() },
+                      { label: 'Low Stock', value: sparesKPIs.lowStock, color: '#e74c3c', onClick: () => navigateToSpares('Low') },
+                      { label: 'Critical Low Stock', value: sparesKPIs.criticalLowStock, color: '#e74c3c', onClick: () => navigateToSpares('Low') },
+                      { label: 'Total Components', value: componentsKPIs.total, color: '#1a2b4a', onClick: navigateToComponents },
+                      { label: 'Stores Inventory', value: storesKPIs.total, color: '#1a2b4a', onClick: () => navigateToStores() },
+                    ].map((item, idx) => (
+                      <div key={item.label}>
+                        <div
+                          style={statRow}
+                          className="cursor-pointer hover:bg-gray-50 transition-colors"
+                          onClick={item.onClick}
+                          data-testid={`row-stat-${item.label.toLowerCase().replace(/\s/g, '-')}`}
+                        >
+                          <span style={{ fontSize: '13px', color: '#374151', fontWeight: 400 }}>{item.label}</span>
+                          <span style={{ fontSize: '14px', fontWeight: 700, color: item.color }}>{item.value}</span>
+                        </div>
+                        {idx < 4 && <div style={{ borderBottom: '1px solid #f1f5f9' }} />}
                       </div>
                     ))}
-                    <button
-                      onClick={() => navigateToWorkOrders('Overdue')}
-                      style={{ display: 'block', width: '100%', textAlign: 'center', fontSize: '12px', color: '#1a6eb5', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', padding: '10px 0', borderTop: '1px solid #f1f5f9', marginTop: '4px' }}
-                      data-testid="button-view-all-watchlist"
-                    >
-                      View All
-                    </button>
                   </div>
-                ) : (
-                  <div className="text-center py-4" style={{ color: '#9E9E9E', fontSize: '12px' }}>
-                    <CheckCircle className="w-6 h-6 mx-auto mb-1" style={{ color: '#2E7D32' }} />
-                    No items requiring attention
-                  </div>
-                )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Superintendent Notifications Tile */}
-        {activeTab === 'overview' && (
-          <div style={{ padding: '16px 16px 0 16px' }}>
+            {/* ROW 2: Two cards — Spares Stock Status (Graph) + Vessel / Group Analysis */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+              {/* Card: Spares Stock Status */}
+              <div className={cardStyle} data-testid="card-spares-status-chart">
+                <div className="p-4">
+                  <div style={sectionHeaderBar} className="!pt-0">SPARES STOCK STATUS</div>
+                  <div style={{ height: '250px' }}>
+                    {sparesStockChartData.length > 0 ? (
+                      <AgCharts options={{
+                        data: sparesStockChartData,
+                        series: [{
+                          type: 'donut',
+                          angleKey: 'count',
+                          calloutLabelKey: 'status',
+                          sectorLabelKey: 'count',
+                          innerRadiusRatio: 0.82,
+                          fills: sparesStockChartData.map(d => d.color),
+                          strokes: sparesStockChartData.map(d => d.color),
+                          listeners: {
+                            nodeClick: (event: any) => {
+                              navigateToSpares(event.datum.status);
+                            }
+                          }
+                        } as any],
+                        legend: { enabled: true, position: 'bottom' }
+                      } as AgChartOptions} />
+                    ) : (
+                      <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '12px' }}>No spares data</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Card: Vessel / Group Analysis */}
+              <div className={cardStyle} data-testid="card-dot-matrix">
+                <div className="p-4">
+                  <div style={sectionHeaderBar} className="!pt-0">VESSEL / GROUP ANALYSIS</div>
+                  {dotMatrixVesselData.length > 0 ? (
+                    <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin' as any }}>
+                      <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse', minWidth: '400px' }}>
+                        <thead>
+                          <tr>
+                            <th style={{ textAlign: 'left', padding: '6px 8px', color: '#6b7280', fontWeight: 500, fontSize: '11px', minWidth: '110px' }}>Metric</th>
+                            {dotMatrixVesselData.map(v => (
+                              <th key={v.id} style={{ textAlign: 'center', padding: '6px 4px', color: '#6b7280', fontWeight: 500, fontSize: '11px', minWidth: '55px', maxWidth: '70px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {v.name.length > 8 ? v.name.substring(0, 7) + '..' : v.name}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {['Work Orders', 'Overdue WOs', 'Low Stock', 'Spares', 'Running Hrs'].map(metric => (
+                            <tr key={metric}>
+                              <td style={{ padding: '8px 10px', color: '#374151', fontWeight: 500, whiteSpace: 'nowrap', fontSize: '12px', borderBottom: '1px solid #f1f5f9' }}>{metric}</td>
+                              {dotMatrixVesselData.map((v, vIdx) => {
+                                const dotColor = getDotColor(vIdx, metric);
+                                return (
+                                  <td key={v.id} style={{ textAlign: 'center', padding: '8px 4px', borderBottom: '1px solid #f1f5f9' }}>
+                                    <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', background: dotColor }} title={`${v.name} - ${metric}`} />
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4" style={{ color: '#9E9E9E', fontSize: '12px' }}>No vessel data available for analysis</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ROW 3: Compliance Anomaly Detection */}
+            <ComplianceAnomalyPanel vesselId={vesselId} />
+
+            {/* ROW 4: Work Order Anomalies */}
+            <AnomalyDetectionTile vesselId={vesselId} />
+
+            {/* ROW 5: Superintendent Notifications */}
             <div
+              className={`${cardStyle} cursor-pointer transition-shadow hover:shadow-md`}
               onClick={() => setLocation('/pms/superintendent')}
-              style={{
-                background: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#fff4e6' : '#f5f5f5',
-                borderRadius: '8px',
-                padding: '20px',
-                cursor: 'pointer',
-                border: (superintendentSummary?.pendingCount ?? 0) > 0 ? '1px solid #ffe0b2' : '1px solid #e0e0e0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '20px',
-                transition: 'box-shadow 0.15s ease',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
               data-testid="tile-superintendent-notifications"
             >
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '12px',
-                background: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#ff6d00' : '#9e9e9e',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}>
-                <Shield className="w-6 h-6 text-white" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: '#424242', marginBottom: '8px', letterSpacing: '0.3px' }}>
-                  Superintendent Notifications
+              <div className="p-5 flex items-center gap-5">
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '12px',
+                  background: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#ff6d00' : '#9e9e9e',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <Shield className="w-6 h-6 text-white" />
                 </div>
-                <div style={{ display: 'flex', gap: '32px', alignItems: 'baseline' }}>
-                  <div>
-                    <span
-                      style={{ fontSize: '28px', fontWeight: 700, color: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#d32f2f' : '#757575' }}
-                      data-testid="text-pending-count"
-                    >
-                      {superintendentSummary?.pendingCount ?? 0}
-                    </span>
-                    <span style={{ fontSize: '12px', color: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#d32f2f' : '#757575', marginLeft: '6px' }}>
-                      Pending Acknowledgment
-                    </span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#424242', marginBottom: '8px', letterSpacing: '0.3px' }}>
+                    Superintendent Notifications
                   </div>
-                  <div>
-                    <span
-                      style={{ fontSize: '18px', fontWeight: 600, color: '#2e7d32' }}
-                      data-testid="text-acknowledged-count"
-                    >
-                      {superintendentSummary?.acknowledgedThisMonthCount ?? 0}
-                    </span>
-                    <span style={{ fontSize: '12px', color: '#2e7d32', marginLeft: '6px' }}>
-                      Acknowledged This Month
-                    </span>
+                  <div style={{ display: 'flex', gap: '32px', alignItems: 'baseline' }}>
+                    <div>
+                      <span style={{ fontSize: '28px', fontWeight: 700, color: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#d32f2f' : '#757575' }} data-testid="text-pending-count">
+                        {superintendentSummary?.pendingCount ?? 0}
+                      </span>
+                      <span style={{ fontSize: '12px', color: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#d32f2f' : '#757575', marginLeft: '6px' }}>
+                        Pending Acknowledgment
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '18px', fontWeight: 600, color: '#2e7d32' }} data-testid="text-acknowledged-count">
+                        {superintendentSummary?.acknowledgedThisMonthCount ?? 0}
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#2e7d32', marginLeft: '6px' }}>
+                        Acknowledged This Month
+                      </span>
+                    </div>
                   </div>
                 </div>
+                <ChevronRight className="w-5 h-5" style={{ color: '#9e9e9e' }} />
               </div>
-              <ChevronRight className="w-5 h-5" style={{ color: '#9e9e9e' }} />
             </div>
-          </div>
-        )}
 
-        {/* Compliance Anomaly Detection Panel (Layer 6) */}
-        {activeTab === 'overview' && (
-          <ComplianceAnomalyPanel vesselId={vesselId} />
-        )}
-
-        {/* Work Order Anomalies Tile (Layer 6 — Individual Anomaly Events) */}
-        {activeTab === 'overview' && (
-          <AnomalyDetectionTile vesselId={vesselId} />
-        )}
-
-        {/* Pending Approval Section (Head of Dept) - shown below layout */}
-        {activeTab === 'overview' && isHeadOfDept && workOrderKPIs.pendingApproval > 0 && (
-          <div style={{ padding: '16px', borderTop: '1px solid #e8e8e8' }}>
-            <div style={{ ...contentCard, padding: 0, overflow: 'hidden' }} data-testid="card-pending-approval-section">
-              <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E0E0E0' }}>
-                <span style={{ fontSize: '13px', fontWeight: 500, color: '#212121' }}>
-                  {workOrderKPIs.pendingApproval} work orders from {currentVessel?.name || 'vessel'} require your review
-                </span>
-                <Button
-                  onClick={() => setBulkApproveModalOpen(true)}
-                  style={{ background: '#1565C0' }}
-                  className="text-white hover:opacity-90"
-                  size="sm"
-                  data-testid="button-bulk-approve-open"
-                >
-                  <CheckSquare className="w-4 h-4 mr-2" />
-                  Bulk Approve ({workOrderKPIs.pendingApproval})
-                </Button>
-              </div>
-              <div className="p-4 space-y-2">
-                {workOrderKPIs.pendingApprovalList.map((wo: any) => (
-                  <div
-                    key={wo.id}
-                    className="flex items-center justify-between p-3 rounded-lg border transition-colors"
-                    style={{ background: wo.wasRejected ? '#FFEBEE' : '#E3F2FD', borderColor: wo.wasRejected ? '#FFCDD2' : '#BBDEFB' }}
-                    data-testid={`row-pending-approval-wo-${wo.id}`}
+            {/* Pending Approval Section (Head of Dept) */}
+            {isHeadOfDept && workOrderKPIs.pendingApproval > 0 && (
+              <div className={cardStyle} data-testid="card-pending-approval-section">
+                <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E0E0E0' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 500, color: '#212121' }}>
+                    {workOrderKPIs.pendingApproval} work orders from {currentVessel?.name || 'vessel'} require your review
+                  </span>
+                  <Button
+                    onClick={() => setBulkApproveModalOpen(true)}
+                    style={{ background: '#1565C0' }}
+                    className="text-white hover:opacity-90"
+                    size="sm"
+                    data-testid="button-bulk-approve-open"
                   >
-                    <div className="flex-1 cursor-pointer" onClick={() => navigateToWorkOrder(wo.id)}>
-                      <div className="font-medium text-sm" style={{ color: wo.wasRejected ? '#C62828' : '#212121' }}>
-                        {wo.workOrderNo || `WO-${wo.id}`}
-                        {wo.wasRejected && (
-                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ background: '#E53935' }}>Resubmitted</span>
-                        )}
+                    <CheckSquare className="w-4 h-4 mr-2" />
+                    Bulk Approve ({workOrderKPIs.pendingApproval})
+                  </Button>
+                </div>
+                <div className="p-4 space-y-2">
+                  {workOrderKPIs.pendingApprovalList.map((wo: any) => (
+                    <div
+                      key={wo.id}
+                      className="flex items-center justify-between p-3 rounded-lg border transition-colors"
+                      style={{ background: wo.wasRejected ? '#FFEBEE' : '#E3F2FD', borderColor: wo.wasRejected ? '#FFCDD2' : '#BBDEFB' }}
+                      data-testid={`row-pending-approval-wo-${wo.id}`}
+                    >
+                      <div className="flex-1 cursor-pointer" onClick={() => navigateToWorkOrder(wo.id)}>
+                        <div className="font-medium text-sm" style={{ color: wo.wasRejected ? '#C62828' : '#212121' }}>
+                          {wo.workOrderNo || `WO-${wo.id}`}
+                          {wo.wasRejected && (
+                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ background: '#E53935' }}>Resubmitted</span>
+                          )}
+                        </div>
+                        <div className="text-xs mt-0.5" style={{ color: wo.wasRejected ? '#E53935' : '#616161' }}>
+                          {wo.jobTitle || 'No description'} - {wo.component}
+                        </div>
+                        <div className="text-xs mt-1" style={{ color: '#9E9E9E' }}>
+                          Assigned: {wo.assignedTo} | Submitted: {wo.submittedDate ? new Date(wo.submittedDate).toLocaleDateString() : 'N/A'}
+                        </div>
                       </div>
-                      <div className="text-xs mt-0.5" style={{ color: wo.wasRejected ? '#E53935' : '#616161' }}>
-                        {wo.jobTitle || 'No description'} - {wo.component}
-                      </div>
-                      <div className="text-xs mt-1" style={{ color: '#9E9E9E' }}>
-                        Assigned: {wo.assignedTo} | Submitted: {wo.submittedDate ? new Date(wo.submittedDate).toLocaleDateString() : 'N/A'}
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => navigateToWorkOrder(wo.id)} data-testid={`button-view-pending-wo-${wo.id}`}>
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const reason = window.prompt("Enter rejection reason:");
+                            if (reason) {
+                              rejectMutation.mutate({ workOrderId: wo.id, comments: reason });
+                            }
+                          }}
+                          style={{ borderColor: '#E53935', color: '#E53935' }}
+                          disabled={rejectMutation.isPending}
+                          data-testid={`button-reject-wo-${wo.id}`}
+                        >
+                          <XCircle className="w-4 h-4 mr-1" />
+                          Reject
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => approveMutation.mutate(wo.id)}
+                          style={{ background: '#2E7D32' }}
+                          className="text-white hover:opacity-90"
+                          disabled={approveMutation.isPending}
+                          data-testid={`button-approve-wo-${wo.id}`}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          Approve
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => navigateToWorkOrder(wo.id)} data-testid={`button-view-pending-wo-${wo.id}`}>
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const reason = window.prompt("Enter rejection reason:");
-                          if (reason) {
-                            rejectMutation.mutate({ workOrderId: wo.id, comments: reason });
-                          }
-                        }}
-                        style={{ borderColor: '#E53935', color: '#E53935' }}
-                        disabled={rejectMutation.isPending}
-                        data-testid={`button-reject-wo-${wo.id}`}
-                      >
-                        <XCircle className="w-4 h-4 mr-1" />
-                        Reject
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => approveMutation.mutate(wo.id)}
-                        style={{ background: '#2E7D32' }}
-                        className="text-white hover:opacity-90"
-                        disabled={approveMutation.isPending}
-                        data-testid={`button-approve-wo-${wo.id}`}
-                      >
-                        <CheckCircle className="w-4 h-4 mr-1" />
-                        Approve
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
           </div>
         )}
       </div>
