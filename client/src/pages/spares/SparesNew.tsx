@@ -2685,7 +2685,7 @@ const Spares: React.FC = () => {
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Header - Fixed */}
-      <div className="flex-shrink-0 space-y-6 mb-4">
+      <div className="flex-shrink-0 space-y-4 pb-4">
         <div className="flex items-center justify-between relative">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold text-gray-800" data-testid={activeTab === 'inventory' ? "E1" : activeTab === 'by-location' ? "E-LOC-1" : "E3.1"}>
@@ -2773,7 +2773,7 @@ const Spares: React.FC = () => {
       </div>
       {/* Search and Filters */}
       {activeTab === 'history' ? (
-      <div className="flex gap-4 mb-4">
+      <div className="flex gap-4">
         <div className="relative w-80" data-testid="history-search">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
@@ -2833,7 +2833,7 @@ const Spares: React.FC = () => {
         </Button>
       </div>
       ) : (
-      <div className="flex gap-3 items-center mb-4">
+      <div className="flex gap-3 items-center">
         {/* Vessel selector - visible for Sail Admin, Client Admin, or in change mode */}
         {(isSailAdmin || isClientAdmin || isChangeMode) && (
           <div className="flex items-center gap-2" data-testid="E4">
