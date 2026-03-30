@@ -1100,9 +1100,10 @@ const Dashboard = () => {
             <span className="text-sm text-gray-600 font-medium">Vessel:</span>
             <Select value={vesselId} onValueChange={handleVesselChange}>
               <SelectTrigger className="w-[180px]" data-testid="select-context-vessel">
-                <SelectValue />
+                <SelectValue placeholder="Select vessel" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all" data-testid="option-vessel-all">All Vessels</SelectItem>
                 {vessels.map(v => (
                   <SelectItem key={v.id} value={v.id} data-testid={`option-vessel-${v.id}`}>{v.name}</SelectItem>
                 ))}
@@ -1195,7 +1196,7 @@ const Dashboard = () => {
                   <div style={sectionHeaderBar} className="!pt-0">WORK ORDER STATUS & TRENDS</div>
 
                   <div className="mb-4">
-                    <div style={subTitle} className="mb-1">Status</div>
+                    <div style={subTitle} className="mb-1">Status Distribution</div>
                     <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '8px' }}>Click segments to filter</div>
                     <div style={{ height: '250px' }} data-testid="card-wo-status-chart">
                       {workOrderStatusChartData.length > 0 ? (
@@ -1231,7 +1232,7 @@ const Dashboard = () => {
                   <div style={dividerH} />
 
                   <div className="mt-4">
-                    <div style={subTitle} className="mb-1">Completion</div>
+                    <div style={subTitle} className="mb-1">6-MONTH MAINTENANCE TREND</div>
                     {maintenanceTrendData.months.length > 0 ? (
                       <div className="flex flex-col gap-2">
                         <div style={{ height: '220px', borderRadius: '8px', padding: '8px 4px' }} data-testid="chart-maintenance-trend">
@@ -1278,7 +1279,7 @@ const Dashboard = () => {
 
                   <div className="mt-4" data-testid="card-overdue-table">
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <div style={subTitle}>Outstanding</div>
+                      <div style={subTitle}>OVERDUE WORK ORDERS</div>
                       {workOrderKPIs.overdue > 0 && (
                         <button
                           onClick={() => navigateToWorkOrders('Overdue')}
