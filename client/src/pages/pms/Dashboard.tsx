@@ -1332,38 +1332,12 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* Card 3: Inventory & Fleet Analysis */}
+              {/* Card 3: Spares Stock Status */}
               <div className={cardStyle} data-testid="column-inventory-fleet">
                 <div className="p-4">
-                  <div style={sectionHeaderBar} className="!pt-0">INVENTORY & FLEET ANALYSIS</div>
+                  <div style={sectionHeaderBar} className="!pt-0">SPARES STOCK STATUS</div>
 
-                  <div data-testid="card-quick-stats">
-                    {[
-                      { label: 'Total Spares', value: sparesKPIs.total, color: '#1a2b4a', onClick: () => navigateToSpares() },
-                      { label: 'Low Stock', value: sparesKPIs.lowStock, color: '#e74c3c', onClick: () => navigateToSpares('Low') },
-                      { label: 'Critical Low Stock', value: sparesKPIs.criticalLowStock, color: '#e74c3c', onClick: () => navigateToSpares('Low') },
-                      { label: 'Total Components', value: componentsKPIs.total, color: '#1a2b4a', onClick: navigateToComponents },
-                      { label: 'Stores Inventory', value: storesKPIs.total, color: '#1a2b4a', onClick: () => navigateToStores() },
-                    ].map((item, idx) => (
-                      <div key={item.label}>
-                        <div
-                          style={statRow}
-                          className="cursor-pointer hover:bg-gray-50 transition-colors"
-                          onClick={item.onClick}
-                          data-testid={`row-stat-${item.label.toLowerCase().replace(/\s/g, '-')}`}
-                        >
-                          <span style={{ fontSize: '13px', color: '#374151', fontWeight: 400 }}>{item.label}</span>
-                          <span style={{ fontSize: '14px', fontWeight: 700, color: item.color }}>{item.value}</span>
-                        </div>
-                        {idx < 4 && <div style={{ borderBottom: '1px solid #f1f5f9' }} />}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div style={dividerH} />
-
-                  <div className="mt-4" data-testid="card-spares-status-chart">
-                    <div style={subTitle} className="mb-1">SPARES STOCK STATUS</div>
+                  <div data-testid="card-spares-status-chart">
                     <div style={{ height: '250px' }}>
                       {sparesStockChartData.length > 0 ? (
                         <AgCharts options={{
