@@ -23,6 +23,7 @@ import {
   Minimize2,
   Check,
   X,
+  GripVertical,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import MaintenanceReports from "./MaintenanceReports";
@@ -144,6 +145,10 @@ const ReportsModule = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [actionTrigger, setActionTrigger] = useState<ReportActionTrigger | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [editCategoryOrder, setEditCategoryOrder] = useState<ReportCategory[]>([]);
+  const [categoryOrder, setCategoryOrder] = useState<ReportCategory[]>(REPORT_CATEGORIES);
+  const [dragSourceId, setDragSourceId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [globalFilters, setGlobalFilters] = useState<FilterValues>({
     vessel: "all",
     department: "all",
@@ -151,25 +156,83 @@ const ReportsModule = () => {
     priority: "all"
   });
 
-  const expandAllCategories = () => {
-    setExpandedCategories(new Set(REPORT_CATEGORIES.map(c => c.id)));
+  const handleExpandSelected = () => {
+    if (!selectedCategoryId) {
+      setExpandedCategories(new Set(categoryOrder.map(c => c.id)));
+      return;
+    }
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      next.add(selectedCategoryId);
+      return next;
+    });
   };
 
-  const collapseAllCategories = () => {
-    setExpandedCategories(new Set());
+  const handleCollapseSelected = () => {
+    if (!selectedCategoryId) {
+      setExpandedCategories(new Set());
+      return;
+    }
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      next.delete(selectedCategoryId);
+      return next;
+    });
   };
 
   const handleEnterEditMode = () => {
+    setEditCategoryOrder([...categoryOrder]);
     setIsEditMode(true);
   };
 
   const handleSaveEditMode = () => {
+    setCategoryOrder(editCategoryOrder);
     setIsEditMode(false);
+    setEditCategoryOrder([]);
+    setDragSourceId(null);
+    setDragOverId(null);
     toast({ title: "Saved", description: "Category ordering saved." });
   };
 
   const handleCancelEditMode = () => {
     setIsEditMode(false);
+    setEditCategoryOrder([]);
+    setDragSourceId(null);
+    setDragOverId(null);
+  };
+
+  const handleDragStart = (e: React.DragEvent, categoryId: string) => {
+    setDragSourceId(categoryId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, categoryId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (categoryId !== dragSourceId) {
+      setDragOverId(categoryId);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!dragSourceId || dragSourceId === targetId) return;
+    setEditCategoryOrder(prev => {
+      const sourceIdx = prev.findIndex(c => c.id === dragSourceId);
+      const targetIdx = prev.findIndex(c => c.id === targetId);
+      if (sourceIdx === -1 || targetIdx === -1) return prev;
+      const newOrder = [...prev];
+      const [moved] = newOrder.splice(sourceIdx, 1);
+      newOrder.splice(targetIdx, 0, moved);
+      return newOrder;
+    });
+    setDragSourceId(null);
+    setDragOverId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragSourceId(null);
+    setDragOverId(null);
   };
 
   const toggleCategory = (categoryId: string) => {
@@ -215,9 +278,9 @@ const ReportsModule = () => {
   };
 
   const filteredCategories = useMemo(() => {
-    if (!searchQuery.trim()) return REPORT_CATEGORIES;
+    if (!searchQuery.trim()) return categoryOrder;
     const q = searchQuery.toLowerCase();
-    return REPORT_CATEGORIES
+    return categoryOrder
       .map(cat => {
         const matchedReports = cat.reports.filter(r => r.name.toLowerCase().includes(q));
         const categoryMatches = cat.title.toLowerCase().includes(q);
@@ -226,7 +289,7 @@ const ReportsModule = () => {
         return null;
       })
       .filter(Boolean) as ReportCategory[];
-  }, [searchQuery]);
+  }, [searchQuery, categoryOrder]);
 
   const selectedReportName = useMemo(() => {
     if (!selectedCategoryId || !selectedReportId) return null;
@@ -347,7 +410,7 @@ const ReportsModule = () => {
                     Edit
                   </button>
                   <button
-                    onClick={expandAllCategories}
+                    onClick={handleExpandSelected}
                     className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
                     data-testid="button-expand-all-reports"
                   >
@@ -355,7 +418,7 @@ const ReportsModule = () => {
                     Expand
                   </button>
                   <button
-                    onClick={collapseAllCategories}
+                    onClick={handleCollapseSelected}
                     className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
                     data-testid="button-collapse-all-reports"
                   >
@@ -368,33 +431,47 @@ const ReportsModule = () => {
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {filteredCategories.map((category) => {
+            {(isEditMode ? editCategoryOrder : filteredCategories).map((category) => {
               const Icon = category.icon;
               const isExpanded = expandedCategories.has(category.id);
               const isCategorySelected = selectedCategoryId === category.id;
+              const isDragOver = dragOverId === category.id;
 
               return (
-                <div key={category.id} data-testid={`tree-category-${category.id}`}>
-                  <button
+                <div
+                  key={category.id}
+                  data-testid={`tree-category-${category.id}`}
+                  draggable={isEditMode}
+                  onDragStart={isEditMode ? (e) => handleDragStart(e, category.id) : undefined}
+                  onDragOver={isEditMode ? (e) => handleDragOver(e, category.id) : undefined}
+                  onDrop={isEditMode ? (e) => handleDrop(e, category.id) : undefined}
+                  onDragEnd={isEditMode ? handleDragEnd : undefined}
+                >
+                  <div
                     className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium transition-colors border-b border-gray-100 dark:border-gray-800 ${
-                      isCategorySelected
-                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
-                    onClick={() => toggleCategory(category.id)}
+                      isDragOver
+                        ? 'bg-blue-100 dark:bg-blue-900/40 border-t-2 border-t-blue-400'
+                        : isCategorySelected
+                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    } ${isEditMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                    onClick={() => { if (!isEditMode) toggleCategory(category.id); }}
                     data-testid={`button-toggle-${category.id}`}
                   >
-                    {isExpanded ? (
+                    {isEditMode && (
+                      <GripVertical className="h-3.5 w-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
+                    )}
+                    {!isEditMode && (isExpanded ? (
                       <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
                     ) : (
                       <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
-                    )}
+                    ))}
                     <Icon className="h-4 w-4 flex-shrink-0 text-[#52baf3]" />
                     <span className="truncate flex-1">{category.title}</span>
                     <span className="text-[11px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 rounded-full px-1.5 py-0.5 min-w-[20px] text-center flex-shrink-0">{category.reports.length}</span>
-                  </button>
+                  </div>
 
-                  {isExpanded && (
+                  {!isEditMode && isExpanded && (
                     <div className="bg-gray-50/50 dark:bg-gray-800/30">
                       {category.reports.map((report) => {
                         const isSelected = selectedCategoryId === category.id && selectedReportId === report.id;
@@ -420,7 +497,7 @@ const ReportsModule = () => {
               );
             })}
 
-            {filteredCategories.length === 0 && (
+            {!isEditMode && filteredCategories.length === 0 && (
               <div className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                 No reports match your search.
               </div>
