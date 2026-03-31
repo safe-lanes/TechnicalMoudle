@@ -105,12 +105,36 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
 
   const items = data?.items || [];
 
+  const rankQueryParams = useMemo(() => {
+    const params: Record<string, string> = {
+      vesselId,
+      days: String(effectiveDays),
+    };
+    if (searchTerm) {
+      params.search = searchTerm;
+    }
+    return params;
+  }, [vesselId, effectiveDays, searchTerm]);
+
+  const { data: rankData } = useQuery<PlannerResponse>({
+    queryKey: ["/technical/api/work-orders/planner", rankQueryParams],
+    queryFn: async () => {
+      const searchParams = new URLSearchParams(rankQueryParams);
+      const response = await fetch(`/technical/api/work-orders/planner?${searchParams.toString()}`);
+      if (!response.ok) throw new Error("Failed to fetch planner data");
+      return response.json();
+    },
+    enabled: !!vesselId && vesselId !== 'all' && selectedRank !== 'all',
+    staleTime: 60000,
+  });
+
   const uniqueRanks = useMemo(() => {
-    const ranks = items
+    const sourceItems = selectedRank !== 'all' && rankData?.items ? rankData.items : items;
+    const ranks = sourceItems
       .map(item => item.assignedTo?.trim())
       .filter((rank): rank is string => !!rank && rank.length > 0 && rank !== "Unassigned");
     return Array.from(new Set(ranks)).sort((a, b) => a.localeCompare(b));
-  }, [items]);
+  }, [items, rankData, selectedRank]);
 
   const totalItems = items.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -183,8 +207,9 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
     try {
       const columns = [
         { header: "S.No", field: "sno", width: 10 },
-        { header: "Component", field: "component", width: 35 },
-        { header: "Job Title", field: "jobTitle", width: 45 },
+        { header: "Component", field: "component", width: 30 },
+        { header: "Job Code", field: "jobCode", width: 20 },
+        { header: "Job Title", field: "jobTitle", width: 35 },
         { header: "Basis", field: "basis", width: 15 },
         { header: "Frequency", field: "frequency", width: 18 },
         { header: "Due Date/RH", field: "dueInfo", width: 20 },
@@ -197,6 +222,7 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
       const tableData = items.map((item, idx) => ({
         sno: idx + 1,
         component: item.componentName,
+        jobCode: item.jobCode,
         jobTitle: item.jobTitle,
         basis: item.maintenanceBasis,
         frequency: item.frequency,
