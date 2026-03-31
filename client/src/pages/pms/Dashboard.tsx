@@ -933,7 +933,7 @@ const Dashboard = () => {
   };
 
   const subTitle: React.CSSProperties = {
-    color: '#1a6eb5',
+    color: '#4a4a4a',
     fontSize: '11px',
     fontWeight: 700,
     textTransform: 'uppercase' as const,
