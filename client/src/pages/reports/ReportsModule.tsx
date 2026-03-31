@@ -17,6 +17,7 @@ import {
   ChevronDown,
   FileText,
   Download,
+  BarChart3,
 } from "lucide-react";
 import MaintenanceReports from "./MaintenanceReports";
 import RunningHoursReports from "./RunningHoursReports";
@@ -276,13 +277,17 @@ const ReportsModule = () => {
         </div>
       </div>
 
-      <div className="flex flex-1 gap-0 overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg">
+      <div className="flex flex-1 gap-0 overflow-hidden rounded-lg shadow-sm">
         <div
-          className="flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 overflow-y-auto"
+          className="flex-shrink-0 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-col rounded-l-lg"
           style={{ width: '300px' }}
           data-testid="report-tree-panel"
         >
-          <div className="py-2">
+          <div className="flex-shrink-0 bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm flex items-center gap-2 rounded-tl-lg">
+            <Marker id="G2" /> REPORTS
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
             {filteredCategories.map((category) => {
               const Icon = category.icon;
               const isExpanded = expandedCategories.has(category.id);
@@ -291,40 +296,40 @@ const ReportsModule = () => {
               return (
                 <div key={category.id} data-testid={`tree-category-${category.id}`}>
                   <button
-                    className={`w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                      isCategorySelected && !selectedReportId
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium transition-colors border-b border-gray-100 dark:border-gray-800 ${
+                      isCategorySelected
                         ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                        : 'text-gray-700 dark:text-gray-300'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                     }`}
                     onClick={() => toggleCategory(category.id)}
                     data-testid={`button-toggle-${category.id}`}
                   >
                     {isExpanded ? (
-                      <ChevronDown className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                      <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
                     ) : (
-                      <ChevronRight className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                      <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
                     )}
-                    <Icon className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate">{category.title}</span>
-                    <span className="ml-auto text-xs text-gray-400 flex-shrink-0">{category.reports.length}</span>
+                    <Icon className="h-4 w-4 flex-shrink-0 text-[#52baf3]" />
+                    <span className="truncate flex-1">{category.title}</span>
+                    <span className="text-[11px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 rounded-full px-1.5 py-0.5 min-w-[20px] text-center flex-shrink-0">{category.reports.length}</span>
                   </button>
 
                   {isExpanded && (
-                    <div className="ml-4">
+                    <div className="bg-gray-50/50 dark:bg-gray-800/30">
                       {category.reports.map((report) => {
                         const isSelected = selectedCategoryId === category.id && selectedReportId === report.id;
                         return (
                           <button
                             key={report.id}
-                            className={`w-full flex items-center gap-2 pl-7 pr-3 py-2 text-left text-sm transition-colors ${
+                            className={`w-full flex items-center gap-2 pl-10 pr-3 py-2 text-left text-[13px] transition-colors border-b border-gray-50 dark:border-gray-800/50 ${
                               isSelected
-                                ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 font-medium'
-                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200'
+                                ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 font-medium border-l-2 border-l-blue-500'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200'
                             }`}
                             onClick={() => handleReportSelect(category.id, report.id)}
                             data-testid={`button-report-${report.id}`}
                           >
-                            <FileText className="h-3.5 w-3.5 flex-shrink-0" />
+                            <FileText className="h-3.5 w-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
                             <span className="truncate">{report.name}</span>
                           </button>
                         );
@@ -336,14 +341,14 @@ const ReportsModule = () => {
             })}
 
             {filteredCategories.length === 0 && (
-              <div className="px-4 py-8 text-center text-sm text-gray-500">
+              <div className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                 No reports match your search.
               </div>
             )}
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-white dark:bg-background" data-testid="report-viewer-panel">
+        <div className="flex-1 overflow-y-auto bg-white dark:bg-background border border-l-0 border-gray-200 dark:border-gray-700 rounded-r-lg" data-testid="report-viewer-panel">
           {selectedCategoryId && selectedReportId ? (
             <div className="h-full flex flex-col">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex-shrink-0">
@@ -369,11 +374,13 @@ const ReportsModule = () => {
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center" data-testid="report-placeholder">
-                <FileText className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-2">Select a Report</h3>
-                <p className="text-sm text-gray-400 dark:text-gray-500 max-w-sm">
+            <div className="flex items-center justify-center h-full bg-gray-50/30 dark:bg-gray-900/20">
+              <div className="text-center px-6" data-testid="report-placeholder">
+                <div className="w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mx-auto mb-5">
+                  <BarChart3 className="h-8 w-8 text-[#52baf3]" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-600 dark:text-gray-300 mb-2">Select a Report</h3>
+                <p className="text-sm text-gray-400 dark:text-gray-500 max-w-xs leading-relaxed">
                   Expand a category in the tree on the left and click on a report to view it here.
                 </p>
               </div>
