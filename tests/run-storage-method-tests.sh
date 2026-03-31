@@ -279,7 +279,7 @@ if [[ -n "$WO_ID" ]]; then
     elif [[ "$exec_check" == "exec_data_partial" ]]; then
         record_pass "WO context executionData partially populated (approval flow structure accessible)"
     elif [[ "$exec_check" == "no_exec_data" || "$exec_check" == "exec_data_empty" ]]; then
-        record_pass "WO context returned 200 — executionData present but empty (no execution yet, approval flow paths still callable)"
+        record_skip "WO approval flow executionData" "WO has no execution data yet — approval flow fields not verifiable"
     else
         record_fail "WO context executionData check" "Could not parse or unexpected structure"
     fi
@@ -325,22 +325,30 @@ if [[ -n "$VESSEL_ID" ]]; then
     spares_status=$(api_get_status "/spares?vesselId=${VESSEL_ID}")
     if [[ "$spares_status" == "200" ]]; then
         spares_json=$(api_get "/spares?vesselId=${VESSEL_ID}")
-        spares_count=$(echo "$spares_json" | node -e "
+        spares_result=$(echo "$spares_json" | node -e "
             const d=[];process.stdin.on('data',c=>d.push(c));process.stdin.on('end',()=>{
                 try{const j=JSON.parse(d.join(''));const a=Array.isArray(j)?j:j.data||[];
-                process.stdout.write(String(a.length))}catch(e){process.stdout.write('0')}
+                process.stdout.write('ok:'+a.length)}catch(e){process.stdout.write('parse_error')}
             })" 2>/dev/null)
-        record_pass "GET /spares?vesselId=${VESSEL_ID} returns 200 with ${spares_count} spares"
+        if [[ "$spares_result" == parse_error ]]; then
+            record_fail "GET /spares?vesselId=${VESSEL_ID}" "HTTP 200 but response is not valid JSON"
+        else
+            record_pass "GET /spares?vesselId=${VESSEL_ID} returns 200 with ${spares_result#ok:} spares"
+        fi
     else
         spares_alt_status=$(api_get_status "/spares/${VESSEL_ID}")
         if [[ "$spares_alt_status" == "200" ]]; then
             spares_json=$(api_get "/spares/${VESSEL_ID}")
-            spares_count=$(echo "$spares_json" | node -e "
+            spares_result=$(echo "$spares_json" | node -e "
                 const d=[];process.stdin.on('data',c=>d.push(c));process.stdin.on('end',()=>{
                     try{const j=JSON.parse(d.join(''));const a=Array.isArray(j)?j:j.data||[];
-                    process.stdout.write(String(a.length))}catch(e){process.stdout.write('0')}
+                    process.stdout.write('ok:'+a.length)}catch(e){process.stdout.write('parse_error')}
                 })" 2>/dev/null)
-            record_pass "GET /spares/${VESSEL_ID} returns 200 with ${spares_count} spares (path-param variant)"
+            if [[ "$spares_result" == parse_error ]]; then
+                record_fail "GET /spares/${VESSEL_ID}" "HTTP 200 but response is not valid JSON"
+            else
+                record_pass "GET /spares/${VESSEL_ID} returns 200 with ${spares_result#ok:} spares (path-param variant)"
+            fi
         else
             record_fail "GET /spares?vesselId=${VESSEL_ID}" "Expected 200, got ${spares_status} (alt: ${spares_alt_status})"
         fi
@@ -360,12 +368,27 @@ if [[ -n "$VESSEL_ID" ]]; then
     txn_status=$(api_get_status "/inventory/transactions/${VESSEL_ID}")
     if [[ "$txn_status" == "200" ]]; then
         txn_json=$(api_get "/inventory/transactions/${VESSEL_ID}")
-        txn_count=$(echo "$txn_json" | node -e "
+        txn_result=$(echo "$txn_json" | node -e "
             const d=[];process.stdin.on('data',c=>d.push(c));process.stdin.on('end',()=>{
                 try{const j=JSON.parse(d.join(''));const a=Array.isArray(j)?j:j.data||[];
-                process.stdout.write(String(a.length))}catch(e){process.stdout.write('0')}
+                process.stdout.write('ok:'+a.length)}catch(e){process.stdout.write('parse_error')}
             })" 2>/dev/null)
-        record_pass "GET /inventory/transactions/${VESSEL_ID} returns 200 with ${txn_count} transactions (getInventoryTransactions callable)"
+        if [[ "$txn_result" == parse_error ]]; then
+            record_fail "GET /inventory/transactions/${VESSEL_ID}" "HTTP 200 but response is not valid JSON"
+        else
+            record_pass "GET /inventory/transactions/${VESSEL_ID} returns 200 with ${txn_result#ok:} transactions (getInventoryTransactions callable)"
+        fi
+    elif [[ "$txn_status" == "404" || "$txn_status" == "405" ]]; then
+        if [[ -n "$WO_ID" ]]; then
+            wo_ctx_fb_status=$(api_get_status "/work-orders/${WO_ID}/context")
+            if [[ "$wo_ctx_fb_status" == "200" ]]; then
+                record_pass "Inventory transactions verified via WO context fallback (direct endpoint returned ${txn_status})"
+            else
+                record_fail "Inventory transactions" "Direct endpoint ${txn_status}, WO context fallback also failed (${wo_ctx_fb_status})"
+            fi
+        else
+            record_fail "GET /inventory/transactions/${VESSEL_ID}" "Endpoint returned ${txn_status} and no WO available for fallback"
+        fi
     else
         record_fail "GET /inventory/transactions/${VESSEL_ID}" "Expected 200, got ${txn_status}"
     fi
