@@ -2,6 +2,7 @@
 
 > **Generated:** 2026-03-31  
 > **Scope:** 23 reports across 7 categories (Maintenance ×10, Running Hours ×2, Spares ×3, Stores ×5, Compliance/IHM ×1, Change Requests ×1, LSA/FFA ×2)  
+> **Note:** Original task framing referenced "22 reports across 8 categories." Actual code implements 23 report IDs across 7 categories (Stores has 5 reports including `stores-consumption-analysis`, which was added after initial scoping).  
 > **Purpose:** Full technical verification and troubleshooting reference covering column definitions, formula logic, data sources, derivation paths, API endpoints, verification methods, edge cases, and debugging guides for every report in the PMS Reports Module.  
 > **Line Number Disclaimer:** Source file line references (e.g., `MaintenanceReports.tsx:335-337`) are snapshot-based from the date above and may drift as code evolves. Prefer searching for the formula expression or function name as a stable anchor.  
 > **Maintenance:** This document should be updated whenever report columns, formulas, or API endpoints are modified. The view-mode column array is the single source of truth — PDF and Excel must match.
@@ -1603,18 +1604,21 @@
 | Confidence Level | `daysOfData > 90 → 'high'; >= 30 → 'medium'; else → 'low'` | storesReportService.ts:320-322 | 4.5 (JSON + Excel) | Data quality tier |
 | Confidence Multiplier | `daysOfData < 7 → 0.5; < 30 → 0.75; else → 1.0` | storesReportService.ts:378-380 | 4.5 consumption rate | Scales raw rate by sample size |
 | Adjusted Monthly Consumption | `rawMonthlyRate × confidenceMultiplier` | storesReportService.ts:381 | 4.5 consumption rate | `avgMonthlyConsumption` used downstream |
-| Reorder Point | `adjustedDaily × leadTimeDays + safetyStock` | storesReportService.ts:520 | 4.5 forecast | leadTimeDays=30, safetyStock=Math.ceil(targetLevel×0.1) |
+| Reorder Point | `adjustedDaily × leadTimeDays + safetyStock` | storesReportService.ts:520 | 4.5 forecast | leadTimeDays=30, safetyStock=projectedMonthly (one month buffer) |
 | Reorder Needed | `currentRob ≤ reorderPoint AND projectedMonthly > 0` | storesReportService.ts:522 | 4.5 forecast | Boolean trigger |
-| Suggested Reorder Qty | `reorderNeeded ? max(0, ceil(targetLevel - currentRob)) : 0` | storesReportService.ts:523 | 4.5 forecast | targetLevel derived from max(minStock, avgMonthly×3) |
+| Suggested Reorder Qty | `reorderNeeded ? max(0, ceil(targetLevel - currentRob)) : 0` | storesReportService.ts:523 | 4.5 forecast | targetLevel = max(minStock×3, projectedMonthly×6) |
 | Forecast Projected Monthly | `adjustedDaily × 30` (rounded to 2 decimal) | storesReportService.ts:515 | 4.5 forecast | Uses confidence-adjusted daily rate |
 | Months Remaining | `currentRob / (adjustedDaily × 30)` | storesReportService.ts:516 | 4.5 forecast | null if adjustedDaily=0 |
 | Forecast Confidence Multiplier | `daysOfData < 7 → 0.5; < 30 → 0.75; else → 1.0` | storesReportService.ts:511-513 | 4.5 forecast | Same thresholds as consumption, applied to forecast |
 | Monthly Trends | Grouped by month: sum(qty), count(events), split by itemType (stores/lubricants/chemicals/others) | storesReportService.ts:669-708 | 4.5 Excel (Monthly Trends sheet) | Multi-sheet Excel export |
 | Stock Efficiency (Movement) | Items classified by consumption activity vs data period | storesReportService.ts:874 | 4.5 Excel (Stock Efficiency sheet) | Movement thresholds adjusted for sample size |
+| Stock Turnover Ratio (JSON) | `totalConsumed / avgRob` (0 if avgRob=0) | storesReportService.ts:441 | 4.5 stock efficiency (JSON) | Used for fast/slow/non-moving classification |
+| Stock Turnover Ratio (Excel) | `totalConsumed / currentRob` (0 if currentRob=0) | storesReportService.ts:821 | 4.5 Excel (Stock Efficiency sheet) | Sorted by turnover DESC |
+| Movement Speed Classification | `turnover >= fastThreshold \|\| freq >= 0.5 → 'Fast'; turnover >= slowThreshold \|\| freq >= 0.1 → 'Slow'; else → 'Non-Moving'` | storesReportService.ts:455-462 (JSON), :830-836 (Excel) | 4.5 stock efficiency | Thresholds are sample-size adjusted |
+| Safety Stock | `safetyStock = projectedMonthly` (one month of projected consumption) | storesReportService.ts:519 (JSON), :915 (Excel) | 4.5 forecast/reorder | Used in reorder point formula |
+| Target Level | `max(minStock × 3, projectedMonthly × 6)` | storesReportService.ts:521 (JSON), :917 (Excel) | 4.5 reorder qty | Determines suggested reorder quantity |
 
-### Formulas Not in Current Implementation
-
-- **Stock Turnover Rate**: No turnover ratio (COGS ÷ average inventory) calculation exists — deficit/shortage and consumption rate serve inventory monitoring instead
+All formulas referenced in the original task scope are implemented in the current codebase. No formulas remain unimplemented.
 
 ---
 
