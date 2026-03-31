@@ -2350,6 +2350,37 @@ const migrations: Migration[] = [
         END IF;
       END $$;
     `
+  },
+  {
+    id: '073_planner_dates_table',
+    name: 'Create planner_dates table for work order planner',
+    description: 'Creates the planner_dates table for storing planned maintenance dates in the Work Order Planner view',
+    sql: `
+      CREATE TABLE IF NOT EXISTS planner_dates (
+        id SERIAL PRIMARY KEY,
+        vessel_id TEXT NOT NULL,
+        job_id TEXT NOT NULL,
+        component_id TEXT NOT NULL,
+        planned_date TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'unique_planner_date_entry'
+          AND conrelid = 'planner_dates'::regclass
+        ) THEN
+          ALTER TABLE planner_dates
+            ADD CONSTRAINT unique_planner_date_entry
+            UNIQUE (vessel_id, job_id, component_id);
+        END IF;
+      END $$;
+
+      CREATE INDEX IF NOT EXISTS idx_planner_dates_vessel ON planner_dates(vessel_id);
+    `
   }
 ];
 
