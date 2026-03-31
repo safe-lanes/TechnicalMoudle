@@ -860,7 +860,7 @@ export function ComplianceAnomalyPanel({ vesselId }: ComplianceAnomalyPanelProps
   ) : "Insufficient data";
 
   return (
-    <div style={{ padding: "16px 16px 0 16px" }} data-testid="panel-compliance-anomaly">
+    <div style={{ padding: 0 }} data-testid="panel-compliance-anomaly">
       <div style={{
         background: "#fff",
         borderRadius: "8px",
