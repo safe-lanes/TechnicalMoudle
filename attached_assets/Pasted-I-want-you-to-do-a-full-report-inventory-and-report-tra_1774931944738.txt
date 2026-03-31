@@ -1,0 +1,342 @@
+I want you to do a full report-inventory and report-traceability analysis for the PMS Reports module and give me a comprehensive structured output so I can understand exactly what reports exist, what each report shows, where each report gets its data from, what columns are displayed, whether any placeholder or dummy data is being used, and what formulas or calculation logic are being applied. This is not a UI task. This is a documentation, reverse-analysis, and mapping task for the reports system.
+
+The final deliverable should be a complete report catalog and technical mapping table for every report currently available inside the PMS Reports module tree. I want this so I can understand what kind of reports are generating and how they are being built.
+
+Objective
+Please inspect the PMS Reports module end to end and produce a structured report that covers all report categories and all child reports. The output should help answer questions like:
+
+What reports exist?
+
+Under which category does each report belong?
+
+What is the purpose of each report?
+
+What columns are shown in the report?
+
+What filter inputs affect that report?
+
+From which tables, APIs, mock objects, services, or frontend states is the data fetched?
+
+Is the report using real data, derived data, dummy data, hardcoded values, fallback values, or placeholders?
+
+What formulas, summary logic, or calculations are used?
+
+What exports exist for that report and how are they generated?
+
+Are there mismatches between UI view mode and export mode?
+
+Scope
+Please cover the full PMS Reports module, including every category currently shown in the left tree such as:
+
+Maintenance & Work Orders
+
+Running Hours & Condition
+
+Inventory - Spares
+
+Inventory - Stores/Lubes/Chemicals
+
+IHM (Inventory of Hazardous Materials)
+
+Modify PMS (Change Requests)
+
+Critical Equipment
+
+LSA/FFA Equipment
+
+Under each category, inspect every child report. Do not skip reports just because they are hidden behind expand/collapse or because some look similar. The goal is a full inventory.
+
+What I want for each report
+For every report, I want a row in a master table and, if needed, a detailed section below it. Each report should include the following fields:
+
+Category name
+The parent report category under which the report appears in the left tree.
+
+Report name
+The exact report name shown in the UI tree.
+
+UI location / route / component
+Identify where the report is wired in the frontend. Mention relevant component names, files, route definitions, config objects, or tree-structure definitions.
+
+Purpose / business description
+A short plain-English explanation of what the report is intended to show. Example: overdue jobs, critical spares, anomaly detection, equipment utilization, etc.
+
+View-mode output type
+State whether the report renders as:
+
+table,
+
+chart,
+
+summary list,
+
+mixed table + summary,
+
+plain printable document,
+
+or dynamic panel.
+
+Displayed columns / fields
+List every column or visible data field shown in the report view. If the report is a table, I want the exact column names in order. If the report is not a table, list the visible fields/labels being shown.
+
+Export columns / fields
+If PDF or Excel output differs from view mode, mention the export-specific column structure too.
+
+Filters that affect the report
+Mention all filters that control the report, such as vessel, date range, search text, status, rank, criticality, or anything else. Also note whether the filters are page-level or report-level.
+
+Data source
+Identify exactly where the report gets data from. This may include:
+
+backend API endpoint,
+
+SQL query or database table,
+
+ORM model,
+
+frontend mock data file,
+
+static JSON,
+
+transformed state,
+
+merged datasets,
+
+derived calculations from another module.
+
+Fetching method / service layer
+Mention the service, hook, controller, helper, API function, or backend method responsible for fetching or generating the report data.
+
+Source tables / models / entities used
+If the data is coming from actual business tables or collections, list them. For example, work orders table, components table, inventory stock table, running hours logs, change request records, etc.
+
+Dummy / mock / placeholder data check
+Explicitly tell me whether the report is using:
+
+real live data,
+
+partially real and partially mocked data,
+
+hardcoded sample rows,
+
+placeholder values,
+
+default/fallback mock values when API is empty,
+
+calculated UI-only dummy counters.
+
+Calculation logic / formulas used
+If the report uses any calculations, explain them in plain English. For example:
+
+overdue = next due date less than today,
+
+due soon = next due date within 7 days,
+
+utilization percentage = current hours divided by period hours or expected hours,
+
+anomaly = delta greater than allowed threshold,
+
+low stock = ROB below min stock,
+
+shortage = min stock minus ROB,
+
+critical count = number of rows marked critical,
+
+etc.
+
+Exact formula or implementation reference
+If possible, give the actual code location where the formula is implemented, such as helper functions, selectors, backend service methods, SQL computed expressions, or utility functions.
+
+Summary metrics used
+If a report currently computes summary stats, identify all such stats and their formulas. Even if we later remove them from the UI, I still want to know how they are being calculated today.
+
+Export generation method
+Explain how PDF and Excel are generated:
+
+client-side export,
+
+server-side generation,
+
+HTML-to-PDF,
+
+jsPDF,
+
+ExcelJS,
+
+backend endpoint,
+
+or other mechanism.
+
+Mismatch check: view mode vs export mode
+Explicitly state whether the report export matches the UI view or whether the export is using an older template or different field layout.
+
+Issues / risks
+Mention if there are known concerns such as:
+
+export mismatch,
+
+hardcoded sample values,
+
+duplicated formulas,
+
+dead code,
+
+inconsistent naming,
+
+placeholder columns,
+
+missing API integration,
+
+hidden dependency on another module.
+
+Required final output format
+I want the final deliverable in two levels:
+
+Level 1: Master report inventory table
+Create one comprehensive table with one row per report. At minimum the master table should contain:
+
+Category
+
+Report Name
+
+Purpose
+
+View Type
+
+Columns
+
+Data Source
+
+Dummy/Real Data
+
+Calculations Used
+
+Export Type
+
+View vs Export Match
+
+Code/File Reference
+
+Notes / Issues
+
+Level 2: Detailed report-by-report breakdown
+After the master table, provide detailed sections for each report with expanded explanation of:
+
+columns,
+
+formulas,
+
+source data,
+
+fetch path,
+
+mock data check,
+
+export logic,
+
+and issues.
+
+Code inspection expectations
+Do not guess. Please inspect the actual codebase and trace the implementation. I want you to examine:
+
+report tree configuration,
+
+frontend report components,
+
+API service files,
+
+backend report generation code,
+
+export utilities,
+
+helper functions,
+
+calculation helpers,
+
+mock data files,
+
+static JSON fixtures,
+
+and any relevant SQL or ORM code if available.
+
+If any report is using hardcoded arrays, sample objects, placeholder counters, or temporary demo logic, clearly call that out. Do not hide it. I specifically want to identify which reports are truly data-backed and which are partly mocked.
+
+Dummy data / placeholder detection must be explicit
+This part is especially important. For every report, explicitly say one of these:
+
+Uses real backend data only.
+
+Uses real data with derived frontend calculations.
+
+Uses mixed real + mock data.
+
+Uses hardcoded dummy data.
+
+Uses placeholder/fallback values when no data is returned.
+
+Unable to verify source clearly.
+
+If you cannot confirm the data source with certainty, say so clearly and mention why.
+
+Formula analysis expectations
+Do not just say “uses calculations.” I want the logic explained clearly. For example:
+
+what counts as overdue,
+
+how due soon is decided,
+
+how shortage is computed,
+
+how utilization is computed,
+
+how anomaly is determined,
+
+how critical flags are decided,
+
+how period summaries are aggregated,
+
+how totals are counted.
+
+If the formulas differ between view mode and export mode, mention that too.
+
+Export-specific audit
+Also audit the export pipeline for each report:
+
+whether PDF and Excel both exist,
+
+whether they use the same source data as the view,
+
+whether they use a shared template or separate template,
+
+whether the export is based on legacy structure,
+
+whether the export includes fields not shown in the UI,
+
+whether the export excludes fields shown in the UI.
+
+I want to know exactly where view/export mismatch exists report by report.
+
+Important instruction
+This task is not to modify the code yet. This task is to inspect, document, and map the reports comprehensively so I can understand the whole reporting system before further fixes.
+
+Do not return a shallow summary. I want a serious technical audit and a comprehensive mapping table.
+
+Final success criteria
+Do not consider this task complete unless:
+
+every visible PMS report has been cataloged,
+
+every report has its columns listed,
+
+every report has its source data path inspected,
+
+dummy/mock/placeholder usage has been explicitly identified,
+
+formulas/calculations have been explained,
+
+export logic has been audited,
+
+and all of this is organized into a comprehensive reference table and detailed breakdown.
+
+The final result should help me answer this question for any PMS report:
+what is this report, what does it show, where does it get data from, how is it calculated, and is it real or dummy?
