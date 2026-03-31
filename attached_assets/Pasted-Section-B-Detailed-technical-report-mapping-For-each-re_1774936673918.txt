@@ -1,0 +1,133 @@
+Section B: Detailed technical report mapping
+For each report, provide a detailed subsection with:
+
+exact visible columns,
+
+exact formulas/derivation rules,
+
+source path,
+
+backend/frontend calculation split,
+
+troubleshooting flow,
+
+verification steps,
+
+test scenario examples,
+
+known risks,
+
+export discrepancies.
+
+Section C: Formula and logic index
+Create a dedicated section that lists all important formulas and where they are used across reports.
+
+For example:
+
+daysRemaining logic,
+
+overdue logic,
+
+grace-period logic,
+
+shortage logic,
+
+utilization logic,
+
+anomaly classification logic,
+
+approval-rate logic,
+
+cycle-time logic,
+
+consumption logic,
+
+summary aggregation logic.
+
+This formula index is important because it will allow quick debugging later without scanning all reports manually.
+
+Section D: Troubleshooting matrix
+Create a dedicated troubleshooting matrix that answers:
+
+If a count looks wrong, where do I check first?
+
+If a field is blank, where do I check?
+
+If export differs from view, where do I check?
+
+If report row count is unexpected, where do I check?
+
+If summary metric is incorrect, where do I check?
+
+This should be practical, not theoretical.
+
+Important instruction
+Do not just say “formula used” or “calculated server-side.” I need enough detail that another developer or QA person can actually validate the logic or troubleshoot issues from this file.
+
+So for every report, the file should answer:
+
+what are the raw inputs,
+
+what transformation happens,
+
+what formula is applied,
+
+what the expected output is,
+
+and where to debug if it fails.
+
+Keep it in the same file
+Do not create a separate “formula note” file and a separate “report inventory” file. I want one consolidated master reference file that includes both:
+
+the inventory/documentation layer,
+
+and the verification/troubleshooting layer.
+
+If needed, use multiple sheets/tabs within the same workbook or multiple sections within the same document, but keep it part of the same deliverable.
+
+If output is Excel
+If you produce this as an Excel workbook, then make it useful:
+
+One master sheet for the report inventory.
+
+One detailed sheet for report-by-report logic.
+
+One formula index sheet.
+
+One troubleshooting matrix sheet.
+
+Use filters and a structured table format.
+
+If formulas are represented, put them as text documentation unless there is a meaningful reason to use live Excel formulas.
+
+If output is markdown or document
+If you produce this as markdown/document, structure it clearly with:
+
+master table,
+
+detailed breakdown,
+
+formula index,
+
+troubleshooting matrix,
+
+issue summary.
+
+Final success criteria
+Do not consider this task complete unless the same file now allows me to do all of the following:
+
+understand what each report is,
+
+know which columns it shows,
+
+know where its data comes from,
+
+know whether it is real or dummy,
+
+know how each metric is calculated,
+
+know how to verify the result,
+
+and know where to troubleshoot if something is wrong.
+
+The final file should become my single source of truth for PMS report understanding, verification, and debugging.

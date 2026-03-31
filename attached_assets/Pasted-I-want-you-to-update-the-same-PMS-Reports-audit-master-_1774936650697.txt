@@ -1,0 +1,207 @@
+I want you to update the same PMS Reports audit/master file so it becomes a true verification and troubleshooting reference, not just a descriptive report catalog. Right now the file is useful, but it is incomplete for debugging because it does not capture formulas, derivation logic, troubleshooting checkpoints, and verification references in a structured enough way. I need those added into the same file.
+
+The goal is that when something is wrong in any report, I should be able to open this one file and understand:
+
+what the report shows,
+
+how each field is derived,
+
+what formula or logic is used,
+
+what source data is involved,
+
+how to verify the result,
+
+and where to troubleshoot if the output is wrong.
+
+So please enhance the same file and keep everything in one consolidated reference document / master table instead of splitting into disconnected outputs.
+
+Main requirement
+The same file must now include formula-level and troubleshooting-level detail for each report, so the file becomes operationally useful for validation, testing, bug diagnosis, and reconciliation.
+
+It should not remain only a business summary of reports. It must become a technical verification file.
+
+What to add into the same file
+For every report, add the following new fields/columns in the master table and detailed breakdown:
+
+New required fields
+Field / metric derivation logic
+For each visible report field, metric, summary value, or status, explain how it is derived.
+Example:
+
+Days Remaining = dueDate minus current date in days
+
+Overdue = dueDate less than today or beyond grace period
+
+Shortage = minStock minus ROB
+
+Utilization % = period hours or current usage divided by expected range
+
+Approval Rate = approved count divided by total count
+
+Exact formula / pseudo-formula
+Add either:
+
+the exact implementation formula from code,
+
+or a pseudo-formula in plain English/math form if the exact code is too verbose.
+
+Example formats:
+
+daysRemaining = ceil((dueDate - today) / 86400000)
+
+shortage = max(0, minStock - rob)
+
+approvalRate = approved / total * 100
+
+completionRate = completed / inScope * 100
+
+Formula/code location
+For each important formula, mention where it is implemented:
+
+file name,
+
+component name,
+
+helper function,
+
+service file,
+
+backend method,
+
+query/aggregation logic,
+
+utility function.
+
+Verification method
+Add a field telling how a tester or developer can verify that this report is correct.
+Example:
+
+Compare with raw work_orders rows filtered by due date
+
+Recalculate using source table and date difference
+
+Validate count against API response length
+
+Cross-check against spares ROB and minStock columns
+
+Check anomaly classification against running_hours_audit row history
+
+Troubleshooting guide
+Add a field saying where to look if the report is wrong.
+Example:
+
+first check API response,
+
+then frontend filter logic,
+
+then date parsing helper,
+
+then export mapping,
+
+then summary aggregation function.
+
+Input dependencies
+Mention all inputs that affect the report output:
+
+vessel,
+
+date range,
+
+report-level filters,
+
+hidden assumptions,
+
+current date/time,
+
+grace periods,
+
+thresholds,
+
+criticality flags,
+
+status mappings,
+
+source table relationships.
+
+Edge cases / failure conditions
+Add possible conditions where the report may behave incorrectly or unexpectedly.
+Example:
+
+null due dates,
+
+missing completion timestamps,
+
+RH logs with meter reset,
+
+spares without min stock,
+
+duplicate work order links,
+
+empty vessel selection,
+
+export using outdated schema.
+
+Expected output logic
+Add a short “what should happen” statement for each report.
+Example:
+
+If due date is within 7 days and WO is not completed, it should appear in Due Jobs report.
+
+If ROB is lower than min stock, it should appear in Low Stock Alert.
+
+If running hours decrease between logs, it should appear as a Negative Delta anomaly.
+
+View vs export formula parity
+Mention whether the same logic is used in:
+
+view mode,
+
+PDF export,
+
+Excel export.
+If not, clearly say what differs and where the discrepancy happens.
+
+Test case hint / validation sample
+For each report, add a short suggested test scenario.
+Example:
+
+Create one WO due yesterday and verify it appears in Overdue Jobs.
+
+Set minStock 10 and ROB 3 and verify shortage becomes 7.
+
+Insert RH log 1000 then 950 and verify Negative Delta anomaly appears.
+
+Required output format
+Please update the same file into these sections:
+
+Section A: Enhanced master table
+Expand the master table to include additional technical-verification columns such as:
+
+Category
+
+Report Name
+
+Purpose
+
+View Columns
+
+Data Source
+
+Real / Dummy / Mixed
+
+Formula Summary
+
+Formula/Logic Location
+
+Verification Method
+
+Troubleshooting Path
+
+Input Dependencies
+
+Edge Cases
+
+Export Match
+
+Notes / Issues
