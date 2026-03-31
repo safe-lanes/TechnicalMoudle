@@ -3196,5 +3196,27 @@ export const insertAdmRoleMenuAccessSchema = createInsertSchema(admRoleMenuAcces
 export type InsertAdmRoleMenuAccess = z.infer<typeof insertAdmRoleMenuAccessSchema>;
 export type AdmRoleMenuAccess = typeof admRoleMenuAccess.$inferSelect;
 
+// ====== PLANNER DATES TABLE ======
+export const plannerDates = pgTable("planner_dates", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
+  jobId: text("job_id").notNull(),
+  componentId: text("component_id").notNull(),
+  plannedDate: text("planned_date"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueJobComponent: unique("unique_planner_vessel_job_component").on(table.vesselId, table.jobId, table.componentId),
+}));
+
+export const insertPlannerDateSchema = createInsertSchema(plannerDates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPlannerDate = z.infer<typeof insertPlannerDateSchema>;
+export type PlannerDate = typeof plannerDates.$inferSelect;
+
 // ====== NOON REPORT MODULE SCHEMA — remove this line to disable ======
 export * from './schema-noon-report';

@@ -6,6 +6,7 @@ import * as woBulkService from '../services/workOrderBulkService';
 import * as woAutoService from '../services/workOrderAutoService';
 import * as executionService from '../services/executionService';
 import * as complianceAnomalyService from '../services/complianceAnomalyService';
+import * as plannerService from '../services/workOrderPlannerService';
 import { ValidationError } from '../../shared/errors';
 import { storage } from '../../../storage';
 
@@ -343,4 +344,69 @@ export async function getSuperintendentNotificationsSummary(req: Request, res: R
   }).length;
 
   res.json({ pendingCount, acknowledgedThisMonthCount });
+}
+
+// ── Work Order Planner ──
+
+export async function getPlannerData(req: Request, res: Response) {
+  try {
+    const vesselId = req.query.vesselId as string;
+    const days = parseInt(req.query.days as string) || 30;
+    const rank = req.query.rank as string | undefined;
+    const search = req.query.search as string | undefined;
+
+    if (!vesselId) {
+      return res.status(400).json({ error: 'vesselId is required' });
+    }
+
+    const result = await plannerService.getWorkOrderPlannerData({ vesselId, days, rank, search });
+    res.json(result);
+  } catch (error: any) {
+    console.error('Planner data error:', error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
+    res.status(500).json({ error: 'Failed to fetch planner data' });
+  }
+}
+
+export async function savePlannedDate(req: Request, res: Response) {
+  try {
+    const { vesselId, jobId, componentId, plannedDate } = req.body;
+
+    if (!vesselId || !jobId || !componentId) {
+      return res.status(400).json({ error: 'vesselId, jobId, and componentId are required' });
+    }
+
+    const result = await plannerService.savePlannedDate(vesselId, jobId, componentId, plannedDate || null);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Save planned date error:', error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
+    res.status(500).json({ error: 'Failed to save planned date' });
+  }
+}
+
+export async function exportPlanner(req: Request, res: Response) {
+  try {
+    const vesselId = req.query.vesselId as string;
+    const days = parseInt(req.query.days as string) || 30;
+    const rank = req.query.rank as string | undefined;
+    const search = req.query.search as string | undefined;
+
+    if (!vesselId) {
+      return res.status(400).json({ error: 'vesselId is required' });
+    }
+
+    const buffer = await plannerService.exportPlannerExcel({ vesselId, days, rank, search });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="work-order-planner.xlsx"`);
+    res.send(Buffer.from(buffer));
+  } catch (error: any) {
+    console.error('Planner export error:', error);
+    res.status(500).json({ error: 'Failed to export planner data' });
+  }
 }

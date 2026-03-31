@@ -45,6 +45,17 @@ router.patch('/anomalies/:anomalyId/acknowledge', asyncHandler(woCtrl.acknowledg
 // GET /anomalies/work-order/:workOrderId — anomalies for a specific WO
 router.get('/anomalies/work-order/:workOrderId', asyncHandler(woCtrl.getAnomalyForWorkOrder));
 
+// ── Work Order Planner ──
+
+// GET  /work-orders/planner — planner data with filters
+router.get('/work-orders/planner', asyncHandler(woCtrl.getPlannerData));
+
+// PATCH /work-orders/planner/planned-date — save planned date
+router.patch('/work-orders/planner/planned-date', asyncHandler(woCtrl.savePlannedDate));
+
+// GET  /work-orders/planner/export — export planner as Excel
+router.get('/work-orders/planner/export', asyncHandler(woCtrl.exportPlanner));
+
 // ── Core Work Order CRUD ──
 
 // GET  /work-orders — list all (optional ?vesselId= filter)

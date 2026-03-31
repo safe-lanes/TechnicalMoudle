@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2 } from "lucide-react";
+import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar } from "lucide-react";
+import WorkOrderPlanner from "./WorkOrderPlanner";
 import { useLocation } from "wouter";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -82,6 +83,7 @@ const WorkOrders: React.FC = () => {
     }
     return "Planned";
   });
+  const [showPlanner, setShowPlanner] = useState(false);
   const [postponeDialogOpen, setPostponeDialogOpen] = useState(false);
   const [unplannedWorkOrderFormOpen, setUnplannedWorkOrderFormOpen] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
@@ -629,6 +631,16 @@ const WorkOrders: React.FC = () => {
     setExportingType(null);
   };
 
+  if (showPlanner) {
+    return (
+      <WorkOrderPlanner
+        onBack={() => setShowPlanner(false)}
+        vesselId={vesselId || ""}
+        vesselName={vesselName || ""}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Header with Status Tabs */}
@@ -665,6 +677,16 @@ const WorkOrders: React.FC = () => {
         </div>
         
         <div className="flex gap-2 items-center">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
+            onClick={() => setShowPlanner(true)}
+            data-testid="button-planner-view"
+          >
+            <Calendar className="h-4 w-4" />
+            Planner
+          </Button>
           {isSailAdmin && (
           <Button 
             variant="outline" 
