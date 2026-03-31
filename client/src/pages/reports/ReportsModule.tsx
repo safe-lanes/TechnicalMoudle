@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Marker } from "@/components/Marker";
@@ -137,7 +137,7 @@ export interface ReportActionTrigger {
 }
 
 const ReportsModule = () => {
-  const { setVesselId } = useVessel();
+  const { vesselId, setVesselId } = useVessel();
   const { toast } = useToast();
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -150,11 +150,17 @@ const ReportsModule = () => {
   const [dragSourceId, setDragSourceId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [globalFilters, setGlobalFilters] = useState<FilterValues>({
-    vessel: "all",
+    vessel: vesselId || "all",
     department: "all",
     dateRange: { from: null, to: null },
     priority: "all"
   });
+
+  useEffect(() => {
+    if (vesselId) {
+      setGlobalFilters(prev => ({ ...prev, vessel: vesselId }));
+    }
+  }, [vesselId]);
 
   const expandAll = () => {
     setExpandedCategories(new Set(categoryOrder.map(c => c.id)));
@@ -249,12 +255,12 @@ const ReportsModule = () => {
 
   const handleFiltersReset = useCallback(() => {
     setGlobalFilters({
-      vessel: "all",
+      vessel: vesselId || "all",
       department: "all",
       dateRange: { from: null, to: null },
       priority: "all"
     });
-  }, []);
+  }, [vesselId]);
 
   const handleClearAll = () => {
     setSearchQuery("");
