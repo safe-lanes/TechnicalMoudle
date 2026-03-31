@@ -1242,14 +1242,13 @@ const Dashboard = () => {
               </div>
 
               {/* Card 2: Work Order Status & Trends */}
-              <div className={cardStyle} data-testid="column-wo-status-trends">
-                <div className="p-4">
+              <div className={cardStyle} data-testid="column-wo-status-trends" style={{ display: 'flex', flexDirection: 'column' }}>
+                <div className="p-4" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                   <div style={sectionHeaderBar} className="!pt-0">WORK ORDER STATUS & TRENDS</div>
 
-                  <div className="mb-4">
+                  <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                     <div style={subTitle} className="mb-1">Status Distribution</div>
-                    <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '8px' }}>Click segments to filter</div>
-                    <div style={{ height: '250px' }} data-testid="card-wo-status-chart">
+                    <div style={{ flex: 1, minHeight: 0 }} data-testid="card-wo-status-chart">
                       {workOrderStatusChartData.length > 0 ? (
                         <AgCharts options={{
                           data: workOrderStatusChartData,
@@ -1282,11 +1281,11 @@ const Dashboard = () => {
 
                   <div style={dividerH} />
 
-                  <div className="mt-4">
+                  <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
                     <div style={subTitle} className="mb-1">6-MONTH MAINTENANCE TREND</div>
                     {maintenanceTrendData.months.length > 0 ? (
-                      <div className="flex flex-col gap-2">
-                        <div style={{ height: '220px', borderRadius: '8px', padding: '8px 4px' }} data-testid="chart-maintenance-trend">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minHeight: 0 }}>
+                        <div style={{ flex: 1, minHeight: 0, borderRadius: '8px', padding: '8px 4px' }} data-testid="chart-maintenance-trend">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={maintenanceTrendData.months} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
@@ -1322,7 +1321,7 @@ const Dashboard = () => {
                         </div>
                       </div>
                     ) : (
-                      <div style={{ height: '180px' }} className="flex items-center justify-center"><span style={{ color: '#9E9E9E', fontSize: '12px' }}>No trend data available</span></div>
+                      <div style={{ flex: 1 }} className="flex items-center justify-center"><span style={{ color: '#9E9E9E', fontSize: '12px' }}>No trend data available</span></div>
                     )}
                   </div>
 
