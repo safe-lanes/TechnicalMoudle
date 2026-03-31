@@ -305,9 +305,10 @@ export async function savePlannedDate(vesselId: string, jobId: string, component
     if (!datePattern.test(plannedDate)) {
       throw new ValidationError('plannedDate must be in YYYY-MM-DD format or null');
     }
-    const parsed = new Date(plannedDate);
-    if (isNaN(parsed.getTime())) {
-      throw new ValidationError('plannedDate is not a valid date');
+    const [year, month, day] = plannedDate.split('-').map(Number);
+    const parsed = new Date(year, month - 1, day);
+    if (isNaN(parsed.getTime()) || parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) {
+      throw new ValidationError('plannedDate is not a valid calendar date');
     }
   }
 
