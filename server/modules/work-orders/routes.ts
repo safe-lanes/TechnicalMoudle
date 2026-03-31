@@ -56,8 +56,11 @@ router.patch('/work-orders/planner/planned-date', asyncHandler(woCtrl.savePlanne
 // PATCH /work-orders/planner/bulk-planned-date — bulk save planned dates
 router.patch('/work-orders/planner/bulk-planned-date', asyncHandler(woCtrl.bulkSavePlannedDate));
 
-// GET  /work-orders/planner/export — export planner as Excel
+// GET  /work-orders/planner/export — export planner as Excel (server-filtered)
 router.get('/work-orders/planner/export', asyncHandler(woCtrl.exportPlanner));
+
+// POST /work-orders/planner/export — export planner as Excel from client-provided items
+router.post('/work-orders/planner/export', asyncHandler(woCtrl.exportPlannerFromItems));
 
 // ── Core Work Order CRUD ──
 

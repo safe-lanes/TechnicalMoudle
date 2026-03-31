@@ -435,3 +435,22 @@ export async function exportPlanner(req: Request, res: Response) {
     res.status(500).json({ error: 'Failed to export planner data' });
   }
 }
+
+export async function exportPlannerFromItems(req: Request, res: Response) {
+  try {
+    const { items } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items array is required' });
+    }
+
+    const buffer = await plannerService.exportPlannerExcelFromItems(items);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="work-order-planner.xlsx"`);
+    res.send(Buffer.from(buffer));
+  } catch (error: any) {
+    console.error('Planner export from items error:', error);
+    res.status(500).json({ error: 'Failed to export planner data' });
+  }
+}

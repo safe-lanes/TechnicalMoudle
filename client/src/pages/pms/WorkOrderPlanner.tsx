@@ -390,8 +390,11 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
 
   const handleExportExcel = async () => {
     try {
-      const searchParams = new URLSearchParams(queryParams);
-      const response = await fetch(`/technical/api/work-orders/planner/export?${searchParams.toString()}`);
+      const response = await fetch(`/technical/api/work-orders/planner/export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: sortedItems }),
+      });
       if (!response.ok) throw new Error("Export failed");
 
       const blob = await response.blob();

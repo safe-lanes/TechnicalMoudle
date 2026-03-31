@@ -369,43 +369,48 @@ export async function bulkSavePlannedDate(
   }
 
   const database = await getDb();
-  let updated = 0;
-  let inserted = 0;
 
-  for (const item of items) {
-    if (!item.jobId || !item.componentId) continue;
+  const result = await database.transaction(async (tx) => {
+    let updated = 0;
+    let inserted = 0;
 
-    const existing = await database.select().from(plannerDates).where(
-      and(
-        eq(plannerDates.vesselId, vesselId),
-        eq(plannerDates.jobId, item.jobId),
-        eq(plannerDates.componentId, item.componentId)
-      )
-    );
+    for (const item of items) {
+      if (!item.jobId || !item.componentId) continue;
 
-    if (existing.length > 0) {
-      await database.update(plannerDates)
-        .set({ plannedDate, updatedAt: new Date() })
-        .where(
-          and(
-            eq(plannerDates.vesselId, vesselId),
-            eq(plannerDates.jobId, item.jobId),
-            eq(plannerDates.componentId, item.componentId)
-          )
-        );
-      updated++;
-    } else {
-      await database.insert(plannerDates).values({
-        vesselId,
-        jobId: item.jobId,
-        componentId: item.componentId,
-        plannedDate,
-      });
-      inserted++;
+      const existing = await tx.select().from(plannerDates).where(
+        and(
+          eq(plannerDates.vesselId, vesselId),
+          eq(plannerDates.jobId, item.jobId),
+          eq(plannerDates.componentId, item.componentId)
+        )
+      );
+
+      if (existing.length > 0) {
+        await tx.update(plannerDates)
+          .set({ plannedDate, updatedAt: new Date() })
+          .where(
+            and(
+              eq(plannerDates.vesselId, vesselId),
+              eq(plannerDates.jobId, item.jobId),
+              eq(plannerDates.componentId, item.componentId)
+            )
+          );
+        updated++;
+      } else {
+        await tx.insert(plannerDates).values({
+          vesselId,
+          jobId: item.jobId,
+          componentId: item.componentId,
+          plannedDate,
+        });
+        inserted++;
+      }
     }
-  }
 
-  return { success: true, updated, inserted, total: updated + inserted };
+    return { success: true, updated, inserted, total: updated + inserted };
+  });
+
+  return result;
 }
 
 export async function exportPlannerExcel(filters: WorkOrderPlannerFilters) {
@@ -413,6 +418,49 @@ export async function exportPlannerExcel(filters: WorkOrderPlannerFilters) {
   const data = await getWorkOrderPlannerData(filters);
 
   const rows = data.items.map((item, idx) => ({
+    'S.No': idx + 1,
+    'Component': item.componentName,
+    'Job Code': item.jobCode,
+    'Job Title': item.jobTitle,
+    'Maintenance Basis': item.maintenanceBasis,
+    'Frequency': item.frequency,
+    'Due Date / RH': item.dueInfo,
+    'Status': item.status,
+    'Assigned To': item.assignedTo,
+    'Work Order': item.woNo || '-',
+    'WO Status': item.woStatus || '-',
+    'Planned Date': item.plannedDate || '',
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [
+    { wch: 6 }, { wch: 30 }, { wch: 20 }, { wch: 40 },
+    { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 14 },
+    { wch: 16 }, { wch: 25 }, { wch: 14 }, { wch: 14 },
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Work Order Planner');
+
+  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  return buffer;
+}
+
+export async function exportPlannerExcelFromItems(items: Array<{
+  componentName: string;
+  jobCode: string;
+  jobTitle: string;
+  maintenanceBasis: string;
+  frequency: string;
+  dueInfo: string;
+  status: string;
+  assignedTo: string;
+  woNo: string | null;
+  woStatus: string | null;
+  plannedDate: string | null;
+}>) {
+  const XLSX = await import('xlsx');
+
+  const rows = items.map((item, idx) => ({
     'S.No': idx + 1,
     'Component': item.componentName,
     'Job Code': item.jobCode,
