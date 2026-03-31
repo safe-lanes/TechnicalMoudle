@@ -20,6 +20,7 @@ import {
   Eye,
   CheckSquare,
   RefreshCw,
+  Shield,
 } from "lucide-react";
 
 interface CycleSkipBreakdown {
@@ -767,11 +768,18 @@ function MetricCard({ icon, title, value, label, severity, onClick, testId }: Me
   );
 }
 
-interface ComplianceAnomalyPanelProps {
-  vesselId?: string;
+interface SuperintendentSummary {
+  pendingCount: number;
+  acknowledgedThisMonthCount: number;
 }
 
-export function ComplianceAnomalyPanel({ vesselId }: ComplianceAnomalyPanelProps) {
+interface ComplianceAnomalyPanelProps {
+  vesselId?: string;
+  superintendentSummary?: SuperintendentSummary;
+  onNavigateToSuperintendent?: () => void;
+}
+
+export function ComplianceAnomalyPanel({ vesselId, superintendentSummary, onNavigateToSuperintendent }: ComplianceAnomalyPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const { isSailAdmin, isClientAdmin, isHeadOfDept, isVessel } = useUIRole();
@@ -987,6 +995,59 @@ export function ComplianceAnomalyPanel({ vesselId }: ComplianceAnomalyPanelProps
                 </>
               )}
             </div>
+
+            {superintendentSummary && onNavigateToSuperintendent && (
+              <div
+                onClick={onNavigateToSuperintendent}
+                style={{
+                  marginTop: "16px",
+                  borderTop: "1px solid #e0e0e0",
+                  padding: "14px 0 0 0",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "14px",
+                }}
+                data-testid="tile-superintendent-notifications"
+              >
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  background: (superintendentSummary.pendingCount ?? 0) > 0 ? '#ff6d00' : '#9e9e9e',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <Shield className="w-5 h-5 text-white" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#424242', marginBottom: '6px', letterSpacing: '0.3px' }}>
+                    Superintendent Notifications
+                  </div>
+                  <div style={{ display: 'flex', gap: '28px', alignItems: 'baseline' }}>
+                    <div>
+                      <span style={{ fontSize: '22px', fontWeight: 700, color: (superintendentSummary.pendingCount ?? 0) > 0 ? '#d32f2f' : '#757575' }} data-testid="text-pending-count">
+                        {superintendentSummary.pendingCount ?? 0}
+                      </span>
+                      <span style={{ fontSize: '11px', color: (superintendentSummary.pendingCount ?? 0) > 0 ? '#d32f2f' : '#757575', marginLeft: '5px' }}>
+                        Pending Acknowledgment
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '16px', fontWeight: 600, color: '#2e7d32' }} data-testid="text-acknowledged-count">
+                        {superintendentSummary.acknowledgedThisMonthCount ?? 0}
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#2e7d32', marginLeft: '5px' }}>
+                        Acknowledged This Month
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5" style={{ color: '#9e9e9e' }} />
+              </div>
+            )}
           </div>
         )}
       </div>

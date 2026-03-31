@@ -19,7 +19,6 @@ import {
   ArrowUp,
   ArrowDown,
   Loader2,
-  Shield,
   Filter
 } from "lucide-react";
 import { AgCharts } from "ag-charts-react";
@@ -1366,54 +1365,12 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* ROW 2: Compliance Anomaly Detection (includes Work Order Anomalies) */}
-            <ComplianceAnomalyPanel vesselId={vesselId} />
-
-            {/* ROW 5: Superintendent Notifications */}
-            <div
-              className={`${cardStyle} cursor-pointer transition-shadow hover:shadow-md`}
-              onClick={() => setLocation('/pms/superintendent')}
-              data-testid="tile-superintendent-notifications"
-            >
-              <div className="p-5 flex items-center gap-5">
-                <div style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '12px',
-                  background: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#ff6d00' : '#9e9e9e',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}>
-                  <Shield className="w-6 h-6 text-white" />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#424242', marginBottom: '8px', letterSpacing: '0.3px' }}>
-                    Superintendent Notifications
-                  </div>
-                  <div style={{ display: 'flex', gap: '32px', alignItems: 'baseline' }}>
-                    <div>
-                      <span style={{ fontSize: '28px', fontWeight: 700, color: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#d32f2f' : '#757575' }} data-testid="text-pending-count">
-                        {superintendentSummary?.pendingCount ?? 0}
-                      </span>
-                      <span style={{ fontSize: '12px', color: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#d32f2f' : '#757575', marginLeft: '6px' }}>
-                        Pending Acknowledgment
-                      </span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '18px', fontWeight: 600, color: '#2e7d32' }} data-testid="text-acknowledged-count">
-                        {superintendentSummary?.acknowledgedThisMonthCount ?? 0}
-                      </span>
-                      <span style={{ fontSize: '12px', color: '#2e7d32', marginLeft: '6px' }}>
-                        Acknowledged This Month
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <ChevronRight className="w-5 h-5" style={{ color: '#9e9e9e' }} />
-              </div>
-            </div>
+            {/* ROW 2: Compliance Anomaly Detection (includes Work Order Anomalies + Superintendent Notifications) */}
+            <ComplianceAnomalyPanel
+              vesselId={vesselId}
+              superintendentSummary={superintendentSummary}
+              onNavigateToSuperintendent={() => setLocation('/pms/superintendent')}
+            />
 
             {/* Pending Approval Section (Head of Dept) */}
             {isHeadOfDept && workOrderKPIs.pendingApproval > 0 && (
