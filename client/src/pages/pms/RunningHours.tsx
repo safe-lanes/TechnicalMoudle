@@ -1338,49 +1338,52 @@ const RunningHours = () => {
       {/* Main Table - Scrollable */}
       {activeTab === 'main' && (<>
       <div className="flex-1 overflow-y-auto bg-white rounded-lg border border-gray-200">
-        {/* Table Header */}
-        <div className="bg-[#52baf3] text-white px-4 py-3">
-          <div className="grid grid-cols-10 gap-4 text-sm font-medium">
-            <div data-testid="D6"><Marker id="D6" />Component Name</div>
-            <div data-testid="D7"><Marker id="D7" />Component Code</div>
-            <div data-testid="D8"><Marker id="D8" />Component Category</div>
-            <div data-testid="D9"><Marker id="D9" />Running Hours</div>
-            <div data-testid="D10"><Marker id="D10" />Last Updated</div>
-            <div data-testid="D11"><Marker id="D11" />Utilization Rate ({periodShortLabels[utilizationPeriod] || 'Monthly'})</div>
-            <div data-testid="D22">Inherited RH</div>
-            <div data-testid="D12"><Marker id="D12" />Update RH</div>
-            <div data-testid="D24">Last Updated By</div>
-          </div>
-        </div>
-
-        {/* Table Body */}
-        <div className="divide-y divide-gray-200">
+        <table className="w-full text-sm">
+          <thead className="bg-[#52baf3] text-white sticky top-0">
+            <tr>
+              <th className="text-left py-3 px-4 font-medium" data-testid="D6"><Marker id="D6" />Component Name</th>
+              <th className="text-left py-3 px-4 font-medium" data-testid="D7"><Marker id="D7" />Component Code</th>
+              <th className="text-left py-3 px-4 font-medium" data-testid="D8"><Marker id="D8" />Component Category</th>
+              <th className="text-left py-3 px-4 font-medium" data-testid="D9"><Marker id="D9" />Running Hours</th>
+              <th className="text-left py-3 px-4 font-medium" data-testid="D10"><Marker id="D10" />Last Updated</th>
+              <th className="text-left py-3 px-4 font-medium" data-testid="D11"><Marker id="D11" />Utilization Rate ({periodShortLabels[utilizationPeriod] || 'Monthly'})</th>
+              <th className="text-left py-3 px-4 font-medium" data-testid="D22">Inherited RH</th>
+              <th className="text-left py-3 px-4 font-medium" data-testid="D12"><Marker id="D12" />Update RH</th>
+              <th className="text-left py-3 px-4 font-medium" data-testid="D24">Last Updated By</th>
+            </tr>
+          </thead>
+          <tbody>
           {isLoadingParents ? (
-            <div className="px-4 py-8 text-center text-gray-500">
-              Loading running hours data...
-            </div>
+            <tr>
+              <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                Loading running hours data...
+              </td>
+            </tr>
           ) : (() => {
             if (filteredRunningHoursData.length === 0 && searchTerm) {
               return (
-                <div className="px-4 py-8 text-center text-gray-500">
-                  No results found. <button onClick={clearFilters} className="text-blue-600 underline">Reset</button>
-                </div>
+                <tr>
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                    No results found. <button onClick={clearFilters} className="text-blue-600 underline">Reset</button>
+                  </td>
+                </tr>
               );
             }
             
             if (filteredRunningHoursData.length === 0) {
               return (
-                <div className="px-4 py-8 text-center text-gray-500">
-                  No running hours data available
-                </div>
+                <tr>
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                    No running hours data available
+                  </td>
+                </tr>
               );
             }
             
             return filteredRunningHoursData.map((item, index) => (
-              <div key={item.id} className="px-4 py-3 hover:bg-gray-50">
-              <div className="grid grid-cols-10 gap-4 text-sm items-center">
-                <div className="text-gray-900" data-testid={index === 0 ? "D13" : undefined}>{index === 0 && <Marker id="D13" />}{item.component}</div>
-                <div data-testid={index === 0 ? "D14" : undefined}>
+              <tr key={item.id} className="hover:bg-gray-50">
+                <td className="py-3 px-4 text-gray-900" data-testid={index === 0 ? "D13" : undefined}>{index === 0 && <Marker id="D13" />}{item.component}</td>
+                <td className="py-3 px-4" data-testid={index === 0 ? "D14" : undefined}>
                   {index === 0 && <Marker id="D14" />}
                   {item.sfiCode && item.componentCode ? (
                     <button
@@ -1397,14 +1400,15 @@ const RunningHours = () => {
                   ) : (
                     <span className="text-sm text-gray-400">—</span>
                   )}
-                </div>
-                <div className="text-gray-700" data-testid={index === 0 ? "D15" : undefined}>{index === 0 && <Marker id="D15" />}{item.componentCategory}</div>
-                <div className="text-gray-900 font-medium" data-testid={index === 0 ? "D16" : undefined}>{index === 0 && <Marker id="D16" />}{item.runningHours}</div>
-                <div className="text-gray-700" data-testid={index === 0 ? "D17" : undefined}>{index === 0 && <Marker id="D17" />}{item.lastUpdated}</div>
-                <div
-                  className="flex items-center gap-1"
+                </td>
+                <td className="py-3 px-4 text-gray-700" data-testid={index === 0 ? "D15" : undefined}>{index === 0 && <Marker id="D15" />}{item.componentCategory}</td>
+                <td className="py-3 px-4 text-gray-900 font-medium" data-testid={index === 0 ? "D16" : undefined}>{index === 0 && <Marker id="D16" />}{item.runningHours}</td>
+                <td className="py-3 px-4 text-gray-700" data-testid={index === 0 ? "D17" : undefined}>{index === 0 && <Marker id="D17" />}{item.lastUpdated}</td>
+                <td
+                  className="py-3 px-4"
                   data-testid={index === 0 ? "D18" : undefined}
                 >
+                  <div className="flex items-center gap-1">
                   {index === 0 && <Marker id="D18" />}
                   <span
                     className={`font-medium ${
@@ -1457,8 +1461,9 @@ const RunningHours = () => {
                       data-testid={`warning-utilization-${item.id}`}
                     />
                   )}
-                </div>
-                <div className="flex items-center gap-2">
+                  </div>
+                </td>
+                <td className="py-3 px-4">
                   {item.inheritedCount && item.inheritedCount > 0 ? (
                     <Button 
                       variant="ghost" 
@@ -1474,8 +1479,8 @@ const RunningHours = () => {
                   ) : (
                     <span className="text-gray-400 text-xs">—</span>
                   )}
-                </div>
-                <div className="flex gap-2">
+                </td>
+                <td className="py-3 px-4">
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -1486,15 +1491,15 @@ const RunningHours = () => {
                   >
                     {index === 0 && <Marker id="D19" />}<Settings className="h-4 w-4 text-gray-600" />
                   </Button>
-                </div>
-                <div className="text-gray-700 truncate" title={item.lastUpdatedBy || ''} data-testid={`text-last-updated-by-${item.id}`}>
+                </td>
+                <td className="py-3 px-4 text-gray-700 truncate" title={item.lastUpdatedBy || ''} data-testid={`text-last-updated-by-${item.id}`}>
                   {item.lastUpdatedBy || <span className="text-gray-400">—</span>}
-                </div>
-              </div>
-            </div>
+                </td>
+              </tr>
             ));
           })()}
-        </div>
+          </tbody>
+        </table>
       </div>
 
       {/* Component count footer */}
