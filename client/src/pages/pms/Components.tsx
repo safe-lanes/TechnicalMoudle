@@ -3395,10 +3395,10 @@ const Components: React.FC = () => {
   return (
     <div className={`flex flex-col ${isModifyMode ? '' : isChangeMode ? 'bg-orange-50' : isChangeRequestMode ? 'bg-[#52baf3]' : ''}`} style={{ height: 'calc(100vh - 120px)' }}>
       {/* Header - Fixed */}
-      <div className="flex-shrink-0">
+      <div className="flex-shrink-0 space-y-4 pb-4">
         {/* Change Mode Banner */}
         {isChangeMode && (
-          <div className="mb-4 p-4 bg-amber-50 border-b-2 border-amber-200">
+          <div className="p-4 bg-amber-50 border-b-2 border-amber-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div>
@@ -3430,7 +3430,7 @@ const Components: React.FC = () => {
         )}
         
         {/* Header with SubModule Title */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             {isChangeRequestMode && (
               <Button
@@ -3478,7 +3478,7 @@ const Components: React.FC = () => {
         </div>
         
         {/* Filters Row */}
-        <div className="flex items-center gap-3 flex-wrap mb-4">
+        <div className="flex items-center gap-3 flex-wrap">
           {(isSailAdmin || isClientAdmin || isChangeMode || isChangeRequestMode) && (
           <div className="flex items-center gap-2" data-testid="B2">
             <Marker id="B2" />
