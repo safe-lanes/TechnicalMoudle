@@ -1,0 +1,26 @@
+What these methods power (the features to verify)
+1. getSpareInventoryByPartCodes and getSpareInventoryByPartNumbers
+These are used in two places:
+•	Work Order context enrichment (workOrderContextService.ts, line 31-34) — When a work order is loaded/displayed, its spare parts list is enriched with ROB (Remaining On Board) inventory quantities. This is the data that shows how many of each spare part are currently in stock on the vessel.
+•	Job repository (jobRepository.ts, line 54-58) — Same spare inventory lookup, used when viewing job details with associated spares.
+What to verify: Open a work order that has spare parts listed → confirm the ROB quantities still display correctly next to each spare part.
+________________________________________
+2. getLocationById
+Used during work order approval (workOrderService.ts, line 1380) — When approving a work order that consumed spare parts, the system looks up the storage location by ID to match it against legacy location names for auto-syncing stock records.
+What to verify: Approve a work order that has consumed spare parts → confirm inventory deduction processes without errors.
+________________________________________
+3. upsertSpareLocationStock
+Used during work order approval (workOrderService.ts, line 1401) — When the system discovers a spare was consumed but there's no spare_location_stock record yet, it auto-creates one by seeding from the legacy ROB fields.
+What to verify: Same as above — part of the approval spare consumption flow.
+________________________________________
+4. getInventoryTransactions
+Used during work order approval (workOrderService.ts, line 1416) — Checks existing inventory transactions to avoid double-deducting spares if the same work order was already partially processed.
+What to verify: Approve a work order with spare consumption → confirm no duplicate deductions occur.
+________________________________________
+5. getSpareLocationStockItem (already on IStorage, but uses typeof check)
+Used during work order approval (workOrderService.ts, line 1376) — Looks up current stock quantity at a specific location before deciding whether to deduct.
+What to verify: Same approval flow.
+________________________________________
+6. getLinkedComponentsForJob
+Used in work order context to fetch which components are linked to a job.
+What to verify: View a work order → confirm linked components display correctly.
