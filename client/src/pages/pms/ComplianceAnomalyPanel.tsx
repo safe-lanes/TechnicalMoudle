@@ -828,7 +828,6 @@ export function ComplianceAnomalyPanel({ vesselId }: ComplianceAnomalyPanelProps
     data.scheduleDrift.severity === "green";
 
   const anomalyStats = statsQuery.data;
-  const anomalyHasData = anomalyStats && anomalyStats.totalPending > 0;
   const anomalySeverity: "green" | "yellow" | "red" | "grey" = !anomalyStats
     ? "grey"
     : anomalyStats.totalHigh > 0
