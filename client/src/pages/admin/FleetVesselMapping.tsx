@@ -74,6 +74,7 @@ interface SpareAutoMatchEntry {
   partCode: string;
   partName: string;
   vesselSpareId: string;
+  vesselSpareIds: string[];
   matched: boolean;
 }
 
@@ -563,18 +564,20 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   }, [jobMappingsData]);
 
   const spareAutoMatchEntries = useMemo((): SpareAutoMatchEntry[] => {
-    const vesselSpareLookup = new Map<string, any>();
+    const vesselSpareLookup = new Map<string, any[]>();
     vesselSparesData.forEach((vs: any) => {
       const key = `${vs.fleetEquipmentCode || ""}|${vs.partCode || ""}`;
       if (vs.fleetEquipmentCode && vs.partCode) {
-        vesselSpareLookup.set(key, vs);
+        const arr = vesselSpareLookup.get(key) || [];
+        arr.push(vs);
+        vesselSpareLookup.set(key, arr);
       }
     });
 
     return fleetSparesData.map((fs) => {
       const compositeKey = `${fs.fleetEquipmentCode}|${fs.partCode}`;
-      const vesselSpare = vesselSpareLookup.get(compositeKey) || null;
-      const matched = !!vesselSpare;
+      const vesselSpares = vesselSpareLookup.get(compositeKey) || [];
+      const matched = vesselSpares.length > 0;
 
       return {
         fleetEquipmentCode: fs.fleetEquipmentCode,
@@ -582,14 +585,15 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
         componentName: fs.fleetEquipmentName || "",
         partCode: fs.partCode,
         partName: fs.partName || "",
-        vesselSpareId: vesselSpare ? String(vesselSpare.suuid) : "",
+        vesselSpareId: matched ? String(vesselSpares[0].suuid) : "",
+        vesselSpareIds: vesselSpares.map((vs: any) => String(vs.suuid)),
         matched,
       };
     });
   }, [vesselSparesData, fleetSparesData]);
 
   const spareMappedCompositeKeys = useMemo(() => {
-    return new Set(spareMappingsData.map((m) => `${m.fleetEquipmentCode}|${m.partCode}`));
+    return new Set(spareMappingsData.map((m) => `${m.fleetEquipmentCode}|${m.partCode}|${m.spareId || ""}`));
   }, [spareMappingsData]);
 
   const createMappingMutation = useMutation({
@@ -627,11 +631,10 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   });
 
   const deleteJobMappingMutation = useMutation({
-    mutationFn: async (params: { jobCode: string; vesselCode: string }) => {
-      await apiRequest(
-        "DELETE",
-        `/technical/api/fleet-admin/fleet-job-mappings?jobCode=${encodeURIComponent(params.jobCode)}&vesselCode=${encodeURIComponent(params.vesselCode)}`
-      );
+    mutationFn: async (params: { jobCode: string; vesselCode: string; jobId?: string }) => {
+      let url = `/technical/api/fleet-admin/fleet-job-mappings?jobCode=${encodeURIComponent(params.jobCode)}&vesselCode=${encodeURIComponent(params.vesselCode)}`;
+      if (params.jobId) url += `&jobId=${encodeURIComponent(params.jobId)}`;
+      await apiRequest("DELETE", url);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-job-mappings", { vesselCode: selectedVessel }] });
@@ -646,16 +649,16 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     deleteJobMappingMutation.mutate({
       jobCode: m.jobCode,
       vesselCode: m.vesselCode || selectedVessel || "",
+      jobId: m.jobId,
     });
   };
 
   const handleRemoveAllJobMappings = async () => {
     for (const m of selectedFleetJobMappings) {
       try {
-        await apiRequest(
-          "DELETE",
-          `/technical/api/fleet-admin/fleet-job-mappings?jobCode=${encodeURIComponent(m.jobCode)}&vesselCode=${encodeURIComponent(m.vesselCode || selectedVessel || "")}`
-        );
+        let url = `/technical/api/fleet-admin/fleet-job-mappings?jobCode=${encodeURIComponent(m.jobCode)}&vesselCode=${encodeURIComponent(m.vesselCode || selectedVessel || "")}`;
+        if (m.jobId) url += `&jobId=${encodeURIComponent(m.jobId)}`;
+        await apiRequest("DELETE", url);
       } catch {}
     }
     queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-job-mappings", { vesselCode: selectedVessel }] });
@@ -696,8 +699,12 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
           isActive: true,
         });
         successCount++;
-      } catch {
+      } catch (err: any) {
         failCount++;
+        const msg = err?.message || "";
+        if (msg.includes("unique") || msg.includes("duplicate")) {
+          toast({ title: "Already linked", description: `Job "${vesselJob.jobNo || jobNo}" is already linked`, variant: "destructive" });
+        }
       }
     }
 
@@ -736,8 +743,12 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
           isActive: true,
         });
         successCount++;
-      } catch {
+      } catch (err: any) {
         failCount++;
+        const msg = err?.message || "";
+        if (msg.includes("unique") || msg.includes("duplicate")) {
+          toast({ title: "Already linked", description: `Component "${vc.componentCode || ""}" is already linked to this fleet equipment`, variant: "destructive" });
+        }
       }
     }
 
@@ -752,11 +763,10 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   };
 
   const deleteSpareMappingMutation = useMutation({
-    mutationFn: async (params: { partCode: string; vesselCode: string }) => {
-      await apiRequest(
-        "DELETE",
-        `/technical/api/fleet-admin/fleet-spare-mappings?partCode=${encodeURIComponent(params.partCode)}&vesselCode=${encodeURIComponent(params.vesselCode)}`
-      );
+    mutationFn: async (params: { partCode: string; vesselCode: string; spareId?: string }) => {
+      let url = `/technical/api/fleet-admin/fleet-spare-mappings?partCode=${encodeURIComponent(params.partCode)}&vesselCode=${encodeURIComponent(params.vesselCode)}`;
+      if (params.spareId) url += `&spareId=${encodeURIComponent(params.spareId)}`;
+      await apiRequest("DELETE", url);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-spare-mappings", { vesselCode: selectedVessel }] });
@@ -771,16 +781,16 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     deleteSpareMappingMutation.mutate({
       partCode: m.partCode,
       vesselCode: m.vesselCode || selectedVessel || "",
+      spareId: m.spareId,
     });
   };
 
   const handleRemoveAllSpareMappings = async () => {
     for (const m of selectedFleetSpareLinkedDetails) {
       try {
-        await apiRequest(
-          "DELETE",
-          `/technical/api/fleet-admin/fleet-spare-mappings?partCode=${encodeURIComponent(m.partCode)}&vesselCode=${encodeURIComponent(m.vesselCode || selectedVessel || "")}`
-        );
+        let url = `/technical/api/fleet-admin/fleet-spare-mappings?partCode=${encodeURIComponent(m.partCode)}&vesselCode=${encodeURIComponent(m.vesselCode || selectedVessel || "")}`;
+        if (m.spareId) url += `&spareId=${encodeURIComponent(m.spareId)}`;
+        await apiRequest("DELETE", url);
       } catch {}
     }
     queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-spare-mappings", { vesselCode: selectedVessel }] });
@@ -816,8 +826,12 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
           isActive: true,
         });
         successCount++;
-      } catch {
+      } catch (err: any) {
         failCount++;
+        const msg = err?.message || "";
+        if (msg.includes("unique") || msg.includes("duplicate")) {
+          toast({ title: "Already linked", description: `Spare "${vesselSpare.partCode || ""}" is already linked`, variant: "destructive" });
+        }
       }
     }
 
@@ -840,35 +854,44 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   };
 
   const handleCreateSpareAutoMappings = async () => {
-    const matchedEntries = spareAutoMatchEntries.filter(
-      (e) => e.matched && !spareMappedCompositeKeys.has(`${e.fleetEquipmentCode}|${e.partCode}`)
-    );
+    const matchedEntries = spareAutoMatchEntries.filter((e) => e.matched);
+    const alreadyMapped = new Set(spareMappedCompositeKeys);
+    const postItems: { fleetEquipmentCode: string; partCode: string; spareId: string }[] = [];
+    for (const entry of matchedEntries) {
+      for (const sid of entry.vesselSpareIds) {
+        const compositeKey = `${entry.fleetEquipmentCode}|${entry.partCode}|${sid}`;
+        if (!alreadyMapped.has(compositeKey)) {
+          postItems.push({ fleetEquipmentCode: entry.fleetEquipmentCode, partCode: entry.partCode, spareId: sid });
+        }
+      }
+    }
 
-    if (matchedEntries.length === 0) {
+    if (postItems.length === 0) {
       toast({ title: "Info", description: "No new spare mappings to create" });
       return;
     }
 
     let linked = 0;
     let failed = 0;
-    setSpareAutoMatchProgress({ current: 0, total: matchedEntries.length, linked: 0, failed: 0 });
+    setSpareAutoMatchProgress({ current: 0, total: postItems.length, linked: 0, failed: 0 });
 
-    for (let i = 0; i < matchedEntries.length; i++) {
-      const entry = matchedEntries[i];
+    for (let i = 0; i < postItems.length; i++) {
+      const item = postItems[i];
       try {
         await apiRequest("POST", "/technical/api/fleet-admin/fleet-spare-mappings", {
-          fleetEquipmentCode: entry.fleetEquipmentCode,
-          partCode: entry.partCode,
-          spareId: entry.vesselSpareId,
+          fleetEquipmentCode: item.fleetEquipmentCode,
+          partCode: item.partCode,
+          spareId: item.spareId,
           vesselCode: selectedVessel,
           mappedBy: "auto-match",
           isActive: true,
         });
         linked++;
+        alreadyMapped.add(`${item.fleetEquipmentCode}|${item.partCode}|${item.spareId}`);
       } catch {
         failed++;
       }
-      setSpareAutoMatchProgress({ current: i + 1, total: matchedEntries.length, linked, failed });
+      setSpareAutoMatchProgress({ current: i + 1, total: postItems.length, linked, failed });
     }
 
     queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-spare-mappings", { vesselCode: selectedVessel }] });
@@ -1611,7 +1634,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                             )}
                           </div>
                           {selectedFleetJobLinkedDetails.map((m) => (
-                            <div key={`${m.jobCode}-${m.vesselCode}`} className="p-2 border rounded-md flex items-center justify-between gap-2">
+                            <div key={`${m.jobCode}-${m.vesselCode}-${m.jobId || m.id}`} className="p-2 border rounded-md flex items-center justify-between gap-2">
                               <div className="min-w-0">
                                 <div className="text-xs font-medium truncate">{m.vesselJobNo}</div>
                                 <div className="text-xs text-gray-500 truncate">{m.vesselJobTitle}</div>
@@ -1892,7 +1915,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                             )}
                           </div>
                           {selectedFleetSpareLinkedDetails.map((m) => (
-                            <div key={`${m.partCode}-${m.vesselCode}`} className="p-2 border rounded-md flex items-center justify-between gap-2">
+                            <div key={`${m.partCode}-${m.vesselCode}-${m.spareId || m.id}`} className="p-2 border rounded-md flex items-center justify-between gap-2">
                               <div className="min-w-0">
                                 <div className="text-xs font-medium truncate">{m.vesselPartCode}</div>
                                 <div className="text-xs text-gray-500 truncate">{m.vesselPartName}</div>

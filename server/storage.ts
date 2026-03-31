@@ -800,12 +800,12 @@ export interface IStorage {
   // Fleet Job Vessel Mapping - Links Fleet Jobs to Vessels  
   getFleetJobVesselMappings(fleetEquipmentCode?: string, jobCode?: string): Promise<FleetJobVesselMapping[]>;
   createFleetJobVesselMappingRecord(mapping: InsertFleetJobVesselMapping): Promise<FleetJobVesselMapping>;
-  removeFleetJobVesselMappingRecord(jobCode: string, vesselCode: string): Promise<void>;
+  removeFleetJobVesselMappingRecord(jobCode: string, vesselCode: string, jobId?: string): Promise<void>;
   
   // Fleet Spare Vessel Mapping - Links Fleet Spares to Vessels
   getFleetSpareVesselMappings(fleetEquipmentCode?: string, partCode?: string): Promise<FleetSpareVesselMapping[]>;
   createFleetSpareVesselMappingRecord(mapping: InsertFleetSpareVesselMapping): Promise<FleetSpareVesselMapping>;
-  removeFleetSpareVesselMappingRecord(partCode: string, vesselCode: string): Promise<void>;
+  removeFleetSpareVesselMappingRecord(partCode: string, vesselCode: string, spareId?: string): Promise<void>;
   
   // Bulk Import History - Tracking all bulk imports
   getBulkImportHistory(vesselCode?: string, moduleType?: string): Promise<BulkImportHistory[]>;

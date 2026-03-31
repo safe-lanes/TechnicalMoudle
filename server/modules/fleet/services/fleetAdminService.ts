@@ -407,7 +407,7 @@ export async function createFleetJobMapping(body: any) {
 }
 
 export async function deleteFleetJobMapping(query: any) {
-  const { jobCode, vesselCode } = query;
+  const { jobCode, vesselCode, jobId } = query;
 
   if (!jobCode || !vesselCode) {
     const err: any = new Error('Missing required parameters: jobCode, vesselCode');
@@ -417,7 +417,8 @@ export async function deleteFleetJobMapping(query: any) {
 
   await repo.removeFleetJobVesselMappingRecord(
     jobCode as string,
-    vesselCode as string
+    vesselCode as string,
+    jobId as string | undefined
   );
   return { success: true, message: 'Mapping deleted' };
 }
@@ -456,7 +457,7 @@ export async function createFleetSpareMapping(body: any) {
 }
 
 export async function deleteFleetSpareMapping(query: any) {
-  const { partCode, vesselCode } = query;
+  const { partCode, vesselCode, spareId } = query;
 
   if (!partCode || !vesselCode) {
     const err: any = new Error('Missing required parameters: partCode, vesselCode');
@@ -466,7 +467,8 @@ export async function deleteFleetSpareMapping(query: any) {
 
   await repo.removeFleetSpareVesselMappingRecord(
     partCode as string,
-    vesselCode as string
+    vesselCode as string,
+    spareId as string | undefined
   );
   return { success: true, message: 'Mapping deleted' };
 }

@@ -1,0 +1,48 @@
+6 fleet mapping issues found. Fix in priority order:
+
+FIX 1 (CRITICAL — Issue 3): Delete removes ALL instances instead of selected one
+
+The DELETE for jobs and spares doesn't include jobId/spareId — it deletes ALL rows matching (jobCode, vesselCode) or (partCode, vesselCode).
+
+Fix across all 3 layers:
+
+Frontend (FleetVesselMapping.tsx):
+- Line 629-633: deletJobMappingMutation should send jobId along with jobCode and vesselCode
+- Line 645: handleRemoveJobMapping should pass m.jobId
+- Line 754: same fix for spare delete — send spareId
+
+Service (fleetAdminService.ts):
+- Line 409-422: deleteFleetJobMapping should extract jobId from query and pass it to repository
+- Same for deleteFleetSpareMapping
+
+Storage (postgresStorage.ts):
+- Line 5494-5502: removeFleetJobVesselMappingRecord should add eq(fleetJobVesselMapping.jobId, jobId) to the WHERE clause
+- Same for removeFleetSpareVesselMappingRecord — add spare_id filter
+
+FIX 2 (HIGH — Issue 5): Spares auto-match creates only 1 linkage per spare type
+
+Frontend (FleetVesselMapping.tsx):
+- Lines 565-580: vesselSpareLookup Map.set() overwrites — only keeps last spare per key. Change to collect an ARRAY of spares per key instead of single value.
+- Lines 221-228: spareMappedCompositeKeys Set blocks all instances once one is mapped. Change to use a Set of (fleetEquipmentCode + partCode + spareId) instead of just (fleetEquipmentCode + partCode).
+- The auto-match loop should iterate ALL vessel spares per key, creating a mapping for each.
+
+FIX 3 (MEDIUM — Issues 4 & 6): Manual link shows generic error instead of "already linked"
+
+Frontend (FleetVesselMapping.tsx):
+- Line 739 (components): Replace empty catch {} with error inspection. If error.status === 500 and message contains "unique" or "duplicate", show toast "This component is already linked". Otherwise show the actual error.
+- Line 820 (spares): Same fix
+- Line 699 (jobs): Same fix
+
+FIX 4 (MEDIUM — Issue 1): Mapping Status shows stale/duplicate entries
+
+Frontend (FleetVesselMapping.tsx):
+- Line 1614: Fix React key from `${m.jobCode}-${m.vesselCode}` to `${m.jobCode}-${m.vesselCode}-${m.jobId || m.id}` to prevent key collisions when multiple instances exist.
+
+TEST after all fixes:
+1. Auto-match spares — same spare across 3 components should create 3 linkages
+2. Select a fleet job — Mapping Status should show only related linked jobs
+3. Remove one linked job instance — only that one should be removed, others stay
+4. Manual link a component/job/spare — should work or show "already linked" if duplicate
+5. Manual link something new — should return 201 success
+
+Commit with message: "fix(fleet): fix delete cascade, spare multi-instance matching, manual link errors, and render keys"

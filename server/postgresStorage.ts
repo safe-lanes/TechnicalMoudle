@@ -5491,14 +5491,18 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async removeFleetJobVesselMappingRecord(jobCode: string, vesselCode: string): Promise<void> {
+  async removeFleetJobVesselMappingRecord(jobCode: string, vesselCode: string, jobId?: string): Promise<void> {
     const db = await getDb();
+    const conditions = [
+      eq(fleetJobVesselMapping.jobCode, jobCode),
+      eq(fleetJobVesselMapping.vesselCode, vesselCode),
+    ];
+    if (jobId) {
+      conditions.push(eq(fleetJobVesselMapping.jobId, jobId));
+    }
     await db.update(fleetJobVesselMapping)
       .set({ isActive: false })
-      .where(and(
-        eq(fleetJobVesselMapping.jobCode, jobCode),
-        eq(fleetJobVesselMapping.vesselCode, vesselCode)
-      ));
+      .where(and(...conditions));
   }
 
   // ============= MODULE 14: FLEET SPARE VESSEL MAPPING =============
@@ -5532,14 +5536,18 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async removeFleetSpareVesselMappingRecord(partCode: string, vesselCode: string): Promise<void> {
+  async removeFleetSpareVesselMappingRecord(partCode: string, vesselCode: string, spareId?: string): Promise<void> {
     const db = await getDb();
+    const conditions = [
+      eq(fleetSpareVesselMapping.partCode, partCode),
+      eq(fleetSpareVesselMapping.vesselCode, vesselCode),
+    ];
+    if (spareId) {
+      conditions.push(eq(fleetSpareVesselMapping.spareId, spareId));
+    }
     await db.update(fleetSpareVesselMapping)
       .set({ isActive: false })
-      .where(and(
-        eq(fleetSpareVesselMapping.partCode, partCode),
-        eq(fleetSpareVesselMapping.vesselCode, vesselCode)
-      ));
+      .where(and(...conditions));
   }
 
   // ============= MODULE 15: IMPORT ENGINE =============
