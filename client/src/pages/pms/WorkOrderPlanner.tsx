@@ -99,7 +99,7 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
       if (!response.ok) throw new Error("Failed to fetch planner data");
       return response.json();
     },
-    enabled: !!vesselId,
+    enabled: !!vesselId && vesselId !== 'all',
     staleTime: 30000,
   });
 
@@ -382,7 +382,13 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {vesselId === 'all' ? (
+                <TableRow>
+                  <TableCell colSpan={10} className="text-center py-12 text-gray-500">
+                    Please select a specific vessel to use the Planner view
+                  </TableCell>
+                </TableRow>
+              ) : isLoading ? (
                 <TableRow>
                   <TableCell colSpan={10} className="text-center py-12">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-gray-400" />

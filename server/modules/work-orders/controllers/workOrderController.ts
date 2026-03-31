@@ -355,8 +355,8 @@ export async function getPlannerData(req: Request, res: Response) {
     const rank = req.query.rank as string | undefined;
     const search = req.query.search as string | undefined;
 
-    if (!vesselId) {
-      return res.status(400).json({ error: 'vesselId is required' });
+    if (!vesselId || vesselId === 'all') {
+      return res.status(400).json({ error: 'A specific vesselId is required (planner does not support "all" vessels)' });
     }
 
     const result = await plannerService.getWorkOrderPlannerData({ vesselId, days, rank, search });
@@ -374,8 +374,8 @@ export async function savePlannedDate(req: Request, res: Response) {
   try {
     const { vesselId, jobId, componentId, plannedDate } = req.body;
 
-    if (!vesselId || !jobId || !componentId) {
-      return res.status(400).json({ error: 'vesselId, jobId, and componentId are required' });
+    if (!vesselId || vesselId === 'all' || !jobId || !componentId) {
+      return res.status(400).json({ error: 'A specific vesselId, jobId, and componentId are required' });
     }
 
     const result = await plannerService.savePlannedDate(vesselId, jobId, componentId, plannedDate || null);
@@ -396,8 +396,8 @@ export async function exportPlanner(req: Request, res: Response) {
     const rank = req.query.rank as string | undefined;
     const search = req.query.search as string | undefined;
 
-    if (!vesselId) {
-      return res.status(400).json({ error: 'vesselId is required' });
+    if (!vesselId || vesselId === 'all') {
+      return res.status(400).json({ error: 'A specific vesselId is required (planner does not support "all" vessels)' });
     }
 
     const buffer = await plannerService.exportPlannerExcel({ vesselId, days, rank, search });
