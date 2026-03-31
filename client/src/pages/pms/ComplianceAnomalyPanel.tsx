@@ -996,7 +996,7 @@ export function ComplianceAnomalyPanel({ vesselId, superintendentSummary, onNavi
               )}
             </div>
 
-            {superintendentSummary && onNavigateToSuperintendent && (
+            {onNavigateToSuperintendent && (
               <div
                 onClick={onNavigateToSuperintendent}
                 style={{
@@ -1014,7 +1014,7 @@ export function ComplianceAnomalyPanel({ vesselId, superintendentSummary, onNavi
                   width: '40px',
                   height: '40px',
                   borderRadius: '10px',
-                  background: (superintendentSummary.pendingCount ?? 0) > 0 ? '#ff6d00' : '#9e9e9e',
+                  background: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#ff6d00' : '#9e9e9e',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1028,16 +1028,16 @@ export function ComplianceAnomalyPanel({ vesselId, superintendentSummary, onNavi
                   </div>
                   <div style={{ display: 'flex', gap: '28px', alignItems: 'baseline' }}>
                     <div>
-                      <span style={{ fontSize: '22px', fontWeight: 700, color: (superintendentSummary.pendingCount ?? 0) > 0 ? '#d32f2f' : '#757575' }} data-testid="text-pending-count">
-                        {superintendentSummary.pendingCount ?? 0}
+                      <span style={{ fontSize: '22px', fontWeight: 700, color: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#d32f2f' : '#757575' }} data-testid="text-pending-count">
+                        {superintendentSummary?.pendingCount ?? 0}
                       </span>
-                      <span style={{ fontSize: '11px', color: (superintendentSummary.pendingCount ?? 0) > 0 ? '#d32f2f' : '#757575', marginLeft: '5px' }}>
+                      <span style={{ fontSize: '11px', color: (superintendentSummary?.pendingCount ?? 0) > 0 ? '#d32f2f' : '#757575', marginLeft: '5px' }}>
                         Pending Acknowledgment
                       </span>
                     </div>
                     <div>
                       <span style={{ fontSize: '16px', fontWeight: 600, color: '#2e7d32' }} data-testid="text-acknowledged-count">
-                        {superintendentSummary.acknowledgedThisMonthCount ?? 0}
+                        {superintendentSummary?.acknowledgedThisMonthCount ?? 0}
                       </span>
                       <span style={{ fontSize: '11px', color: '#2e7d32', marginLeft: '5px' }}>
                         Acknowledged This Month
