@@ -637,46 +637,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           };
         });
 
-        // Calculate summary statistics
-        const deptStats: Record<string, { count: number; manHours: number }> = {};
-        const priorityStats: Record<string, number> = {};
-        const jobTypeStats: Record<string, number> = {};
-        let totalDuration = 0;
-
-        completedJobs.forEach((wo: any) => {
-          const dept = wo.department || 'Unassigned';
-          const priority = wo.jobPriority || wo.priority || 'Normal';
-          const jobType = wo.taskType || wo.maintenanceType || 'Other';
-          const duration = parseFloat(wo.totalTimeHours) || calculateDuration(wo.startDateTime, wo.completionDateTime);
-          const persons = parseInt(wo.noOfPersons) || 1;
-          const manHours = parseFloat(wo.manhours) || (duration * persons);
-
-          if (!deptStats[dept]) deptStats[dept] = { count: 0, manHours: 0 };
-          deptStats[dept].count++;
-          deptStats[dept].manHours += manHours;
-
-          priorityStats[priority] = (priorityStats[priority] || 0) + 1;
-          jobTypeStats[jobType] = (jobTypeStats[jobType] || 0) + 1;
-          totalDuration += duration;
-        });
-
-        const summaryStats = {
-          byDepartment: Object.entries(deptStats).map(([department, stats]) => ({
-            department,
-            count: stats.count,
-            manHours: stats.manHours
-          })),
-          byPriority: Object.entries(priorityStats).map(([priority, count]) => ({
-            priority,
-            count
-          })),
-          byJobType: Object.entries(jobTypeStats).map(([jobType, count]) => ({
-            jobType,
-            count
-          })),
-          avgCompletionTime: completedJobs.length > 0 ? totalDuration / completedJobs.length : 0
-        };
-
         const completedColumns = [
           { header: 'S.No', field: 'sNo', width: 8 },
           { header: 'WO No', field: 'workOrderNo', width: 22 },

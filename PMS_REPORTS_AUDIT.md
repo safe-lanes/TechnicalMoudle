@@ -332,12 +332,31 @@ Server-side column definitions match frontend column definitions for all four st
 
 ### Post-Fix Verification
 
-| Report | View | PDF | Excel | Status |
-|--------|------|-----|-------|--------|
-| Due Jobs (7 Days) | 8 | 8 | 8 | Aligned |
-| Overdue Jobs | 15 | 15 | 15 | Aligned |
-| Completed Jobs | 11 | 11 | 11 | Aligned |
-| All other reports | Match | Match | Match | Aligned |
+| # | Report | View | PDF | Excel | Status |
+|---|--------|------|-----|-------|--------|
+| 1.1 | Due Jobs (7 Days) | 8 | 8 | 8 | Aligned |
+| 1.2 | Overdue Jobs | 15 | 15 | 15 | Aligned |
+| 1.3 | Completed Jobs Register | 11 | 11 | 11 | Aligned |
+| 1.4 | Monthly Maintenance Summary | 3 | 3 | KPI | Aligned |
+| 1.5 | Critical Equipment Status | 12 | 12 | 12 | Aligned |
+| 1.6 | Unplanned/Breakdown Jobs | 11 | 11 | 11 | Aligned |
+| 1.7 | Job Postponement Log | 10 | 10 | 10 | Aligned |
+| 1.8 | Work Priority Performance | 5 | 5 | N/A | Aligned |
+| 1.9 | Man-Hours Analysis | 5 | 5 | N/A | Aligned |
+| 1.10 | Crew Workload Distribution | 10 | 10 | 10 | Aligned |
+| 2.1 | Running Hours Log | Var | Var | Var | Aligned |
+| 2.2 | RH Anomaly Detection | Var | Var | Var | Aligned |
+| 3.1 | Critical Spares Availability | Var | Var | Var | Aligned |
+| 3.2 | Low Stock Alert | Var | Var | Var | Aligned |
+| 3.3 | Spares Consumption Analysis | Var | Var | Var | Aligned |
+| 4.1 | Stores Inventory Status | Var | Var | Var | Aligned |
+| 4.2 | Stores Consumption Analysis | Var | Var | Var | Aligned |
+| 4.3 | Combined Consumption Report | Var | Var | Var | Aligned |
+| 4.4 | Stores Low Stock Alert | Var | Var | Var | Aligned |
+| 5.1 | IHM Inventory Status | 10 | 10 | 10 | Aligned |
+| 6.1 | CR Status & Tracking | 13 | 13 | 13 | Aligned |
+| 7.1 | LSA/FFA Equipment Master | 12 | 12 | 12 | Aligned |
+| 7.2 | LSA/FFA Maintenance Schedule | 16 | 16 | 16 | Aligned |
 
 ### Remaining Known Divergence
 
