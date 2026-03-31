@@ -1,0 +1,219 @@
+Please enhance the Work Order Planner inside the Work Orders module with two important usability improvements:
+
+Sorting from table headers
+
+Checkbox-based multi-selection with bulk Planned Date assignment, including safe handling of already-planned rows
+
+This is a planner workflow improvement. The current direction is correct, but now the planner must become more practical and safer to use.
+
+Sorting on table headers
+Add sorting support on the planner table headers so that users can click column headers and sort the visible planner rows.
+
+Expected behavior:
+
+Clicking a sortable header once sorts ascending.
+
+Clicking the same header again sorts descending.
+
+Show a visible sort indicator on the active sorted column.
+
+Sorting should apply to the currently filtered visible planner list, not the entire hidden dataset.
+
+Please enable sorting on meaningful columns such as:
+
+due date,
+
+next due,
+
+component,
+
+job title,
+
+department,
+
+rank,
+
+priority,
+
+planned date,
+
+running-hour related fields if shown,
+
+and other useful visible columns.
+
+Sorting must work properly together with:
+
+vessel context,
+
+days filter,
+
+rank filter,
+
+search,
+
+planner results list.
+
+Checkbox multi-selection
+Add a checkbox column on the far left side of the planner table, before the S.No column. This allows users to select multiple planner rows together.
+
+This checkbox system should support:
+
+selecting individual rows,
+
+a header-level checkbox for select all visible rows,
+
+correct behavior after filtering, searching, and sorting.
+
+The purpose is to let users assign one common Planned Date to multiple jobs at once instead of doing it one by one.
+
+Bulk Planned Date assignment
+Add a bulk planning action flow using the selected rows.
+
+Recommended workflow:
+
+User selects multiple rows using checkboxes.
+
+A clean bulk action bar appears.
+
+User chooses one Planned Date.
+
+User clicks Apply Planned Date.
+
+That Planned Date is assigned to all selected rows.
+
+User can then Clear Selection.
+
+Please keep this clean and simple. This option is the preferred UX.
+
+Clear Selection action
+Add a clear and visible Clear Selection action after bulk selection. This is required because the planner will often be used repeatedly across batches of jobs.
+
+After applying a planned date, the user should be able to clear all current checkbox selections quickly without manually unchecking rows one by one.
+
+Differentiate already-planned rows
+This is extremely important.
+
+Rows that already have a Planned Date assigned must be clearly visually differentiated from rows that are still unplanned. Otherwise, when users use select-all or bulk selection, they may accidentally overwrite rows that were already planned earlier.
+
+So the planner must clearly distinguish between:
+
+rows with no Planned Date,
+
+rows with an existing Planned Date,
+
+rows that are currently selected.
+
+Please implement this visually in a clean PMS-style way. Good options include:
+
+subtle row highlighting for already-planned rows,
+
+a visible “Planned” badge/tag in the Planned Date column,
+
+and/or a different text treatment for rows that already have a plan.
+
+The actual Planned Date value must still be visible. Do not hide it behind only an icon.
+
+Safe overwrite behavior
+If selected rows include jobs that already have a Planned Date, do not silently overwrite them during bulk apply.
+
+Implement safe behavior such as:
+
+warn the user before overwriting existing planned dates,
+
+or give the user a choice like:
+
+apply only to unplanned selected rows,
+
+overwrite all selected rows,
+
+or another similarly safe and clear confirmation flow.
+
+At minimum, the planner must not allow invisible accidental overwrite of existing planning decisions.
+
+Select-all behavior
+The header checkbox should select all currently visible filtered rows only. It should not select hidden rows outside the current filter/search/sort context.
+
+Because some visible rows may already be planned, the UI must make that obvious before the user applies a new bulk planned date.
+
+Optional but recommended quick filter
+If possible, add a quick planner-state filter like:
+
+All
+
+Unplanned Only
+
+Planned Only
+
+This is recommended because it makes bulk planning much more practical:
+
+user switches to Unplanned Only,
+
+clicks select all,
+
+applies one Planned Date,
+
+clears selection.
+
+If this can be added cleanly without complicating the planner, include it.
+
+Planned Date display behavior
+In the Planned Date column:
+
+blank = not yet planned,
+
+date shown = planned,
+
+optional small badge/tag = already planned.
+
+This should make scanability much better.
+
+Keep these existing rules unchanged
+Do not break the existing planner behavior:
+
+keep days filter,
+
+keep rank filter,
+
+keep RH projection logic,
+
+keep due/overdue inclusion logic,
+
+keep export rule that export reflects visible planner data,
+
+keep Planner inside Work Orders,
+
+keep duplicate WO prevention validation rule already in the system.
+
+These new features are only usability improvements on top of the current planner.
+
+Export behavior
+Export should continue to export exactly what is visible in the planner after filter/search/sort. If Planned Dates are assigned — individually or in bulk — export must include the Planned Date value in the export output.
+
+Final acceptance criteria
+Do not consider this complete until all of the following are true:
+
+Planner table headers support sorting on meaningful visible columns.
+
+Sorting direction is visible and works correctly.
+
+Checkbox column exists before S.No.
+
+Multiple rows can be selected together.
+
+A single Planned Date can be assigned to selected rows in bulk.
+
+A Clear Selection action exists.
+
+Already-planned rows are visually differentiated from unplanned rows.
+
+Selected rows are visually distinguishable as well.
+
+Bulk overwrite of already-planned rows is handled safely and not silently.
+
+Select-all applies only to visible filtered rows.
+
+Export still reflects exactly the visible planner data and includes Planned Date when present.
+
+Existing planner logic and WO validation rules remain intact.
+
+Important: the planner should feel fast and practical for planning, but it must also protect users from accidental overwriting of existing planning dates.
