@@ -443,6 +443,9 @@ export async function exportPlannerFromItems(req: Request, res: Response) {
     if (!items || !Array.isArray(items)) {
       return res.status(400).json({ error: 'items array is required' });
     }
+    if (items.length > 5000) {
+      return res.status(400).json({ error: 'Maximum 5000 items per export' });
+    }
 
     const buffer = await plannerService.exportPlannerExcelFromItems(items);
 
