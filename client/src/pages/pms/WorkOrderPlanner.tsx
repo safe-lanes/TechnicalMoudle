@@ -599,7 +599,7 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
         </div>
 
         <div className="flex items-center gap-1.5">
-          <span className="text-sm font-medium text-gray-600">Status:</span>
+          <span className="text-sm font-medium text-gray-600">Planner State:</span>
           <Select value={plannerStateFilter} onValueChange={setPlannerStateFilter}>
             <SelectTrigger className="w-36" data-testid="select-planner-state">
               <SelectValue placeholder="All" />
@@ -635,7 +635,7 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
       </div>
 
       {selectedKeys.size > 0 && (
-        <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-3" data-testid="bulk-action-bar">
+        <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-3 sticky top-0 z-20" data-testid="bulk-action-bar">
           <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
             {selectedKeys.size} row{selectedKeys.size !== 1 ? "s" : ""} selected
           </span>

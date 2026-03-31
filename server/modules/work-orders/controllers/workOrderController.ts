@@ -440,7 +440,7 @@ export async function exportPlannerFromItems(req: Request, res: Response) {
   try {
     const { items } = req.body;
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
+    if (!items || !Array.isArray(items)) {
       return res.status(400).json({ error: 'items array is required' });
     }
 
