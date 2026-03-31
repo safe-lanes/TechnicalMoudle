@@ -2,7 +2,7 @@ import * as jobRepo from '../../jobs/repositories/jobRepository';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { ValidationError } from '../../shared/errors';
 import { getDb } from '../../../db';
-import { plannerDates } from '@shared/schema';
+import { plannerDates, type Job, type Component, type WorkOrder, type PmsVesselSettings } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 
 export interface WorkOrderPlannerFilters {
@@ -30,7 +30,28 @@ export interface PlannerItem {
   plannedDate: string | null;
 }
 
+interface VesselGraceSettings {
+  calendarGraceMode: 'COMPANY_STANDARD' | 'CUSTOM_DAYS';
+  calendarGraceDays: number;
+  rhGraceHours: number;
+}
+
 const RH_PER_DAY = 24;
+
+function buildVesselGraceSettings(vesselSettings: PmsVesselSettings | undefined): VesselGraceSettings {
+  if (!vesselSettings) {
+    return {
+      calendarGraceMode: 'COMPANY_STANDARD',
+      calendarGraceDays: WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+      rhGraceHours: WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+    };
+  }
+  return {
+    calendarGraceMode: (vesselSettings.calendarGraceMode || 'COMPANY_STANDARD') as 'COMPANY_STANDARD' | 'CUSTOM_DAYS',
+    calendarGraceDays: vesselSettings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+    rhGraceHours: vesselSettings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+  };
+}
 
 export async function getWorkOrderPlannerData(filters: WorkOrderPlannerFilters) {
   const { vesselId, days = 30, rank, search } = filters;
@@ -40,25 +61,19 @@ export async function getWorkOrderPlannerData(filters: WorkOrderPlannerFilters) 
   }
 
   const vesselSettings = await jobRepo.findPmsVesselSettings(vesselId);
-  const vs = vesselSettings as any;
-  const vesselGraceSettings = vesselSettings ? {
-    calendarGraceMode: (vesselSettings.calendarGraceMode || 'COMPANY_STANDARD') as 'COMPANY_STANDARD' | 'CUSTOM_DAYS',
-    calendarGraceDays: vesselSettings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
-    rhGraceHours: vesselSettings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
-    rhLeadTimeHours: (vs?.rhLeadTimeHours ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS) as number
-  } : {
-    calendarGraceMode: 'COMPANY_STANDARD' as const,
-    calendarGraceDays: WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
-    rhGraceHours: WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
-    rhLeadTimeHours: WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
-  };
+  const graceSettings = buildVesselGraceSettings(vesselSettings);
 
-  const allJobs = await jobRepo.findJobs(vesselId);
-  const activeJobs = allJobs.filter(j => (j as any).isActive !== false && (j as any).dataScope === 'vessel');
+  const allJobs: Job[] = await jobRepo.findJobs(vesselId);
+  const activeJobs = allJobs.filter(j => j.isActive !== false && j.dataScope === 'vessel');
 
-  const components = await jobRepo.findComponents(vesselId);
-  const componentMap = new Map(components.map(c => [c.cuuid, c]));
-  const componentCodeMap = new Map(components.map(c => [(c as any).componentCode, c]));
+  const allComponents: Component[] = await jobRepo.findComponents(vesselId);
+  const componentMap = new Map(allComponents.map(c => [c.cuuid, c]));
+  const componentCodeMap = new Map<string, Component>();
+  for (const c of allComponents) {
+    if (c.componentCode) {
+      componentCodeMap.set(c.componentCode, c);
+    }
+  }
 
   const jobComponentLinks = await jobRepo.findJobComponentLinks(vesselId);
   const jobToComponentsMap = new Map<string, Set<string>>();
@@ -69,7 +84,16 @@ export async function getWorkOrderPlannerData(filters: WorkOrderPlannerFilters) 
     jobToComponentsMap.get(link.jobId)!.add(link.componentId);
   }
 
-  const allWorkOrders = await jobRepo.findWorkOrders(vesselId);
+  const allWorkOrders: WorkOrder[] = await jobRepo.findWorkOrders(vesselId);
+
+  const woByJobAndComponent = new Map<string, WorkOrder>();
+  for (const wo of allWorkOrders) {
+    if (wo.status === 'Completed' || wo.status === 'Rejected') continue;
+    const key = `${wo.jobId}::${wo.componentCode || ''}`;
+    if (!woByJobAndComponent.has(key)) {
+      woByJobAndComponent.set(key, wo);
+    }
+  }
 
   const database = await getDb();
   const savedPlannerDates = await database.select().from(plannerDates).where(eq(plannerDates.vesselId, vesselId));
@@ -87,9 +111,9 @@ export async function getWorkOrderPlannerData(filters: WorkOrderPlannerFilters) 
   const projectedRHIncrease = RH_PER_DAY * days;
 
   interface JobComponentPair {
-    job: typeof activeJobs[0];
+    job: Job;
     componentId: string;
-    component: typeof components[0] | undefined;
+    component: Component | undefined;
   }
 
   const jobComponentPairs: JobComponentPair[] = [];
@@ -97,12 +121,13 @@ export async function getWorkOrderPlannerData(filters: WorkOrderPlannerFilters) 
   for (const job of activeJobs) {
     const linkedComponentIds = jobToComponentsMap.get(job.juuid);
     if (linkedComponentIds && linkedComponentIds.size > 0) {
-      for (const componentId of Array.from(linkedComponentIds)) {
-        const component = componentMap.get(componentId);
-        jobComponentPairs.push({ job, componentId, component });
+      for (const cid of Array.from(linkedComponentIds)) {
+        const component = componentMap.get(cid);
+        jobComponentPairs.push({ job, componentId: cid, component });
       }
     } else {
-      const component = componentMap.get(job.componentId as string) || componentCodeMap.get(job.componentCode);
+      const component = (job.componentId ? componentMap.get(job.componentId) : undefined)
+        || (job.componentCode ? componentCodeMap.get(job.componentCode) : undefined);
       if (component) {
         jobComponentPairs.push({ job, componentId: component.cuuid, component });
       } else if (job.componentId || job.componentCode) {
@@ -114,8 +139,8 @@ export async function getWorkOrderPlannerData(filters: WorkOrderPlannerFilters) 
   const plannerItems: PlannerItem[] = [];
 
   for (const { job, componentId, component } of jobComponentPairs) {
-    const isCalendarJob = job.maintenanceBasis === 'Calendar' || (job as any).frequencyType === 'Calendar';
-    const isRHJob = job.maintenanceBasis === 'Running Hours' || (job as any).frequencyType === 'Running Hours';
+    const isCalendarJob = job.maintenanceBasis === 'Calendar' || job.frequencyType === 'Calendar';
+    const isRHJob = job.maintenanceBasis === 'Running Hours' || job.frequencyType === 'Running Hours';
 
     if (!isCalendarJob && !isRHJob) continue;
 
@@ -124,12 +149,13 @@ export async function getWorkOrderPlannerData(filters: WorkOrderPlannerFilters) 
       if (assignedRank !== rank) continue;
     }
 
-    let nextDueDate: Date | null = null;
     let status = 'Upcoming';
     let dueInfo = '-';
     let shouldInclude = false;
 
     if (isCalendarJob) {
+      let nextDueDate: Date | null = null;
+
       if (job.nextDueDate) {
         nextDueDate = new Date(job.nextDueDate);
       } else if (job.lastDoneDate && job.frequencyValue && job.frequencyUnit) {
@@ -150,9 +176,9 @@ export async function getWorkOrderPlannerData(filters: WorkOrderPlannerFilters) 
         const daysUntilDue = Math.floor((dueDateTime.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
         let graceEndDate: Date;
-        if (vesselGraceSettings.calendarGraceMode === 'CUSTOM_DAYS') {
+        if (graceSettings.calendarGraceMode === 'CUSTOM_DAYS') {
           graceEndDate = new Date(dueDateTime);
-          graceEndDate.setDate(graceEndDate.getDate() + vesselGraceSettings.calendarGraceDays);
+          graceEndDate.setDate(graceEndDate.getDate() + graceSettings.calendarGraceDays);
         } else {
           const endOfMonth = new Date(dueDateTime.getFullYear(), dueDateTime.getMonth() + 1, 0);
           endOfMonth.setHours(0, 0, 0, 0);
@@ -172,32 +198,28 @@ export async function getWorkOrderPlannerData(filters: WorkOrderPlannerFilters) 
             status = 'Due (Grace P)';
           }
           shouldInclude = true;
-        } else if (daysUntilDue <= WORK_ORDER_THRESHOLDS.CALENDAR_LEAD_TIME_DAYS) {
-          status = 'Due';
-          shouldInclude = true;
         } else if (dueDateTime <= horizonDate) {
-          status = 'Upcoming';
+          status = daysUntilDue === 0 ? 'Due' : 'Upcoming';
           shouldInclude = true;
         }
 
         dueInfo = nextDueDate.toISOString().split('T')[0];
       }
     } else if (isRHJob) {
-      let parentComponent: any = component;
-      if ((component as any)?.parentId) {
-        parentComponent = componentMap.get((component as any).parentId) || component;
+      let rhSourceComponent: Component | undefined = component;
+      if (component?.parentId) {
+        rhSourceComponent = componentMap.get(component.parentId) || component;
       }
 
-      const currentRH = parseFloat(parentComponent?.currentCumulativeRH || '0') || 0;
+      const currentRH = parseFloat(String(rhSourceComponent?.currentCumulativeRH || '0')) || 0;
       const lastDoneRH = parseFloat(job.lastDoneRH || '0') || 0;
-      const frequencyRH = parseInt(job.frequencyValue || '0') || (job as any).intervalRunningHour || 0;
+      const frequencyRH = parseInt(job.frequencyValue || '0') || job.intervalRunningHour || 0;
 
       const rhDue = lastDoneRH + frequencyRH;
       const rhRemaining = rhDue - currentRH;
       const projectedRH = currentRH + projectedRHIncrease;
 
-      const graceHours = vesselGraceSettings.rhGraceHours;
-      const leadTimeHours = vesselGraceSettings.rhLeadTimeHours;
+      const graceHours = graceSettings.rhGraceHours;
 
       if (rhRemaining < -graceHours) {
         status = 'Overdue';
@@ -205,11 +227,8 @@ export async function getWorkOrderPlannerData(filters: WorkOrderPlannerFilters) 
       } else if (rhRemaining < 0) {
         status = 'Due (Grace P)';
         shouldInclude = true;
-      } else if (rhRemaining <= leadTimeHours) {
-        status = 'Due';
-        shouldInclude = true;
       } else if (rhDue <= projectedRH) {
-        status = 'Upcoming';
+        status = rhRemaining <= 0 ? 'Due' : 'Upcoming';
         shouldInclude = true;
       }
 
@@ -222,18 +241,17 @@ export async function getWorkOrderPlannerData(filters: WorkOrderPlannerFilters) 
       const searchLower = search.toLowerCase();
       const jobTitle = (job.jobTitle || '').toLowerCase();
       const jobCode = (job.jobNo || '').toLowerCase();
-      const compName = ((component as any)?.name || '').toLowerCase();
-      const compCode = ((component as any)?.componentCode || '').toLowerCase();
+      const compName = (component?.name || '').toLowerCase();
+      const compCode = (component?.componentCode || '').toLowerCase();
       if (!jobTitle.includes(searchLower) && !jobCode.includes(searchLower) &&
           !compName.includes(searchLower) && !compCode.includes(searchLower)) {
         continue;
       }
     }
 
-    const jobWOs = allWorkOrders.filter(wo => wo.jobId === job.juuid);
-    const relevantWO = jobWOs.find(wo =>
-      wo.status !== 'Completed' && wo.status !== 'Rejected'
-    ) || null;
+    const compCodeForLookup = component?.componentCode || job.componentCode || '';
+    const woKey = `${job.juuid}::${compCodeForLookup}`;
+    const relevantWO = woByJobAndComponent.get(woKey) || null;
 
     const savedDate = plannerDateMap.get(`${job.juuid}::${componentId}`) || null;
 
@@ -247,14 +265,14 @@ export async function getWorkOrderPlannerData(filters: WorkOrderPlannerFilters) 
       jobTitle: job.jobTitle || '-',
       jobType: isCalendarJob ? 'CALENDAR' : 'RH',
       componentId,
-      componentCode: (component as any)?.componentCode || job.componentCode || '-',
-      componentName: (component as any)?.name || job.componentName || '-',
+      componentCode: component?.componentCode || job.componentCode || '-',
+      componentName: component?.name || job.componentName || '-',
       assignedTo: job.assignedTo || 'Unassigned',
       maintenanceBasis: isCalendarJob ? 'Calendar' : 'Running Hours',
       frequency: freq,
       dueInfo,
       status,
-      woNo: (relevantWO as any)?.workOrderNo || null,
+      woNo: relevantWO?.workOrderNo || null,
       woStatus: relevantWO?.status || null,
       plannedDate: savedDate,
     });
