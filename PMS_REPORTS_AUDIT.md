@@ -1,8 +1,10 @@
 # PMS Reports Module — Comprehensive Audit & Technical Reference
 
 > **Generated:** 2026-03-31  
-> **Scope:** All 22 reports across 8 categories  
-> **Purpose:** Full technical verification and troubleshooting reference covering column definitions, formula logic, data sources, derivation paths, API endpoints, verification methods, edge cases, and debugging guides for every report in the PMS Reports Module.
+> **Scope:** 22 reports across 7 categories (Maintenance ×10, Running Hours ×2, Spares ×3, Stores ×4, Compliance/IHM ×1, Change Requests ×1, LSA/FFA ×2)  
+> **Purpose:** Full technical verification and troubleshooting reference covering column definitions, formula logic, data sources, derivation paths, API endpoints, verification methods, edge cases, and debugging guides for every report in the PMS Reports Module.  
+> **Line Number Disclaimer:** Source file line references (e.g., `MaintenanceReports.tsx:335-337`) are snapshot-based from the date above and may drift as code evolves. Prefer searching for the formula expression or function name as a stable anchor.  
+> **Maintenance:** This document should be updated whenever report columns, formulas, or API endpoints are modified. The view-mode column array is the single source of truth — PDF and Excel must match.
 
 ---
 
