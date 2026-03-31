@@ -461,7 +461,8 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
                           type="date"
                           value={item.plannedDate || ""}
                           onChange={(e) => handlePlannedDateChange(item, e.target.value)}
-                          className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 w-full bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                          disabled={!item.componentId}
+                          className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 w-full bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
                           data-testid={`input-planned-date-${globalIdx}`}
                         />
                       </TableCell>

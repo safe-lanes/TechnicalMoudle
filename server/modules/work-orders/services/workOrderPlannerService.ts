@@ -300,6 +300,17 @@ export async function savePlannedDate(vesselId: string, jobId: string, component
     throw new ValidationError('vesselId, jobId, and componentId are required');
   }
 
+  if (plannedDate !== null) {
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (!datePattern.test(plannedDate)) {
+      throw new ValidationError('plannedDate must be in YYYY-MM-DD format or null');
+    }
+    const parsed = new Date(plannedDate);
+    if (isNaN(parsed.getTime())) {
+      throw new ValidationError('plannedDate is not a valid date');
+    }
+  }
+
   const database = await getDb();
   const existing = await database.select().from(plannerDates).where(
     and(
