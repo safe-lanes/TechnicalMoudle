@@ -343,6 +343,71 @@ export async function savePlannedDate(vesselId: string, jobId: string, component
   return { success: true };
 }
 
+export async function bulkSavePlannedDate(
+  vesselId: string,
+  items: Array<{ jobId: string; componentId: string }>,
+  plannedDate: string
+) {
+  if (!vesselId) {
+    throw new ValidationError('vesselId is required');
+  }
+  if (!items || items.length === 0) {
+    throw new ValidationError('At least one item is required');
+  }
+  if (items.length > 500) {
+    throw new ValidationError('Maximum 500 items per bulk operation');
+  }
+
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  if (!datePattern.test(plannedDate)) {
+    throw new ValidationError('plannedDate must be in YYYY-MM-DD format');
+  }
+  const [year, month, day] = plannedDate.split('-').map(Number);
+  const parsed = new Date(year, month - 1, day);
+  if (isNaN(parsed.getTime()) || parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) {
+    throw new ValidationError('plannedDate is not a valid calendar date');
+  }
+
+  const database = await getDb();
+  let updated = 0;
+  let inserted = 0;
+
+  for (const item of items) {
+    if (!item.jobId || !item.componentId) continue;
+
+    const existing = await database.select().from(plannerDates).where(
+      and(
+        eq(plannerDates.vesselId, vesselId),
+        eq(plannerDates.jobId, item.jobId),
+        eq(plannerDates.componentId, item.componentId)
+      )
+    );
+
+    if (existing.length > 0) {
+      await database.update(plannerDates)
+        .set({ plannedDate, updatedAt: new Date() })
+        .where(
+          and(
+            eq(plannerDates.vesselId, vesselId),
+            eq(plannerDates.jobId, item.jobId),
+            eq(plannerDates.componentId, item.componentId)
+          )
+        );
+      updated++;
+    } else {
+      await database.insert(plannerDates).values({
+        vesselId,
+        jobId: item.jobId,
+        componentId: item.componentId,
+        plannedDate,
+      });
+      inserted++;
+    }
+  }
+
+  return { success: true, updated, inserted, total: updated + inserted };
+}
+
 export async function exportPlannerExcel(filters: WorkOrderPlannerFilters) {
   const XLSX = await import('xlsx');
   const data = await getWorkOrderPlannerData(filters);

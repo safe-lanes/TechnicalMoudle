@@ -389,6 +389,31 @@ export async function savePlannedDate(req: Request, res: Response) {
   }
 }
 
+export async function bulkSavePlannedDate(req: Request, res: Response) {
+  try {
+    const { vesselId, items, plannedDate } = req.body;
+
+    if (!vesselId || vesselId === 'all') {
+      return res.status(400).json({ error: 'A specific vesselId is required' });
+    }
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items array is required' });
+    }
+    if (!plannedDate) {
+      return res.status(400).json({ error: 'plannedDate is required' });
+    }
+
+    const result = await plannerService.bulkSavePlannedDate(vesselId, items, plannedDate);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Bulk save planned date error:', error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
+    res.status(500).json({ error: 'Failed to bulk save planned dates' });
+  }
+}
+
 export async function exportPlanner(req: Request, res: Response) {
   try {
     const vesselId = req.query.vesselId as string;

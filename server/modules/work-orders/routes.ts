@@ -53,6 +53,9 @@ router.get('/work-orders/planner', asyncHandler(woCtrl.getPlannerData));
 // PATCH /work-orders/planner/planned-date — save planned date
 router.patch('/work-orders/planner/planned-date', asyncHandler(woCtrl.savePlannedDate));
 
+// PATCH /work-orders/planner/bulk-planned-date — bulk save planned dates
+router.patch('/work-orders/planner/bulk-planned-date', asyncHandler(woCtrl.bulkSavePlannedDate));
+
 // GET  /work-orders/planner/export — export planner as Excel
 router.get('/work-orders/planner/export', asyncHandler(woCtrl.exportPlanner));
 
