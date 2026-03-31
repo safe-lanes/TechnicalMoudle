@@ -895,11 +895,16 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   };
 
   const handleCreateAutoMappings = async () => {
-    const matchedEntries = autoMatchEntries.filter((e) => e.matched && !mappedComponentCodes.has(e.vesselComponentCode));
+    const alreadyMapped = new Set(mappedComponentCodes);
+    const matchedEntries = autoMatchEntries.filter((e) => e.matched && !alreadyMapped.has(e.vesselComponentCode));
     let linked = 0;
     let notLinked = 0;
 
     for (const entry of matchedEntries) {
+      if (alreadyMapped.has(entry.vesselComponentCode)) {
+        notLinked++;
+        continue;
+      }
       try {
         await apiRequest("POST", "/technical/api/fleet-admin/fleet-component-mappings", {
           fleetEquipmentCode: entry.fleetEquipmentCode,
@@ -911,6 +916,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
           isActive: true,
         });
         linked++;
+        alreadyMapped.add(entry.vesselComponentCode);
       } catch {
         notLinked++;
       }
