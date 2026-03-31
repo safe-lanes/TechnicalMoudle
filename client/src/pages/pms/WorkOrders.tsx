@@ -845,7 +845,7 @@ const WorkOrders: React.FC = () => {
       })()}
 
       {/* Work Orders Table */}
-      <div className="flex-1 overflow-auto bg-white">
+      <div className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
         <table className="w-full text-sm">
           <thead className="bg-[#52baf3] text-white sticky top-0">
             <tr>
