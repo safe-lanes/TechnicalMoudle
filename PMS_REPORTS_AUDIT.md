@@ -1241,6 +1241,9 @@
 - **View** uses 7-column table of `topConsumedItems` (StoresReports.tsx:441-448).
 - **PDF** uses specialized `generateConsumptionAnalysisPDF()` — a multi-section dashboard report (NOT generic table). Includes: summary, consumption trends, top consumed items, category breakdown, stock efficiency, forecast data, and non-moving items. Location: StoresReports.tsx:471-489
 - **Excel**: POST `/technical/api/reports/stores-consumption-analysis/:vesselId/excel` → `storesCtrl.exportStoresConsumptionExcel` (routes.ts:35). Location: StoresReports.tsx:564-577
+  - Multi-sheet workbook: Stock Status, Monthly Trends, Stock Efficiency, Forecast & Reorder Projections
+  - Forecast sheet includes: reorder point, confidence multiplier-adjusted rates, suggested reorder quantities
+  - Uses confidence multiplier system: `daysOfData < 7 → ×0.5; < 30 → ×0.75; else → ×1.0`
 - PDF format differs significantly from view — it's a comprehensive analysis dashboard, not a simple table.
 
 **6. Verification Steps:**
@@ -1593,13 +1596,25 @@
 | RH Delta | `newRh - previousRh` | Server: complianceReportService | 2.2 | Consecutive RH entries | Can be negative (rollback) |
 | Avg Daily (Anomaly) | `delta / daysBetween` | Server: complianceReportService | 2.2 | Delta, days between entries | Per-entry pair |
 
-### Formulas Not Applicable in Current Implementation
+### Advanced Formulas in Stores Consumption (storesReportService.ts)
 
-The following formulas were considered during task scoping but are not currently implemented:
-- **Stock Turnover Rate**: Not computed — no turnover ratio calculation exists in any report
-- **Reorder Point**: Not explicitly computed — deficit/shortage serves this purpose
-- **Consumption Rate with Confidence Multipliers**: Not implemented — consumption analysis uses simple sum/count without confidence intervals
-- **Trend Analysis with Statistical Methods**: Not implemented — server computes basic totals; no trend line/regression calculation in current reports
+| Formula Name | Expression | Implementation File:Line | Used In | Notes |
+|-------------|------------|-------------------------|---------|-------|
+| Confidence Level | `daysOfData > 90 → 'high'; >= 30 → 'medium'; else → 'low'` | storesReportService.ts:320-322 | 4.5 (JSON + Excel) | Data quality tier |
+| Confidence Multiplier | `daysOfData < 7 → 0.5; < 30 → 0.75; else → 1.0` | storesReportService.ts:378-380 | 4.5 consumption rate | Scales raw rate by sample size |
+| Adjusted Monthly Consumption | `rawMonthlyRate × confidenceMultiplier` | storesReportService.ts:381 | 4.5 consumption rate | `avgMonthlyConsumption` used downstream |
+| Reorder Point | `adjustedDaily × leadTimeDays + safetyStock` | storesReportService.ts:520 | 4.5 forecast | leadTimeDays=30, safetyStock=Math.ceil(targetLevel×0.1) |
+| Reorder Needed | `currentRob ≤ reorderPoint AND projectedMonthly > 0` | storesReportService.ts:522 | 4.5 forecast | Boolean trigger |
+| Suggested Reorder Qty | `reorderNeeded ? max(0, ceil(targetLevel - currentRob)) : 0` | storesReportService.ts:523 | 4.5 forecast | targetLevel derived from max(minStock, avgMonthly×3) |
+| Forecast Projected Monthly | `adjustedDaily × 30` (rounded to 2 decimal) | storesReportService.ts:515 | 4.5 forecast | Uses confidence-adjusted daily rate |
+| Months Remaining | `currentRob / (adjustedDaily × 30)` | storesReportService.ts:516 | 4.5 forecast | null if adjustedDaily=0 |
+| Forecast Confidence Multiplier | `daysOfData < 7 → 0.5; < 30 → 0.75; else → 1.0` | storesReportService.ts:511-513 | 4.5 forecast | Same thresholds as consumption, applied to forecast |
+| Monthly Trends | Grouped by month: sum(qty), count(events), split by itemType (stores/lubricants/chemicals/others) | storesReportService.ts:669-708 | 4.5 Excel (Monthly Trends sheet) | Multi-sheet Excel export |
+| Stock Efficiency (Movement) | Items classified by consumption activity vs data period | storesReportService.ts:874 | 4.5 Excel (Stock Efficiency sheet) | Movement thresholds adjusted for sample size |
+
+### Formulas Not in Current Implementation
+
+- **Stock Turnover Rate**: No turnover ratio (COGS ÷ average inventory) calculation exists — deficit/shortage and consumption rate serve inventory monitoring instead
 
 ---
 
