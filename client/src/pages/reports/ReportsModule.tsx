@@ -18,7 +18,13 @@ import {
   FileText,
   Download,
   BarChart3,
+  Pencil,
+  Expand,
+  Minimize2,
+  Check,
+  X,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import MaintenanceReports from "./MaintenanceReports";
 import RunningHoursReports from "./RunningHoursReports";
 import SparesReports from "./SparesReports";
@@ -131,17 +137,40 @@ export interface ReportActionTrigger {
 
 const ReportsModule = () => {
   const { setVesselId } = useVessel();
+  const { toast } = useToast();
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [actionTrigger, setActionTrigger] = useState<ReportActionTrigger | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [globalFilters, setGlobalFilters] = useState<FilterValues>({
     vessel: "all",
     department: "all",
     dateRange: { from: null, to: null },
     priority: "all"
   });
+
+  const expandAllCategories = () => {
+    setExpandedCategories(new Set(REPORT_CATEGORIES.map(c => c.id)));
+  };
+
+  const collapseAllCategories = () => {
+    setExpandedCategories(new Set());
+  };
+
+  const handleEnterEditMode = () => {
+    setIsEditMode(true);
+  };
+
+  const handleSaveEditMode = () => {
+    setIsEditMode(false);
+    toast({ title: "Saved", description: "Category ordering saved." });
+  };
+
+  const handleCancelEditMode = () => {
+    setIsEditMode(false);
+  };
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCategories(prev => {
@@ -283,8 +312,59 @@ const ReportsModule = () => {
           style={{ width: '300px' }}
           data-testid="report-tree-panel"
         >
-          <div className="flex-shrink-0 bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm flex items-center gap-2 rounded-tl-lg">
-            <Marker id="G2" /> REPORTS
+          <div className="flex-shrink-0 bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm flex items-center justify-between gap-2 rounded-tl-lg">
+            <div className="flex items-center gap-2">
+              <Marker id="G2" /> REPORTS
+            </div>
+            <div className="flex items-center gap-1">
+              {isEditMode ? (
+                <>
+                  <button
+                    onClick={handleSaveEditMode}
+                    className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
+                    data-testid="button-save-reports"
+                  >
+                    <Check className="h-3 w-3" />
+                    Save
+                  </button>
+                  <button
+                    onClick={handleCancelEditMode}
+                    className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
+                    data-testid="button-cancel-reports"
+                  >
+                    <X className="h-3 w-3" />
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={handleEnterEditMode}
+                    className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
+                    data-testid="button-edit-reports"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    Edit
+                  </button>
+                  <button
+                    onClick={expandAllCategories}
+                    className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
+                    data-testid="button-expand-all-reports"
+                  >
+                    <Expand className="h-3 w-3" />
+                    Expand
+                  </button>
+                  <button
+                    onClick={collapseAllCategories}
+                    className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
+                    data-testid="button-collapse-all-reports"
+                  >
+                    <Minimize2 className="h-3 w-3" />
+                    Collapse
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto">
