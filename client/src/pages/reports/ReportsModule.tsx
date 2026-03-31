@@ -156,11 +156,11 @@ const ReportsModule = () => {
     priority: "all"
   });
 
-  const handleExpandSelected = () => {
+  const expandAll = () => {
     setExpandedCategories(new Set(categoryOrder.map(c => c.id)));
   };
 
-  const handleCollapseSelected = () => {
+  const collapseAll = () => {
     setExpandedCategories(new Set());
   };
 
@@ -394,7 +394,7 @@ const ReportsModule = () => {
                     Edit
                   </button>
                   <button
-                    onClick={handleExpandSelected}
+                    onClick={expandAll}
                     className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
                     data-testid="button-expand-all-reports"
                   >
@@ -402,7 +402,7 @@ const ReportsModule = () => {
                     Expand
                   </button>
                   <button
-                    onClick={handleCollapseSelected}
+                    onClick={collapseAll}
                     className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
                     data-testid="button-collapse-all-reports"
                   >
