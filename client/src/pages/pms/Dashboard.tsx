@@ -8,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
   CheckCircle,
-  ChevronRight,
   CheckSquare,
   XCircle,
   Eye,
