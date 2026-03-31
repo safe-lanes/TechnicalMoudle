@@ -54,7 +54,8 @@ function buildVesselGraceSettings(vesselSettings: PmsVesselSettings | undefined)
 }
 
 export async function getWorkOrderPlannerData(filters: WorkOrderPlannerFilters) {
-  const { vesselId, days = 30, rank, search } = filters;
+  const { vesselId, days: rawDays = 30, rank, search } = filters;
+  const days = Math.max(1, Math.min(rawDays, 365));
 
   if (!vesselId) {
     throw new ValidationError('vesselId is required');

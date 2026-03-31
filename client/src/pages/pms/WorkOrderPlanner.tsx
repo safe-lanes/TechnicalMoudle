@@ -280,19 +280,21 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
             variant="outline"
             size="sm"
             onClick={handleExportExcel}
+            title={`Export all ${totalItems} filtered items to Excel`}
             data-testid="button-planner-export-excel"
           >
             <FileSpreadsheet className="h-4 w-4 mr-1" />
-            Excel
+            Excel ({totalItems})
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={handleExportPdf}
+            title={`Export all ${totalItems} filtered items to PDF`}
             data-testid="button-planner-export-pdf"
           >
             <FileText className="h-4 w-4 mr-1" />
-            PDF
+            PDF ({totalItems})
           </Button>
         </div>
       </div>
