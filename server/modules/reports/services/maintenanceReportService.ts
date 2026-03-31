@@ -258,7 +258,7 @@ export async function exportDueJobs7Days(vesselId: string): Promise<{ buffer: Bu
       assignedTo: job.assignedTo,
       _rowStatus: (job.isOverdue ? 'overdue' : 'due') as WorkOrderStatus,
       isCriticalEquipment: job.critical === 'Yes'
-    } as any;
+    };
   });
 
   applyWorkOrderDataRows(worksheet, preparedData, columns, dataStartRow);
@@ -453,7 +453,7 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
       criticalEquipment: isCritical ? 'YES' : 'No',
       _rowStatus: 'overdue' as WorkOrderStatus,
       isCriticalEquipment: isCritical
-    } as any;
+    };
   });
 
   applyWorkOrderDataRows(worksheet, preparedData, columns, dataStartRow);
@@ -564,27 +564,14 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
       sNo: index + 1,
       workOrderNo: wo.workOrderNo || wo.id || '\u2014',
       componentName: wo.component || comp?.name || '\u2014',
-      componentCode: wo.componentCode || '\u2014',
       jobTitle: wo.jobTitle || '\u2014',
       jobType: wo.taskType || wo.maintenanceType || '\u2014',
-      maintenanceBasis: wo.maintenanceBasis || job?.maintenanceBasis || '\u2014',
       department: wo.department || 'Unassigned',
       priority: wo.jobPriority || 'Normal',
-      criticality: isCritical ? 'Yes' : 'No',
-      classRelated: wo.classRelated || 'No',
       assignedTo: wo.performedBy || wo.assignedTo || '\u2014',
-      approver: wo.approver || '\u2014',
-      submittedDate: formatDateDDMMMYYYY(wo.submittedDate || wo.createdAt),
       startDate: formatDateDDMMMYYYY(wo.startDateTime),
-      startTime: formatTimeHHMM(wo.startDateTime),
       completionDate: formatDateDDMMMYYYY(wo.dateCompleted || (wo as any).completionDateTime),
-      completionTime: formatTimeHHMM((wo as any).completionDateTime),
-      workDuration: duration > 0 ? duration.toFixed(1) : '\u2014',
-      noOfPersons: wo.noOfPersons || '1',
       manHours: manHours > 0 ? manHours.toFixed(1) : '\u2014',
-      riskAssessment: wo.riskAssessmentStatus || 'N/A',
-      safetyChecklists: wo.safetyChecklistsStatus || 'N/A',
-      operationalForms: wo.operationalFormsStatus || 'N/A'
     };
   });
 
@@ -597,30 +584,17 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
   });
 
   const columns: ColumnDef[] = [
-    { header: 'S.No', key: 'sNo', width: 6 },
-    { header: 'Work Order No', key: 'workOrderNo', width: 22 },
-    { header: 'Component', key: 'componentName', width: 20 },
-    { header: 'Comp Code', key: 'componentCode', width: 14 },
-    { header: 'Job Title', key: 'jobTitle', width: 25 },
-    { header: 'Job Type', key: 'jobType', width: 12 },
-    { header: 'Basis', key: 'maintenanceBasis', width: 10 },
-    { header: 'Dept', key: 'department', width: 10 },
-    { header: 'Priority', key: 'priority', width: 10 },
-    { header: 'Critical', key: 'criticality', width: 8 },
-    { header: 'Class', key: 'classRelated', width: 7 },
-    { header: 'Assigned To', key: 'assignedTo', width: 14 },
-    { header: 'Approver', key: 'approver', width: 14 },
-    { header: 'Submitted', key: 'submittedDate', width: 14 },
-    { header: 'Start Date', key: 'startDate', width: 14 },
-    { header: 'Start Time', key: 'startTime', width: 10 },
-    { header: 'Completed', key: 'completionDate', width: 14 },
-    { header: 'End Time', key: 'completionTime', width: 10 },
-    { header: 'Duration (Hrs)', key: 'workDuration', width: 12 },
-    { header: 'Persons', key: 'noOfPersons', width: 8 },
-    { header: 'Man-Hours', key: 'manHours', width: 10 },
-    { header: 'Risk Assmt', key: 'riskAssessment', width: 10 },
-    { header: 'Safety Chk', key: 'safetyChecklists', width: 10 },
-    { header: 'Ops Forms', key: 'operationalForms', width: 10 }
+    { header: 'S.No', key: 'sNo', width: 8 },
+    { header: 'WO No', key: 'workOrderNo', width: 22 },
+    { header: 'Component', key: 'componentName', width: 28 },
+    { header: 'Job Title', key: 'jobTitle', width: 30 },
+    { header: 'Job Type', key: 'jobType', width: 14 },
+    { header: 'Dept', key: 'department', width: 12 },
+    { header: 'Priority', key: 'priority', width: 12 },
+    { header: 'Assigned To', key: 'assignedTo', width: 18 },
+    { header: 'Start Date', key: 'startDate', width: 16 },
+    { header: 'Completion Date', key: 'completionDate', width: 16 },
+    { header: 'Man Hours', key: 'manHours', width: 12 }
   ];
 
   const totalColumns = columns.length;
@@ -646,16 +620,16 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
 
   worksheet.getCell('A3').value = `Vessel: ${vesselName}`;
   worksheet.getCell('A3').font = { bold: true };
-  worksheet.mergeCells(`A3:E3`);
+  worksheet.mergeCells(`A3:D3`);
 
   const periodText = dateFrom && dateTo
     ? `Report Period: ${formatDateDDMMMYYYY(dateFrom)} to ${formatDateDDMMMYYYY(dateTo)}`
     : 'Report Period: All Time';
-  worksheet.getCell('F3').value = periodText;
-  worksheet.mergeCells(`F3:L3`);
+  worksheet.getCell('E3').value = periodText;
+  worksheet.mergeCells(`E3:H3`);
 
-  worksheet.getCell('M3').value = `Generated: ${formatDateDDMMMYYYY(new Date())}`;
-  worksheet.mergeCells(`M3:Q3`);
+  worksheet.getCell('I3').value = `Generated: ${formatDateDDMMMYYYY(new Date())}`;
+  worksheet.mergeCells(`I3:${lastColLetter}3`);
 
   worksheet.getRow(4).height = 5;
   worksheet.getRow(5).height = 5;
@@ -695,9 +669,6 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
       };
       if (rowIdx % 2 === 1) {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7F9FC' } };
-      }
-      if (job.criticality === 'Yes') {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF6FFED' } };
       }
     });
     row.height = 18;
@@ -954,25 +925,16 @@ export async function exportPostponementLog(
   });
 
   const postponementColumns: ColumnDef[] = [
-    { key: 'sno', header: 'S.No', width: 6, type: 'number', align: 'center' },
-    { key: 'postponementNo', header: 'Post. #', width: 8, type: 'number', align: 'center' },
-    { key: 'workOrderNo', header: 'WO Number', width: 16, type: 'text', align: 'left' },
+    { key: 'sno', header: 'S.No', width: 8, type: 'number', align: 'center' },
+    { key: 'workOrderNo', header: 'WO Number', width: 22, type: 'text', align: 'left' },
     { key: 'jobTitle', header: 'Job Title', width: 35, type: 'text', align: 'left' },
-    { key: 'componentCode', header: 'Comp. Code', width: 14, type: 'text', align: 'center' },
-    { key: 'componentName', header: 'Component Name', width: 30, type: 'text', align: 'left' },
+    { key: 'componentName', header: 'Component', width: 30, type: 'text', align: 'left' },
     { key: 'department', header: 'Dept', width: 12, type: 'text', align: 'center' },
-    { key: 'originalDueDate', header: 'Original Due', width: 14, type: 'date', align: 'center' },
-    { key: 'newDueDate', header: 'New Due Date', width: 14, type: 'date', align: 'center' },
-    { key: 'durationDays', header: 'Days Extended', width: 12, type: 'number', align: 'center' },
-    { key: 'postponementReason', header: 'Postponement Reason', width: 40, type: 'text', align: 'left' },
-    { key: 'authorizedBy', header: 'Authorized By', width: 18, type: 'text', align: 'left' },
-    { key: 'submittedDate', header: 'Submitted', width: 14, type: 'date', align: 'center' },
-    { key: 'status', header: 'Status', width: 12, type: 'text', align: 'center' },
-    { key: 'approvedDate', header: 'Approved On', width: 14, type: 'date', align: 'center' },
-    { key: 'approvedBy', header: 'Approved By', width: 18, type: 'text', align: 'left' },
-    { key: 'approvalRemarks', header: 'Approval Remarks', width: 30, type: 'text', align: 'left' },
-    { key: 'informOffice', header: 'Office Notified', width: 12, type: 'text', align: 'center' },
-    { key: 'critical', header: 'Critical Equip.', width: 12, type: 'text', align: 'center' }
+    { key: 'originalDueDate', header: 'Original Due', width: 16, type: 'date', align: 'center' },
+    { key: 'newDueDate', header: 'New Due', width: 16, type: 'date', align: 'center' },
+    { key: 'durationDays', header: 'Days Extended', width: 14, type: 'number', align: 'center' },
+    { key: 'postponementReason', header: 'Reason', width: 40, type: 'text', align: 'left' },
+    { key: 'status', header: 'Status', width: 14, type: 'text', align: 'center' }
   ];
 
   const totalColumns = postponementColumns.length;

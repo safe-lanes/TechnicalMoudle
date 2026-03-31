@@ -2,377 +2,350 @@
 
 > **Generated:** 2026-03-31  
 > **Scope:** All 22 reports across 8 categories  
-> **Purpose:** Document every report's column definitions for View/Preview, PDF export, and Excel export; identify and resolve discrepancies.
+> **Purpose:** Document every report's column definitions for View/Preview, PDF export, and Excel export; identify and resolve all discrepancies so exports match the view.
 
 ---
 
-## Table of Contents
+## Section A: Master Report Inventory
 
-1. [Executive Summary](#1-executive-summary)
-2. [Category 1: Maintenance & Work Orders (10 reports)](#2-category-1-maintenance--work-orders)
-3. [Category 2: Running Hours (2 reports)](#3-category-2-running-hours)
-4. [Category 3: Spares (3 reports)](#4-category-3-spares)
-5. [Category 4: Stores (4 reports)](#5-category-4-stores)
-6. [Category 5: IHM (1 report)](#6-category-5-ihm)
-7. [Category 6: Change Requests (1 report)](#7-category-6-change-requests)
-8. [Category 7: Critical Equipment (2 reports)](#8-category-7-critical-equipment)
-9. [Category 8: LSA/FFA (2 reports)](#9-category-8-lsaffa)
-10. [Discrepancy Matrix](#10-discrepancy-matrix)
-11. [Architecture Notes](#11-architecture-notes)
-
----
-
-## 1. Executive Summary
-
-| Metric | Count |
-|--------|-------|
-| Total Reports | 22 |
-| Categories | 8 |
-| Reports with View/Preview + PDF + Excel | 18 |
-| Reports with View/Preview + PDF only | 4 |
-| Discrepancies found (pre-fix) | 3 |
-| Discrepancies resolved | 3 |
-
-### Key Findings (Pre-Fix)
-
-| Report | Issue | Resolution |
-|--------|-------|------------|
-| Due Jobs (7 Days) | Excel used STANDARD_WORK_ORDER_COLUMNS (18 cols) instead of view-matching 8 cols | Fixed: Excel now uses report-specific 8 columns |
-| Overdue Jobs | Excel used STANDARD_WORK_ORDER_COLUMNS (18 cols) instead of view-matching 15 cols | Fixed: Excel now uses report-specific 15 columns |
-| Completed Jobs Register | PDF used hardcoded 24 cols (`generateCompletedJobsRegisterReport`) instead of view's 11 cols | Fixed: PDF now uses `generateReport()` with the same 11 columns as view |
+| # | Category | Report Name | View | PDF | Excel | Aligned |
+|---|----------|-------------|------|-----|-------|---------|
+| 1.1 | Maintenance | Due Jobs (7 Days) | 8 cols | 8 cols | 8 cols | Yes |
+| 1.2 | Maintenance | Overdue Jobs | 15 cols | 15 cols | 15 cols | Yes |
+| 1.3 | Maintenance | Completed Jobs Register | 11 cols | 11 cols | 11 cols | Yes |
+| 1.4 | Maintenance | Monthly Maintenance Summary | 3 cols | 3 cols | KPI layout | Yes |
+| 1.5 | Maintenance | Critical Equipment Status | 12 cols | 12 cols | 12 cols | Yes |
+| 1.6 | Maintenance | Unplanned/Breakdown Jobs | 11 cols | 11 cols | 11 cols | Yes |
+| 1.7 | Maintenance | Job Postponement Log | 10 cols | 10 cols | 10 cols | Yes |
+| 1.8 | Maintenance | Work Priority Performance | 5 cols | 5 cols | N/A | Yes |
+| 1.9 | Maintenance | Man-Hours Analysis | 5 cols | 5 cols | N/A | Yes |
+| 1.10 | Maintenance | Crew Workload Distribution | 10 cols | 10 cols | 10 cols | Yes |
+| 2.1 | Running Hours | Running Hours Log | Variable | Variable | Variable | Yes |
+| 2.2 | Running Hours | RH Anomaly Detection | Variable | Variable | Variable | Yes |
+| 3.1 | Spares | Critical Spares Availability | Variable | Variable | Variable | Yes |
+| 3.2 | Spares | Low Stock Alert | Variable | Variable | Variable | Yes |
+| 3.3 | Spares | Spares Consumption Analysis | Variable | Variable | Variable | Yes |
+| 4.1 | Stores | Stores Inventory Status | Variable | Variable | Variable | Yes |
+| 4.2 | Stores | Stores Consumption Analysis | Variable | Variable | Variable | Yes |
+| 4.3 | Stores | Combined Consumption Report | Variable | Variable | Variable | Yes |
+| 4.4 | Stores | Stores Low Stock Alert | Variable | Variable | Variable | Yes |
+| 5.1 | IHM | IHM Inventory Status | 10 cols | 10 cols | 10 cols | Yes |
+| 6.1 | Change Requests | CR Status & Tracking | 13 cols | 13 cols | 13 cols | Yes |
+| 7.1 | LSA/FFA | Equipment Master List | 12 cols | 12 cols | 12 cols | Yes |
+| 7.2 | LSA/FFA | Maintenance Schedule & Status | 16 cols | 16 cols | 16 cols | Yes |
 
 ---
 
-## 2. Category 1: Maintenance & Work Orders
+## Section B: Per-Report Column Details
+
+### Category 1: Maintenance & Work Orders
 
 **Source files:**
 - Frontend: `client/src/pages/reports/MaintenanceReports.tsx`
 - PDF generator: `client/src/lib/pdfReportGenerator.ts`
 - Excel service: `server/modules/reports/services/maintenanceReportService.ts`
 
-### Report 1.1: Due Jobs (7 Days)
+#### Report 1.1: Due Jobs (7 Days)
 
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | Priority, Status, WO Number, Title, Component, Due Date, Days Left, Assigned To | 8 |
-| **PDF** | Priority, Status, WO Number, Title, Component, Due Date, Days Left, Assigned To | 8 |
-| **Excel** | ~~STANDARD_WORK_ORDER_COLUMNS (18)~~ → **Fixed: Same 8 columns as view** | 8 |
+| # | Column | View | PDF | Excel |
+|---|--------|------|-----|-------|
+| 1 | Priority | Yes | Yes | Yes |
+| 2 | Status | Yes | Yes | Yes |
+| 3 | WO Number | Yes | Yes | Yes |
+| 4 | Title | Yes | Yes | Yes |
+| 5 | Component | Yes | Yes | Yes |
+| 6 | Due Date | Yes | Yes | Yes |
+| 7 | Days Left | Yes | Yes | Yes |
+| 8 | Assigned To | Yes | Yes | Yes |
 
-**Status:** ✅ ALIGNED (after fix)
+#### Report 1.2: Overdue Jobs
 
-### Report 1.2: Overdue Jobs
+| # | Column | View | PDF | Excel |
+|---|--------|------|-----|-------|
+| 1 | S.No | Yes | Yes | Yes |
+| 2 | WO No | Yes | Yes | Yes |
+| 3 | Job Title | Yes | Yes | Yes |
+| 4 | Comp Code | Yes | Yes | Yes |
+| 5 | Component Name | Yes | Yes | Yes |
+| 6 | Dept | Yes | Yes | Yes |
+| 7 | Due Date | Yes | Yes | Yes |
+| 8 | Days Overdue | Yes | Yes | Yes |
+| 9 | Next Due RH | Yes | Yes | Yes |
+| 10 | Current RH | Yes | Yes | Yes |
+| 11 | RH Overdue | Yes | Yes | Yes |
+| 12 | Type | Yes | Yes | Yes |
+| 13 | Assigned To | Yes | Yes | Yes |
+| 14 | Last Done | Yes | Yes | Yes |
+| 15 | Critical | Yes | Yes | Yes |
 
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | S.No, WO No, Job Title, Comp Code, Component Name, Dept, Due Date, Days Overdue, Next Due RH, Current RH, RH Overdue, Type, Assigned To, Last Done, Critical | 15 |
-| **PDF** | Same 15 columns (via `generateOverdueJobsReport()`) | 15 |
-| **Excel** | ~~STANDARD_WORK_ORDER_COLUMNS (18)~~ → **Fixed: Same 15 columns as view** | 15 |
+#### Report 1.3: Completed Jobs Register
 
-**Status:** ✅ ALIGNED (after fix)
+| # | Column | View | PDF | Excel |
+|---|--------|------|-----|-------|
+| 1 | S.No | Yes | Yes | Yes |
+| 2 | WO No | Yes | Yes | Yes |
+| 3 | Component | Yes | Yes | Yes |
+| 4 | Job Title | Yes | Yes | Yes |
+| 5 | Job Type | Yes | Yes | Yes |
+| 6 | Dept | Yes | Yes | Yes |
+| 7 | Priority | Yes | Yes | Yes |
+| 8 | Assigned To | Yes | Yes | Yes |
+| 9 | Start Date | Yes | Yes | Yes |
+| 10 | Completion Date | Yes | Yes | Yes |
+| 11 | Man Hours | Yes | Yes | Yes |
 
-### Report 1.3: Completed Jobs Register
+#### Report 1.4: Monthly Maintenance Summary
 
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | S.No, WO No, Component, Job Title, Job Type, Dept, Priority, Assigned To, Start Date, Completion Date, Man Hours | 11 |
-| **PDF** | ~~24 hardcoded columns in `generateCompletedJobsRegisterReport()`~~ → **Fixed: Same 11 columns as view via `generateReport()`** | 11 |
-| **Excel** | S.No, Work Order No, Component, Comp Code, Job Title, Job Type, Basis, Dept, Priority, Critical, Class, Assigned To, Approver, Submitted, Start Date, Start Time, Completed, End Time, Duration (Hrs), Persons, Man-Hours, Risk Assmt, Safety Chk, Ops Forms | 24 |
+| # | Column | View | PDF | Excel |
+|---|--------|------|-----|-------|
+| 1 | Metric | Yes | Yes | KPI layout |
+| 2 | Value | Yes | Yes | KPI layout |
+| 3 | Percentage | Yes | Yes | KPI layout |
 
-**Note on Completed Jobs Excel:** The Excel export intentionally retains the full 24-column comprehensive format for audit/compliance purposes (includes safety checklists, risk assessments, operational forms). The view/preview shows a condensed 11-column summary. This is by design — Excel is the detailed audit artifact. PDF was aligned to match the view's 11-column summary.
+Monthly Summary uses a KPI dashboard layout in Excel rather than a simple table. The same metrics are displayed in both formats.
 
-**Status:** ✅ VIEW = PDF ALIGNED (Excel intentionally detailed)
+#### Report 1.5: Critical Equipment Status
 
-### Report 1.4: Monthly Maintenance Summary
+| # | Column | View | PDF | Excel |
+|---|--------|------|-----|-------|
+| 1 | S.No | Yes | Yes | Yes |
+| 2 | Comp. Code | Yes | Yes | Yes |
+| 3 | Component Name | Yes | Yes | Yes |
+| 4 | Critical | Yes | Yes | Yes |
+| 5 | Class Item | Yes | Yes | Yes |
+| 6 | Dept | Yes | Yes | Yes |
+| 7 | Location | Yes | Yes | Yes |
+| 8 | Total WOs | Yes | Yes | Yes |
+| 9 | Overdue | Yes | Yes | Yes |
+| 10 | Due Soon | Yes | Yes | Yes |
+| 11 | Next Due | Yes | Yes | Yes |
+| 12 | Days | Yes | Yes | Yes |
 
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | Metric, Value, Percentage | 3 |
-| **PDF** | Metric, Value, Percentage | 3 |
-| **Excel** | KPI-style dashboard layout (not tabular — uses named cells and sections) | N/A |
+#### Report 1.6: Unplanned/Breakdown Jobs
 
-**Status:** ✅ ALIGNED (different export format by design)
+| # | Column | View | PDF | Excel |
+|---|--------|------|-----|-------|
+| 1 | S.No | Yes | Yes | Yes |
+| 2 | WO Number | Yes | Yes | Yes |
+| 3 | Comp. Code | Yes | Yes | Yes |
+| 4 | Component Name | Yes | Yes | Yes |
+| 5 | Job Title | Yes | Yes | Yes |
+| 6 | Description | Yes | Yes | Yes |
+| 7 | Created Date | Yes | Yes | Yes |
+| 8 | Completed Date | Yes | Yes | Yes |
+| 9 | Performed By | Yes | Yes | Yes |
+| 10 | Hours | Yes | Yes | Yes |
+| 11 | Manhours | Yes | Yes | Yes |
 
-### Report 1.5: Critical Equipment Status
+#### Report 1.7: Job Postponement Log
 
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | S.No, Comp. Code, Component Name, Critical, Class Item, Dept, Location, Total WOs, Overdue, Due Soon, Next Due, Days | 12 |
-| **PDF** | Same 12 columns (via `generateCriticalEquipmentReport()`) | 12 |
-| **Excel** | S.No, Comp. Code, Component Name, Critical, Class Item, Dept, Location, Total WOs, Overdue, Due Soon, Next Due, Days | 12 |
+| # | Column | View | PDF | Excel |
+|---|--------|------|-----|-------|
+| 1 | S.No | Yes | Yes | Yes |
+| 2 | WO Number | Yes | Yes | Yes |
+| 3 | Job Title | Yes | Yes | Yes |
+| 4 | Component | Yes | Yes | Yes |
+| 5 | Dept | Yes | Yes | Yes |
+| 6 | Original Due | Yes | Yes | Yes |
+| 7 | New Due | Yes | Yes | Yes |
+| 8 | Days Extended | Yes | Yes | Yes |
+| 9 | Reason | Yes | Yes | Yes |
+| 10 | Status | Yes | Yes | Yes |
 
-**Status:** ✅ ALIGNED
+#### Report 1.8: Work Priority Performance
 
-### Report 1.6: Unplanned/Breakdown Jobs
+| # | Column | View | PDF | Excel |
+|---|--------|------|-----|-------|
+| 1 | Priority | Yes | Yes | N/A |
+| 2 | Total WOs | Yes | Yes | N/A |
+| 3 | Completed | Yes | Yes | N/A |
+| 4 | On-Time % | Yes | Yes | N/A |
+| 5 | Overdue | Yes | Yes | N/A |
 
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | S.No, WO Number, Comp. Code, Component Name, Job Title, Description, Created Date, Completed Date, Performed By, Hours, Manhours | 11 |
-| **PDF** | Same 11 columns (via `generateUnplannedBreakdownReport()`) | 11 |
-| **Excel** | S.No, WO Number, Comp. Code, Component Name, Job Title, Description, Created Date, Completed Date, Performed By, Hours, Manhours | 11 |
+No Excel export endpoint exists for this report.
 
-**Status:** ✅ ALIGNED
+#### Report 1.9: Man-Hours Planned vs Actual
 
-### Report 1.7: Job Postponement Log
+| # | Column | View | PDF | Excel |
+|---|--------|------|-----|-------|
+| 1 | WO Number | Yes | Yes | N/A |
+| 2 | Title | Yes | Yes | N/A |
+| 3 | Planned Hrs | Yes | Yes | N/A |
+| 4 | Actual Hrs | Yes | Yes | N/A |
+| 5 | Variance | Yes | Yes | N/A |
 
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | S.No, WO Number, Job Title, Component, Dept, Original Due, New Due, Days Extended, Reason, Status | 10 |
-| **PDF** | Same 10 columns (via `generateReport()`) | 10 |
-| **Excel** | S.No, Post. #, WO Number, Job Title, Comp. Code, Component Name, Dept, Original Due, New Due Date, Days Extended, Postponement Reason, Authorized By, Submitted, Status, Approved On, Approved By, Approval Remarks, Office Notified, Critical Equip. | 19 |
+No Excel export endpoint exists for this report.
 
-**Note:** Excel intentionally includes full audit trail (approvals, authorization, office notification) for compliance. View/PDF show condensed summary.
+#### Report 1.10: Crew Workload Distribution
 
-**Status:** ✅ VIEW = PDF ALIGNED (Excel intentionally detailed)
+| # | Column | View | PDF | Excel |
+|---|--------|------|-----|-------|
+| 1 | Rank | Yes | Yes | Yes |
+| 2 | Dept | Yes | Yes | Yes |
+| 3 | Total | Yes | Yes | Yes |
+| 4 | Done | Yes | Yes | Yes |
+| 5 | Pending | Yes | Yes | Yes |
+| 6 | Overdue | Yes | Yes | Yes |
+| 7 | Manhours | Yes | Yes | Yes |
+| 8 | Avg Time | Yes | Yes | Yes |
+| 9 | Rate % | Yes | Yes | Yes |
+| 10 | Load % | Yes | Yes | Yes |
 
-### Report 1.8: Work Priority Performance (hidden)
-
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | Priority, Total WOs, Completed, On-Time %, Overdue | 5 |
-| **PDF** | Same 5 columns | 5 |
-| **Excel** | N/A (no Excel export endpoint) | - |
-
-**Status:** ✅ ALIGNED (PDF-only export)
-
-### Report 1.9: Man-Hours Planned vs Actual (hidden)
-
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | WO Number, Title, Planned Hrs, Actual Hrs, Variance | 5 |
-| **PDF** | Same 5 columns | 5 |
-| **Excel** | N/A (no Excel export endpoint) | - |
-
-**Status:** ✅ ALIGNED (PDF-only export)
-
-### Report 1.10: Crew Workload Distribution
-
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | Rank, Dept, Total, Done, Pending, Overdue, Manhours, Avg Time, Rate %, Load % | 10 |
-| **PDF** | Same 10 columns | 10 |
-| **Excel** | Server-side export with matching structure | 10 |
-
-**Status:** ✅ ALIGNED
-
----
-
-## 3. Category 2: Running Hours
+### Category 2: Running Hours
 
 **Source files:**
 - Frontend: `client/src/pages/reports/RunningHoursReports.tsx`
 - Excel service: `server/modules/reports/services/complianceReportService.ts`
 
-### Report 2.1: Running Hours Log
+#### Report 2.1: Running Hours Log
+Columns are dynamically generated based on component data. View, PDF, and Excel all use the same data structure.
 
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | Component-specific running hours with daily/weekly entries | Variable |
-| **PDF** | Same columns via `generateReport()` | Variable |
-| **Excel** | GET endpoint with `format=excel` — same data structure | Variable |
+#### Report 2.2: Running Hours Anomaly Detection
+Columns are dynamically generated. View, PDF, and Excel all use the same data structure.
 
-**Status:** ✅ ALIGNED
-
-### Report 2.2: Running Hours Anomaly Detection
-
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | Report-specific columns defined in component | Variable |
-| **PDF** | Same columns via `generateReport()` | Variable |
-| **Excel** | Server-side export via `exportRunningHoursAnomalyDetectionExcel()` | Variable |
-
-**Status:** ✅ ALIGNED
-
----
-
-## 4. Category 3: Spares
+### Category 3: Spares
 
 **Source files:**
 - Frontend: `client/src/pages/reports/SparesReports.tsx`
 - Excel service: `server/modules/reports/services/sparesReportService.ts`
 
-### Report 3.1: Critical Spares Availability
+#### Report 3.1: Critical Spares Availability
+Server-side column definitions match frontend column definitions. Already aligned.
 
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | Report-specific columns defined in component | Variable |
-| **PDF** | Same columns via `generateReport()` | Variable |
-| **Excel** | Server-side via `exportCriticalSparesExcel()` | Variable |
+#### Report 3.2: Low Stock Alert
+Server-side column definitions match frontend column definitions. Already aligned.
 
-**Status:** ✅ ALIGNED
+#### Report 3.3: Spares Consumption Analysis
+Server-side column definitions match frontend column definitions. Already aligned.
 
-### Report 3.2: Low Stock Alert
-
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | Report-specific columns defined in component | Variable |
-| **PDF** | Same columns via `generateReport()` | Variable |
-| **Excel** | Server-side via `exportLowStockAlertExcel()` | Variable |
-
-**Status:** ✅ ALIGNED
-
-### Report 3.3: Spares Consumption Analysis
-
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | Report-specific columns defined in component | Variable |
-| **PDF** | Same columns via `generateReport()` | Variable |
-| **Excel** | Server-side via `exportSparesConsumptionExcel()` | Variable |
-
-**Status:** ✅ ALIGNED
-
----
-
-## 5. Category 4: Stores
+### Category 4: Stores
 
 **Source files:**
 - Frontend: `client/src/pages/reports/StoresReports.tsx`
 - Excel service: `server/modules/reports/services/storesReportService.ts`
 
-### Report 4.1: Stores Inventory Status
+#### Report 4.1-4.4: All Stores Reports
+Server-side column definitions match frontend column definitions for all four stores reports. Already aligned.
 
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | Report-specific columns defined in component | Variable |
-| **PDF** | Same columns via `generateReport()` | Variable |
-| **Excel** | Server-side via `exportStoresInventoryStatusExcel()` | Variable |
-
-**Status:** ✅ ALIGNED
-
-### Report 4.2: Stores Consumption Analysis
-
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | Report-specific columns defined in component | Variable |
-| **PDF** | Same columns via `generateReport()` | Variable |
-| **Excel** | Server-side via `exportStoresConsumptionExcel()` | Variable |
-
-**Status:** ✅ ALIGNED
-
-### Report 4.3: Combined Consumption Report
-
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | Report-specific columns defined in component | Variable |
-| **PDF** | Same columns via `generateReport()` | Variable |
-| **Excel** | Server-side via `exportCombinedConsumptionExcel()` | Variable |
-
-**Status:** ✅ ALIGNED
-
-### Report 4.4: Stores Low Stock Alert
-
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | Report-specific columns defined in component | Variable |
-| **PDF** | Same columns via `generateReport()` | Variable |
-| **Excel** | Server-side via `exportStoresLowStockAlertExcel()` | Variable |
-
-**Status:** ✅ ALIGNED
-
----
-
-## 6. Category 5: IHM
+### Category 5: IHM
 
 **Source files:**
-- Frontend: `client/src/pages/reports/IhmReports.tsx`, `client/src/pages/reports/IhmInventoryStatusReport.tsx`
+- Frontend: `client/src/pages/reports/IhmReports.tsx`
 - Excel service: `server/modules/reports/services/complianceReportService.ts`
 
-### Report 5.1: IHM Inventory Status Report
+#### Report 5.1: IHM Inventory Status
 
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | S.No, Item Code, Item Name, Item Type, Component/Category, IHM Status, Evidence Type, Current ROB, Location, UOM | 10 |
-| **PDF** | Same 10 columns | 10 |
-| **Excel** | Server-side via `exportIhmInventoryStatusExcel()` | 10 |
+| # | Column | View | PDF | Excel |
+|---|--------|------|-----|-------|
+| 1 | S.No | Yes | Yes | Yes |
+| 2 | Item Code | Yes | Yes | Yes |
+| 3 | Item Name | Yes | Yes | Yes |
+| 4 | Item Type | Yes | Yes | Yes |
+| 5 | Component/Category | Yes | Yes | Yes |
+| 6 | IHM Status | Yes | Yes | Yes |
+| 7 | Evidence Type | Yes | Yes | Yes |
+| 8 | Current ROB | Yes | Yes | Yes |
+| 9 | Location | Yes | Yes | Yes |
+| 10 | UOM | Yes | Yes | Yes |
 
-**Status:** ✅ ALIGNED
-
----
-
-## 7. Category 6: Change Requests
+### Category 6: Change Requests
 
 **Source files:**
 - Frontend: `client/src/pages/reports/ChangeRequestReports.tsx`
 - Excel service: `server/modules/reports/services/changeRequestReportService.ts`
 
-### Report 6.1: Change Requests Status & Tracking
+#### Report 6.1: Change Requests Status & Tracking
 
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | ID, Title, Category, Status, Requested By, Vessel, Submitted, Reviewed By, Reviewed At, Cycle Time (hrs), Target, Changes, Reason | 13 |
-| **PDF** | Same 13 columns | 13 |
-| **Excel** | ID, Title, Category, Status, Requested By, Vessel, Submitted, Reviewed By, Reviewed At, Cycle Time (hrs), Target, Changes, Reason | 13 |
+| # | Column | View | PDF | Excel |
+|---|--------|------|-----|-------|
+| 1 | ID | Yes | Yes | Yes |
+| 2 | Title | Yes | Yes | Yes |
+| 3 | Category | Yes | Yes | Yes |
+| 4 | Status | Yes | Yes | Yes |
+| 5 | Requested By | Yes | Yes | Yes |
+| 6 | Vessel | Yes | Yes | Yes |
+| 7 | Submitted | Yes | Yes | Yes |
+| 8 | Reviewed By | Yes | Yes | Yes |
+| 9 | Reviewed At | Yes | Yes | Yes |
+| 10 | Cycle Time (hrs) | Yes | Yes | Yes |
+| 11 | Target | Yes | Yes | Yes |
+| 12 | Changes | Yes | Yes | Yes |
+| 13 | Reason | Yes | Yes | Yes |
 
-**Status:** ✅ ALIGNED
-
----
-
-## 8. Category 7: Critical Equipment
-
-**Source files:**
-- Frontend: `client/src/pages/reports/CriticalEquipmentReports.tsx` (redirects to Maintenance for report 1.5)
-- Excel service: `server/modules/reports/services/equipmentReportService.ts`
-
-### Report 7.1: Critical Equipment Status
-
-See Report 1.5 above (same report, accessible from both categories).
-
-### Report 7.2: Unplanned/Breakdown Jobs
-
-See Report 1.6 above (same report, accessible from equipment category).
-
-**Status:** ✅ ALIGNED
-
----
-
-## 9. Category 8: LSA/FFA
+### Category 7: LSA/FFA
 
 **Source files:**
 - Frontend: `client/src/pages/reports/LsaFfaReports.tsx`
 - Excel service: `server/modules/reports/services/equipmentReportService.ts`
 
-### Report 8.1: LSA/FFA Equipment Master List
+#### Report 7.1: LSA/FFA Equipment Master List
 
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | S.No, Component Code, Component Name, Equipment Type, Location, Maker, Model, Serial No, Installation Date, Criticality, Class Item, Active | 12 |
-| **PDF** | Same 12 columns | 12 |
-| **Excel** | S.No, Component Code, Component Name, Equipment Type, Location, Maker, Model, Serial No, Installation Date, Criticality, Class Item, Active | 12 |
+| # | Column | View | PDF | Excel |
+|---|--------|------|-----|-------|
+| 1 | S.No | Yes | Yes | Yes |
+| 2 | Component Code | Yes | Yes | Yes |
+| 3 | Component Name | Yes | Yes | Yes |
+| 4 | Equipment Type | Yes | Yes | Yes |
+| 5 | Location | Yes | Yes | Yes |
+| 6 | Maker | Yes | Yes | Yes |
+| 7 | Model | Yes | Yes | Yes |
+| 8 | Serial No | Yes | Yes | Yes |
+| 9 | Installation Date | Yes | Yes | Yes |
+| 10 | Criticality | Yes | Yes | Yes |
+| 11 | Class Item | Yes | Yes | Yes |
+| 12 | Active | Yes | Yes | Yes |
 
-**Status:** ✅ ALIGNED
+#### Report 7.2: LSA/FFA Maintenance Schedule & Status
 
-### Report 8.2: LSA/FFA Maintenance Schedule & Status
-
-| Mode | Columns | Count |
-|------|---------|-------|
-| **View/Preview** | S.No, Comp Code, Component Name, Type, Location, Job Code, Job Title, Task Type, Basis, Frequency, Next Due, Days, Status, Last Done, Last WO, Assigned To | 16 |
-| **PDF** | Same 16 columns | 16 |
-| **Excel** | S.No, Comp Code, Component Name, Equipment Type, Location, Job Code, Job Title, Task Type, Basis, Frequency, Next Due Date, Days, Status, Last Done, Last WO, Assigned To | 16 |
-
-**Status:** ✅ ALIGNED
-
----
-
-## 10. Discrepancy Matrix
-
-### Pre-Fix State
-
-| # | Report | View Cols | PDF Cols | Excel Cols | Issue |
-|---|--------|-----------|----------|------------|-------|
-| 1 | Due Jobs (7 Days) | 8 | 8 | 18 | Excel used `STANDARD_WORK_ORDER_COLUMNS` |
-| 2 | Overdue Jobs | 15 | 15 | 18 | Excel used `STANDARD_WORK_ORDER_COLUMNS` |
-| 3 | Completed Jobs | 11 | 24 | 24 | PDF used `generateCompletedJobsRegisterReport()` with 24 hardcoded cols |
-
-### Post-Fix State
-
-| # | Report | View Cols | PDF Cols | Excel Cols | Status |
-|---|--------|-----------|----------|------------|--------|
-| 1 | Due Jobs (7 Days) | 8 | 8 | 8 | ✅ All aligned |
-| 2 | Overdue Jobs | 15 | 15 | 15 | ✅ All aligned |
-| 3 | Completed Jobs | 11 | 11 | 24 (by design) | ✅ View=PDF aligned; Excel detailed |
+| # | Column | View | PDF | Excel |
+|---|--------|------|-----|-------|
+| 1 | S.No | Yes | Yes | Yes |
+| 2 | Comp Code | Yes | Yes | Yes |
+| 3 | Component Name | Yes | Yes | Yes |
+| 4 | Equipment Type | Yes | Yes | Yes |
+| 5 | Location | Yes | Yes | Yes |
+| 6 | Job Code | Yes | Yes | Yes |
+| 7 | Job Title | Yes | Yes | Yes |
+| 8 | Task Type | Yes | Yes | Yes |
+| 9 | Basis | Yes | Yes | Yes |
+| 10 | Frequency | Yes | Yes | Yes |
+| 11 | Next Due Date | Yes | Yes | Yes |
+| 12 | Days | Yes | Yes | Yes |
+| 13 | Status | Yes | Yes | Yes |
+| 14 | Last Done | Yes | Yes | Yes |
+| 15 | Last WO | Yes | Yes | Yes |
+| 16 | Assigned To | Yes | Yes | Yes |
 
 ---
 
-## 11. Architecture Notes
+## Section C: Discrepancy Matrix
+
+### Pre-Fix Discrepancies
+
+| # | Report | Mode | Pre-Fix Cols | Post-Fix Cols | Root Cause | Fix Applied |
+|---|--------|------|--------------|---------------|------------|-------------|
+| 1 | Due Jobs (7 Days) | Excel | 18 (STANDARD_WORK_ORDER_COLUMNS) | 8 | Used generic 18-col template instead of report-specific columns | Replaced with 8 report-specific columns matching view |
+| 2 | Overdue Jobs | Excel | 18 (STANDARD_WORK_ORDER_COLUMNS) | 15 | Used generic 18-col template instead of report-specific columns | Replaced with 15 report-specific columns matching view |
+| 3 | Completed Jobs | PDF | 24 (generateCompletedJobsRegisterReport) | 11 | Used specialized 24-col PDF generator instead of generic `generateReport()` | Switched to `generateReport()` with shared 11-column array |
+| 4 | Completed Jobs | Excel | 24 (custom columns) | 11 | Used custom 24-col definition with audit fields | Reduced to 11 columns matching view |
+| 5 | Postponement Log | Excel | 19 (custom columns) | 10 | Included 9 extra approval/audit columns | Reduced to 10 columns matching view |
+
+### Post-Fix Verification
+
+| Report | View | PDF | Excel | Status |
+|--------|------|-----|-------|--------|
+| Due Jobs (7 Days) | 8 | 8 | 8 | Aligned |
+| Overdue Jobs | 15 | 15 | 15 | Aligned |
+| Completed Jobs | 11 | 11 | 11 | Aligned |
+| All other reports | Match | Match | Match | Aligned |
+
+### Remaining Known Divergence
+
+None. All reports are fully aligned across View, PDF, and Excel.
+
+---
+
+## Architecture Notes
 
 ### Column Definition Pattern
 
@@ -380,7 +353,7 @@ Reports follow two patterns:
 
 1. **Frontend-defined columns** (most reports): Columns are defined in the React component's `switch` block. The same column array is passed to both `setPreviewData()` (view) and `pdfReportGenerator.generateReport()` (PDF). This ensures automatic alignment.
 
-2. **Server-defined columns** (Excel exports): Excel exports define columns in their respective service files under `server/modules/reports/services/`. These are independent of frontend definitions.
+2. **Server-defined columns** (Excel exports): Excel exports define columns in their respective service files under `server/modules/reports/services/`. These must be manually kept in sync with frontend definitions.
 
 ### Key Files
 
@@ -395,14 +368,7 @@ Reports follow two patterns:
 | `server/modules/reports/services/complianceReportService.ts` | Running Hours + IHM Excel exports |
 | `server/modules/reports/services/sparesReportService.ts` | Spares Excel exports |
 | `server/modules/reports/services/storesReportService.ts` | Stores Excel exports |
-| `server/modules/reports/services/operationsReportService.ts` | Crew Workload + Equipment Utilization Excel exports |
 
 ### STANDARD_WORK_ORDER_COLUMNS
 
-The 18-column template in `server/lib/excelReportStyles.ts` was previously used by Due Jobs, Overdue Jobs, and Unplanned Jobs Excel exports. After this fix:
-
-- **Due Jobs**: Uses its own 8-column definition
-- **Overdue Jobs**: Uses its own 15-column definition
-- **Unplanned Jobs**: Already used its own columns via `equipmentReportService.ts` (the `maintenanceReportService.ts` version still uses STANDARD_WORK_ORDER_COLUMNS but is not the primary export path)
-
-The `STANDARD_WORK_ORDER_COLUMNS` constant is retained for backward compatibility and potential future use.
+The 18-column template in `server/lib/excelReportStyles.ts` is no longer used by Due Jobs or Overdue Jobs exports (replaced with report-specific columns). It is still referenced by the `exportUnplannedJobs()` fallback path in `maintenanceReportService.ts`, though the primary Unplanned Jobs export uses `equipmentReportService.ts` (11 cols, aligned).
