@@ -1,0 +1,158 @@
+Please refine the PMS Reports UI so it feels more complete, structured, and visually aligned with the existing Components module. The current reports screen is working in terms of the basic layout, but the left tree looks too plain and the right pane feels too empty and unfinished when no report is selected. I want the Reports page to have stronger visual structure and closer UI consistency with the Components screen.
+
+The most important visual correction is this: the left report tree must have a blue title/header bar labeled “REPORTS”, similar to how the Components module has a blue title/header bar labeled “COMPONENTS” above its tree/list area. This blue title/header should be placed at the top of the left tree panel and should visually anchor the report navigation area. It should not be just plain text floating above the tree. It should behave like a proper section header bar.
+
+The Components module already demonstrates the style reference I want: the left navigation panel has a distinct blue header strip, clear title labeling, and a more structured tree area. The Reports module should adopt the same visual idea for its own left-side navigation tree, while keeping the Reports-specific functionality intact.
+
+Main UI corrections required
+Please make the following design adjustments to the Reports page:
+
+Add a blue header/title bar above the left-side report tree.
+
+The title inside that blue bar must read REPORTS in uppercase, similar in spirit to the Components module header.
+
+The blue title/header should visually belong to the left navigation panel, not to the entire page.
+
+The report tree below that header should feel like a structured panel, not a loose list.
+
+This is the first and most important change because right now the left pane does not feel visually anchored.
+
+Left tree panel improvements
+After adding the blue “REPORTS” header bar, also improve the left tree presentation so it feels cleaner and more polished:
+
+Parent categories should be visually distinct from child reports.
+
+Expand/collapse arrows should be aligned cleanly.
+
+Report counts on the right side of categories should remain visible but be better aligned and less awkward.
+
+The spacing between categories should be tidy and consistent.
+
+Selected report state should be clearly highlighted.
+
+Hover states should be subtle but visible.
+
+The left panel should feel like a formal navigation tree, not a temporary placeholder.
+
+You can take visual inspiration from how the Components module’s left pane feels more deliberate and organized.
+
+Right pane empty state improvements
+The right side of the Reports page currently looks too empty when nothing is selected. The “Select a Report” placeholder is too plain and makes the screen feel unfinished. Improve the empty state so it still remains simple, but looks more intentional and product-quality.
+
+I do not want a flashy redesign, but I do want a better empty-state experience:
+
+Keep the message centered.
+
+Keep it clean and minimal.
+
+Improve spacing and visual balance.
+
+Make the empty state feel designed, not just dropped into a large blank area.
+
+It should guide the user to expand a category and select a report.
+
+The right pane should not feel dead when no report is selected.
+
+Layout refinement
+The overall split between left tree and right viewer is correct conceptually, so do not change the basic master-detail layout. Keep:
+
+left panel for report navigation,
+
+right panel for report content/preview.
+
+But refine the visual treatment:
+
+left pane should feel more like a structured sidebar card/panel,
+
+right pane should feel like a report workspace,
+
+borders, spacing, alignment, and padding should be more cohesive,
+
+the screen should feel more balanced overall.
+
+Keep these behaviors unchanged
+Do not change the functionality already achieved:
+
+Keep the tree-based report navigation.
+
+Keep the expandable/collapsible report categories.
+
+Keep the idea that clicking a report opens it in the right pane.
+
+Keep the export buttons behavior.
+
+Keep top-level filters such as vessel, search, and date range.
+
+This task is primarily a UI polish and layout consistency task, not a new functional redesign.
+
+Relationship to Components module
+I want the Reports module to feel visually related to the Components module, especially in these ways:
+
+blue title/header strip above the left panel,
+
+stronger panel structure,
+
+more deliberate layout framing,
+
+better empty/detail state balance.
+
+However, do not copy Components blindly. Reports still has different behavior and different content. Just use Components as the styling reference for how the left panel should be framed and introduced.
+
+Specific instruction for the left pane header
+Please implement the left tree header exactly as a dedicated blue section header for the report navigation panel.
+
+Expected characteristics:
+
+Blue background/header bar.
+
+Text: “REPORTS”.
+
+Positioned above the report tree panel.
+
+Consistent with the Components left-pane header style.
+
+Visually integrated into the tree container.
+
+Clean padding and alignment.
+
+Not too tall, not too heavy.
+
+This should make the report tree feel like a defined navigation module rather than just a list of text items.
+
+What not to do
+Do not:
+
+redesign the whole page into cards or tiles again,
+
+move the report tree to a different side,
+
+remove the master-detail layout,
+
+add large decorative illustrations,
+
+add unnecessary extra buttons,
+
+add another top toolbar inside the left pane,
+
+make the UI flashy or overdesigned.
+
+Keep it professional, compact, and consistent with the rest of the PMS application.
+
+Final acceptance criteria
+Do not consider the work complete until all of these are true:
+
+The left report tree has a blue title/header bar labeled “REPORTS.”
+
+That header visually resembles the structural role played by the blue “COMPONENTS” header in the Components module.
+
+The left report tree feels more polished, structured, and aligned.
+
+Category rows, child report rows, counts, and expand/collapse states are cleaner and better spaced.
+
+The selected report state is visually clear.
+
+The right-pane empty state looks more intentional and less blank.
+
+The overall page remains consistent with the current PMS style and keeps the same functionality.
+
+Important: this is a UI refinement request. The goal is to make the Reports page look finished and visually consistent with similar modules, especially the Components screen, while keeping the current report-tree workflow intact.
