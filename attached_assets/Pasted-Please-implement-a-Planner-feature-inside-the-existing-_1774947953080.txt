@@ -1,0 +1,99 @@
+Please implement a Planner feature inside the existing Work Orders module. This is not a separate new module. There was already a Work Planner concept earlier in Reports, but now it needs to be moved into the Work Orders module and enhanced with planning-focused functionality. Keep the design and behavior aligned with the PMS application style.
+
+Add a new button on the right side of the Work Orders page named Planner. When the user clicks this button, open the Work Planner view inside the Work Orders workflow. Do not treat it as a separate module. It is part of Work Orders and should feel like an extension of Work Orders.
+
+The purpose of the Planner is to help the user see which scheduled jobs are already due, overdue, or may become due in the next selected planning horizon. This is for rough planning and visibility. It should not show random jobs. Only relevant planned maintenance / scheduled jobs that are due, overdue, or expected to become due within the chosen range should be shown.
+
+If a job is already due or overdue, it must still appear in the Planner if it falls naturally within the selected planning logic. In other words, the Planner is not only for future jobs — it must also include current due/overdue jobs that are still open and relevant for planning.
+
+Reuse the existing Rank filter logic from the current Work Orders module. There is already a dynamic rank filter in Work Orders, and the same logic should be reused in Planner. Do not invent a separate rank system. Use the same rank source and same behavior already used in the Work Orders module.
+
+Add one more filter for Days. This filter should support:
+
+30 days
+
+60 days
+
+90 days
+
+custom / random user-entered number of days
+
+The Planner should use the selected number of days to determine what jobs should be shown.
+
+For calendar-based jobs, the Planner should show jobs that are due/overdue already and jobs that are expected to fall due within the selected number of days from today.
+
+For running-hour-based jobs, the Planner must use a rough maximum-condition forecast of 24 running hours per day. This is intentional because the user wants to see the maximum possible set of jobs that might become due in that period. So:
+
+if 30 days are selected, forecast RH increase = 24 × 30 = 720
+
+if 60 days are selected, forecast RH increase = 24 × 60 = 1440
+
+if 90 days are selected, forecast RH increase = 24 × 90 = 2160
+
+if custom/random number of days is selected, forecast RH increase = 24 × selectedDays
+
+Then use that projected RH increase to identify RH-based jobs that might become due within that projected horizon. This is a rough planning assumption and should be implemented intentionally as maximum possible running condition.
+
+Very important: respect the existing system rule that if a work order for the same job is already due or overdue and is not yet completed and approved, the system must not create another work order for that same job. Do not break or bypass this rule. The Planner must follow existing validation logic and should not lead to duplicate work order generation behavior. Remind yourself that the Planner is for visibility and planning, not duplicate WO creation.
+
+There is no need for an extra column like Generated or Forecasted. Do not add such a column. It is already understood that the planner is working on work-order-related jobs and the user does not want that extra distinction shown in the UI. Keep the screen simpler.
+
+Add a new column called Planned Date (or Plan Date) in the planner results. This column is for rough manual planning. The user should be able to assign any date manually to a row as a rough plan. This is not the official due date and not a new WO generation rule — it is simply a planner date for visibility and scheduling discussion.
+
+The Planned Date must be saveable. If the user assigns a planning date and saves, that planned date should persist and be visible again when the Planner is reopened. The saved planning date should act as a manual planning aid only. It should not overwrite the true due date and should not change the core WO generation logic.
+
+The Planner results list should include only the jobs that are relevant based on:
+
+vessel
+
+existing Work Orders module filters as appropriate
+
+rank filter
+
+selected planning days
+
+due/overdue state
+
+calendar-based future due logic
+
+RH-based projected future due logic
+
+Do not include unrelated random jobs just because they exist in the system. The list must be filtered and planning-relevant.
+
+Export behavior must also be added. Export should export what is currently visible in Planner after filters are applied. Do not export hidden rows or unrelated data. The exported data should reflect the current planner list exactly.
+
+If a row has a saved Planned Date, export must include a Planned Date column/value. If no planning date is assigned, that field can remain blank. The important point is that export must reflect the current visible planner content.
+
+If needed, provide export in the same style as the current Work Orders/Reports export behavior, but make sure it aligns with Planner and includes the Plan Date when present.
+
+UI-wise, the Planner should remain consistent with the PMS application and the Work Orders module. Do not make it look like a separate module. It should feel like a planning view inside Work Orders. Reuse existing table/filter/export patterns where possible.
+
+Please also think carefully about jobs that are due based on calendar and jobs that are due based on running hours. Both must be considered in one planning experience. The logic should not be calendar-only. One of the core reasons for this planner is to see what may come due next month, next 2 months, next 3 months, or custom days, including RH-based jobs based on projected 24-hour/day increase.
+
+Before considering the work complete, verify the following:
+
+A Planner button exists on the right side of the Work Orders module.
+
+Clicking Planner opens the planner view inside Work Orders.
+
+Rank filter is reused from current Work Orders logic.
+
+Days filter supports 30 / 60 / 90 / custom.
+
+Due and overdue jobs are still shown when relevant.
+
+RH-based jobs are forecast using 24 × selectedDays.
+
+Existing duplicate-WO prevention rule is respected.
+
+A Planned Date column exists and is manually editable.
+
+Planned Date can be saved and persists.
+
+Export exports exactly the currently visible planner results.
+
+If plan dates exist, export includes Planned Date.
+
+No random irrelevant jobs are shown.
+
+Important: this is a planning/visibility enhancement within Work Orders, not a new separate planner module and not a rework of core WO generation rules.
