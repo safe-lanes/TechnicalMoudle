@@ -157,27 +157,11 @@ const ReportsModule = () => {
   });
 
   const handleExpandSelected = () => {
-    if (!selectedCategoryId) {
-      setExpandedCategories(new Set(categoryOrder.map(c => c.id)));
-      return;
-    }
-    setExpandedCategories(prev => {
-      const next = new Set(prev);
-      next.add(selectedCategoryId);
-      return next;
-    });
+    setExpandedCategories(new Set(categoryOrder.map(c => c.id)));
   };
 
   const handleCollapseSelected = () => {
-    if (!selectedCategoryId) {
-      setExpandedCategories(new Set());
-      return;
-    }
-    setExpandedCategories(prev => {
-      const next = new Set(prev);
-      next.delete(selectedCategoryId);
-      return next;
-    });
+    setExpandedCategories(new Set());
   };
 
   const handleEnterEditMode = () => {
