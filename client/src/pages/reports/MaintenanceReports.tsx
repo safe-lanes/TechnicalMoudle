@@ -677,14 +677,21 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           avgCompletionTime: completedJobs.length > 0 ? totalDuration / completedJobs.length : 0
         };
 
+        const completedColumns = [
+          { header: 'S.No', field: 'sNo', width: 8 },
+          { header: 'WO No', field: 'workOrderNo', width: 22 },
+          { header: 'Component', field: 'componentName', width: 28 },
+          { header: 'Job Title', field: 'jobTitle', width: 30 },
+          { header: 'Job Type', field: 'jobType', width: 14 },
+          { header: 'Dept', field: 'department', width: 12 },
+          { header: 'Priority', field: 'priority', width: 12 },
+          { header: 'Assigned To', field: 'assignedTo', width: 18 },
+          { header: 'Start Date', field: 'startDate', width: 16 },
+          { header: 'Completion Date', field: 'completionDate', width: 16 },
+          { header: 'Man Hours', field: 'manHours', width: 12 }
+        ];
+
         if (mode === 'preview') {
-          const completedColumns = [
-            { header: 'S.No', field: 'sNo' }, { header: 'WO No', field: 'workOrderNo' }, { header: 'Component', field: 'componentName' },
-            { header: 'Job Title', field: 'jobTitle' }, { header: 'Job Type', field: 'jobType' }, { header: 'Dept', field: 'department' },
-            { header: 'Priority', field: 'priority' }, { header: 'Assigned To', field: 'assignedTo' },
-            { header: 'Start Date', field: 'startDate' }, { header: 'Completion Date', field: 'completionDate' },
-            { header: 'Man Hours', field: 'manHours' }
-          ];
           const completedSummary = [
             { label: 'Total Jobs', value: data.length },
             { label: 'Total Man-Hours', value: totalManHours.toFixed(1) }
@@ -692,17 +699,16 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           return { title: 'COMPLETED JOBS REGISTER', subtitle: `Vessel: ${vesselName}`, vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns: completedColumns, data, summary: completedSummary } as ReportPreviewData;
         }
 
-        pdfReportGenerator.generateCompletedJobsRegisterReport(
+        pdfReportGenerator.generateReport(
           { 
             title: 'COMPLETED JOBS REGISTER', 
+            subtitle: `${data.length} completed jobs | ${totalManHours.toFixed(1)} total man-hours`,
             vessel: vesselName,
-            dateFrom: dateFrom ? formatDateDDMMMYYYY(dateFrom.toISOString()) : undefined,
-            dateTo: dateTo ? formatDateDDMMMYYYY(dateTo.toISOString()) : undefined,
-            totalJobs: data.length,
-            totalManHours: totalManHours
+            orientation: 'landscape',
+            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
-          data,
-          summaryStats
+          completedColumns,
+          data
         );
         break;
       }

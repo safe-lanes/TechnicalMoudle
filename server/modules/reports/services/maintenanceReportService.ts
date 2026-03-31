@@ -225,7 +225,16 @@ export async function exportDueJobs7Days(vesselId: string): Promise<{ buffer: Bu
     views: [{ state: 'frozen', ySplit: 7, xSplit: 3 }]
   });
 
-  const columns = STANDARD_WORK_ORDER_COLUMNS;
+  const columns: ColumnDef[] = [
+    { key: 'priority', header: 'Priority', width: 12, type: 'text', align: 'center' },
+    { key: 'statusIndicator', header: 'Status', width: 12, type: 'text', align: 'center' },
+    { key: 'workOrderNo', header: 'WO Number', width: 22, type: 'text' },
+    { key: 'jobTitle', header: 'Title', width: 35, type: 'text' },
+    { key: 'componentName', header: 'Component', width: 28, type: 'text' },
+    { key: 'dueDate', header: 'Due Date', width: 14, type: 'date', align: 'center' },
+    { key: 'daysLeft', header: 'Days Left', width: 10, type: 'number', align: 'right' },
+    { key: 'assignedTo', header: 'Assigned To', width: 18, type: 'text' },
+  ];
   const totalColumns = columns.length;
   const lastColLetter = getLastColumnLetter(totalColumns);
   const headerRowNum = 7;
@@ -235,39 +244,21 @@ export async function exportDueJobs7Days(vesselId: string): Promise<{ buffer: Bu
   applyStandardTableHeader(worksheet, columns, headerRowNum);
 
   const preparedData: WorkOrderRowData[] = dueJobs.map((job, index) => {
-    const isCritical = job.critical === 'Yes';
-    const isCalendarBased = job.maintenanceBasis === 'Calendar';
-    const woStatus = job.woStatus || 'Active';
-    const isGracePeriod = woStatus === 'Due (Grace P)' || woStatus.includes('Grace');
-    const isDueStatus = woStatus === 'Due' || isGracePeriod;
-    const isOverdueRow = job.isOverdue === true && !isDueStatus;
-    const rowStatus: WorkOrderStatus = isOverdueRow ? 'overdue' : 'due';
     const daysRemainingValue = job.daysRemaining;
     const hasDaysRemaining = typeof daysRemainingValue === 'number' && !isNaN(daysRemainingValue);
-    const daysOverdueValue = isOverdueRow && hasDaysRemaining ? Math.abs(daysRemainingValue) : '-';
 
     return {
-      sno: index + 1,
-      workOrderNo: job.workOrderNo,
-      jobCode: job.templateCode || '-',
-      jobTitle: job.jobTitle,
-      componentCode: job.componentCode,
-      componentName: job.componentName,
-      department: job.department,
       priority: job.priority,
-      status: woStatus,
+      statusIndicator: job.statusIndicator,
+      workOrderNo: job.workOrderNo,
+      jobTitle: job.jobTitle,
+      componentName: job.componentName,
       dueDate: job.dueDate,
-      lastDoneDate: job.lastDoneDate,
-      daysLeft: isOverdueRow ? '-' : (hasDaysRemaining ? daysRemainingValue : '-'),
-      daysOverdue: daysOverdueValue,
-      nextDueRH: isCalendarBased ? '-' : (job.nextDueReading ?? '-'),
-      currentRH: isCalendarBased ? '-' : (job.currentReading ?? '-'),
-      rhRemaining: isCalendarBased ? '-' : (job.hoursRemaining ?? '-'),
+      daysLeft: hasDaysRemaining ? daysRemainingValue : '-',
       assignedTo: job.assignedTo,
-      criticalEquipment: isCritical ? 'YES' : 'No',
-      _rowStatus: rowStatus,
-      isCriticalEquipment: isCritical
-    };
+      _rowStatus: (job.isOverdue ? 'overdue' : 'due') as WorkOrderStatus,
+      isCriticalEquipment: job.critical === 'Yes'
+    } as any;
   });
 
   applyWorkOrderDataRows(worksheet, preparedData, columns, dataStartRow);
@@ -415,7 +406,23 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
     views: [{ state: 'frozen', ySplit: 7, xSplit: 2 }]
   });
 
-  const columns = STANDARD_WORK_ORDER_COLUMNS;
+  const columns: ColumnDef[] = [
+    { key: 'sno', header: 'S.No', width: 6, type: 'number', align: 'center' },
+    { key: 'workOrderNo', header: 'Work Order No', width: 22, type: 'text' },
+    { key: 'jobTitle', header: 'Job Title', width: 30, type: 'text' },
+    { key: 'componentCode', header: 'Comp Code', width: 14, type: 'text' },
+    { key: 'componentName', header: 'Component Name', width: 25, type: 'text' },
+    { key: 'department', header: 'Dept', width: 10, type: 'text', align: 'center' },
+    { key: 'dueDate', header: 'Due Date', width: 14, type: 'date', align: 'center' },
+    { key: 'daysOverdue', header: 'Days Overdue', width: 12, type: 'number', align: 'right' },
+    { key: 'nextDueRH', header: 'Next Due RH', width: 12, type: 'number', align: 'right' },
+    { key: 'currentRH', header: 'Current RH', width: 12, type: 'number', align: 'right' },
+    { key: 'rhOverdue', header: 'RH Overdue', width: 12, type: 'number', align: 'right' },
+    { key: 'overdueType', header: 'Type', width: 10, type: 'text', align: 'center' },
+    { key: 'assignedTo', header: 'Assigned To', width: 16, type: 'text' },
+    { key: 'lastDoneDate', header: 'Last Done', width: 14, type: 'date', align: 'center' },
+    { key: 'criticalEquipment', header: 'Critical', width: 10, type: 'text', align: 'center' },
+  ];
   const totalColumns = columns.length;
   const lastColLetter = getLastColumnLetter(totalColumns);
   const headerRowNum = 7;
@@ -431,25 +438,22 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
     return {
       sno: index + 1,
       workOrderNo: job.workOrderNo,
-      jobCode: '-',
       jobTitle: job.jobTitle,
       componentCode: job.componentCode,
       componentName: job.componentName,
       department: job.department,
-      priority: '-',
-      status: 'Overdue',
       dueDate: job.dueDate,
-      lastDoneDate: job.lastDoneDate,
-      daysLeft: '-',
       daysOverdue: job.daysPastDue || '-',
       nextDueRH: isCalendarBased ? '-' : (job.nextDueReading ?? '-'),
       currentRH: isCalendarBased ? '-' : (job.currentReading ?? '-'),
-      rhRemaining: isCalendarBased ? '-' : (job.hoursPastDue ? `-${job.hoursPastDue}` : '-'),
+      rhOverdue: isCalendarBased ? '-' : (job.hoursPastDue || '-'),
+      overdueType: job.overdueType || '-',
       assignedTo: job.assignedTo,
+      lastDoneDate: job.lastDoneDate,
       criticalEquipment: isCritical ? 'YES' : 'No',
       _rowStatus: 'overdue' as WorkOrderStatus,
       isCriticalEquipment: isCritical
-    };
+    } as any;
   });
 
   applyWorkOrderDataRows(worksheet, preparedData, columns, dataStartRow);
