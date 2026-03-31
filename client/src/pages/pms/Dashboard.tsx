@@ -29,7 +29,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { WorkOrder } from "@shared/schema";
-import AnomalyDetectionTile from "./AnomalyDetectionTile";
 import { useVessels } from "@/hooks/useVessels";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
@@ -1367,11 +1366,8 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* ROW 2: Compliance Anomaly Detection */}
+            {/* ROW 2: Compliance Anomaly Detection (includes Work Order Anomalies) */}
             <ComplianceAnomalyPanel vesselId={vesselId} />
-
-            {/* ROW 4: Work Order Anomalies */}
-            <AnomalyDetectionTile vesselId={vesselId} />
 
             {/* ROW 5: Superintendent Notifications */}
             <div

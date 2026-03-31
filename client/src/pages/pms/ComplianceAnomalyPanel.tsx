@@ -1,6 +1,9 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import {
   AlertTriangle,
   Calendar,
@@ -9,8 +12,14 @@ import {
   CheckCircle,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   X,
   Search,
+  Clock,
+  Filter,
+  Eye,
+  CheckSquare,
+  RefreshCw,
 } from "lucide-react";
 
 interface CycleSkipBreakdown {
@@ -64,10 +73,75 @@ interface ComplianceAnomalies {
   };
 }
 
+interface AnomalyDetails {
+  backdatingInfo?: {
+    hasBackdating: boolean;
+    daysBackdated: number;
+    backdatedDate: string | null;
+  };
+  missedCyclesInfo?: {
+    hasMissedCycles: boolean;
+    cyclesSkipped: number;
+    expectedCompletionDate: string | null;
+    actualCompletionDate: string | null;
+  };
+  patternInfo?: {
+    hasPattern: boolean;
+    patternDescription: string;
+    relatedWorkOrders: string[];
+  };
+  allAnomalyTypes?: string[];
+}
+
+interface Anomaly {
+  id: number;
+  workOrderId: string;
+  workOrderCode: string | null;
+  componentCode: string | null;
+  componentName: string | null;
+  jobTitle: string | null;
+  vesselId: string | null;
+  anomalyType: string;
+  severity: string;
+  detectedAt: string;
+  completionDate: string | null;
+  dueDate: string | null;
+  daysLate: number;
+  missedCycles: number;
+  anomalyDetails: AnomalyDetails | null;
+  status: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  justification: string | null;
+  isResolved: boolean;
+}
+
+interface AnomalyStats {
+  totalPending: number;
+  totalHigh: number;
+  totalMedium: number;
+  totalLow: number;
+  lastDetected: string | null;
+  trendPercentage: number;
+}
+
 const severityColors: Record<string, { border: string; bg: string; text: string; badge: string }> = {
   red: { border: "#d32f2f", bg: "#FFEBEE", text: "#c62828", badge: "#d32f2f" },
   yellow: { border: "#f9a825", bg: "#FFF8E1", text: "#f57f17", badge: "#f9a825" },
   green: { border: "#2e7d32", bg: "#E8F5E9", text: "#1b5e20", badge: "#2e7d32" },
+};
+
+const WO_SEVERITY_COLORS: Record<string, { border: string; bg: string; text: string; badge: string }> = {
+  HIGH: { border: '#DC2626', bg: '#FEF2F2', text: '#991B1B', badge: '#DC2626' },
+  MEDIUM: { border: '#F59E0B', bg: '#FFFBEB', text: '#92400E', badge: '#F59E0B' },
+  LOW: { border: '#FCD34D', bg: '#FEFCE8', text: '#854D0E', badge: '#CA8A04' },
+};
+
+const ANOMALY_TYPE_LABELS: Record<string, string> = {
+  BACKDATING: 'Backdating',
+  MISSED_CYCLES: 'Missed Cycles',
+  SUSPICIOUS_PATTERN: 'Suspicious Pattern',
+  MULTIPLE_ANOMALIES: 'Multiple Anomalies',
 };
 
 function formatDate(dateStr: string): string {
@@ -77,6 +151,27 @@ function formatDate(dateStr: string): string {
   } catch {
     return dateStr;
   }
+}
+
+function formatDateNullable(dateStr: string | null | undefined): string {
+  if (!dateStr) return 'N/A';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function timeAgo(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins} min ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 30) return `${diffDays}d ago`;
+  return `${Math.floor(diffDays / 30)}mo ago`;
 }
 
 function SeverityBadge({ severity }: { severity: "green" | "yellow" | "red" }) {
@@ -106,10 +201,12 @@ function DetailModal({
   title,
   onClose,
   children,
+  wide,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  wide?: boolean;
 }) {
   return (
     <div
@@ -133,7 +230,7 @@ function DetailModal({
           background: "#fff",
           borderRadius: "12px",
           padding: "24px",
-          maxWidth: "720px",
+          maxWidth: wide ? "820px" : "720px",
           width: "90%",
           maxHeight: "80vh",
           overflow: "auto",
@@ -311,11 +408,309 @@ function ScheduleDriftDetails({ data }: { data: ComplianceAnomalies["scheduleDri
   );
 }
 
+function WorkOrderAnomaliesDetails({
+  vesselId,
+  canAcknowledge,
+}: {
+  vesselId?: string;
+  canAcknowledge: boolean;
+}) {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [severityFilter, setSeverityFilter] = useState<string>('ALL');
+
+  const effectiveVesselId = vesselId && vesselId !== 'all' ? vesselId : undefined;
+
+  const anomaliesQuery = useQuery<Anomaly[]>({
+    queryKey: ['/technical/api/anomalies/dashboard', effectiveVesselId, severityFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (effectiveVesselId) params.set('vesselId', effectiveVesselId);
+      if (severityFilter !== 'ALL') params.set('severity', severityFilter);
+      params.set('limit', '10');
+      const res = await fetch(`/technical/api/anomalies/dashboard?${params}`);
+      if (!res.ok) throw new Error('Failed to fetch anomalies');
+      return res.json();
+    },
+    refetchInterval: 5 * 60 * 1000,
+  });
+
+  const acknowledgeMutation = useMutation({
+    mutationFn: async ({ anomalyId, acknowledgedBy }: { anomalyId: number; acknowledgedBy: string }) => {
+      return apiRequest('PATCH', `/technical/api/anomalies/${anomalyId}/acknowledge`, { acknowledgedBy });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/anomalies/dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/anomalies/statistics'] });
+      toast({ title: 'Anomaly acknowledged successfully' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to acknowledge anomaly', variant: 'destructive' });
+    },
+  });
+
+  const anomalies = anomaliesQuery.data || [];
+  const isLoading = anomaliesQuery.isLoading;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+            <Filter className="w-3 h-3" style={{ position: 'absolute', left: '6px', color: '#9e9e9e', pointerEvents: 'none' }} />
+            <select
+              value={severityFilter}
+              onChange={(e) => setSeverityFilter(e.target.value)}
+              style={{
+                fontSize: '11px',
+                padding: '4px 8px 4px 22px',
+                borderRadius: '6px',
+                border: '1px solid #e0e0e0',
+                background: '#fafafa',
+                color: '#424242',
+                cursor: 'pointer',
+                appearance: 'auto',
+              }}
+              data-testid="select-wo-anomaly-severity-filter"
+            >
+              <option value="ALL">All</option>
+              <option value="HIGH">High</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="LOW">Low</option>
+            </select>
+          </div>
+          <button
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ['/technical/api/anomalies/dashboard'] });
+              queryClient.invalidateQueries({ queryKey: ['/technical/api/anomalies/statistics'] });
+            }}
+            style={{
+              background: 'none',
+              border: '1px solid #e0e0e0',
+              borderRadius: '6px',
+              padding: '4px 6px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            data-testid="button-refresh-wo-anomalies"
+          >
+            <RefreshCw className="w-3.5 h-3.5" style={{ color: '#757575' }} />
+          </button>
+        </div>
+      </div>
+
+      <div style={{ minHeight: '100px', maxHeight: '50vh', overflow: 'auto' }}>
+        {isLoading ? (
+          <div style={{ padding: '16px' }}>
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                style={{
+                  height: '72px',
+                  background: '#f5f5f5',
+                  borderRadius: '8px',
+                  marginBottom: '8px',
+                  animation: 'pulse 1.5s infinite',
+                }}
+              />
+            ))}
+          </div>
+        ) : anomalies.length === 0 ? (
+          <div
+            style={{
+              padding: '32px 16px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+            data-testid="empty-state-wo-anomalies"
+          >
+            <CheckCircle className="w-10 h-10" style={{ color: '#4CAF50' }} />
+            <span style={{ fontSize: '14px', fontWeight: 500, color: '#4CAF50' }}>
+              No anomalies detected
+            </span>
+            <span style={{ fontSize: '12px', color: '#9e9e9e' }}>
+              All work orders are on track!
+            </span>
+          </div>
+        ) : (
+          <div>
+            {anomalies.map((anomaly) => {
+              const colors = WO_SEVERITY_COLORS[anomaly.severity] || WO_SEVERITY_COLORS.LOW;
+              const allTypes = (anomaly.anomalyDetails as AnomalyDetails)?.allAnomalyTypes || [anomaly.anomalyType];
+              const backdatingDays = (anomaly.anomalyDetails as AnomalyDetails)?.backdatingInfo?.daysBackdated || 0;
+
+              return (
+                <div
+                  key={anomaly.id}
+                  style={{
+                    borderLeft: `4px solid ${colors.border}`,
+                    background: colors.bg,
+                    borderRadius: '8px',
+                    padding: '10px 12px',
+                    marginBottom: '6px',
+                    transition: 'box-shadow 0.15s',
+                  }}
+                  className="hover:shadow-md"
+                  data-testid={`card-anomaly-${anomaly.id}`}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                        <span
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#1565C0',
+                            cursor: 'pointer',
+                            textDecoration: 'underline',
+                          }}
+                          onClick={() => setLocation(`/pms/work-order/${anomaly.workOrderCode || anomaly.workOrderId}`)}
+                          data-testid={`link-wo-${anomaly.id}`}
+                        >
+                          {anomaly.workOrderCode || anomaly.workOrderId}
+                        </span>
+                        {allTypes.map((type: string) => (
+                          <span
+                            key={type}
+                            style={{
+                              fontSize: '9px',
+                              fontWeight: 600,
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              background: colors.badge,
+                              color: '#fff',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.3px',
+                            }}
+                            data-testid={`badge-type-${type.toLowerCase()}-${anomaly.id}`}
+                          >
+                            {ANOMALY_TYPE_LABELS[type] || type}
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#424242', fontWeight: 500, marginBottom: '2px' }}>
+                        {anomaly.jobTitle || 'Unknown Job'}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#757575', marginBottom: '4px' }}>
+                        {anomaly.componentCode && <span>{anomaly.componentCode} — </span>}
+                        {anomaly.componentName || ''}
+                      </div>
+                      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '11px', color: colors.text }}>
+                        {anomaly.daysLate > 0 && (
+                          <span data-testid={`text-days-late-${anomaly.id}`}>
+                            <strong>{anomaly.daysLate}</strong> days late
+                          </span>
+                        )}
+                        {anomaly.missedCycles > 0 && (
+                          <span data-testid={`text-missed-cycles-${anomaly.id}`}>
+                            <strong>{anomaly.missedCycles}</strong> cycles missed
+                          </span>
+                        )}
+                        {backdatingDays > 0 && (
+                          <span data-testid={`text-backdated-${anomaly.id}`}>
+                            <strong>{backdatingDays}</strong> days backdated
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '12px', fontSize: '10px', color: '#9e9e9e', marginTop: '4px' }}>
+                        <span>Due: {formatDateNullable(anomaly.dueDate)}</span>
+                        <span>Completed: {formatDateNullable(anomaly.completionDate)}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+                      <span style={{ fontSize: '10px', color: '#9e9e9e', whiteSpace: 'nowrap' }} data-testid={`text-detected-${anomaly.id}`}>
+                        <Clock className="w-3 h-3 inline-block mr-1" style={{ verticalAlign: 'text-bottom' }} />
+                        {timeAgo(anomaly.detectedAt)}
+                      </span>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          onClick={() => setLocation(`/pms/work-order/${anomaly.workOrderCode || anomaly.workOrderId}`)}
+                          style={{
+                            fontSize: '10px',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            border: '1px solid #e0e0e0',
+                            background: '#fff',
+                            color: '#424242',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                          }}
+                          data-testid={`button-view-details-${anomaly.id}`}
+                        >
+                          <Eye className="w-3 h-3" />
+                          View
+                        </button>
+                        {canAcknowledge && anomaly.status === 'PENDING_REVIEW' && (
+                          <button
+                            onClick={() => {
+                              acknowledgeMutation.mutate({
+                                anomalyId: anomaly.id,
+                                acknowledgedBy: 'Superintendent',
+                              });
+                            }}
+                            disabled={acknowledgeMutation.isPending}
+                            style={{
+                              fontSize: '10px',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              border: 'none',
+                              background: '#1565C0',
+                              color: '#fff',
+                              cursor: acknowledgeMutation.isPending ? 'not-allowed' : 'pointer',
+                              opacity: acknowledgeMutation.isPending ? 0.6 : 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                            }}
+                            data-testid={`button-acknowledge-${anomaly.id}`}
+                          >
+                            <CheckSquare className="w-3 h-3" />
+                            Ack
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div style={{
+        paddingTop: '12px',
+        borderTop: '1px solid #E0E0E0',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: '8px',
+      }}>
+        <span
+          onClick={() => setLocation('/pms/anomalies')}
+          style={{ fontSize: '12px', color: '#1565C0', cursor: 'pointer', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}
+          data-testid="link-view-all-anomalies"
+        >
+          View All Anomalies
+          <ChevronRight className="w-3.5 h-3.5" />
+        </span>
+      </div>
+    </div>
+  );
+}
+
 interface MetricCardProps {
   icon: React.ReactNode;
   title: string;
   value: string;
-  label: string;
+  label: string | React.ReactNode;
   severity: "green" | "yellow" | "red" | "grey";
   onClick: () => void;
   testId: string;
@@ -376,10 +771,14 @@ export function ComplianceAnomalyPanel({ vesselId }: ComplianceAnomalyPanelProps
 
   const canViewPanel = isSailAdmin;
   const isRestricted = isVessel;
+  const canAcknowledge = isSailAdmin || isClientAdmin;
+  const canViewAnomalies = isSailAdmin || isClientAdmin || isHeadOfDept;
 
   const queryUrl = vesselId && vesselId !== "all"
     ? `/technical/api/dashboard/compliance-anomalies?vesselId=${vesselId}`
     : "/technical/api/dashboard/compliance-anomalies";
+
+  const effectiveVesselId = vesselId && vesselId !== 'all' ? vesselId : undefined;
 
   const { data, isLoading, error } = useQuery<ComplianceAnomalies>({
     queryKey: ["/technical/api/dashboard/compliance-anomalies", vesselId],
@@ -392,7 +791,21 @@ export function ComplianceAnomalyPanel({ vesselId }: ComplianceAnomalyPanelProps
     enabled: canViewPanel || isVessel,
   });
 
-  if (!canViewPanel && !isVessel) return null;
+  const statsQuery = useQuery<AnomalyStats>({
+    queryKey: ['/technical/api/anomalies/statistics', effectiveVesselId],
+    queryFn: async () => {
+      const url = effectiveVesselId
+        ? `/technical/api/anomalies/statistics?vesselId=${effectiveVesselId}`
+        : '/technical/api/anomalies/statistics';
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch statistics');
+      return res.json();
+    },
+    enabled: canViewAnomalies && !isVessel,
+    refetchInterval: 5 * 60 * 1000,
+  });
+
+  if (!canViewPanel && !canViewAnomalies && !isVessel) return null;
 
   const hasNoData = !data || (
     data.cycleSkipRate.breakdown.length === 0 &&
@@ -406,6 +819,39 @@ export function ComplianceAnomalyPanel({ vesselId }: ComplianceAnomalyPanelProps
     data.backdatingFrequency.severity === "green" &&
     data.bulkCompletions.severity === "green" &&
     data.scheduleDrift.severity === "green";
+
+  const anomalyStats = statsQuery.data;
+  const anomalyHasData = anomalyStats && anomalyStats.totalPending > 0;
+  const anomalySeverity: "green" | "yellow" | "red" | "grey" = !anomalyStats
+    ? "grey"
+    : anomalyStats.totalHigh > 0
+      ? "red"
+      : anomalyStats.totalMedium > 0
+        ? "yellow"
+        : anomalyStats.totalPending > 0
+          ? "green"
+          : "green";
+
+  const anomalyLabel = anomalyStats ? (
+    <span style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+      {anomalyStats.totalHigh > 0 && (
+        <span style={{ background: '#DC2626', color: '#fff', fontSize: '10px', fontWeight: 600, padding: '1px 5px', borderRadius: '6px' }}>
+          {anomalyStats.totalHigh} HIGH
+        </span>
+      )}
+      {anomalyStats.totalMedium > 0 && (
+        <span style={{ background: '#F59E0B', color: '#fff', fontSize: '10px', fontWeight: 600, padding: '1px 5px', borderRadius: '6px' }}>
+          {anomalyStats.totalMedium} MED
+        </span>
+      )}
+      {anomalyStats.totalLow > 0 && (
+        <span style={{ background: '#CA8A04', color: '#fff', fontSize: '10px', fontWeight: 600, padding: '1px 5px', borderRadius: '6px' }}>
+          {anomalyStats.totalLow} LOW
+        </span>
+      )}
+      {anomalyStats.totalPending === 0 && "No anomalies detected"}
+    </span>
+  ) : "Insufficient data";
 
   return (
     <div style={{ padding: "16px 16px 0 16px" }} data-testid="panel-compliance-anomaly">
@@ -448,43 +894,54 @@ export function ComplianceAnomalyPanel({ vesselId }: ComplianceAnomalyPanelProps
 
         {!isCollapsed && (
           <div style={{ padding: "16px" }}>
-            {isLoading && (
+            {(canViewPanel || isVessel) && isLoading && (
               <div style={{ textAlign: "center", padding: "32px", color: "#757575", fontSize: "13px" }} data-testid="loading-compliance">
                 <div className="animate-spin inline-block w-6 h-6 border-2 border-gray-300 border-t-blue-600 rounded-full mb-2" />
                 <div>Analyzing compliance patterns...</div>
               </div>
             )}
 
-            {error && (
+            {(canViewPanel || isVessel) && error && (
               <div style={{ textAlign: "center", padding: "20px", color: "#d32f2f", fontSize: "13px" }} data-testid="error-compliance">
                 Failed to load compliance data. Please try again later.
               </div>
             )}
 
-            {data && !isLoading && (
-              <>
-                {allGreen && !hasNoData && (
-                  <div
-                    style={{
-                      background: "#E8F5E9",
-                      border: "1px solid #C8E6C9",
-                      borderRadius: "8px",
-                      padding: "12px 16px",
-                      marginBottom: "16px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                    }}
-                    data-testid="banner-all-green"
-                  >
-                    <CheckCircle className="w-5 h-5" style={{ color: "#2e7d32" }} />
-                    <span style={{ fontSize: "13px", fontWeight: 500, color: "#1b5e20" }}>
-                      No compliance anomalies detected. Maintenance schedule is on track.
-                    </span>
-                  </div>
-                )}
+            {data && !isLoading && allGreen && !hasNoData && (
+              <div
+                style={{
+                  background: "#E8F5E9",
+                  border: "1px solid #C8E6C9",
+                  borderRadius: "8px",
+                  padding: "12px 16px",
+                  marginBottom: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                }}
+                data-testid="banner-all-green"
+              >
+                <CheckCircle className="w-5 h-5" style={{ color: "#2e7d32" }} />
+                <span style={{ fontSize: "13px", fontWeight: 500, color: "#1b5e20" }}>
+                  No compliance anomalies detected. Maintenance schedule is on track.
+                </span>
+              </div>
+            )}
 
-                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+              {canViewAnomalies && !isVessel && (
+                <MetricCard
+                  icon={<AlertTriangle className="w-4 h-4" style={{ color: anomalyHasData ? (anomalyStats.totalHigh > 0 ? '#DC2626' : '#F59E0B') : '#bdbdbd' }} />}
+                  title="Work Order Anomalies"
+                  value={anomalyStats ? `${anomalyStats.totalPending}` : "—"}
+                  label={anomalyLabel}
+                  severity={!anomalyStats ? "grey" : anomalySeverity}
+                  onClick={() => setActiveModal("woAnomalies")}
+                  testId="card-work-order-anomalies"
+                />
+              )}
+              {data && !isLoading && (
+                <>
                   <MetricCard
                     icon={<AlertTriangle className="w-4 h-4" style={{ color: hasNoData ? "#bdbdbd" : severityColors[data.cycleSkipRate.severity].text }} />}
                     title="Cycle Skip Rate"
@@ -521,13 +978,21 @@ export function ComplianceAnomalyPanel({ vesselId }: ComplianceAnomalyPanelProps
                     onClick={() => !hasNoData && !isRestricted && setActiveModal("drift")}
                     testId="card-schedule-drift"
                   />
-                </div>
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
 
+      {activeModal === "woAnomalies" && (
+        <DetailModal title="Work Order Anomalies" onClose={() => setActiveModal(null)} wide>
+          <WorkOrderAnomaliesDetails
+            vesselId={vesselId}
+            canAcknowledge={canAcknowledge}
+          />
+        </DetailModal>
+      )}
       {activeModal === "cycleSkip" && data && (
         <DetailModal title="Cycle Skip Rate — Breakdown by Crew Member" onClose={() => setActiveModal(null)}>
           <CycleSkipDetails data={data.cycleSkipRate} isRestricted={isRestricted} />
