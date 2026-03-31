@@ -43,7 +43,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Initialize PostgreSQL-only storage (file-based storage has been removed)
+  // Initialize PostgreSQL storage
   await initStorage();
   
   // Run database backup and schema migrations (idempotent - skips if already applied)

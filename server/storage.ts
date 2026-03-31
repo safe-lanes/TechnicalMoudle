@@ -936,6 +936,10 @@ export interface IStorage {
   getLocationsWithStock(vesselId: string): Promise<Array<{ id: number; locationName: string; sparesCount: number }>>;
   reconcileSpareLocationStock(vesselId: string, userId?: string): Promise<{ synced: number; errors: number }>;
   
+  // Spare Inventory Lookup Methods
+  getSpareInventoryByPartCodes(vesselId: string, partCodes: string[]): Promise<Map<string, { rob: number; robLocationA: number; robLocationB: number; partNumber: string | null }>>;
+  getSpareInventoryByPartNumbers(vesselId: string, partNumbers: string[]): Promise<Map<string, { rob: number; robLocationA: number; robLocationB: number }>>;
+
   // Inventory Transaction Methods
   createInventoryTransaction(txn: InsertInventoryTransaction): Promise<InventoryTransaction>;
   getInventoryTransactions(vesselId: string, options?: {
@@ -1029,7 +1033,7 @@ function getStorageInstance(): IStorage {
 }
 
 // Initialize storage using the factory
-// Supports PostgreSQL (when DATABASE_URL set) or file-based fallback
+// Supports PostgreSQL (requires DATABASE_URL)
 async function initStorage(): Promise<void> {
   if (_storage !== null) return;
   

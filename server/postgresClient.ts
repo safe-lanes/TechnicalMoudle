@@ -18,7 +18,7 @@ export function getConnectionString(): string | undefined {
 /**
  * Runtime PostgreSQL database resolver with caching
  * Returns database client if DATABASE_URL is available and connection works
- * Returns undefined if DATABASE_URL is not set (file-storage mode)
+ * Returns undefined if DATABASE_URL is not set
  * Throws if DATABASE_URL exists but connection fails
  * 
  * IMPORTANT: This function caches the connection pool to prevent socket leaks
@@ -33,7 +33,7 @@ export async function resolvePostgres(): Promise<{ db: ReturnType<typeof drizzle
   if (!process.env.DATABASE_URL) {
     cacheInitialized = true;
     cachedPostgres = null;
-    return undefined; // File-storage mode
+    return undefined;
   }
 
   try {

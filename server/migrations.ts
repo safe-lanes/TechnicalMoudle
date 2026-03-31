@@ -1,6 +1,5 @@
 import { sql } from 'drizzle-orm';
 import { resolvePostgres } from './postgresClient';
-import { isFileStorageForced } from './storageFactory';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
@@ -2387,11 +2386,6 @@ const migrations: Migration[] = [
 export async function createDatabaseBackup(): Promise<string | null> {
   console.log('📦 Creating database backup...');
   
-  if (isFileStorageForced()) {
-    console.log('⏭️  Skipping database backup - file-based storage is active');
-    return null;
-  }
-  
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     console.log('⏭️  Skipping database backup - DATABASE_URL not configured');
@@ -2472,11 +2466,6 @@ async function markMigrationComplete(db: any, migration: Migration): Promise<voi
 export async function runMigrations(): Promise<{ applied: number; skipped: number }> {
   console.log('🔄 Running database migrations...');
   
-  if (isFileStorageForced()) {
-    console.log('⏭️  Skipping migrations - file-based storage is active');
-    return { applied: 0, skipped: 0 };
-  }
-  
   const postgres = await resolvePostgres();
   if (!postgres) {
     console.log('⏭️  Skipping migrations - DATABASE_URL not configured');
@@ -2528,11 +2517,6 @@ export async function runMigrations(): Promise<{ applied: number; skipped: numbe
 export async function generateDrizzleMigrations(): Promise<boolean> {
   console.log('🔄 Checking for schema changes and generating migrations...');
   
-  if (isFileStorageForced()) {
-    console.log('⏭️  Skipping migration generation - file-based storage is active');
-    return false;
-  }
-  
   if (!process.env.DATABASE_URL) {
     console.log('⏭️  Skipping migration generation - DATABASE_URL not configured');
     return false;
@@ -2578,11 +2562,6 @@ export async function generateDrizzleMigrations(): Promise<boolean> {
 
 export async function runDrizzleMigrations(): Promise<{ applied: number; skipped: number }> {
   console.log('🔄 Running Drizzle file-based SQL migrations (unified tracking)...');
-  
-  if (isFileStorageForced()) {
-    console.log('⏭️  Skipping Drizzle migrations - file-based storage is active');
-    return { applied: 0, skipped: 0 };
-  }
   
   const postgres = await resolvePostgres();
   if (!postgres) {

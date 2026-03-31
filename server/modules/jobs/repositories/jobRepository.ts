@@ -51,11 +51,11 @@ export async function findWorkOrders(vesselId: string) {
 }
 
 export async function findSpareInventoryByPartCodes(vesselId: string, partCodes: string[]) {
-  return (storage as any).getSpareInventoryByPartCodes(vesselId, partCodes);
+  return storage.getSpareInventoryByPartCodes(vesselId, partCodes);
 }
 
 export async function findSpareInventoryByPartNumbers(vesselId: string, partNumbers: string[]) {
-  return (storage as any).getSpareInventoryByPartNumbers(vesselId, partNumbers);
+  return storage.getSpareInventoryByPartNumbers(vesselId, partNumbers);
 }
 
 export async function findSpares(vesselId: string) {

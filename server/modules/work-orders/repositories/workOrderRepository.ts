@@ -114,17 +114,11 @@ export async function createRunningHoursAudit(data: any) {
 // ── Inventory ──
 
 export async function findSpareInventoryByPartCodes(vesselId: string, partCodes: string[]) {
-  if (typeof (storage as any).getSpareInventoryByPartCodes === 'function') {
-    return (storage as any).getSpareInventoryByPartCodes(vesselId, partCodes);
-  }
-  return new Map(); // MemStorage doesn't implement this method
+  return storage.getSpareInventoryByPartCodes(vesselId, partCodes);
 }
 
 export async function findSpareInventoryByPartNumbers(vesselId: string, partNumbers: string[]) {
-  if (typeof (storage as any).getSpareInventoryByPartNumbers === 'function') {
-    return (storage as any).getSpareInventoryByPartNumbers(vesselId, partNumbers);
-  }
-  return new Map(); // MemStorage doesn't implement this method
+  return storage.getSpareInventoryByPartNumbers(vesselId, partNumbers);
 }
 
 export async function findSpares(vesselId: string) {
@@ -140,31 +134,19 @@ export async function performInventoryTransaction(data: any) {
 }
 
 export async function getSpareLocationStockItem(spareId: number, locationId: number) {
-  if (typeof (storage as any).getSpareLocationStockItem === 'function') {
-    return (storage as any).getSpareLocationStockItem(spareId, locationId);
-  }
-  return null;
+  return storage.getSpareLocationStockItem(spareId, locationId);
 }
 
 export async function upsertSpareLocationStock(data: any) {
-  if (typeof (storage as any).upsertSpareLocationStock === 'function') {
-    return (storage as any).upsertSpareLocationStock(data);
-  }
-  return null;
+  return storage.upsertSpareLocationStock(data);
 }
 
 export async function getLocationById(id: number) {
-  if (typeof (storage as any).getLocationById === 'function') {
-    return (storage as any).getLocationById(id);
-  }
-  return null;
+  return storage.getLocationById(id);
 }
 
 export async function getInventoryTransactions(vesselId: string, options?: any) {
-  if (typeof (storage as any).getInventoryTransactions === 'function') {
-    return (storage as any).getInventoryTransactions(vesselId, options);
-  }
-  return [];
+  return storage.getInventoryTransactions(vesselId, options);
 }
 
 // ── Maintenance History ──
@@ -192,10 +174,7 @@ export async function findAllJobComponentLinks() {
 }
 
 export async function findLinkedComponentsForJob(jobId: string) {
-  if (typeof storage.getLinkedComponentsForJob === 'function') {
-    return storage.getLinkedComponentsForJob(jobId);
-  }
-  return []; // MemStorage doesn't implement this method
+  return storage.getLinkedComponentsForJob(jobId);
 }
 
 // ── Users ──

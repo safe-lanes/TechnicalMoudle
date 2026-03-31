@@ -13,7 +13,7 @@ let db: ReturnType<typeof drizzle> | undefined;
 
 if (process.env.DATABASE_URL) {
   // Only initialize if DATABASE_URL is available
-  // This allows the module to be imported without crashing in file-storage mode
+  // This allows the module to be imported without crashing if DATABASE_URL is not yet resolved
   pool = new Pool({ connectionString: process.env.DATABASE_URL });
   db = drizzle(pool, { schema });
 }

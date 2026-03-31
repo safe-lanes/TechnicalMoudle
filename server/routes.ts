@@ -11,7 +11,7 @@ import { getSeedDefectsData, ALL_SEED_IDS } from "./modules/defects/services/see
 export async function registerRoutes(app: Express): Promise<Server> {
   // CRITICAL: Ensure immutability trigger exists BEFORE registering routes
   // In PostgreSQL mode, this will fail fast if trigger creation fails
-  // In file-storage mode, this will skip trigger setup
+  // Ensures immutability trigger exists (skips if DB unavailable)
   try {
     await ensureMaintenanceHistoryImmutability();
   } catch (error: any) {
