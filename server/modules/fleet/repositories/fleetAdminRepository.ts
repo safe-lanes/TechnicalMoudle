@@ -145,8 +145,8 @@ export async function createFleetJobVesselMappingRecord(data: any) {
   return storage.createFleetJobVesselMappingRecord(data);
 }
 
-export async function removeFleetJobVesselMappingRecord(jobCode: string, vesselCode: string) {
-  return storage.removeFleetJobVesselMappingRecord(jobCode, vesselCode);
+export async function removeFleetJobVesselMappingRecord(jobCode: string, vesselCode: string, jobId?: string) {
+  return storage.removeFleetJobVesselMappingRecord(jobCode, vesselCode, jobId);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -161,8 +161,8 @@ export async function createFleetSpareVesselMappingRecord(data: any) {
   return storage.createFleetSpareVesselMappingRecord(data);
 }
 
-export async function removeFleetSpareVesselMappingRecord(partCode: string, vesselCode: string) {
-  return storage.removeFleetSpareVesselMappingRecord(partCode, vesselCode);
+export async function removeFleetSpareVesselMappingRecord(partCode: string, vesselCode: string, spareId?: string) {
+  return storage.removeFleetSpareVesselMappingRecord(partCode, vesselCode, spareId);
 }
 
 // ══════════════════════════════════════════════════════════
