@@ -1,7 +1,7 @@
 # PMS Reports Module — Comprehensive Audit & Technical Reference
 
 > **Generated:** 2026-03-31  
-> **Scope:** 22 reports across 7 categories (Maintenance ×10, Running Hours ×2, Spares ×3, Stores ×4, Compliance/IHM ×1, Change Requests ×1, LSA/FFA ×2)  
+> **Scope:** 23 reports across 7 categories (Maintenance ×10, Running Hours ×2, Spares ×3, Stores ×5, Compliance/IHM ×1, Change Requests ×1, LSA/FFA ×2)  
 > **Purpose:** Full technical verification and troubleshooting reference covering column definitions, formula logic, data sources, derivation paths, API endpoints, verification methods, edge cases, and debugging guides for every report in the PMS Reports Module.  
 > **Line Number Disclaimer:** Source file line references (e.g., `MaintenanceReports.tsx:335-337`) are snapshot-based from the date above and may drift as code evolves. Prefer searching for the formula expression or function name as a stable anchor.  
 > **Maintenance:** This document should be updated whenever report columns, formulas, or API endpoints are modified. The view-mode column array is the single source of truth — PDF and Excel must match.
@@ -26,11 +26,12 @@
 | 2.2 | Running Hours | Anomaly Detection | 11 | 11 | 11 | All 3 match | Server: GET `/technical/api/reports/running-hours-anomaly-detection` | RunningHoursReports.tsx:248-340 | complianceReportService.ts | Server-computed: anomaly types (high_increment/negative_delta/zero_change/irregular_pattern/meter_replaced), severity (critical/warning/info) | Server: complianceReportService | Verify anomaly types→severity classification→delta=newRh-prevRh→counts match summary→Excel 11 cols | serverQuery→logPairAnalysis→deltaCalc→thresholdCheck→anomalyClassify→clientDisplay→colMap→export | vesselId, startDate, endDate params | Empty if no RH logs; requires ≥2 log entries per component; negative_delta=meter rollback | Server pre-computes anomalies |
 | 3.1 | Spares | Critical Spares | 10 | 10 | 10 | All 3 match | Server: GET `/technical/api/reports/critical-spares/preview` | SparesReports.tsx:258-303 | sparesReportService.ts | `shortage=max(0,minStock-rob)` (server); `criticalEquip=linkedToCriticalEquipment?'YES':'NO'` | SparesReports.tsx:285; Server: sparesReportService | Verify shortage calc→criticalEquip flag→stockStatus values→PDF 10 cols→Excel 10 cols | serverQuery→sparesFilter→shortageCalc→criticalityLink→clientMap→colMap→export | vesselId param | Empty if no spares for vessel; shortage server-computed | Server pre-computes shortage/status |
 | 3.2 | Spares | Low Stock Alert | 8 | 8 | 8 | All 3 match | Server: GET `/technical/api/reports/low-stock-alert/:vesselId` | SparesReports.tsx:216-255 | sparesReportService.ts | `shortage=minQty-currentQty` (server) | Server: sparesReportService | Verify shortage values→status assignments→row count→PDF 8 cols→Excel 8 cols | serverQuery→stockCheck→shortageCalc→statusAssign→clientDisplay→colMap→export | vesselId path param | Empty if all above minimum; shortage server-computed | Server pre-computes all |
-| 3.3 | Spares | Consumption Analysis | 10 | 10 | 10 | All 3 match | Server: GET `/technical/api/reports/consumption-analysis/:vesselId` | SparesReports.tsx:305-361 | sparesReportService.ts | `totalConsumed=sum(history)`; lastConsumed formatted DD-MMM-YYYY | SparesReports.tsx:310-317; Server: sparesReportService | Verify totalConsumed→consumptionEvents count→lastConsumed date format→PDF 10 cols→Excel 10 cols | serverQuery→historyAgg→trendCalc→clientDateFormat→colMap→export | vesselId path param | lastConsumed uses custom DD-MMM-YYYY formatter; server computes totals | Date format applied client-side |
+| 3.3 | Spares | Consumption Analysis | 10 | 10 | 10 | All 3 match | Server: GET `/technical/api/reports/consumption-analysis/:vesselId` → `storesCtrl.getCombinedConsumptionAnalysis` | SparesReports.tsx:305-361 | storesReportService.ts (combined endpoint) | `totalConsumed=sum(history)`; lastConsumed formatted DD-MMM-YYYY | SparesReports.tsx:310-317; Server: storesReportService (combined) | Verify totalConsumed→consumptionEvents count→lastConsumed date format→PDF 10 cols→Excel 10 cols | serverQuery(storesCtrl)→historyAgg→trendCalc→clientDateFormat→colMap→export | vesselId path param | lastConsumed uses custom DD-MMM-YYYY formatter; endpoint routes to storesCtrl NOT sparesCtrl | Combined endpoint serves spares consumption data |
 | 4.1 | Stores | Inventory Status | 8 | 8 | 8 | All 3 match | Client: useQuery `/technical/api/stores` | StoresReports.tsx:226-267 | storesReportService.ts | `status: rob===0?'Critical':rob<=min?'Low':'OK'`; `rob=parseFloat(String(s.rob))\|\|0` | StoresReports.tsx:216-220, 239 | Verify status logic vs rob/min→parseFloat handles string→PDF 8 cols→Excel 8 cols | API→allStoresQuery→robParse→statusCalc→colMap→export | vesselId (optional); stores table | parseFloat(String(val)) handles string/number; NaN→0; 'all' vessel returns all stores | Client-side computation |
 | 4.2 | Stores | Lubricants & Oil | 6 | 6 | N/A | View/PDF match; no Excel | Client: useQuery `/technical/api/stores`, filter itemType=lubes | StoresReports.tsx:270-308 | — | Same stock status as 4.1; UOM defaults to 'L' | StoresReports.tsx:216-220 | Verify only lubes items→UOM default→status calc→PDF 6 cols | API→typeFilter(lubes)→statusCalc→colMap→export | storesItems, itemType field | Empty if no lubes items; UOM='L' default; no Excel | View/PDF only |
 | 4.3 | Stores | Chemicals & Expiry | 9 | 9 | N/A | View/PDF match; no Excel | Client: useQuery `/technical/api/stores`, filter itemType=chemicals | StoresReports.tsx:311-372 | — | `expiryDays=floor((expiry-today)/86400000)`; `sdsCompliance=round((withSds/total)*100)` | StoresReports.tsx:332-336, 354-355 | Verify EXPIRED for past dates→SDS%→filter itemType=chemicals→PDF 9 cols | API→typeFilter(chemicals)→expiryCalc→SDScount→statusCalc→colMap→export | storesItems, itemType, expiryDate, sdsReference | TZ uses new Date() (browser local); near-midnight off-by-one; no Excel | View/PDF only |
 | 4.4 | Stores | Low Stock Alert | 13 | 13 | 13 | All 3 match | Server: GET `/technical/api/reports/stores-low-stock-alert/:vesselId` | StoresReports.tsx:374-450 | storesReportService.ts | `deficit=max(0,minStock-rob)`; `daysToStockout=(rob/avgMonthly)*30` | Server: storesReportService | Verify deficit calc→daysToStockout→div-by-zero check→PDF 13 cols→Excel 13 cols | serverQuery→deficitCalc→stockoutCalc→priorityAssign→clientDisplay→colMap→export | vesselId path param | daysToStockout undefined if avgMonthly=0; widest stores report (13 cols) | Server pre-computes |
+| 4.5 | Stores | Consumption Analysis | 7 | Special | 7 | View/Excel=7; PDF uses specialized generator | Server: GET `/technical/api/reports/stores-consumption-analysis/:vesselId` → `storesCtrl.getStoresConsumptionAnalysis` | StoresReports.tsx:434-491 | storesReportService.ts | `confidence: daysOfData>90→High, ≥30→Medium, else→Low` | StoresReports.tsx:469-470; Server: storesReportService | Verify topConsumedItems→summary totals→confidence level→Excel 7 cols | serverQuery(storesCtrl)→topItemsAgg→trendCalc→forecastCalc→clientDisplay→colMap→export | vesselId path param | Uses specialized `generateConsumptionAnalysisPDF()` (not generic); includes forecast/trend/stockEfficiency sections | PDF is multi-section dashboard, not simple table |
 | 5.1 | Compliance | IHM Inventory | 10 | 10 | 10 | All 3 match | Server: GET `/technical/api/reports/ihm-inventory-status` | IhmReports.tsx | complianceReportService.ts | Server-computed: IHM status mapping, evidence type classification | Server: complianceReportService | Verify server response structure→status values→evidence types→PDF 10 cols→Excel 10 cols | serverQuery→ihmStatusMap→evidenceMap→clientDisplay→colMap→export | vesselId param | Empty if no IHM items for vessel | Server pre-computes all |
 | 6.1 | Change Requests | CR Tracking | 13 | 13 | 13 | All 3 match | Server: GET `/technical/api/reports/change-requests-status-tracking` | ChangeRequestReports.tsx:236-311 | changeRequestReportService.ts | `cycleTime=reviewedAt-submittedAt` (hrs, server); `approvalRate=round((approved/total)*100)`; title truncated 50 chars | ChangeRequestReports.tsx:255-271; Server: changeRequestReportService | Verify cycleTime→approval/rejection%→title truncation→category labels→Excel uses GET (not POST) | serverQuery→statusCount→cycleTimeCalc→categoryBreak→clientTruncate→colMap→export | vesselId, status, category, startDate, endDate params | cycleTime null if not reviewed; title >50 chars truncated; Excel is GET `/export` (exception) | Excel uses GET method unlike most reports |
 | 7.1 | LSA/FFA | Equipment Master | 12 | 12 | 12 | All 3 match | Server: GET `/technical/api/reports/lsa-ffa-master-list` | LsaFfaReports.tsx:172-242 | equipmentReportService.ts | Server-computed: component listing with equipment type filter | Server: equipmentReportsController | Verify component count→equipmentType filter→summary counts→Excel via format=excel param | serverQuery→equipTypeFilter→componentMap→clientDisplay→colMap→export | vesselId, equipmentType params | Empty if no LSA/FFA components; Excel via `?format=excel` query param (exception) | Excel is GET with query param |
@@ -932,49 +933,51 @@
 
 **2. Data Source & Filter Logic:**
 - Source: Server GET `/technical/api/reports/consumption-analysis/:vesselId`. Location: SparesReports.tsx:306-308
+- **Route mapping:** `routes.ts:36` → `storesCtrl.getCombinedConsumptionAnalysis` (NOT sparesCtrl — this is a combined endpoint served by the stores controller)
 - Returns `{ items[], summary }`.
 
 **3. Derived Fields & Formulas:**
 
 | Field | Formula | Location |
 |-------|---------|----------|
-| `lastConsumed` | Client-side DD-MMM-YYYY formatting via custom formatter | SparesReports.tsx:310-317 |
-| `totalConsumed` | Server: sum of all consumption history entries for spare | Server: sparesReportService |
-| `consumptionEvents` | Server: count of consumption records | Server: sparesReportService |
+| `lastConsumed` | Client-side DD-MMM-YYYY formatting via custom UTC formatter | SparesReports.tsx:310-317 |
+| `totalConsumed` | Server (storesReportService/combined): sum of all consumption history entries | Server: storesReportService (combined endpoint) |
+| `consumptionEvents` | Server (storesReportService/combined): count of consumption records | Server: storesReportService (combined endpoint) |
 
 **4. Sort & Summary:**
 - Summary from server: Total Items, Total Consumed, Total Events, Critical Items.
 
 **5. View/PDF/Excel Parity:**
 - View/PDF share `columns` (SparesReports.tsx:319-330). PDF uses generic `generateReport()` landscape.
-- Excel: POST `/technical/api/reports/consumption-analysis/:vesselId/excel`.
+- Excel: POST `/technical/api/reports/consumption-analysis/:vesselId/excel` → `storesCtrl.exportCombinedConsumptionExcel` (routes.ts:37).
 
 **6. Verification Steps:**
 1. Verify totalConsumed matches sum of consumption history.
 2. Check consumptionEvents = count of records.
-3. Verify lastConsumed date format DD-MMM-YYYY.
+3. Verify lastConsumed date format DD-MMM-YYYY (UTC-based).
 4. Summary totals match data array statistics.
 5. PDF: 10 columns landscape. Excel: 10 columns.
+6. Confirm endpoint routes to storesCtrl, NOT sparesCtrl.
 
 **7. Edge Cases:**
-- lastConsumed date formatted client-side — timezone differences possible.
-- Custom DD-MMM-YYYY formatter uses UTC methods (getUTCDate, getUTCMonth).
+- lastConsumed date formatted client-side — uses UTC methods (getUTCDate, getUTCMonth), not local time.
+- Endpoint is `/consumption-analysis/` (combined), not `/spares-consumption-analysis/` (which is a separate spares-specific endpoint at routes.ts:29-30).
 
 **8. Troubleshooting Flow:**
 ```
-1. API → GET with vesselId path param
-2. Server Data → Consumption history exists
-3. Aggregation → totalConsumed/events computed server-side
-4. Date Format → Client formatter uses UTC methods
+1. API → GET /consumption-analysis/:vesselId (combined endpoint)
+2. Route → storesCtrl.getCombinedConsumptionAnalysis (NOT sparesCtrl)
+3. Server Data → Consumption history exists for spares
+4. Date Format → Client DD-MMM-YYYY formatter uses UTC
 5. PDF → generateReport() landscape, 10 cols
-6. Excel → POST to /excel; 10 cols
+6. Excel → POST /consumption-analysis/:vesselId/excel → storesCtrl.exportCombinedConsumptionExcel
 ```
 
 ---
 
 ### Category 4: Stores
 
-**Source Files:** Frontend: `client/src/pages/reports/StoresReports.tsx` | Excel: `server/modules/reports/services/storesReportService.ts` | Routes: `server/modules/reports/routes.ts:33-40`
+**Source Files:** Frontend: `client/src/pages/reports/StoresReports.tsx` | Excel: `server/modules/reports/services/storesReportService.ts` | Routes: `server/modules/reports/routes.ts:33-40` | PDF: `client/src/lib/pdfReportGenerator.ts` (generic + specialized `generateConsumptionAnalysisPDF`)
 
 ---
 
@@ -1199,6 +1202,70 @@
 5. Priority → Server assigns based on severity
 6. PDF → generateReport() landscape, 13 cols
 7. Excel → POST to /excel; 13 cols in service
+```
+
+---
+
+#### Report 4.5: Stores Consumption Pattern Analysis
+
+**1. Column Definition (7 columns — view/preview):**
+
+| # | Header | Field | Width | Source Field(s) |
+|---|--------|-------|-------|-----------------|
+| 1 | S.No | sno | 12 | Sequential idx+1 |
+| 2 | Item Code | itemCode | 25 | Server: item.itemCode |
+| 3 | Item Name | itemName | 45 | Server: item.itemName |
+| 4 | Category | category | 25 | Server: item.category |
+| 5 | Total Consumed | totalConsumed | 25 | Server: sum of consumption history |
+| 6 | Events | events | 15 | Server: consumptionEvents or events count |
+| 7 | Current ROB | rob | 20 | Server: currentRob or rob |
+
+**2. Data Source & Filter Logic:**
+- Source: Server GET `/technical/api/reports/stores-consumption-analysis/:vesselId` → `storesCtrl.getStoresConsumptionAnalysis` (routes.ts:34). Location: StoresReports.tsx:434-437
+- Returns `{ summary, consumptionTrends[], topConsumedItems[], categoryBreakdown[], stockEfficiency[], forecastData[], nonMovingItems[] }`.
+- View uses `topConsumedItems` array for table rows.
+
+**3. Derived Fields & Formulas:**
+
+| Field | Formula | Location |
+|-------|---------|----------|
+| `events` | `i.consumptionEvents \|\| i.events \|\| 0` | StoresReports.tsx:456 |
+| `rob` | `i.currentRob \|\| i.rob \|\| 0` | StoresReports.tsx:457 |
+| `confidence` | `daysOfData > 90 → 'High'; daysOfData >= 30 → 'Medium'; else → 'Low'` | StoresReports.tsx:469-470 |
+| `daysOfData` | `freshData.summary?.dataQuality?.daysOfData \|\| 0` | StoresReports.tsx:469 |
+
+**4. Sort & Summary:**
+- View summary: Total Items Analyzed, Total Consumption, Categories count. Location: StoresReports.tsx:460-464
+
+**5. View/PDF/Excel Parity:**
+- **View** uses 7-column table of `topConsumedItems` (StoresReports.tsx:441-448).
+- **PDF** uses specialized `generateConsumptionAnalysisPDF()` — a multi-section dashboard report (NOT generic table). Includes: summary, consumption trends, top consumed items, category breakdown, stock efficiency, forecast data, and non-moving items. Location: StoresReports.tsx:471-489
+- **Excel**: POST `/technical/api/reports/stores-consumption-analysis/:vesselId/excel` → `storesCtrl.exportStoresConsumptionExcel` (routes.ts:35). Location: StoresReports.tsx:564-577
+- PDF format differs significantly from view — it's a comprehensive analysis dashboard, not a simple table.
+
+**6. Verification Steps:**
+1. Verify server returns full data structure (summary, topConsumedItems, etc.).
+2. View: verify 7-column table shows topConsumedItems data.
+3. Verify confidence level: >90 days=High, ≥30=Medium, <30=Low.
+4. PDF: verify multi-section layout (not generic table).
+5. Excel: verify POST to stores-consumption-analysis endpoint.
+6. Check summary values match data array statistics.
+
+**7. Edge Cases:**
+- PDF uses `generateConsumptionAnalysisPDF()` — specialized generator, NOT `generateReport()`.
+- View only shows topConsumedItems subset; PDF shows comprehensive analysis.
+- daysOfData=0 if no consumption history → confidence='Low'.
+- Empty if no stores consumption data for vessel.
+
+**8. Troubleshooting Flow:**
+```
+1. API → GET /stores-consumption-analysis/:vesselId returns 200
+2. Route → storesCtrl.getStoresConsumptionAnalysis (routes.ts:34)
+3. Data Structure → Response has summary/topConsumedItems/categoryBreakdown/etc.
+4. View → 7-col table from topConsumedItems
+5. PDF → generateConsumptionAnalysisPDF() (specialized, NOT generateReport)
+6. Excel → POST /stores-consumption-analysis/:vesselId/excel → storesCtrl.exportStoresConsumptionExcel
+7. Confidence → daysOfData threshold check
 ```
 
 ---
@@ -1517,7 +1584,9 @@
 | Approval Rate | `Math.round((approved / totalRequests) * 100)` | ChangeRequestReports.tsx:270 | 6.1 | Approved count, total | Percentage |
 | Rejection Rate | `Math.round((rejected / totalRequests) * 100)` | ChangeRequestReports.tsx:271 | 6.1 | Rejected count, total | Percentage |
 | SDS Compliance | `Math.round((withSds / totalChemicals) * 100)` | StoresReports.tsx:354-355 | 4.3 | Items with sdsReference, total | Guarded by total>0 |
-| Consumption Sum | `sum(consumption history records)` | Server: sparesReportService | 3.3 | Consumption records | Server-side |
+| Consumption Sum (Spares) | `sum(consumption history records)` | Server: storesReportService (combined endpoint) | 3.3 | Consumption records | Server-side via getCombinedConsumptionAnalysis |
+| Consumption Sum (Stores) | `sum(consumption history records)` | Server: storesReportService | 4.5 | Consumption records | Server-side via getStoresConsumptionAnalysis |
+| Data Confidence | `daysOfData > 90 → 'High'; >= 30 → 'Medium'; else → 'Low'` | StoresReports.tsx:469-470 | 4.5 | summary.dataQuality.daysOfData | Client-side |
 | Period Hours (RH) | `latestRH - earliestRH` | Server: operationsReportService | 2.1 | RH log entries | Over report period |
 | Avg Daily (RH) | `periodHours / dayCount` | Server: operationsReportService | 2.1 | Period hours, day count | Per-component |
 | Utilization % | `(avgDaily / expectedDailyHours) × 100` | Server: operationsReportService | 2.1 | Avg daily, expected | Can exceed 100% |
@@ -1645,7 +1714,7 @@ The following formulas were considered during task scoping but are not currently
 | 4 | Completed Jobs | Excel | 24 (custom columns) | 11 | Used custom 24-col definition with audit fields | Reduced to 11 columns |
 | 5 | Postponement Log | Excel | 19 (custom columns) | 10 | Included 9 extra approval/audit columns | Reduced to 10 columns |
 
-### Post-Fix Verification (All 22 Reports)
+### Post-Fix Verification (All 23 Reports)
 
 Verification method: For each report, the view-mode column array in the frontend switch case was compared against the PDF generator call and the Excel service file. Column count and header names were confirmed matching per format.
 
@@ -1665,11 +1734,12 @@ Verification method: For each report, the view-mode column array in the frontend
 | 2.2 | Anomaly Detection | 11 | 11 | 11 | Columns at RunningHoursReports.tsx:271-283. Excel via complianceReportService. |
 | 3.1 | Critical Spares | 10 | 10 | 10 | Columns at SparesReports.tsx:263-274. Excel via sparesReportService. |
 | 3.2 | Low Stock (Spares) | 8 | 8 | 8 | Columns at SparesReports.tsx:221-229. Excel via sparesReportService. |
-| 3.3 | Consumption (Spares) | 10 | 10 | 10 | Columns at SparesReports.tsx:319-330. Excel via sparesReportService. |
+| 3.3 | Consumption (Spares) | 10 | 10 | 10 | Columns at SparesReports.tsx:319-330. API `/consumption-analysis/:vesselId` routes to storesCtrl (combined). Excel via storesReportService (combined). |
 | 4.1 | Stores Inventory | 8 | 8 | 8 | Columns at StoresReports.tsx:227-236. Excel via storesReportService. |
 | 4.2 | Lubricants & Oil | 6 | 6 | N/A | Columns at StoresReports.tsx:273-280. No Excel endpoint. |
 | 4.3 | Chemicals & Expiry | 9 | 9 | N/A | Columns at StoresReports.tsx:314-324. No Excel endpoint. |
 | 4.4 | Stores Low Stock | 13 | 13 | 13 | Columns at StoresReports.tsx:383-397. Excel via storesReportService. |
+| 4.5 | Stores Consumption | 7 | Special | 7 | View 7-col table at StoresReports.tsx:441-448. PDF uses specialized `generateConsumptionAnalysisPDF()` (multi-section dashboard). Excel via storesReportService. |
 | 5.1 | IHM Inventory | 10 | 10 | 10 | Columns in IhmReports.tsx. Excel via complianceReportService. |
 | 6.1 | CR Tracking | 13 | 13 | 13 | Columns at ChangeRequestReports.tsx:237-251. Excel via GET /export (changeRequestReportService). |
 | 7.1 | LSA/FFA Master | 12 | 12 | 12 | Columns at LsaFfaReports.tsx:178-191. Excel via GET ?format=excel (equipmentReportService). |
@@ -1693,9 +1763,10 @@ Verification method: For each report, the view-mode column array in the frontend
 | POST | `/technical/api/reports/running-hours-anomaly-detection/excel` | 2.2 | `{ vesselId, startDate?, endDate? }` |
 | POST | `/technical/api/reports/critical-spares` | 3.1 | `{ vesselId }` |
 | POST | `/technical/api/reports/low-stock-alert/:vesselId/excel` | 3.2 | POST body |
-| POST | `/technical/api/reports/consumption-analysis/:vesselId/excel` | 3.3 | POST body |
+| POST | `/technical/api/reports/consumption-analysis/:vesselId/excel` | 3.3 | POST body (routes to storesCtrl.exportCombinedConsumptionExcel) |
 | POST | `/technical/api/reports/stores-inventory-status/:vesselId/excel` | 4.1 | POST body |
 | POST | `/technical/api/reports/stores-low-stock-alert/:vesselId/excel` | 4.4 | POST body |
+| POST | `/technical/api/reports/stores-consumption-analysis/:vesselId/excel` | 4.5 | POST body (routes to storesCtrl.exportStoresConsumptionExcel) |
 | POST | `/technical/api/reports/ihm-inventory-status/excel` | 5.1 | POST body |
 | GET | `/technical/api/reports/change-requests-status-tracking/export` | 6.1 | Query params: vesselId, status, category |
 | GET | `/technical/api/reports/lsa-ffa-master-list?format=excel` | 7.1 | Query params: vesselId, equipmentType |
@@ -1739,10 +1810,11 @@ Frontend switch block → defines columns[] array
 
 | Method | Reports | Paper | Notes |
 |--------|---------|-------|-------|
-| `generateReport()` | Most (1.1, 1.3, 1.4, 1.7-1.10, 2.x, 3.x, 4.x, 5.1, 6.1, 7.x) | A4 landscape | Generic table with conditional formatting |
+| `generateReport()` | Most (1.1, 1.3, 1.4, 1.7-1.10, 2.x, 3.x, 4.1-4.4, 5.1, 6.1, 7.x) | A4 landscape | Generic table with conditional formatting |
 | `generateOverdueJobsReport()` | 1.2 Overdue | A3 landscape | Colored header, critical row highlighting |
 | `generateCriticalEquipmentReport()` | 1.5 Critical Equip | Custom | Metadata summary above table |
 | `generateUnplannedBreakdownReport()` | 1.6 Unplanned | Custom | Similar to overdue styling |
+| `generateConsumptionAnalysisPDF()` | 4.5 Stores Consumption | Landscape | Multi-section dashboard (trends, categories, forecast, etc.) |
 | `generateCompletedJobsRegisterReport()` | Legacy (unused) | A3 | Was 24 cols; replaced in Phase 1 |
 
 ### Excel Export API Exceptions
