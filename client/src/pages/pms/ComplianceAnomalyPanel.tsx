@@ -411,9 +411,11 @@ function ScheduleDriftDetails({ data }: { data: ComplianceAnomalies["scheduleDri
 function WorkOrderAnomaliesDetails({
   vesselId,
   canAcknowledge,
+  stats,
 }: {
   vesselId?: string;
   canAcknowledge: boolean;
+  stats?: AnomalyStats;
 }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -701,6 +703,11 @@ function WorkOrderAnomaliesDetails({
           View All Anomalies
           <ChevronRight className="w-3.5 h-3.5" />
         </span>
+        <span style={{ fontSize: '10px', color: '#bdbdbd' }} data-testid="text-last-updated">
+          {stats?.lastDetected
+            ? `Last detected: ${timeAgo(stats.lastDetected)}`
+            : 'No anomalies recorded'}
+        </span>
       </div>
     </div>
   );
@@ -828,8 +835,8 @@ export function ComplianceAnomalyPanel({ vesselId }: ComplianceAnomalyPanelProps
       ? "red"
       : anomalyStats.totalMedium > 0
         ? "yellow"
-        : anomalyStats.totalPending > 0
-          ? "green"
+        : anomalyStats.totalLow > 0
+          ? "yellow"
           : "green";
 
   const anomalyLabel = anomalyStats ? (
@@ -931,7 +938,7 @@ export function ComplianceAnomalyPanel({ vesselId }: ComplianceAnomalyPanelProps
             <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
               {canViewAnomalies && !isVessel && (
                 <MetricCard
-                  icon={<AlertTriangle className="w-4 h-4" style={{ color: anomalyHasData ? (anomalyStats.totalHigh > 0 ? '#DC2626' : '#F59E0B') : '#bdbdbd' }} />}
+                  icon={<AlertTriangle className="w-4 h-4" style={{ color: anomalySeverity === 'grey' ? '#bdbdbd' : anomalySeverity === 'red' ? '#DC2626' : anomalySeverity === 'yellow' ? '#F59E0B' : '#2e7d32' }} />}
                   title="Work Order Anomalies"
                   value={anomalyStats ? `${anomalyStats.totalPending}` : "—"}
                   label={anomalyLabel}
@@ -990,6 +997,7 @@ export function ComplianceAnomalyPanel({ vesselId }: ComplianceAnomalyPanelProps
           <WorkOrderAnomaliesDetails
             vesselId={vesselId}
             canAcknowledge={canAcknowledge}
+            stats={anomalyStats}
           />
         </DetailModal>
       )}
