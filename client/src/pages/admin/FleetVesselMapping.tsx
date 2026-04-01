@@ -141,7 +141,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   });
 
   const vesselComponentsNonParent = useMemo(
-    () => vesselComponentsData.filter((c) => c.isParent !== true),
+    () => vesselComponentsData.filter((c) => c.isParent === false),
     [vesselComponentsData]
   );
 
@@ -924,12 +924,21 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const handleCreateAutoMappings = async () => {
     const alreadyMapped = new Set(mappedComponentCodes);
     const matchedEntries = autoMatchEntries.filter((e) => e.matched && !alreadyMapped.has(e.vesselComponentCode));
-    let linked = 0;
-    let notLinked = 0;
 
-    for (const entry of matchedEntries) {
+    if (matchedEntries.length === 0) {
+      toast({ title: "Info", description: "No new component mappings to create" });
+      return;
+    }
+
+    let linked = 0;
+    let failed = 0;
+    setAutoMatchProgress({ current: 0, total: matchedEntries.length, linked: 0, failed: 0 });
+
+    for (let i = 0; i < matchedEntries.length; i++) {
+      const entry = matchedEntries[i];
       if (alreadyMapped.has(entry.vesselComponentCode)) {
-        notLinked++;
+        failed++;
+        setAutoMatchProgress({ current: i + 1, total: matchedEntries.length, linked, failed });
         continue;
       }
       try {
@@ -945,13 +954,15 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
         linked++;
         alreadyMapped.add(entry.vesselComponentCode);
       } catch {
-        notLinked++;
+        failed++;
       }
+      setAutoMatchProgress({ current: i + 1, total: matchedEntries.length, linked, failed });
     }
 
     queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-component-mappings", { vesselCode: selectedVessel }] });
     setAutoMatchDialogOpen(false);
-    setSummaryData({ linked, notLinked });
+    setAutoMatchProgress(null);
+    setSummaryData({ linked, notLinked: failed });
     setSummaryDialogOpen(true);
   };
 
@@ -2090,10 +2101,14 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
             <div className="flex items-center gap-2">
               <Ship className="h-3.5 w-3.5 text-white" />
               <DialogTitle className="text-xs font-semibold text-white m-0">Auto-Match Results (Is Parent = No only)</DialogTitle>
+              <span className="text-[10px] text-white/80 ml-2" data-testid="text-auto-match-summary">
+                Matching: {autoMatchEntries.filter((e) => e.matched).length} | Not Matching: {autoMatchEntries.filter((e) => !e.matched).length}
+              </span>
             </div>
             <Button
               onClick={handleCreateAutoMappings}
               className="h-6 px-2 text-[10px] bg-white text-blue-700 hover:bg-gray-100"
+              disabled={!!autoMatchProgress}
               data-testid="button-create-auto-mappings"
             >
               Create Mapping
