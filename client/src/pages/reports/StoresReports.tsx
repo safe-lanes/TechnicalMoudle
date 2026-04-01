@@ -260,7 +260,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
           { header: 'Status', field: 'status', width: 25 }
         ];
 
-        const data = storesItems.map((s: any) => {
+        const data = filteredStoresItems.map((s: any) => {
           const rob = parseFloat(String(s.rob)) || 0;
           const min = parseFloat(String(s.min)) || 0;
           return {
@@ -293,7 +293,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
       }
 
       case 'lubes-oil-analysis': {
-        const lubesItems = storesItems.filter((s: any) => s.itemType === 'lubes');
+        const lubesItems = filteredStoresItems.filter((s: any) => s.itemType === 'lubes');
 
         const columns = [
           { header: 'Item Code', field: 'itemCode', width: 30 },
@@ -334,7 +334,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
       }
 
       case 'chemicals-tracking': {
-        const chemicalsItems = storesItems.filter((s: any) => s.itemType === 'chemicals');
+        const chemicalsItems = filteredStoresItems.filter((s: any) => s.itemType === 'chemicals');
 
         const columns = [
           { header: 'Item Code', field: 'itemCode', width: 25 },
@@ -539,7 +539,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
     
     if (generatingReports.has(reportKey)) return;
 
-    if (storesItems.length === 0) {
+    if (filteredStoresItems.length === 0) {
       toast({ title: "No Data Available", description: "No stores inventory data found for the selected vessel.", variant: "destructive" });
       return;
     }
@@ -621,9 +621,9 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
     }
   };
 
-  const lubesCount = storesItems.filter((s: any) => s.itemType === 'lubes').length;
-  const chemicalsCount = storesItems.filter((s: any) => s.itemType === 'chemicals').length;
-  const lowStockCount = storesItems.filter((s: any) => (s.rob || 0) < (s.min || 0)).length;
+  const lubesCount = filteredStoresItems.filter((s: any) => s.itemType === 'lubes').length;
+  const chemicalsCount = filteredStoresItems.filter((s: any) => s.itemType === 'chemicals').length;
+  const lowStockCount = filteredStoresItems.filter((s: any) => (s.rob || 0) < (s.min || 0)).length;
 
   if (selectedReport === 'stores-inventory-status') {
     return (
@@ -715,7 +715,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
                   <Store className="w-4 h-4 text-purple-500" />
                   Total Items
                 </CardDescription>
-                <CardTitle className="text-3xl">{storesItems.length}</CardTitle>
+                <CardTitle className="text-3xl">{filteredStoresItems.length}</CardTitle>
               </CardHeader>
             </Card>
             <Card className="border-l-4 border-l-red-500 bg-white">

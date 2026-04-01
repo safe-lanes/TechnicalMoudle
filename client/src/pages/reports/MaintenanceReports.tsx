@@ -314,11 +314,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     const now = new Date();
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     
-    // Work orders are already filtered by vessel from the API query
-    // This secondary filter is kept for safety but should already be vessel-specific
-    const vesselWorkOrders = effectiveVesselId && effectiveVesselId !== 'all' 
-      ? workOrders.filter((wo: any) => wo.vesselId === effectiveVesselId)
-      : workOrders;
+    const vesselWorkOrders = filteredWorkOrders;
 
     switch (reportId) {
       case 'due-jobs-7': {

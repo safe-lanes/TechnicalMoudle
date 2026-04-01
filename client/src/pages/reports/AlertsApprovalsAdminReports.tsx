@@ -257,7 +257,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
 
         const alerts: any[] = [];
         
-        workOrders.filter((wo: any) => wo.status === 'Overdue' || (wo.dueDate && new Date(wo.dueDate) < now && wo.status !== 'Completed'))
+        filteredWorkOrders.filter((wo: any) => wo.status === 'Overdue' || (wo.dueDate && new Date(wo.dueDate) < now && wo.status !== 'Completed'))
           .forEach((wo: any) => alerts.push({
             type: 'Overdue Work Order',
             description: wo.workOrderNumber || wo.title || wo.id,
@@ -265,7 +265,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
             status: 'Active'
           }));
 
-        defects.filter((d: any) => d.status === 'Open')
+        filteredDefects.filter((d: any) => d.status === 'Open')
           .forEach((d: any) => alerts.push({
             type: 'Open Defect',
             description: d.defectNumber || d.title || d.id,
@@ -298,7 +298,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
 
         const pendingItems: any[] = [];
         
-        workOrders.filter((wo: any) => wo.status === 'Pending Approval')
+        filteredWorkOrders.filter((wo: any) => wo.status === 'Pending Approval')
           .forEach((wo: any) => pendingItems.push({
             type: 'Work Order',
             id: wo.workOrderNumber || wo.id,
@@ -306,7 +306,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
             status: 'Awaiting Approval'
           }));
 
-        defects.filter((d: any) => d.status === 'Pending Approval')
+        filteredDefects.filter((d: any) => d.status === 'Pending Approval')
           .forEach((d: any) => pendingItems.push({
             type: 'Defect',
             id: d.defectNumber || d.id,
@@ -364,7 +364,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
 
         const overdueItems: any[] = [];
         
-        workOrders.filter((wo: any) => {
+        filteredWorkOrders.filter((wo: any) => {
           if (!wo.dueDate || wo.status === 'Completed') return false;
           return new Date(wo.dueDate) < now;
         }).forEach((wo: any) => {
@@ -436,13 +436,13 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
     }
   };
 
-  const overdueWOs = workOrders.filter((wo: any) => {
+  const overdueWOs = filteredWorkOrders.filter((wo: any) => {
     if (!wo.dueDate || wo.status === 'Completed') return false;
     return new Date(wo.dueDate) < new Date();
   }).length;
 
-  const pendingApprovals = workOrders.filter((wo: any) => wo.status === 'Pending Approval').length + 
-                          defects.filter((d: any) => d.status === 'Pending Approval').length;
+  const pendingApprovals = filteredWorkOrders.filter((wo: any) => wo.status === 'Pending Approval').length + 
+                          filteredDefects.filter((d: any) => d.status === 'Pending Approval').length;
 
   return (
     <div className="p-6 bg-white min-h-screen">

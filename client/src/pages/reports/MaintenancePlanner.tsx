@@ -197,11 +197,6 @@ export default function MaintenancePlanner({ onBack, globalFilters }: Maintenanc
     staleTime: 60000,
   });
 
-  // Reset to page 1 when data changes (filters change)
-  const totalJobs = data?.jobs?.length || 0;
-  const totalPages = Math.ceil(totalJobs / pageSize);
-  
-  // Calculate paginated jobs
   const filteredPlannerJobs = useMemo(() => {
     if (!data?.jobs) return [];
     let result = data.jobs;
@@ -222,13 +217,15 @@ export default function MaintenancePlanner({ onBack, globalFilters }: Maintenanc
     return result;
   }, [data?.jobs, globalVessels, globalComponent, vessels?.length]);
 
+  const totalJobs = filteredPlannerJobs.length;
+  const totalPages = Math.ceil(totalJobs / pageSize);
+
   const paginatedJobs = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
     return filteredPlannerJobs.slice(startIndex, endIndex);
   }, [filteredPlannerJobs, currentPage, pageSize]);
 
-  // Extract unique ranks from jobs data for dynamic filter (similar to WorkOrders)
   const uniqueRanks = useMemo(() => {
     if (!data?.jobs) return [];
     const ranks = data.jobs

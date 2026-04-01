@@ -400,7 +400,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
     
     if (generatingReports.has(reportKey)) return;
 
-    if (spares.length === 0) {
+    if (filteredSpares.length === 0) {
       toast({
         title: "No Data Available",
         description: "No spares inventory data found for the selected vessel.",
@@ -496,7 +496,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
     }
   };
 
-  const lowStockCount = spares.filter((s: any) => (s.rob || 0) < (s.min || 0)).length;
+  const lowStockCount = filteredSpares.filter((s: any) => (s.rob || 0) < (s.min || 0)).length;
   const highPriorityCount = reports.filter(r => r.priority === 'high').length;
 
   if (activeDetailReport === 'spares-low-stock') {
@@ -581,7 +581,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
                   <Package className="w-4 h-4 text-orange-500" />
                   Total Spares
                 </CardDescription>
-                <CardTitle className="text-3xl">{spares.length}</CardTitle>
+                <CardTitle className="text-3xl">{filteredSpares.length}</CardTitle>
               </CardHeader>
             </Card>
             <Card className="border-l-4 border-l-red-500 bg-white">

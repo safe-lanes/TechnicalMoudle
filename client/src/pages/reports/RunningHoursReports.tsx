@@ -485,7 +485,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
     document.body.removeChild(a);
   };
 
-  const componentsWithRH = components.filter((c: any) => c.runningHours !== undefined && c.runningHours !== null);
+  const componentsWithRH = filteredComponents.filter((c: any) => c.runningHours !== undefined && c.runningHours !== null);
   const highPriorityCount = reports.filter(r => r.priority === 'high').length;
 
   return (
@@ -546,7 +546,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
                   <Activity className="w-4 h-4 text-blue-500" />
                   Total Components
                 </CardDescription>
-                <CardTitle className="text-3xl text-blue-600">{components.length}</CardTitle>
+                <CardTitle className="text-3xl text-blue-600">{filteredComponents.length}</CardTitle>
               </CardHeader>
             </Card>
             <Card className="border-l-4 border-l-purple-500 bg-white">

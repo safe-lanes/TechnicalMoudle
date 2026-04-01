@@ -392,7 +392,7 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
             </div>
           </div>
         )}
-        {componentDropdownOpen && componentInput.length >= 2 && componentSuggestions.length === 0 && effectiveVesselForComponents !== "all" && (
+        {componentDropdownOpen && componentInput.length >= 2 && componentSuggestions.length === 0 && selectedVesselIds.length > 0 && (
           <div
             ref={componentDropdownRef}
             className="absolute z-50 top-full left-0 mt-1 w-full bg-popover border rounded-md shadow-lg p-3 text-sm text-muted-foreground text-center"

@@ -238,7 +238,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           { header: 'Status', field: 'status', width: 30 }
         ];
 
-        const data = certificates.map((c: any) => {
+        const data = filteredCertificates.map((c: any) => {
           const days = getDaysToExpiry(c.expiryDate);
           return {
             name: c.name || c.certificateName || '-',
@@ -272,7 +272,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           { header: 'Status', field: 'status', width: 30 }
         ];
 
-        const data = surveys.map((s: any) => {
+        const data = filteredSurveys.map((s: any) => {
           const days = getDaysToExpiry(s.dueDate || s.expiryDate);
           return {
             name: s.name || s.surveyType || '-',
@@ -297,7 +297,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
       }
 
       case 'expiring-certificates': {
-        const expiringCerts = certificates.filter((c: any) => {
+        const expiringCerts = filteredCertificates.filter((c: any) => {
           const days = getDaysToExpiry(c.expiryDate);
           return days <= 90 && days >= 0;
         });
@@ -333,10 +333,10 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
       }
 
       case 'compliance-summary': {
-        const totalCerts = certificates.length;
-        const totalSurveys = surveys.length;
-        const expiredCerts = certificates.filter((c: any) => getDaysToExpiry(c.expiryDate) < 0).length;
-        const expiredSurveys = surveys.filter((s: any) => getDaysToExpiry(s.dueDate || s.expiryDate) < 0).length;
+        const totalCerts = filteredCertificates.length;
+        const totalSurveys = filteredSurveys.length;
+        const expiredCerts = filteredCertificates.filter((c: any) => getDaysToExpiry(c.expiryDate) < 0).length;
+        const expiredSurveys = filteredSurveys.filter((s: any) => getDaysToExpiry(s.dueDate || s.expiryDate) < 0).length;
 
         const columns = [
           { header: 'Area', field: 'area', width: 50 },
@@ -389,7 +389,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           { header: 'Status', field: 'status', width: 30 }
         ];
 
-        const data = certificates.map((c: any) => ({
+        const data = filteredCertificates.map((c: any) => ({
           name: c.name || c.certificateName || '-',
           issueDate: formatDate(c.issueDate),
           expiryDate: formatDate(c.expiryDate),
@@ -410,7 +410,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
   };
 
   const handlePreviewReport = async (reportId: string) => {
-    if (certificates.length === 0 && surveys.length === 0) {
+    if (filteredCertificates.length === 0 && filteredSurveys.length === 0) {
       toast({ title: "No Data Available", description: "No certificates or surveys data found for the selected vessel.", variant: "destructive" });
       return;
     }
@@ -428,7 +428,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
     
     if (generatingReports.has(reportKey)) return;
 
-    if (certificates.length === 0 && surveys.length === 0) {
+    if (filteredCertificates.length === 0 && filteredSurveys.length === 0) {
       toast({ title: "No Data Available", description: "No certificates or surveys data found for the selected vessel.", variant: "destructive" });
       return;
     }
@@ -456,12 +456,12 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
     }
   };
 
-  const expiringCertificates = certificates.filter((c: any) => {
+  const expiringCertificates = filteredCertificates.filter((c: any) => {
     const days = getDaysToExpiry(c.expiryDate);
     return days <= 90 && days >= 0;
   }).length;
 
-  const expiredCertificates = certificates.filter((c: any) => getDaysToExpiry(c.expiryDate) < 0).length;
+  const expiredCertificates = filteredCertificates.filter((c: any) => getDaysToExpiry(c.expiryDate) < 0).length;
   const highPriorityCount = reports.filter(r => r.priority === 'high').length;
 
   return (
@@ -497,7 +497,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
               <FileCheck className="w-4 h-4 text-blue-500" />
               Total Certificates
             </CardDescription>
-            <CardTitle className="text-3xl">{certificates.length}</CardTitle>
+            <CardTitle className="text-3xl">{filteredCertificates.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card className="border-l-4 border-l-yellow-500 bg-white">
@@ -524,7 +524,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
               <Calendar className="w-4 h-4 text-green-500" />
               Total Surveys
             </CardDescription>
-            <CardTitle className="text-3xl text-green-600">{surveys.length}</CardTitle>
+            <CardTitle className="text-3xl text-green-600">{filteredSurveys.length}</CardTitle>
           </CardHeader>
         </Card>
       </div>
