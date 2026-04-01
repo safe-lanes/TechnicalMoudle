@@ -110,7 +110,11 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
       setPreviewData(null);
       initialLoadRef.current = false;
       handlePreviewReport(selectedReportId).then(() => {
-        if (previewVersionRef.current === version) initialLoadRef.current = true;
+        if (previewVersionRef.current === version) {
+          initialLoadRef.current = true;
+        } else {
+          setPreviewData(null);
+        }
       });
     }
   }, [embedded, selectedReportId]);
@@ -123,7 +127,10 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
     filterTimerRef.current = setTimeout(() => {
       setPreviewData(null);
       handlePreviewReport(selectedReportId).finally(() => {
-        if (previewVersionRef.current === version) setIsFilterRefreshing(false);
+        if (previewVersionRef.current !== version) {
+          setPreviewData(null);
+        }
+        setIsFilterRefreshing(false);
       });
     }, 300);
     return () => { if (filterTimerRef.current) clearTimeout(filterTimerRef.current); };

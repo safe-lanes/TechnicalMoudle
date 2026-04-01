@@ -159,7 +159,7 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
     });
 
     return items;
-  }, [data?.data, searchQuery, criticalityFilter, sortField, sortDirection]);
+  }, [data?.data, searchQuery, criticalityFilter, sortField, sortDirection, globalComponent]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {

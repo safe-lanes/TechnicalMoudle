@@ -280,7 +280,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
     }
 
     return result;
-  }, [items, searchQuery, categoryFilter, priorityFilter]);
+  }, [items, searchQuery, categoryFilter, priorityFilter, globalComponent]);
 
   const sortedItems = useMemo(() => {
     const sorted = [...filteredItems];

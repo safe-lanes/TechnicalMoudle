@@ -255,7 +255,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
     }
 
     return result;
-  }, [items, searchQuery, expiryFilter, hazardFilter, stockFilter]);
+  }, [items, searchQuery, expiryFilter, hazardFilter, stockFilter, globalComponent]);
 
   const sortedItems = useMemo(() => {
     const sorted = [...filteredItems];

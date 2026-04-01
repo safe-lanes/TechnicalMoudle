@@ -120,7 +120,11 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
       } else {
         setActiveDetailReport(null);
         handlePreviewReport(selectedReportId).then(() => {
-          if (previewVersionRef.current === version) initialLoadRef.current = true;
+          if (previewVersionRef.current === version) {
+            initialLoadRef.current = true;
+          } else {
+            setPreviewData(null);
+          }
         });
       }
     }
@@ -135,7 +139,10 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
     filterTimerRef.current = setTimeout(() => {
       setPreviewData(null);
       handlePreviewReport(selectedReportId).finally(() => {
-        if (previewVersionRef.current === version) setIsFilterRefreshing(false);
+        if (previewVersionRef.current !== version) {
+          setPreviewData(null);
+        }
+        setIsFilterRefreshing(false);
       });
     }, 300);
     return () => { if (filterTimerRef.current) clearTimeout(filterTimerRef.current); };
