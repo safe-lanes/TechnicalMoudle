@@ -1,6 +1,6 @@
 {
-  "id": "30bbe746-44d0-4cd0-ba11-30a0a752fcf5",
-  "prevId": "a4a9eb09-dbfd-4b48-b7ce-066e3843b3c1",
+  "id": "b4bd9636-d48e-4f88-84cd-5ebe69e7b20d",
+  "prevId": "30bbe746-44d0-4cd0-ba11-30a0a752fcf5",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2122,13 +2122,14 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'MONTH_END'"
+          "default": "'FIXED_DAYS'"
         },
         "grace_value": {
           "name": "grace_value",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": 7
         },
         "scope": {
           "name": "scope",
@@ -2142,6 +2143,13 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false
+        },
+        "fallback_method": {
+          "name": "fallback_method",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'MONTH_END'"
         },
         "updated_by": {
           "name": "updated_by",
