@@ -1144,18 +1144,18 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
       return (
         <div key={node.code}>
           <div
-            className={`flex items-center border-b border-gray-100 transition-colors text-xs ${
+            className={`flex items-center border-b border-gray-100 transition-colors text-sm px-3 py-2 ${
               node.isLeaf ? "cursor-pointer" : "cursor-default"
             } ${
               isSelected
-                ? "bg-blue-100"
+                ? "bg-blue-50"
                 : isLinkedFromRight
                 ? "bg-green-50"
                 : node.isLeaf
-                ? "hover:bg-blue-50/50"
+                ? "hover:bg-gray-50"
                 : ""
             }`}
-            style={{ paddingLeft: `${level * 16 + 8}px` }}
+            style={{ paddingLeft: `${level * 20 + 12}px` }}
             onClick={() => {
               if (hasChildren) {
                 toggleFleetNode(node.code);
@@ -1167,7 +1167,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
             data-testid={`row-fleet-${node.code}`}
           >
             <button
-              className="mr-1 flex-shrink-0 p-0.5"
+              className="mr-2 flex-shrink-0 p-0.5"
               onClick={(e) => {
                 e.stopPropagation();
                 if (hasChildren) {
@@ -1178,12 +1178,12 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
             >
               {hasChildren ? (
                 isExpanded ? (
-                  <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
+                  <ChevronDown className="h-4 w-4 text-gray-600" />
                 ) : (
-                  <ChevronRight className="h-3.5 w-3.5 text-gray-500" />
+                  <ChevronRight className="h-4 w-4 text-gray-600" />
                 )
               ) : (
-                <span className="inline-block w-3.5" />
+                <span className="inline-block w-4" />
               )}
             </button>
             {hasChildren ? (
@@ -1191,8 +1191,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
             ) : (
               <Box className="h-3 w-3 text-gray-400 mr-1.5 flex-shrink-0" />
             )}
-            <span className="font-mono text-[11px] text-gray-500 mr-2 flex-shrink-0">{node.code}</span>
-            <span className="truncate py-1.5" title={node.name}>{node.name}</span>
+            <span className="text-gray-700 truncate" title={node.name}>{node.code} {node.name}</span>
             {!hasChildren && isMapped && (
               <div className="w-2 h-2 rounded-full bg-green-500 ml-auto mr-2 flex-shrink-0" />
             )}
@@ -1220,18 +1219,18 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
       return (
         <div key={node.code}>
           <div
-            className={`flex items-center border-b border-gray-100 transition-colors text-xs ${
+            className={`flex items-center border-b border-gray-100 transition-colors text-sm px-3 py-2 ${
               canSelect ? "cursor-pointer" : "cursor-default"
             } ${
               isSelected && canSelect
-                ? "bg-blue-100"
+                ? "bg-blue-50"
                 : isLinkedFromLeft && canSelect
                 ? "bg-green-50"
                 : canSelect
-                ? "hover:bg-blue-50/50"
+                ? "hover:bg-gray-50"
                 : "bg-gray-50/50"
             }`}
-            style={{ paddingLeft: `${level * 16 + 8}px` }}
+            style={{ paddingLeft: `${level * 20 + 12}px` }}
             onClick={() => {
               if (hasChildren) {
                 toggleVesselNode(node.code);
@@ -1251,7 +1250,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
             data-testid={`row-vessel-${node.code}`}
           >
             <button
-              className="mr-1 flex-shrink-0 p-0.5"
+              className="mr-2 flex-shrink-0 p-0.5"
               onClick={(e) => {
                 e.stopPropagation();
                 if (hasChildren) {
@@ -1262,12 +1261,12 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
             >
               {hasChildren ? (
                 isExpanded ? (
-                  <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
+                  <ChevronDown className="h-4 w-4 text-gray-600" />
                 ) : (
-                  <ChevronRight className="h-3.5 w-3.5 text-gray-500" />
+                  <ChevronRight className="h-4 w-4 text-gray-600" />
                 )
               ) : (
-                <span className="inline-block w-3.5" />
+                <span className="inline-block w-4" />
               )}
             </button>
             {canSelect && (
@@ -1294,8 +1293,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
             ) : !canSelect ? (
               <Box className="h-3 w-3 text-gray-400 mr-1.5 flex-shrink-0" />
             ) : null}
-            <span className="font-mono text-[11px] text-gray-500 mr-2 flex-shrink-0">{node.code}</span>
-            <span className={`truncate py-1.5 ${isParentNode ? "font-medium text-gray-700" : ""}`} title={node.name}>{node.name}</span>
+            <span className={`text-gray-700 truncate ${isParentNode ? "font-medium" : ""}`} title={node.name}>{node.code} {node.name}</span>
             {canSelect && (
               <div className="ml-auto mr-2 flex-shrink-0 flex items-center gap-1">
                 {hasConflict && (
