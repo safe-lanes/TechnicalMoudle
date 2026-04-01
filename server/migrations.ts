@@ -2409,12 +2409,22 @@ const migrations: Migration[] = [
         END IF;
       END $$;
 
-      DELETE FROM planner_dates
-        WHERE vessel_id NOT IN (SELECT vuuid FROM vessels);
-      DELETE FROM planner_dates
-        WHERE job_id NOT IN (SELECT juuid FROM jobs);
-      DELETE FROM planner_dates
-        WHERE component_id NOT IN (SELECT cuuid FROM components);
+      DO $$
+      DECLARE
+        orphan_vessel INT;
+        orphan_job INT;
+        orphan_component INT;
+      BEGIN
+        SELECT COUNT(*) INTO orphan_vessel FROM planner_dates WHERE vessel_id NOT IN (SELECT vuuid FROM vessels);
+        SELECT COUNT(*) INTO orphan_job FROM planner_dates WHERE job_id NOT IN (SELECT juuid FROM jobs);
+        SELECT COUNT(*) INTO orphan_component FROM planner_dates WHERE component_id NOT IN (SELECT cuuid FROM components);
+        IF orphan_vessel > 0 OR orphan_job > 0 OR orphan_component > 0 THEN
+          RAISE NOTICE 'planner_dates orphan cleanup: vessel=%, job=%, component=%', orphan_vessel, orphan_job, orphan_component;
+          DELETE FROM planner_dates WHERE vessel_id NOT IN (SELECT vuuid FROM vessels);
+          DELETE FROM planner_dates WHERE job_id NOT IN (SELECT juuid FROM jobs);
+          DELETE FROM planner_dates WHERE component_id NOT IN (SELECT cuuid FROM components);
+        END IF;
+      END $$;
 
       DO $$
       BEGIN
