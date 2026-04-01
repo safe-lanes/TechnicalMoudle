@@ -38,10 +38,9 @@ interface IhmReport {
 interface IhmReportsProps {
   onBack: () => void;
   globalFilters?: {
-    vessel: string;
-    department: string;
+    vessels: string[];
+    component: string;
     dateRange: { from: Date | null; to: Date | null };
-    priority: string;
   };
   embedded?: boolean;
   selectedReportId?: string | null;
@@ -51,7 +50,7 @@ interface IhmReportsProps {
 const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded, selectedReportId, actionTrigger }) => {
   const [categoryFilters, setCategoryFilters] = useState<CategoryFilterValues>({
     searchQuery: "",
-    vessel: globalFilters?.vessel || "all",
+    vessel: (globalFilters?.vessels?.length === 1 ? globalFilters.vessels[0] : "all"),
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
@@ -61,10 +60,11 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
   const { vesselId: contextVesselId } = useVessel();
 
   useEffect(() => {
-    if (globalFilters?.vessel) {
-      setCategoryFilters(prev => ({ ...prev, vessel: globalFilters.vessel }));
+    if (globalFilters?.vessels) {
+      const v = globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : "all";
+      setCategoryFilters(prev => ({ ...prev, vessel: v }));
     }
-  }, [globalFilters?.vessel]);
+  }, [globalFilters?.vessels]);
 
   useEffect(() => {
     if (globalFilters?.dateRange) {

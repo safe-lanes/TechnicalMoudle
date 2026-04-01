@@ -45,17 +45,16 @@ interface ComplianceReport {
 interface ComplianceReportsProps {
   onBack: () => void;
   globalFilters?: {
-    vessel: string;
-    department: string;
+    vessels: string[];
+    component: string;
     dateRange: { from: Date | null; to: Date | null };
-    priority: string;
   };
 }
 
 const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFilters }) => {
   const [categoryFilters, setCategoryFilters] = useState<CategoryFilterValues>({
     searchQuery: "",
-    vessel: globalFilters?.vessel || "all",
+    vessel: (globalFilters?.vessels?.length === 1 ? globalFilters.vessels[0] : "all"),
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
@@ -65,10 +64,11 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
   const { vesselId: contextVesselId } = useVessel();
 
   useEffect(() => {
-    if (globalFilters?.vessel) {
-      setCategoryFilters(prev => ({ ...prev, vessel: globalFilters.vessel }));
+    if (globalFilters?.vessels) {
+      const v = globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : "all";
+      setCategoryFilters(prev => ({ ...prev, vessel: v }));
     }
-  }, [globalFilters?.vessel]);
+  }, [globalFilters?.vessels]);
 
   useEffect(() => {
     if (globalFilters?.dateRange) {

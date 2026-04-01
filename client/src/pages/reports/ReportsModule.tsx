@@ -150,15 +150,17 @@ const ReportsModule = () => {
   const [dragSourceId, setDragSourceId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [globalFilters, setGlobalFilters] = useState<FilterValues>({
-    vessel: vesselId || "all",
-    department: "all",
+    vessels: vesselId ? [vesselId] : [],
+    component: "",
     dateRange: { from: null, to: null },
-    priority: "all"
   });
 
   useEffect(() => {
     if (vesselId) {
-      setGlobalFilters(prev => ({ ...prev, vessel: vesselId }));
+      setGlobalFilters(prev => {
+        if (prev.vessels.length === 1 && prev.vessels[0] === vesselId) return prev;
+        return { ...prev, vessels: [vesselId] };
+      });
     }
   }, [vesselId]);
 
@@ -248,17 +250,16 @@ const ReportsModule = () => {
 
   const handleFiltersChange = useCallback((filters: FilterValues) => {
     setGlobalFilters(filters);
-    if (filters.vessel && filters.vessel !== "all") {
-      setVesselId(filters.vessel);
+    if (filters.vessels.length === 1) {
+      setVesselId(filters.vessels[0]);
     }
   }, [setVesselId]);
 
   const handleFiltersReset = useCallback(() => {
     setGlobalFilters({
-      vessel: vesselId || "all",
-      department: "all",
+      vessels: vesselId ? [vesselId] : [],
+      component: "",
       dateRange: { from: null, to: null },
-      priority: "all"
     });
   }, [vesselId]);
 
@@ -322,14 +323,12 @@ const ReportsModule = () => {
           <h1 className="text-2xl font-bold text-gray-800 dark:text-foreground" data-testid="G1"><Marker id="G1" />Reports</h1>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <GlobalFilters
-            filters={globalFilters}
-            onFiltersChange={handleFiltersChange}
-            onReset={handleFiltersReset}
-            className="border-0 shadow-none bg-transparent p-0 mb-0 flex-shrink-0"
-            vesselOnly
-          />
+        <GlobalFilters
+          filters={globalFilters}
+          onFiltersChange={handleFiltersChange}
+          onReset={handleClearAll}
+        />
+        <div className="flex items-center gap-3 mt-2">
           <div className="relative w-72">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
@@ -340,22 +339,6 @@ const ReportsModule = () => {
               data-testid="G3"
             />
           </div>
-          <GlobalFilters
-            filters={globalFilters}
-            onFiltersChange={handleFiltersChange}
-            onReset={handleFiltersReset}
-            className="border-0 shadow-none bg-transparent p-0 mb-0"
-            dateOnly
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleClearAll}
-            className="text-gray-600"
-            data-testid="button-clear-all-filters"
-          >
-            Clear
-          </Button>
         </div>
       </div>
 
