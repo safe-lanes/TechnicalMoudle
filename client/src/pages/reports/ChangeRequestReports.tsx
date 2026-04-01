@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -130,6 +130,9 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
+  const [isFilterRefreshing, setIsFilterRefreshing] = useState(false);
+  const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initialLoadRef = useRef(false);
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
@@ -154,12 +157,31 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
     }
   }, [globalFilters?.component]);
 
+  const filterFingerprint = useMemo(() => JSON.stringify({
+    v: globalFilters?.vessels,
+    c: globalFilters?.component,
+    df: globalFilters?.dateRange?.from?.getTime(),
+    dt: globalFilters?.dateRange?.to?.getTime(),
+  }), [globalFilters?.vessels, globalFilters?.component, globalFilters?.dateRange?.from, globalFilters?.dateRange?.to]);
+
   useEffect(() => {
     if (embedded && selectedReportId) {
       setPreviewData(null);
-      handlePreviewReport(selectedReportId);
+      initialLoadRef.current = false;
+      handlePreviewReport(selectedReportId).then(() => { initialLoadRef.current = true; });
     }
   }, [embedded, selectedReportId]);
+
+  useEffect(() => {
+    if (!embedded || !selectedReportId || !initialLoadRef.current) return;
+    if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
+    setIsFilterRefreshing(true);
+    filterTimerRef.current = setTimeout(() => {
+      setPreviewData(null);
+      handlePreviewReport(selectedReportId).finally(() => setIsFilterRefreshing(false));
+    }, 300);
+    return () => { if (filterTimerRef.current) clearTimeout(filterTimerRef.current); };
+  }, [filterFingerprint]);
 
   useEffect(() => {
     if (!actionTrigger || !embedded || !selectedReportId) return;
@@ -676,6 +698,12 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
         </>
       )}
 
+      {embedded && isFilterRefreshing && !previewData && (
+        <div className="flex items-center justify-center py-12" data-testid="filter-refresh-loading">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+          <span className="text-sm text-muted-foreground">Refreshing report data...</span>
+        </div>
+      )}
       {embedded && previewData && (
         <InlineReportPreview reportData={previewData} embedded={embedded} />
       )}
