@@ -1,6 +1,6 @@
 import * as repo from '../repositories/workOrderRepository';
 import { NotFoundError, ValidationError } from '../../shared/errors';
-import { computeWorkOrderStatus } from '@shared/workOrders/status';
+import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { computeSpareConsumptionDelta, ConsumedSpareEntry } from '../utils/spareConsumptionDelta';
 import { calculateMissedCycles, calculateMissedCyclesRH } from '@shared/dateUtils';
@@ -95,6 +95,9 @@ export async function createSuperintendentNotificationForWO(wo: any, daysLate: n
 
 export async function listWorkOrders(vesselId?: string) {
   const workOrders = await repo.findWorkOrders(vesselId);
+
+  const companyGraceRow = await storage.getCompanyStandardGraceSettings();
+  const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
 
   // For "All Vessels" (no vesselId), we need per-vessel components, jobs, and settings
   const isAllVessels = !vesselId;
@@ -239,7 +242,8 @@ export async function listWorkOrders(vesselId?: string) {
       maintenanceBasis: wo.maintenanceBasis || job?.maintenanceBasis || undefined,
       vesselGraceSettings,
       rhLeadTimeHours,
-      calendarLeadTimeDays
+      calendarLeadTimeDays,
+      companyGraceConfig
     });
 
     let liveMissedCycles = wo.missedCycles || 0;
@@ -305,6 +309,9 @@ export async function listWorkOrders(vesselId?: string) {
 // ── Get Single Work Order with Enrichment ──
 
 export async function getWorkOrder(id: string) {
+  const companyGraceRow = await storage.getCompanyStandardGraceSettings();
+  const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
+
   let workOrder = await repo.findById(id);
   if (!workOrder) {
     workOrder = await repo.findByCode(id);
@@ -413,7 +420,8 @@ export async function getWorkOrder(id: string) {
       maintenanceBasis: workOrder.maintenanceBasis || job?.maintenanceBasis || undefined,
       vesselGraceSettings,
       rhLeadTimeHours,
-      calendarLeadTimeDays: calendarLeadTimeDays2
+      calendarLeadTimeDays: calendarLeadTimeDays2,
+      companyGraceConfig
     }),
     leadTimeValue,
     leadTimeUnit

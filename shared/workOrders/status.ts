@@ -52,19 +52,36 @@ export const GRACE_PERIOD_CONSTANTS = {
 
 export type GraceMode = 'COMPANY_STANDARD' | 'CUSTOM_DAYS';
 
+export type GraceMethodType = 'FIXED_DAYS' | 'MONTH_END' | 'SPECIFIC_DATE_NEXT_MONTH';
+export type GraceScopeType = 'ALL_WORK_ORDERS' | 'LAST_WEEK_OF_MONTH';
+
 export interface CompanyStandardGraceConfig {
-  graceMethod: 'FIXED_DAYS' | 'MONTH_END' | 'SPECIFIC_DATE_NEXT_MONTH';
+  graceMethod: GraceMethodType;
   graceValue: number | null;
-  scope: 'ALL_WORK_ORDERS' | 'LAST_WEEK_OF_MONTH';
+  scope: GraceScopeType;
   fallbackGraceDays: number | null;
+  fallbackMethod: GraceMethodType | null;
 }
 
 export const DEFAULT_COMPANY_GRACE_CONFIG: CompanyStandardGraceConfig = {
-  graceMethod: 'MONTH_END',
-  graceValue: null,
+  graceMethod: 'FIXED_DAYS',
+  graceValue: 7,
   scope: 'LAST_WEEK_OF_MONTH',
-  fallbackGraceDays: 7,
+  fallbackGraceDays: null,
+  fallbackMethod: 'MONTH_END',
 };
+
+const VALID_GRACE_METHODS: GraceMethodType[] = ['FIXED_DAYS', 'MONTH_END', 'SPECIFIC_DATE_NEXT_MONTH'];
+const VALID_SCOPES: GraceScopeType[] = ['ALL_WORK_ORDERS', 'LAST_WEEK_OF_MONTH'];
+
+export function buildCompanyGraceConfig(row: { graceMethod: string; graceValue: number | null; scope: string; fallbackGraceDays: number | null; fallbackMethod?: string | null } | null | undefined): CompanyStandardGraceConfig {
+  if (!row) return DEFAULT_COMPANY_GRACE_CONFIG;
+  const method = VALID_GRACE_METHODS.find(m => m === row.graceMethod);
+  const scope = VALID_SCOPES.find(s => s === row.scope);
+  if (!method || !scope) return DEFAULT_COMPANY_GRACE_CONFIG;
+  const fbMethod = row.fallbackMethod ? VALID_GRACE_METHODS.find(m => m === row.fallbackMethod) : null;
+  return { graceMethod: method, graceValue: row.graceValue, scope, fallbackGraceDays: row.fallbackGraceDays, fallbackMethod: fbMethod ?? null };
+}
 
 export interface VesselGraceSettings {
   calendarGraceMode: GraceMode;
@@ -147,6 +164,8 @@ export function calculateCompanyStandardGraceEnd(dueDate: Date, config?: Company
 
   if (daysUntilEndOfMonth <= 7) {
     return applyGraceMethod(dueDate, cfg.graceMethod, cfg.graceValue);
+  } else if (cfg.fallbackMethod) {
+    return applyGraceMethod(dueDate, cfg.fallbackMethod, cfg.fallbackGraceDays);
   } else {
     const fallbackDays = cfg.fallbackGraceDays ?? GRACE_PERIOD_CONSTANTS.GRACE_PERIOD_DAYS;
     const graceEnd = new Date(dueDate);

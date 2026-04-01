@@ -25,6 +25,7 @@ interface CompanyGraceSettings {
   graceValue: number | null;
   scope: string;
   fallbackGraceDays: number | null;
+  fallbackMethod: string | null;
   configured: boolean;
 }
 
@@ -39,8 +40,11 @@ function formatCompanyGraceSummary(settings: CompanyGraceSettings): string {
     return `${methodLabel} for all WOs`;
   }
 
-  const fallbackLabel = settings.fallbackGraceDays != null
-    ? `${settings.fallbackGraceDays} days for remaining WOs`
+  const fallbackMethodStr = settings.fallbackMethod || 'MONTH_END';
+  const fallbackLabel = fallbackMethodStr === 'MONTH_END'
+    ? 'Month End for remaining WOs'
+    : fallbackMethodStr === 'FIXED_DAYS'
+    ? `${settings.fallbackGraceDays ?? 0} days grace for remaining WOs`
     : 'no fallback set';
 
   return `${methodLabel} for WOs due in last week of month; ${fallbackLabel}`;
@@ -70,10 +74,11 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
   });
 
   const [companyGraceForm, setCompanyGraceForm] = useState({
-    graceMethod: 'MONTH_END',
+    graceMethod: 'FIXED_DAYS',
     graceValue: 7,
     scope: 'LAST_WEEK_OF_MONTH',
-    fallbackGraceDays: 7,
+    fallbackGraceDays: 0 as number | null,
+    fallbackMethod: 'MONTH_END' as string | null,
   });
 
   const { data: vessels = [], isLoading: isVesselsLoading } = useVessels();
@@ -160,10 +165,11 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
   const openCompanyGraceDialog = () => {
     if (companyGraceSettings) {
       setCompanyGraceForm({
-        graceMethod: companyGraceSettings.graceMethod || 'MONTH_END',
+        graceMethod: companyGraceSettings.graceMethod || 'FIXED_DAYS',
         graceValue: companyGraceSettings.graceValue ?? 7,
         scope: companyGraceSettings.scope || 'LAST_WEEK_OF_MONTH',
-        fallbackGraceDays: companyGraceSettings.fallbackGraceDays ?? 7,
+        fallbackGraceDays: companyGraceSettings.fallbackGraceDays ?? 0,
+        fallbackMethod: companyGraceSettings.fallbackMethod || 'MONTH_END',
       });
     }
     setIsCompanyGraceDialogOpen(true);
@@ -668,21 +674,44 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
 
               {companyGraceForm.scope === 'LAST_WEEK_OF_MONTH' && (
                 <div className="ml-7 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <Label className="text-sm font-medium text-amber-900">Grace period for WOs not due in last week of month</Label>
+                  <Label className="text-sm font-medium text-amber-900">Fallback for WOs not due in last week of month</Label>
                   <p className="text-xs text-amber-700 mt-0.5 mb-2">
                     This covers all remaining work orders that fall outside the last week.
                   </p>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      min={0}
-                      max={365}
-                      value={companyGraceForm.fallbackGraceDays}
-                      onChange={(e) => setCompanyGraceForm({...companyGraceForm, fallbackGraceDays: parseInt(e.target.value) || 0})}
-                      className="w-24"
-                      data-testid="input-grace-fallback-days"
-                    />
-                    <span className="text-sm text-gray-500">days</span>
+                  <div className="space-y-2">
+                    {[
+                      { value: 'MONTH_END', label: 'Month End', desc: 'Grace until end of due month' },
+                      { value: 'FIXED_DAYS', label: 'Fixed Days', desc: 'Set a specific number of grace days' },
+                    ].map(option => (
+                      <label key={option.value} className="flex items-start gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="fallbackMethod"
+                          checked={companyGraceForm.fallbackMethod === option.value}
+                          onChange={() => setCompanyGraceForm({...companyGraceForm, fallbackMethod: option.value})}
+                          className="mt-1"
+                          data-testid={`radio-fallback-${option.value.toLowerCase()}`}
+                        />
+                        <div>
+                          <span className="text-sm font-medium text-amber-900">{option.label}</span>
+                          <p className="text-xs text-amber-700">{option.desc}</p>
+                        </div>
+                      </label>
+                    ))}
+                    {companyGraceForm.fallbackMethod === 'FIXED_DAYS' && (
+                      <div className="flex items-center gap-2 ml-6">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={365}
+                          value={companyGraceForm.fallbackGraceDays ?? 0}
+                          onChange={(e) => setCompanyGraceForm({...companyGraceForm, fallbackGraceDays: parseInt(e.target.value) || 0})}
+                          className="w-24"
+                          data-testid="input-grace-fallback-days"
+                        />
+                        <span className="text-sm text-gray-500">days</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

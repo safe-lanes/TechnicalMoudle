@@ -1,7 +1,7 @@
 import { storage } from "../storage";
 import { ValidationError } from "../modules/shared/errors";
 import type { WorkOrder, InsertWorkOrder, WorkOrderExecution, InsertWorkOrderExecution, Job, PmsVesselSettings, Component } from "@shared/schema";
-import { computeWorkOrderStatus, VesselGraceSettings } from "@shared/workOrders/status";
+import { computeWorkOrderStatus, VesselGraceSettings, buildCompanyGraceConfig } from "@shared/workOrders/status";
 import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 import { shouldGenerateWorkOrder } from "@shared/dateUtils";
 import { generatePlannedWorkOrderNumber, generateUnplannedWorkOrderNumber } from "../utils/workOrderNumbering";
@@ -63,6 +63,8 @@ export class WorkOrderService {
    * Fetches component running hours for RH-based work orders and vessel grace settings
    */
   async getWorkOrders(vesselId?: string): Promise<WorkOrder[]> {
+    const companyGraceRow = await storage.getCompanyStandardGraceSettings();
+    const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
     const workOrders = await storage.getWorkOrders(vesselId);
     
     // Get unique job IDs from RH-based work orders to fetch component data
@@ -172,7 +174,8 @@ export class WorkOrderService {
           maintenanceBasis: wo.maintenanceBasis || undefined,
           vesselGraceSettings,
           rhLeadTimeHours,
-          calendarLeadTimeDays
+          calendarLeadTimeDays,
+          companyGraceConfig
         })
       };
     });

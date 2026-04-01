@@ -1,6 +1,6 @@
 import { storage } from "../storage";
 import type { WorkOrder, Job, Component, PmsVesselSettings } from "@shared/schema";
-import { computeWorkOrderStatus, VesselGraceSettings, ComputedWorkOrderStatus, CompanyStandardGraceConfig, DEFAULT_COMPANY_GRACE_CONFIG } from "@shared/workOrders/status";
+import { computeWorkOrderStatus, VesselGraceSettings, ComputedWorkOrderStatus, CompanyStandardGraceConfig, buildCompanyGraceConfig } from "@shared/workOrders/status";
 import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 
 /**
@@ -133,16 +133,7 @@ export class WorkOrderStatusRecalculatorService {
 
       // Load company standard grace config once
       const companyGraceRow = await storage.getCompanyStandardGraceSettings();
-      const validGraceMethods = ['FIXED_DAYS', 'MONTH_END', 'SPECIFIC_DATE_NEXT_MONTH'] as const;
-      const validScopes = ['ALL_WORK_ORDERS', 'LAST_WEEK_OF_MONTH'] as const;
-      let companyGraceConfig: CompanyStandardGraceConfig = DEFAULT_COMPANY_GRACE_CONFIG;
-      if (companyGraceRow) {
-        const method = validGraceMethods.find(m => m === companyGraceRow.graceMethod);
-        const scope = validScopes.find(s => s === companyGraceRow.scope);
-        if (method && scope) {
-          companyGraceConfig = { graceMethod: method, graceValue: companyGraceRow.graceValue, scope, fallbackGraceDays: companyGraceRow.fallbackGraceDays };
-        }
-      }
+      const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
 
       // Prefetch vessel settings
       const vesselIds = new Set<string>();

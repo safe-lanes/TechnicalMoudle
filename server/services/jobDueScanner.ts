@@ -3,7 +3,7 @@ import { jobService } from "./jobService";
 import { storage } from "../storage";
 import { generatePlannedWorkOrderNumber } from "../utils/workOrderNumbering";
 import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
-import { computeWorkOrderStatus, type VesselGraceSettings } from "@shared/workOrders/status";
+import { computeWorkOrderStatus, type VesselGraceSettings, buildCompanyGraceConfig } from "@shared/workOrders/status";
 import { 
   isBlockingStatus, 
   extractJobNoFromWorkOrderNo,
@@ -675,18 +675,23 @@ export class JobDueScannerService {
       ? (isJobCritical(job) ? settings.calendarLeadDaysCritical : settings.calendarLeadDaysNonCritical)
       : undefined;
 
+    // Load company standard grace config for accurate status computation
+    const companyGraceRow = await storage.getCompanyStandardGraceSettings();
+    const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
+
     // Use the shared computeWorkOrderStatus function for spec-compliant status
     const computedStatusResult = computeWorkOrderStatus({
       dueDate: job.nextDueDate,
       dueRH,
       currentRH,
       isExecution: false,
-      status: undefined, // New WO, no existing status
+      status: undefined,
       completionDateTime: null,
       maintenanceBasis: job.maintenanceBasis || undefined,
       vesselGraceSettings,
       rhLeadTimeHours,
-      calendarLeadTimeDays
+      calendarLeadTimeDays,
+      companyGraceConfig
     });
     
     // Map computed status to database status field

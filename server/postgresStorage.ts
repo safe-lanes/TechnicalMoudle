@@ -6826,7 +6826,7 @@ export class PostgresStorage {
     
     // Import shared utilities for consistent blocking status checks
     const { isBlockingStatus } = await import('./utils/workOrderStatus');
-    const { computeWorkOrderStatus } = await import('@shared/workOrders/status');
+    const { computeWorkOrderStatus, buildCompanyGraceConfig } = await import('@shared/workOrders/status');
     const { WORK_ORDER_THRESHOLDS } = await import('@shared/workOrders/constants');
     const { generatePlannedWorkOrderNumber } = await import('./utils/workOrderNumbering');
     
@@ -7019,18 +7019,23 @@ export class PostgresStorage {
           : vesselSettings.calendarLeadDaysNonCritical)
       : undefined;
 
+    // Load company standard grace config for consistent status computation
+    const companyGraceRow = await this.getCompanyStandardGraceSettings();
+    const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
+
     // Use the shared computeWorkOrderStatus function for spec-compliant status
     const computedStatusResult = computeWorkOrderStatus({
       dueDate: job.nextDueDate,
       dueRH,
       currentRH,
       isExecution: false,
-      status: undefined, // New WO, no existing status
+      status: undefined,
       completionDateTime: null,
       maintenanceBasis: job.maintenanceBasis || undefined,
       vesselGraceSettings,
       rhLeadTimeHours,
-      calendarLeadTimeDays
+      calendarLeadTimeDays,
+      companyGraceConfig
     });
     
     // Map computed status to database status field

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { storage } from '../../../storage';
 import { getDb } from '../../../db';
-import { computeWorkOrderStatus } from '@shared/workOrders/status';
+import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { buildExternalMasterDataUrl } from '../../../config/externalApi';
 import { sql, eq, and } from 'drizzle-orm';
@@ -203,6 +203,9 @@ export async function syncWorkOrderStatus(req: Request, res: Response) {
   }
   const componentByCodeMap = new Map(allComponents.map(c => [c.componentCode, c]));
 
+  const companyGraceRow = await storage.getCompanyStandardGraceSettings();
+  const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
+
   const stats = {
     totalProcessed: 0,
     statusUpdated: 0,
@@ -262,7 +265,8 @@ export async function syncWorkOrderStatus(req: Request, res: Response) {
           rhLeadTimeHours: vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
         } : undefined,
         rhLeadTimeHours,
-        calendarLeadTimeDays
+        calendarLeadTimeDays,
+        companyGraceConfig
       });
 
       if (wo.status !== computedStatus) {

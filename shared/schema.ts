@@ -1869,10 +1869,11 @@ export const companyStandardGraceSettings = pgTable("company_standard_grace_sett
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   singletonKey: text("singleton_key").notNull().unique().default("ACTIVE"),
 
-  graceMethod: text("grace_method").notNull().default("MONTH_END"),
-  graceValue: integer("grace_value"),
+  graceMethod: text("grace_method").notNull().default("FIXED_DAYS"),
+  graceValue: integer("grace_value").default(7),
   scope: text("scope").notNull().default("LAST_WEEK_OF_MONTH"),
   fallbackGraceDays: integer("fallback_grace_days"),
+  fallbackMethod: text("fallback_method").default("MONTH_END"),
 
   updatedBy: text("updated_by").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),

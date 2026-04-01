@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import * as repo from '../repositories/reportRepository';
-import { computeWorkOrderStatus } from '@shared/workOrders/status';
+import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
+import { storage } from '../../../storage';
 import {
   COLORS, STATUS_COLORS, STANDARD_WORK_ORDER_COLUMNS,
   applyStandardHeader, applyStandardTableHeader,
@@ -312,6 +313,9 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
     criticalEquipment: 0
   };
 
+  const companyGraceRow = await storage.getCompanyStandardGraceSettings();
+  const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
+
   for (const wo of workOrders) {
     if (wo.isExecution) { debugStats.skippedExecution++; continue; }
     if (wo.status === 'Completed') { debugStats.skippedCompleted++; continue; }
@@ -335,6 +339,7 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
       status: wo.status,
       completionDateTime: wo.completionDateTime,
       maintenanceBasis: maintenanceBasis,
+      companyGraceConfig,
     });
 
     if (computedStatus === 'Overdue') {

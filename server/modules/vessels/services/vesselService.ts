@@ -258,10 +258,11 @@ export async function deletePmsVesselSettings(vesselId: string): Promise<void> {
 // ── Company Standard Grace Settings operations ──
 
 const COMPANY_GRACE_DEFAULTS = {
-  graceMethod: 'MONTH_END' as const,
-  graceValue: null as number | null,
+  graceMethod: 'FIXED_DAYS' as const,
+  graceValue: 7 as number | null,
   scope: 'LAST_WEEK_OF_MONTH' as const,
-  fallbackGraceDays: 7 as number | null,
+  fallbackGraceDays: null as number | null,
+  fallbackMethod: 'MONTH_END' as string | null,
 };
 
 export async function getCompanyStandardGraceSettings() {
@@ -296,15 +297,22 @@ export async function upsertCompanyStandardGraceSettings(data: any, username: st
     throw new ValidationError('Specific Date of Next Month requires a day value between 1 and 28');
   }
 
-  if (data.scope === 'LAST_WEEK_OF_MONTH' && (data.fallbackGraceDays === undefined || data.fallbackGraceDays === null || data.fallbackGraceDays < 0)) {
-    throw new ValidationError('Fallback grace days is required when scope is Last Week of Month');
+  const fallbackMethod = data.fallbackMethod || 'MONTH_END';
+  if (data.scope === 'LAST_WEEK_OF_MONTH') {
+    if (!validMethods.includes(fallbackMethod)) {
+      throw new ValidationError(`Invalid fallback method: ${fallbackMethod}`);
+    }
+    if (fallbackMethod === 'FIXED_DAYS' && (data.fallbackGraceDays === undefined || data.fallbackGraceDays === null || data.fallbackGraceDays < 0)) {
+      throw new ValidationError('Fallback grace days is required when fallback method is Fixed Days');
+    }
   }
 
   return repo.upsertCompanyStandardGraceSettings({
     graceMethod: data.graceMethod,
     graceValue: data.graceMethod === 'MONTH_END' ? null : data.graceValue,
     scope: data.scope,
-    fallbackGraceDays: data.scope === 'LAST_WEEK_OF_MONTH' ? data.fallbackGraceDays : null,
+    fallbackGraceDays: data.scope === 'LAST_WEEK_OF_MONTH' && fallbackMethod === 'FIXED_DAYS' ? data.fallbackGraceDays : null,
+    fallbackMethod: data.scope === 'LAST_WEEK_OF_MONTH' ? fallbackMethod : null,
     updatedBy: username,
   });
 }
