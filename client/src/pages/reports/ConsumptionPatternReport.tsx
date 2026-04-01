@@ -35,6 +35,8 @@ interface ConsumptionPatternReportProps {
   embedded?: boolean;
   globalVessels?: string[];
   globalComponent?: string;
+  globalDateFrom?: Date | null;
+  globalDateTo?: Date | null;
 }
 
 type ActiveTab = "trends" | "items" | "categories" | "efficiency" | "forecast";
@@ -43,14 +45,16 @@ type SortDirection = "asc" | "desc";
 
 const PIE_COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16"];
 
-const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onBack, vesselId, embedded, globalVessels = [], globalComponent = "" }) => {
+const toDateStr = (d: Date | null | undefined) => d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : "";
+
+const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onBack, vesselId, embedded, globalVessels = [], globalComponent = "", globalDateFrom, globalDateTo }) => {
   const { toast } = useToast();
 
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState(toDateStr(globalDateFrom));
+  const [endDate, setEndDate] = useState(toDateStr(globalDateTo));
   const [itemType, setItemType] = useState("all");
   const [category, setCategory] = useState("");
-  const [appliedFilters, setAppliedFilters] = useState({ startDate: "", endDate: "", itemType: "all", category: "" });
+  const [appliedFilters, setAppliedFilters] = useState({ startDate: toDateStr(globalDateFrom), endDate: toDateStr(globalDateTo), itemType: "all", category: "" });
   const [activeTab, setActiveTab] = useState<ActiveTab>("trends");
   const [sortField, setSortField] = useState<SortField>("totalConsumed");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -58,6 +62,14 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
   const [nonMovingOpen, setNonMovingOpen] = useState(false);
   const [generatingExcel, setGeneratingExcel] = useState(false);
   const { currentPage, pageSize, handlePageChange, handlePageSizeChange, resetPage, paginateItems } = usePagination(25);
+
+  useEffect(() => {
+    const sf = toDateStr(globalDateFrom);
+    const ef = toDateStr(globalDateTo);
+    setStartDate(sf);
+    setEndDate(ef);
+    setAppliedFilters(prev => ({ ...prev, startDate: sf, endDate: ef }));
+  }, [globalDateFrom, globalDateTo]);
 
   useEffect(() => {
     resetPage();

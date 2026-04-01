@@ -722,6 +722,8 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         embedded={embedded}
         globalVessels={globalVessels}
         globalComponent={globalComponent}
+        globalDateFrom={categoryFilters.dateRange.from}
+        globalDateTo={categoryFilters.dateRange.to}
       />
     );
   }
