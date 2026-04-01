@@ -291,6 +291,16 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     return ids;
   }, [jobMappingsData]);
 
+  const vesselJobMappedCount = useMemo(() => {
+    return vesselJobsData.filter((vj: { juuid?: string }) => vj.juuid && jobLinkedVesselJobIds.has(vj.juuid)).length;
+  }, [vesselJobsData, jobLinkedVesselJobIds]);
+  const vesselJobUnmappedCount = useMemo(() => Math.max(0, vesselJobsData.length - vesselJobMappedCount), [vesselJobsData, vesselJobMappedCount]);
+
+  const vesselSpareMappedCount = useMemo(() => {
+    return vesselSparesData.filter((vs: { suuid?: string }) => vs.suuid && spareLinkedVesselSpareIds.has(String(vs.suuid))).length;
+  }, [vesselSparesData, spareLinkedVesselSpareIds]);
+  const vesselSpareUnmappedCount = useMemo(() => Math.max(0, vesselSparesData.length - vesselSpareMappedCount), [vesselSparesData, vesselSpareMappedCount]);
+
   const selectedFleetJobLinkedDetails = useMemo(() => {
     if (!selectedFleetJob) return [];
     return selectedFleetJobMappings.map((m) => {
@@ -1731,6 +1741,16 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                     <Anchor className="h-4 w-4 text-cyan-600" />
                     Vessel Jobs
                   </CardTitle>
+                  <div className="flex items-center gap-4 text-sm mt-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500" />
+                      <span data-testid="text-vessel-job-mapped-count">Mapped: {vesselJobMappedCount}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gray-400" />
+                      <span data-testid="text-vessel-job-unmapped-count">Not Mapped: {vesselJobUnmappedCount}</span>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   <ScrollArea className="h-[500px]">
@@ -2022,6 +2042,16 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                         className="h-7 pl-7 pr-2 text-xs w-44"
                         data-testid="input-vessel-spare-search"
                       />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm mt-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500" />
+                      <span data-testid="text-vessel-spare-mapped-count">Mapped: {vesselSpareMappedCount}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gray-400" />
+                      <span data-testid="text-vessel-spare-unmapped-count">Not Mapped: {vesselSpareUnmappedCount}</span>
                     </div>
                   </div>
                 </CardHeader>
