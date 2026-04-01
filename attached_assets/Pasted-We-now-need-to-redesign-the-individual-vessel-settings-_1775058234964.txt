@@ -1,0 +1,346 @@
+We now need to redesign the individual vessel settings popup in the Lead Time & Grace Period Settings page.
+
+The current vessel popup still follows the older pattern:
+
+inside Calendar-Based Jobs there is a Grace Period Mode dropdown,
+
+it shows a company-standard summary text,
+
+it still has the old Default Grace Days field behavior,
+
+and the overall structure is not consistent with the new Company Standard Settings popup we created.
+
+We want to make the vessel popup more logical and aligned with the new company-standard model.
+
+Main requirement
+The individual vessel settings popup must now support two modes at the top:
+
+Company Standard
+
+Custom
+
+This mode selector must appear at the top of the vessel popup, not buried inside only one section.
+
+Intended behavior
+By default, vessel can use Company Standard settings.
+
+If the user selects Company Standard, the vessel should inherit the company-standard settings already configured in the Company Standard popup.
+
+If the user selects Custom, the user should be able to define separate vessel-specific settings.
+
+These custom settings must override company standard for that vessel only.
+
+They must not affect any other vessel.
+
+They must not change the company-standard settings.
+
+This is the core business rule.
+
+UI requirement
+When vessel popup is in Custom mode, the UI and settings structure must be exactly same as what we made for the Company Standard popup UI.
+
+That means the vessel-specific popup should follow the same structure and feel as the company-standard popup, so the user sees one consistent configuration model.
+
+New top-level mode control
+At the very top of the vessel popup, add a clear selector for:
+
+Company Standard
+
+Custom
+
+Use a dropdown, segmented control, or radio-group pattern — whichever fits the current UI best — but it must be clear and prominent.
+
+Recommended label:
+
+Settings Mode
+
+or
+
+Configuration Mode
+
+Expected behavior
+If mode = Company Standard
+The vessel should use the saved company-standard values.
+
+The popup should show the company-standard configuration in read-only or inherited form.
+
+User should understand that this vessel is inheriting global defaults.
+
+Saving in this mode should simply mark the vessel as using company standard.
+
+If mode = Custom
+The popup should open full editable vessel-specific settings.
+
+These settings should override company standard for this vessel only.
+
+Structure in Custom mode
+When Custom mode is selected, the popup should match the same UI pattern as Company Standard popup.
+
+That means it should contain two tabs:
+
+Calendar-Based Jobs
+
+Running Hours Based Jobs
+
+This should mirror the company-standard popup structure.
+
+Calendar-Based Jobs tab in Custom mode
+This tab should allow vessel-specific configuration for:
+
+A. Lead Time
+Provide editable fields:
+
+Lead Time for Critical Jobs — days before due
+
+Lead Time for Non-Critical Jobs — days before due
+
+B. Grace Period
+Use the same structure as company-standard popup:
+
+Grace Method
+Radio buttons, one selection only:
+
+Fixed Days
+
+Month End
+
+Specific Date of Next Month
+
+Scope
+Radio buttons, one selection only:
+
+Apply to all Calendar-Based Work Orders
+
+Apply only to Calendar-Based WOs due in last week of month
+
+Fallback for remaining WOs
+If scope = only due in last week of month, show the fallback section for:
+
+Calendar-Based WOs not due in last week of month
+
+This should follow the same pattern and behavior as the company-standard popup.
+
+Running Hours Based Jobs tab in Custom mode
+This tab should allow vessel-specific configuration for:
+
+A. Lead Time
+Provide editable fields:
+
+Lead Time for Critical Jobs — hours before due
+
+Lead Time for Non-Critical Jobs — hours before due
+
+B. Grace Period
+Use the same RH structure as company-standard popup:
+
+Grace Method / RH grace configuration as already finalized in the company-standard UI for RH jobs
+
+Same scope pattern as finalized there
+
+Same fallback logic if currently supported there
+
+Important:
+The vessel popup in Custom mode should not invent a different RH structure. It must stay aligned with the same RH model used in the company-standard popup so the two experiences remain consistent.
+
+Structure in Company Standard mode
+When Company Standard mode is selected:
+
+user should not be editing vessel-specific values,
+
+instead the popup should clearly show that this vessel uses inherited company-standard settings,
+
+and the displayed values should match the current company-standard configuration.
+
+Recommended UX behavior
+You may do one of the following:
+
+Option A — Read-only inherited view
+Show the same two tabs:
+
+Calendar-Based Jobs
+
+Running Hours Based Jobs
+
+but all fields are read-only / disabled, with a clear note:
+
+“This vessel is currently using Company Standard settings.”
+
+This is my preferred option because it keeps the UI consistent and transparent.
+
+Option B — Compact inherited summary
+Show a compact inherited summary and disable editing entirely.
+
+Option A is better because it visually matches the company-standard structure and makes comparison easier.
+
+Important business logic
+Please implement the persistence carefully.
+
+If vessel mode = Company Standard
+The vessel should:
+
+reference/use company-standard settings,
+
+not store separate active custom values as the effective source,
+
+and use company standard for status behavior.
+
+If vessel mode = Custom
+The vessel should:
+
+use its own saved vessel-specific settings,
+
+override company standard only for this vessel,
+
+not modify company-standard data.
+
+Switching behavior
+If a vessel has custom settings and the user changes mode back to Company Standard:
+
+the effective settings should return to inherited company-standard behavior,
+
+custom values may remain stored in background for future reuse if desired, but they must not remain active unless mode = Custom.
+
+Please choose the cleanest implementation, but the business rule is:
+
+effective source must depend on selected mode
+
+Current outdated elements to remove or replace
+The current vessel popup still has:
+
+Grace Period Mode dropdown within Calendar-Based Jobs,
+
+old Default Grace Days field,
+
+company-standard summary text placed inside the old layout.
+
+These should be removed or redesigned as part of the new structure.
+
+Specifically:
+
+do not keep the old embedded Grace Period Mode pattern,
+
+do not keep the old “Default Grace Days” field pattern,
+
+do not keep a mixed old/new UI.
+
+The popup should become fully aligned with the new company-standard configuration structure.
+
+Suggested popup flow
+Top area
+Popup title: Lead Time & Grace Period Settings
+
+Vessel badge/name
+
+Settings Mode selector: Company Standard / Custom
+
+Body
+If Company Standard:
+
+show inherited tabs and values in read-only mode
+
+If Custom:
+
+show editable tabs
+
+Calendar-Based Jobs tab
+
+Running Hours Based Jobs tab
+
+Bottom
+Cancel
+
+Save Settings
+
+Validation requirements
+Please test these scenarios:
+
+Scenario 1 — Vessel uses Company Standard
+Open vessel popup
+
+Select Company Standard mode
+
+Save
+
+Confirm vessel inherits current company-standard values
+
+Confirm no other vessel is affected
+
+Scenario 2 — Vessel switches to Custom
+Open vessel popup
+
+Select Custom mode
+
+Change calendar lead/grace
+
+Change RH lead/grace
+
+Save
+
+Confirm only this vessel uses custom values
+
+Confirm company-standard values remain unchanged
+
+Scenario 3 — Switch back from Custom to Company Standard
+Vessel currently has custom settings
+
+Change mode back to Company Standard
+
+Save
+
+Confirm vessel again uses inherited company-standard values
+
+Confirm custom values are not active anymore
+
+Scenario 4 — UI consistency
+Custom mode vessel popup should visually and structurally match the company-standard popup
+
+Labels must remain type-specific:
+
+Calendar-Based Work Orders
+
+RH-Based Work Orders
+
+Data / backend expectation
+Please update the vessel-specific settings model so it can explicitly store or determine:
+
+whether vessel is using Company Standard or Custom
+
+and, if Custom, the vessel-specific lead and grace values for both calendar and RH job types
+
+This should be implemented cleanly so future logic can always determine the vessel’s effective settings source.
+
+Out of scope
+Do not change in this task:
+
+company-standard popup structure,
+
+dashboard behavior,
+
+report logic,
+
+unrelated admin pages.
+
+This task is only about:
+
+redesigning the individual vessel popup,
+
+adding top-level Company Standard / Custom mode,
+
+aligning vessel popup UI with company-standard popup UI,
+
+and implementing vessel-level override behavior properly.
+
+Final expected result
+After this task:
+
+each vessel popup begins with Company Standard / Custom mode selection,
+
+Company Standard mode uses inherited company defaults,
+
+Custom mode allows full editable vessel-specific override,
+
+the vessel popup UI is consistent with the company-standard popup UI,
+
+custom settings affect only the selected vessel,
+
+company-standard settings remain unchanged for all other vessels.
