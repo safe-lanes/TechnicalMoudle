@@ -340,10 +340,11 @@ export async function upsertCompanyStandardGraceSettings(data: any, username: st
     throw new ValidationError('Specific Date of Next Month requires a day value between 1 and 28');
   }
 
+  const validRhFallbackMethods = ['MONTH_END', 'FIXED_HOURS'];
   const rhFallbackMethod = data.rhFallbackMethod || 'MONTH_END';
   if (rhGraceScope === 'LAST_WEEK_OF_MONTH') {
-    if (!validRhMethods.includes(rhFallbackMethod)) {
-      throw new ValidationError(`Invalid RH fallback method: ${rhFallbackMethod}`);
+    if (!validRhFallbackMethods.includes(rhFallbackMethod)) {
+      throw new ValidationError(`Invalid RH fallback method: ${rhFallbackMethod}. Must be MONTH_END or FIXED_HOURS`);
     }
     if (rhFallbackMethod === 'FIXED_HOURS' && (data.rhFallbackGraceHours === undefined || data.rhFallbackGraceHours === null || data.rhFallbackGraceHours < 0)) {
       throw new ValidationError('RH fallback grace hours is required when fallback method is Fixed Hours');
