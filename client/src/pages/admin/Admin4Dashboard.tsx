@@ -4,7 +4,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Building2, List, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, Database, AlertTriangle, CheckCircle2, X, Bell, Settings, MapPin } from "lucide-react";
+import { Building2, List, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, Database, AlertTriangle, CheckCircle2, X, Bell, MapPin } from "lucide-react";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
 import MasterDataManagement from "./MasterDataManagement";
@@ -50,15 +50,6 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
     queryKey: ['/technical/api/fleet/spares'],
   });
 
-  const { data: masterDataResponse, isLoading: isMasterDataLoading } = useQuery<{ items: any[]; total: number }>({
-    queryKey: ['/technical/api/fleet-admin/master-data', 'dashboard'],
-    queryFn: async () => {
-      const response = await fetch('/technical/api/fleet-admin/master-data?limit=1');
-      if (!response.ok) throw new Error('Failed to fetch master data');
-      return response.json();
-    }
-  });
-
   const { data: pmsSettingsData, isLoading: isPmsSettingsLoading } = useQuery<PmsVesselSettings[]>({
     queryKey: ['/technical/api/pms-vessel-settings'],
   });
@@ -69,13 +60,12 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
     queryKey: ['/technical/api/fleets'],
   });
 
-  const { data: dashboardStats, isLoading: isStatsLoading } = useQuery<any>({
+  const { data: dashboardStats } = useQuery<any>({
     queryKey: ['/technical/api/fleet-admin/dashboard-stats'],
   });
 
   const totalMakers = Array.isArray(makersData) ? makersData.length : 0;
   const totalMasterLists = Array.isArray(masterListsData) ? masterListsData.length : 0;
-  const totalMasterData = masterDataResponse?.total ?? 0;
   const totalComponents = Array.isArray(componentsData) ? componentsData.filter((c: any) => c.fleetEquipmentCode?.length === 10).length : 0;
   const totalJobs = Array.isArray(jobsData) ? jobsData.length : 0;
   const totalSpares = Array.isArray(sparesData) ? sparesData.length : 0;
