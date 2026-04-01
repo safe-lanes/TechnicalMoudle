@@ -104,6 +104,32 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
 
   type TreeNode = FleetComponents & { children: TreeNode[] };
 
+  const naturalSortCompare = (a: string, b: string): number => {
+    const aParts = a.split(".");
+    const bParts = b.split(".");
+    const numRe = /^\d+$/;
+    const len = Math.max(aParts.length, bParts.length);
+    for (let i = 0; i < len; i++) {
+      if (i >= aParts.length) return -1;
+      if (i >= bParts.length) return 1;
+      const aIsNum = numRe.test(aParts[i]);
+      const bIsNum = numRe.test(bParts[i]);
+      if (aIsNum && bIsNum) {
+        const diff = parseInt(aParts[i], 10) - parseInt(bParts[i], 10);
+        if (diff !== 0) return diff;
+      } else {
+        const cmp = aParts[i].localeCompare(bParts[i]);
+        if (cmp !== 0) return cmp;
+      }
+    }
+    return 0;
+  };
+
+  const sortTreeNodes = (nodes: TreeNode[]) => {
+    nodes.sort((a, b) => naturalSortCompare(a.fleetEquipmentCode, b.fleetEquipmentCode));
+    nodes.forEach((n) => sortTreeNodes(n.children));
+  };
+
   const buildTree = (components: FleetComponents[]): TreeNode[] => {
     const tree: TreeNode[] = [];
     const lookup = new Map<string, TreeNode>();
@@ -127,6 +153,8 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
         tree.push(node);
       }
     });
+
+    sortTreeNodes(tree);
 
     return tree;
   };

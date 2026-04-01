@@ -343,8 +343,28 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
       }
     });
 
+    const numRe = /^\d+$/;
+    const naturalSortCompare = (x: string, y: string): number => {
+      const xParts = x.split(".");
+      const yParts = y.split(".");
+      const len = Math.max(xParts.length, yParts.length);
+      for (let i = 0; i < len; i++) {
+        if (i >= xParts.length) return -1;
+        if (i >= yParts.length) return 1;
+        const xIsNum = numRe.test(xParts[i]);
+        const yIsNum = numRe.test(yParts[i]);
+        if (xIsNum && yIsNum) {
+          const diff = parseInt(xParts[i], 10) - parseInt(yParts[i], 10);
+          if (diff !== 0) return diff;
+        } else {
+          const cmp = xParts[i].localeCompare(yParts[i]);
+          if (cmp !== 0) return cmp;
+        }
+      }
+      return 0;
+    };
     const sortNodes = (nodes: FleetTreeNode[]) => {
-      nodes.sort((a, b) => a.code.localeCompare(b.code));
+      nodes.sort((a, b) => naturalSortCompare(a.code, b.code));
       nodes.forEach((n) => sortNodes(n.children));
     };
     sortNodes(roots);
@@ -394,8 +414,28 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
       node.isParent = node.children.length > 0;
     });
 
+    const numRe2 = /^\d+$/;
+    const naturalSortCompare = (x: string, y: string): number => {
+      const xParts = x.split(".");
+      const yParts = y.split(".");
+      const len = Math.max(xParts.length, yParts.length);
+      for (let i = 0; i < len; i++) {
+        if (i >= xParts.length) return -1;
+        if (i >= yParts.length) return 1;
+        const xIsNum = numRe2.test(xParts[i]);
+        const yIsNum = numRe2.test(yParts[i]);
+        if (xIsNum && yIsNum) {
+          const diff = parseInt(xParts[i], 10) - parseInt(yParts[i], 10);
+          if (diff !== 0) return diff;
+        } else {
+          const cmp = xParts[i].localeCompare(yParts[i]);
+          if (cmp !== 0) return cmp;
+        }
+      }
+      return 0;
+    };
     const sortNodes = (nodes: VesselTreeNode[]) => {
-      nodes.sort((a, b) => a.code.localeCompare(b.code));
+      nodes.sort((a, b) => naturalSortCompare(a.code, b.code));
       nodes.forEach((n) => sortNodes(n.children));
     };
     sortNodes(roots);
