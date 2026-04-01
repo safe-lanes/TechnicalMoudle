@@ -76,6 +76,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
   const [isFilterRefreshing, setIsFilterRefreshing] = useState(false);
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialLoadRef = useRef(false);
+  const previewVersionRef = useRef(0);
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
@@ -112,6 +113,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
   useEffect(() => {
     if (embedded && selectedReportId) {
       if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
+      const version = ++previewVersionRef.current;
       setPreviewData(null);
       initialLoadRef.current = false;
       if (storesDetailReportIds.includes(selectedReportId)) {
@@ -119,7 +121,9 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         initialLoadRef.current = true;
       } else {
         setSelectedReport(null);
-        handlePreviewReport(selectedReportId).then(() => { initialLoadRef.current = true; });
+        handlePreviewReport(selectedReportId).then(() => {
+          if (previewVersionRef.current === version) initialLoadRef.current = true;
+        });
       }
     }
   }, [embedded, selectedReportId]);
@@ -129,9 +133,12 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
     if (storesDetailReportIds.includes(selectedReportId)) return;
     if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
     setIsFilterRefreshing(true);
+    const version = ++previewVersionRef.current;
     filterTimerRef.current = setTimeout(() => {
       setPreviewData(null);
-      handlePreviewReport(selectedReportId).finally(() => setIsFilterRefreshing(false));
+      handlePreviewReport(selectedReportId).finally(() => {
+        if (previewVersionRef.current === version) setIsFilterRefreshing(false);
+      });
     }, 300);
     return () => { if (filterTimerRef.current) clearTimeout(filterTimerRef.current); };
   }, [filterFingerprint]);
@@ -666,6 +673,8 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         onBack={() => setSelectedReport(embedded ? selectedReportId : null)}
         vesselId={effectiveVesselId}
         embedded={embedded}
+        globalVessels={globalVessels}
+        globalComponent={globalComponent}
       />
     );
   }
@@ -676,6 +685,8 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         onBack={() => setSelectedReport(embedded ? selectedReportId : null)}
         vesselId={effectiveVesselId}
         embedded={embedded}
+        globalVessels={globalVessels}
+        globalComponent={globalComponent}
       />
     );
   }
@@ -687,6 +698,8 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         vesselId={effectiveVesselId}
         source="stores"
         embedded={embedded}
+        globalVessels={globalVessels}
+        globalComponent={globalComponent}
       />
     );
   }
@@ -697,6 +710,8 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         onBack={() => setSelectedReport(embedded ? selectedReportId : null)}
         vesselId={effectiveVesselId}
         embedded={embedded}
+        globalVessels={globalVessels}
+        globalComponent={globalComponent}
       />
     );
   }

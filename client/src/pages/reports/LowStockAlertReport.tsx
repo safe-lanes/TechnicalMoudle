@@ -85,6 +85,8 @@ interface LowStockAlertReportProps {
   vesselId?: string;
   source?: 'spares' | 'stores';
   embedded?: boolean;
+  globalVessels?: string[];
+  globalComponent?: string;
 }
 
 type SortField = 'priority' | 'itemCode' | 'itemName' | 'itemType' | 'category' | 'rob' | 'minStock' | 'deficit' | 'deficitPercent' | 'uom' | 'avgMonthlyConsumption' | 'daysUntilStockout' | 'estimatedCost' | 'supplier' | 'leadTime';
@@ -130,7 +132,7 @@ function getDaysUntilStockoutDisplay(days: number | null) {
   return <span className="text-green-600">{days} days</span>;
 }
 
-const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesselId: propVesselId, source = 'stores', embedded }) => {
+const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesselId: propVesselId, source = 'stores', embedded, globalVessels = [], globalComponent = "" }) => {
   const { vesselId: contextVesselId, vessels } = useVessel();
   const effectiveVesselId = propVesselId || contextVesselId;
   const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels?.find((v: any) => v.id === effectiveVesselId)?.name || effectiveVesselId);
@@ -245,6 +247,15 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
 
   const filteredItems = useMemo(() => {
     let result = [...items];
+
+    if (globalComponent && globalComponent.trim()) {
+      const gc = globalComponent.toLowerCase();
+      result = result.filter(i =>
+        (i.itemCode || '').toLowerCase().includes(gc) ||
+        (i.itemName || '').toLowerCase().includes(gc) ||
+        (i.category || '').toLowerCase().includes(gc)
+      );
+    }
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();

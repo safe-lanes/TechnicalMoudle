@@ -83,6 +83,8 @@ interface StoresInventoryStatusReportProps {
   onBack: () => void;
   vesselId?: string;
   embedded?: boolean;
+  globalVessels?: string[];
+  globalComponent?: string;
 }
 
 type SortField = 'itemCode' | 'itemName' | 'category' | 'rob' | 'min' | 'status' | 'consumption' | 'trend' | 'daysUntilStockout' | 'priority';
@@ -110,7 +112,7 @@ function getLocation(item: StoresItem): string {
   return a || b || '-';
 }
 
-const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = ({ onBack, vesselId: propVesselId, embedded }) => {
+const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = ({ onBack, vesselId: propVesselId, embedded, globalVessels = [], globalComponent = "" }) => {
   const { vesselId: contextVesselId } = useVessel();
   const effectiveVesselId = propVesselId || contextVesselId;
   const { toast } = useToast();
@@ -142,8 +144,16 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
   const error = errorItems || errorLedger;
 
   const storesItems = useMemo(() => {
-    return rawStoresItems.filter(item => !item.deleted && item.isActive !== false);
-  }, [rawStoresItems]);
+    let items = rawStoresItems.filter(item => !item.deleted && item.isActive !== false);
+    if (globalComponent && globalComponent.trim()) {
+      const gc = globalComponent.toLowerCase();
+      items = items.filter(item =>
+        (item.itemCode || '').toLowerCase().includes(gc) ||
+        (item.itemName || '').toLowerCase().includes(gc)
+      );
+    }
+    return items;
+  }, [rawStoresItems, globalComponent]);
 
   const consumptionMap = useMemo(() => {
     const now = new Date();

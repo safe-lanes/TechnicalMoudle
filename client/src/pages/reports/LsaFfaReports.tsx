@@ -72,6 +72,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
   const [isFilterRefreshing, setIsFilterRefreshing] = useState(false);
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialLoadRef = useRef(false);
+  const previewVersionRef = useRef(0);
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
@@ -106,9 +107,12 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
   useEffect(() => {
     if (embedded && selectedReportId) {
       if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
+      const version = ++previewVersionRef.current;
       setPreviewData(null);
       initialLoadRef.current = false;
-      handlePreviewReport(selectedReportId).then(() => { initialLoadRef.current = true; });
+      handlePreviewReport(selectedReportId).then(() => {
+        if (previewVersionRef.current === version) initialLoadRef.current = true;
+      });
     }
   }, [embedded, selectedReportId]);
 
@@ -116,9 +120,12 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
     if (!embedded || !selectedReportId || !initialLoadRef.current) return;
     if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
     setIsFilterRefreshing(true);
+    const version = ++previewVersionRef.current;
     filterTimerRef.current = setTimeout(() => {
       setPreviewData(null);
-      handlePreviewReport(selectedReportId).finally(() => setIsFilterRefreshing(false));
+      handlePreviewReport(selectedReportId).finally(() => {
+        if (previewVersionRef.current === version) setIsFilterRefreshing(false);
+      });
     }, 300);
     return () => { if (filterTimerRef.current) clearTimeout(filterTimerRef.current); };
   }, [filterFingerprint]);

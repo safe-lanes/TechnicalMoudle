@@ -95,6 +95,8 @@ interface ChemicalsExpiryReportProps {
   onBack: () => void;
   vesselId?: string;
   embedded?: boolean;
+  globalVessels?: string[];
+  globalComponent?: string;
 }
 
 type SortField = 'itemCode' | 'itemName' | 'batchNumber' | 'manufactureDate' | 'expiryDate' | 'daysUntilExpiry' | 'rob' | 'min' | 'stockStatus' | 'locationA' | 'hazardClassification' | 'hasSds';
@@ -167,7 +169,7 @@ function getExpiryDateColor(item: ChemicalItem): string {
   return 'text-gray-900';
 }
 
-const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, vesselId: propVesselId, embedded }) => {
+const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, vesselId: propVesselId, embedded, globalVessels = [], globalComponent = "" }) => {
   const { vesselId: contextVesselId } = useVessel();
   const effectiveVesselId = propVesselId || contextVesselId;
   const { toast } = useToast();
@@ -203,6 +205,14 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
 
   const filteredItems = useMemo(() => {
     let result = [...items];
+
+    if (globalComponent && globalComponent.trim()) {
+      const gc = globalComponent.toLowerCase();
+      result = result.filter(i =>
+        (i.itemCode || '').toLowerCase().includes(gc) ||
+        (i.itemName || '').toLowerCase().includes(gc)
+      );
+    }
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();

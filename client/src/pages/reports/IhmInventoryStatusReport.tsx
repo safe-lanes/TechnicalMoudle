@@ -136,15 +136,15 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
     enabled: !!effectiveVesselId,
   });
 
-  const rawItems = data?.items || [];
+  const rawItems: IhmInventoryItem[] = data?.items || [];
   const filteredByGlobal = useMemo(() => {
     let result = rawItems;
     if (globalVessels.length > 0 && vessels.length > 0 && globalVessels.length < vessels.length) {
-      result = result.filter((item: any) => !item.vesselId || globalVessels.includes(item.vesselId));
+      result = result.filter((item: IhmInventoryItem & { vesselId?: string }) => !item.vesselId || globalVessels.includes(item.vesselId));
     }
     if (globalComponent) {
       const q = globalComponent.toLowerCase();
-      result = result.filter((item: any) => {
+      result = result.filter((item: IhmInventoryItem) => {
         const name = (item.itemName || item.componentOrCategory || "").toLowerCase();
         const code = (item.itemCode || "").toLowerCase();
         return name.includes(q) || code.includes(q);
@@ -157,9 +157,9 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
     if (globalVessels.length === 0 && !globalComponent && data?.summary) return data.summary;
     return {
       totalItems: filteredByGlobal.length,
-      ihmPresent: filteredByGlobal.filter((i: any) => i.ihmStatus === 'present').length,
-      noIhm: filteredByGlobal.filter((i: any) => i.ihmStatus === 'not_present').length,
-      unknown: filteredByGlobal.filter((i: any) => i.ihmStatus !== 'present' && i.ihmStatus !== 'not_present').length,
+      ihmPresent: filteredByGlobal.filter((i: IhmInventoryItem) => i.ihmStatus === 'present').length,
+      noIhm: filteredByGlobal.filter((i: IhmInventoryItem) => i.ihmStatus === 'not_present').length,
+      unknown: filteredByGlobal.filter((i: IhmInventoryItem) => i.ihmStatus !== 'present' && i.ihmStatus !== 'not_present').length,
     };
   }, [filteredByGlobal, globalVessels.length, globalComponent, data?.summary]);
   const items = filteredByGlobal;

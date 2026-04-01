@@ -33,6 +33,8 @@ interface ConsumptionPatternReportProps {
   onBack: () => void;
   vesselId: string | null;
   embedded?: boolean;
+  globalVessels?: string[];
+  globalComponent?: string;
 }
 
 type ActiveTab = "trends" | "items" | "categories" | "efficiency" | "forecast";
@@ -41,7 +43,7 @@ type SortDirection = "asc" | "desc";
 
 const PIE_COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16"];
 
-const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onBack, vesselId, embedded }) => {
+const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onBack, vesselId, embedded, globalVessels = [], globalComponent = "" }) => {
   const { toast } = useToast();
 
   const [startDate, setStartDate] = useState("");
@@ -112,7 +114,15 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
   };
 
   const sortedItems = useMemo(() => {
-    const items = [...topConsumedItems];
+    let items = [...topConsumedItems];
+    if (globalComponent && globalComponent.trim()) {
+      const gc = globalComponent.toLowerCase();
+      items = items.filter((i: Record<string, unknown>) =>
+        ((i.itemCode as string) || '').toLowerCase().includes(gc) ||
+        ((i.itemName as string) || '').toLowerCase().includes(gc) ||
+        ((i.category as string) || '').toLowerCase().includes(gc)
+      );
+    }
     items.sort((a: any, b: any) => {
       let aVal = a[sortField];
       let bVal = b[sortField];
@@ -125,7 +135,7 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
       return 0;
     });
     return items;
-  }, [topConsumedItems, sortField, sortDirection]);
+  }, [topConsumedItems, sortField, sortDirection, globalComponent]);
 
   const [generatingPdf, setGeneratingPdf] = useState(false);
 

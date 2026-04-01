@@ -72,12 +72,14 @@ interface CriticalSparesReportProps {
   onBack: () => void;
   vesselId?: string;
   embedded?: boolean;
+  globalVessels?: string[];
+  globalComponent?: string;
 }
 
 type SortField = 'partCode' | 'partName' | 'rob' | 'shortageQty' | 'stockStatus' | 'criticalityLevel';
 type SortDirection = 'asc' | 'desc';
 
-const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, vesselId: propVesselId, embedded }) => {
+const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, vesselId: propVesselId, embedded, globalVessels = [], globalComponent = "" }) => {
   const { vesselId: contextVesselId } = useVessel();
   const effectiveVesselId = propVesselId || contextVesselId;
   const { toast } = useToast();
@@ -115,6 +117,16 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
   const filteredAndSortedItems = useMemo(() => {
     if (!data?.data) return [];
     let items = [...data.data];
+
+    if (globalComponent && globalComponent.trim()) {
+      const gc = globalComponent.toLowerCase();
+      items = items.filter(
+        (i) =>
+          i.partCode.toLowerCase().includes(gc) ||
+          i.partName.toLowerCase().includes(gc) ||
+          (i.criticalComponents && i.criticalComponents.toLowerCase().includes(gc))
+      );
+    }
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
