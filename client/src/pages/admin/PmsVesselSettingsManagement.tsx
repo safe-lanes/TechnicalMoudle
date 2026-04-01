@@ -757,11 +757,11 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
 
                   <div className="border-t pt-3 space-y-3">
                     <Label className="text-sm font-semibold text-gray-700">Scope</Label>
-                    <p className="text-xs text-gray-500">Select which work orders this grace rule applies to.</p>
+                    <p className="text-xs text-gray-500">Select which calendar-based work orders this grace rule applies to.</p>
                     <div className="space-y-2">
                       {[
-                        { value: 'ALL_WORK_ORDERS', label: 'Apply to all Work Orders', desc: 'The selected grace method applies to all calendar-based WOs' },
-                        { value: 'LAST_WEEK_OF_MONTH', label: 'Apply only to WOs due in last week of month', desc: 'The grace method applies only to WOs due in the last 7 days of the month' },
+                        { value: 'ALL_WORK_ORDERS', label: 'Apply to all Calendar-Based Work Orders', desc: 'The selected grace method applies to all calendar-based work orders' },
+                        { value: 'LAST_WEEK_OF_MONTH', label: 'Apply only to Calendar-Based WOs due in last week of month', desc: 'The grace method applies only to calendar-based work orders whose due date falls in the last 7 days of the month' },
                       ].map(option => (
                         <label
                           key={option.value}
@@ -790,9 +790,9 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
 
                     {companyGraceForm.scope === 'LAST_WEEK_OF_MONTH' && (
                       <div className="ml-7 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                        <Label className="text-sm font-medium text-amber-900">Fallback for WOs not due in last week of month</Label>
+                        <Label className="text-sm font-medium text-amber-900">Fallback for Calendar-Based WOs not due in last week of month</Label>
                         <p className="text-xs text-amber-700 mt-0.5 mb-2">
-                          This covers all remaining work orders that fall outside the last week.
+                          This covers all remaining calendar-based work orders whose due date falls outside the last 7 days of the month.
                         </p>
                         <div className="space-y-2">
                           {[
@@ -947,11 +947,11 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
 
                   <div className="border-t pt-3 space-y-3">
                     <Label className="text-sm font-semibold text-gray-700">Scope</Label>
-                    <p className="text-xs text-gray-500">Select which work orders this grace rule applies to.</p>
+                    <p className="text-xs text-gray-500">Select which running-hours-based work orders this grace rule applies to.</p>
                     <div className="space-y-2">
                       {[
-                        { value: 'ALL_WORK_ORDERS', label: 'Apply to all Work Orders', desc: 'The selected grace method applies to all RH-based WOs' },
-                        { value: 'LAST_WEEK_OF_MONTH', label: 'Apply only to WOs due in last week of month', desc: 'The grace method applies only to WOs due in the last 7 days of the month' },
+                        { value: 'ALL_WORK_ORDERS', label: 'Apply to all RH-Based Work Orders', desc: 'The selected grace method applies to all running-hours-based work orders' },
+                        { value: 'LAST_WEEK_OF_MONTH', label: 'Apply only to RH-Based WOs due in last week of month', desc: 'The grace method applies only to running-hours-based work orders whose due date falls in the last 7 days of the month' },
                       ].map(option => (
                         <label
                           key={option.value}
@@ -980,9 +980,9 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
 
                     {companyGraceForm.rhGraceScope === 'LAST_WEEK_OF_MONTH' && (
                       <div className="ml-7 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                        <Label className="text-sm font-medium text-amber-900">Fallback for WOs not due in last week of month</Label>
+                        <Label className="text-sm font-medium text-amber-900">Fallback for RH-Based WOs not due in last week of month</Label>
                         <p className="text-xs text-amber-700 mt-0.5 mb-2">
-                          This covers all remaining work orders that fall outside the last week.
+                          This covers all remaining running-hours-based work orders whose due date falls outside the last 7 days of the month.
                         </p>
                         <div className="space-y-2">
                           {[
