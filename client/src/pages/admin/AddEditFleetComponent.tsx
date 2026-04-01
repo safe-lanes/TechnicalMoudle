@@ -4,8 +4,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { ChevronRight, ChevronDown, Plus, Search, ArrowLeft, Trash2, X } from "lucide-react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ChevronRight, ChevronDown, ChevronUp, Plus, Search, ArrowLeft, Trash2, X } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { FleetComponents, Maker } from "@shared/schema";
@@ -201,6 +201,7 @@ export default function AddEditFleetComponent() {
   const [newComponentCode, setNewComponentCode] = useState("");
   const [makerSearchText, setMakerSearchText] = useState("");
   const [showMakerSuggestions, setShowMakerSuggestions] = useState(false);
+  const [sectionCollapsed, setSectionCollapsed] = useState(false);
 
   const { data: fleetComponentsList = [], isLoading } = useQuery<FleetComponents[]>({
     queryKey: ["/technical/api/fleet-admin/fleet-components"],
@@ -500,14 +501,14 @@ export default function AddEditFleetComponent() {
     : (formData.fleetEquipmentName || selectedNode?.name || "");
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="bg-white border-b px-6 py-4">
+    <div className="h-full flex flex-col bg-gray-50">
+      <div className="px-6 py-4 bg-white border-b">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-gray-800">Add / Edit Fleet Component</h1>
-          <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold text-gray-900">Add / Edit Fleet Component</h1>
+          <div className="flex items-center gap-2">
             <Button
-              variant="outline"
-              className="border-cyan-600 text-cyan-600 hover:bg-cyan-50"
+              size="sm"
+              className="bg-[#16569e] text-white"
               onClick={() => handleAddChild(selectedNode?.code || formData.fleetEquipmentCode || "6")}
               data-testid="btn-add-sub-equipment"
             >
@@ -516,6 +517,8 @@ export default function AddEditFleetComponent() {
             </Button>
             <Button
               variant="outline"
+              size="sm"
+              className="text-gray-600 hover:bg-gray-50"
               onClick={() => setLocation("/admin/fleet-data")}
               data-testid="btn-back"
             >
@@ -524,48 +527,47 @@ export default function AddEditFleetComponent() {
             </Button>
           </div>
         </div>
-
-        <div className="flex items-center gap-4 mt-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search Components.."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-components"
-            />
-          </div>
-
-          <Button
-            variant="outline"
-            size="icon"
-            className="text-red-600 hover:bg-red-50"
-            onClick={handleDelete}
-            disabled={!selectedNode?.data && !editId}
-            data-testid="btn-delete"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-
-          <Button
-            className="bg-cyan-600 hover:bg-cyan-700"
-            onClick={handleSave}
-            disabled={updateFleetComponentMutation.isPending || createFleetComponentMutation.isPending}
-            data-testid="btn-save"
-          >
-            Save
-          </Button>
-        </div>
       </div>
 
-      <div className="flex h-[calc(100vh-140px)]">
-        <div className="w-96 bg-white border-r flex flex-col">
-          <div className="bg-cyan-600 text-white px-4 py-3 font-semibold flex items-center">
-            <ChevronDown className="h-4 w-4 mr-2" />
-            FLEET COMPONENTS
+      <div className="bg-white border-b px-6 py-2 flex items-center gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search Components..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 h-8"
+            data-testid="input-search-components"
+          />
+        </div>
+
+        <Button
+          variant="outline"
+          size="icon"
+          className="text-red-600 hover:bg-red-50 h-8 w-8"
+          onClick={handleDelete}
+          disabled={!selectedNode?.data && !editId}
+          data-testid="btn-delete"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+
+        <Button
+          className="bg-green-600 hover:bg-green-700 text-white h-8"
+          onClick={handleSave}
+          disabled={updateFleetComponentMutation.isPending || createFleetComponentMutation.isPending}
+          data-testid="btn-save"
+        >
+          Save
+        </Button>
+      </div>
+
+      <div className="flex-1 flex overflow-hidden">
+        <div className="w-[30%] flex flex-col border-r">
+          <div className="px-3 py-2 bg-sky-500">
+            <span className="text-white font-semibold text-sm">FLEET COMPONENTS</span>
           </div>
-          <ScrollArea className="flex-1">
+          <div className="flex-1 overflow-y-auto bg-white">
             {isLoading ? (
               <div className="p-4 space-y-2">
                 {[...Array(8)].map((_, i) => (
@@ -595,183 +597,195 @@ export default function AddEditFleetComponent() {
                   value={newComponentCode}
                   onChange={(e) => setNewComponentCode(e.target.value)}
                   placeholder="Enter new component code..."
-                  className="text-sm"
+                  className="text-sm h-8"
                   data-testid="input-new-component-code"
                 />
               </div>
             )}
-          </ScrollArea>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6">
           {(selectedNode || isAddingNew || editId) ? (
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-600 mb-4">
+            <>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4" data-testid="text-component-title">
                 {displayCode} {displayName}
               </h2>
 
-              <div className="border-t pt-4">
-                <h3 className="text-cyan-600 font-medium mb-4">Fleet Component Information</h3>
-
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="relative">
-                    <label className="text-blue-600 text-xs font-medium mb-1 block">Maker*</label>
+              <div className="space-y-4">
+                <Card className="rounded-sm border border-gray-200 shadow-none">
+                  <CardHeader
+                    className="py-3 px-4 cursor-pointer hover:bg-gray-50 flex-row items-center justify-between"
+                    onClick={() => setSectionCollapsed(!sectionCollapsed)}
+                    data-testid="section-header-fleet-info"
+                  >
+                    <span className="text-sm font-medium text-[#16569e]">Fleet Component Information</span>
+                    {sectionCollapsed ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
+                  </CardHeader>
+                  {!sectionCollapsed && (
+                  <CardContent className="pt-4 pb-4 px-4 border-t border-gray-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     <div className="relative">
-                      <Input
-                        value={makerSearchText}
-                        onChange={(e) => handleMakerSearchChange(e.target.value)}
-                        onFocus={() => { if (makerSearchText.trim()) setShowMakerSuggestions(true); }}
-                        onBlur={() => setTimeout(() => setShowMakerSuggestions(false), 200)}
-                        placeholder="Type to search makers..."
-                        className="text-sm pr-8"
-                        data-testid="input-maker-search"
-                      />
-                      {makerSearchText && (
-                        <button
-                          type="button"
-                          onClick={handleClearMaker}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                          data-testid="button-clear-maker"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Maker*</label>
+                      <div className="relative">
+                        <Input
+                          value={makerSearchText}
+                          onChange={(e) => handleMakerSearchChange(e.target.value)}
+                          onFocus={() => { if (makerSearchText.trim()) setShowMakerSuggestions(true); }}
+                          onBlur={() => setTimeout(() => setShowMakerSuggestions(false), 200)}
+                          placeholder="Type to search makers..."
+                          className="h-8 text-sm pr-8"
+                          data-testid="input-maker-search"
+                        />
+                        {makerSearchText && (
+                          <button
+                            type="button"
+                            onClick={handleClearMaker}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            data-testid="button-clear-maker"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                      {showMakerSuggestions && filteredMakers.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                          {filteredMakers.map((maker) => (
+                            <div
+                              key={maker.id}
+                              className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 hover:text-cyan-700 border-b border-gray-100 last:border-b-0"
+                              onMouseDown={() => handleMakerSelect(maker)}
+                              data-testid={`maker-suggestion-${maker.id}`}
+                            >
+                              <span className="font-medium">{maker.makerName}</span>
+                              {maker.makerCode && (
+                                <span className="text-gray-400 ml-2 text-xs">({maker.makerCode})</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
-                    {showMakerSuggestions && filteredMakers.length > 0 && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                        {filteredMakers.map((maker) => (
-                          <div
-                            key={maker.id}
-                            className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 hover:text-cyan-700 border-b border-gray-100 last:border-b-0"
-                            onMouseDown={() => handleMakerSelect(maker)}
-                            data-testid={`maker-suggestion-${maker.id}`}
-                          >
-                            <span className="font-medium">{maker.makerName}</span>
-                            {maker.makerCode && (
-                              <span className="text-gray-400 ml-2 text-xs">({maker.makerCode})</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
 
-                  <div>
-                    <label className="text-blue-600 text-xs font-medium mb-1 block">Maker Code</label>
-                    <Input
-                      value={formData.makerCode}
-                      readOnly
-                      placeholder="Auto-filled from maker selection"
-                      className="text-sm bg-gray-100 text-gray-600"
-                      data-testid="input-maker-code"
-                    />
-                  </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Maker Code</label>
+                      <Input
+                        value={formData.makerCode}
+                        readOnly
+                        placeholder="Auto-filled from maker selection"
+                        className="h-8 text-sm bg-gray-100 text-gray-600"
+                        data-testid="input-maker-code"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="text-blue-600 text-xs font-medium mb-1 block">Model</label>
-                    <Input
-                      value={formData.model}
-                      onChange={(e) => setFormData(prev => ({ ...prev, model: e.target.value }))}
-                      placeholder="As Per Master Data"
-                      className="text-sm"
-                      data-testid="input-model"
-                    />
-                  </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Model</label>
+                      <Input
+                        value={formData.model}
+                        onChange={(e) => setFormData(prev => ({ ...prev, model: e.target.value }))}
+                        placeholder="As Per Master Data"
+                        className="h-8 text-sm"
+                        data-testid="input-model"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="text-blue-600 text-xs font-medium mb-1 block">Model Code</label>
-                    <Input
-                      value={formData.modelCode}
-                      onChange={(e) => setFormData(prev => ({ ...prev, modelCode: e.target.value }))}
-                      className="text-sm"
-                      data-testid="input-model-code"
-                    />
-                  </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Model Code</label>
+                      <Input
+                        value={formData.modelCode}
+                        onChange={(e) => setFormData(prev => ({ ...prev, modelCode: e.target.value }))}
+                        className="h-8 text-sm"
+                        data-testid="input-model-code"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="text-blue-600 text-xs font-medium mb-1 block">Parent Code</label>
-                    <Input
-                      value={formData.parentCode}
-                      readOnly
-                      className="text-sm bg-gray-50"
-                      data-testid="input-parent-code"
-                    />
-                  </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Parent Code</label>
+                      <Input
+                        value={formData.parentCode}
+                        readOnly
+                        className="h-8 text-sm bg-gray-50"
+                        data-testid="input-parent-code"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="text-blue-600 text-xs font-medium mb-1 block">Fleet Equipment Code</label>
-                    <Input
-                      value={isAddingNew ? newComponentCode : formData.fleetEquipmentCode}
-                      readOnly={!isAddingNew}
-                      onChange={(e) => isAddingNew && setNewComponentCode(e.target.value)}
-                      className={`text-sm ${!isAddingNew ? "bg-gray-50" : ""}`}
-                      data-testid="input-fleet-equipment-code"
-                    />
-                  </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Fleet Equipment Code</label>
+                      <Input
+                        value={isAddingNew ? newComponentCode : formData.fleetEquipmentCode}
+                        readOnly={!isAddingNew}
+                        onChange={(e) => isAddingNew && setNewComponentCode(e.target.value)}
+                        className={`h-8 text-sm ${!isAddingNew ? "bg-gray-50" : ""}`}
+                        data-testid="input-fleet-equipment-code"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="text-blue-600 text-xs font-medium mb-1 block">Location</label>
-                    <Input
-                      value={formData.location}
-                      onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                      className="text-sm"
-                      data-testid="input-location"
-                    />
-                  </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Location</label>
+                      <Input
+                        value={formData.location}
+                        onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                        className="h-8 text-sm"
+                        data-testid="input-location"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="text-blue-600 text-xs font-medium mb-1 block">Rating</label>
-                    <Input
-                      value={formData.rating}
-                      onChange={(e) => setFormData(prev => ({ ...prev, rating: e.target.value }))}
-                      className="text-sm"
-                      data-testid="input-rating"
-                    />
-                  </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Rating</label>
+                      <Input
+                        value={formData.rating}
+                        onChange={(e) => setFormData(prev => ({ ...prev, rating: e.target.value }))}
+                        className="h-8 text-sm"
+                        data-testid="input-rating"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="text-blue-600 text-xs font-medium mb-1 block">Eqpt./ System Department</label>
-                    <Input
-                      value={formData.eqptSystemDept}
-                      onChange={(e) => setFormData(prev => ({ ...prev, eqptSystemDept: e.target.value }))}
-                      className="text-sm"
-                      data-testid="input-dept"
-                    />
-                  </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Eqpt./ System Department</label>
+                      <Input
+                        value={formData.eqptSystemDept}
+                        onChange={(e) => setFormData(prev => ({ ...prev, eqptSystemDept: e.target.value }))}
+                        className="h-8 text-sm"
+                        data-testid="input-dept"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="text-blue-600 text-xs font-medium mb-1 block">Component Category</label>
-                    <Input
-                      value={formData.componentCategory}
-                      onChange={(e) => setFormData(prev => ({ ...prev, componentCategory: e.target.value }))}
-                      className="text-sm"
-                      data-testid="input-category"
-                    />
-                  </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Component Category</label>
+                      <Input
+                        value={formData.componentCategory}
+                        onChange={(e) => setFormData(prev => ({ ...prev, componentCategory: e.target.value }))}
+                        className="h-8 text-sm"
+                        data-testid="input-category"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="text-blue-600 text-xs font-medium mb-1 block">Notes</label>
-                    <Input
-                      value={formData.notes}
-                      onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                      placeholder="Notes"
-                      className="text-sm bg-amber-50"
-                      data-testid="input-notes"
-                    />
-                  </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Notes</label>
+                      <Input
+                        value={formData.notes}
+                        onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                        placeholder="Notes"
+                        className="h-8 text-sm bg-amber-50"
+                        data-testid="input-notes"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="text-blue-600 text-xs font-medium mb-1 block">Fleet Equipment Name*</label>
-                    <Input
-                      value={formData.fleetEquipmentName}
-                      onChange={(e) => setFormData(prev => ({ ...prev, fleetEquipmentName: e.target.value }))}
-                      className="text-sm"
-                      data-testid="input-fleet-equipment-name"
-                    />
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Fleet Equipment Name*</label>
+                      <Input
+                        value={formData.fleetEquipmentName}
+                        onChange={(e) => setFormData(prev => ({ ...prev, fleetEquipmentName: e.target.value }))}
+                        className="h-8 text-sm"
+                        data-testid="input-fleet-equipment-name"
+                      />
+                    </div>
                   </div>
-                </div>
+                  </CardContent>
+                  )}
+                </Card>
               </div>
-            </div>
+            </>
           ) : (
             <div className="flex items-center justify-center h-full text-gray-500">
               <div className="text-center">
