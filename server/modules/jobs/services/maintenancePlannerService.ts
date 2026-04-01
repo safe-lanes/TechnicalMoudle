@@ -1,6 +1,8 @@
 import * as repo from '../repositories/jobRepository';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
+import { calculateCompanyStandardGraceEnd, buildCompanyGraceConfig } from '@shared/workOrders/status';
 import { ValidationError } from '../../shared/errors';
+import { storage } from '../../../storage';
 
 // ── Types ──
 
@@ -36,6 +38,8 @@ export async function getMaintenancePlannerData(filters: PlannerFilters) {
 
   // Fetch vessel PMS settings for grace period configuration
   // This aligns with work order table status logic
+  const companyGraceRow = await storage.getCompanyStandardGraceSettings();
+  const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
   const vesselSettings = await repo.findPmsVesselSettings(vesselId);
   const vs = vesselSettings as any;
   const vesselGraceSettings = vesselSettings ? {
@@ -181,26 +185,11 @@ export async function getMaintenancePlannerData(filters: PlannerFilters) {
         // Calculate grace end date based on vessel settings (same as work order logic)
         let graceEndDate: Date;
         if (vesselGraceSettings.calendarGraceMode === 'CUSTOM_DAYS') {
-          // Use custom fixed grace period
           graceEndDate = new Date(dueDateTime);
           graceEndDate.setDate(graceEndDate.getDate() + vesselGraceSettings.calendarGraceDays);
           graceEndDate.setHours(0, 0, 0, 0);
         } else {
-          // COMPANY_STANDARD: If due date is in last 7 days of month → grace = 7 days
-          // Otherwise → grace extends to end of the due month
-          const endOfMonth = new Date(dueDateTime.getFullYear(), dueDateTime.getMonth() + 1, 0);
-          endOfMonth.setHours(0, 0, 0, 0);
-          const daysUntilEndOfMonth = endOfMonth.getDate() - dueDateTime.getDate();
-
-          if (daysUntilEndOfMonth <= 7) {
-            // Due date is in last 7 days of month - use fixed 7-day grace
-            graceEndDate = new Date(dueDateTime);
-            graceEndDate.setDate(graceEndDate.getDate() + WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS);
-            graceEndDate.setHours(0, 0, 0, 0);
-          } else {
-            // Grace extends to end of month
-            graceEndDate = endOfMonth;
-          }
+          graceEndDate = calculateCompanyStandardGraceEnd(dueDateTime, companyGraceConfig);
         }
 
         // Status logic aligned with work order table:

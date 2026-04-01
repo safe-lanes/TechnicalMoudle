@@ -1,9 +1,11 @@
 import * as jobRepo from '../../jobs/repositories/jobRepository';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
+import { calculateCompanyStandardGraceEnd, buildCompanyGraceConfig, type CompanyStandardGraceConfig } from '@shared/workOrders/status';
 import { ValidationError } from '../../shared/errors';
 import { getDb } from '../../../db';
 import { plannerDates, type Job, type Component, type WorkOrder, type PmsVesselSettings } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
+import { storage } from '../../../storage';
 
 export interface WorkOrderPlannerFilters {
   vesselId: string;
@@ -63,6 +65,8 @@ export async function getWorkOrderPlannerData(filters: WorkOrderPlannerFilters) 
 
   const vesselSettings = await jobRepo.findPmsVesselSettings(vesselId);
   const graceSettings = buildVesselGraceSettings(vesselSettings);
+  const companyGraceRow = await storage.getCompanyStandardGraceSettings();
+  const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
 
   const allJobs: Job[] = await jobRepo.findJobs(vesselId);
   const activeJobs = allJobs.filter(j => j.isActive !== false && j.dataScope === 'vessel');
@@ -181,15 +185,7 @@ export async function getWorkOrderPlannerData(filters: WorkOrderPlannerFilters) 
           graceEndDate = new Date(dueDateTime);
           graceEndDate.setDate(graceEndDate.getDate() + graceSettings.calendarGraceDays);
         } else {
-          const endOfMonth = new Date(dueDateTime.getFullYear(), dueDateTime.getMonth() + 1, 0);
-          endOfMonth.setHours(0, 0, 0, 0);
-          const daysUntilEndOfMonth = endOfMonth.getDate() - dueDateTime.getDate();
-          if (daysUntilEndOfMonth <= 7) {
-            graceEndDate = new Date(dueDateTime);
-            graceEndDate.setDate(graceEndDate.getDate() + WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS);
-          } else {
-            graceEndDate = endOfMonth;
-          }
+          graceEndDate = calculateCompanyStandardGraceEnd(dueDateTime, companyGraceConfig);
         }
 
         if (daysUntilDue < 0) {
