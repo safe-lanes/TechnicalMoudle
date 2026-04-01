@@ -1,0 +1,427 @@
+You are working on the Reports sub-module of our Planned Maintenance System (PMS) web app.
+
+We need to redesign and enhance the top universal filter bar of the Reports page. These filters must be treated as global/universal filters, meaning they apply to all reports inside the Reports module, not just one report block.
+
+The current page already has:
+
+A vessel dropdown.
+
+A search bar that currently searches reports.
+
+A date range selector.
+
+A clear button.
+
+We want to retain these controls, but redefine and upgrade them properly.
+
+Main objective
+Build a universal filter system for the Reports page with these four global filters only:
+
+Vessel selector
+
+Search bar
+
+Date range
+
+Clear button
+
+These four filters must sit together in the top filter area near the current date range section and must apply to all reports shown in the Reports sub-module. The reports area currently includes sections such as Maintenance & Work Orders, Running Hours & Condition, IHM, Critical Equipment, and LSA/FFA Equipment, so the filter behavior must be common and reusable across all report types.
+
+Important product rule
+Keep the UI simple, practical, and operationally useful. Do not over-design it, do not add fancy logic for the sake of complexity, and do not make it feel like bulky enterprise software. The experience should feel clean, fast, and obvious for a marine PMS user.
+
+Universal filter behavior
+These four controls are universal filters. That means:
+
+They must remain visible at the Reports page level.
+
+They must affect all report widgets/cards/tables/lists inside the Reports sub-module.
+
+Their state must remain active while the user browses different reports on the same page.
+
+Every report should refresh according to the currently selected universal filters.
+
+Universal filters must be clearly separate from any future report-specific filters.
+
+Do not make the user guess whether a filter applies to one report or the entire page. These top filters are always global.
+
+Vessel selector
+The current vessel control is a single-select dropdown. We need to convert it into a multi-vessel selector with checkboxes because users may want to view a single vessel, combine multiple vessels into one result, or compare data across selected vessels. The current page visibly supports only one selected vessel, so this needs to change into a reusable fleet-level filter.
+
+Vessel selector requirements
+Convert the vessel dropdown into a searchable multi-select dropdown/popover with checkboxes.
+
+Required behavior:
+
+User can select one or multiple vessels.
+
+Each vessel in the dropdown must have a checkbox.
+
+Selected vessels must remain visible in the control summary.
+
+There should be a quick visual summary like:
+
+“1 vessel selected”
+
+“3 vessels selected”
+
+or show vessel names if count is small.
+
+Add:
+
+Select all
+
+Clear all
+
+Apply button if needed for performance
+
+The dropdown must stay easy to use even if there are many vessels.
+
+UX expectations for vessel selector
+If only one vessel is selected, reports behave normally.
+
+If multiple vessels are selected, the reports must use those selected vessels as the common dataset.
+
+The component should feel clean and compact in the closed state.
+
+The open dropdown should not be huge or messy.
+
+Selected items should be obvious.
+
+The control must support quick scanning and quick selection.
+
+Vessel selector search inside dropdown
+Inside the vessel dropdown, include a small search field so users can quickly find vessels by typing part of the vessel name.
+
+Example behavior:
+
+User clicks vessel selector.
+
+Dropdown opens with vessel checkboxes.
+
+At the top of the dropdown there is a small “Search vessel” input.
+
+Typing filters the vessel list in real time.
+
+Vessel selection persistence
+User selections must remain active until the user changes them or presses Clear.
+
+The system should not reset selected vessels when the user opens another report or expands/collapses report sections.
+
+Universal filters must persist at page level within the current session/view.
+
+Search bar
+The current search box is searching reports. That behavior is no longer correct. The search bar must now become a global component search filter for the Reports module. The current placeholder and logic are report-oriented, but the actual reports data already contains component values such as “EMERGENCY DIESEL GENSET,” “SEWAGE TREATMENT PLANTS,” “TUNNEL THRUSTER NO 1,” and similar component names, so this search should target components instead of report titles or report names.
+
+New purpose of search bar
+Change the search bar from:
+
+Searching report names / report categories
+
+To:
+
+Searching components across all reports.
+
+This is a universal filter, not a report finder.
+
+Search bar requirements
+The search field must be:
+
+Dynamic
+
+Searchable by component name
+
+Suggestion-based
+
+Fast and user-friendly
+
+When the user starts typing, the system must begin suggesting relevant components.
+
+Suggestion behavior
+Required behavior:
+
+Suggestions start appearing as the user types.
+
+Suggestions should match component names dynamically.
+
+Matching should work for partial text, not exact text only.
+
+Suggestions should narrow down as the user types more characters.
+
+User can select a suggestion from the dropdown.
+
+Search must support keyboard navigation:
+
+Arrow down/up
+
+Enter to select
+
+Escape to close suggestions
+
+Clicking outside should close the suggestion list.
+
+What should be suggested
+Suggest component names, not report titles.
+
+Examples based on the visible data on the page include component values like:
+
+EMERGENCY DIESEL GENSET
+
+SEWAGE TREATMENT PLANTS
+
+INCINERATOR PLANTS
+
+TUNNEL THRUSTER NO 1
+
+TUNNEL THRUSTER NO 2
+
+AIR COMPRESSOR
+
+FIXED GAS DETECTION SYSTEM
+
+LIFEBOATS
+
+LIFE BOAT ENGINE.
+
+Suggestions should come from the actual component dataset available across reports.
+
+Search interaction model
+Expected flow:
+
+User starts typing in the search bar.
+
+Component suggestions appear below the input.
+
+User clicks or selects one suggestion.
+
+That component becomes the active universal filter.
+
+All reports refresh to show data only for that component, subject also to vessel and date range filters.
+
+Search bar UX details
+Update placeholder text to something like: “Search component…”
+
+Show suggestion dropdown below the input.
+
+Highlight matching text if possible.
+
+If no matching component is found, show a clean “No components found” state.
+
+Do not make the search bar search everything blindly.
+
+This search is for components, and the UX should communicate that clearly.
+
+Search scope
+The component search should act as a universal filter across the Reports sub-module, meaning:
+
+If selected component exists in Maintenance & Work Orders, filter it there.
+
+If selected component exists in Running Hours & Condition, filter it there.
+
+If selected component relates to other reports, those reports should also respond accordingly.
+
+Reports with no matching data should show an empty or zero-result state gracefully.
+
+Date range
+Keep the date range as a universal top-level filter. The page already includes a date range control, and it should remain one of the four standard global filters for the Reports module.
+
+Date range requirements
+Must remain visible in the universal filter bar.
+
+Must apply to all reports.
+
+Should support standard selection behavior already used in the system.
+
+It should be clear to the user which date field is being used for filtering within each report context, but the global control itself remains common.
+
+Date range UX expectations
+Keep it simple.
+
+Do not overload it with too many options.
+
+It must visually align with the vessel selector and search bar.
+
+Selected date range should remain visible and easy to understand.
+
+It should work smoothly together with vessel and component search filters.
+
+Clear button
+Keep the Clear button as a universal filter reset control. The page already has a clear action in the filter area, and this should remain part of the universal filter framework.
+
+Clear button requirements
+When the user clicks Clear, it must reset all universal filters:
+
+Clear selected vessels.
+
+Clear selected/searched component.
+
+Clear date range.
+
+Reset the filter state across all reports.
+
+After Clear:
+
+The page should return to default unfiltered report behavior.
+
+The filter controls should visibly reset.
+
+Any suggestion selection in the component search should be removed.
+
+Multi-vessel selections should be cleared.
+
+Clear button UX expectations
+Clear should be obvious but not too visually dominant.
+
+It should act immediately and predictably.
+
+It should not clear only one control unless explicitly designed that way; this top Clear is a global reset for universal filters.
+
+Filter bar layout and UI/UX expectations
+Design the universal filter row so it feels like a natural upgrade of the existing Reports page. The current layout already places Vessel, Search, Date Range, and Clear at the top, so preserve this mental model and improve it rather than replacing it with a completely different pattern.
+
+Layout expectations
+The top filter row should include:
+
+Vessel selector
+
+Search component bar
+
+Date range
+
+Clear button
+
+The layout should be:
+
+Clean
+
+Well-aligned
+
+Responsive
+
+Easy to scan
+
+Not visually crowded
+
+Suggested design behavior
+Vessel selector should be the most prominent control on the left.
+
+Search component field should be next to it and clearly indicate component search.
+
+Date range should remain in the same top filter family.
+
+Clear button should sit at the end as a utility action.
+
+On smaller widths, controls may wrap neatly, but usability must remain intact.
+
+Active filter clarity
+The user should always be able to understand what is currently applied.
+
+So:
+
+Show clear selected state in vessel selector.
+
+Show the selected component in the search box.
+
+Show the chosen date range.
+
+Ensure the report results clearly reflect the universal filters.
+
+Optionally, show active filter chips below the top bar if this improves clarity, but do not clutter the interface unnecessarily.
+
+Universal filtering logic
+Implement the filter architecture in a way that is reusable across all reports in this module.
+
+Functional expectation:
+
+The universal filter state should be centralized.
+
+Every report should consume the same filter state.
+
+Reports should not implement separate versions of vessel/date/component filters on their own when these are universal.
+
+Future report-specific filters can be added later inside individual report sections, but they must not interfere with the universal filters.
+
+Priority/order of filtering
+All report data should be filtered consistently using the active universal filters, typically by:
+
+Selected vessels
+
+Selected component
+
+Selected date range
+
+The exact technical sequence can be handled by the developer, but the user experience must feel consistent.
+
+Empty and edge states
+Please handle these properly:
+
+No vessel selected.
+
+Multiple vessels selected.
+
+No component selected.
+
+Typed component has no match.
+
+Selected component has no results in one or more reports.
+
+Date range returns no data.
+
+Combined filters return no data.
+
+Expected UX:
+
+No crashes.
+
+No broken layouts.
+
+No confusing blank spaces.
+
+Show simple, meaningful empty states where needed.
+
+Performance and usability expectations
+The reports page may grow, so build this filter logic cleanly.
+
+Requirements:
+
+Component suggestions should feel fast.
+
+Multi-vessel selection should not lag.
+
+Report updates should be smooth and predictable.
+
+Avoid unnecessary re-renders or messy duplicated logic.
+
+Keep the implementation maintainable because these are foundational universal filters for the whole Reports module.
+
+Final implementation intent
+The final result should achieve this product behavior:
+
+The Reports page has one clean universal filter bar.
+
+Vessel selector supports multi-select with checkboxes.
+
+Search bar is no longer “search reports”; it becomes “search components” with live suggestions.
+
+Date range remains universal.
+
+Clear resets all universal filters.
+
+These filters apply across every report in the Reports sub-module.
+
+The solution should feel simple, strong, and useful for real PMS operations, not overloaded.
+
+Do not write code yet in the response. First understand the required UX and functionality exactly as described above, then implement it carefully in the existing Reports page structure.
+
+Notes for developer
+Base your work on the existing Reports page behavior and layout already visible in the module:
+
+top filter area exists,
+
+reports are grouped under the Reports page,
+
+report tables include component-level data,
+
+filtering must now move from report-name search to component-level universal filtering.
+
+After implementation, ensure the resulting UI is intuitive enough that a marine superintendent or vessel-side user can understand it immediately without training.
