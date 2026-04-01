@@ -4,8 +4,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Building2, List, ArrowRight, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, Database, Layers, AlertTriangle, CheckCircle2, X, Bell, LayoutDashboard, Settings, MapPin } from "lucide-react";
-import { Marker } from "@/components/Marker";
+import { Building2, List, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, Database, AlertTriangle, CheckCircle2, X, Bell, Settings, MapPin } from "lucide-react";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
 import MasterDataManagement from "./MasterDataManagement";
@@ -158,47 +157,38 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
   }
 
   return (
-    <div className="p-6">
-      <Card>
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <LayoutDashboard className="h-5 w-5 text-white" />
+    <div className="p-6 space-y-6">
+      <div className="bg-white rounded-lg shadow-sm">
+        <div className="px-6 py-4 border-b flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold" data-testid="text-master-data-title">Master Data</h1>
+            <p className="text-sm text-gray-600 mt-1">Manage fleet-level master data including makers, components, jobs, spares, and configurations</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {stats?.dataQuality && stats.dataQuality.totalIssues > 0 && (
+              <button
+                onClick={() => setShowNotification(!showNotification)}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
+                data-testid="button-notifications"
+              >
+                <Bell className="h-5 w-5 text-gray-500" />
+                <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                  {stats.dataQuality.totalIssues}
+                </span>
+              </button>
+            )}
+            {stats?.dataQuality && stats.dataQuality.totalIssues === 0 && (
+              <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <span className="text-xs text-green-700 font-medium">All checks passed</span>
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">Fleet Admin Dashboard</h1>
-                <p className="text-cyan-100 text-sm mt-0.5">Manage fleet-level master data including makers, components, jobs, spares, and configurations</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {stats?.dataQuality && stats.dataQuality.totalIssues > 0 && (
-                <div className="relative">
-                  <button
-                    onClick={() => setShowNotification(!showNotification)}
-                    className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors relative"
-                    data-testid="button-notifications"
-                  >
-                    <Bell className="h-5 w-5 text-white" />
-                    <span className="absolute -top-1 -right-1 bg-amber-400 text-amber-900 text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
-                      {stats.dataQuality.totalIssues}
-                    </span>
-                  </button>
-                </div>
-              )}
-              {stats?.dataQuality && stats.dataQuality.totalIssues === 0 && (
-                <div className="flex items-center gap-1.5 bg-white/20 rounded-lg px-3 py-1.5">
-                  <CheckCircle2 className="h-4 w-4 text-green-300" />
-                  <span className="text-xs text-white font-medium">All checks passed</span>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-6 space-y-6">
           {showNotification && stats?.dataQuality && stats.dataQuality.totalIssues > 0 && (
-            <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3" data-testid="data-quality-banner">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3" data-testid="data-quality-banner">
               <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -218,194 +208,182 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <Card className="hover:shadow-lg transition-shadow border border-gray-200" data-testid="card-makers">
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Building2 className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => setCurrentView('makers')} className="text-cyan-600 text-xs" data-testid="button-view-makers">
-                    View <ArrowRight className="ml-1 h-3 w-3" />
-                  </Button>
-                </div>
-                <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-makers">{isMakersLoading ? '...' : totalMakers}</div>
-                <p className="text-xs text-gray-500 mt-0.5">Total Makers</p>
-                {stats?.makers && (
-                  <div className="mt-3 flex gap-2 flex-wrap">
-                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">{stats.makers.linked} linked</Badge>
-                    {stats.makers.unlinked > 0 && <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-500">{stats.makers.unlinked} unused</Badge>}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="hover:shadow-lg transition-shadow border border-gray-200" data-testid="card-components">
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <Box className="h-4 w-4 text-purple-600" />
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => setCurrentView('components')} className="text-cyan-600 text-xs" data-testid="button-view-components">
-                    View <ArrowRight className="ml-1 h-3 w-3" />
-                  </Button>
-                </div>
-                <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-components">{isComponentsLoading ? '...' : totalComponents}</div>
-                <p className="text-xs text-gray-500 mt-0.5">Fleet Components</p>
-                {stats?.components && (
-                  <>
-                    <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
-                      <span>{stats.components.withMaker} with maker</span>
-                      <span className="text-gray-300">|</span>
-                      <span className={stats.components.withoutMaker > 0 ? 'text-amber-600' : ''}>{stats.components.withoutMaker} without</span>
+          <Card>
+            <CardHeader>
+              <CardTitle>Fleet Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-testid="card-makers">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="p-2 bg-gray-100 rounded-lg">
+                      <Building2 className="h-4 w-4 text-gray-600" />
                     </div>
-                    <ProgressBar value={stats.components.withMaker} max={stats.components.total} color="bg-purple-500" />
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="hover:shadow-lg transition-shadow border border-gray-200" data-testid="card-jobs">
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <Wrench className="h-4 w-4 text-orange-600" />
+                    <Button size="sm" onClick={() => setCurrentView('makers')} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 px-3" data-testid="button-view-makers">
+                      View
+                    </Button>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => setCurrentView('jobs')} className="text-cyan-600 text-xs" data-testid="button-view-jobs">
-                    View <ArrowRight className="ml-1 h-3 w-3" />
-                  </Button>
-                </div>
-                <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-jobs">{isJobsLoading ? '...' : totalJobs}</div>
-                <p className="text-xs text-gray-500 mt-0.5">Fleet Jobs</p>
-                {stats?.jobs && (
-                  <>
-                    <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
-                      <span>{stats.jobs.withValidComponent} linked</span>
-                      <span className="text-gray-300">|</span>
-                      <span className={stats.jobs.withInvalidComponent > 0 ? 'text-red-500' : ''}>{stats.jobs.withInvalidComponent} unlinked</span>
+                  <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-makers">{isMakersLoading ? '...' : totalMakers}</div>
+                  <p className="text-xs text-gray-500 mt-0.5">Total Makers</p>
+                  {stats?.makers && (
+                    <div className="mt-3 flex gap-2 flex-wrap">
+                      <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">{stats.makers.linked} linked</Badge>
+                      {stats.makers.unlinked > 0 && <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-500">{stats.makers.unlinked} unused</Badge>}
                     </div>
-                    <ProgressBar value={stats.jobs.withValidComponent} max={stats.jobs.total} color="bg-orange-500" />
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="hover:shadow-lg transition-shadow border border-gray-200" data-testid="card-spares">
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-2 bg-teal-100 rounded-lg">
-                    <Package className="h-4 w-4 text-teal-600" />
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => setCurrentView('spares')} className="text-cyan-600 text-xs" data-testid="button-view-spares">
-                    View <ArrowRight className="ml-1 h-3 w-3" />
-                  </Button>
+                  )}
                 </div>
-                <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-spares">{isSparesLoading ? '...' : totalSpares}</div>
-                <p className="text-xs text-gray-500 mt-0.5">Fleet Spares</p>
-                {stats?.spares && (
-                  <>
-                    <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
-                      <span>{stats.spares.withValidComponent} linked</span>
-                      <span className="text-gray-300">|</span>
-                      <span className={stats.spares.withInvalidComponent > 0 ? 'text-red-500' : ''}>{stats.spares.withInvalidComponent} unlinked</span>
+
+                <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-testid="card-components">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="p-2 bg-gray-100 rounded-lg">
+                      <Box className="h-4 w-4 text-gray-600" />
                     </div>
-                    <ProgressBar value={stats.spares.withValidComponent} max={stats.spares.total} color="bg-teal-500" />
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <Card className="hover:shadow-lg transition-shadow border border-gray-200">
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <List className="h-4 w-4 text-green-600" />
+                    <Button size="sm" onClick={() => setCurrentView('components')} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 px-3" data-testid="button-view-components">
+                      View
+                    </Button>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => setCurrentView('master-lists')} className="text-cyan-600 text-xs" data-testid="button-view-master-lists">
-                    View <ArrowRight className="ml-1 h-3 w-3" />
-                  </Button>
+                  <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-components">{isComponentsLoading ? '...' : totalComponents}</div>
+                  <p className="text-xs text-gray-500 mt-0.5">Fleet Components</p>
+                  {stats?.components && (
+                    <>
+                      <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+                        <span>{stats.components.withMaker} with maker</span>
+                        <span className="text-gray-300">|</span>
+                        <span className={stats.components.withoutMaker > 0 ? 'text-amber-600' : ''}>{stats.components.withoutMaker} without</span>
+                      </div>
+                      <ProgressBar value={stats.components.withMaker} max={stats.components.total} color="bg-blue-500" />
+                    </>
+                  )}
                 </div>
-                <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-master-lists">{isMasterListsLoading ? '...' : totalMasterLists}</div>
-                <p className="text-xs text-gray-500 mt-0.5">Master Lists</p>
-              </CardContent>
-            </Card>
 
-            <Card className="hover:shadow-lg transition-shadow border border-gray-200">
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-2 bg-indigo-100 rounded-lg">
-                    <FileCode2 className="h-4 w-4 text-indigo-600" />
+                <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-testid="card-jobs">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="p-2 bg-gray-100 rounded-lg">
+                      <Wrench className="h-4 w-4 text-gray-600" />
+                    </div>
+                    <Button size="sm" onClick={() => setCurrentView('jobs')} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 px-3" data-testid="button-view-jobs">
+                      View
+                    </Button>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => setCurrentView('master-data-table')} className="text-cyan-600 text-xs" data-testid="button-view-master-data">
-                    View <ArrowRight className="ml-1 h-3 w-3" />
-                  </Button>
+                  <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-jobs">{isJobsLoading ? '...' : totalJobs}</div>
+                  <p className="text-xs text-gray-500 mt-0.5">Fleet Jobs</p>
+                  {stats?.jobs && (
+                    <>
+                      <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+                        <span>{stats.jobs.withValidComponent} linked</span>
+                        <span className="text-gray-300">|</span>
+                        <span className={stats.jobs.withInvalidComponent > 0 ? 'text-amber-600' : ''}>{stats.jobs.withInvalidComponent} unlinked</span>
+                      </div>
+                      <ProgressBar value={stats.jobs.withValidComponent} max={stats.jobs.total} color="bg-blue-500" />
+                    </>
+                  )}
                 </div>
-                <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-master-data">{isComponentsLoading ? '...' : totalComponents}</div>
-                <p className="text-xs text-gray-500 mt-0.5">Equipment Codes</p>
-              </CardContent>
-            </Card>
 
-            <Card className="hover:shadow-lg transition-shadow border border-gray-200">
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-2 bg-cyan-100 rounded-lg">
-                    <Clock className="h-4 w-4 text-cyan-600" />
+                <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-testid="card-spares">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="p-2 bg-gray-100 rounded-lg">
+                      <Package className="h-4 w-4 text-gray-600" />
+                    </div>
+                    <Button size="sm" onClick={() => setCurrentView('spares')} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 px-3" data-testid="button-view-spares">
+                      View
+                    </Button>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => setCurrentView('pms-settings')} className="text-cyan-600 text-xs" data-testid="button-view-pms-settings">
-                    Configure <ArrowRight className="ml-1 h-3 w-3" />
-                  </Button>
+                  <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-spares">{isSparesLoading ? '...' : totalSpares}</div>
+                  <p className="text-xs text-gray-500 mt-0.5">Fleet Spares</p>
+                  {stats?.spares && (
+                    <>
+                      <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+                        <span>{stats.spares.withValidComponent} linked</span>
+                        <span className="text-gray-300">|</span>
+                        <span className={stats.spares.withInvalidComponent > 0 ? 'text-amber-600' : ''}>{stats.spares.withInvalidComponent} unlinked</span>
+                      </div>
+                      <ProgressBar value={stats.spares.withValidComponent} max={stats.spares.total} color="bg-blue-500" />
+                    </>
+                  )}
                 </div>
-                <div className="text-2xl font-bold text-gray-900" data-testid="widget-pms-settings">{isPmsSettingsLoading || isVesselsLoading ? '...' : `${configuredPmsSettings}/${totalVessels}`}</div>
-                <p className="text-xs text-gray-500 mt-0.5">Lead Time & Grace</p>
-                {!isPmsSettingsLoading && !isVesselsLoading && totalVessels > 0 && (
-                  <ProgressBar value={configuredPmsSettings} max={totalVessels} color="bg-cyan-500" />
-                )}
-              </CardContent>
-            </Card>
+              </div>
+            </CardContent>
+          </Card>
 
-            <Card className="hover:shadow-lg transition-shadow border border-gray-200">
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-2 bg-rose-100 rounded-lg">
-                    <Anchor className="h-4 w-4 text-rose-600" />
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => setCurrentView('fleet-vessel-manager')} className="text-cyan-600 text-xs" data-testid="button-view-fleet-vessel">
-                    Manage <ArrowRight className="ml-1 h-3 w-3" />
-                  </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-2 bg-gray-100 rounded-lg">
+                  <List className="h-4 w-4 text-gray-600" />
                 </div>
-                <div className="text-2xl font-bold text-gray-900" data-testid="widget-fleet-vessel">{isFleetsLoading || isVesselsLoading ? '...' : `${totalFleets} / ${totalVessels}`}</div>
-                <p className="text-xs text-gray-500 mt-0.5">Fleets / Vessels</p>
-              </CardContent>
-            </Card>
+                <Button size="sm" onClick={() => setCurrentView('master-lists')} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 px-3" data-testid="button-view-master-lists">
+                  View
+                </Button>
+              </div>
+              <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-master-lists">{isMasterListsLoading ? '...' : totalMasterLists}</div>
+              <p className="text-xs text-gray-500 mt-0.5">Master Lists</p>
+            </div>
+
+            <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-2 bg-gray-100 rounded-lg">
+                  <FileCode2 className="h-4 w-4 text-gray-600" />
+                </div>
+                <Button size="sm" onClick={() => setCurrentView('master-data-table')} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 px-3" data-testid="button-view-master-data">
+                  View
+                </Button>
+              </div>
+              <div className="text-2xl font-bold text-gray-900" data-testid="widget-total-master-data">{isComponentsLoading ? '...' : totalComponents}</div>
+              <p className="text-xs text-gray-500 mt-0.5">Equipment Codes</p>
+            </div>
+
+            <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-2 bg-gray-100 rounded-lg">
+                  <Clock className="h-4 w-4 text-gray-600" />
+                </div>
+                <Button size="sm" onClick={() => setCurrentView('pms-settings')} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 px-3" data-testid="button-view-pms-settings">
+                  Configure
+                </Button>
+              </div>
+              <div className="text-2xl font-bold text-gray-900" data-testid="widget-pms-settings">{isPmsSettingsLoading || isVesselsLoading ? '...' : `${configuredPmsSettings}/${totalVessels}`}</div>
+              <p className="text-xs text-gray-500 mt-0.5">Lead Time & Grace</p>
+              {!isPmsSettingsLoading && !isVesselsLoading && totalVessels > 0 && (
+                <ProgressBar value={configuredPmsSettings} max={totalVessels} color="bg-blue-500" />
+              )}
+            </div>
+
+            <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-2 bg-gray-100 rounded-lg">
+                  <Anchor className="h-4 w-4 text-gray-600" />
+                </div>
+                <Button size="sm" onClick={() => setCurrentView('fleet-vessel-manager')} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 px-3" data-testid="button-view-fleet-vessel">
+                  Manage
+                </Button>
+              </div>
+              <div className="text-2xl font-bold text-gray-900" data-testid="widget-fleet-vessel">{isFleetsLoading || isVesselsLoading ? '...' : `${totalFleets} / ${totalVessels}`}</div>
+              <p className="text-xs text-gray-500 mt-0.5">Fleets / Vessels</p>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="border border-gray-200">
-              <CardHeader className="pb-2 pt-3 px-4">
-                <CardTitle className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                  <Layers className="h-3.5 w-3.5 text-cyan-500" />
-                  Fleet Data
-                </CardTitle>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Fleet Data</CardTitle>
               </CardHeader>
-              <CardContent className="px-4 pb-3 pt-1">
+              <CardContent>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
                   {[
-                    { view: 'makers' as ViewType, icon: Building2, label: 'Makers', color: 'text-blue-600', bg: 'bg-blue-50' },
-                    { view: 'components' as ViewType, icon: Box, label: 'Components', color: 'text-purple-600', bg: 'bg-purple-50' },
-                    { view: 'jobs' as ViewType, icon: Wrench, label: 'Jobs', color: 'text-orange-600', bg: 'bg-orange-50' },
-                    { view: 'spares' as ViewType, icon: Package, label: 'Spares', color: 'text-teal-600', bg: 'bg-teal-50' },
-                    { view: 'master-lists' as ViewType, icon: List, label: 'Master Lists', color: 'text-green-600', bg: 'bg-green-50' },
-                    { view: 'fleet-data' as ViewType, icon: Database, label: 'Fleet Data', color: 'text-cyan-600', bg: 'bg-cyan-50' },
+                    { view: 'makers' as ViewType, icon: Building2, label: 'Makers' },
+                    { view: 'components' as ViewType, icon: Box, label: 'Components' },
+                    { view: 'jobs' as ViewType, icon: Wrench, label: 'Jobs' },
+                    { view: 'spares' as ViewType, icon: Package, label: 'Spares' },
+                    { view: 'master-lists' as ViewType, icon: List, label: 'Master Lists' },
+                    { view: 'fleet-data' as ViewType, icon: Database, label: 'Fleet Data' },
                   ].map(link => (
                     <button
                       key={link.view}
                       onClick={() => setCurrentView(link.view)}
-                      className={`flex items-center gap-2 p-2.5 rounded-lg border border-gray-200 transition-all text-left hover-elevate active-elevate-2 ${link.bg}`}
+                      className="flex items-center gap-2 p-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-left"
                       data-testid={`link-${link.view}`}
                     >
-                      <link.icon className={`h-4 w-4 ${link.color} flex-shrink-0`} />
+                      <link.icon className="h-4 w-4 text-gray-500 flex-shrink-0" />
                       <span className="text-xs font-medium text-gray-700 truncate">{link.label}</span>
                     </button>
                   ))}
@@ -413,29 +391,26 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
               </CardContent>
             </Card>
 
-            <Card className="border border-gray-200">
-              <CardHeader className="pb-2 pt-3 px-4">
-                <CardTitle className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                  <Settings className="h-3.5 w-3.5 text-gray-400" />
-                  Configuration & Mapping
-                </CardTitle>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Configuration & Mapping</CardTitle>
               </CardHeader>
-              <CardContent className="px-4 pb-3 pt-1">
-                <div className="grid grid-cols-2 lg:grid-cols-2 gap-2">
+              <CardContent>
+                <div className="grid grid-cols-2 gap-2">
                   {[
-                    { view: 'vessel-mapping' as ViewType, icon: Ship, label: 'Vessel Mapping', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                    { view: 'fleet-vessel-manager' as ViewType, icon: Anchor, label: 'Fleet & Vessel', color: 'text-rose-600', bg: 'bg-rose-50' },
-                    { view: 'pms-settings' as ViewType, icon: Clock, label: 'Lead Time & Grace', color: 'text-cyan-600', bg: 'bg-cyan-50' },
-                    { view: 'master-data-table' as ViewType, icon: Database, label: 'Master Data', color: 'text-purple-600', bg: 'bg-purple-50' },
-                    { view: 'locations' as ViewType, icon: MapPin, label: 'Locations', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                    { view: 'vessel-mapping' as ViewType, icon: Ship, label: 'Vessel Mapping' },
+                    { view: 'fleet-vessel-manager' as ViewType, icon: Anchor, label: 'Fleet & Vessel' },
+                    { view: 'pms-settings' as ViewType, icon: Clock, label: 'Lead Time & Grace' },
+                    { view: 'master-data-table' as ViewType, icon: Database, label: 'Master Data' },
+                    { view: 'locations' as ViewType, icon: MapPin, label: 'Locations' },
                   ].map(link => (
                     <button
                       key={link.view}
                       onClick={() => setCurrentView(link.view)}
-                      className={`flex items-center gap-2 p-2.5 rounded-lg border border-gray-200 transition-all text-left hover-elevate active-elevate-2 ${link.bg}`}
+                      className="flex items-center gap-2 p-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-left"
                       data-testid={`link-${link.view}`}
                     >
-                      <link.icon className={`h-4 w-4 ${link.color} flex-shrink-0`} />
+                      <link.icon className="h-4 w-4 text-gray-500 flex-shrink-0" />
                       <span className="text-xs font-medium text-gray-700 truncate">{link.label}</span>
                     </button>
                   ))}
@@ -443,9 +418,8 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
               </CardContent>
             </Card>
           </div>
-
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
