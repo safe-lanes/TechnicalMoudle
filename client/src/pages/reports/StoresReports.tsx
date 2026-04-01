@@ -448,11 +448,11 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         }));
 
         const summary = [
-          { label: 'Total Low Stock', value: reportSummary.totalLowStock || data.length },
-          { label: 'Critical', value: reportSummary.criticalItems || 0 },
-          { label: 'High Priority', value: reportSummary.highPriorityItems || 0 },
-          { label: 'Medium Priority', value: reportSummary.mediumPriorityItems || 0 },
-          { label: 'Est. Total Cost', value: reportSummary.estimatedTotalCost ? `$${reportSummary.estimatedTotalCost}` : '$0' },
+          { label: 'Total Low Stock', value: data.length },
+          { label: 'Critical', value: data.filter((d: any) => d.priority === 'CRITICAL' || d.priority === 'critical').length },
+          { label: 'High Priority', value: data.filter((d: any) => d.priority === 'HIGH' || d.priority === 'high').length },
+          { label: 'Medium Priority', value: data.filter((d: any) => d.priority === 'MEDIUM' || d.priority === 'medium').length },
+          { label: 'Est. Total Cost', value: `$${data.reduce((sum: number, d: any) => sum + (parseFloat(String(d.estCost).replace(/[$,]/g, '')) || 0), 0).toFixed(0)}` },
         ];
 
         if (mode === 'preview') {

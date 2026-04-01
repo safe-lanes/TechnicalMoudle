@@ -278,8 +278,8 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
 
         const summary = [
           { label: 'Total Low Stock Items', value: data.length },
-          { label: 'Critical', value: apiData.summary?.criticalCount || 0 },
-          { label: 'At Minimum', value: apiData.summary?.atMinCount || 0 },
+          { label: 'Critical', value: data.filter((d: any) => d.status === 'Critical').length },
+          { label: 'At Minimum', value: data.filter((d: any) => d.status === 'At Min').length },
         ];
 
         pdfReportGenerator.generateReport(
@@ -325,10 +325,10 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
 
         const summary = [
           { label: 'Total Spares', value: data.length },
-          { label: 'Critical Equipment Spares', value: previewData.summary?.byCriticality?.CRITICAL || 0 },
-          { label: 'Out of Stock', value: previewData.summary?.byStatus?.ZERO || 0 },
-          { label: 'Low Stock', value: previewData.summary?.byStatus?.LOW || 0 },
-          { label: 'Total Shortage', value: `${previewData.summary?.totalShortage || 0} units` },
+          { label: 'Critical Equipment Spares', value: data.filter((d: any) => d.criticalityLevel === 'CRITICAL').length },
+          { label: 'Out of Stock', value: data.filter((d: any) => d.stockStatus === 'ZERO' || d.rob === 0).length },
+          { label: 'Low Stock', value: data.filter((d: any) => d.stockStatus === 'LOW').length },
+          { label: 'Total Shortage', value: `${data.reduce((sum: number, d: any) => sum + (Number(d.shortageQty) || 0), 0)} units` },
         ];
 
         pdfReportGenerator.generateReport(
@@ -382,9 +382,9 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
 
         const summary = [
           { label: 'Total Items', value: data.length },
-          { label: 'Total Consumed', value: apiData.summary?.totalConsumed || 0 },
-          { label: 'Total Events', value: apiData.summary?.totalEvents || 0 },
-          { label: 'Critical Items', value: apiData.summary?.criticalItems || 0 },
+          { label: 'Total Consumed', value: data.reduce((sum: number, d: any) => sum + (Number(d.totalConsumed) || 0), 0) },
+          { label: 'Total Events', value: data.reduce((sum: number, d: any) => sum + (Number(d.consumptionEvents) || 0), 0) },
+          { label: 'Critical Items', value: data.filter((d: any) => d.status === 'Critical' || d.status === 'critical').length },
         ];
 
         if (mode === 'preview') {

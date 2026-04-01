@@ -164,11 +164,11 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
   };
 
   const handleSelectAllVessels = () => {
-    if (filters.vessels.length === vessels.length) {
-      onFiltersChange({ ...filters, vessels: [] });
-    } else {
-      onFiltersChange({ ...filters, vessels: vessels.map(v => v.id) });
-    }
+    onFiltersChange({ ...filters, vessels: vessels.map(v => v.id) });
+  };
+
+  const handleClearAllVessels = () => {
+    onFiltersChange({ ...filters, vessels: [] });
   };
 
   const handleDateRangeChange = (from: Date | null, to: Date | null) => {
@@ -295,25 +295,25 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
               data-testid="input-vessel-search"
             />
           </div>
-          <div className="max-h-[240px] overflow-y-auto p-1">
+          <div className="flex items-center justify-between px-2 py-1.5 border-b">
             <button
               type="button"
-              className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors"
+              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
               onClick={handleSelectAllVessels}
               data-testid="button-select-all-vessels"
             >
-              <div className={cn(
-                "h-4 w-4 rounded border flex items-center justify-center flex-shrink-0",
-                filters.vessels.length === vessels.length || filters.vessels.length === 0
-                  ? "bg-primary border-primary"
-                  : "border-gray-300 dark:border-gray-600"
-              )}>
-                {(filters.vessels.length === vessels.length || filters.vessels.length === 0) && (
-                  <Check className="h-3 w-3 text-primary-foreground" />
-                )}
-              </div>
-              <span className="font-medium">All Vessels</span>
+              Select All
             </button>
+            <button
+              type="button"
+              className="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
+              onClick={handleClearAllVessels}
+              data-testid="button-clear-all-vessels"
+            >
+              Clear All
+            </button>
+          </div>
+          <div className="max-h-[240px] overflow-y-auto p-1">
             {filteredVessels.map((vessel) => {
               const isChecked = filters.vessels.includes(vessel.id);
               return (
