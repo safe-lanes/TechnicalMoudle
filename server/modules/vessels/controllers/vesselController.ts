@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import * as service from '../services/vesselService';
+import { WorkOrderStatusRecalculatorService } from '../../../services/workOrderStatusRecalculator';
 
 // ── Fleet controllers ──
 
@@ -124,6 +125,10 @@ export async function getCompanyStandardGraceSettings(_req: Request, res: Respon
 export async function updateCompanyStandardGraceSettings(req: Request, res: Response) {
   const username = (req as any).user?.username || 'test';
   const settings = await service.upsertCompanyStandardGraceSettings(req.body, username);
+  const recalculator = new WorkOrderStatusRecalculatorService();
+  recalculator.forceRecalculation().catch(err => {
+    console.error('[CompanyGrace] Status recalculation after update failed:', err);
+  });
   res.json(settings);
 }
 
