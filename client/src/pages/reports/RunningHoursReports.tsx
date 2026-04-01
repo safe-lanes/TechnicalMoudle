@@ -108,13 +108,12 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
       const version = ++previewVersionRef.current;
       setPreviewData(null);
       initialLoadRef.current = false;
-      handlePreviewReport(selectedReportId).then(() => {
+      generateRunningHoursReport(selectedReportId, 'preview').then((data) => {
         if (previewVersionRef.current === version) {
+          if (data) setPreviewData(data);
           initialLoadRef.current = true;
-        } else {
-          setPreviewData(null);
         }
-      });
+      }).catch(() => {});
     }
   }, [embedded, selectedReportId]);
 
@@ -125,11 +124,13 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
     const version = ++previewVersionRef.current;
     filterTimerRef.current = setTimeout(() => {
       setPreviewData(null);
-      handlePreviewReport(selectedReportId).finally(() => {
-        if (previewVersionRef.current !== version) {
-          setPreviewData(null);
+      generateRunningHoursReport(selectedReportId, 'preview').then((data) => {
+        if (previewVersionRef.current === version) {
+          if (data) setPreviewData(data);
+          setIsFilterRefreshing(false);
         }
-        setIsFilterRefreshing(false);
+      }).catch(() => {
+        if (previewVersionRef.current === version) setIsFilterRefreshing(false);
       });
     }, 300);
     return () => { if (filterTimerRef.current) clearTimeout(filterTimerRef.current); };
@@ -242,7 +243,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
     return vessels.map((v: any) => v.id).filter(Boolean);
   };
 
-  const generateRunningHoursReport = async (reportId: string, mode: 'preview' | 'download' = 'download') => {
+  const generateRunningHoursReport = async (reportId: string, mode: 'preview' | 'download' = 'download'): Promise<ReportPreviewData | void> => {
     const vesselIds = getVesselIdsForReport();
     const vesselName = vesselIds.length === 1 
       ? (vessels.find((v: any) => v.id === vesselIds[0])?.name || vesselIds[0]) 
@@ -318,7 +319,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         ];
         
         if (mode === 'preview') {
-          setPreviewData({
+          return {
             title: 'Equipment Utilization Summary',
             subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`,
             vessel: vesselName,
@@ -326,8 +327,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
             columns,
             data: utilizationData,
             summary: summaryItems
-          });
-          return;
+          };
         }
 
         pdfReportGenerator.generateReport(
@@ -414,7 +414,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         }));
         
         if (mode === 'preview') {
-          setPreviewData({
+          return {
             title: 'Running Hours Anomaly Detection',
             subtitle: `Period: ${summaryData.periodStart || 'N/A'} to ${summaryData.periodEnd || 'N/A'}`,
             vessel: vesselName,
@@ -422,8 +422,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
             columns,
             data: formattedData,
             summary: summaryItems
-          });
-          return;
+          };
         }
 
         pdfReportGenerator.generateReport(
@@ -451,7 +450,10 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
   const handlePreviewReport = async (reportId: string) => {
     try {
       toast({ title: "Loading Preview", description: "Fetching report data..." });
-      await generateRunningHoursReport(reportId, 'preview');
+      const data = await generateRunningHoursReport(reportId, 'preview');
+      if (data) {
+        setPreviewData(data);
+      }
     } catch (error: any) {
       console.error('Error generating preview:', error);
       toast({ title: "Preview Failed", description: error.message || "Failed to load report preview.", variant: "destructive" });

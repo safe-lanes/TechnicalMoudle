@@ -118,6 +118,10 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
     if (!data?.data) return [];
     let items = [...data.data];
 
+    if (globalVessels.length > 0) {
+      items = items.filter((i: any) => !i.vesselId || globalVessels.includes(i.vesselId));
+    }
+
     if (globalComponent && globalComponent.trim()) {
       const gc = globalComponent.toLowerCase();
       items = items.filter(
@@ -159,7 +163,7 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
     });
 
     return items;
-  }, [data?.data, searchQuery, criticalityFilter, sortField, sortDirection, globalComponent]);
+  }, [data?.data, searchQuery, criticalityFilter, sortField, sortDirection, globalComponent, globalVessels]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {

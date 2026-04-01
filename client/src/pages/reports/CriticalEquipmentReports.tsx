@@ -109,13 +109,12 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
       const version = ++previewVersionRef.current;
       setPreviewData(null);
       initialLoadRef.current = false;
-      handlePreviewReport(selectedReportId).then(() => {
+      generateCriticalReport(selectedReportId, 'preview').then((data) => {
         if (previewVersionRef.current === version) {
+          if (data) setPreviewData(data);
           initialLoadRef.current = true;
-        } else {
-          setPreviewData(null);
         }
-      });
+      }).catch(() => {});
     }
   }, [embedded, selectedReportId]);
 
@@ -126,11 +125,13 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
     const version = ++previewVersionRef.current;
     filterTimerRef.current = setTimeout(() => {
       setPreviewData(null);
-      handlePreviewReport(selectedReportId).finally(() => {
-        if (previewVersionRef.current !== version) {
-          setPreviewData(null);
+      generateCriticalReport(selectedReportId, 'preview').then((data) => {
+        if (previewVersionRef.current === version) {
+          if (data) setPreviewData(data);
+          setIsFilterRefreshing(false);
         }
-        setIsFilterRefreshing(false);
+      }).catch(() => {
+        if (previewVersionRef.current === version) setIsFilterRefreshing(false);
       });
     }, 300);
     return () => { if (filterTimerRef.current) clearTimeout(filterTimerRef.current); };
@@ -252,7 +253,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
     }
   };
 
-  const generateCriticalReport = async (reportId: string, mode: 'preview' | 'download' = 'download') => {
+  const generateCriticalReport = async (reportId: string, mode: 'preview' | 'download' = 'download'): Promise<ReportPreviewData | void> => {
     const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
 
     switch (reportId) {
@@ -306,7 +307,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
         const finalData = tableData.length > 0 ? tableData : [{ sno: '-', componentCode: '-', componentName: 'No critical components found', parentName: '-', category: '-', location: '-', maker: '-', model: '-', serialNo: '-', installationDate: '-', classItem: '-', conditionBased: '-', isActive: '-' }];
 
         if (mode === 'preview') {
-          setPreviewData({
+          return {
             title: 'Critical Components Master List',
             subtitle: `Complete list of safety-critical equipment - ${components.length} components`,
             vessel: vesselName,
@@ -314,8 +315,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
             columns,
             data: finalData,
             summary: summaryItems
-          });
-          return;
+          };
         }
 
         pdfReportGenerator.generateReport(
@@ -373,7 +373,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
         const finalData = tableData.length > 0 ? tableData : [{ sno: '-', componentCode: '-', componentName: 'No schedule items found', location: '-', jobCode: '-', jobTitle: '-', taskType: '-', maintenanceBasis: '-', frequency: '-', nextDueDate: '-', daysUntilDue: '-', status: '-', lastDoneDate: '-', lastWONumber: '-', assignedTo: '-' }];
 
         if (mode === 'preview') {
-          setPreviewData({
+          return {
             title: 'Critical Equipment Maintenance Schedule & Status',
             subtitle: `Maintenance tracking for critical components - ${scheduleItems.length} items`,
             vessel: vesselName,
@@ -381,8 +381,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
             columns,
             data: finalData,
             summary: summaryItems
-          });
-          return;
+          };
         }
 
         pdfReportGenerator.generateReport(
@@ -407,7 +406,10 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
   const handlePreviewReport = async (reportId: string) => {
     try {
       toast({ title: "Loading Preview", description: "Preparing report data..." });
-      await generateCriticalReport(reportId, 'preview');
+      const data = await generateCriticalReport(reportId, 'preview');
+      if (data) {
+        setPreviewData(data);
+      }
     } catch (error: any) {
       console.error('Error generating preview:', error);
       toast({ title: "Preview Failed", description: error.message || "Failed to load report preview.", variant: "destructive" });

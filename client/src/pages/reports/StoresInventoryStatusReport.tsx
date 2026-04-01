@@ -145,6 +145,9 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
 
   const storesItems = useMemo(() => {
     let items = rawStoresItems.filter(item => !item.deleted && item.isActive !== false);
+    if (globalVessels.length > 0) {
+      items = items.filter((i: any) => !i.vesselId || globalVessels.includes(i.vesselId));
+    }
     if (globalComponent && globalComponent.trim()) {
       const gc = globalComponent.toLowerCase();
       items = items.filter(item =>
@@ -153,7 +156,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
       );
     }
     return items;
-  }, [rawStoresItems, globalComponent]);
+  }, [rawStoresItems, globalComponent, globalVessels]);
 
   const consumptionMap = useMemo(() => {
     const now = new Date();

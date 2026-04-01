@@ -159,6 +159,9 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
 
   const sortedItems = useMemo(() => {
     let items = [...topConsumedItems];
+    if (globalVessels.length > 0) {
+      items = items.filter((i: any) => !i.vesselId || globalVessels.includes(i.vesselId));
+    }
     if (globalComponent && globalComponent.trim()) {
       const gc = globalComponent.toLowerCase();
       items = items.filter((i: Record<string, unknown>) =>
@@ -179,7 +182,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
       return 0;
     });
     return items;
-  }, [topConsumedItems, sortField, sortDirection, globalComponent]);
+  }, [topConsumedItems, sortField, sortDirection, globalComponent, globalVessels]);
 
   const [generatingPdf, setGeneratingPdf] = useState(false);
 

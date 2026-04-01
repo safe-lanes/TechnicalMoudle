@@ -119,30 +119,35 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         initialLoadRef.current = true;
       } else {
         setActiveDetailReport(null);
-        handlePreviewReport(selectedReportId).then(() => {
+        generateSparesReport(selectedReportId, 'preview').then((data) => {
           if (previewVersionRef.current === version) {
+            if (data) setPreviewData(data);
             initialLoadRef.current = true;
-          } else {
-            setPreviewData(null);
           }
-        });
+        }).catch(() => {});
       }
     }
   }, [embedded, selectedReportId]);
 
   useEffect(() => {
     if (!embedded || !selectedReportId || !initialLoadRef.current) return;
-    if (sparesDetailReportIds.includes(selectedReportId)) return;
+    if (sparesDetailReportIds.includes(selectedReportId)) {
+      setIsFilterRefreshing(true);
+      const tid = setTimeout(() => setIsFilterRefreshing(false), 100);
+      return () => clearTimeout(tid);
+    }
     if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
     setIsFilterRefreshing(true);
     const version = ++previewVersionRef.current;
     filterTimerRef.current = setTimeout(() => {
       setPreviewData(null);
-      handlePreviewReport(selectedReportId).finally(() => {
-        if (previewVersionRef.current !== version) {
-          setPreviewData(null);
+      generateSparesReport(selectedReportId, 'preview').then((data) => {
+        if (previewVersionRef.current === version) {
+          if (data) setPreviewData(data);
+          setIsFilterRefreshing(false);
         }
-        setIsFilterRefreshing(false);
+      }).catch(() => {
+        if (previewVersionRef.current === version) setIsFilterRefreshing(false);
       });
     }, 300);
     return () => { if (filterTimerRef.current) clearTimeout(filterTimerRef.current); };
@@ -266,7 +271,10 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
   const handlePreviewReport = async (reportId: string) => {
     try {
       toast({ title: "Loading Preview", description: "Preparing report data..." });
-      await generateSparesReport(reportId, 'preview');
+      const data = await generateSparesReport(reportId, 'preview');
+      if (data) {
+        setPreviewData(data);
+      }
     } catch (error: any) {
       console.error('Error generating preview:', error);
       toast({ title: "Preview Failed", description: error.message || "Failed to load report preview.", variant: "destructive" });
@@ -283,7 +291,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
     });
   };
 
-  const generateSparesReport = async (reportId: string, mode: 'preview' | 'download' = 'download') => {
+  const generateSparesReport = async (reportId: string, mode: 'preview' | 'download' = 'download'): Promise<ReportPreviewData | void> => {
     const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
 
     switch (reportId) {
@@ -427,8 +435,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         ];
 
         if (mode === 'preview') {
-          setPreviewData({ title: 'Consumption Pattern Analysis', subtitle: 'Spare parts consumption patterns and trends', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary });
-          return;
+          return { title: 'Consumption Pattern Analysis', subtitle: 'Spare parts consumption patterns and trends', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary };
         }
         pdfReportGenerator.generateReport(
           { title: 'Consumption Pattern Analysis', subtitle: 'Spare parts consumption patterns and trends', vessel: vesselName, orientation: 'landscape', dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },

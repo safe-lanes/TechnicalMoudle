@@ -171,13 +171,12 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
       const version = ++previewVersionRef.current;
       setPreviewData(null);
       initialLoadRef.current = false;
-      handlePreviewReport(selectedReportId).then(() => {
+      generateChangeRequestReport(selectedReportId, 'preview').then((data) => {
         if (previewVersionRef.current === version) {
+          if (data) setPreviewData(data);
           initialLoadRef.current = true;
-        } else {
-          setPreviewData(null);
         }
-      });
+      }).catch(() => {});
     }
   }, [embedded, selectedReportId]);
 
@@ -188,11 +187,13 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
     const version = ++previewVersionRef.current;
     filterTimerRef.current = setTimeout(() => {
       setPreviewData(null);
-      handlePreviewReport(selectedReportId).finally(() => {
-        if (previewVersionRef.current !== version) {
-          setPreviewData(null);
+      generateChangeRequestReport(selectedReportId, 'preview').then((data) => {
+        if (previewVersionRef.current === version) {
+          if (data) setPreviewData(data);
+          setIsFilterRefreshing(false);
         }
-        setIsFilterRefreshing(false);
+      }).catch(() => {
+        if (previewVersionRef.current === version) setIsFilterRefreshing(false);
       });
     }, 300);
     return () => { if (filterTimerRef.current) clearTimeout(filterTimerRef.current); };
@@ -285,7 +286,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
     return String(val);
   };
 
-  const generateChangeRequestReport = async (reportId: string, mode: 'preview' | 'download' = 'download') => {
+  const generateChangeRequestReport = async (reportId: string, mode: 'preview' | 'download' = 'download'): Promise<ReportPreviewData | void> => {
     if (!reportData) {
       toast({ title: "No Data", description: "No report data available to export.", variant: "destructive" });
       return;
@@ -347,7 +348,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
         const finalData = tableData.length > 0 ? tableData : [{ id: '-', title: 'No change requests found', category: '-', status: '-', requestedBy: '-', vessel: '-', submittedAt: '-', reviewedBy: '-', reviewedAt: '-', cycleTime: '-', target: '-', changesCount: '-', reason: '-' }];
 
         if (mode === 'preview') {
-          setPreviewData({
+          return {
             title: 'Change Requests Status & Tracking',
             subtitle: `Comprehensive tracking report - ${requests.length} requests`,
             vessel: vesselName,
@@ -355,8 +356,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
             columns,
             data: finalData,
             summary: summaryItems
-          });
-          return;
+          };
         }
 
         pdfReportGenerator.generateReport(
@@ -396,15 +396,14 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
         ];
 
         if (mode === 'preview') {
-          setPreviewData({
+          return {
             title: 'Change Request Analytics',
             subtitle: 'Statistical analysis and trends',
             vessel: vesselName,
             dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to),
             columns,
             data
-          });
-          return;
+          };
         }
 
         pdfReportGenerator.generateReport(
@@ -423,7 +422,10 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
   const handlePreviewReport = async (reportId: string) => {
     try {
       toast({ title: "Loading Preview", description: "Preparing report data..." });
-      await generateChangeRequestReport(reportId, 'preview');
+      const data = await generateChangeRequestReport(reportId, 'preview');
+      if (data) {
+        setPreviewData(data);
+      }
     } catch (error: any) {
       console.error('Error generating preview:', error);
       toast({ title: "Preview Failed", description: error.message || "Failed to load report preview.", variant: "destructive" });

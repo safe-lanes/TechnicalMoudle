@@ -113,13 +113,15 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       setPreviewData(null);
       setPreviewOpen(false);
       initialLoadRef.current = false;
-      handlePreviewReport(selectedReportId).then(() => {
+      generateMaintenancePDF(selectedReportId, 'preview').then((data) => {
         if (previewVersionRef.current === version) {
+          if (data) {
+            setPreviewData(data);
+            setPreviewOpen(true);
+          }
           initialLoadRef.current = true;
-        } else {
-          setPreviewData(null);
         }
-      });
+      }).catch(() => {});
     }
   }, [embedded, selectedReportId]);
 
@@ -130,11 +132,13 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     const version = ++previewVersionRef.current;
     filterTimerRef.current = setTimeout(() => {
       setPreviewData(null);
-      handlePreviewReport(selectedReportId).finally(() => {
-        if (previewVersionRef.current !== version) {
-          setPreviewData(null);
+      generateMaintenancePDF(selectedReportId, 'preview').then((data) => {
+        if (previewVersionRef.current === version) {
+          if (data) setPreviewData(data);
+          setIsFilterRefreshing(false);
         }
-        setIsFilterRefreshing(false);
+      }).catch(() => {
+        if (previewVersionRef.current === version) setIsFilterRefreshing(false);
       });
     }, 300);
     return () => { if (filterTimerRef.current) clearTimeout(filterTimerRef.current); };

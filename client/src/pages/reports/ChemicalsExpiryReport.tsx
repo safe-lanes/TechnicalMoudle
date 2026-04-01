@@ -206,6 +206,10 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
   const filteredItems = useMemo(() => {
     let result = [...items];
 
+    if (globalVessels.length > 0) {
+      result = result.filter((i: any) => !i.vesselId || globalVessels.includes(i.vesselId));
+    }
+
     if (globalComponent && globalComponent.trim()) {
       const gc = globalComponent.toLowerCase();
       result = result.filter(i =>
@@ -255,7 +259,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
     }
 
     return result;
-  }, [items, searchQuery, expiryFilter, hazardFilter, stockFilter, globalComponent]);
+  }, [items, searchQuery, expiryFilter, hazardFilter, stockFilter, globalComponent, globalVessels]);
 
   const sortedItems = useMemo(() => {
     const sorted = [...filteredItems];

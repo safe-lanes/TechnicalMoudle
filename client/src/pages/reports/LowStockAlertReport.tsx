@@ -248,6 +248,10 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
   const filteredItems = useMemo(() => {
     let result = [...items];
 
+    if (globalVessels.length > 0) {
+      result = result.filter((i: any) => !i.vesselId || globalVessels.includes(i.vesselId));
+    }
+
     if (globalComponent && globalComponent.trim()) {
       const gc = globalComponent.toLowerCase();
       result = result.filter(i =>
@@ -280,7 +284,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
     }
 
     return result;
-  }, [items, searchQuery, categoryFilter, priorityFilter, globalComponent]);
+  }, [items, searchQuery, categoryFilter, priorityFilter, globalComponent, globalVessels]);
 
   const sortedItems = useMemo(() => {
     const sorted = [...filteredItems];

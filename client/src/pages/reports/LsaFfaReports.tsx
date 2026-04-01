@@ -110,13 +110,12 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
       const version = ++previewVersionRef.current;
       setPreviewData(null);
       initialLoadRef.current = false;
-      handlePreviewReport(selectedReportId).then(() => {
+      generateReport(selectedReportId, 'preview').then((data) => {
         if (previewVersionRef.current === version) {
+          if (data) setPreviewData(data);
           initialLoadRef.current = true;
-        } else {
-          setPreviewData(null);
         }
-      });
+      }).catch(() => {});
     }
   }, [embedded, selectedReportId]);
 
@@ -127,11 +126,13 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
     const version = ++previewVersionRef.current;
     filterTimerRef.current = setTimeout(() => {
       setPreviewData(null);
-      handlePreviewReport(selectedReportId).finally(() => {
-        if (previewVersionRef.current !== version) {
-          setPreviewData(null);
+      generateReport(selectedReportId, 'preview').then((data) => {
+        if (previewVersionRef.current === version) {
+          if (data) setPreviewData(data);
+          setIsFilterRefreshing(false);
         }
-        setIsFilterRefreshing(false);
+      }).catch(() => {
+        if (previewVersionRef.current === version) setIsFilterRefreshing(false);
       });
     }, 300);
     return () => { if (filterTimerRef.current) clearTimeout(filterTimerRef.current); };
@@ -247,7 +248,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
     }
   };
 
-  const generateReport = async (reportId: string, mode: 'preview' | 'download' = 'download') => {
+  const generateReport = async (reportId: string, mode: 'preview' | 'download' = 'download'): Promise<ReportPreviewData | void> => {
     const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
 
     if (reportId === 'lsa-ffa-master-list') {
@@ -298,7 +299,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
       const finalData = tableData.length > 0 ? tableData : [{ sno: '-', componentCode: '-', componentName: 'No LSA/FFA components found', equipmentType: '-', location: '-', maker: '-', model: '-', serialNo: '-', installationDate: '-', critical: '-', classItem: '-', isActive: '-' }];
 
       if (mode === 'preview') {
-        setPreviewData({
+        return {
           title: 'LSA/FFA Equipment Master List',
           subtitle: `Complete inventory - ${components.length} components (LSA: ${summary.lsaCount ?? 0}, FFA: ${summary.ffaCount ?? 0})`,
           vessel: vesselName,
@@ -306,8 +307,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
           columns,
           data: finalData,
           summary: summaryItems
-        });
-        return;
+        };
       }
 
       pdfReportGenerator.generateReport(
@@ -377,7 +377,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
       const finalData = tableData.length > 0 ? tableData : [{ sno: '-', componentCode: '-', componentName: 'No maintenance items found', equipmentType: '-', location: '-', jobCode: '-', jobTitle: '-', taskType: '-', maintenanceBasis: '-', frequency: '-', nextDueDate: '-', daysUntilDue: '-', status: '-', lastDoneDate: '-', lastWONumber: '-', assignedTo: '-' }];
 
       if (mode === 'preview') {
-        setPreviewData({
+        return {
           title: 'LSA/FFA Maintenance Schedule & Status',
           subtitle: `${items.length} schedule items (Overdue: ${summary.overdue ?? 0}, Due Soon: ${summary.dueSoon ?? 0}, On Schedule: ${summary.onSchedule ?? 0})`,
           vessel: vesselName,
@@ -385,8 +385,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
           columns,
           data: finalData,
           summary: summaryItems
-        });
-        return;
+        };
       }
 
       pdfReportGenerator.generateReport(
@@ -408,7 +407,10 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
   const handlePreviewReport = async (reportId: string) => {
     try {
       toast({ title: "Loading Preview", description: "Preparing report data..." });
-      await generateReport(reportId, 'preview');
+      const data = await generateReport(reportId, 'preview');
+      if (data) {
+        setPreviewData(data);
+      }
     } catch (error: any) {
       console.error('Error generating preview:', error);
       toast({ title: "Preview Failed", description: error.message || "Failed to load report preview.", variant: "destructive" });
