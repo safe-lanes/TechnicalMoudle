@@ -3249,10 +3249,15 @@ export type AdmRoleMenuAccess = typeof admRoleMenuAccess.$inferSelect;
 // ====== PLANNER DATES TABLE ======
 export const plannerDates = pgTable("planner_dates", {
   id: serial("id").primaryKey(),
-  vesselId: text("vessel_id").notNull(),
-  jobId: text("job_id").notNull(),
-  componentId: text("component_id").notNull(),
+  pduuid: text("pduuid").notNull().unique(),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
+  jobId: text("job_id").notNull().references(() => jobs.juuid),
+  componentId: text("component_id").notNull().references(() => components.cuuid),
   plannedDate: text("planned_date"),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({

@@ -2380,6 +2380,81 @@ const migrations: Migration[] = [
 
       CREATE INDEX IF NOT EXISTS idx_planner_dates_vessel ON planner_dates(vessel_id);
     `
+  },
+  {
+    id: '074_planner_dates_add_uuid_audit_fk',
+    name: 'Add UUID, audit, sync/delete columns and FK constraints to planner_dates',
+    description: 'Adds pduuid, created_by_uuid, updated_by_uuid, is_sync, is_deleted columns and FK constraints on vessel_id, job_id, component_id',
+    sql: `
+      ALTER TABLE planner_dates ADD COLUMN IF NOT EXISTS pduuid TEXT;
+      ALTER TABLE planner_dates ADD COLUMN IF NOT EXISTS created_by_uuid TEXT;
+      ALTER TABLE planner_dates ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT;
+      ALTER TABLE planner_dates ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
+      ALTER TABLE planner_dates ADD COLUMN IF NOT EXISTS is_sync BOOLEAN NOT NULL DEFAULT false;
+
+      UPDATE planner_dates SET pduuid = gen_random_uuid()::text WHERE pduuid IS NULL;
+
+      ALTER TABLE planner_dates ALTER COLUMN pduuid SET NOT NULL;
+      ALTER TABLE planner_dates ALTER COLUMN pduuid SET DEFAULT gen_random_uuid()::text;
+
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'planner_dates_pduuid_unique'
+          AND conrelid = 'planner_dates'::regclass
+        ) THEN
+          ALTER TABLE planner_dates
+            ADD CONSTRAINT planner_dates_pduuid_unique UNIQUE (pduuid);
+        END IF;
+      END $$;
+
+      DELETE FROM planner_dates
+        WHERE vessel_id NOT IN (SELECT vuuid FROM vessels);
+      DELETE FROM planner_dates
+        WHERE job_id NOT IN (SELECT juuid FROM jobs);
+      DELETE FROM planner_dates
+        WHERE component_id NOT IN (SELECT cuuid FROM components);
+
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'planner_dates_vessel_id_fk'
+          AND conrelid = 'planner_dates'::regclass
+        ) THEN
+          ALTER TABLE planner_dates
+            ADD CONSTRAINT planner_dates_vessel_id_fk
+            FOREIGN KEY (vessel_id) REFERENCES vessels(vuuid);
+        END IF;
+      END $$;
+
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'planner_dates_job_id_fk'
+          AND conrelid = 'planner_dates'::regclass
+        ) THEN
+          ALTER TABLE planner_dates
+            ADD CONSTRAINT planner_dates_job_id_fk
+            FOREIGN KEY (job_id) REFERENCES jobs(juuid);
+        END IF;
+      END $$;
+
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'planner_dates_component_id_fk'
+          AND conrelid = 'planner_dates'::regclass
+        ) THEN
+          ALTER TABLE planner_dates
+            ADD CONSTRAINT planner_dates_component_id_fk
+            FOREIGN KEY (component_id) REFERENCES components(cuuid);
+        END IF;
+      END $$;
+    `
   }
 ];
 

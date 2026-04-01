@@ -6,6 +6,7 @@ import { getDb } from '../../../db';
 import { plannerDates, type Job, type Component, type WorkOrder, type PmsVesselSettings } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { storage } from '../../../storage';
+import { randomUUID } from 'crypto';
 
 export interface WorkOrderPlannerFilters {
   vesselId: string;
@@ -329,6 +330,7 @@ export async function savePlannedDate(vesselId: string, jobId: string, component
       );
   } else {
     await database.insert(plannerDates).values({
+      pduuid: randomUUID(),
       vesselId,
       jobId,
       componentId,
@@ -394,6 +396,7 @@ export async function bulkSavePlannedDate(
         updated++;
       } else {
         await tx.insert(plannerDates).values({
+          pduuid: randomUUID(),
           vesselId,
           jobId: item.jobId,
           componentId: item.componentId,
