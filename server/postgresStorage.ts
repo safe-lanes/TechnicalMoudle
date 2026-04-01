@@ -6954,7 +6954,8 @@ export class PostgresStorage {
       const rhLastDone = parseFloat(job.lastDoneRH || '0');
       const frequencyRH = job.intervalRunningHour || 0;
       const rhDueValue = rhLastDone + frequencyRH;
-      const rhGenerate = Math.max(0, rhDueValue - rhLeadTimeHours);
+      // Use FIXED 720-hour generation advance (business rule: generation is fixed, not vessel-driven)
+      const rhGenerate = Math.max(0, rhDueValue - WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS);
       
       dueRH = rhDueValue;
       currentRH = rhEffectiveCurrent;
@@ -6979,17 +6980,14 @@ export class PostgresStorage {
       console.log(`   RH_due=${rhDueValue}, RH_current=${rhEffectiveCurrent}`);
       
     } else {
-      // Calendar-based: compute cycle snapshots
-      const leadTimeDays = isJobCritical
-        ? (vesselSettings?.calendarLeadDaysCritical ?? WORK_ORDER_THRESHOLDS.CALENDAR_LEAD_TIME_DAYS)
-        : (vesselSettings?.calendarLeadDaysNonCritical ?? WORK_ORDER_THRESHOLDS.CALENDAR_LEAD_TIME_DAYS);
-      
+      // Calendar-based: compute cycle snapshots using fixed 30-day generation advance
       const dueDate = job.nextDueDate ? new Date(job.nextDueDate) : new Date();
       dueDate.setHours(0, 0, 0, 0);
       const dueDateStr = dueDate.toISOString().split('T')[0];
       
+      // Use FIXED 30-day generation advance (business rule: generation is fixed, not vessel-driven)
       const generateDate = new Date(dueDate);
-      generateDate.setDate(generateDate.getDate() - leadTimeDays);
+      generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
       const generateDateStr = generateDate.toISOString().split('T')[0];
       
       // Set Calendar cycle snapshots (matching auto-gen format)
@@ -7013,6 +7011,13 @@ export class PostgresStorage {
       rhLeadTimeHours: rhLeadTimeHours
     } : undefined;
     
+    // Compute calendar lead time for status calculation (vessel-configured, for Planned → Due)
+    const calendarLeadTimeDays = job.maintenanceBasis !== 'Running Hours' && vesselSettings
+      ? (isJobCritical
+          ? vesselSettings.calendarLeadDaysCritical
+          : vesselSettings.calendarLeadDaysNonCritical)
+      : undefined;
+
     // Use the shared computeWorkOrderStatus function for spec-compliant status
     const computedStatusResult = computeWorkOrderStatus({
       dueDate: job.nextDueDate,
@@ -7023,7 +7028,8 @@ export class PostgresStorage {
       completionDateTime: null,
       maintenanceBasis: job.maintenanceBasis || undefined,
       vesselGraceSettings,
-      rhLeadTimeHours
+      rhLeadTimeHours,
+      calendarLeadTimeDays
     });
     
     // Map computed status to database status field

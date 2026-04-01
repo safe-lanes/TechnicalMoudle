@@ -25,9 +25,13 @@ function isJobCritical(job: Job): boolean {
 
 /**
  * Get the appropriate calendar lead time in days for a job based on its priority
+ * This is used for the Planned → Due transition (vessel-configured), NOT for WO generation.
+ * WO generation always uses the fixed CALENDAR_GENERATION_ADVANCE_DAYS constant.
  */
 function getCalendarLeadDays(job: Job, settings: PmsVesselSettings | null | undefined): number {
-  if (!settings) return 0; // No settings configured, use 0 lead time
+  if (!settings) {
+    return WORK_ORDER_THRESHOLDS.CALENDAR_LEAD_TIME_DAYS;
+  }
   return isJobCritical(job) 
     ? settings.calendarLeadDaysCritical 
     : settings.calendarLeadDaysNonCritical;
@@ -35,9 +39,13 @@ function getCalendarLeadDays(job: Job, settings: PmsVesselSettings | null | unde
 
 /**
  * Get the appropriate RH lead time in hours for a job based on its priority
+ * This is used for the Planned → Due transition (vessel-configured), NOT for WO generation.
+ * WO generation always uses the fixed RH_GENERATION_ADVANCE_HOURS constant.
  */
 function getRhLeadHours(job: Job, settings: PmsVesselSettings | null | undefined): number {
-  if (!settings) return 0; // No settings configured, use 0 lead time
+  if (!settings) {
+    return WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS;
+  }
   return isJobCritical(job)
     ? settings.rhLeadHoursCritical
     : settings.rhLeadHoursNonCritical;
@@ -145,6 +153,12 @@ export class WorkOrderService {
             ? (vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL)
             : (vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL))
         : undefined;
+
+      const calendarLeadTimeDays = wo.maintenanceBasis !== 'Running Hours' && vesselSettings
+        ? (isJobCritical
+            ? vesselSettings.calendarLeadDaysCritical
+            : vesselSettings.calendarLeadDaysNonCritical)
+        : undefined;
       
       return {
         ...wo,
@@ -157,7 +171,8 @@ export class WorkOrderService {
           completionDateTime: wo.dateCompleted,
           maintenanceBasis: wo.maintenanceBasis || undefined,
           vesselGraceSettings,
-          rhLeadTimeHours
+          rhLeadTimeHours,
+          calendarLeadTimeDays
         })
       };
     });
@@ -381,16 +396,6 @@ export class WorkOrderService {
       job.nextDueDate // Must have valid due date
     );
     
-    // Fetch vessel PMS settings for lead time configuration
-    const settingsCache = new Map<string, PmsVesselSettings | null>();
-    const getSettingsForVessel = async (vId: string | null): Promise<PmsVesselSettings | null> => {
-      if (!vId) return null;
-      if (settingsCache.has(vId)) return settingsCache.get(vId) || null;
-      const settings = await storage.getPmsVesselSettings(vId);
-      settingsCache.set(vId, settings || null);
-      return settings || null;
-    };
-    
     // Get all work orders to check for duplicates
     // Note: We fetch WOs for the specified vessel (or all) but use vessel-scoped keys
     const allWorkOrders = await this.getWorkOrders(vesselId);
@@ -416,18 +421,14 @@ export class WorkOrderService {
     today.setHours(0, 0, 0, 0); // Normalize to start of day
     
     for (const job of calendarJobs) {
-      // Get vessel settings for lead time
-      const settings = await getSettingsForVessel(job.vesselId);
-      const leadTimeDays = getCalendarLeadDays(job, settings);
-      
       // Calculate DUE_DATE and GENERATE_DATE
       // DUE_DATE is stored in job.nextDueDate
       const dueDate = new Date(job.nextDueDate!);
       dueDate.setHours(0, 0, 0, 0);
       
-      // GENERATE_DATE = DUE_DATE - LT_days
+      // GENERATE_DATE = DUE_DATE - FIXED 30 days (business rule: generation is fixed, not vessel-driven)
       const generateDate = new Date(dueDate);
-      generateDate.setDate(generateDate.getDate() - leadTimeDays);
+      generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
       
       // Check auto-generation condition: Today >= GENERATE_DATE
       if (today < generateDate) {
@@ -504,7 +505,7 @@ export class WorkOrderService {
           jobTitle: job.jobTitle,
           assignedTo: job.assignedTo || 'Unassigned',
           dueDate: job.nextDueDate,
-          status: 'Due',
+          status: 'Active',
           taskType: job.maintenanceType,
           maintenanceBasis: job.maintenanceBasis,
           frequencyValue: job.frequencyValue?.toString(),
@@ -536,8 +537,8 @@ export class WorkOrderService {
           existingCycleWOs.set(componentCycleKey, workOrderData as any);
           
           const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
-          console.log(`✅ [Calendar Trigger 2] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode}`);
-          console.log(`   last_done=${job.lastDoneDate || 'N/A'}, LT=${leadTimeDays} days`);
+          console.log(`✅ [Calendar Trigger 2] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode} (status: Active/Planned)`);
+          console.log(`   last_done=${job.lastDoneDate || 'N/A'}, Generation advance=${WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS} days`);
           console.log(`   DUE_DATE=${dueDateStr}, GENERATE_DATE=${generateDateStr}, Today=${today.toISOString().split('T')[0]}`);
         } catch (error: any) {
           console.warn(`⚠️ Failed to create WO for job ${job.jobNo} + component ${componentCode}: ${error.message}`);
@@ -545,16 +546,7 @@ export class WorkOrderService {
       }
     }
     
-    // Log settings used for transparency
-    if (settingsCache.size > 0) {
-      Array.from(settingsCache.entries()).forEach(([vId, settings]) => {
-        if (settings) {
-          console.log(`📋 [Calendar WO Gen] Vessel ${vId} lead times: Critical=${settings.calendarLeadDaysCritical}d, Non-Critical=${settings.calendarLeadDaysNonCritical}d`);
-        } else {
-          console.log(`⚠️ [Calendar WO Gen] Vessel ${vId} has no PMS settings configured, using 0 day lead time`);
-        }
-      });
-    }
+    console.log(`📋 [Calendar WO Gen] Using fixed generation advance: ${WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS} days. Initial status: Active (Planned).`);
     
     return results;
   }

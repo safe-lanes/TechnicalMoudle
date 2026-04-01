@@ -334,7 +334,7 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
       isExecution: wo.isExecution,
       status: wo.status,
       completionDateTime: wo.completionDateTime,
-      maintenanceBasis: maintenanceBasis
+      maintenanceBasis: maintenanceBasis,
     });
 
     if (computedStatus === 'Overdue') {

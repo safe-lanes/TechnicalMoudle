@@ -240,6 +240,13 @@ export async function syncWorkOrderStatus(req: Request, res: Response) {
             : (vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS))
         : undefined;
 
+      // Determine calendar lead time for Planned → Due transition
+      const calendarLeadTimeDays = wo.maintenanceBasis !== 'Running Hours' && vesselSettings
+        ? (isJobCritical
+            ? vesselSettings.calendarLeadDaysCritical
+            : vesselSettings.calendarLeadDaysNonCritical)
+        : undefined;
+
       const computedStatus = computeWorkOrderStatus({
         dueDate: wo.dueDate,
         dueRH,
@@ -254,7 +261,8 @@ export async function syncWorkOrderStatus(req: Request, res: Response) {
           rhGraceHours: vesselSettings?.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
           rhLeadTimeHours: vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
         } : undefined,
-        rhLeadTimeHours
+        rhLeadTimeHours,
+        calendarLeadTimeDays
       });
 
       if (wo.status !== computedStatus) {

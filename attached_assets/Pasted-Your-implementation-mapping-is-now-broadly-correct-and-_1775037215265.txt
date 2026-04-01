@@ -1,0 +1,106 @@
+Your implementation mapping is now broadly correct and aligned with the business rule. You may proceed, but first note these final clarifications:
+
+1. Final business rule confirmed
+Please proceed on this basis:
+
+WO generation is fixed
+
+Calendar jobs: generate at due date minus 30 days
+
+Running-hours jobs: generate at due point minus 720 hours
+
+Generated WOs must start in Planned
+
+If internal status name is Active and that maps to Planned tab, that is acceptable
+
+Vessel Lead Time controls only Planned -> Due
+
+Calendar jobs use vessel calendar lead days
+
+RH jobs use vessel RH lead hours
+
+Grace logic remains unchanged
+
+After due date / due point, if still within grace, show Grace P
+
+Overdue remains unchanged
+
+After grace expiry, move to Overdue
+
+2. Confirm fallback behavior for vessels with no settings
+This is important because many vessels in Admin are still shown as Not Set / Not Configured, while only some vessels display configured lead values like 7d / 50hrs.
+
+Please confirm exact behavior for such vessels:
+
+Generation should still use fixed 30 days / 720 hours, regardless of settings availability.
+
+For calendar Due threshold, if vessel lead settings are missing, what fallback value will be used?
+
+For RH Due threshold, if vessel lead settings are missing, what fallback value will be used?
+
+For calendar grace, if vessel has no custom grace configuration, confirm company standard grace remains the fallback.
+
+For RH grace, if vessel settings are missing, confirm what default grace hours are used.
+
+We need this written explicitly before implementation so vessels without config do not behave unpredictably.
+
+3. Correct validation wording for RH scenario
+In your validation scenarios, please word RH cases carefully:
+
+If RH due = 5000 and current RH = 4300, then remaining = 700 hours.
+
+Since 700 is within the 720-hour generation trigger, WO should already exist.
+
+If vessel RH lead = 50 hours, it should still be in Planned, not Due.
+
+Please keep this logic precise in testing notes.
+
+4. One more implementation guardrail
+When auditing API endpoints and status calculation call sites, make sure there is no place where:
+
+generation still depends on vessel lead,
+
+or Due status still depends on a hardcoded 30-day calendar threshold.
+
+We want one consistent rule across:
+
+generation service,
+
+status recalculator,
+
+manual generation,
+
+API computed status,
+
+dashboard counts,
+
+tab counts,
+
+reports if they depend on WO status.
+
+5. Post-implementation verification required
+After implementation, please provide a short verification report showing:
+
+before vs after logic summary,
+
+results of all 10 validation scenarios,
+
+one example each for:
+
+Planned calendar WO,
+
+Due calendar WO,
+
+Grace P calendar WO,
+
+Overdue calendar WO,
+
+Planned RH WO,
+
+Due RH WO,
+
+Grace P RH WO,
+
+Overdue RH WO.
+
+If the above is clear, proceed with implementation.

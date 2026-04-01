@@ -7,69 +7,59 @@
  * 
  * DO NOT CHANGE THESE VALUES UNLESS EXPLICITLY REQUESTED BY THE USER.
  * 
- * Specification (as per Status Types document):
- * - Active: Job is not yet due (>30 days for calendar, >720 RH for running hours)
- * - Due: Job is approaching due date (≤30 days for calendar, ≤720 RH for running hours)
- * - Due (Grace P): Job is past due date but still within grace period
- * - Overdue: Job has exceeded both the due date AND the grace period
+ * BUSINESS RULE SEPARATION:
+ * - GENERATION constants control WHEN a WO is created (fixed, not vessel-driven)
+ * - LEAD TIME constants are FALLBACK defaults for vessel-configured Due thresholds
+ * - GRACE constants control the grace period after the due date/point
+ * 
+ * Lifecycle: Generated early → Planned → Due by vessel Lead Time → Grace P → Overdue
  */
 
 export const WORK_ORDER_THRESHOLDS = {
   /**
-   * Calendar Lead Time (in days)
-   * Work orders become "Due" when within this many days of due date
-   * Work orders are "Active" when more than this many days away
+   * GENERATION CONSTANTS (FIXED - not vessel-driven)
+   * These control WHEN a work order is created, independent of vessel settings.
    */
+
+  /** Calendar: generate WO this many days before due date (FIXED 30 days) */
+  CALENDAR_GENERATION_ADVANCE_DAYS: 30,
+
+  /** RH: generate WO this many hours before due RH point (FIXED 720 hours) */
+  RH_GENERATION_ADVANCE_HOURS: 720,
+
+  /**
+   * FALLBACK LEAD TIME CONSTANTS (used when vessel settings are NOT configured)
+   * When vessel settings exist, vessel-configured lead times are used instead.
+   * These serve as safe defaults for the Planned → Due transition.
+   */
+
+  /** Fallback calendar lead time when vessel has no settings (days) */
   CALENDAR_LEAD_TIME_DAYS: 30,
 
-  /**
-   * Running Hours Lead Time (in hours)
-   * Work orders become "Due" when within this many hours of due RH
-   * Work orders are "Active" when more than this many hours away
-   * 
-   * IMPORTANT: This is 720 hours per specification, NOT 100!
-   */
+  /** Fallback RH lead time when vessel has no settings (hours) */
   RH_LEAD_TIME_HOURS: 720,
 
-  /**
-   * Running Hours Grace Period (in hours)
-   * After due RH is exceeded, WO stays in "Grace P" for this many hours
-   * Then transitions to "Overdue"
-   * 168 hours = 7 days equivalent
-   */
-  RH_GRACE_PERIOD_HOURS: 168,
-
-  /**
-   * Calendar Grace Period (in days)
-   * Minimum fixed grace period for calendar-based jobs
-   * Used when due date is in last 7 days of month (COMPANY_STANDARD mode)
-   */
-  CALENDAR_GRACE_PERIOD_DAYS: 7,
-
-  /**
-   * Critical job RH lead time multiplier
-   * Critical/High priority jobs may use different lead times
-   * This is the default for critical jobs when vessel settings not configured
-   */
+  /** Fallback RH lead time for critical jobs when vessel has no settings */
   RH_LEAD_TIME_HOURS_CRITICAL: 720,
 
-  /**
-   * Non-critical job RH lead time
-   * Same as standard RH_LEAD_TIME_HOURS for consistency
-   */
+  /** Fallback RH lead time for non-critical jobs when vessel has no settings */
   RH_LEAD_TIME_HOURS_NON_CRITICAL: 720,
 
-  /**
-   * Calendar Lead Time for Critical/High priority jobs (in days)
-   * Work orders for critical jobs become "Due" when within this many days
-   */
+  /** Fallback calendar lead time for critical jobs when vessel has no settings */
   CALENDAR_LEAD_TIME_DAYS_CRITICAL: 7,
 
-  /**
-   * Calendar Lead Time for Non-Critical jobs (in days)
-   * Work orders for non-critical jobs become "Due" when within this many days
-   */
+  /** Fallback calendar lead time for non-critical jobs when vessel has no settings */
   CALENDAR_LEAD_TIME_DAYS_NON_CRITICAL: 14,
+
+  /**
+   * GRACE PERIOD CONSTANTS
+   */
+
+  /** RH grace period hours (168 = 7 days equivalent) */
+  RH_GRACE_PERIOD_HOURS: 168,
+
+  /** Calendar grace period days (minimum fixed grace for COMPANY_STANDARD mode) */
+  CALENDAR_GRACE_PERIOD_DAYS: 7,
 } as const;
 
 /**

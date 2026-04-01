@@ -60,17 +60,17 @@ export interface VesselGraceSettings {
 }
 
 /**
- * Work order status types for display - SPEC-COMPLIANT
- * Per specification, only these statuses are allowed:
- * - Active: >30 days or >720 RH before due
- * - Due: ≤30 days or ≤720 RH before due (within lead time)
+ * Work order status types for display
+ * Lifecycle: Active (Planned) → Due → Due (Grace P) → Overdue
+ * - Active: Outside vessel lead time window (appears in Planned tab)
+ * - Due: Within vessel lead time window (≤ vessel lead days/hours before due)
  * - Due (Grace P): Past due but within grace period
  * - Overdue: Past due AND past grace period
  * - Completed/Pending Approval/Rejected/Postponed: Terminal states
  */
 export type ComputedWorkOrderStatus = 
-  | 'Active'        // Far from due (>30 days or >720 RH)
-  | 'Due'           // Within lead time (≤30 days or ≤720 RH)
+  | 'Active'        // Outside vessel lead time window (Planned tab)
+  | 'Due'           // Within vessel lead time window
   | 'Due (Grace P)' // Past due but within grace period
   | 'Overdue'       // Past due AND past grace period
   | 'Completed'
@@ -79,7 +79,7 @@ export type ComputedWorkOrderStatus =
   | 'Postponed';
 
 /**
- * RH-specific status for maintenance planning - SPEC-COMPLIANT
+ * RH-specific status for maintenance planning
  * Uses lead time and grace period driven categorization:
  * - OVERDUE: Past due RH AND past grace period
  * - DUE_GRACE: Past due RH but within grace period
@@ -97,7 +97,8 @@ export interface WorkOrderStatusInput {
   completionDateTime?: string | null;
   maintenanceBasis?: string;
   vesselGraceSettings?: VesselGraceSettings;
-  rhLeadTimeHours?: number; // Lead time for RH-based status calculation
+  rhLeadTimeHours?: number;
+  calendarLeadTimeDays?: number;
 }
 
 /**
@@ -125,16 +126,16 @@ function calculateCompanyStandardGraceEnd(dueDate: Date): Date {
 }
 
 /**
- * Calculate RH status category based on spec-compliant rules
+ * Calculate RH status category based on vessel lead time and grace period
  * 
  * Formulas:
  * - RH_remaining = RH_due - RH_effective_current
  * 
- * Status categories (SPEC-COMPLIANT):
+ * Status categories:
  * - OVERDUE: Past due RH AND past grace period (rhRemaining < -graceHours)
  * - DUE_GRACE: Past due RH but within grace period (-graceHours <= rhRemaining < 0)
- * - DUE: Within lead time (0 <= rhRemaining <= leadTimeHours)
- * - ACTIVE: Beyond lead time (rhRemaining > leadTimeHours)
+ * - DUE: Within vessel lead time (0 <= rhRemaining <= leadTimeHours)
+ * - PLANNED: Beyond vessel lead time (rhRemaining > leadTimeHours)
  */
 export function computeRHStatusCategory(
   dueRH: number,
@@ -153,16 +154,16 @@ export function computeRHStatusCategory(
     // Past due but within grace period
     return 'DUE_GRACE' as RHStatusCategory;
   } else if (rhRemaining <= leadTimeHours) {
-    // Within lead time: 0 <= RH_remaining <= LT
+    // Within vessel lead time: 0 <= RH_remaining <= LT
     return 'DUE';
   } else {
-    // Beyond lead time: RH_remaining > LT
+    // Beyond vessel lead time: RH_remaining > LT
     return 'PLANNED';
   }
 }
 
 /**
- * Map RH status category to display status - SPEC-COMPLIANT
+ * Map RH status category to display status
  * Maps to only the four allowed statuses: Active, Due, Due (Grace P), Overdue
  */
 export function rhCategoryToDisplayStatus(category: RHStatusCategory): ComputedWorkOrderStatus {
@@ -192,7 +193,8 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
     completionDateTime, 
     maintenanceBasis, 
     vesselGraceSettings,
-    rhLeadTimeHours
+    rhLeadTimeHours,
+    calendarLeadTimeDays
   } = input;
   
   const FINALIZED_STATUSES = new Set(['completed', 'approved', 'closed', 'cancelled', 'canceled']);
@@ -220,14 +222,12 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
     return 'Completed';
   }
   
-  // Branch based on maintenance basis for spec-compliant status calculation
+  // Branch based on maintenance basis for status calculation
   if (maintenanceBasis === 'Running Hours') {
-    // Running Hours-based status calculation - SPEC-COMPLIANT
+    // Running Hours-based status calculation
     if (dueRH == null || currentRH == null) return 'Active';
     
-    // Get lead time from settings
-    // Important: Respect explicit zero lead time (null-coalescing only for undefined/null)
-    // If rhLeadTimeHours is 0, use 0; only fall back to default when truly undefined
+    // Get lead time from settings (vessel-configured RH lead time for Due transition)
     let leadTime: number;
     if (rhLeadTimeHours !== undefined && rhLeadTimeHours !== null) {
       leadTime = rhLeadTimeHours;
@@ -240,7 +240,7 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
     // Get grace period from settings
     const graceHours = vesselGraceSettings?.rhGraceHours ?? GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
     
-    // Calculate RH status category using spec-compliant rules (includes grace period)
+    // Calculate RH status category using vessel lead time (includes grace period)
     const category = computeRHStatusCategory(dueRH, currentRH, leadTime, graceHours);
     
     // Map to display status
@@ -276,11 +276,17 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
       graceEndDate = calculateCompanyStandardGraceEnd(dueDateTime);
     }
     
+    // Determine the effective calendar lead time for the Planned → Due transition
+    // Use vessel-configured calendarLeadTimeDays if provided, otherwise fallback to constant
+    const effectiveLeadDays = (calendarLeadTimeDays !== undefined && calendarLeadTimeDays !== null)
+      ? calendarLeadTimeDays
+      : GRACE_PERIOD_CONSTANTS.DUE_HORIZON_DAYS;
+    
     // Status logic for calendar jobs:
     // - Overdue: today is past grace end date
     // - Due (Grace P): past due date but within grace (today <= grace end date)
-    // - Due: approaching but not yet due (positive days within horizon)
-    // - Active: more than horizon away
+    // - Due: within vessel lead time window (0 <= diffDays <= effectiveLeadDays)
+    // - Active: more than vessel lead time away (Planned)
     
     if (diffDays < 0) {
       // Past due date - check if we're still in grace period
@@ -289,7 +295,7 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
       } else {
         return 'Due (Grace P)';
       }
-    } else if (diffDays <= GRACE_PERIOD_CONSTANTS.DUE_HORIZON_DAYS) {
+    } else if (diffDays <= effectiveLeadDays) {
       return 'Due';
     } else {
       return 'Active';

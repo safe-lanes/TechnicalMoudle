@@ -222,6 +222,13 @@ export async function listWorkOrders(vesselId?: string) {
           : (vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL))
       : undefined;
 
+    // Determine calendar lead time for Planned → Due transition
+    const calendarLeadTimeDays = wo.maintenanceBasis !== 'Running Hours' && vesselSettings
+      ? (isJobCritical
+          ? vesselSettings.calendarLeadDaysCritical
+          : vesselSettings.calendarLeadDaysNonCritical)
+      : undefined;
+
     const woComputedStatus = computeWorkOrderStatus({
       dueDate: wo.dueDate,
       dueRH,
@@ -231,7 +238,8 @@ export async function listWorkOrders(vesselId?: string) {
       completionDateTime: wo.dateCompleted,
       maintenanceBasis: wo.maintenanceBasis || job?.maintenanceBasis || undefined,
       vesselGraceSettings,
-      rhLeadTimeHours
+      rhLeadTimeHours,
+      calendarLeadTimeDays
     });
 
     let liveMissedCycles = wo.missedCycles || 0;
@@ -386,6 +394,13 @@ export async function getWorkOrder(id: string) {
         : (vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL))
     : undefined;
 
+  // Determine calendar lead time for Planned → Due transition
+  const calendarLeadTimeDays2 = workOrder.maintenanceBasis !== 'Running Hours' && vesselSettings
+    ? (isJobCritical
+        ? vesselSettings.calendarLeadDaysCritical
+        : vesselSettings.calendarLeadDaysNonCritical)
+    : undefined;
+
   return {
     ...workOrder,
     computedStatus: computeWorkOrderStatus({
@@ -397,7 +412,8 @@ export async function getWorkOrder(id: string) {
       completionDateTime: workOrder.dateCompleted,
       maintenanceBasis: workOrder.maintenanceBasis || job?.maintenanceBasis || undefined,
       vesselGraceSettings,
-      rhLeadTimeHours
+      rhLeadTimeHours,
+      calendarLeadTimeDays: calendarLeadTimeDays2
     }),
     leadTimeValue,
     leadTimeUnit

@@ -25,7 +25,8 @@ function isJobCritical(job: Job): boolean {
 
 /**
  * Get the appropriate RH lead time in hours for a job based on its priority
- * Uses centralized WORK_ORDER_THRESHOLDS as fallback when vessel settings not configured
+ * This is used for the Planned → Due transition (vessel-configured), NOT for WO generation.
+ * WO generation always uses the fixed RH_GENERATION_ADVANCE_HOURS constant.
  */
 function getRhLeadHours(job: Job, settings: PmsVesselSettings | null | undefined): number {
   if (!settings) {
@@ -172,16 +173,6 @@ export class JobDueScannerService {
       job.intervalRunningHour && job.intervalRunningHour > 0 // Must have valid frequency
     );
 
-    // Fetch vessel PMS settings for lead time configuration
-    const settingsCache = new Map<string, PmsVesselSettings | null>();
-    const getSettingsForVessel = async (vId: string | null): Promise<PmsVesselSettings | null> => {
-      if (!vId) return null;
-      if (settingsCache.has(vId)) return settingsCache.get(vId) || null;
-      const settings = await storage.getPmsVesselSettings(vId);
-      settingsCache.set(vId, settings || null);
-      return settings || null;
-    };
-
     // Get all work orders to check for duplicates
     // Note: We fetch all WOs but use vessel-scoped keys for proper cross-vessel handling
     const allWorkOrders = await storage.getWorkOrders();
@@ -248,9 +239,8 @@ export class JobDueScannerService {
       const frequencyRH = job.intervalRunningHour || 0;
       if (frequencyRH <= 0) continue;
 
-      // Get vessel settings for lead time
-      const settings = await getSettingsForVessel(job.vesselId);
-      const leadTimeRH = getRhLeadHours(job, settings);
+      // Use FIXED 720-hour generation advance (business rule: generation is fixed, not vessel-driven)
+      const generationAdvanceRH = WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS;
 
       // LEGACY FALLBACK: Check if job has any active WO with NULL/empty componentCode
       // If so, block ALL generation for this job to protect legacy data
@@ -310,9 +300,9 @@ export class JobDueScannerService {
           }
         }
 
-        // Calculate per-component cycle values
+        // Calculate per-component cycle values using fixed generation advance
         const rhDue = rhLastDone + frequencyRH;
-        const rhGenerate = Math.max(0, rhDue - leadTimeRH);
+        const rhGenerate = Math.max(0, rhDue - generationAdvanceRH);
 
         // Check auto-generation condition per component using component's own current RH
         if (componentCurrentRH < rhGenerate) {
@@ -353,7 +343,7 @@ export class JobDueScannerService {
           dueDate: undefined, // RH-based jobs don't have calendar due date
           nextDueReading: String(rhDue), // Store the due RH value
           currentReading: String(componentCurrentRH), // Store per-component current RH at generation time
-          status: 'Due', // Start as Due since trigger condition is met
+          status: 'Active', // Start as Active/Planned; recalculator will move to Due when within vessel lead time
           taskType: job.maintenanceType,
           maintenanceBasis: job.maintenanceBasis,
           frequencyValue: job.frequencyValue?.toString(),
@@ -388,8 +378,8 @@ export class JobDueScannerService {
           allWorkOrders.push(createdWO); // Keep in-memory array in sync for subsequent checks
           
           const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
-          console.log(`✅ [RH Trigger 1] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode}`);
-          console.log(`   RH_last_done=${rhLastDone}, F=${frequencyRH}, LT=${leadTimeRH}`);
+          console.log(`✅ [RH Trigger 1] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode} (status: Active/Planned)`);
+          console.log(`   RH_last_done=${rhLastDone}, F=${frequencyRH}, Generation advance=${generationAdvanceRH}hrs`);
           console.log(`   RH_due=${rhDue}, RH_generate=${rhGenerate}, RH_current=${rhEffectiveCurrent}`);
         } catch (error: any) {
           console.warn(`⚠️ Failed to create WO for RH job ${job.jobNo} + component ${componentCode}: ${error.message}`);
@@ -397,16 +387,7 @@ export class JobDueScannerService {
       }
     }
 
-    // Log settings used for transparency
-    if (settingsCache.size > 0) {
-      Array.from(settingsCache.entries()).forEach(([vId, settings]) => {
-        if (settings) {
-          console.log(`📋 [RH WO Gen] Vessel ${vId} lead times: Critical=${settings.rhLeadHoursCritical}hrs, Non-Critical=${settings.rhLeadHoursNonCritical}hrs`);
-        } else {
-          console.log(`⚠️ [RH WO Gen] Vessel ${vId} has no PMS settings configured, using 0 hour lead time`);
-        }
-      });
-    }
+    console.log(`📋 [RH WO Gen] Using fixed generation advance: ${WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS} hours. Initial status: Active (Planned).`);
 
     const totalSkipped = Object.values(skipReasons).reduce((a, b) => a + b, 0);
     if (rhJobs.length > 0 && generated === 0) {
@@ -570,7 +551,7 @@ export class JobDueScannerService {
         return { success: false, message: 'Component not found for job' };
       }
       
-      // Get lead time hours using shared utility
+      // Get vessel lead time hours for status computation (Planned → Due transition)
       rhLeadTimeHours = getRhLeadHours(job, settings);
       
       // Determine effective current RH based on counter type
@@ -588,7 +569,7 @@ export class JobDueScannerService {
       
       // Calculate cycle values
       const rhDueValue = rhLastDone + frequencyRH;
-      const rhGenerate = Math.max(0, rhDueValue - rhLeadTimeHours);
+      const rhGenerate = Math.max(0, rhDueValue - WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS);
       dueRH = rhDueValue;
       
       // Step 3: CYCLE-LEVEL CHECK (RH) using Trigger 1's cycle map (direct lookup)
@@ -629,7 +610,7 @@ export class JobDueScannerService {
         intervalRunningHour: job.intervalRunningHour,
       };
       
-      console.log(`[Manual Trigger 3] RH Job: RH_last_done=${rhLastDone}, F=${frequencyRH}, LT=${rhLeadTimeHours}`);
+      console.log(`[Manual Trigger 3] RH Job: RH_last_done=${rhLastDone}, F=${frequencyRH}, Generation advance=${WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS}hrs, Vessel LT=${rhLeadTimeHours}hrs`);
       console.log(`   RH_due=${rhDueValue}, RH_generate=${rhGenerate}, RH_current=${currentRH}`);
     } else {
       // Calendar Job: compute cycle values
@@ -637,12 +618,9 @@ export class JobDueScannerService {
       dueDate.setHours(0, 0, 0, 0);
       const dueDateStr = dueDate.toISOString().split('T')[0];
       
-      const leadTimeDays = isJobCritical(job) 
-        ? (settings?.calendarLeadDaysCritical ?? WORK_ORDER_THRESHOLDS.CALENDAR_LEAD_TIME_DAYS) 
-        : (settings?.calendarLeadDaysNonCritical ?? WORK_ORDER_THRESHOLDS.CALENDAR_LEAD_TIME_DAYS);
-      
+      // Use FIXED 30-day generation advance (business rule: generation is fixed, not vessel-driven)
       const generateDate = new Date(dueDate);
-      generateDate.setDate(generateDate.getDate() - leadTimeDays);
+      generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
       const generateDateStr = generateDate.toISOString().split('T')[0];
       
       // Step 3: CYCLE-LEVEL CHECK (Calendar) using Trigger 1's cycle map (direct lookup)
@@ -679,7 +657,7 @@ export class JobDueScannerService {
         dueDate: job.nextDueDate,
       };
       
-      console.log(`[Manual Trigger 3] Calendar Job: last_done=${job.lastDoneDate || 'N/A'}, LT=${leadTimeDays} days`);
+      console.log(`[Manual Trigger 3] Calendar Job: last_done=${job.lastDoneDate || 'N/A'}, Generation advance=${WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS} days`);
       console.log(`   DUE_DATE=${dueDateStr}, GENERATE_DATE=${generateDateStr}`);
     }
 
@@ -692,6 +670,11 @@ export class JobDueScannerService {
       rhLeadTimeHours: rhLeadTimeHours
     } : undefined;
     
+    // Compute calendar lead time for status calculation (vessel-configured, for Planned → Due)
+    const calendarLeadTimeDays = job.maintenanceBasis !== 'Running Hours' && settings
+      ? (isJobCritical(job) ? settings.calendarLeadDaysCritical : settings.calendarLeadDaysNonCritical)
+      : undefined;
+
     // Use the shared computeWorkOrderStatus function for spec-compliant status
     const computedStatusResult = computeWorkOrderStatus({
       dueDate: job.nextDueDate,
@@ -702,7 +685,8 @@ export class JobDueScannerService {
       completionDateTime: null,
       maintenanceBasis: job.maintenanceBasis || undefined,
       vesselGraceSettings,
-      rhLeadTimeHours
+      rhLeadTimeHours,
+      calendarLeadTimeDays
     });
     
     // Map computed status to database status field

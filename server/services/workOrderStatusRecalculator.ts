@@ -183,12 +183,19 @@ export class WorkOrderStatusRecalculatorService {
         const vesselGraceSettings = wo.vesselId ? graceSettingsCache.get(wo.vesselId) : undefined;
         const vesselSettings = wo.vesselId ? vesselSettingsCache.get(wo.vesselId) : null;
 
-        // Determine RH lead time based on job criticality
+        // Determine RH lead time based on job criticality (for Planned → Due transition)
         const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === 'true' || String(job?.classRelated) === 'true';
         const rhLeadTimeHours = wo.maintenanceBasis === 'Running Hours' 
           ? (isJobCritical 
               ? (vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL)
               : (vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL))
+          : undefined;
+
+        // Determine calendar lead time based on job criticality (for Planned → Due transition)
+        const calendarLeadTimeDays = wo.maintenanceBasis !== 'Running Hours' && vesselSettings
+          ? (isJobCritical
+              ? vesselSettings.calendarLeadDaysCritical
+              : vesselSettings.calendarLeadDaysNonCritical)
           : undefined;
 
         // Compute new status
@@ -201,7 +208,8 @@ export class WorkOrderStatusRecalculatorService {
           completionDateTime: wo.dateCompleted,
           maintenanceBasis: wo.maintenanceBasis || undefined,
           vesselGraceSettings,
-          rhLeadTimeHours
+          rhLeadTimeHours,
+          calendarLeadTimeDays
         });
 
         // Only update if status has changed
