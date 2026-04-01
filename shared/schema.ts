@@ -2158,7 +2158,6 @@ export const fleetComponentMapping = pgTable("fleet_component_mapping", {
   fleetCodeIdx: index("idx_fleet_comp_mapping_fleet").on(table.fleetEquipmentCode),
   vesselCodeIdx: index("idx_fleet_comp_mapping_vessel").on(table.vesselCode),
   componentCodeIdx: index("idx_fleet_comp_mapping_component").on(table.componentCode),
-  uniqueMapping: unique("unique_fleet_component_mapping").on(table.fleetEquipmentCode, table.vesselCode, table.componentCode),
 }));
 
 export const insertFleetComponentMappingSchema = createInsertSchema(fleetComponentMapping).omit({
@@ -2187,7 +2186,6 @@ export const fleetJobVesselMapping = pgTable("fleet_job_vessel_mapping", {
   fleetCodeIdx: index("idx_fleet_job_mapping_fleet").on(table.fleetEquipmentCode),
   jobCodeIdx: index("idx_fleet_job_mapping_job").on(table.jobCode),
   vesselCodeIdx: index("idx_fleet_job_mapping_vessel").on(table.vesselCode),
-  uniqueMapping: unique("unique_fleet_job_vessel_mapping").on(table.fleetEquipmentCode, table.jobCode, table.vesselCode, table.jobId),
 }));
 
 export const insertFleetJobVesselMappingSchema = createInsertSchema(fleetJobVesselMapping).omit({
@@ -2216,7 +2214,6 @@ export const fleetSpareVesselMapping = pgTable("fleet_spare_vessel_mapping", {
   fleetCodeIdx: index("idx_fleet_spare_mapping_fleet").on(table.fleetEquipmentCode),
   partCodeIdx: index("idx_fleet_spare_mapping_part").on(table.partCode),
   vesselCodeIdx: index("idx_fleet_spare_mapping_vessel").on(table.vesselCode),
-  uniqueMapping: unique("unique_fleet_spare_vessel_mapping").on(table.fleetEquipmentCode, table.partCode, table.vesselCode, table.spareId),
 }));
 
 export const insertFleetSpareVesselMappingSchema = createInsertSchema(fleetSpareVesselMapping).omit({

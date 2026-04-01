@@ -566,8 +566,8 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const spareAutoMatchEntries = useMemo((): SpareAutoMatchEntry[] => {
     const vesselSpareLookup = new Map<string, any[]>();
     vesselSparesData.forEach((vs: any) => {
-      const key = `${vs.fleetEquipmentCode || ""}|${vs.partCode || ""}`;
-      if (vs.fleetEquipmentCode && vs.partCode) {
+      if (vs.partCode) {
+        const key = vs.partCode;
         const arr = vesselSpareLookup.get(key) || [];
         arr.push(vs);
         vesselSpareLookup.set(key, arr);
@@ -575,8 +575,7 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     });
 
     return fleetSparesData.map((fs) => {
-      const compositeKey = `${fs.fleetEquipmentCode}|${fs.partCode}`;
-      const vesselSpares = vesselSpareLookup.get(compositeKey) || [];
+      const vesselSpares = vesselSpareLookup.get(fs.partCode) || [];
       const matched = vesselSpares.length > 0;
 
       return {
