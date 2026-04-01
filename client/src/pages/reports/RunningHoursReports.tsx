@@ -245,8 +245,17 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         }
 
         const utilizationData = applyComponentFilter(allUtilizationData);
-        const summary = mergedSummary;
         
+        const highUtil = utilizationData.filter((d: any) => d.utilizationBand === 'High').length;
+        const normalUtil = utilizationData.filter((d: any) => d.utilizationBand === 'Normal').length;
+        const lowUtil = utilizationData.filter((d: any) => d.utilizationBand === 'Low').length;
+        const avgUtil = utilizationData.length > 0
+          ? (utilizationData.reduce((s: number, d: any) => s + (Number(d.utilizationPercent) || 0), 0) / utilizationData.length).toFixed(1)
+          : '0';
+        const actualCount = utilizationData.filter((d: any) => d.dataSource === 'actual' || d.dataSource === 'Actual').length;
+        const estimatedCount = utilizationData.filter((d: any) => d.dataSource === 'estimated' || d.dataSource === 'Estimated' || d.dataSource === 'estimated_capped').length;
+        const noDataCount = utilizationData.filter((d: any) => d.dataSource === 'no_data' || d.dataSource === 'No Data' || !d.dataSource).length;
+
         const columns = [
           { header: 'S.No', field: 'sNo', width: 12 },
           { header: 'Code', field: 'componentCode', width: 30 },
@@ -261,14 +270,14 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         ];
         
         const summaryItems = [
-          { label: 'Total Equipment', value: summary.totalEquipment },
-          { label: 'High Utilization', value: summary.highUtilization },
-          { label: 'Normal Utilization', value: summary.normalUtilization },
-          { label: 'Low Utilization', value: summary.lowUtilization },
-          { label: 'Avg Utilization', value: `${summary.avgUtilization}%` },
-          { label: 'Actual Data', value: summary.actualData || 0 },
-          { label: 'Estimated', value: (summary.estimatedData || 0) + (summary.estimatedCapped || 0) },
-          { label: 'No Data', value: summary.noData || 0 }
+          { label: 'Total Equipment', value: utilizationData.length },
+          { label: 'High Utilization', value: highUtil },
+          { label: 'Normal Utilization', value: normalUtil },
+          { label: 'Low Utilization', value: lowUtil },
+          { label: 'Avg Utilization', value: `${avgUtil}%` },
+          { label: 'Actual Data', value: actualCount },
+          { label: 'Estimated', value: estimatedCount },
+          { label: 'No Data', value: noDataCount }
         ];
         
         if (mode === 'preview') {
@@ -328,7 +337,6 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         }
         
         const anomalies = applyComponentFilter(allAnomalies);
-        const summaryData = mergedAnomalySummary;
         
         const columns = [
           { header: 'S.No', field: 'sNo', width: 12 },
@@ -344,13 +352,14 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           { header: 'Description', field: 'description', width: 60 }
         ];
         
+        const uniqueComponents = new Set(anomalies.map((a: any) => a.componentCode || a.componentName)).size;
         const summaryItems = [
-          { label: 'Total Anomalies', value: summaryData.totalAnomalies || 0 },
-          { label: 'Critical', value: summaryData.criticalCount || 0 },
-          { label: 'Warning', value: summaryData.warningCount || 0 },
-          { label: 'Info', value: summaryData.infoCount || 0 },
-          { label: 'Logs Analyzed', value: summaryData.totalLogsAnalyzed || 0 },
-          { label: 'Components', value: summaryData.componentsAnalyzed || 0 }
+          { label: 'Total Anomalies', value: anomalies.length },
+          { label: 'Critical', value: anomalies.filter((a: any) => a.severity === 'critical' || a.severity === 'Critical').length },
+          { label: 'Warning', value: anomalies.filter((a: any) => a.severity === 'warning' || a.severity === 'Warning').length },
+          { label: 'Info', value: anomalies.filter((a: any) => a.severity === 'info' || a.severity === 'Info').length },
+          { label: 'Logs Analyzed', value: mergedAnomalySummary.totalLogsAnalyzed || 0 },
+          { label: 'Components', value: uniqueComponents }
         ];
         
         const formattedData = anomalies.map((a: any) => ({
