@@ -126,7 +126,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
             if (data) setPreviewData(data);
             initialLoadRef.current = true;
           }
-        }).catch(() => {});
+        }).catch((err) => { console.error('Report preview load failed:', err); });
       }
     }
   }, [embedded, selectedReportId]);

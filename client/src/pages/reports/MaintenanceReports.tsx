@@ -121,7 +121,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           }
           initialLoadRef.current = true;
         }
-      }).catch(() => {});
+      }).catch((err) => { console.error('Report preview load failed:', err); });
     }
   }, [embedded, selectedReportId]);
 

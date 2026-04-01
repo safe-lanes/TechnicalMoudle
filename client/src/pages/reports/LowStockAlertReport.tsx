@@ -234,16 +234,6 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
   });
 
   const items = data?.items || [];
-  const summary = data?.summary || {
-    totalLowStock: 0,
-    criticalItems: 0,
-    highPriorityItems: 0,
-    mediumPriorityItems: 0,
-    storesCount: 0,
-    lubesCount: 0,
-    chemicalsCount: 0,
-    estimatedTotalCost: 0,
-  };
 
   const filteredItems = useMemo(() => {
     let result = [...items];
@@ -285,6 +275,20 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
 
     return result;
   }, [items, searchQuery, categoryFilter, priorityFilter, globalComponent, globalVessels]);
+
+  const summary = useMemo(() => {
+    const base = filteredItems;
+    return {
+      totalLowStock: base.length,
+      criticalItems: base.filter(i => i.priority === 'Critical').length,
+      highPriorityItems: base.filter(i => i.priority === 'High').length,
+      mediumPriorityItems: base.filter(i => i.priority === 'Medium').length,
+      storesCount: base.filter(i => i.itemType === 'stores').length,
+      lubesCount: base.filter(i => i.itemType === 'lubes' || i.itemType === 'lubricants').length,
+      chemicalsCount: base.filter(i => i.itemType === 'chemicals').length,
+      estimatedTotalCost: base.reduce((sum, i) => sum + (i.estimatedCost || 0), 0),
+    };
+  }, [filteredItems]);
 
   const sortedItems = useMemo(() => {
     const sorted = [...filteredItems];

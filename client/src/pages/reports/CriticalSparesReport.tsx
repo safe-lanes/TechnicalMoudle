@@ -292,7 +292,15 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
   };
 
   const summary = data?.summary;
-  const meta = data?.reportMeta;
+  const meta = useMemo(() => {
+    const base = filteredAndSortedItems;
+    return {
+      totalSpares: base.length,
+      totalLinkedCriticalEquip: base.filter((i: any) => i.criticalComponents && i.criticalComponents.length > 0).length,
+      totalZeroStock: base.filter((i: any) => i.stockStatus === 'ZERO').length,
+      totalLowStock: base.filter((i: any) => i.stockStatus === 'LOW').length,
+    };
+  }, [filteredAndSortedItems]);
 
   const SortButton = ({ field, label }: { field: SortField; label: string }) => (
     <button

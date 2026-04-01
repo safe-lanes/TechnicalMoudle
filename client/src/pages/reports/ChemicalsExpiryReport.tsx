@@ -193,15 +193,6 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
   });
 
   const items = data?.items || [];
-  const summary = data?.summary || {
-    totalChemicals: 0,
-    expiredCount: 0,
-    expiringSoonCount: 0,
-    sdsCompliancePercent: 0,
-    withSds: 0,
-    withoutSds: 0,
-    lowStockCount: 0,
-  };
 
   const filteredItems = useMemo(() => {
     let result = [...items];
@@ -261,6 +252,21 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
     return result;
   }, [items, searchQuery, expiryFilter, hazardFilter, stockFilter, globalComponent, globalVessels]);
 
+  const summary = useMemo(() => {
+    const base = filteredItems;
+    const withSds = base.filter(i => i.hasSds).length;
+    const withoutSds = base.length - withSds;
+    return {
+      totalChemicals: base.length,
+      expiredCount: base.filter(i => i.expiryStatus === 'Expired').length,
+      expiringSoonCount: base.filter(i => i.daysUntilExpiry !== null && i.daysUntilExpiry >= 0 && i.daysUntilExpiry <= 90 && i.expiryStatus !== 'Expired').length,
+      sdsCompliancePercent: base.length > 0 ? Math.round((withSds / base.length) * 100) : 0,
+      withSds,
+      withoutSds,
+      lowStockCount: base.filter(i => i.stockStatus === 'Low' || i.stockStatus === 'Critical').length,
+    };
+  }, [filteredItems]);
+
   const sortedItems = useMemo(() => {
     const sorted = [...filteredItems];
     sorted.sort((a, b) => {
@@ -290,29 +296,29 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
   }, [filteredItems, sortField, sortDirection]);
 
   const expiredItems = useMemo(() => {
-    return items
+    return filteredItems
       .filter(i => i.expiryStatus === 'Expired')
       .sort((a, b) => (a.daysUntilExpiry ?? 0) - (b.daysUntilExpiry ?? 0));
-  }, [items]);
+  }, [filteredItems]);
 
   const expiringSoonItems = useMemo(() => {
-    return items
+    return filteredItems
       .filter(i => i.daysUntilExpiry !== null && i.daysUntilExpiry >= 0 && i.daysUntilExpiry <= 90)
       .sort((a, b) => (a.daysUntilExpiry ?? 0) - (b.daysUntilExpiry ?? 0));
-  }, [items]);
+  }, [filteredItems]);
 
   const missingSdsItems = useMemo(() => {
-    return items.filter(i => !i.hasSds);
-  }, [items]);
+    return filteredItems.filter(i => !i.hasSds);
+  }, [filteredItems]);
 
   const hazardBreakdown = useMemo(() => {
     const counts: Record<string, number> = {};
-    items.forEach(i => {
+    filteredItems.forEach(i => {
       const hc = i.hazardClassification || 'None';
       counts[hc] = (counts[hc] || 0) + 1;
     });
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  }, [items]);
+  }, [filteredItems]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {

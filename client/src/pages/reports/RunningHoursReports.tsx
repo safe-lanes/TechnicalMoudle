@@ -113,7 +113,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           if (data) setPreviewData(data);
           initialLoadRef.current = true;
         }
-      }).catch(() => {});
+      }).catch((err) => { console.error('Report preview load failed:', err); });
     }
   }, [embedded, selectedReportId]);
 

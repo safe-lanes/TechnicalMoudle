@@ -114,7 +114,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
           if (data) setPreviewData(data);
           initialLoadRef.current = true;
         }
-      }).catch(() => {});
+      }).catch((err) => { console.error('Report preview load failed:', err); });
     }
   }, [embedded, selectedReportId]);
 
