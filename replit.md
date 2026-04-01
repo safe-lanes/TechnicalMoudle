@@ -81,6 +81,13 @@ Preferred communication style: Simple, everyday language.
 -   **Navigation**: "Noon Report" tab in `TopMenuBar.tsx` with sidebar in `SideMenuBar.tsx` containing 7 items.
 -   **Daily Entry Form**: 5-tab form (Navigation, Weather, Fuel & Machinery, Emissions, Cargo & Remarks) with draft auto-save and submission lock.
 
+### PMS Vessel Settings & Grace Period System
+-   **Company Standard Grace Settings**: Singleton table `company_standard_grace_settings` stores company-wide grace rules for both calendar-based and RH-based work orders. Configurable via admin UI.
+-   **Per-Vessel Settings**: Table `pms_vessel_settings` supports a `settings_mode` column (`COMPANY_STANDARD` | `CUSTOM`). In `COMPANY_STANDARD` mode, only lead times are customized per vessel while grace rules inherit from the company standard. In `CUSTOM` mode, vessels have their own full grace config (method/value/scope/fallback) for both calendar and RH tabs.
+-   **Grace Config Columns** (per-vessel custom): `calendar_grace_method`, `calendar_grace_value`, `calendar_grace_scope`, `calendar_fallback_method`, `calendar_fallback_grace_days`, `rh_grace_method`, `rh_grace_value`, `rh_grace_scope`, `rh_fallback_method`, `rh_fallback_grace_hours`.
+-   **Status Recalculator**: `server/services/workOrderStatusRecalculator.ts` builds a `VesselGraceSettings` cache per vessel. When `settingsMode=CUSTOM`, it populates `vesselCalendarGraceConfig` and `vesselRhGraceConfig` which drive `computeWorkOrderStatus` in `shared/workOrders/status.ts`.
+-   **Backend Validation**: `server/modules/vessels/services/vesselService.ts` validates all grace config fields when `settingsMode=CUSTOM`, including method/scope enums and fallback constraints.
+
 ### Database Standards
 -   **Required Base Columns**: Every new table MUST include: `uuid` (TEXT NOT NULL, DEFAULT gen_random_uuid(), omit from insertSchema), `created_at` (timestamp, DEFAULT NOW()), `updated_at` (timestamp, DEFAULT NOW()), `created_by_uuid` (TEXT, FK to users), `updated_by_uuid` (TEXT, FK to users), `is_deleted` (BOOLEAN NOT NULL, DEFAULT false), `is_sync` (BOOLEAN NOT NULL, DEFAULT false).
 -   **Primary Keys**: Use TEXT type with UUID values (`gen_random_uuid()`) and naming convention `{table_abbreviation}uuid`.

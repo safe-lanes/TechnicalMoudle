@@ -94,14 +94,27 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
   const [isCompanyGraceDialogOpen, setIsCompanyGraceDialogOpen] = useState(false);
   const [vesselSearch, setVesselSearch] = useState("");
 
+  const [vesselTab, setVesselTab] = useState<'calendar' | 'rh'>('calendar');
+
   const [formData, setFormData] = useState({
+    settingsMode: 'COMPANY_STANDARD' as 'COMPANY_STANDARD' | 'CUSTOM',
     calendarLeadDaysCritical: 7,
     calendarLeadDaysNonCritical: 14,
     calendarGraceMode: 'COMPANY_STANDARD',
     calendarGraceDays: 7,
+    calendarGraceMethod: 'FIXED_DAYS',
+    calendarGraceValue: 7,
+    calendarGraceScope: 'ALL_WORK_ORDERS',
+    calendarFallbackMethod: 'MONTH_END' as string | null,
+    calendarFallbackGraceDays: 0 as number | null,
     rhLeadHoursCritical: 50,
     rhLeadHoursNonCritical: 100,
     rhGraceHours: 168,
+    rhGraceMethod: 'FIXED_HOURS',
+    rhGraceValue: 168,
+    rhGraceScope: 'ALL_WORK_ORDERS',
+    rhFallbackMethod: 'MONTH_END' as string | null,
+    rhFallbackGraceHours: 0 as number | null,
   });
 
   const [companyStandardTab, setCompanyStandardTab] = useState<'calendar' | 'rh'>('calendar');
@@ -180,28 +193,51 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
 
   const openEditDialog = (vessel: Vessel) => {
     setSelectedVessel(vessel);
-    const existingSettings = settingsMap.get(vessel.id);
-    if (existingSettings) {
+    const s = settingsMap.get(vessel.id);
+    if (s) {
       setFormData({
-        calendarLeadDaysCritical: existingSettings.calendarLeadDaysCritical ?? 7,
-        calendarLeadDaysNonCritical: existingSettings.calendarLeadDaysNonCritical ?? 14,
-        calendarGraceMode: existingSettings.calendarGraceMode ?? 'COMPANY_STANDARD',
-        calendarGraceDays: existingSettings.calendarGraceDays ?? 7,
-        rhLeadHoursCritical: existingSettings.rhLeadHoursCritical ?? 50,
-        rhLeadHoursNonCritical: existingSettings.rhLeadHoursNonCritical ?? 100,
-        rhGraceHours: existingSettings.rhGraceHours ?? 168,
+        settingsMode: ((s as any).settingsMode as 'COMPANY_STANDARD' | 'CUSTOM') || 'COMPANY_STANDARD',
+        calendarLeadDaysCritical: s.calendarLeadDaysCritical ?? 7,
+        calendarLeadDaysNonCritical: s.calendarLeadDaysNonCritical ?? 14,
+        calendarGraceMode: s.calendarGraceMode ?? 'COMPANY_STANDARD',
+        calendarGraceDays: s.calendarGraceDays ?? 7,
+        calendarGraceMethod: (s as any).calendarGraceMethod || 'FIXED_DAYS',
+        calendarGraceValue: (s as any).calendarGraceValue ?? 7,
+        calendarGraceScope: (s as any).calendarGraceScope || 'ALL_WORK_ORDERS',
+        calendarFallbackMethod: (s as any).calendarFallbackMethod || 'MONTH_END',
+        calendarFallbackGraceDays: (s as any).calendarFallbackGraceDays ?? 0,
+        rhLeadHoursCritical: s.rhLeadHoursCritical ?? 50,
+        rhLeadHoursNonCritical: s.rhLeadHoursNonCritical ?? 100,
+        rhGraceHours: s.rhGraceHours ?? 168,
+        rhGraceMethod: (s as any).rhGraceMethod || 'FIXED_HOURS',
+        rhGraceValue: (s as any).rhGraceValue ?? 168,
+        rhGraceScope: (s as any).rhGraceScope || 'ALL_WORK_ORDERS',
+        rhFallbackMethod: (s as any).rhFallbackMethod || 'MONTH_END',
+        rhFallbackGraceHours: (s as any).rhFallbackGraceHours ?? 0,
       });
     } else {
       setFormData({
+        settingsMode: 'COMPANY_STANDARD',
         calendarLeadDaysCritical: 7,
         calendarLeadDaysNonCritical: 14,
         calendarGraceMode: 'COMPANY_STANDARD',
         calendarGraceDays: 7,
+        calendarGraceMethod: 'FIXED_DAYS',
+        calendarGraceValue: 7,
+        calendarGraceScope: 'ALL_WORK_ORDERS',
+        calendarFallbackMethod: 'MONTH_END',
+        calendarFallbackGraceDays: 0,
         rhLeadHoursCritical: 50,
         rhLeadHoursNonCritical: 100,
         rhGraceHours: 168,
+        rhGraceMethod: 'FIXED_HOURS',
+        rhGraceValue: 168,
+        rhGraceScope: 'ALL_WORK_ORDERS',
+        rhFallbackMethod: 'MONTH_END',
+        rhFallbackGraceHours: 0,
       });
     }
+    setVesselTab('calendar');
     setIsEditDialogOpen(true);
   };
 
@@ -241,7 +277,8 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
   const formatSettingsSummary = (vesselId: string): string => {
     const settings = settingsMap.get(vesselId);
     if (!settings) return "Not Configured";
-    return `Lead: ${settings.calendarLeadDaysCritical}d / ${settings.rhLeadHoursCritical}hrs`;
+    const mode = (settings as any).settingsMode === 'CUSTOM' ? 'Custom' : 'Company Std';
+    return `${mode} · Lead: ${settings.calendarLeadDaysCritical}d / ${settings.rhLeadHoursCritical}hrs`;
   };
 
   const isConfigured = (vesselId: string): boolean => {
@@ -426,166 +463,376 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 border-b pb-2" data-testid="I4.QL7.3">
-                <Marker id="I4.QL7.3" />
-                <Calendar className="h-5 w-5 text-blue-600" />
-                <h3 className="font-semibold text-gray-900">Calendar-Based Jobs</h3>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="calendarLeadDaysCritical" className="text-sm font-medium" data-testid="I4.QL7.4">
-                    <Marker id="I4.QL7.4" />Lead Time (Critical Jobs)
-                  </Label>
-                  <div className="mt-1 flex items-center gap-2">
-                    <Input
-                      id="calendarLeadDaysCritical"
-                      type="number"
-                      min={1}
-                      value={formData.calendarLeadDaysCritical}
-                      onChange={(e) => setFormData({...formData, calendarLeadDaysCritical: parseInt(e.target.value) || 0})}
-                      className="w-24"
-                      data-testid="I4.QL7.5"
-                    />
-                    <span className="text-sm text-gray-500">days before due</span>
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="calendarLeadDaysNonCritical" className="text-sm font-medium" data-testid="I4.QL7.6">
-                    <Marker id="I4.QL7.6" />Lead Time (Non-Critical Jobs)
-                  </Label>
-                  <div className="mt-1 flex items-center gap-2">
-                    <Input
-                      id="calendarLeadDaysNonCritical"
-                      type="number"
-                      min={1}
-                      value={formData.calendarLeadDaysNonCritical}
-                      onChange={(e) => setFormData({...formData, calendarLeadDaysNonCritical: parseInt(e.target.value) || 0})}
-                      className="w-24"
-                      data-testid="I4.QL7.7"
-                    />
-                    <span className="text-sm text-gray-500">days before due</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="calendarGraceMode" className="text-sm font-medium" data-testid="I4.QL7.8">
-                    <Marker id="I4.QL7.8" />Grace Period Mode
-                  </Label>
-                  <Select
-                    value={formData.calendarGraceMode}
-                    onValueChange={(value) => setFormData({...formData, calendarGraceMode: value})}
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm font-semibold text-gray-700" data-testid="label-settings-mode">Settings Mode</Label>
+              <div className="flex gap-3 mt-2">
+                {[
+                  { value: 'COMPANY_STANDARD' as const, label: 'Company Standard', desc: 'Uses company-wide grace rules' },
+                  { value: 'CUSTOM' as const, label: 'Custom', desc: 'Override grace rules for this vessel' },
+                ].map(option => (
+                  <label
+                    key={option.value}
+                    className={`flex-1 flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      formData.settingsMode === option.value
+                        ? 'border-blue-400 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    data-testid={`radio-settings-mode-${option.value.toLowerCase()}`}
                   >
-                    <SelectTrigger className="mt-1" data-testid="I4.QL7.9">
-                      <SelectValue placeholder="Select mode" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="COMPANY_STANDARD">Company Standard</SelectItem>
-                      <SelectItem value="CUSTOM_DAYS">Fixed Days</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {formData.calendarGraceMode === 'COMPANY_STANDARD' && companyGraceSettings && (
-                    <p className="text-xs text-blue-600 mt-1">
-                      {formatCompanyStandardSummary(companyGraceSettings)}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="calendarGraceDays" className="text-sm font-medium" data-testid="I4.QL7.10">
-                    <Marker id="I4.QL7.10" />{formData.calendarGraceMode === 'CUSTOM_DAYS' ? 'Fixed Grace Days' : 'Default Grace Days'}
-                  </Label>
-                  <div className="mt-1 flex items-center gap-2">
-                    <Input
-                      id="calendarGraceDays"
-                      type="number"
-                      min={0}
-                      value={formData.calendarGraceDays}
-                      onChange={(e) => setFormData({...formData, calendarGraceDays: parseInt(e.target.value) || 0})}
-                      className="w-24"
-                      disabled={formData.calendarGraceMode === 'COMPANY_STANDARD'}
-                      data-testid="I4.QL7.11"
+                    <input
+                      type="radio"
+                      name="settingsMode"
+                      value={option.value}
+                      checked={formData.settingsMode === option.value}
+                      onChange={() => setFormData({...formData, settingsMode: option.value})}
+                      className="mt-0.5"
                     />
-                    <span className="text-sm text-gray-500">days</span>
-                  </div>
-                  {formData.calendarGraceMode === 'COMPANY_STANDARD' && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      This field is ignored in Company Standard mode
-                    </p>
-                  )}
-                </div>
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">{option.label}</span>
+                      <p className="text-xs text-gray-500 mt-0.5">{option.desc}</p>
+                    </div>
+                  </label>
+                ))}
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 border-b pb-2" data-testid="I4.QL7.12">
-                <Marker id="I4.QL7.12" />
-                <Gauge className="h-5 w-5 text-orange-600" />
-                <h3 className="font-semibold text-gray-900">Running Hours Jobs</h3>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="rhLeadHoursCritical" className="text-sm font-medium" data-testid="I4.QL7.13">
-                    <Marker id="I4.QL7.13" />Lead Time (Critical Jobs)
-                  </Label>
-                  <div className="mt-1 flex items-center gap-2">
-                    <Input
-                      id="rhLeadHoursCritical"
-                      type="number"
-                      min={1}
-                      value={formData.rhLeadHoursCritical}
-                      onChange={(e) => setFormData({...formData, rhLeadHoursCritical: parseInt(e.target.value) || 0})}
-                      className="w-24"
-                      data-testid="I4.QL7.14"
-                    />
-                    <span className="text-sm text-gray-500">hours before due</span>
+            {formData.settingsMode === 'COMPANY_STANDARD' && (
+              <div className="space-y-4">
+                {companyGraceSettings && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-xs font-medium text-blue-800 mb-1">Company Standard Grace Rules</p>
+                    <p className="text-xs text-blue-700">{formatCompanyStandardSummary(companyGraceSettings)}</p>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 border-b pb-2">
+                  <Calendar className="h-5 w-5 text-blue-600" />
+                  <h3 className="font-semibold text-gray-900">Calendar-Based Jobs — Lead Time</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium">Lead Time (Critical Jobs)</Label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Input type="number" min={1} value={formData.calendarLeadDaysCritical} onChange={(e) => setFormData({...formData, calendarLeadDaysCritical: parseInt(e.target.value) || 1})} className="w-24" data-testid="input-vessel-cal-lead-critical" />
+                      <span className="text-sm text-gray-500">days before due</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Lead Time (Non-Critical Jobs)</Label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Input type="number" min={1} value={formData.calendarLeadDaysNonCritical} onChange={(e) => setFormData({...formData, calendarLeadDaysNonCritical: parseInt(e.target.value) || 1})} className="w-24" data-testid="input-vessel-cal-lead-noncritical" />
+                      <span className="text-sm text-gray-500">days before due</span>
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="rhLeadHoursNonCritical" className="text-sm font-medium" data-testid="I4.QL7.15">
-                    <Marker id="I4.QL7.15" />Lead Time (Non-Critical Jobs)
-                  </Label>
-                  <div className="mt-1 flex items-center gap-2">
-                    <Input
-                      id="rhLeadHoursNonCritical"
-                      type="number"
-                      min={1}
-                      value={formData.rhLeadHoursNonCritical}
-                      onChange={(e) => setFormData({...formData, rhLeadHoursNonCritical: parseInt(e.target.value) || 0})}
-                      className="w-24"
-                      data-testid="I4.QL7.16"
-                    />
-                    <span className="text-sm text-gray-500">hours before due</span>
+                <div className="flex items-center gap-2 border-b pb-2">
+                  <Gauge className="h-5 w-5 text-orange-600" />
+                  <h3 className="font-semibold text-gray-900">Running Hours Jobs — Lead Time</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium">Lead Time (Critical Jobs)</Label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Input type="number" min={1} value={formData.rhLeadHoursCritical} onChange={(e) => setFormData({...formData, rhLeadHoursCritical: parseInt(e.target.value) || 1})} className="w-24" data-testid="input-vessel-rh-lead-critical" />
+                      <span className="text-sm text-gray-500">hours before due</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Lead Time (Non-Critical Jobs)</Label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Input type="number" min={1} value={formData.rhLeadHoursNonCritical} onChange={(e) => setFormData({...formData, rhLeadHoursNonCritical: parseInt(e.target.value) || 1})} className="w-24" data-testid="input-vessel-rh-lead-noncritical" />
+                      <span className="text-sm text-gray-500">hours before due</span>
+                    </div>
                   </div>
                 </div>
               </div>
+            )}
 
-              <div>
-                <Label htmlFor="rhGraceHours" className="text-sm font-medium" data-testid="I4.QL7.17">
-                  <Marker id="I4.QL7.17" />Grace Period
-                </Label>
-                <div className="mt-1 flex items-center gap-2">
-                  <Input
-                    id="rhGraceHours"
-                    type="number"
-                    min={0}
-                    value={formData.rhGraceHours}
-                    onChange={(e) => setFormData({...formData, rhGraceHours: parseInt(e.target.value) || 0})}
-                    className="w-24"
-                    data-testid="I4.QL7.18"
-                  />
-                  <span className="text-sm text-gray-500" data-testid="I4.QL7.19"><Marker id="I4.QL7.19" />hours after due</span>
-                  <span className="text-xs text-gray-400">(≈ {Math.round(formData.rhGraceHours / 24)} days)</span>
+            {formData.settingsMode === 'CUSTOM' && (
+              <div className="space-y-4">
+                <div className="flex border-b">
+                  <button
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                      vesselTab === 'calendar'
+                        ? 'border-blue-600 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                    onClick={() => setVesselTab('calendar')}
+                    data-testid="tab-vessel-calendar"
+                  >
+                    <Calendar className="h-4 w-4" />
+                    Calendar-Based Jobs
+                  </button>
+                  <button
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                      vesselTab === 'rh'
+                        ? 'border-orange-600 text-orange-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                    onClick={() => setVesselTab('rh')}
+                    data-testid="tab-vessel-rh"
+                  >
+                    <Gauge className="h-4 w-4" />
+                    Running Hours Based Jobs
+                  </button>
                 </div>
+
+                {vesselTab === 'calendar' && (
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-semibold text-gray-700">Lead Time</Label>
+                      <div className="grid grid-cols-2 gap-4 mt-2">
+                        <div>
+                          <Label className="text-xs text-gray-500">Critical Jobs</Label>
+                          <div className="mt-1 flex items-center gap-2">
+                            <Input type="number" min={1} value={formData.calendarLeadDaysCritical} onChange={(e) => setFormData({...formData, calendarLeadDaysCritical: parseInt(e.target.value) || 1})} className="w-24" data-testid="input-vessel-custom-cal-lead-critical" />
+                            <span className="text-sm text-gray-500">days</span>
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-500">Non-Critical Jobs</Label>
+                          <div className="mt-1 flex items-center gap-2">
+                            <Input type="number" min={1} value={formData.calendarLeadDaysNonCritical} onChange={(e) => setFormData({...formData, calendarLeadDaysNonCritical: parseInt(e.target.value) || 1})} className="w-24" data-testid="input-vessel-custom-cal-lead-noncritical" />
+                            <span className="text-sm text-gray-500">days</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t pt-3 space-y-3">
+                      <Label className="text-sm font-semibold text-gray-700">Grace Period</Label>
+                      <p className="text-xs text-gray-500">Select how the grace period is calculated for calendar-based work orders on this vessel.</p>
+                      <div className="space-y-2">
+                        {[
+                          { value: 'FIXED_DAYS', label: 'Fixed Days', desc: 'Grace period is a fixed number of days after due date' },
+                          { value: 'MONTH_END', label: 'Month End', desc: 'Grace extends to the end of the month the WO is due' },
+                          { value: 'SPECIFIC_DATE_NEXT_MONTH', label: 'Specific Date of Next Month', desc: 'Grace extends to a specific day of the following month' },
+                        ].map(option => (
+                          <label
+                            key={option.value}
+                            className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                              formData.calendarGraceMethod === option.value
+                                ? 'border-blue-400 bg-blue-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                            data-testid={`radio-vessel-cal-grace-method-${option.value.toLowerCase()}`}
+                          >
+                            <input type="radio" name="vesselCalGraceMethod" value={option.value} checked={formData.calendarGraceMethod === option.value} onChange={() => setFormData({...formData, calendarGraceMethod: option.value})} className="mt-0.5" />
+                            <div>
+                              <span className="text-sm font-medium text-gray-900">{option.label}</span>
+                              <p className="text-xs text-gray-500 mt-0.5">{option.desc}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+
+                      {formData.calendarGraceMethod === 'FIXED_DAYS' && (
+                        <div className="ml-7 mt-2">
+                          <Label className="text-sm text-gray-700">Number of grace days</Label>
+                          <div className="mt-1 flex items-center gap-2">
+                            <Input type="number" min={1} max={365} value={formData.calendarGraceValue} onChange={(e) => setFormData({...formData, calendarGraceValue: parseInt(e.target.value) || 1})} className="w-24" data-testid="input-vessel-cal-grace-fixed-days" />
+                            <span className="text-sm text-gray-500">days</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {formData.calendarGraceMethod === 'SPECIFIC_DATE_NEXT_MONTH' && (
+                        <div className="ml-7 mt-2">
+                          <Label className="text-sm text-gray-700">Day of the next month</Label>
+                          <div className="mt-1 flex items-center gap-2">
+                            <Input type="number" min={1} max={28} value={formData.calendarGraceValue} onChange={(e) => { const val = parseInt(e.target.value) || 1; setFormData({...formData, calendarGraceValue: Math.min(28, Math.max(1, val))}); }} className="w-24" data-testid="input-vessel-cal-grace-day-of-month" />
+                            <span className="text-sm text-gray-500">of next month (1-28)</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="border-t pt-3 space-y-3">
+                        <Label className="text-sm font-semibold text-gray-700">Scope</Label>
+                        <p className="text-xs text-gray-500">Select which calendar-based work orders this grace rule applies to.</p>
+                        <div className="space-y-2">
+                          {[
+                            { value: 'ALL_WORK_ORDERS', label: 'Apply to all Calendar-Based Work Orders', desc: 'The selected grace method applies to all calendar-based work orders' },
+                            { value: 'LAST_WEEK_OF_MONTH', label: 'Apply only to Calendar-Based WOs due in last week of month', desc: 'The grace method applies only to calendar-based work orders whose due date falls in the last 7 days of the month' },
+                          ].map(option => (
+                            <label
+                              key={option.value}
+                              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                                formData.calendarGraceScope === option.value
+                                  ? 'border-blue-400 bg-blue-50'
+                                  : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                              data-testid={`radio-vessel-cal-grace-scope-${option.value.toLowerCase()}`}
+                            >
+                              <input type="radio" name="vesselCalGraceScope" value={option.value} checked={formData.calendarGraceScope === option.value} onChange={() => setFormData({...formData, calendarGraceScope: option.value})} className="mt-0.5" />
+                              <div>
+                                <span className="text-sm font-medium text-gray-900">{option.label}</span>
+                                <p className="text-xs text-gray-500 mt-0.5">{option.desc}</p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+
+                        {formData.calendarGraceScope === 'LAST_WEEK_OF_MONTH' && (
+                          <div className="ml-7 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <Label className="text-sm font-medium text-amber-900">Fallback for Calendar-Based WOs not due in last week of month</Label>
+                            <p className="text-xs text-amber-700 mt-0.5 mb-2">This covers all remaining calendar-based work orders whose due date falls outside the last 7 days of the month.</p>
+                            <div className="space-y-2">
+                              {[
+                                { value: 'MONTH_END', label: 'Month End', desc: 'Grace until end of due month' },
+                                { value: 'FIXED_DAYS', label: 'Fixed Days', desc: 'Set a specific number of grace days' },
+                              ].map(option => (
+                                <label key={option.value} className="flex items-start gap-2 cursor-pointer">
+                                  <input type="radio" name="vesselCalFallback" checked={formData.calendarFallbackMethod === option.value} onChange={() => setFormData({...formData, calendarFallbackMethod: option.value})} className="mt-1" data-testid={`radio-vessel-cal-fallback-${option.value.toLowerCase()}`} />
+                                  <div>
+                                    <span className="text-sm font-medium text-amber-900">{option.label}</span>
+                                    <p className="text-xs text-amber-700">{option.desc}</p>
+                                  </div>
+                                </label>
+                              ))}
+                              {formData.calendarFallbackMethod === 'FIXED_DAYS' && (
+                                <div className="flex items-center gap-2 ml-6">
+                                  <Input type="number" min={0} max={365} value={formData.calendarFallbackGraceDays ?? 0} onChange={(e) => setFormData({...formData, calendarFallbackGraceDays: parseInt(e.target.value) || 0})} className="w-24" data-testid="input-vessel-cal-fallback-days" />
+                                  <span className="text-sm text-gray-500">days</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {vesselTab === 'rh' && (
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-semibold text-gray-700">Lead Time</Label>
+                      <div className="grid grid-cols-2 gap-4 mt-2">
+                        <div>
+                          <Label className="text-xs text-gray-500">Critical Jobs</Label>
+                          <div className="mt-1 flex items-center gap-2">
+                            <Input type="number" min={1} value={formData.rhLeadHoursCritical} onChange={(e) => setFormData({...formData, rhLeadHoursCritical: parseInt(e.target.value) || 1})} className="w-24" data-testid="input-vessel-custom-rh-lead-critical" />
+                            <span className="text-sm text-gray-500">hours</span>
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-500">Non-Critical Jobs</Label>
+                          <div className="mt-1 flex items-center gap-2">
+                            <Input type="number" min={1} value={formData.rhLeadHoursNonCritical} onChange={(e) => setFormData({...formData, rhLeadHoursNonCritical: parseInt(e.target.value) || 1})} className="w-24" data-testid="input-vessel-custom-rh-lead-noncritical" />
+                            <span className="text-sm text-gray-500">hours</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t pt-3 space-y-3">
+                      <Label className="text-sm font-semibold text-gray-700">Grace Period</Label>
+                      <p className="text-xs text-gray-500">Select how the grace period is calculated for running hours based work orders on this vessel.</p>
+                      <div className="space-y-2">
+                        {[
+                          { value: 'FIXED_HOURS', label: 'Fixed Hours', desc: 'Grace period is a fixed number of hours after due running hours' },
+                          { value: 'MONTH_END', label: 'Month End', desc: 'Grace extends to the end of the month the WO is due' },
+                          { value: 'SPECIFIC_DATE_NEXT_MONTH', label: 'Specific Date of Next Month', desc: 'Grace extends to a specific day of the following month' },
+                        ].map(option => (
+                          <label
+                            key={option.value}
+                            className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                              formData.rhGraceMethod === option.value
+                                ? 'border-orange-400 bg-orange-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                            data-testid={`radio-vessel-rh-grace-method-${option.value.toLowerCase()}`}
+                          >
+                            <input type="radio" name="vesselRhGraceMethod" value={option.value} checked={formData.rhGraceMethod === option.value} onChange={() => setFormData({...formData, rhGraceMethod: option.value})} className="mt-0.5" />
+                            <div>
+                              <span className="text-sm font-medium text-gray-900">{option.label}</span>
+                              <p className="text-xs text-gray-500 mt-0.5">{option.desc}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+
+                      {formData.rhGraceMethod === 'FIXED_HOURS' && (
+                        <div className="ml-7 mt-2">
+                          <Label className="text-sm text-gray-700">Number of grace hours</Label>
+                          <div className="mt-1 flex items-center gap-2">
+                            <Input type="number" min={1} value={formData.rhGraceValue} onChange={(e) => setFormData({...formData, rhGraceValue: parseInt(e.target.value) || 1})} className="w-24" data-testid="input-vessel-rh-grace-fixed-hours" />
+                            <span className="text-sm text-gray-500">hours</span>
+                            <span className="text-xs text-gray-400">(≈ {Math.round((formData.rhGraceValue || 0) / 24)} days)</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {formData.rhGraceMethod === 'SPECIFIC_DATE_NEXT_MONTH' && (
+                        <div className="ml-7 mt-2">
+                          <Label className="text-sm text-gray-700">Day of the next month</Label>
+                          <div className="mt-1 flex items-center gap-2">
+                            <Input type="number" min={1} max={28} value={formData.rhGraceValue} onChange={(e) => { const val = parseInt(e.target.value) || 1; setFormData({...formData, rhGraceValue: Math.min(28, Math.max(1, val))}); }} className="w-24" data-testid="input-vessel-rh-grace-day-of-month" />
+                            <span className="text-sm text-gray-500">of next month (1-28)</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="border-t pt-3 space-y-3">
+                        <Label className="text-sm font-semibold text-gray-700">Scope</Label>
+                        <p className="text-xs text-gray-500">Select which running-hours-based work orders this grace rule applies to.</p>
+                        <div className="space-y-2">
+                          {[
+                            { value: 'ALL_WORK_ORDERS', label: 'Apply to all RH-Based Work Orders', desc: 'The selected grace method applies to all running-hours-based work orders' },
+                            { value: 'LAST_WEEK_OF_MONTH', label: 'Apply only to RH-Based WOs due in last week of month', desc: 'The grace method applies only to running-hours-based work orders whose due date falls in the last 7 days of the month' },
+                          ].map(option => (
+                            <label
+                              key={option.value}
+                              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                                formData.rhGraceScope === option.value
+                                  ? 'border-orange-400 bg-orange-50'
+                                  : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                              data-testid={`radio-vessel-rh-grace-scope-${option.value.toLowerCase()}`}
+                            >
+                              <input type="radio" name="vesselRhGraceScope" value={option.value} checked={formData.rhGraceScope === option.value} onChange={() => setFormData({...formData, rhGraceScope: option.value})} className="mt-0.5" />
+                              <div>
+                                <span className="text-sm font-medium text-gray-900">{option.label}</span>
+                                <p className="text-xs text-gray-500 mt-0.5">{option.desc}</p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+
+                        {formData.rhGraceScope === 'LAST_WEEK_OF_MONTH' && (
+                          <div className="ml-7 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <Label className="text-sm font-medium text-amber-900">Fallback for RH-Based WOs not due in last week of month</Label>
+                            <p className="text-xs text-amber-700 mt-0.5 mb-2">This covers all remaining running-hours-based work orders whose due date falls outside the last 7 days of the month.</p>
+                            <div className="space-y-2">
+                              {[
+                                { value: 'MONTH_END', label: 'Month End', desc: 'Grace until end of due month' },
+                                { value: 'FIXED_HOURS', label: 'Fixed Hours', desc: 'Set a specific number of grace hours' },
+                              ].map(option => (
+                                <label key={option.value} className="flex items-start gap-2 cursor-pointer">
+                                  <input type="radio" name="vesselRhFallback" checked={formData.rhFallbackMethod === option.value} onChange={() => setFormData({...formData, rhFallbackMethod: option.value})} className="mt-1" data-testid={`radio-vessel-rh-fallback-${option.value.toLowerCase()}`} />
+                                  <div>
+                                    <span className="text-sm font-medium text-amber-900">{option.label}</span>
+                                    <p className="text-xs text-amber-700">{option.desc}</p>
+                                  </div>
+                                </label>
+                              ))}
+                              {formData.rhFallbackMethod === 'FIXED_HOURS' && (
+                                <div className="flex items-center gap-2 ml-6">
+                                  <Input type="number" min={0} value={formData.rhFallbackGraceHours ?? 0} onChange={(e) => setFormData({...formData, rhFallbackGraceHours: parseInt(e.target.value) || 0})} className="w-24" data-testid="input-vessel-rh-fallback-hours" />
+                                  <span className="text-sm text-gray-500">hours</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
           </div>
 
           <DialogFooter>

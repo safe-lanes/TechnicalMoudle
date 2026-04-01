@@ -232,11 +232,106 @@ export async function createPmsVesselSettings(data: {
 
 export async function updatePmsVesselSettings(vesselId: string, data: Record<string, any>, username: string): Promise<{ settings: PmsVesselSettings; recalcResult?: { statusesUpdated: number } }> {
   const updatedBy = data.updatedBy || username || 'test';
-  const settings = await repo.createOrUpdatePmsVesselSettings({
+
+  const settingsMode = data.settingsMode || 'COMPANY_STANDARD';
+  if (settingsMode !== 'COMPANY_STANDARD' && settingsMode !== 'CUSTOM') {
+    throw new ValidationError(`Invalid settingsMode: ${settingsMode}. Must be COMPANY_STANDARD or CUSTOM`);
+  }
+
+  const persistData: Record<string, any> = {
     vesselId,
-    ...data,
+    settingsMode,
+    calendarLeadDaysCritical: Math.max(1, Math.round(data.calendarLeadDaysCritical ?? 7)),
+    calendarLeadDaysNonCritical: Math.max(1, Math.round(data.calendarLeadDaysNonCritical ?? 14)),
+    rhLeadHoursCritical: Math.max(1, Math.round(data.rhLeadHoursCritical ?? 50)),
+    rhLeadHoursNonCritical: Math.max(1, Math.round(data.rhLeadHoursNonCritical ?? 100)),
     updatedBy,
-  });
+  };
+
+  if (settingsMode === 'CUSTOM') {
+    const validCalMethods = ['FIXED_DAYS', 'MONTH_END', 'SPECIFIC_DATE_NEXT_MONTH'];
+    const validScopes = ['ALL_WORK_ORDERS', 'LAST_WEEK_OF_MONTH'];
+    const validRhMethods = ['FIXED_HOURS', 'MONTH_END', 'SPECIFIC_DATE_NEXT_MONTH'];
+
+    const calMethod = data.calendarGraceMethod || 'FIXED_DAYS';
+    if (!validCalMethods.includes(calMethod)) {
+      throw new ValidationError(`Invalid calendar grace method: ${calMethod}`);
+    }
+    const calScope = data.calendarGraceScope || 'ALL_WORK_ORDERS';
+    if (!validScopes.includes(calScope)) {
+      throw new ValidationError(`Invalid calendar grace scope: ${calScope}`);
+    }
+    const calValue = data.calendarGraceValue ?? 7;
+    if (calMethod === 'SPECIFIC_DATE_NEXT_MONTH' && (calValue < 1 || calValue > 28)) {
+      throw new ValidationError('Specific Date of Next Month requires a day value between 1 and 28');
+    }
+
+    persistData.calendarGraceMethod = calMethod;
+    persistData.calendarGraceValue = calMethod === 'MONTH_END' ? 0 : calValue;
+    persistData.calendarGraceScope = calScope;
+    persistData.calendarGraceMode = 'CUSTOM_DAYS';
+    persistData.calendarGraceDays = calMethod === 'FIXED_DAYS' ? calValue : 7;
+
+    if (calScope === 'LAST_WEEK_OF_MONTH') {
+      const validCalFallbacks = ['MONTH_END', 'FIXED_DAYS'];
+      const calFb = data.calendarFallbackMethod || 'MONTH_END';
+      if (!validCalFallbacks.includes(calFb)) {
+        throw new ValidationError(`Invalid calendar fallback method: ${calFb}`);
+      }
+      persistData.calendarFallbackMethod = calFb;
+      persistData.calendarFallbackGraceDays = calFb === 'FIXED_DAYS' ? (data.calendarFallbackGraceDays ?? 0) : null;
+    } else {
+      persistData.calendarFallbackMethod = null;
+      persistData.calendarFallbackGraceDays = null;
+    }
+
+    const rhMethod = data.rhGraceMethod || 'FIXED_HOURS';
+    if (!validRhMethods.includes(rhMethod)) {
+      throw new ValidationError(`Invalid RH grace method: ${rhMethod}`);
+    }
+    const rhScope = data.rhGraceScope || 'ALL_WORK_ORDERS';
+    if (!validScopes.includes(rhScope)) {
+      throw new ValidationError(`Invalid RH grace scope: ${rhScope}`);
+    }
+    const rhValue = data.rhGraceValue ?? 168;
+    if (rhMethod === 'SPECIFIC_DATE_NEXT_MONTH' && (rhValue < 1 || rhValue > 28)) {
+      throw new ValidationError('Specific Date of Next Month requires a day value between 1 and 28');
+    }
+
+    persistData.rhGraceMethod = rhMethod;
+    persistData.rhGraceValue = rhMethod === 'MONTH_END' ? 0 : rhValue;
+    persistData.rhGraceScope = rhScope;
+    persistData.rhGraceHours = rhMethod === 'FIXED_HOURS' ? rhValue : 168;
+
+    if (rhScope === 'LAST_WEEK_OF_MONTH') {
+      const validRhFallbacks = ['MONTH_END', 'FIXED_HOURS'];
+      const rhFb = data.rhFallbackMethod || 'MONTH_END';
+      if (!validRhFallbacks.includes(rhFb)) {
+        throw new ValidationError(`Invalid RH fallback method: ${rhFb}`);
+      }
+      persistData.rhFallbackMethod = rhFb;
+      persistData.rhFallbackGraceHours = rhFb === 'FIXED_HOURS' ? (data.rhFallbackGraceHours ?? 0) : null;
+    } else {
+      persistData.rhFallbackMethod = null;
+      persistData.rhFallbackGraceHours = null;
+    }
+  } else {
+    persistData.calendarGraceMode = 'COMPANY_STANDARD';
+    persistData.calendarGraceDays = data.calendarGraceDays ?? 7;
+    persistData.calendarGraceMethod = data.calendarGraceMethod || 'FIXED_DAYS';
+    persistData.calendarGraceValue = data.calendarGraceValue ?? 7;
+    persistData.calendarGraceScope = data.calendarGraceScope || 'ALL_WORK_ORDERS';
+    persistData.calendarFallbackMethod = null;
+    persistData.calendarFallbackGraceDays = null;
+    persistData.rhGraceHours = data.rhGraceHours ?? 168;
+    persistData.rhGraceMethod = data.rhGraceMethod || 'FIXED_HOURS';
+    persistData.rhGraceValue = data.rhGraceValue ?? 168;
+    persistData.rhGraceScope = data.rhGraceScope || 'ALL_WORK_ORDERS';
+    persistData.rhFallbackMethod = null;
+    persistData.rhFallbackGraceHours = null;
+  }
+
+  const settings = await repo.createOrUpdatePmsVesselSettings(persistData as any);
 
   // Trigger immediate status recalculation when grace period settings change
   let recalcResult: { statusesUpdated: number } | undefined;

@@ -146,12 +146,32 @@ export class WorkOrderStatusRecalculatorService {
         vesselSettingsCache.set(vesselId, settings || null);
         
         if (settings) {
-          graceSettingsCache.set(vesselId, {
+          const graceEntry: any = {
             calendarGraceMode: (settings.calendarGraceMode as 'COMPANY_STANDARD' | 'CUSTOM_DAYS') ?? 'COMPANY_STANDARD',
             calendarGraceDays: settings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
             rhGraceHours: settings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
             rhLeadTimeHours: settings.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
-          });
+          };
+
+          if ((settings as any).settingsMode === 'CUSTOM') {
+            graceEntry.calendarGraceMode = 'CUSTOM_DAYS';
+            graceEntry.vesselCalendarGraceConfig = {
+              graceMethod: (settings as any).calendarGraceMethod || 'FIXED_DAYS',
+              graceValue: (settings as any).calendarGraceValue ?? 7,
+              scope: (settings as any).calendarGraceScope || 'ALL_WORK_ORDERS',
+              fallbackMethod: (settings as any).calendarFallbackMethod || null,
+              fallbackGraceDays: (settings as any).calendarFallbackGraceDays ?? null,
+            };
+            graceEntry.vesselRhGraceConfig = {
+              graceMethod: (settings as any).rhGraceMethod || 'FIXED_HOURS',
+              graceValue: (settings as any).rhGraceValue ?? 168,
+              scope: (settings as any).rhGraceScope || 'ALL_WORK_ORDERS',
+              fallbackMethod: (settings as any).rhFallbackMethod || null,
+              fallbackGraceHours: (settings as any).rhFallbackGraceHours ?? null,
+            };
+          }
+
+          graceSettingsCache.set(vesselId, graceEntry);
         }
       }
 

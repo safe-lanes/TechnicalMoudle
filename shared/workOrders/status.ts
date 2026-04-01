@@ -83,11 +83,21 @@ export function buildCompanyGraceConfig(row: { graceMethod: string; graceValue: 
   return { graceMethod: method, graceValue: row.graceValue, scope, fallbackGraceDays: row.fallbackGraceDays, fallbackMethod: fbMethod ?? null };
 }
 
+export interface RhGraceConfig {
+  graceMethod: 'FIXED_HOURS' | 'MONTH_END' | 'SPECIFIC_DATE_NEXT_MONTH';
+  graceValue: number | null;
+  scope: GraceScopeType;
+  fallbackMethod: 'MONTH_END' | 'FIXED_HOURS' | null;
+  fallbackGraceHours: number | null;
+}
+
 export interface VesselGraceSettings {
   calendarGraceMode: GraceMode;
   calendarGraceDays: number;
   rhGraceHours: number;
   rhLeadTimeHours?: number;
+  vesselCalendarGraceConfig?: CompanyStandardGraceConfig;
+  vesselRhGraceConfig?: RhGraceConfig;
 }
 
 /**
@@ -288,13 +298,33 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
       leadTime = GRACE_PERIOD_CONSTANTS.DEFAULT_RH_LEAD_TIME;
     }
     
-    // Get grace period from settings
-    const graceHours = vesselGraceSettings?.rhGraceHours ?? GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+    let graceHours: number;
+    if (vesselGraceSettings?.vesselRhGraceConfig) {
+      const rhCfg = vesselGraceSettings.vesselRhGraceConfig;
+      if (rhCfg.scope === 'ALL_WORK_ORDERS') {
+        graceHours = rhCfg.graceMethod === 'FIXED_HOURS' ? (rhCfg.graceValue ?? GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS) : GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+      } else {
+        let inLastWeek = false;
+        if (dueDate) {
+          const dueDateObj = parseDate(dueDate);
+          if (dueDateObj) {
+            const endOfMonth = new Date(dueDateObj.getFullYear(), dueDateObj.getMonth() + 1, 0);
+            inLastWeek = (endOfMonth.getDate() - dueDateObj.getDate()) <= 7;
+          }
+        }
+        if (inLastWeek) {
+          graceHours = rhCfg.graceMethod === 'FIXED_HOURS' ? (rhCfg.graceValue ?? GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS) : GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+        } else if (rhCfg.fallbackMethod === 'FIXED_HOURS') {
+          graceHours = rhCfg.fallbackGraceHours ?? GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+        } else {
+          graceHours = GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+        }
+      }
+    } else {
+      graceHours = vesselGraceSettings?.rhGraceHours ?? GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+    }
     
-    // Calculate RH status category using vessel lead time (includes grace period)
     const category = computeRHStatusCategory(dueRH, currentRH, leadTime, graceHours);
-    
-    // Map to display status
     return rhCategoryToDisplayStatus(category);
   } else {
     // Calendar-based status calculation (default)
@@ -318,12 +348,14 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
     let graceEndDate: Date;
     
     if (vesselGraceSettings?.calendarGraceMode === 'CUSTOM_DAYS') {
-      // Use custom fixed grace period
-      graceEndDate = new Date(dueDateTime);
-      graceEndDate.setDate(graceEndDate.getDate() + (vesselGraceSettings.calendarGraceDays || GRACE_PERIOD_CONSTANTS.GRACE_PERIOD_DAYS));
-      graceEndDate.setHours(0, 0, 0, 0);
+      if (vesselGraceSettings.vesselCalendarGraceConfig) {
+        graceEndDate = calculateCompanyStandardGraceEnd(dueDateTime, vesselGraceSettings.vesselCalendarGraceConfig);
+      } else {
+        graceEndDate = new Date(dueDateTime);
+        graceEndDate.setDate(graceEndDate.getDate() + (vesselGraceSettings.calendarGraceDays || GRACE_PERIOD_CONSTANTS.GRACE_PERIOD_DAYS));
+        graceEndDate.setHours(0, 0, 0, 0);
+      }
     } else {
-      // Default to COMPANY_STANDARD grace rule (uses configurable company settings)
       graceEndDate = calculateCompanyStandardGraceEnd(dueDateTime, companyGraceConfig);
     }
     

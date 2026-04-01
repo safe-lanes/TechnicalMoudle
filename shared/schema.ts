@@ -1826,24 +1826,32 @@ export type ComponentRequisition = typeof componentRequisitions.$inferSelect;
 // Controls WO auto-generation timing and status transitions
 export const pmsVesselSettings = pgTable("pms_vessel_settings", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  vesselId: text("vessel_id").notNull().unique().references(() => vessels.vuuid), // Unique per vessel
+  vesselId: text("vessel_id").notNull().unique().references(() => vessels.vuuid),
 
-  // Calendar-based jobs settings
-  calendarLeadDaysCritical: integer("calendar_lead_days_critical").notNull().default(7), // Days before due for critical jobs
-  calendarLeadDaysNonCritical: integer("calendar_lead_days_non_critical").notNull().default(14), // Days before due for non-critical jobs
-  calendarGraceMode: text("calendar_grace_mode").notNull().default("COMPANY_STANDARD"), // 'COMPANY_STANDARD' | 'CUSTOM_DAYS'
-  calendarGraceDays: integer("calendar_grace_days").notNull().default(7), // Custom grace period days (used when mode = CUSTOM_DAYS)
+  settingsMode: text("settings_mode").notNull().default("COMPANY_STANDARD"),
 
-  // Running-hour based jobs settings  
-  rhLeadHoursCritical: integer("rh_lead_hours_critical").notNull().default(50), // Hours before due for critical RH jobs
-  rhLeadHoursNonCritical: integer("rh_lead_hours_non_critical").notNull().default(100), // Hours before due for non-critical RH jobs
-  rhGraceHours: integer("rh_grace_hours").notNull().default(168), // Grace period hours for escalation (default 168 = 1 week)
+  calendarLeadDaysCritical: integer("calendar_lead_days_critical").notNull().default(7),
+  calendarLeadDaysNonCritical: integer("calendar_lead_days_non_critical").notNull().default(14),
+  calendarGraceMode: text("calendar_grace_mode").notNull().default("COMPANY_STANDARD"),
+  calendarGraceDays: integer("calendar_grace_days").notNull().default(7),
+  calendarGraceMethod: text("calendar_grace_method").notNull().default("FIXED_DAYS"),
+  calendarGraceValue: integer("calendar_grace_value").notNull().default(7),
+  calendarGraceScope: text("calendar_grace_scope").notNull().default("ALL_WORK_ORDERS"),
+  calendarFallbackMethod: text("calendar_fallback_method"),
+  calendarFallbackGraceDays: integer("calendar_fallback_grace_days"),
 
-  // Spare Parts Location Names (customizable per vessel)
-  locationAName: text("location_a_name").notNull().default("Location A"), // Custom name for Location A
-  locationBName: text("location_b_name").notNull().default("Location B"), // Custom name for Location B
+  rhLeadHoursCritical: integer("rh_lead_hours_critical").notNull().default(50),
+  rhLeadHoursNonCritical: integer("rh_lead_hours_non_critical").notNull().default(100),
+  rhGraceHours: integer("rh_grace_hours").notNull().default(168),
+  rhGraceMethod: text("rh_grace_method").notNull().default("FIXED_HOURS"),
+  rhGraceValue: integer("rh_grace_value").notNull().default(168),
+  rhGraceScope: text("rh_grace_scope").notNull().default("ALL_WORK_ORDERS"),
+  rhFallbackMethod: text("rh_fallback_method"),
+  rhFallbackGraceHours: integer("rh_fallback_grace_hours"),
 
-  // Audit fields
+  locationAName: text("location_a_name").notNull().default("Location A"),
+  locationBName: text("location_b_name").notNull().default("Location B"),
+
   updatedBy: text("updated_by").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
