@@ -268,6 +268,11 @@ const COMPANY_GRACE_DEFAULTS = {
   rhLeadHoursCritical: 720,
   rhLeadHoursNonCritical: 720,
   rhGraceHours: 168,
+  rhGraceMethod: 'FIXED_HOURS' as string,
+  rhGraceValue: 168 as number,
+  rhGraceScope: 'ALL_WORK_ORDERS' as string,
+  rhFallbackMethod: null as string | null,
+  rhFallbackGraceHours: null as number | null,
 };
 
 export async function getCompanyStandardGraceSettings() {
@@ -316,7 +321,36 @@ export async function upsertCompanyStandardGraceSettings(data: any, username: st
   const calendarLeadNonCrit = data.calendarLeadDaysNonCritical != null ? Math.max(1, Math.round(data.calendarLeadDaysNonCritical)) : 14;
   const rhLeadCrit = data.rhLeadHoursCritical != null ? Math.max(1, Math.round(data.rhLeadHoursCritical)) : 720;
   const rhLeadNonCrit = data.rhLeadHoursNonCritical != null ? Math.max(1, Math.round(data.rhLeadHoursNonCritical)) : 720;
-  const rhGrace = data.rhGraceHours != null ? Math.max(0, Math.round(data.rhGraceHours)) : 168;
+
+  const validRhMethods = ['FIXED_HOURS', 'MONTH_END', 'SPECIFIC_DATE_NEXT_MONTH'];
+  const rhGraceMethod = data.rhGraceMethod || 'FIXED_HOURS';
+  const rhGraceScope = data.rhGraceScope || 'ALL_WORK_ORDERS';
+
+  if (!validRhMethods.includes(rhGraceMethod)) {
+    throw new ValidationError(`Invalid RH grace method: ${rhGraceMethod}`);
+  }
+  if (!validScopes.includes(rhGraceScope)) {
+    throw new ValidationError(`Invalid RH grace scope: ${rhGraceScope}`);
+  }
+  const rhGraceValue = data.rhGraceValue != null ? Math.max(0, Math.round(data.rhGraceValue)) : 168;
+  if (rhGraceMethod === 'FIXED_HOURS' && rhGraceValue < 1) {
+    throw new ValidationError('Fixed Hours requires a positive RH grace value');
+  }
+  if (rhGraceMethod === 'SPECIFIC_DATE_NEXT_MONTH' && (rhGraceValue < 1 || rhGraceValue > 28)) {
+    throw new ValidationError('Specific Date of Next Month requires a day value between 1 and 28');
+  }
+
+  const rhFallbackMethod = data.rhFallbackMethod || 'MONTH_END';
+  if (rhGraceScope === 'LAST_WEEK_OF_MONTH') {
+    if (!validRhMethods.includes(rhFallbackMethod)) {
+      throw new ValidationError(`Invalid RH fallback method: ${rhFallbackMethod}`);
+    }
+    if (rhFallbackMethod === 'FIXED_HOURS' && (data.rhFallbackGraceHours === undefined || data.rhFallbackGraceHours === null || data.rhFallbackGraceHours < 0)) {
+      throw new ValidationError('RH fallback grace hours is required when fallback method is Fixed Hours');
+    }
+  }
+
+  const rhGraceHoursComputed = rhGraceMethod === 'FIXED_HOURS' ? rhGraceValue : 168;
 
   return repo.upsertCompanyStandardGraceSettings({
     graceMethod: data.graceMethod,
@@ -328,7 +362,12 @@ export async function upsertCompanyStandardGraceSettings(data: any, username: st
     calendarLeadDaysNonCritical: calendarLeadNonCrit,
     rhLeadHoursCritical: rhLeadCrit,
     rhLeadHoursNonCritical: rhLeadNonCrit,
-    rhGraceHours: rhGrace,
+    rhGraceHours: rhGraceHoursComputed,
+    rhGraceMethod: rhGraceMethod,
+    rhGraceValue: rhGraceMethod === 'MONTH_END' ? 0 : rhGraceValue,
+    rhGraceScope: rhGraceScope,
+    rhFallbackMethod: rhGraceScope === 'LAST_WEEK_OF_MONTH' ? rhFallbackMethod : null,
+    rhFallbackGraceHours: rhGraceScope === 'LAST_WEEK_OF_MONTH' && rhFallbackMethod === 'FIXED_HOURS' ? (data.rhFallbackGraceHours ?? 0) : null,
     updatedBy: username,
   });
 }
