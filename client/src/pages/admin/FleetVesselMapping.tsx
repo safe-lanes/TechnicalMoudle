@@ -504,6 +504,11 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   const mappedCount = useMemo(() => mappedFleetCodes.size, [mappedFleetCodes]);
   const unmappedCount = useMemo(() => Math.max(0, leafFleetCount - mappedCount), [leafFleetCount, mappedCount]);
 
+  const vesselMappedCount = useMemo(() => {
+    return vesselComponentsNonParent.filter((c) => mappedComponentCodes.has(c.componentCode || c.id)).length;
+  }, [vesselComponentsNonParent, mappedComponentCodes]);
+  const vesselUnmappedCount = useMemo(() => Math.max(0, vesselComponentsNonParent.length - vesselMappedCount), [vesselComponentsNonParent, vesselMappedCount]);
+
   const selectedFleetData = useMemo(() => {
     if (!selectedFleetItem) return null;
     return fleetComponents.find((fc) => fc.fleetEquipmentCode === selectedFleetItem) || null;
@@ -1466,6 +1471,16 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
                     <Anchor className="h-4 w-4 text-cyan-600" />
                     Vessel Components
                   </CardTitle>
+                  <div className="flex items-center gap-4 text-sm mt-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500" />
+                      <span data-testid="text-vessel-mapped-count">Mapped: {vesselMappedCount}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gray-400" />
+                      <span data-testid="text-vessel-unmapped-count">Not Mapped: {vesselUnmappedCount}</span>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   <ScrollArea className="h-[500px]">
