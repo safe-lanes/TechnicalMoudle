@@ -169,6 +169,14 @@ export class WorkOrderStatusRecalculatorService {
               fallbackMethod: settings.rhFallbackMethod as 'MONTH_END' | 'FIXED_HOURS' | null,
               fallbackGraceHours: settings.rhFallbackGraceHours ?? null,
             };
+          } else if (companyGraceRow) {
+            graceEntry.vesselRhGraceConfig = {
+              graceMethod: (companyGraceRow.rhGraceMethod || 'FIXED_HOURS') as 'FIXED_HOURS' | 'MONTH_END' | 'SPECIFIC_DATE_NEXT_MONTH',
+              graceValue: companyGraceRow.rhGraceValue ?? 168,
+              scope: (companyGraceRow.rhGraceScope || 'ALL_WORK_ORDERS') as 'ALL_WORK_ORDERS' | 'LAST_WEEK_OF_MONTH',
+              fallbackMethod: companyGraceRow.rhFallbackMethod as 'MONTH_END' | 'FIXED_HOURS' | null,
+              fallbackGraceHours: companyGraceRow.rhFallbackGraceHours ?? null,
+            };
           }
 
           graceSettingsCache.set(vesselId, graceEntry);
