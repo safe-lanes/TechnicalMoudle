@@ -31,6 +31,7 @@ import DataMasters from "./admin/DataMasters";
 import ShipsCertificatesAdmin from "./admin/ShipsCertificatesAdmin";
 import ShipsSurveysAdmin from "./admin/ShipsSurveysAdmin";
 import AccessControl from "./admin/AccessControl";
+import AddEditFleetComponent from "./admin/AddEditFleetComponent";
 // ====== NOON REPORT MODULE — START (remove to disable) ======
 import NoonEntryForm from "./noon-report/NoonEntryForm";
 import ReportHistory from "./noon-report/ReportHistory";
@@ -50,7 +51,9 @@ export const TechnicalModule = () => {
   // Derive state from URL
   const getStateFromUrl = () => {
     if (location === "/admin") {
-      return { subModule: "admin", menuItem: "masters" }; // Default to alerts when accessing /admin
+      return { subModule: "admin", menuItem: "masters" };
+    } else if (location.startsWith("/admin/fleet-component-editor")) {
+      return { subModule: "admin", menuItem: "fleet-component-editor" };
     } else if (location.startsWith("/admin/")) {
       const subpage = location.replace("/admin/", "");
       return { subModule: "admin", menuItem: subpage };
@@ -156,7 +159,7 @@ export const TechnicalModule = () => {
         </div>
         
         {/* Main Content Area */}
-        <div className="flex-1 p-6 min-h-0 overflow-auto">
+        <div className={`flex-1 min-h-0 overflow-auto ${selectedMenuItem === "fleet-component-editor" ? "" : "p-6"}`}>
           {(permissionStatus === "configured" || permissionStatus === "error") && !(selectedMenuItem === "access-control" && isSailAdmin) && !canViewSidebarItem(selectedSubModule, selectedMenuItem) ? (
             <div className="flex items-center justify-center h-full min-h-[400px]" data-testid="access-denied">
               <div className="text-center">
@@ -233,6 +236,8 @@ export const TechnicalModule = () => {
                 </button>
               </div>
             </div>
+          ) : selectedSubModule === "admin" && selectedMenuItem === "fleet-component-editor" ? (
+            <AddEditFleetComponent />
           ) : selectedSubModule === "admin" ? (
             <PMSAdmin />
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (

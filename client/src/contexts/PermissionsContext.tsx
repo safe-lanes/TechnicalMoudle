@@ -151,6 +151,9 @@ const SIDEBAR_ITEM_PARENT_MAP: Record<string, Record<string, string>> = {
     "new": "defect-log",
     "edit": "defect-log",
   },
+  admin: {
+    "fleet-component-editor": "masters",
+  },
 };
 
 function resolveSidebarItemId(subModule: string, itemId: string): string {

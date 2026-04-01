@@ -18,7 +18,6 @@ import DefectFormWizard from "./pages/defects/DefectFormWizard";
 import WorkOrderFormPage from "./pages/pms/WorkOrderFormPage";
 import JobsFormPage from "./pages/pms/JobsFormPage";
 import AnomaliesPage from "./pages/pms/AnomaliesPage";
-import AddEditFleetComponent from "./pages/admin/AddEditFleetComponent";
 import BulkUpdateSpares from "./pages/spares/BulkUpdateSpares";
 import BulkUpdateStores from "./pages/stores/BulkUpdateStores";
 
@@ -92,9 +91,7 @@ function App() {
                 <Route path="/defects/:subpage" component={TechnicalModule} />
                 
                 <Route path="/admin" component={TechnicalModule} />
-                <Route path="/admin/fleet-component-editor/:id?">
-                  {() => <ProtectedRoute><AddEditFleetComponent /></ProtectedRoute>}
-                </Route>
+                <Route path="/admin/fleet-component-editor/:id?" component={TechnicalModule} />
                 <Route path="/admin/:subpage" component={TechnicalModule} />
                 
                 <Route path="/cert-surveys" component={TechnicalModule} />

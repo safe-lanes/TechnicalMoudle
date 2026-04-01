@@ -501,7 +501,7 @@ export default function AddEditFleetComponent() {
     : (formData.fleetEquipmentName || selectedNode?.name || "");
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
       <div className="px-6 py-4 bg-white border-b">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-semibold text-gray-900">Add / Edit Fleet Component</h1>
