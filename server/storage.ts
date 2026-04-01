@@ -122,6 +122,9 @@ import {
   pmsVesselSettings,
   type PmsVesselSettings,
   type InsertPmsVesselSettings,
+  companyStandardGraceSettings,
+  type CompanyStandardGraceSettings,
+  type InsertCompanyStandardGraceSettings,
   makerList,
   type MakerList,
   type InsertMakerList,
@@ -731,6 +734,10 @@ export interface IStorage {
   getAllPmsVesselSettings(): Promise<PmsVesselSettings[]>;
   createOrUpdatePmsVesselSettings(settings: InsertPmsVesselSettings): Promise<PmsVesselSettings>;
   deletePmsVesselSettings(vesselId: string): Promise<void>;
+
+  // Company Standard Grace Settings - Singleton company-wide grace rule
+  getCompanyStandardGraceSettings(): Promise<CompanyStandardGraceSettings | undefined>;
+  upsertCompanyStandardGraceSettings(settings: InsertCompanyStandardGraceSettings): Promise<CompanyStandardGraceSettings>;
   
   // Maker List - Master data for manufacturers
   getMakerList(): Promise<MakerList[]>;

@@ -52,11 +52,25 @@ export const GRACE_PERIOD_CONSTANTS = {
 
 export type GraceMode = 'COMPANY_STANDARD' | 'CUSTOM_DAYS';
 
+export interface CompanyStandardGraceConfig {
+  graceMethod: 'FIXED_DAYS' | 'MONTH_END' | 'SPECIFIC_DATE_NEXT_MONTH';
+  graceValue: number | null;
+  scope: 'ALL_WORK_ORDERS' | 'LAST_WEEK_OF_MONTH';
+  fallbackGraceDays: number | null;
+}
+
+export const DEFAULT_COMPANY_GRACE_CONFIG: CompanyStandardGraceConfig = {
+  graceMethod: 'MONTH_END',
+  graceValue: null,
+  scope: 'LAST_WEEK_OF_MONTH',
+  fallbackGraceDays: 7,
+};
+
 export interface VesselGraceSettings {
   calendarGraceMode: GraceMode;
   calendarGraceDays: number;
   rhGraceHours: number;
-  rhLeadTimeHours?: number; // RH Lead Time (used for DUE SOON categorization)
+  rhLeadTimeHours?: number;
 }
 
 /**
@@ -99,29 +113,46 @@ export interface WorkOrderStatusInput {
   vesselGraceSettings?: VesselGraceSettings;
   rhLeadTimeHours?: number;
   calendarLeadTimeDays?: number;
+  companyGraceConfig?: CompanyStandardGraceConfig;
 }
 
-/**
- * Calculate grace end date based on Company Standard rule:
- * - If due date is in the last 7 days of the month → grace = 7 days
- * - Otherwise → grace extends to end of the due month
- */
-function calculateCompanyStandardGraceEnd(dueDate: Date): Date {
-  const endOfMonth = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, 0);
-  endOfMonth.setHours(0, 0, 0, 0);
-  
-  // Check if due date is in last 7 days of month
-  const daysUntilEndOfMonth = endOfMonth.getDate() - dueDate.getDate();
-  
-  if (daysUntilEndOfMonth <= 7) {
-    // Due date is in last 7 days of month - use fixed 7-day grace
+function applyGraceMethod(dueDate: Date, method: CompanyStandardGraceConfig['graceMethod'], value: number | null): Date {
+  if (method === 'FIXED_DAYS') {
     const graceEnd = new Date(dueDate);
-    graceEnd.setDate(graceEnd.getDate() + GRACE_PERIOD_CONSTANTS.GRACE_PERIOD_DAYS);
+    graceEnd.setDate(graceEnd.getDate() + (value || GRACE_PERIOD_CONSTANTS.GRACE_PERIOD_DAYS));
     graceEnd.setHours(0, 0, 0, 0);
     return graceEnd;
-  } else {
-    // Grace extends to end of month
+  } else if (method === 'MONTH_END') {
+    const endOfMonth = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, 0);
+    endOfMonth.setHours(0, 0, 0, 0);
     return endOfMonth;
+  } else {
+    const dayOfNextMonth = value || 5;
+    const graceEnd = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, dayOfNextMonth);
+    graceEnd.setHours(0, 0, 0, 0);
+    return graceEnd;
+  }
+}
+
+export function calculateCompanyStandardGraceEnd(dueDate: Date, config?: CompanyStandardGraceConfig): Date {
+  const cfg = config || DEFAULT_COMPANY_GRACE_CONFIG;
+
+  if (cfg.scope === 'ALL_WORK_ORDERS') {
+    return applyGraceMethod(dueDate, cfg.graceMethod, cfg.graceValue);
+  }
+
+  const endOfMonth = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, 0);
+  endOfMonth.setHours(0, 0, 0, 0);
+  const daysUntilEndOfMonth = endOfMonth.getDate() - dueDate.getDate();
+
+  if (daysUntilEndOfMonth <= 7) {
+    return applyGraceMethod(dueDate, cfg.graceMethod, cfg.graceValue);
+  } else {
+    const fallbackDays = cfg.fallbackGraceDays ?? GRACE_PERIOD_CONSTANTS.GRACE_PERIOD_DAYS;
+    const graceEnd = new Date(dueDate);
+    graceEnd.setDate(graceEnd.getDate() + fallbackDays);
+    graceEnd.setHours(0, 0, 0, 0);
+    return graceEnd;
   }
 }
 
@@ -194,7 +225,8 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
     maintenanceBasis, 
     vesselGraceSettings,
     rhLeadTimeHours,
-    calendarLeadTimeDays
+    calendarLeadTimeDays,
+    companyGraceConfig
   } = input;
   
   const FINALIZED_STATUSES = new Set(['completed', 'approved', 'closed', 'cancelled', 'canceled']);
@@ -272,8 +304,8 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
       graceEndDate.setDate(graceEndDate.getDate() + (vesselGraceSettings.calendarGraceDays || GRACE_PERIOD_CONSTANTS.GRACE_PERIOD_DAYS));
       graceEndDate.setHours(0, 0, 0, 0);
     } else {
-      // Default to COMPANY_STANDARD grace rule
-      graceEndDate = calculateCompanyStandardGraceEnd(dueDateTime);
+      // Default to COMPANY_STANDARD grace rule (uses configurable company settings)
+      graceEndDate = calculateCompanyStandardGraceEnd(dueDateTime, companyGraceConfig);
     }
     
     // Determine the effective calendar lead time for the Planned → Due transition

@@ -1861,6 +1861,38 @@ export type InsertPmsVesselSettings = z.infer<typeof insertPmsVesselSettingsSche
 export type PmsVesselSettings = typeof pmsVesselSettings.$inferSelect;
 
 // =====================================================
+// COMPANY STANDARD GRACE SETTINGS - Singleton company-wide grace rule
+// Defines the default calendar-based grace period logic for all vessels
+// using Company Standard mode. Only one active row allowed.
+// =====================================================
+export const companyStandardGraceSettings = pgTable("company_standard_grace_settings", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  singletonKey: text("singleton_key").notNull().unique().default("ACTIVE"),
+
+  graceMethod: text("grace_method").notNull().default("MONTH_END"),
+  graceValue: integer("grace_value"),
+  scope: text("scope").notNull().default("LAST_WEEK_OF_MONTH"),
+  fallbackGraceDays: integer("fallback_grace_days"),
+
+  updatedBy: text("updated_by").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertCompanyStandardGraceSettingsSchema = createInsertSchema(companyStandardGraceSettings).omit({
+  id: true,
+  singletonKey: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCompanyStandardGraceSettings = z.infer<typeof insertCompanyStandardGraceSettingsSchema>;
+export type CompanyStandardGraceSettings = typeof companyStandardGraceSettings.$inferSelect;
+
+export type CompanyGraceMethod = 'FIXED_DAYS' | 'MONTH_END' | 'SPECIFIC_DATE_NEXT_MONTH';
+export type CompanyGraceScope = 'ALL_WORK_ORDERS' | 'LAST_WEEK_OF_MONTH';
+
+// =====================================================
 // MAKER LIST - Master data for equipment manufacturers
 // Linked with fleet components, vessel components, fleet spares, vessel spares
 // =====================================================

@@ -1,5 +1,5 @@
 import { storage } from '../../../storage';
-import type { Fleet, InsertFleet, Vessel, InsertVessel, PmsVesselSettings, InsertPmsVesselSettings, FleetClass, InsertFleetClass } from '@shared/schema';
+import type { Fleet, InsertFleet, Vessel, InsertVessel, PmsVesselSettings, InsertPmsVesselSettings, FleetClass, InsertFleetClass, CompanyStandardGraceSettings, InsertCompanyStandardGraceSettings } from '@shared/schema';
 
 // ── Fleet methods ──
 
@@ -87,4 +87,14 @@ export async function createOrUpdatePmsVesselSettings(settings: InsertPmsVesselS
 
 export async function deletePmsVesselSettings(vesselId: string): Promise<void> {
   return storage.deletePmsVesselSettings(vesselId);
+}
+
+// ── Company Standard Grace Settings methods ──
+
+export async function getCompanyStandardGraceSettings(): Promise<CompanyStandardGraceSettings | undefined> {
+  return storage.getCompanyStandardGraceSettings();
+}
+
+export async function upsertCompanyStandardGraceSettings(settings: InsertCompanyStandardGraceSettings): Promise<CompanyStandardGraceSettings> {
+  return storage.upsertCompanyStandardGraceSettings(settings);
 }

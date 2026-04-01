@@ -36,6 +36,11 @@ router.get('/pms-vessel-settings/:vesselId', asyncHandler(ctrl.getPmsVesselSetti
 router.put('/pms-vessel-settings/:vesselId', asyncHandler(ctrl.updatePmsVesselSettings));
 router.delete('/pms-vessel-settings/:vesselId', asyncHandler(ctrl.deletePmsVesselSettings));
 
+// ── Company Standard Grace Settings ──
+
+router.get('/company-standard-grace-settings', asyncHandler(ctrl.getCompanyStandardGraceSettings));
+router.put('/company-standard-grace-settings', asyncHandler(ctrl.updateCompanyStandardGraceSettings));
+
 // ── Vessel Location Names ──
 
 router.get('/vessel-location-names/:vesselId', asyncHandler(ctrl.getVesselLocationNames));

@@ -114,6 +114,19 @@ export async function deletePmsVesselSettings(req: Request, res: Response) {
   res.json({ success: true });
 }
 
+// ── Company Standard Grace Settings controllers ──
+
+export async function getCompanyStandardGraceSettings(_req: Request, res: Response) {
+  const settings = await service.getCompanyStandardGraceSettings();
+  res.json(settings);
+}
+
+export async function updateCompanyStandardGraceSettings(req: Request, res: Response) {
+  const username = (req as any).user?.username || 'test';
+  const settings = await service.upsertCompanyStandardGraceSettings(req.body, username);
+  res.json(settings);
+}
+
 // ── Vessel Location Names controllers ──
 
 export async function getVesselLocationNames(req: Request, res: Response) {

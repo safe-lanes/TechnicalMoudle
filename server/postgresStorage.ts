@@ -7,6 +7,7 @@ import {
   fleetClasses,
   vessels,
   pmsVesselSettings,
+  companyStandardGraceSettings,
   makers,
   masterLists,
   makerList,
@@ -7186,6 +7187,30 @@ export class PostgresStorage {
     } else {
       // Create new
       const result = await db.insert(pmsVesselSettings).values(settings).returning();
+      return result[0];
+    }
+  }
+
+  // ============= COMPANY STANDARD GRACE SETTINGS =============
+
+  async getCompanyStandardGraceSettings(): Promise<CompanyStandardGraceSettings | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(companyStandardGraceSettings).limit(1);
+    return result[0];
+  }
+
+  async upsertCompanyStandardGraceSettings(settings: InsertCompanyStandardGraceSettings): Promise<CompanyStandardGraceSettings> {
+    const db = await getDb();
+    const existing = await db.select().from(companyStandardGraceSettings).limit(1);
+    
+    if (existing.length > 0) {
+      const result = await db.update(companyStandardGraceSettings)
+        .set({ ...settings, updatedAt: new Date() })
+        .where(eq(companyStandardGraceSettings.id, existing[0].id))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(companyStandardGraceSettings).values(settings).returning();
       return result[0];
     }
   }

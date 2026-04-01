@@ -1,6 +1,6 @@
 import { storage } from "../storage";
 import type { WorkOrder, Job, Component, PmsVesselSettings } from "@shared/schema";
-import { computeWorkOrderStatus, VesselGraceSettings, ComputedWorkOrderStatus } from "@shared/workOrders/status";
+import { computeWorkOrderStatus, VesselGraceSettings, ComputedWorkOrderStatus, CompanyStandardGraceConfig, DEFAULT_COMPANY_GRACE_CONFIG } from "@shared/workOrders/status";
 import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 
 /**
@@ -131,6 +131,12 @@ export class WorkOrderStatusRecalculatorService {
         if (component) componentsCache.set(componentId, component);
       }
 
+      // Load company standard grace config once
+      const companyGraceRow = await storage.getCompanyStandardGraceSettings();
+      const companyGraceConfig: CompanyStandardGraceConfig = companyGraceRow
+        ? { graceMethod: companyGraceRow.graceMethod as any, graceValue: companyGraceRow.graceValue, scope: companyGraceRow.scope as any, fallbackGraceDays: companyGraceRow.fallbackGraceDays }
+        : DEFAULT_COMPANY_GRACE_CONFIG;
+
       // Prefetch vessel settings
       const vesselIds = new Set<string>();
       activeWorkOrders.forEach(wo => {
@@ -209,7 +215,8 @@ export class WorkOrderStatusRecalculatorService {
           maintenanceBasis: wo.maintenanceBasis || undefined,
           vesselGraceSettings,
           rhLeadTimeHours,
-          calendarLeadTimeDays
+          calendarLeadTimeDays,
+          companyGraceConfig
         });
 
         // Only update if status has changed

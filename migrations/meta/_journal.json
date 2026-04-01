@@ -204,6 +204,13 @@
       "when": 1772775119641,
       "tag": "0028_giant_stature",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1775041144663,
+      "tag": "0029_faulty_whizzer",
+      "breakpoints": true
     }
   ]
 }

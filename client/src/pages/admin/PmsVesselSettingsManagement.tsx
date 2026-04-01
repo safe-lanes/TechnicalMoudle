@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Clock, Settings, Ship, Save, X, Calendar, Gauge, AlertCircle, CheckCircle2, ArrowLeft, Search } from "lucide-react";
+import { Clock, Settings, Ship, Save, X, Calendar, Gauge, CheckCircle2, ArrowLeft, Search, Building2 } from "lucide-react";
 import type { PmsVesselSettings } from "@shared/schema";
 import { Marker } from "@/components/Marker";
 
@@ -20,12 +20,45 @@ interface Vessel {
   vesselCode?: string;
 }
 
+interface CompanyGraceSettings {
+  graceMethod: string;
+  graceValue: number | null;
+  scope: string;
+  fallbackGraceDays: number | null;
+  configured: boolean;
+}
+
+function formatCompanyGraceSummary(settings: CompanyGraceSettings): string {
+  const methodLabel =
+    settings.graceMethod === 'FIXED_DAYS' ? `Fixed ${settings.graceValue} days` :
+    settings.graceMethod === 'MONTH_END' ? 'Month End' :
+    settings.graceMethod === 'SPECIFIC_DATE_NEXT_MONTH' ? `${settings.graceValue}${getOrdinalSuffix(settings.graceValue || 1)} of next month` :
+    'Unknown';
+
+  if (settings.scope === 'ALL_WORK_ORDERS') {
+    return `${methodLabel} for all WOs`;
+  }
+
+  const fallbackLabel = settings.fallbackGraceDays != null
+    ? `${settings.fallbackGraceDays} days for remaining WOs`
+    : 'no fallback set';
+
+  return `${methodLabel} for WOs due in last week of month; ${fallbackLabel}`;
+}
+
+function getOrdinalSuffix(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return s[(v - 20) % 10] || s[v] || s[0];
+}
+
 export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
   const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isCompanyGraceDialogOpen, setIsCompanyGraceDialogOpen] = useState(false);
   const [vesselSearch, setVesselSearch] = useState("");
-  
+
   const [formData, setFormData] = useState({
     calendarLeadDaysCritical: 7,
     calendarLeadDaysNonCritical: 14,
@@ -36,10 +69,21 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
     rhGraceHours: 168,
   });
 
+  const [companyGraceForm, setCompanyGraceForm] = useState({
+    graceMethod: 'MONTH_END',
+    graceValue: 7,
+    scope: 'LAST_WEEK_OF_MONTH',
+    fallbackGraceDays: 7,
+  });
+
   const { data: vessels = [], isLoading: isVesselsLoading } = useVessels();
 
   const { data: allSettings = [], isLoading: isSettingsLoading } = useQuery<PmsVesselSettings[]>({
     queryKey: ['/technical/api/pms-vessel-settings'],
+  });
+
+  const { data: companyGraceSettings } = useQuery<CompanyGraceSettings>({
+    queryKey: ['/technical/api/company-standard-grace-settings'],
   });
 
   const settingsMap = new Map(allSettings.map(s => [s.vesselId, s]));
@@ -60,6 +104,27 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
       toast({
         title: "Error",
         description: error.message || "Failed to save settings",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const companyGraceSaveMutation = useMutation({
+    mutationFn: async (data: typeof companyGraceForm) => {
+      return apiRequest('PUT', '/technical/api/company-standard-grace-settings', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/company-standard-grace-settings'] });
+      setIsCompanyGraceDialogOpen(false);
+      toast({
+        title: "Company Standard Saved",
+        description: "Company standard grace rule has been updated",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save company standard settings",
         variant: "destructive",
       });
     },
@@ -92,9 +157,25 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
     setIsEditDialogOpen(true);
   };
 
+  const openCompanyGraceDialog = () => {
+    if (companyGraceSettings) {
+      setCompanyGraceForm({
+        graceMethod: companyGraceSettings.graceMethod || 'MONTH_END',
+        graceValue: companyGraceSettings.graceValue ?? 7,
+        scope: companyGraceSettings.scope || 'LAST_WEEK_OF_MONTH',
+        fallbackGraceDays: companyGraceSettings.fallbackGraceDays ?? 7,
+      });
+    }
+    setIsCompanyGraceDialogOpen(true);
+  };
+
   const handleSave = () => {
     if (!selectedVessel) return;
     saveMutation.mutate({ vesselId: selectedVessel.id, settings: formData });
+  };
+
+  const handleCompanyGraceSave = () => {
+    companyGraceSaveMutation.mutate(companyGraceForm);
   };
 
   const formatSettingsSummary = (vesselId: string): string => {
@@ -188,17 +269,21 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
         </div>
 
         <div className="p-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
-              <div>
-                <h3 className="font-medium text-blue-900">Company Standard Grace Rule</h3>
-                <p className="text-sm text-blue-700 mt-1">
-                  When enabled, grace period is calculated as: If due date falls in last 7 days of month, grace = 7 days. 
-                  Otherwise, grace extends to end of month.
-                </p>
-              </div>
-            </div>
+          <div className="flex items-center gap-4 mb-6 p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+            <Button
+              variant="outline"
+              className="flex items-center gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
+              onClick={openCompanyGraceDialog}
+              data-testid="button-company-standard"
+            >
+              <Building2 className="h-4 w-4" />
+              Company Standard
+            </Button>
+            {companyGraceSettings && (
+              <p className="text-sm text-gray-600" data-testid="text-company-grace-summary">
+                {formatCompanyGraceSummary(companyGraceSettings)}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -344,9 +429,9 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
                       <SelectItem value="CUSTOM_DAYS">Fixed Days</SelectItem>
                     </SelectContent>
                   </Select>
-                  {formData.calendarGraceMode === 'COMPANY_STANDARD' && (
+                  {formData.calendarGraceMode === 'COMPANY_STANDARD' && companyGraceSettings && (
                     <p className="text-xs text-blue-600 mt-1">
-                      Due in last 7 days = 7 days grace; otherwise = extends to month end
+                      {formatCompanyGraceSummary(companyGraceSettings)}
                     </p>
                   )}
                 </div>
@@ -459,6 +544,167 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
             >
               <Save className="h-4 w-4 mr-1" />
               {saveMutation.isPending ? 'Saving...' : 'Save Settings'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCompanyGraceDialogOpen} onOpenChange={setIsCompanyGraceDialogOpen}>
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-blue-600" />
+              Company Standard Grace Settings
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold text-gray-900">Grace Method</Label>
+              <p className="text-xs text-gray-500">Select how the grace period is calculated for calendar-based work orders.</p>
+              <div className="space-y-2">
+                {[
+                  { value: 'FIXED_DAYS', label: 'Fixed Days', desc: 'Grace period is a fixed number of days after due date' },
+                  { value: 'MONTH_END', label: 'Month End', desc: 'Grace extends to the end of the month the WO is due' },
+                  { value: 'SPECIFIC_DATE_NEXT_MONTH', label: 'Specific Date of Next Month', desc: 'Grace extends to a specific day of the following month' },
+                ].map(option => (
+                  <label
+                    key={option.value}
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      companyGraceForm.graceMethod === option.value
+                        ? 'border-blue-400 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    data-testid={`radio-grace-method-${option.value.toLowerCase()}`}
+                  >
+                    <input
+                      type="radio"
+                      name="graceMethod"
+                      value={option.value}
+                      checked={companyGraceForm.graceMethod === option.value}
+                      onChange={() => setCompanyGraceForm({...companyGraceForm, graceMethod: option.value})}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">{option.label}</span>
+                      <p className="text-xs text-gray-500 mt-0.5">{option.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+
+              {companyGraceForm.graceMethod === 'FIXED_DAYS' && (
+                <div className="ml-7 mt-2">
+                  <Label className="text-sm text-gray-700">Number of grace days</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={companyGraceForm.graceValue}
+                      onChange={(e) => setCompanyGraceForm({...companyGraceForm, graceValue: parseInt(e.target.value) || 1})}
+                      className="w-24"
+                      data-testid="input-grace-fixed-days"
+                    />
+                    <span className="text-sm text-gray-500">days</span>
+                  </div>
+                </div>
+              )}
+
+              {companyGraceForm.graceMethod === 'SPECIFIC_DATE_NEXT_MONTH' && (
+                <div className="ml-7 mt-2">
+                  <Label className="text-sm text-gray-700">Day of the next month</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={28}
+                      value={companyGraceForm.graceValue}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 1;
+                        setCompanyGraceForm({...companyGraceForm, graceValue: Math.min(28, Math.max(1, val))});
+                      }}
+                      className="w-24"
+                      data-testid="input-grace-day-of-month"
+                    />
+                    <span className="text-sm text-gray-500">of next month (1-28)</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <Label className="text-sm font-semibold text-gray-900">Scope</Label>
+              <p className="text-xs text-gray-500">Select which work orders this grace rule applies to.</p>
+              <div className="space-y-2">
+                {[
+                  { value: 'ALL_WORK_ORDERS', label: 'Apply to all Work Orders', desc: 'The selected grace method applies to all calendar-based WOs' },
+                  { value: 'LAST_WEEK_OF_MONTH', label: 'Apply only to WOs due in last week of month', desc: 'The grace method applies only to WOs due in the last 7 days of the month' },
+                ].map(option => (
+                  <label
+                    key={option.value}
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      companyGraceForm.scope === option.value
+                        ? 'border-blue-400 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    data-testid={`radio-grace-scope-${option.value.toLowerCase()}`}
+                  >
+                    <input
+                      type="radio"
+                      name="graceScope"
+                      value={option.value}
+                      checked={companyGraceForm.scope === option.value}
+                      onChange={() => setCompanyGraceForm({...companyGraceForm, scope: option.value})}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">{option.label}</span>
+                      <p className="text-xs text-gray-500 mt-0.5">{option.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+
+              {companyGraceForm.scope === 'LAST_WEEK_OF_MONTH' && (
+                <div className="ml-7 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <Label className="text-sm font-medium text-amber-900">Grace period for WOs not due in last week of month</Label>
+                  <p className="text-xs text-amber-700 mt-0.5 mb-2">
+                    This covers all remaining work orders that fall outside the last week.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={365}
+                      value={companyGraceForm.fallbackGraceDays}
+                      onChange={(e) => setCompanyGraceForm({...companyGraceForm, fallbackGraceDays: parseInt(e.target.value) || 0})}
+                      className="w-24"
+                      data-testid="input-grace-fallback-days"
+                    />
+                    <span className="text-sm text-gray-500">days</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsCompanyGraceDialogOpen(false)}
+              data-testid="button-cancel-company-grace"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCompanyGraceSave}
+              disabled={companyGraceSaveMutation.isPending}
+              data-testid="button-save-company-grace"
+            >
+              <Save className="h-4 w-4 mr-1" />
+              {companyGraceSaveMutation.isPending ? 'Saving...' : 'Save Settings'}
             </Button>
           </DialogFooter>
         </DialogContent>

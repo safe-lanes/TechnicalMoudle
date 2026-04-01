@@ -255,6 +255,60 @@ export async function deletePmsVesselSettings(vesselId: string): Promise<void> {
   return repo.deletePmsVesselSettings(vesselId);
 }
 
+// ── Company Standard Grace Settings operations ──
+
+const COMPANY_GRACE_DEFAULTS = {
+  graceMethod: 'MONTH_END' as const,
+  graceValue: null as number | null,
+  scope: 'LAST_WEEK_OF_MONTH' as const,
+  fallbackGraceDays: 7 as number | null,
+};
+
+export async function getCompanyStandardGraceSettings() {
+  const settings = await repo.getCompanyStandardGraceSettings();
+  if (!settings) {
+    return {
+      ...COMPANY_GRACE_DEFAULTS,
+      configured: false,
+    };
+  }
+  return {
+    ...settings,
+    configured: true,
+  };
+}
+
+export async function upsertCompanyStandardGraceSettings(data: any, username: string) {
+  const validMethods = ['FIXED_DAYS', 'MONTH_END', 'SPECIFIC_DATE_NEXT_MONTH'];
+  const validScopes = ['ALL_WORK_ORDERS', 'LAST_WEEK_OF_MONTH'];
+
+  if (!validMethods.includes(data.graceMethod)) {
+    throw new ValidationError(`Invalid grace method: ${data.graceMethod}`);
+  }
+  if (!validScopes.includes(data.scope)) {
+    throw new ValidationError(`Invalid scope: ${data.scope}`);
+  }
+
+  if (data.graceMethod === 'FIXED_DAYS' && (!data.graceValue || data.graceValue < 1)) {
+    throw new ValidationError('Fixed Days requires a positive grace value');
+  }
+  if (data.graceMethod === 'SPECIFIC_DATE_NEXT_MONTH' && (!data.graceValue || data.graceValue < 1 || data.graceValue > 28)) {
+    throw new ValidationError('Specific Date of Next Month requires a day value between 1 and 28');
+  }
+
+  if (data.scope === 'LAST_WEEK_OF_MONTH' && (data.fallbackGraceDays === undefined || data.fallbackGraceDays === null || data.fallbackGraceDays < 0)) {
+    throw new ValidationError('Fallback grace days is required when scope is Last Week of Month');
+  }
+
+  return repo.upsertCompanyStandardGraceSettings({
+    graceMethod: data.graceMethod,
+    graceValue: data.graceMethod === 'MONTH_END' ? null : data.graceValue,
+    scope: data.scope,
+    fallbackGraceDays: data.scope === 'LAST_WEEK_OF_MONTH' ? data.fallbackGraceDays : null,
+    updatedBy: username,
+  });
+}
+
 // ── Vessel Location Names operations ──
 
 export async function getVesselLocationNames(vesselId: string): Promise<{
