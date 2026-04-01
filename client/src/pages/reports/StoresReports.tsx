@@ -244,6 +244,16 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
     return 'OK';
   };
 
+  const applyComponentFilter = (items: any[]) => {
+    if (!globalComponent) return items;
+    const q = globalComponent.toLowerCase();
+    return items.filter((i: any) => {
+      const name = (i.itemName || i.componentName || i.name || "").toLowerCase();
+      const code = (i.itemCode || i.componentCode || i.code || "").toLowerCase();
+      return name.includes(q) || code.includes(q);
+    });
+  };
+
   const generateStoresReport = async (reportId: string, mode: 'preview' | 'download' = 'download') => {
     const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
 
@@ -402,7 +412,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         });
         if (!reportRes.ok) throw new Error('Failed to fetch low stock alert data');
         const reportData = await reportRes.json();
-        const items = reportData.items || [];
+        const items = applyComponentFilter(reportData.items || []);
         const reportSummary = reportData.summary || {};
 
         const columns = [
@@ -462,7 +472,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         const freshData = await apiRes.json();
 
         if (mode === 'preview') {
-          const topItems = freshData.topConsumedItems || [];
+          const topItems = applyComponentFilter(freshData.topConsumedItems || []);
           const columns = [
             { header: 'S.No', field: 'sno', width: 12 },
             { header: 'Item Code', field: 'itemCode', width: 25 },

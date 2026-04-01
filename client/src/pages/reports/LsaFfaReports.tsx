@@ -154,6 +154,23 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
     return { ...masterListData, equipment: result };
   }, [masterListData, globalVessels, globalComponent, vessels.length]);
 
+  const filteredScheduleData = useMemo(() => {
+    if (!scheduleData?.scheduleItems) return scheduleData;
+    let result = scheduleData.scheduleItems;
+    if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
+      result = result.filter((item: any) => !item.vesselId || globalVessels.includes(item.vesselId));
+    }
+    if (globalComponent) {
+      const q = globalComponent.toLowerCase();
+      result = result.filter((item: any) => {
+        const name = (item.componentName || "").toLowerCase();
+        const code = (item.componentCode || "").toLowerCase();
+        return name.includes(q) || code.includes(q);
+      });
+    }
+    return { ...scheduleData, scheduleItems: result, summary: { ...scheduleData.summary, total: result.length, onSchedule: result.filter((i: any) => i.status === 'On Schedule' || i.status === 'on-schedule').length, dueSoon: result.filter((i: any) => i.status === 'Due Soon' || i.status === 'due-soon').length, overdue: result.filter((i: any) => i.status === 'Overdue' || i.status === 'overdue').length } };
+  }, [scheduleData, globalVessels, globalComponent, vessels.length]);
+
   const reports: LsaFfaReport[] = [
     {
       id: "lsa-ffa-master-list",
@@ -267,7 +284,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
         finalData
       );
     } else if (reportId === 'lsa-ffa-maintenance-schedule') {
-      if (!scheduleData) {
+      if (!filteredScheduleData) {
         toast({ title: "No Data", description: "No maintenance schedule data available.", variant: "destructive" });
         return;
       }
@@ -291,7 +308,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
         { header: 'Assigned To', field: 'assignedTo', width: 14 }
       ];
 
-      const items = scheduleData.scheduleItems || [];
+      const items = filteredScheduleData.scheduleItems || [];
       const tableData = items.map((item: any) => ({
         sno: String(item.sno || ''),
         componentCode: item.componentCode || '-',
@@ -311,7 +328,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
         assignedTo: item.assignedTo || '-'
       }));
 
-      const summary = scheduleData.summary || {};
+      const summary = filteredScheduleData.summary || {};
       const summaryItems = [
         { label: 'Total Items', value: summary.total ?? 0 },
         { label: 'On Schedule', value: summary.onSchedule ?? 0 },
@@ -364,6 +381,8 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
     const params = new URLSearchParams();
     params.set('vesselId', effectiveVesselId || 'all');
     params.set('format', 'excel');
+    if (globalVessels.length > 0) params.set('vesselIds', globalVessels.join(','));
+    if (globalComponent) params.set('componentSearch', globalComponent);
     if (equipmentTypeFilter !== 'all') params.set('equipmentType', equipmentTypeFilter);
 
     let endpoint = '';
@@ -416,7 +435,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
     }
   };
 
-  const scheduleSummary = scheduleData?.summary || {};
+  const scheduleSummary = filteredScheduleData?.summary || {};
   const masterSummary = filteredMasterList?.summary || {};
   const anyLoading = isLoading || isScheduleLoading;
 
@@ -541,7 +560,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
             </Card>
           </div>
 
-          {!filteredMasterList && !scheduleData && !anyLoading && (
+          {!filteredMasterList && !filteredScheduleData && !anyLoading && (
             <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg" data-testid="text-error-message">
               <p className="text-red-700 dark:text-red-300 text-sm">Failed to load report data. Please try again.</p>
             </div>

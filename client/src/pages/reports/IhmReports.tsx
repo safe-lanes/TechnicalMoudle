@@ -101,21 +101,48 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
     : (categoryFilters.vessel || contextVesselId);
 
   const { data: ihmData } = useQuery<any>({
-    queryKey: ['/technical/api/reports/ihm-inventory-status', effectiveVesselId, 'summary'],
+    queryKey: ['/technical/api/reports/ihm-inventory-status', effectiveVesselId, 'full'],
     queryFn: async () => {
-      const params = new URLSearchParams({ page: '1', pageSize: '1' });
+      const params = new URLSearchParams({ page: '1', pageSize: '10000' });
       if (effectiveVesselId && effectiveVesselId !== 'all') {
         params.set('vesselId', effectiveVesselId);
       }
       const res = await fetch(`/technical/api/reports/ihm-inventory-status?${params}`, {
         credentials: 'include',
       });
-      if (!res.ok) throw new Error('Failed to fetch IHM summary');
+      if (!res.ok) throw new Error('Failed to fetch IHM data');
       return res.json();
     },
   });
 
-  const ihmSummary = ihmData?.summary || { totalItems: 0, ihmPresent: 0, noIhm: 0, unknown: 0 };
+  const filteredIhmItems = useMemo(() => {
+    if (!ihmData?.items) return [];
+    let result = ihmData.items;
+    if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
+      result = result.filter((item: any) => !item.vesselId || globalVessels.includes(item.vesselId));
+    }
+    if (globalComponent) {
+      const q = globalComponent.toLowerCase();
+      result = result.filter((item: any) => {
+        const name = (item.itemName || item.componentOrCategory || "").toLowerCase();
+        const code = (item.itemCode || "").toLowerCase();
+        return name.includes(q) || code.includes(q);
+      });
+    }
+    return result;
+  }, [ihmData?.items, globalVessels, globalComponent, vessels.length]);
+
+  const ihmSummary = useMemo(() => {
+    const items = filteredIhmItems;
+    if (items.length === 0 && !ihmData?.summary) return { totalItems: 0, ihmPresent: 0, noIhm: 0, unknown: 0 };
+    if (globalVessels.length === 0 && !globalComponent && ihmData?.summary) return ihmData.summary;
+    return {
+      totalItems: items.length,
+      ihmPresent: items.filter((i: any) => i.ihmStatus === 'present').length,
+      noIhm: items.filter((i: any) => i.ihmStatus === 'not_present').length,
+      unknown: items.filter((i: any) => i.ihmStatus !== 'present' && i.ihmStatus !== 'not_present').length,
+    };
+  }, [filteredIhmItems, globalVessels.length, globalComponent, ihmData?.summary]);
 
   const reports: IhmReport[] = [
     {
@@ -152,13 +179,7 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
 
     switch (reportId) {
       case 'ihm-inventory-status': {
-        const res = await fetch(`/technical/api/reports/ihm-inventory-status?vesselId=${effectiveVesselId}&page=1&pageSize=10000&sortBy=itemCode&sortOrder=asc`, {
-          credentials: 'include',
-        });
-        if (!res.ok) throw new Error('Failed to fetch data for PDF');
-        const allData = await res.json();
-
-        if (allData.items.length === 0) {
+        if (filteredIhmItems.length === 0) {
           toast({ title: "No Data", description: "No items to export.", variant: "destructive" });
           return;
         }
@@ -176,7 +197,7 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
           { header: 'UOM', field: 'uom', width: 15 },
         ];
 
-        const data = allData.items.map((item: any, idx: number) => ({
+        const data = filteredIhmItems.map((item: any, idx: number) => ({
           sno: idx + 1,
           itemCode: item.itemCode || '-',
           itemName: item.itemName || '-',
@@ -190,10 +211,10 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
         }));
 
         const summary = [
-          { label: 'Total Items', value: allData.summary.totalItems },
-          { label: 'IHM Present', value: allData.summary.ihmPresent },
-          { label: 'No IHM', value: allData.summary.noIhm },
-          { label: 'Unknown', value: allData.summary.unknown }
+          { label: 'Total Items', value: ihmSummary.totalItems },
+          { label: 'IHM Present', value: ihmSummary.ihmPresent },
+          { label: 'No IHM', value: ihmSummary.noIhm },
+          { label: 'Unknown', value: ihmSummary.unknown }
         ];
 
         pdfReportGenerator.generateReport(
@@ -240,11 +261,6 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
     const reportKey = `${reportId}-${format}`;
     
     if (generatingReports.has(reportKey)) return;
-
-    if (!effectiveVesselId || effectiveVesselId === 'all') {
-      toast({ title: "Select a Vessel", description: "Please select a specific vessel to generate this report.", variant: "destructive" });
-      return;
-    }
 
     try {
       setGeneratingReports(prev => new Set(prev).add(reportKey));

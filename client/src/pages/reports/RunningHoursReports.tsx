@@ -189,36 +189,63 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
     }
   };
 
+  const applyComponentFilter = (items: any[]) => {
+    if (!globalComponent) return items;
+    const q = globalComponent.toLowerCase();
+    return items.filter((i: any) => {
+      const name = (i.componentName || i.name || "").toLowerCase();
+      const code = (i.componentCode || i.code || "").toLowerCase();
+      return name.includes(q) || code.includes(q);
+    });
+  };
+
+  const getVesselIdsForReport = (): string[] => {
+    if (globalVessels.length > 0) return globalVessels;
+    if (effectiveVesselId && effectiveVesselId !== 'all') return [effectiveVesselId];
+    return vessels.map((v: any) => v.id).filter(Boolean);
+  };
+
   const generateRunningHoursReport = async (reportId: string, mode: 'preview' | 'download' = 'download') => {
-    if (!effectiveVesselId || effectiveVesselId === 'all') {
-      throw new Error('Please select a specific vessel to generate the report. "All Vessels" is not supported for exports.');
-    }
-    
-    const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
+    const vesselIds = getVesselIdsForReport();
+    const vesselName = vesselIds.length === 1 
+      ? (vessels.find((v: any) => v.id === vesselIds[0])?.name || vesselIds[0]) 
+      : `${vesselIds.length} Vessels`;
 
     switch (reportId) {
       case 'rh-utilization-summary': {
-        const params = new URLSearchParams({ vesselId: effectiveVesselId });
-        if (categoryFilters.dateRange?.from) {
-          params.append('startDate', categoryFilters.dateRange.from.toISOString().split('T')[0]);
+        let allUtilizationData: any[] = [];
+        let mergedSummary: any = {};
+
+        for (const vId of vesselIds) {
+          const params = new URLSearchParams({ vesselId: vId });
+          if (categoryFilters.dateRange?.from) {
+            params.append('startDate', categoryFilters.dateRange.from.toISOString().split('T')[0]);
+          }
+          if (categoryFilters.dateRange?.to) {
+            params.append('endDate', categoryFilters.dateRange.to.toISOString().split('T')[0]);
+          }
+          
+          const response = await fetch(`/technical/api/reports/equipment-utilization-summary?${params}`);
+          const result = await response.json();
+          
+          if (response.ok && result.success && result.data) {
+            allUtilizationData = allUtilizationData.concat(result.data);
+            if (!mergedSummary.periodDays) mergedSummary = { ...result.summary };
+            else {
+              mergedSummary.totalEquipment = (mergedSummary.totalEquipment || 0) + (result.summary?.totalEquipment || 0);
+              mergedSummary.highUtilization = (mergedSummary.highUtilization || 0) + (result.summary?.highUtilization || 0);
+              mergedSummary.normalUtilization = (mergedSummary.normalUtilization || 0) + (result.summary?.normalUtilization || 0);
+              mergedSummary.lowUtilization = (mergedSummary.lowUtilization || 0) + (result.summary?.lowUtilization || 0);
+            }
+          }
         }
-        if (categoryFilters.dateRange?.to) {
-          params.append('endDate', categoryFilters.dateRange.to.toISOString().split('T')[0]);
+
+        if (allUtilizationData.length === 0) {
+          throw new Error('No equipment utilization data returned. Please ensure the selected vessel(s) have components with running hours.');
         }
-        
-        const response = await fetch(`/technical/api/reports/equipment-utilization-summary?${params}`);
-        const result = await response.json();
-        
-        if (!response.ok || result.error) {
-          throw new Error(result.error || `Failed to fetch data (status ${response.status})`);
-        }
-        
-        if (!result.success || !result.data) {
-          throw new Error('No equipment utilization data returned. Please ensure the vessel has components with running hours.');
-        }
-        
-        const utilizationData = result.data;
-        const summary = result.summary;
+
+        const utilizationData = applyComponentFilter(allUtilizationData);
+        const summary = mergedSummary;
         
         const columns = [
           { header: 'S.No', field: 'sNo', width: 12 },
@@ -271,27 +298,37 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
       }
 
       case 'rh-anomaly-detection': {
-        const params = new URLSearchParams({ vesselId: effectiveVesselId || '' });
-        if (categoryFilters.dateRange?.from) {
-          params.append('startDate', categoryFilters.dateRange.from.toISOString().split('T')[0]);
-        }
-        if (categoryFilters.dateRange?.to) {
-          params.append('endDate', categoryFilters.dateRange.to.toISOString().split('T')[0]);
+        let allAnomalies: any[] = [];
+        let mergedAnomalySummary: any = {};
+
+        for (const vId of vesselIds) {
+          const params = new URLSearchParams({ vesselId: vId });
+          if (categoryFilters.dateRange?.from) {
+            params.append('startDate', categoryFilters.dateRange.from.toISOString().split('T')[0]);
+          }
+          if (categoryFilters.dateRange?.to) {
+            params.append('endDate', categoryFilters.dateRange.to.toISOString().split('T')[0]);
+          }
+          
+          const response = await fetch(`/technical/api/reports/running-hours-anomaly-detection?${params}`);
+          const result = await response.json();
+          
+          if (response.ok && result.success) {
+            allAnomalies = allAnomalies.concat(result.data || []);
+            if (!mergedAnomalySummary.periodStart) mergedAnomalySummary = { ...result.summary };
+            else {
+              mergedAnomalySummary.totalAnomalies = (mergedAnomalySummary.totalAnomalies || 0) + (result.summary?.totalAnomalies || 0);
+              mergedAnomalySummary.criticalCount = (mergedAnomalySummary.criticalCount || 0) + (result.summary?.criticalCount || 0);
+              mergedAnomalySummary.warningCount = (mergedAnomalySummary.warningCount || 0) + (result.summary?.warningCount || 0);
+              mergedAnomalySummary.infoCount = (mergedAnomalySummary.infoCount || 0) + (result.summary?.infoCount || 0);
+              mergedAnomalySummary.totalLogsAnalyzed = (mergedAnomalySummary.totalLogsAnalyzed || 0) + (result.summary?.totalLogsAnalyzed || 0);
+              mergedAnomalySummary.componentsAnalyzed = (mergedAnomalySummary.componentsAnalyzed || 0) + (result.summary?.componentsAnalyzed || 0);
+            }
+          }
         }
         
-        const response = await fetch(`/technical/api/reports/running-hours-anomaly-detection?${params}`);
-        const result = await response.json();
-        
-        if (!response.ok || result.error) {
-          throw new Error(result.error || `Failed to fetch data (status ${response.status})`);
-        }
-        
-        if (!result.success) {
-          throw new Error('Failed to fetch anomaly data');
-        }
-        
-        const anomalies = result.data || [];
-        const summaryData = result.summary || {};
+        const anomalies = applyComponentFilter(allAnomalies);
+        const summaryData = mergedAnomalySummary;
         
         const columns = [
           { header: 'S.No', field: 'sNo', width: 12 },
@@ -366,20 +403,6 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
   };
 
   const handlePreviewReport = async (reportId: string) => {
-    const isAllVessels = !effectiveVesselId || 
-                         effectiveVesselId === 'all' || 
-                         effectiveVesselId === 'all-vessels' ||
-                         effectiveVesselId.toLowerCase().includes('all');
-    
-    if (isAllVessels) {
-      toast({ 
-        title: "Vessel Required", 
-        description: "Please select a specific vessel from the dropdown to preview this report.",
-        variant: "destructive" 
-      });
-      return;
-    }
-
     try {
       toast({ title: "Loading Preview", description: "Fetching report data..." });
       await generateRunningHoursReport(reportId, 'preview');
@@ -393,22 +416,6 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
     const reportKey = `${reportId}-${format}`;
     
     if (generatingReports.has(reportKey)) return;
-
-    // Require vessel selection for these reports
-    // Check for various "all vessels" representations
-    const isAllVessels = !effectiveVesselId || 
-                         effectiveVesselId === 'all' || 
-                         effectiveVesselId === 'all-vessels' ||
-                         effectiveVesselId.toLowerCase().includes('all');
-    
-    if (isAllVessels) {
-      toast({ 
-        title: "Vessel Required", 
-        description: "Please select a specific vessel from the dropdown to generate this report.",
-        variant: "destructive" 
-      });
-      return;
-    }
 
     try {
       setGeneratingReports(prev => new Set(prev).add(reportKey));
@@ -435,11 +442,9 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
   };
 
   const generateRunningHoursExcel = async (reportId: string) => {
-    // Check if a vessel is selected
-    if (!effectiveVesselId || effectiveVesselId === 'all') {
-      throw new Error('Please select a specific vessel to generate the Excel report. "All Vessels" is not supported for exports.');
-    }
-    
+    const vesselIds = getVesselIdsForReport();
+    const excelVesselId = vesselIds.length === 1 ? vesselIds[0] : (effectiveVesselId || 'all');
+
     const reportEndpoints: Record<string, string> = {
       'rh-utilization-summary': '/technical/api/reports/equipment-utilization-summary/excel',
       'rh-anomaly-detection': '/technical/api/reports/running-hours-anomaly-detection/excel',
@@ -451,7 +456,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
       return;
     }
 
-    let requestBody: any = { vesselId: effectiveVesselId };
+    let requestBody: any = { vesselId: excelVesselId, vesselIds };
     
     // Add date range if available
     if (categoryFilters.dateRange?.from) {

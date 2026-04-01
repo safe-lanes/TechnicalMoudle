@@ -156,6 +156,23 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
     return { ...componentsData, components: result };
   }, [componentsData, globalVessels, globalComponent, vessels.length]);
 
+  const filteredScheduleData = useMemo(() => {
+    if (!scheduleData?.scheduleItems) return scheduleData;
+    let result = scheduleData.scheduleItems;
+    if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
+      result = result.filter((item: any) => !item.vesselId || globalVessels.includes(item.vesselId));
+    }
+    if (globalComponent) {
+      const q = globalComponent.toLowerCase();
+      result = result.filter((item: any) => {
+        const name = (item.componentName || "").toLowerCase();
+        const code = (item.componentCode || "").toLowerCase();
+        return name.includes(q) || code.includes(q);
+      });
+    }
+    return { ...scheduleData, scheduleItems: result, summary: { ...scheduleData.summary, total: result.length, onSchedule: result.filter((i: any) => i.status === 'On Schedule' || i.status === 'on-schedule').length, dueSoon: result.filter((i: any) => i.status === 'Due Soon' || i.status === 'due-soon').length, overdue: result.filter((i: any) => i.status === 'Overdue' || i.status === 'overdue').length } };
+  }, [scheduleData, globalVessels, globalComponent, vessels.length]);
+
   const reports: CriticalEquipmentReport[] = [
     {
       id: "critical-components-list",
@@ -279,7 +296,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
       }
 
       case 'critical-equipment-schedule': {
-        if (!scheduleData) {
+        if (!filteredScheduleData) {
           toast({ title: "No Data", description: "No schedule data available to export.", variant: "destructive" });
           return;
         }
@@ -302,13 +319,13 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
           { header: 'Assigned To', field: 'assignedTo', width: 16 }
         ];
 
-        const scheduleItems = scheduleData.scheduleItems || [];
+        const scheduleItems = filteredScheduleData.scheduleItems || [];
         const tableData = scheduleItems.map((item: any, idx: number) => ({
           ...item,
           sno: String(idx + 1)
         }));
 
-        const summary = scheduleData.summary || {};
+        const summary = filteredScheduleData.summary || {};
         const summaryItems = [
           { label: 'Total Items', value: summary.total ?? 0 },
           { label: 'On Schedule', value: summary.onSchedule ?? 0 },
@@ -364,6 +381,8 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
     const params = new URLSearchParams();
     params.set('vesselId', effectiveVesselId || 'all');
     params.set('format', 'excel');
+    if (globalVessels.length > 0) params.set('vesselIds', globalVessels.join(','));
+    if (globalComponent) params.set('componentSearch', globalComponent);
 
     if (reportId === 'critical-components-list') {
       if (classItemFilter !== 'all') params.set('classItem', classItemFilter);
@@ -512,7 +531,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
                   Overdue Maintenance
                 </CardDescription>
                 <CardTitle className="text-3xl text-red-600" data-testid="text-overdue-count">
-                  {isLoading ? '...' : (scheduleData?.summary?.overdue ?? 0)}
+                  {isLoading ? '...' : (filteredScheduleData?.summary?.overdue ?? 0)}
                 </CardTitle>
               </CardHeader>
             </Card>
@@ -523,7 +542,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
                   Due Soon
                 </CardDescription>
                 <CardTitle className="text-3xl text-yellow-600" data-testid="text-due-soon-count">
-                  {isLoading ? '...' : (scheduleData?.summary?.dueSoon ?? 0)}
+                  {isLoading ? '...' : (filteredScheduleData?.summary?.dueSoon ?? 0)}
                 </CardTitle>
               </CardHeader>
             </Card>
@@ -534,7 +553,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
                   On Schedule
                 </CardDescription>
                 <CardTitle className="text-3xl text-green-600" data-testid="text-on-schedule-count">
-                  {isLoading ? '...' : (scheduleData?.summary?.onSchedule ?? 0)}
+                  {isLoading ? '...' : (filteredScheduleData?.summary?.onSchedule ?? 0)}
                 </CardTitle>
               </CardHeader>
             </Card>

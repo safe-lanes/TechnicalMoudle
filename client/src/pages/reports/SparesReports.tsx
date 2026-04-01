@@ -234,6 +234,16 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
     }
   };
 
+  const applyComponentFilter = (items: any[]) => {
+    if (!globalComponent) return items;
+    const q = globalComponent.toLowerCase();
+    return items.filter((i: any) => {
+      const name = (i.componentName || i.partName || i.name || "").toLowerCase();
+      const code = (i.componentCode || i.partCode || i.code || "").toLowerCase();
+      return name.includes(q) || code.includes(q);
+    });
+  };
+
   const generateSparesReport = async (reportId: string, mode: 'preview' | 'download' = 'download') => {
     const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
 
@@ -254,7 +264,8 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
           { header: 'Status', field: 'status', width: 25 },
         ];
 
-        const data = (apiData.items || []).map((i: any, idx: number) => ({
+        const filteredItems = applyComponentFilter(apiData.items || []);
+        const data = filteredItems.map((i: any, idx: number) => ({
           sno: idx + 1,
           partCode: i.partCode,
           partName: i.partName,
@@ -266,7 +277,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         }));
 
         const summary = [
-          { label: 'Total Low Stock Items', value: apiData.summary?.totalLowStock || data.length },
+          { label: 'Total Low Stock Items', value: data.length },
           { label: 'Critical', value: apiData.summary?.criticalCount || 0 },
           { label: 'At Minimum', value: apiData.summary?.atMinCount || 0 },
         ];
@@ -298,7 +309,8 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
           { header: 'Remarks', field: 'remarks', width: 45 },
         ];
 
-        const data = (previewData.data || []).map((i: any, idx: number) => ({
+        const filteredCriticalItems = applyComponentFilter(previewData.data || []);
+        const data = filteredCriticalItems.map((i: any, idx: number) => ({
           sNo: idx + 1,
           partCode: i.partCode,
           partName: i.partName,
@@ -312,7 +324,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         }));
 
         const summary = [
-          { label: 'Total Spares', value: previewData.reportMeta?.totalSpares || data.length },
+          { label: 'Total Spares', value: data.length },
           { label: 'Critical Equipment Spares', value: previewData.summary?.byCriticality?.CRITICAL || 0 },
           { label: 'Out of Stock', value: previewData.summary?.byStatus?.ZERO || 0 },
           { label: 'Low Stock', value: previewData.summary?.byStatus?.LOW || 0 },
@@ -354,7 +366,8 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
           { header: 'Last Consumed', field: 'lastConsumed', width: 25 },
         ];
 
-        const data = (apiData.items || []).map((i: any, idx: number) => ({
+        const filteredConsumptionItems = applyComponentFilter(apiData.items || []);
+        const data = filteredConsumptionItems.map((i: any, idx: number) => ({
           sno: idx + 1,
           partCode: i.partCode,
           partName: i.partName,
@@ -368,7 +381,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         }));
 
         const summary = [
-          { label: 'Total Items', value: apiData.summary?.totalItems || data.length },
+          { label: 'Total Items', value: data.length },
           { label: 'Total Consumed', value: apiData.summary?.totalConsumed || 0 },
           { label: 'Total Events', value: apiData.summary?.totalEvents || 0 },
           { label: 'Critical Items', value: apiData.summary?.criticalItems || 0 },
