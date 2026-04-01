@@ -141,12 +141,16 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
   });
 
   const structuralParentCodes = useMemo(() => {
+    const byId = new Map<string, any>();
+    const byCode = new Map<string, any>();
+    vesselComponentsData.forEach((vc) => {
+      if (vc.id) byId.set(vc.id, vc);
+      if (vc.componentCode) byCode.set(vc.componentCode, vc);
+    });
     const parentCodes = new Set<string>();
     vesselComponentsData.forEach((vc) => {
       if (vc.parentId) {
-        const parentComp = vesselComponentsData.find(
-          (c: any) => c.id === vc.parentId || c.componentCode === vc.parentId
-        );
+        const parentComp = byId.get(vc.parentId) || byCode.get(vc.parentId);
         if (parentComp) {
           parentCodes.add(parentComp.componentCode || parentComp.id);
         }
