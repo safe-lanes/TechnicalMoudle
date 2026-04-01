@@ -499,6 +499,9 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
 
             {formData.settingsMode === 'COMPANY_STANDARD' && (
               <div className="space-y-4">
+                <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-700">This vessel inherits all lead time and grace period settings from the Company Standard configuration. Switch to Custom mode to override.</p>
+                </div>
                 <div className="flex border-b">
                   <button
                     className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
@@ -530,7 +533,6 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
                   <div className="space-y-4">
                     <div>
                       <Label className="text-sm font-semibold text-gray-700">Lead Time</Label>
-                      <p className="text-xs text-gray-500">Inherited from Company Standard settings.</p>
                       <div className="grid grid-cols-2 gap-4 mt-2">
                         <div>
                           <Label className="text-xs text-blue-700">Critical Jobs</Label>
@@ -551,7 +553,7 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
 
                     <div className="border-t pt-3 space-y-3">
                       <Label className="text-sm font-semibold text-gray-700">Grace Period</Label>
-                      <p className="text-xs text-gray-500">Inherited from Company Standard settings.</p>
+
                       {companyGraceSettings ? (
                         <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
                           <div className="grid grid-cols-2 gap-4">
@@ -582,7 +584,7 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
                   <div className="space-y-4">
                     <div>
                       <Label className="text-sm font-semibold text-gray-700">Lead Time</Label>
-                      <p className="text-xs text-gray-500">Inherited from Company Standard settings.</p>
+
                       <div className="grid grid-cols-2 gap-4 mt-2">
                         <div>
                           <Label className="text-xs text-orange-700">Critical Jobs</Label>
@@ -603,7 +605,7 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
 
                     <div className="border-t pt-3 space-y-3">
                       <Label className="text-sm font-semibold text-gray-700">Grace Period</Label>
-                      <p className="text-xs text-gray-500">Inherited from Company Standard settings.</p>
+
                       {companyGraceSettings ? (
                         <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg space-y-2">
                           <div className="grid grid-cols-2 gap-4">
