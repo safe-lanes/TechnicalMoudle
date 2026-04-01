@@ -1,0 +1,108 @@
+Your plan is broadly correct and the UI/UX direction is approved. The current page still has a static company standard grace banner with hardcoded logic and vessel rows beneath it, so replacing that static section with a configurable Company Standard button and modal is the right direction.
+
+Before implementation, please refine the plan with the following clarifications:
+
+1. Keep the data model simple
+This is a single company-wide active standard, not a multi-record business object.
+
+So please confirm whether you will implement this as:
+
+a singleton settings record, or
+
+a table constrained to only one active row.
+
+Do not over-engineer this into a historical or multi-profile structure unless there is a real need.
+
+2. Preserve current behavior as the initial default
+The page currently states the hardcoded company rule as:
+
+If due date falls in last 7 days of month, grace = 7 days
+
+Otherwise, grace extends to end of month.
+
+When this feature is deployed, the initial saved company-standard configuration must reproduce the current behavior exactly, so existing vessels using Company Standard do not suddenly change behavior.
+
+Please state explicitly how you will seed/default the configuration so current behavior remains unchanged until an admin edits it.
+
+3. Clarify fallback behavior
+Please explicitly confirm this business interpretation:
+
+The selected main grace method in the modal applies to the selected scope.
+
+If scope = Apply only to WOs due in last week of month, then the additional fallback text box applies to all remaining WOs not due in the last week of month.
+
+That fallback field is a fixed grace days value only for phase 1.
+
+Do not assume the fallback also supports Month End or Specific Date unless explicitly added later.
+
+4. Limit this task to company-standard calendar logic only
+This task should only cover:
+
+replacing the static company banner,
+
+opening the company-standard popup,
+
+saving the company-standard calendar grace configuration,
+
+displaying the saved summary,
+
+using that saved company-standard rule in calendar grace calculation.
+
+Do not modify:
+
+vessel-specific popup UX,
+
+RH grace configuration,
+
+vessel override flow,
+
+any unrelated admin settings.
+
+5. Confirm exact UI behavior
+Please confirm the modal will work like this:
+
+Grace Method radio group:
+
+Fixed Days
+
+Month End
+
+Specific Date of Next Month
+
+Scope radio group:
+
+Apply to all WOs
+
+Apply only to WOs due in last week of month
+
+If grace method = Fixed Days -> show numeric days input
+
+If grace method = Month End -> no numeric input for main rule
+
+If grace method = Specific Date of Next Month -> show numeric day-of-next-month input
+
+If scope = last week of month only -> show one additional numeric input for remaining WOs
+
+If scope = all WOs -> hide the additional fallback input
+
+6. Backend change scope
+Please confirm you will update only the company-standard grace calculation path and all call sites that depend on that path, but without creating unnecessary logic duplication across services.
+
+If there is already a shared helper like calculateCompanyStandardGraceEnd, then centralize the new configuration there and make the callers consume that shared logic rather than each service implementing its own branch logic.
+
+7. Done condition
+Implementation is approved once:
+
+static banner is removed,
+
+Company Standard button is visible,
+
+modal opens correctly,
+
+configuration saves,
+
+summary displays correctly,
+
+current default behavior is preserved on first rollout,
+
+vessels using company standard continue to work correctly after deployment.
