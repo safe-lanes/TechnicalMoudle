@@ -146,28 +146,28 @@ export class WorkOrderStatusRecalculatorService {
         vesselSettingsCache.set(vesselId, settings || null);
         
         if (settings) {
-          const graceEntry: any = {
+          const graceEntry: VesselGraceSettings = {
             calendarGraceMode: (settings.calendarGraceMode as 'COMPANY_STANDARD' | 'CUSTOM_DAYS') ?? 'COMPANY_STANDARD',
             calendarGraceDays: settings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
             rhGraceHours: settings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
             rhLeadTimeHours: settings.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
           };
 
-          if ((settings as any).settingsMode === 'CUSTOM') {
+          if (settings.settingsMode === 'CUSTOM') {
             graceEntry.calendarGraceMode = 'CUSTOM_DAYS';
             graceEntry.vesselCalendarGraceConfig = {
-              graceMethod: (settings as any).calendarGraceMethod || 'FIXED_DAYS',
-              graceValue: (settings as any).calendarGraceValue ?? 7,
-              scope: (settings as any).calendarGraceScope || 'ALL_WORK_ORDERS',
-              fallbackMethod: (settings as any).calendarFallbackMethod || null,
-              fallbackGraceDays: (settings as any).calendarFallbackGraceDays ?? null,
+              graceMethod: (settings.calendarGraceMethod || 'FIXED_DAYS') as CompanyStandardGraceConfig['graceMethod'],
+              graceValue: settings.calendarGraceValue ?? 7,
+              scope: (settings.calendarGraceScope || 'ALL_WORK_ORDERS') as CompanyStandardGraceConfig['scope'],
+              fallbackMethod: settings.calendarFallbackMethod as CompanyStandardGraceConfig['graceMethod'] | null,
+              fallbackGraceDays: settings.calendarFallbackGraceDays ?? null,
             };
             graceEntry.vesselRhGraceConfig = {
-              graceMethod: (settings as any).rhGraceMethod || 'FIXED_HOURS',
-              graceValue: (settings as any).rhGraceValue ?? 168,
-              scope: (settings as any).rhGraceScope || 'ALL_WORK_ORDERS',
-              fallbackMethod: (settings as any).rhFallbackMethod || null,
-              fallbackGraceHours: (settings as any).rhFallbackGraceHours ?? null,
+              graceMethod: (settings.rhGraceMethod || 'FIXED_HOURS') as 'FIXED_HOURS' | 'MONTH_END' | 'SPECIFIC_DATE_NEXT_MONTH',
+              graceValue: settings.rhGraceValue ?? 168,
+              scope: (settings.rhGraceScope || 'ALL_WORK_ORDERS') as 'ALL_WORK_ORDERS' | 'LAST_WEEK_OF_MONTH',
+              fallbackMethod: settings.rhFallbackMethod as 'MONTH_END' | 'FIXED_HOURS' | null,
+              fallbackGraceHours: settings.rhFallbackGraceHours ?? null,
             };
           }
 

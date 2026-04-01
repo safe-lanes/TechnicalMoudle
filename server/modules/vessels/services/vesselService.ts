@@ -1,6 +1,6 @@
 import * as repo from '../repositories/vesselRepository';
 import { NotFoundError, ValidationError, ConflictError } from '../../shared/errors';
-import type { Fleet, Vessel, PmsVesselSettings, FleetClass } from '@shared/schema';
+import type { Fleet, Vessel, PmsVesselSettings, InsertPmsVesselSettings, FleetClass } from '@shared/schema';
 import { randomUUID } from 'crypto';
 
 // ── Fleet operations ──
@@ -238,15 +238,12 @@ export async function updatePmsVesselSettings(vesselId: string, data: Record<str
     throw new ValidationError(`Invalid settingsMode: ${settingsMode}. Must be COMPANY_STANDARD or CUSTOM`);
   }
 
-  const persistData: Record<string, any> = {
-    vesselId,
-    settingsMode,
-    calendarLeadDaysCritical: Math.max(1, Math.round(data.calendarLeadDaysCritical ?? 7)),
-    calendarLeadDaysNonCritical: Math.max(1, Math.round(data.calendarLeadDaysNonCritical ?? 14)),
-    rhLeadHoursCritical: Math.max(1, Math.round(data.rhLeadHoursCritical ?? 50)),
-    rhLeadHoursNonCritical: Math.max(1, Math.round(data.rhLeadHoursNonCritical ?? 100)),
-    updatedBy,
-  };
+  const calLeadCrit = Math.max(1, Math.round(data.calendarLeadDaysCritical ?? 7));
+  const calLeadNonCrit = Math.max(1, Math.round(data.calendarLeadDaysNonCritical ?? 14));
+  const rhLeadCrit = Math.max(1, Math.round(data.rhLeadHoursCritical ?? 50));
+  const rhLeadNonCrit = Math.max(1, Math.round(data.rhLeadHoursNonCritical ?? 100));
+
+  let persistData: InsertPmsVesselSettings;
 
   if (settingsMode === 'CUSTOM') {
     const validCalMethods = ['FIXED_DAYS', 'MONTH_END', 'SPECIFIC_DATE_NEXT_MONTH'];
@@ -261,28 +258,24 @@ export async function updatePmsVesselSettings(vesselId: string, data: Record<str
     if (!validScopes.includes(calScope)) {
       throw new ValidationError(`Invalid calendar grace scope: ${calScope}`);
     }
-    const calValue = data.calendarGraceValue ?? 7;
+    const calValue = Math.max(0, Math.round(data.calendarGraceValue ?? 7));
+    if (calMethod === 'FIXED_DAYS' && calValue < 1) {
+      throw new ValidationError('Fixed Days requires a positive grace value');
+    }
     if (calMethod === 'SPECIFIC_DATE_NEXT_MONTH' && (calValue < 1 || calValue > 28)) {
       throw new ValidationError('Specific Date of Next Month requires a day value between 1 and 28');
     }
 
-    persistData.calendarGraceMethod = calMethod;
-    persistData.calendarGraceValue = calMethod === 'MONTH_END' ? 0 : calValue;
-    persistData.calendarGraceScope = calScope;
-    persistData.calendarGraceMode = 'CUSTOM_DAYS';
-    persistData.calendarGraceDays = calMethod === 'FIXED_DAYS' ? calValue : 7;
-
+    let calFallbackMethod: string | null = null;
+    let calFallbackDays: number | null = null;
     if (calScope === 'LAST_WEEK_OF_MONTH') {
       const validCalFallbacks = ['MONTH_END', 'FIXED_DAYS'];
       const calFb = data.calendarFallbackMethod || 'MONTH_END';
       if (!validCalFallbacks.includes(calFb)) {
         throw new ValidationError(`Invalid calendar fallback method: ${calFb}`);
       }
-      persistData.calendarFallbackMethod = calFb;
-      persistData.calendarFallbackGraceDays = calFb === 'FIXED_DAYS' ? (data.calendarFallbackGraceDays ?? 0) : null;
-    } else {
-      persistData.calendarFallbackMethod = null;
-      persistData.calendarFallbackGraceDays = null;
+      calFallbackMethod = calFb;
+      calFallbackDays = calFb === 'FIXED_DAYS' ? Math.max(0, Math.round(data.calendarFallbackGraceDays ?? 0)) : null;
     }
 
     const rhMethod = data.rhGraceMethod || 'FIXED_HOURS';
@@ -293,45 +286,74 @@ export async function updatePmsVesselSettings(vesselId: string, data: Record<str
     if (!validScopes.includes(rhScope)) {
       throw new ValidationError(`Invalid RH grace scope: ${rhScope}`);
     }
-    const rhValue = data.rhGraceValue ?? 168;
+    const rhValue = Math.max(0, Math.round(data.rhGraceValue ?? 168));
+    if (rhMethod === 'FIXED_HOURS' && rhValue < 1) {
+      throw new ValidationError('Fixed Hours requires a positive RH grace value');
+    }
     if (rhMethod === 'SPECIFIC_DATE_NEXT_MONTH' && (rhValue < 1 || rhValue > 28)) {
       throw new ValidationError('Specific Date of Next Month requires a day value between 1 and 28');
     }
 
-    persistData.rhGraceMethod = rhMethod;
-    persistData.rhGraceValue = rhMethod === 'MONTH_END' ? 0 : rhValue;
-    persistData.rhGraceScope = rhScope;
-    persistData.rhGraceHours = rhMethod === 'FIXED_HOURS' ? rhValue : 168;
-
+    let rhFallbackMethod: string | null = null;
+    let rhFallbackHours: number | null = null;
     if (rhScope === 'LAST_WEEK_OF_MONTH') {
       const validRhFallbacks = ['MONTH_END', 'FIXED_HOURS'];
       const rhFb = data.rhFallbackMethod || 'MONTH_END';
       if (!validRhFallbacks.includes(rhFb)) {
         throw new ValidationError(`Invalid RH fallback method: ${rhFb}`);
       }
-      persistData.rhFallbackMethod = rhFb;
-      persistData.rhFallbackGraceHours = rhFb === 'FIXED_HOURS' ? (data.rhFallbackGraceHours ?? 0) : null;
-    } else {
-      persistData.rhFallbackMethod = null;
-      persistData.rhFallbackGraceHours = null;
+      rhFallbackMethod = rhFb;
+      rhFallbackHours = rhFb === 'FIXED_HOURS' ? Math.max(0, Math.round(data.rhFallbackGraceHours ?? 0)) : null;
     }
+
+    persistData = {
+      vesselId,
+      settingsMode,
+      calendarLeadDaysCritical: calLeadCrit,
+      calendarLeadDaysNonCritical: calLeadNonCrit,
+      rhLeadHoursCritical: rhLeadCrit,
+      rhLeadHoursNonCritical: rhLeadNonCrit,
+      calendarGraceMode: 'CUSTOM_DAYS',
+      calendarGraceDays: calMethod === 'FIXED_DAYS' ? calValue : 7,
+      calendarGraceMethod: calMethod,
+      calendarGraceValue: calMethod === 'MONTH_END' ? 0 : calValue,
+      calendarGraceScope: calScope,
+      calendarFallbackMethod: calFallbackMethod,
+      calendarFallbackGraceDays: calFallbackDays,
+      rhGraceHours: rhMethod === 'FIXED_HOURS' ? rhValue : 168,
+      rhGraceMethod: rhMethod,
+      rhGraceValue: rhMethod === 'MONTH_END' ? 0 : rhValue,
+      rhGraceScope: rhScope,
+      rhFallbackMethod: rhFallbackMethod,
+      rhFallbackGraceHours: rhFallbackHours,
+      updatedBy,
+    };
   } else {
-    persistData.calendarGraceMode = 'COMPANY_STANDARD';
-    persistData.calendarGraceDays = data.calendarGraceDays ?? 7;
-    persistData.calendarGraceMethod = data.calendarGraceMethod || 'FIXED_DAYS';
-    persistData.calendarGraceValue = data.calendarGraceValue ?? 7;
-    persistData.calendarGraceScope = data.calendarGraceScope || 'ALL_WORK_ORDERS';
-    persistData.calendarFallbackMethod = null;
-    persistData.calendarFallbackGraceDays = null;
-    persistData.rhGraceHours = data.rhGraceHours ?? 168;
-    persistData.rhGraceMethod = data.rhGraceMethod || 'FIXED_HOURS';
-    persistData.rhGraceValue = data.rhGraceValue ?? 168;
-    persistData.rhGraceScope = data.rhGraceScope || 'ALL_WORK_ORDERS';
-    persistData.rhFallbackMethod = null;
-    persistData.rhFallbackGraceHours = null;
+    persistData = {
+      vesselId,
+      settingsMode,
+      calendarLeadDaysCritical: calLeadCrit,
+      calendarLeadDaysNonCritical: calLeadNonCrit,
+      rhLeadHoursCritical: rhLeadCrit,
+      rhLeadHoursNonCritical: rhLeadNonCrit,
+      calendarGraceMode: 'COMPANY_STANDARD',
+      calendarGraceDays: data.calendarGraceDays ?? 7,
+      calendarGraceMethod: 'FIXED_DAYS',
+      calendarGraceValue: 7,
+      calendarGraceScope: 'ALL_WORK_ORDERS',
+      calendarFallbackMethod: null,
+      calendarFallbackGraceDays: null,
+      rhGraceHours: data.rhGraceHours ?? 168,
+      rhGraceMethod: 'FIXED_HOURS',
+      rhGraceValue: 168,
+      rhGraceScope: 'ALL_WORK_ORDERS',
+      rhFallbackMethod: null,
+      rhFallbackGraceHours: null,
+      updatedBy,
+    };
   }
 
-  const settings = await repo.createOrUpdatePmsVesselSettings(persistData as any);
+  const settings = await repo.createOrUpdatePmsVesselSettings(persistData);
 
   // Trigger immediate status recalculation when grace period settings change
   let recalcResult: { statusesUpdated: number } | undefined;
