@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +62,8 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
     vessel: (globalFilters?.vessels?.length === 1 ? globalFilters.vessels[0] : "all"),
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
+  const [globalVessels, setGlobalVessels] = useState<string[]>(globalFilters?.vessels || []);
+  const [globalComponent, setGlobalComponent] = useState<string>(globalFilters?.component || "");
   const [equipmentTypeFilter, setEquipmentTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
@@ -72,6 +74,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
 
   useEffect(() => {
     if (globalFilters?.vessels) {
+      setGlobalVessels(globalFilters.vessels);
       const v = globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : "all";
       setCategoryFilters(prev => ({ ...prev, vessel: v }));
     }
@@ -82,6 +85,12 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
       setCategoryFilters(prev => ({ ...prev, dateRange: globalFilters.dateRange }));
     }
   }, [globalFilters?.dateRange]);
+
+  useEffect(() => {
+    if (globalFilters) {
+      setGlobalComponent(globalFilters.component || "");
+    }
+  }, [globalFilters?.component]);
 
   useEffect(() => {
     if (embedded && selectedReportId) {
@@ -127,6 +136,23 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
       return res.json();
     },
   });
+
+  const filteredMasterList = useMemo(() => {
+    if (!masterListData?.equipment) return masterListData;
+    let result = masterListData.equipment;
+    if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
+      result = result.filter((e: any) => !e.vesselId || globalVessels.includes(e.vesselId));
+    }
+    if (globalComponent) {
+      const q = globalComponent.toLowerCase();
+      result = result.filter((e: any) => {
+        const name = (e.equipmentName || e.name || "").toLowerCase();
+        const code = (e.equipmentCode || e.code || "").toLowerCase();
+        return name.includes(q) || code.includes(q);
+      });
+    }
+    return { ...masterListData, equipment: result };
+  }, [masterListData, globalVessels, globalComponent, vessels.length]);
 
   const reports: LsaFfaReport[] = [
     {

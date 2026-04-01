@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,8 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
     vessel: (globalFilters?.vessels?.length === 1 ? globalFilters.vessels[0] : "all"),
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
+  const [globalVessels, setGlobalVessels] = useState<string[]>(globalFilters?.vessels || []);
+  const [globalComponent, setGlobalComponent] = useState<string>(globalFilters?.component || "");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const [viewingReport, setViewingReport] = useState<string | null>(null);
   const { toast } = useToast();
@@ -61,6 +63,7 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
 
   useEffect(() => {
     if (globalFilters?.vessels) {
+      setGlobalVessels(globalFilters.vessels);
       const v = globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : "all";
       setCategoryFilters(prev => ({ ...prev, vessel: v }));
     }
@@ -71,6 +74,12 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
       setCategoryFilters(prev => ({ ...prev, dateRange: globalFilters.dateRange }));
     }
   }, [globalFilters?.dateRange]);
+
+  useEffect(() => {
+    if (globalFilters) {
+      setGlobalComponent(globalFilters.component || "");
+    }
+  }, [globalFilters?.component]);
 
   useEffect(() => {
     if (embedded && selectedReportId) {

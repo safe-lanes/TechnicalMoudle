@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +62,8 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
     vessel: (globalFilters?.vessels?.length === 1 ? globalFilters.vessels[0] : "all"),
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
+  const [globalVessels, setGlobalVessels] = useState<string[]>(globalFilters?.vessels || []);
+  const [globalComponent, setGlobalComponent] = useState<string>(globalFilters?.component || "");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
   const { toast } = useToast();
@@ -70,6 +72,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
 
   useEffect(() => {
     if (globalFilters?.vessels) {
+      setGlobalVessels(globalFilters.vessels);
       const v = globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : "all";
       setCategoryFilters(prev => ({ ...prev, vessel: v }));
     }
@@ -80,6 +83,12 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
       setCategoryFilters(prev => ({ ...prev, dateRange: globalFilters.dateRange }));
     }
   }, [globalFilters?.dateRange]);
+
+  useEffect(() => {
+    if (globalFilters) {
+      setGlobalComponent(globalFilters.component || "");
+    }
+  }, [globalFilters?.component]);
 
   const effectiveVesselId = categoryFilters.vessel === 'all' 
     ? 'all' 
@@ -112,6 +121,30 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
       return res.json();
     },
   });
+
+  const filteredWorkOrders = useMemo(() => {
+    let result = workOrders;
+    if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
+      result = result.filter((wo: any) => globalVessels.includes(wo.vesselId));
+    }
+    if (globalComponent) {
+      const q = globalComponent.toLowerCase();
+      result = result.filter((wo: any) => {
+        const compName = (wo.componentName || wo.component || "").toLowerCase();
+        const compCode = (wo.componentCode || "").toLowerCase();
+        return compName.includes(q) || compCode.includes(q);
+      });
+    }
+    return result;
+  }, [workOrders, globalVessels, globalComponent, vessels.length]);
+
+  const filteredDefects = useMemo(() => {
+    let result = defects;
+    if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
+      result = result.filter((d: any) => !d.vesselId || globalVessels.includes(d.vesselId));
+    }
+    return result;
+  }, [defects, globalVessels, vessels.length]);
 
   const reports: AdminReport[] = [
     {

@@ -31,6 +31,20 @@ export interface FilterValues {
   };
 }
 
+interface ComponentRecord {
+  id?: string;
+  name?: string;
+  componentName?: string;
+  componentCode?: string;
+  code?: string;
+}
+
+interface ComponentSuggestion {
+  id: string;
+  name: string;
+  code: string;
+}
+
 interface GlobalFiltersProps {
   filters: FilterValues;
   onFiltersChange: (filters: FilterValues) => void;
@@ -67,33 +81,52 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
   const componentInputRef = useRef<HTMLInputElement>(null);
   const componentDropdownRef = useRef<HTMLDivElement>(null);
 
-  const effectiveVesselForComponents = useMemo(() => {
-    if (filters.vessels.length === 1) return filters.vessels[0];
-    return "all";
-  }, [filters.vessels]);
+  const selectedVesselIds = useMemo(() => {
+    if (filters.vessels.length === 0 || filters.vessels.length === vessels.length) {
+      return vessels.map(v => v.id);
+    }
+    return filters.vessels;
+  }, [filters.vessels, vessels]);
 
-  const { data: componentsRaw = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/components', effectiveVesselForComponents],
+  const { data: componentsRaw = [] } = useQuery<ComponentRecord[]>({
+    queryKey: ['/technical/api/components', selectedVesselIds],
     queryFn: async () => {
-      if (effectiveVesselForComponents === "all") return [];
-      const res = await fetch(`/technical/api/components/${effectiveVesselForComponents}`, { credentials: 'include' });
-      if (!res.ok) return [];
-      return res.json();
+      const idsToFetch = selectedVesselIds;
+      if (idsToFetch.length === 0) return [];
+      const results: ComponentRecord[] = [];
+      const seen = new Set<string>();
+      await Promise.all(
+        idsToFetch.map(async (vid) => {
+          try {
+            const res = await fetch(`/technical/api/components/${vid}`, { credentials: 'include' });
+            if (!res.ok) return;
+            const data: ComponentRecord[] = await res.json();
+            for (const c of data) {
+              const key = c.componentCode || c.code || c.name || c.componentName || "";
+              if (key && !seen.has(key)) {
+                seen.add(key);
+                results.push(c);
+              }
+            }
+          } catch { /* skip failed vessel */ }
+        })
+      );
+      return results;
     },
-    enabled: effectiveVesselForComponents !== "all",
+    enabled: selectedVesselIds.length > 0,
   });
 
-  const componentSuggestions = useMemo(() => {
+  const componentSuggestions = useMemo((): ComponentSuggestion[] => {
     if (!componentInput.trim() || componentInput.length < 2) return [];
     const q = componentInput.toLowerCase();
     return (componentsRaw || [])
-      .filter((c: any) => {
+      .filter((c: ComponentRecord) => {
         const name = (c.name || c.componentName || "").toLowerCase();
         const code = (c.componentCode || c.code || "").toLowerCase();
         return name.includes(q) || code.includes(q);
       })
       .slice(0, 10)
-      .map((c: any) => ({
+      .map((c: ComponentRecord) => ({
         id: c.id || c.componentCode || "",
         name: c.name || c.componentName || "",
         code: c.componentCode || c.code || "",

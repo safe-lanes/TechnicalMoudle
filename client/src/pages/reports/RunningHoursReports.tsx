@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +63,8 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
     vessel: (globalFilters?.vessels?.length === 1 ? globalFilters.vessels[0] : "all"),
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
+  const [globalVessels, setGlobalVessels] = useState<string[]>(globalFilters?.vessels || []);
+  const [globalComponent, setGlobalComponent] = useState<string>(globalFilters?.component || "");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
   const { toast } = useToast();
@@ -71,6 +73,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
 
   useEffect(() => {
     if (globalFilters?.vessels) {
+      setGlobalVessels(globalFilters.vessels);
       const v = globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : "all";
       setCategoryFilters(prev => ({ ...prev, vessel: v }));
     }
@@ -81,6 +84,12 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
       setCategoryFilters(prev => ({ ...prev, dateRange: globalFilters.dateRange }));
     }
   }, [globalFilters?.dateRange]);
+
+  useEffect(() => {
+    if (globalFilters) {
+      setGlobalComponent(globalFilters.component || "");
+    }
+  }, [globalFilters?.component]);
 
   useEffect(() => {
     if (embedded && selectedReportId) {
@@ -120,6 +129,22 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
     queryKey: ['/technical/api/running-hours', effectiveVesselId],
     enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
   });
+
+  const filteredComponents = useMemo(() => {
+    let result = components;
+    if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
+      result = result.filter((c: any) => !c.vesselId || globalVessels.includes(c.vesselId));
+    }
+    if (globalComponent) {
+      const q = globalComponent.toLowerCase();
+      result = result.filter((c: any) => {
+        const name = (c.name || c.componentName || "").toLowerCase();
+        const code = (c.componentCode || c.code || "").toLowerCase();
+        return name.includes(q) || code.includes(q);
+      });
+    }
+    return result;
+  }, [components, globalVessels, globalComponent, vessels.length]);
 
   const reports: RunningHoursReport[] = [
     {

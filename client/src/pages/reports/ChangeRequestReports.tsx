@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -124,6 +124,8 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
     vessel: (globalFilters?.vessels?.length === 1 ? globalFilters.vessels[0] : "all"),
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
+  const [globalVessels, setGlobalVessels] = useState<string[]>(globalFilters?.vessels || []);
+  const [globalComponent, setGlobalComponent] = useState<string>(globalFilters?.component || "");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
@@ -134,6 +136,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
 
   useEffect(() => {
     if (globalFilters?.vessels) {
+      setGlobalVessels(globalFilters.vessels);
       const v = globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : "all";
       setCategoryFilters(prev => ({ ...prev, vessel: v }));
     }
@@ -144,6 +147,12 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
       setCategoryFilters(prev => ({ ...prev, dateRange: globalFilters.dateRange }));
     }
   }, [globalFilters?.dateRange]);
+
+  useEffect(() => {
+    if (globalFilters) {
+      setGlobalComponent(globalFilters.component || "");
+    }
+  }, [globalFilters?.component]);
 
   useEffect(() => {
     if (embedded && selectedReportId) {
@@ -186,6 +195,22 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
       return res.json();
     },
   });
+
+  const filteredRequests = useMemo(() => {
+    if (!reportData?.requests) return [];
+    let result = reportData.requests;
+    if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
+      result = result.filter(r => !r.vessel?.id || globalVessels.includes(r.vessel.id));
+    }
+    if (globalComponent) {
+      const q = globalComponent.toLowerCase();
+      result = result.filter(r => {
+        const target = (r.targetInfo?.name || "").toLowerCase();
+        return target.includes(q);
+      });
+    }
+    return result;
+  }, [reportData?.requests, globalVessels, globalComponent, vessels.length]);
 
   const reports: ChangeRequestReport[] = [
     {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +57,8 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
     vessel: (globalFilters?.vessels?.length === 1 ? globalFilters.vessels[0] : "all"),
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
+  const [globalVessels, setGlobalVessels] = useState<string[]>(globalFilters?.vessels || []);
+  const [globalComponent, setGlobalComponent] = useState<string>(globalFilters?.component || "");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
   const { toast } = useToast();
@@ -65,6 +67,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
 
   useEffect(() => {
     if (globalFilters?.vessels) {
+      setGlobalVessels(globalFilters.vessels);
       const v = globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : "all";
       setCategoryFilters(prev => ({ ...prev, vessel: v }));
     }
@@ -75,6 +78,12 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
       setCategoryFilters(prev => ({ ...prev, dateRange: globalFilters.dateRange }));
     }
   }, [globalFilters?.dateRange]);
+
+  useEffect(() => {
+    if (globalFilters) {
+      setGlobalComponent(globalFilters.component || "");
+    }
+  }, [globalFilters?.component]);
 
   const effectiveVesselId = categoryFilters.vessel === 'all' 
     ? 'all' 
@@ -107,6 +116,22 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
       return res.json();
     },
   });
+
+  const filteredCertificates = useMemo(() => {
+    let result = certificates;
+    if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
+      result = result.filter((c: any) => !c.vesselId || globalVessels.includes(c.vesselId));
+    }
+    return result;
+  }, [certificates, globalVessels, vessels.length]);
+
+  const filteredSurveys = useMemo(() => {
+    let result = surveys;
+    if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
+      result = result.filter((s: any) => !s.vesselId || globalVessels.includes(s.vesselId));
+    }
+    return result;
+  }, [surveys, globalVessels, vessels.length]);
 
   const reports: ComplianceReport[] = [
     {

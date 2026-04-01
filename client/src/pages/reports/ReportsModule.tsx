@@ -264,7 +264,6 @@ const ReportsModule = () => {
   }, [vesselId]);
 
   const handleClearAll = () => {
-    setSearchQuery("");
     handleFiltersReset();
   };
 

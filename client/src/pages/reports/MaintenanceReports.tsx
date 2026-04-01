@@ -66,6 +66,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     vessel: (globalFilters?.vessels?.length === 1 ? globalFilters.vessels[0] : "all"),
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
+  const [globalVessels, setGlobalVessels] = useState<string[]>(globalFilters?.vessels || []);
+  const [globalComponent, setGlobalComponent] = useState<string>(globalFilters?.component || "");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -75,6 +77,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
   useEffect(() => {
     if (globalFilters?.vessels) {
+      setGlobalVessels(globalFilters.vessels);
       const v = globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : "all";
       setCategoryFilters(prev => ({ ...prev, vessel: v }));
     }
@@ -85,6 +88,12 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       setCategoryFilters(prev => ({ ...prev, dateRange: globalFilters.dateRange }));
     }
   }, [globalFilters?.dateRange]);
+
+  useEffect(() => {
+    if (globalFilters) {
+      setGlobalComponent(globalFilters.component || "");
+    }
+  }, [globalFilters?.component]);
 
   useEffect(() => {
     if (embedded && selectedReportId) {
@@ -1374,19 +1383,33 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   };
 
   const filteredWorkOrders = useMemo(() => {
-    if (!categoryFilters.dateRange?.from && !categoryFilters.dateRange?.to) return workOrders;
-    return workOrders.filter((wo: any) => {
-      if (!wo.dueDate) return false;
-      const dueDate = new Date(wo.dueDate);
-      if (categoryFilters.dateRange.from && dueDate < categoryFilters.dateRange.from) return false;
-      if (categoryFilters.dateRange.to) {
-        const endOfDay = new Date(categoryFilters.dateRange.to);
-        endOfDay.setHours(23, 59, 59, 999);
-        if (dueDate > endOfDay) return false;
-      }
-      return true;
-    });
-  }, [workOrders, categoryFilters.dateRange]);
+    let result = workOrders;
+    if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
+      result = result.filter((wo: any) => globalVessels.includes(wo.vesselId));
+    }
+    if (globalComponent) {
+      const q = globalComponent.toLowerCase();
+      result = result.filter((wo: any) => {
+        const compName = (wo.componentName || wo.component || "").toLowerCase();
+        const compCode = (wo.componentCode || "").toLowerCase();
+        return compName.includes(q) || compCode.includes(q);
+      });
+    }
+    if (categoryFilters.dateRange?.from || categoryFilters.dateRange?.to) {
+      result = result.filter((wo: any) => {
+        if (!wo.dueDate) return false;
+        const dueDate = new Date(wo.dueDate);
+        if (categoryFilters.dateRange.from && dueDate < categoryFilters.dateRange.from) return false;
+        if (categoryFilters.dateRange.to) {
+          const endOfDay = new Date(categoryFilters.dateRange.to);
+          endOfDay.setHours(23, 59, 59, 999);
+          if (dueDate > endOfDay) return false;
+        }
+        return true;
+      });
+    }
+    return result;
+  }, [workOrders, categoryFilters.dateRange, globalVessels, globalComponent, vessels.length]);
 
   const isDateRangeActive = !!(categoryFilters.dateRange?.from || categoryFilters.dateRange?.to);
 

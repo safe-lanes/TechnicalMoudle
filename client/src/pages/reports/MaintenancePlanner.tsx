@@ -121,14 +121,15 @@ interface MaintenancePlannerProps {
 
 export default function MaintenancePlanner({ onBack, globalFilters }: MaintenancePlannerProps) {
   const { vesselId: contextVesselId, setVesselId, vessels } = useVessel();
-  const vesselId = globalFilters?.vessels?.length === 1
-    ? globalFilters.vessels[0]
-    : (globalFilters?.vessels?.length === 0 ? 'all' : contextVesselId);
+  const globalVessels = globalFilters?.vessels || [];
+  const globalComponent = globalFilters?.component || "";
+  const vesselId = globalVessels.length === 1
+    ? globalVessels[0]
+    : (globalVessels.length === 0 ? 'all' : contextVesselId);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { isSailAdmin, isClientAdmin } = useUIRole();
 
-  // Filter state
   const [jobType, setJobType] = useState<string>("BOTH");
   const [dateWindow, setDateWindow] = useState<string>("30");
   const [rhWindow, setRhWindow] = useState<string>("500");
@@ -201,12 +202,31 @@ export default function MaintenancePlanner({ onBack, globalFilters }: Maintenanc
   const totalPages = Math.ceil(totalJobs / pageSize);
   
   // Calculate paginated jobs
-  const paginatedJobs = useMemo(() => {
+  const filteredPlannerJobs = useMemo(() => {
     if (!data?.jobs) return [];
+    let result = data.jobs;
+    if (globalVessels.length > 0 && globalVessels.length < (vessels?.length || 0)) {
+      result = result.filter(job => {
+        const jobVessel = (job as PlannerJob & { vesselId?: string }).vesselId;
+        return !jobVessel || globalVessels.includes(jobVessel);
+      });
+    }
+    if (globalComponent) {
+      const q = globalComponent.toLowerCase();
+      result = result.filter(job => {
+        const name = (job.componentName || "").toLowerCase();
+        const code = (job.componentCode || "").toLowerCase();
+        return name.includes(q) || code.includes(q);
+      });
+    }
+    return result;
+  }, [data?.jobs, globalVessels, globalComponent, vessels?.length]);
+
+  const paginatedJobs = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
-    return data.jobs.slice(startIndex, endIndex);
-  }, [data?.jobs, currentPage, pageSize]);
+    return filteredPlannerJobs.slice(startIndex, endIndex);
+  }, [filteredPlannerJobs, currentPage, pageSize]);
 
   // Extract unique ranks from jobs data for dynamic filter (similar to WorkOrders)
   const uniqueRanks = useMemo(() => {

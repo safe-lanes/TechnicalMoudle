@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +62,8 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
     vessel: (globalFilters?.vessels?.length === 1 ? globalFilters.vessels[0] : "all"),
     dateRange: globalFilters?.dateRange || { from: null, to: null }
   });
+  const [globalVessels, setGlobalVessels] = useState<string[]>(globalFilters?.vessels || []);
+  const [globalComponent, setGlobalComponent] = useState<string>(globalFilters?.component || "");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [classItemFilter, setClassItemFilter] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
@@ -72,6 +74,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
 
   useEffect(() => {
     if (globalFilters?.vessels) {
+      setGlobalVessels(globalFilters.vessels);
       const v = globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : "all";
       setCategoryFilters(prev => ({ ...prev, vessel: v }));
     }
@@ -82,6 +85,12 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
       setCategoryFilters(prev => ({ ...prev, dateRange: globalFilters.dateRange }));
     }
   }, [globalFilters?.dateRange]);
+
+  useEffect(() => {
+    if (globalFilters) {
+      setGlobalComponent(globalFilters.component || "");
+    }
+  }, [globalFilters?.component]);
 
   useEffect(() => {
     if (embedded && selectedReportId) {
@@ -129,6 +138,23 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
 
   const isLoading = componentsLoading || scheduleLoading;
   const error = !componentsData && !scheduleData && !isLoading;
+
+  const filteredComponentsData = useMemo(() => {
+    if (!componentsData?.components) return componentsData;
+    let result = componentsData.components;
+    if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
+      result = result.filter((c: any) => !c.vesselId || globalVessels.includes(c.vesselId));
+    }
+    if (globalComponent) {
+      const q = globalComponent.toLowerCase();
+      result = result.filter((c: any) => {
+        const name = (c.componentName || c.name || "").toLowerCase();
+        const code = (c.componentCode || c.code || "").toLowerCase();
+        return name.includes(q) || code.includes(q);
+      });
+    }
+    return { ...componentsData, components: result };
+  }, [componentsData, globalVessels, globalComponent, vessels.length]);
 
   const reports: CriticalEquipmentReport[] = [
     {
