@@ -1,0 +1,215 @@
+TASK: ANALYSIS AND CORRECTION – FLEET COMPONENT TREE SORTING + UI ALIGNMENT (REFINED SCOPE)
+
+Objective:
+
+1. Investigate incorrect sorting in Fleet Component Tree  
+2. Fix “2 series” appearing at bottom  
+3. Implement correct sorting logic  
+4. Align ONLY UI styling (padding, color, format) with Component section (do NOT copy buttons)
+
+--------------------------------------------------
+
+1. Root Cause (Confirmed)
+
+Primary Issue:
+
+• Component Code stored as **string (varchar)**  
+• Sorting applied as:
+
+  ORDER BY component_code  
+
+Result:
+
+• Lexicographical sorting (string-based), NOT numeric
+
+Example issue:
+
+"1, 10, 100, 2" instead of "1, 2, 10, 100"
+
+--------------------------------------------------
+
+2. Final Sorting Decision
+
+Implement **Natural Sorting (Recommended)**
+
+Reason:
+1
+10
+100
+100.001
+2
+20
+201
+201.001
+
+• Supports:
+  - Numeric codes  
+  - Alphanumeric codes  
+  - Mixed formats  
+
+--------------------------------------------------
+
+3. Corrective Plan – Sorting
+
+A. Backend Fix (Mandatory)
+
+Replace:
+
+  ORDER BY component_code  
+
+With Natural Sort Logic:
+
+Option 1 (if numeric-heavy):
+
+  ORDER BY 
+    CASE 
+      WHEN component_code ~ '^[0-9]+$' 
+      THEN CAST(component_code AS INT) 
+    END,
+    component_code
+
+--------------------------------------------------
+
+Option 2 (Full Natural Sort – Preferred)
+
+• Split numeric and text portions  
+• Sort numeric parts as integers  
+
+(Implementation depends on DB: PostgreSQL / MySQL / etc.)
+
+--------------------------------------------------
+
+B. Hierarchy Sorting (Important)
+
+• Apply sorting **within each parent level**
+
+Meaning:
+
+• Same parent → children sorted  
+• Different parents → independent sorting  
+
+--------------------------------------------------
+
+C. Frontend Validation
+
+• Ensure tree component:
+
+  - Does NOT re-sort data  
+  - Uses backend order as-is  
+
+--------------------------------------------------
+
+D. Data Normalization
+
+• Trim spaces  
+• Standardize format  
+• Handle leading zeros consistently  
+
+--------------------------------------------------
+
+4. Why “2 Series” Going Bottom
+
+Root Cause:
+
+• String comparison:
+
+  "2" > "100" → FALSE in numeric  
+  BUT TRUE in string sorting  
+
+Hence pushed after larger prefixes like "10", "100"
+
+--------------------------------------------------
+
+5. UI Alignment Scope (STRICT)
+
+⚠️ Only apply:
+
+• Padding  
+• Color  
+• Format  
+
+❌ Do NOT copy:
+
+• Buttons  
+• Functional controls  
+• Additional actions  
+
+--------------------------------------------------
+
+6. UI Alignment Plan
+
+A. Padding
+
+• Match spacing between:
+
+  - Tree nodes  
+  - Sections  
+  - Containers  
+
+• Ensure consistent:
+
+  - Left indentation  
+  - Vertical spacing  
+
+--------------------------------------------------
+
+B. Color
+
+Match:
+
+• Background color  
+• Tree node hover color  
+• Selected node highlight color  
+• Border colors  
+
+--------------------------------------------------
+
+C. Typography
+
+• Same font size  
+• Same font weight  
+• Same line height  
+
+--------------------------------------------------
+
+D. Layout Format
+
+• Section alignment  
+• Container width  
+• Tree panel structure  
+
+--------------------------------------------------
+
+E. Tree Visual Behavior
+
+• Same expand/collapse icons  
+• Same indentation levels  
+• Same selection highlight  
+
+--------------------------------------------------
+
+7. Validation
+
+Sorting:
+
+• Test with:
+  - 1,2,10,20,100  
+  - A1, A2, A10  
+  - Mixed values  
+
+UI:
+
+• Compare visually with Component section:
+  - Padding match  
+  - Color match  
+  - Structure match  
+
+--------------------------------------------------
+
+Expected Result:
+
+• Fleet Component Tree sorted in natural logical order  
+• “2 series” appears in correct position  
+• No inconsistent ordering  
+• UI visually aligned (padding, color, format only)  
+• No functional UI duplication  
