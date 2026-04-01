@@ -1,0 +1,256 @@
+We need to align the Work Order generation and status transition logic in the PMS with the intended business rules.
+
+Before making any changes, do not directly implement new logic. First, inspect the current system behavior and tell us exactly:
+
+What logic is currently being followed for work order generation.
+
+What logic is currently being followed for Planned / Due / Grace / Overdue status movement.
+
+How vessel-level Lead Time settings are currently being used.
+
+How vessel-level Grace Period settings are currently being used.
+
+Whether the current logic is using any company-level standard grace rule or fallback rule.
+
+Where the current implementation deviates from the business rules described below.
+
+Which modules, services, queries, cron logic, or frontend filters are impacted if we change this.
+
+This step is mandatory because the Admin module already has Lead Time & Grace Period Settings with vessel-specific configuration and a visible Company Standard Grace Rule, so we need to understand existing behavior before implementing anything and avoid conflicts.
+
+Business rules to be followed
+Below are the core business rules that the PMS should follow.
+
+1) Planned Work Order generation rule
+Work Orders must be generated in advance before they become due.
+
+Required rule:
+
+For date-based jobs, Work Orders should be generated 30 days in advance from the due date.
+
+For running-hours-based jobs, Work Orders should be generated 720 hours in advance from the due point.
+
+These generated Work Orders must appear under the “Planned” tab in the Work Order sub-module.
+
+2) Due transition rule
+Each vessel has a Lead Time setting.
+
+Required rule:
+
+Once the job enters the vessel’s configured Lead Time window, the Work Order must become Due.
+
+At that point, it must move from the Planned tab to the Due tab.
+
+This means:
+
+Planned = generated early but not yet inside due action window.
+
+Due = now within operational action window defined by vessel Lead Time.
+
+3) Grace Period rule
+Each vessel has a Grace Period setting.
+
+Required rule:
+
+After the actual Due Date has passed, the Work Order should not immediately move to the Overdue tab if the vessel still has active grace period days/hours remaining.
+
+During that grace period, the Work Order must still be visibly marked with the existing “Grace P” marker, as presently shown in the system.
+
+Important:
+
+During grace period, it should be treated as past due date but still within grace allowance.
+
+The existing visible Grace P marker behavior should be preserved conceptually.
+
+4) Overdue transition rule
+Required rule:
+
+Once the configured Grace Period has fully expired, the Work Order must become Overdue.
+
+At that point it must appear under the “Overdue” tab.
+
+This is the final transition after the grace window ends.
+
+Expected status lifecycle
+The intended lifecycle should therefore be:
+
+Work Order generated
+
+30 days before due date for date-based jobs
+
+720 hours before due point for running-hours-based jobs
+
+Appears in Planned
+
+Work Order enters Lead Time window
+
+As per vessel-specific Lead Time setting
+
+Moves to Due
+
+Due date passes
+
+If grace period exists and is still active, show with Grace P marker
+
+Do not move to final Overdue yet
+
+Grace period expires
+
+Move to Overdue
+
+Show under Overdue tab
+
+Important interpretation rule
+Please validate whether the system currently distinguishes clearly between:
+
+generation date
+
+due window date
+
+actual due date
+
+grace expiry date
+
+It is critical that these are not mixed together.
+
+The intended logic is:
+
+Generation trigger = early WO creation point
+
+Due trigger = vessel Lead Time threshold
+
+Grace trigger = starts after actual due date
+
+Overdue trigger = after grace expiry
+
+If the current system is collapsing any of these into one status or using wrong dates for status movement, identify that clearly.
+
+What I want from you first
+Before implementing, provide a proper analysis in this structure:
+
+A. Current logic being followed
+Explain exactly what the code currently does for:
+
+WO generation
+
+Planned tab
+
+Due tab
+
+Grace period
+
+Overdue tab
+
+Running-hours jobs
+
+Date-based jobs
+
+Vessel lead time
+
+Vessel grace period
+
+Company standard grace rule
+
+B. Deviation from required business rules
+Compare current logic vs required logic and list:
+
+what matches,
+
+what partially matches,
+
+what is wrong,
+
+what is missing,
+
+what may create conflict.
+
+C. Impacted areas
+List which areas will be affected if we implement this properly, for example:
+
+backend status calculation logic,
+
+WO generation scheduler,
+
+tab filtering logic,
+
+API responses,
+
+admin lead/grace settings usage,
+
+running hours due calculation,
+
+frontend labels/markers,
+
+reports/dashboard counts.
+
+D. Proposed implementation approach
+Only after the above analysis, propose how to safely implement the correct business logic without breaking existing data or UI behavior.
+
+Do not directly code the final change until this analysis is presented.
+
+Business logic details to respect
+Date-based jobs
+Generate WO at due date minus 30 days.
+
+Show in Planned until Lead Time window starts.
+
+Move to Due when within vessel Lead Time.
+
+After due date, show Grace P while within grace.
+
+After grace expires, move to Overdue.
+
+Running-hours-based jobs
+Generate WO at due running hours minus 720 hours.
+
+Show in Planned until within vessel running-hours Lead Time window.
+
+Move to Due when within vessel Lead Time threshold for running-hours jobs.
+
+If due point is crossed, grace logic should apply as per configured vessel rule for running-hours-based jobs as applicable in system design.
+
+After grace expires, move to Overdue.
+
+If the current data model uses separate lead/grace units for date-based and hour-based jobs, identify that clearly. The Admin page already shows examples like “Lead: 7d / 50hrs,” so we need to understand how the existing dual-unit setup is currently wired and how it should map to the above rules.
+
+Conflict check
+Because the Admin module currently shows:
+
+vessel-level lead/grace configuration,
+
+configured vs not configured vessels,
+
+and a company standard grace rule,
+
+please specifically verify:
+
+whether company standard grace rule overrides vessel grace,
+
+whether it is fallback only,
+
+whether it is active by default,
+
+whether it affects overdue transition today,
+
+whether it conflicts with the required business rule above.
+
+Final instruction
+Do not make assumptions.
+
+First inspect the current implementation and respond with:
+
+what it is following now,
+
+where it is deviating,
+
+what conflicts exist,
+
+and what exact changes should be made.
+
+Only after that should implementation begin.
+
+The goal is to ensure the PMS follows this exact lifecycle:
+
+Generated early -> Planned -> Due by vessel Lead Time -> Grace P after due date within grace -> Overdue after grace expiry
+
+and that this is applied consistently for both date-based and running-hours-based work orders.
