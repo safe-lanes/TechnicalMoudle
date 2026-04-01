@@ -3259,7 +3259,7 @@ export const plannerDates = pgTable("planner_dates", {
   isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdateFn(() => new Date()),
 }, (table) => ({
   uniqueJobComponent: unique("unique_planner_date_entry").on(table.vesselId, table.jobId, table.componentId),
 }));

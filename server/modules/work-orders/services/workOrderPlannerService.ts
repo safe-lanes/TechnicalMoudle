@@ -320,7 +320,7 @@ export async function savePlannedDate(vesselId: string, jobId: string, component
 
   if (existing.length > 0) {
     await database.update(plannerDates)
-      .set({ plannedDate: plannedDate || null, updatedAt: new Date() })
+      .set({ plannedDate: plannedDate || null })
       .where(
         and(
           eq(plannerDates.vesselId, vesselId),
@@ -385,7 +385,7 @@ export async function bulkSavePlannedDate(
 
       if (existing.length > 0) {
         await tx.update(plannerDates)
-          .set({ plannedDate, updatedAt: new Date() })
+          .set({ plannedDate })
           .where(
             and(
               eq(plannerDates.vesselId, vesselId),
