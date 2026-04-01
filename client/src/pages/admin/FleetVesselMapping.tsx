@@ -140,9 +140,24 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     enabled: !!selectedVessel && activeTab === "components",
   });
 
+  const structuralParentCodes = useMemo(() => {
+    const parentCodes = new Set<string>();
+    vesselComponentsData.forEach((vc) => {
+      if (vc.parentId) {
+        const parentComp = vesselComponentsData.find(
+          (c: any) => c.id === vc.parentId || c.componentCode === vc.parentId
+        );
+        if (parentComp) {
+          parentCodes.add(parentComp.componentCode || parentComp.id);
+        }
+      }
+    });
+    return parentCodes;
+  }, [vesselComponentsData]);
+
   const vesselComponentsNonParent = useMemo(
-    () => vesselComponentsData.filter((c) => c.isParent === false),
-    [vesselComponentsData]
+    () => vesselComponentsData.filter((c) => !structuralParentCodes.has(c.componentCode || c.id)),
+    [vesselComponentsData, structuralParentCodes]
   );
 
   const { data: fleetJobsData = [], isLoading: isLoadingFleetJobs } = useQuery<FleetJobs[]>({
@@ -359,6 +374,10 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
       } else {
         roots.push(node);
       }
+    });
+
+    nodeMap.forEach((node) => {
+      node.isParent = node.children.length > 0;
     });
 
     const sortNodes = (nodes: VesselTreeNode[]) => {
