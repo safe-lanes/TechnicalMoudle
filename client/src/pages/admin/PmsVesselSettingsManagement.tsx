@@ -26,28 +26,36 @@ interface CompanyGraceSettings {
   scope: string;
   fallbackGraceDays: number | null;
   fallbackMethod: string | null;
+  calendarLeadDaysCritical: number;
+  calendarLeadDaysNonCritical: number;
+  rhLeadHoursCritical: number;
+  rhLeadHoursNonCritical: number;
+  rhGraceHours: number;
   configured: boolean;
 }
 
-function formatCompanyGraceSummary(settings: CompanyGraceSettings): string {
+function formatCalendarGraceLabel(settings: CompanyGraceSettings): string {
   const methodLabel =
-    settings.graceMethod === 'FIXED_DAYS' ? `Fixed ${settings.graceValue} days` :
+    settings.graceMethod === 'FIXED_DAYS' ? `Fixed ${settings.graceValue}d` :
     settings.graceMethod === 'MONTH_END' ? 'Month End' :
-    settings.graceMethod === 'SPECIFIC_DATE_NEXT_MONTH' ? `${settings.graceValue}${getOrdinalSuffix(settings.graceValue || 1)} of next month` :
+    settings.graceMethod === 'SPECIFIC_DATE_NEXT_MONTH' ? `${settings.graceValue}${getOrdinalSuffix(settings.graceValue || 1)} next mo` :
     'Unknown';
 
   if (settings.scope === 'ALL_WORK_ORDERS') {
-    return `${methodLabel} for all WOs`;
+    return methodLabel;
   }
 
-  const fallbackMethodStr = settings.fallbackMethod || 'MONTH_END';
-  const fallbackLabel = fallbackMethodStr === 'MONTH_END'
-    ? 'Month End for remaining WOs'
-    : fallbackMethodStr === 'FIXED_DAYS'
-    ? `${settings.fallbackGraceDays ?? 0} days grace for remaining WOs`
-    : 'no fallback set';
+  const fb = settings.fallbackMethod || 'MONTH_END';
+  const fbLabel = fb === 'MONTH_END' ? 'Month End' : fb === 'FIXED_DAYS' ? `${settings.fallbackGraceDays ?? 0}d` : '—';
+  return `${methodLabel} (last wk); ${fbLabel} (others)`;
+}
 
-  return `${methodLabel} for WOs due in last week of month; ${fallbackLabel}`;
+function formatCompanyStandardSummary(settings: CompanyGraceSettings): string {
+  const calLead = `${settings.calendarLeadDaysCritical ?? 7}d / ${settings.calendarLeadDaysNonCritical ?? 14}d`;
+  const calGrace = formatCalendarGraceLabel(settings);
+  const rhLead = `${settings.rhLeadHoursCritical ?? 720}h / ${settings.rhLeadHoursNonCritical ?? 720}h`;
+  const rhGrace = `${settings.rhGraceHours ?? 168}h`;
+  return `Cal Lead: ${calLead} · Cal Grace: ${calGrace} · RH Lead: ${rhLead} · RH Grace: ${rhGrace}`;
 }
 
 function getOrdinalSuffix(n: number): string {
@@ -79,6 +87,11 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
     scope: 'LAST_WEEK_OF_MONTH',
     fallbackGraceDays: 0 as number | null,
     fallbackMethod: 'MONTH_END' as string | null,
+    calendarLeadDaysCritical: 7,
+    calendarLeadDaysNonCritical: 14,
+    rhLeadHoursCritical: 720,
+    rhLeadHoursNonCritical: 720,
+    rhGraceHours: 168,
   });
 
   const { data: vessels = [], isLoading: isVesselsLoading } = useVessels();
@@ -170,6 +183,11 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
         scope: companyGraceSettings.scope || 'LAST_WEEK_OF_MONTH',
         fallbackGraceDays: companyGraceSettings.fallbackGraceDays ?? 0,
         fallbackMethod: companyGraceSettings.fallbackMethod || 'MONTH_END',
+        calendarLeadDaysCritical: companyGraceSettings.calendarLeadDaysCritical ?? 7,
+        calendarLeadDaysNonCritical: companyGraceSettings.calendarLeadDaysNonCritical ?? 14,
+        rhLeadHoursCritical: companyGraceSettings.rhLeadHoursCritical ?? 720,
+        rhLeadHoursNonCritical: companyGraceSettings.rhLeadHoursNonCritical ?? 720,
+        rhGraceHours: companyGraceSettings.rhGraceHours ?? 168,
       });
     }
     setIsCompanyGraceDialogOpen(true);
@@ -287,7 +305,7 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
             </Button>
             {companyGraceSettings && (
               <p className="text-sm text-gray-600" data-testid="text-company-grace-summary">
-                {formatCompanyGraceSummary(companyGraceSettings)}
+                {formatCompanyStandardSummary(companyGraceSettings)}
               </p>
             )}
           </div>
@@ -437,7 +455,7 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
                   </Select>
                   {formData.calendarGraceMode === 'COMPANY_STANDARD' && companyGraceSettings && (
                     <p className="text-xs text-blue-600 mt-1">
-                      {formatCompanyGraceSummary(companyGraceSettings)}
+                      {formatCompanyStandardSummary(companyGraceSettings)}
                     </p>
                   )}
                 </div>
@@ -556,165 +574,263 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
       </Dialog>
 
       <Dialog open={isCompanyGraceDialogOpen} onOpenChange={setIsCompanyGraceDialogOpen}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5 text-blue-600" />
-              Company Standard Grace Settings
+              Company Standard Settings
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-6 py-4">
-            <div className="space-y-3">
-              <Label className="text-sm font-semibold text-gray-900">Grace Method</Label>
-              <p className="text-xs text-gray-500">Select how the grace period is calculated for calendar-based work orders.</p>
-              <div className="space-y-2">
-                {[
-                  { value: 'FIXED_DAYS', label: 'Fixed Days', desc: 'Grace period is a fixed number of days after due date' },
-                  { value: 'MONTH_END', label: 'Month End', desc: 'Grace extends to the end of the month the WO is due' },
-                  { value: 'SPECIFIC_DATE_NEXT_MONTH', label: 'Specific Date of Next Month', desc: 'Grace extends to a specific day of the following month' },
-                ].map(option => (
-                  <label
-                    key={option.value}
-                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      companyGraceForm.graceMethod === option.value
-                        ? 'border-blue-400 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    data-testid={`radio-grace-method-${option.value.toLowerCase()}`}
-                  >
-                    <input
-                      type="radio"
-                      name="graceMethod"
-                      value={option.value}
-                      checked={companyGraceForm.graceMethod === option.value}
-                      onChange={() => setCompanyGraceForm({...companyGraceForm, graceMethod: option.value})}
-                      className="mt-0.5"
-                    />
-                    <div>
-                      <span className="text-sm font-medium text-gray-900">{option.label}</span>
-                      <p className="text-xs text-gray-500 mt-0.5">{option.desc}</p>
-                    </div>
-                  </label>
-                ))}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 border-b pb-2">
+                <Calendar className="h-5 w-5 text-blue-600" />
+                <h3 className="font-semibold text-gray-900">Calendar-Based Jobs</h3>
               </div>
 
-              {companyGraceForm.graceMethod === 'FIXED_DAYS' && (
-                <div className="ml-7 mt-2">
-                  <Label className="text-sm text-gray-700">Number of grace days</Label>
-                  <div className="mt-1 flex items-center gap-2">
-                    <Input
-                      type="number"
-                      min={1}
-                      max={365}
-                      value={companyGraceForm.graceValue}
-                      onChange={(e) => setCompanyGraceForm({...companyGraceForm, graceValue: parseInt(e.target.value) || 1})}
-                      className="w-24"
-                      data-testid="input-grace-fixed-days"
-                    />
-                    <span className="text-sm text-gray-500">days</span>
-                  </div>
-                </div>
-              )}
-
-              {companyGraceForm.graceMethod === 'SPECIFIC_DATE_NEXT_MONTH' && (
-                <div className="ml-7 mt-2">
-                  <Label className="text-sm text-gray-700">Day of the next month</Label>
-                  <div className="mt-1 flex items-center gap-2">
-                    <Input
-                      type="number"
-                      min={1}
-                      max={28}
-                      value={companyGraceForm.graceValue}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value) || 1;
-                        setCompanyGraceForm({...companyGraceForm, graceValue: Math.min(28, Math.max(1, val))});
-                      }}
-                      className="w-24"
-                      data-testid="input-grace-day-of-month"
-                    />
-                    <span className="text-sm text-gray-500">of next month (1-28)</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="border-t pt-4 space-y-3">
-              <Label className="text-sm font-semibold text-gray-900">Scope</Label>
-              <p className="text-xs text-gray-500">Select which work orders this grace rule applies to.</p>
-              <div className="space-y-2">
-                {[
-                  { value: 'ALL_WORK_ORDERS', label: 'Apply to all Work Orders', desc: 'The selected grace method applies to all calendar-based WOs' },
-                  { value: 'LAST_WEEK_OF_MONTH', label: 'Apply only to WOs due in last week of month', desc: 'The grace method applies only to WOs due in the last 7 days of the month' },
-                ].map(option => (
-                  <label
-                    key={option.value}
-                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      companyGraceForm.scope === option.value
-                        ? 'border-blue-400 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    data-testid={`radio-grace-scope-${option.value.toLowerCase()}`}
-                  >
-                    <input
-                      type="radio"
-                      name="graceScope"
-                      value={option.value}
-                      checked={companyGraceForm.scope === option.value}
-                      onChange={() => setCompanyGraceForm({...companyGraceForm, scope: option.value})}
-                      className="mt-0.5"
-                    />
-                    <div>
-                      <span className="text-sm font-medium text-gray-900">{option.label}</span>
-                      <p className="text-xs text-gray-500 mt-0.5">{option.desc}</p>
+              <div>
+                <Label className="text-sm font-semibold text-gray-700">Lead Time</Label>
+                <div className="grid grid-cols-2 gap-4 mt-2">
+                  <div>
+                    <Label className="text-xs text-gray-500">Critical Jobs</Label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={companyGraceForm.calendarLeadDaysCritical}
+                        onChange={(e) => setCompanyGraceForm({...companyGraceForm, calendarLeadDaysCritical: parseInt(e.target.value) || 1})}
+                        className="w-24"
+                        data-testid="input-company-cal-lead-critical"
+                      />
+                      <span className="text-sm text-gray-500">days</span>
                     </div>
-                  </label>
-                ))}
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Non-Critical Jobs</Label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={companyGraceForm.calendarLeadDaysNonCritical}
+                        onChange={(e) => setCompanyGraceForm({...companyGraceForm, calendarLeadDaysNonCritical: parseInt(e.target.value) || 1})}
+                        className="w-24"
+                        data-testid="input-company-cal-lead-noncritical"
+                      />
+                      <span className="text-sm text-gray-500">days</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {companyGraceForm.scope === 'LAST_WEEK_OF_MONTH' && (
-                <div className="ml-7 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <Label className="text-sm font-medium text-amber-900">Fallback for WOs not due in last week of month</Label>
-                  <p className="text-xs text-amber-700 mt-0.5 mb-2">
-                    This covers all remaining work orders that fall outside the last week.
-                  </p>
+              <div className="border-t pt-3 space-y-3">
+                <Label className="text-sm font-semibold text-gray-700">Grace Period</Label>
+                <p className="text-xs text-gray-500">Select how the grace period is calculated for calendar-based work orders.</p>
+                <div className="space-y-2">
+                  {[
+                    { value: 'FIXED_DAYS', label: 'Fixed Days', desc: 'Grace period is a fixed number of days after due date' },
+                    { value: 'MONTH_END', label: 'Month End', desc: 'Grace extends to the end of the month the WO is due' },
+                    { value: 'SPECIFIC_DATE_NEXT_MONTH', label: 'Specific Date of Next Month', desc: 'Grace extends to a specific day of the following month' },
+                  ].map(option => (
+                    <label
+                      key={option.value}
+                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        companyGraceForm.graceMethod === option.value
+                          ? 'border-blue-400 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      data-testid={`radio-grace-method-${option.value.toLowerCase()}`}
+                    >
+                      <input
+                        type="radio"
+                        name="graceMethod"
+                        value={option.value}
+                        checked={companyGraceForm.graceMethod === option.value}
+                        onChange={() => setCompanyGraceForm({...companyGraceForm, graceMethod: option.value})}
+                        className="mt-0.5"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">{option.label}</span>
+                        <p className="text-xs text-gray-500 mt-0.5">{option.desc}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                {companyGraceForm.graceMethod === 'FIXED_DAYS' && (
+                  <div className="ml-7 mt-2">
+                    <Label className="text-sm text-gray-700">Number of grace days</Label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={companyGraceForm.graceValue}
+                        onChange={(e) => setCompanyGraceForm({...companyGraceForm, graceValue: parseInt(e.target.value) || 1})}
+                        className="w-24"
+                        data-testid="input-grace-fixed-days"
+                      />
+                      <span className="text-sm text-gray-500">days</span>
+                    </div>
+                  </div>
+                )}
+
+                {companyGraceForm.graceMethod === 'SPECIFIC_DATE_NEXT_MONTH' && (
+                  <div className="ml-7 mt-2">
+                    <Label className="text-sm text-gray-700">Day of the next month</Label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={28}
+                        value={companyGraceForm.graceValue}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 1;
+                          setCompanyGraceForm({...companyGraceForm, graceValue: Math.min(28, Math.max(1, val))});
+                        }}
+                        className="w-24"
+                        data-testid="input-grace-day-of-month"
+                      />
+                      <span className="text-sm text-gray-500">of next month (1-28)</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="border-t pt-3 space-y-3">
+                  <Label className="text-sm font-semibold text-gray-700">Scope</Label>
+                  <p className="text-xs text-gray-500">Select which work orders this grace rule applies to.</p>
                   <div className="space-y-2">
                     {[
-                      { value: 'MONTH_END', label: 'Month End', desc: 'Grace until end of due month' },
-                      { value: 'FIXED_DAYS', label: 'Fixed Days', desc: 'Set a specific number of grace days' },
+                      { value: 'ALL_WORK_ORDERS', label: 'Apply to all Work Orders', desc: 'The selected grace method applies to all calendar-based WOs' },
+                      { value: 'LAST_WEEK_OF_MONTH', label: 'Apply only to WOs due in last week of month', desc: 'The grace method applies only to WOs due in the last 7 days of the month' },
                     ].map(option => (
-                      <label key={option.value} className="flex items-start gap-2 cursor-pointer">
+                      <label
+                        key={option.value}
+                        className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                          companyGraceForm.scope === option.value
+                            ? 'border-blue-400 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                        data-testid={`radio-grace-scope-${option.value.toLowerCase()}`}
+                      >
                         <input
                           type="radio"
-                          name="fallbackMethod"
-                          checked={companyGraceForm.fallbackMethod === option.value}
-                          onChange={() => setCompanyGraceForm({...companyGraceForm, fallbackMethod: option.value})}
-                          className="mt-1"
-                          data-testid={`radio-fallback-${option.value.toLowerCase()}`}
+                          name="graceScope"
+                          value={option.value}
+                          checked={companyGraceForm.scope === option.value}
+                          onChange={() => setCompanyGraceForm({...companyGraceForm, scope: option.value})}
+                          className="mt-0.5"
                         />
                         <div>
-                          <span className="text-sm font-medium text-amber-900">{option.label}</span>
-                          <p className="text-xs text-amber-700">{option.desc}</p>
+                          <span className="text-sm font-medium text-gray-900">{option.label}</span>
+                          <p className="text-xs text-gray-500 mt-0.5">{option.desc}</p>
                         </div>
                       </label>
                     ))}
-                    {companyGraceForm.fallbackMethod === 'FIXED_DAYS' && (
-                      <div className="flex items-center gap-2 ml-6">
-                        <Input
-                          type="number"
-                          min={0}
-                          max={365}
-                          value={companyGraceForm.fallbackGraceDays ?? 0}
-                          onChange={(e) => setCompanyGraceForm({...companyGraceForm, fallbackGraceDays: parseInt(e.target.value) || 0})}
-                          className="w-24"
-                          data-testid="input-grace-fallback-days"
-                        />
-                        <span className="text-sm text-gray-500">days</span>
+                  </div>
+
+                  {companyGraceForm.scope === 'LAST_WEEK_OF_MONTH' && (
+                    <div className="ml-7 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <Label className="text-sm font-medium text-amber-900">Fallback for WOs not due in last week of month</Label>
+                      <p className="text-xs text-amber-700 mt-0.5 mb-2">
+                        This covers all remaining work orders that fall outside the last week.
+                      </p>
+                      <div className="space-y-2">
+                        {[
+                          { value: 'MONTH_END', label: 'Month End', desc: 'Grace until end of due month' },
+                          { value: 'FIXED_DAYS', label: 'Fixed Days', desc: 'Set a specific number of grace days' },
+                        ].map(option => (
+                          <label key={option.value} className="flex items-start gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="fallbackMethod"
+                              checked={companyGraceForm.fallbackMethod === option.value}
+                              onChange={() => setCompanyGraceForm({...companyGraceForm, fallbackMethod: option.value})}
+                              className="mt-1"
+                              data-testid={`radio-fallback-${option.value.toLowerCase()}`}
+                            />
+                            <div>
+                              <span className="text-sm font-medium text-amber-900">{option.label}</span>
+                              <p className="text-xs text-amber-700">{option.desc}</p>
+                            </div>
+                          </label>
+                        ))}
+                        {companyGraceForm.fallbackMethod === 'FIXED_DAYS' && (
+                          <div className="flex items-center gap-2 ml-6">
+                            <Input
+                              type="number"
+                              min={0}
+                              max={365}
+                              value={companyGraceForm.fallbackGraceDays ?? 0}
+                              onChange={(e) => setCompanyGraceForm({...companyGraceForm, fallbackGraceDays: parseInt(e.target.value) || 0})}
+                              className="w-24"
+                              data-testid="input-grace-fallback-days"
+                            />
+                            <span className="text-sm text-gray-500">days</span>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 border-b pb-2">
+                <Gauge className="h-5 w-5 text-orange-600" />
+                <h3 className="font-semibold text-gray-900">Running Hours Based Jobs</h3>
+              </div>
+
+              <div>
+                <Label className="text-sm font-semibold text-gray-700">Lead Time</Label>
+                <div className="grid grid-cols-2 gap-4 mt-2">
+                  <div>
+                    <Label className="text-xs text-gray-500">Critical Jobs</Label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={companyGraceForm.rhLeadHoursCritical}
+                        onChange={(e) => setCompanyGraceForm({...companyGraceForm, rhLeadHoursCritical: parseInt(e.target.value) || 1})}
+                        className="w-24"
+                        data-testid="input-company-rh-lead-critical"
+                      />
+                      <span className="text-sm text-gray-500">hours</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Non-Critical Jobs</Label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={companyGraceForm.rhLeadHoursNonCritical}
+                        onChange={(e) => setCompanyGraceForm({...companyGraceForm, rhLeadHoursNonCritical: parseInt(e.target.value) || 1})}
+                        className="w-24"
+                        data-testid="input-company-rh-lead-noncritical"
+                      />
+                      <span className="text-sm text-gray-500">hours</span>
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
+
+              <div className="border-t pt-3">
+                <Label className="text-sm font-semibold text-gray-700">Grace Period</Label>
+                <div className="mt-2 flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={companyGraceForm.rhGraceHours}
+                    onChange={(e) => setCompanyGraceForm({...companyGraceForm, rhGraceHours: parseInt(e.target.value) || 0})}
+                    className="w-24"
+                    data-testid="input-company-rh-grace"
+                  />
+                  <span className="text-sm text-gray-500">hours after due</span>
+                  <span className="text-xs text-gray-400">(≈ {Math.round(companyGraceForm.rhGraceHours / 24)} days)</span>
+                </div>
+              </div>
             </div>
           </div>
 

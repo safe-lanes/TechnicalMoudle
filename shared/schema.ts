@@ -1875,6 +1875,12 @@ export const companyStandardGraceSettings = pgTable("company_standard_grace_sett
   fallbackGraceDays: integer("fallback_grace_days"),
   fallbackMethod: text("fallback_method").default("MONTH_END"),
 
+  calendarLeadDaysCritical: integer("calendar_lead_days_critical").notNull().default(7),
+  calendarLeadDaysNonCritical: integer("calendar_lead_days_non_critical").notNull().default(14),
+  rhLeadHoursCritical: integer("rh_lead_hours_critical").notNull().default(720),
+  rhLeadHoursNonCritical: integer("rh_lead_hours_non_critical").notNull().default(720),
+  rhGraceHours: integer("rh_grace_hours").notNull().default(168),
+
   updatedBy: text("updated_by").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

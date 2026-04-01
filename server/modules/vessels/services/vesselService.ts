@@ -263,6 +263,11 @@ const COMPANY_GRACE_DEFAULTS = {
   scope: 'LAST_WEEK_OF_MONTH' as const,
   fallbackGraceDays: null as number | null,
   fallbackMethod: 'MONTH_END' as string | null,
+  calendarLeadDaysCritical: 7,
+  calendarLeadDaysNonCritical: 14,
+  rhLeadHoursCritical: 720,
+  rhLeadHoursNonCritical: 720,
+  rhGraceHours: 168,
 };
 
 export async function getCompanyStandardGraceSettings() {
@@ -307,12 +312,23 @@ export async function upsertCompanyStandardGraceSettings(data: any, username: st
     }
   }
 
+  const calendarLeadCrit = data.calendarLeadDaysCritical != null ? Math.max(1, Math.round(data.calendarLeadDaysCritical)) : 7;
+  const calendarLeadNonCrit = data.calendarLeadDaysNonCritical != null ? Math.max(1, Math.round(data.calendarLeadDaysNonCritical)) : 14;
+  const rhLeadCrit = data.rhLeadHoursCritical != null ? Math.max(1, Math.round(data.rhLeadHoursCritical)) : 720;
+  const rhLeadNonCrit = data.rhLeadHoursNonCritical != null ? Math.max(1, Math.round(data.rhLeadHoursNonCritical)) : 720;
+  const rhGrace = data.rhGraceHours != null ? Math.max(0, Math.round(data.rhGraceHours)) : 168;
+
   return repo.upsertCompanyStandardGraceSettings({
     graceMethod: data.graceMethod,
     graceValue: data.graceMethod === 'MONTH_END' ? null : data.graceValue,
     scope: data.scope,
     fallbackGraceDays: data.scope === 'LAST_WEEK_OF_MONTH' && fallbackMethod === 'FIXED_DAYS' ? data.fallbackGraceDays : null,
     fallbackMethod: data.scope === 'LAST_WEEK_OF_MONTH' ? fallbackMethod : null,
+    calendarLeadDaysCritical: calendarLeadCrit,
+    calendarLeadDaysNonCritical: calendarLeadNonCrit,
+    rhLeadHoursCritical: rhLeadCrit,
+    rhLeadHoursNonCritical: rhLeadNonCrit,
+    rhGraceHours: rhGrace,
     updatedBy: username,
   });
 }
