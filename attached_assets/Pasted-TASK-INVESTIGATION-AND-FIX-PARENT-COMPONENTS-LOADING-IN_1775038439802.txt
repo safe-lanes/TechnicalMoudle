@@ -1,0 +1,157 @@
+TASK: INVESTIGATION AND FIX – PARENT COMPONENTS LOADING IN AUTO MATCH SCREEN
+
+Objective:
+
+Identify why **Parent Components (is_parent = Yes)** are appearing in the **Component Auto Match Screen**, even though only **is_parent = No / NULL** components should be loaded.  
+Provide a detailed corrective solution.
+
+--------------------------------------------------
+
+1. Expected Logic
+
+• Only components where:
+
+  is_parent = No OR is_parent IS NULL  
+
+should be loaded in Auto Match screen.
+
+• Components where:
+
+  is_parent = Yes  
+
+must be strictly excluded.
+
+--------------------------------------------------
+
+2. Current Issue
+
+• Parent components (is_parent = Yes) are visible in the screen  
+• This indicates filtering logic is not working correctly  
+
+--------------------------------------------------
+
+3. Investigation Areas
+
+A. Backend Query
+
+• Check the component fetch query:
+
+  - Is filter applied?
+    WHERE is_parent = 'No'
+
+• Common issues:
+  - Missing WHERE clause  
+  - Incorrect condition (e.g., != 'Yes' instead of explicit filter)  
+  - Case mismatch ('No' vs 'NO' vs null handling)  
+
+--------------------------------------------------
+
+B. NULL Handling
+
+• If is_parent is NULL for some records:
+
+  - Are NULL values treated as valid (expected)?  
+  - Are unintended records included due to improper NULL handling?
+
+Correct condition should be:
+
+  WHERE is_parent = 'No' OR is_parent IS NULL  
+
+--------------------------------------------------
+
+C. API Layer
+
+• Verify if UI is passing filter parameters  
+• Check if API is ignoring or overriding filters  
+
+--------------------------------------------------
+
+D. Frontend Filtering
+
+• Check if frontend is:
+  - Applying additional merging logic  
+  - Rendering full dataset without filtering  
+
+--------------------------------------------------
+
+E. Data Integrity Check
+
+• Validate database records:
+
+  - Are some parent components incorrectly marked?
+  - Is is_parent field inconsistent (Yes/No/Null/mixed values)?
+
+--------------------------------------------------
+
+4. Root Cause Possibilities
+
+• Missing backend filter  
+• Incorrect SQL condition  
+• NULL values not handled properly  
+• UI rendering unfiltered data  
+• Data inconsistency in is_parent field  
+
+--------------------------------------------------
+
+5. Corrective Solution
+
+A. Enforce Strict Backend Filter
+
+Update query to:
+
+  WHERE (is_parent = 'No' OR is_parent IS NULL)
+
+• Do NOT rely on frontend filtering  
+
+--------------------------------------------------
+
+B. Data Normalization
+
+• Standardize is_parent values:
+
+  - Yes / No only  
+  - Avoid NULL where possible  
+
+--------------------------------------------------
+
+C. API Enforcement
+
+• Ensure API always applies this filter  
+• Do not allow override from UI  
+
+--------------------------------------------------
+
+D. Defensive Frontend Filter (Optional)
+
+• Add secondary validation before rendering:
+
+  - Exclude is_parent = Yes  
+
+--------------------------------------------------
+
+E. Data Cleanup (If Required)
+
+• Run script to fix inconsistent data:
+
+  - Convert NULL → No (if business allows)  
+  - Remove invalid values  
+
+--------------------------------------------------
+
+6. Validation Plan
+
+Test Cases:
+
+• Verify no component with is_parent = Yes appears  
+• Verify all valid (No / NULL) components appear  
+• Test with mixed data scenarios  
+• Validate after fresh load and after refresh  
+
+--------------------------------------------------
+
+Expected Result:
+
+• Auto Match screen shows ONLY non-parent components  
+• Parent components are completely excluded  
+• Filtering works consistently across all scenarios  
+• Data integrity is maintained  
