@@ -107,6 +107,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
   useEffect(() => {
     if (embedded && selectedReportId) {
+      if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
       setPreviewData(null);
       setPreviewOpen(false);
       initialLoadRef.current = false;

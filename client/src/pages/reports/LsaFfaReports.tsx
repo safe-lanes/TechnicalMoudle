@@ -105,6 +105,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
 
   useEffect(() => {
     if (embedded && selectedReportId) {
+      if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
       setPreviewData(null);
       initialLoadRef.current = false;
       handlePreviewReport(selectedReportId).then(() => { initialLoadRef.current = true; });

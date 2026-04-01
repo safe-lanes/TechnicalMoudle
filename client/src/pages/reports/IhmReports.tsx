@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -288,18 +288,14 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
   const ihmNotPresent = ihmSummary.noIhm;
   const ihmUnknown = ihmSummary.unknown;
 
-  useEffect(() => {
-    if (embedded && selectedReportId) {
-      setViewingReport(selectedReportId);
-    }
-  }, [embedded, selectedReportId]);
-
   if (viewingReport === 'ihm-inventory-status') {
     return (
       <IhmInventoryStatusReport
         onBack={() => setViewingReport(embedded ? selectedReportId : null)}
         vesselId={effectiveVesselId || undefined}
         embedded={embedded}
+        globalVessels={globalVessels}
+        globalComponent={globalComponent}
       />
     );
   }

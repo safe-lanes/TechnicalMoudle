@@ -111,6 +111,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
 
   useEffect(() => {
     if (embedded && selectedReportId) {
+      if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
       setPreviewData(null);
       initialLoadRef.current = false;
       if (storesDetailReportIds.includes(selectedReportId)) {

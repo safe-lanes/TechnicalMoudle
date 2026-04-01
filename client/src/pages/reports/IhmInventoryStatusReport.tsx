@@ -73,12 +73,14 @@ interface IhmInventoryStatusReportProps {
   onBack: () => void;
   vesselId?: string;
   embedded?: boolean;
+  globalVessels?: string[];
+  globalComponent?: string;
 }
 
 type SortField = 'itemCode' | 'itemName' | 'itemType' | 'componentOrCategory' | 'ihmStatus' | 'evidenceType' | 'currentROB' | 'location';
 type SortDirection = 'asc' | 'desc';
 
-const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onBack, vesselId: propVesselId, embedded }) => {
+const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onBack, vesselId: propVesselId, embedded, globalVessels = [], globalComponent = "" }) => {
   const { vesselId: contextVesselId, vessels } = useVessel();
   const effectiveVesselId = propVesselId || contextVesselId;
   const { toast } = useToast();
@@ -106,6 +108,10 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
     setPage(1);
   }, [itemTypeFilter]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [globalVessels, globalComponent]);
+
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
     params.set('vesselId', effectiveVesselId || '');
@@ -130,8 +136,33 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
     enabled: !!effectiveVesselId,
   });
 
-  const summary = data?.summary || { totalItems: 0, ihmPresent: 0, noIhm: 0, unknown: 0 };
-  const items = data?.items || [];
+  const rawItems = data?.items || [];
+  const filteredByGlobal = useMemo(() => {
+    let result = rawItems;
+    if (globalVessels.length > 0 && vessels.length > 0 && globalVessels.length < vessels.length) {
+      result = result.filter((item: any) => !item.vesselId || globalVessels.includes(item.vesselId));
+    }
+    if (globalComponent) {
+      const q = globalComponent.toLowerCase();
+      result = result.filter((item: any) => {
+        const name = (item.itemName || item.componentOrCategory || "").toLowerCase();
+        const code = (item.itemCode || "").toLowerCase();
+        return name.includes(q) || code.includes(q);
+      });
+    }
+    return result;
+  }, [rawItems, globalVessels, globalComponent, vessels.length]);
+
+  const summary = useMemo(() => {
+    if (globalVessels.length === 0 && !globalComponent && data?.summary) return data.summary;
+    return {
+      totalItems: filteredByGlobal.length,
+      ihmPresent: filteredByGlobal.filter((i: any) => i.ihmStatus === 'present').length,
+      noIhm: filteredByGlobal.filter((i: any) => i.ihmStatus === 'not_present').length,
+      unknown: filteredByGlobal.filter((i: any) => i.ihmStatus !== 'present' && i.ihmStatus !== 'not_present').length,
+    };
+  }, [filteredByGlobal, globalVessels.length, globalComponent, data?.summary]);
+  const items = filteredByGlobal;
   const pagination = data?.pagination || { currentPage: 1, totalPages: 1, totalItems: 0, pageSize: 25 };
   const categoryCounts = data?.categoryCounts || { all: 0, spares: 0, stores: 0 };
 

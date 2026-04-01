@@ -103,6 +103,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
 
   useEffect(() => {
     if (embedded && selectedReportId) {
+      if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
       setPreviewData(null);
       initialLoadRef.current = false;
       handlePreviewReport(selectedReportId).then(() => { initialLoadRef.current = true; });
