@@ -329,21 +329,27 @@ export async function updatePmsVesselSettings(vesselId: string, data: Record<str
       updatedBy,
     };
   } else {
+    const companySettings = await repo.getCompanyStandardGraceSettings();
+    const companyCalLeadCrit = companySettings?.calendarLeadDaysCritical ?? 7;
+    const companyCalLeadNonCrit = companySettings?.calendarLeadDaysNonCritical ?? 14;
+    const companyRhLeadCrit = companySettings?.rhLeadHoursCritical ?? 720;
+    const companyRhLeadNonCrit = companySettings?.rhLeadHoursNonCritical ?? 720;
+
     persistData = {
       vesselId,
       settingsMode,
-      calendarLeadDaysCritical: calLeadCrit,
-      calendarLeadDaysNonCritical: calLeadNonCrit,
-      rhLeadHoursCritical: rhLeadCrit,
-      rhLeadHoursNonCritical: rhLeadNonCrit,
+      calendarLeadDaysCritical: companyCalLeadCrit,
+      calendarLeadDaysNonCritical: companyCalLeadNonCrit,
+      rhLeadHoursCritical: companyRhLeadCrit,
+      rhLeadHoursNonCritical: companyRhLeadNonCrit,
       calendarGraceMode: 'COMPANY_STANDARD',
-      calendarGraceDays: data.calendarGraceDays ?? 7,
+      calendarGraceDays: 7,
       calendarGraceMethod: 'FIXED_DAYS',
       calendarGraceValue: 7,
       calendarGraceScope: 'ALL_WORK_ORDERS',
       calendarFallbackMethod: null,
       calendarFallbackGraceDays: null,
-      rhGraceHours: data.rhGraceHours ?? 168,
+      rhGraceHours: 168,
       rhGraceMethod: 'FIXED_HOURS',
       rhGraceValue: 168,
       rhGraceScope: 'ALL_WORK_ORDERS',

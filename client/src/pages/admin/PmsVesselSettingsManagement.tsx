@@ -530,18 +530,19 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
                   <div className="space-y-4">
                     <div>
                       <Label className="text-sm font-semibold text-gray-700">Lead Time</Label>
+                      <p className="text-xs text-gray-500">Inherited from Company Standard settings.</p>
                       <div className="grid grid-cols-2 gap-4 mt-2">
                         <div>
-                          <Label className="text-xs text-gray-500">Critical Jobs</Label>
+                          <Label className="text-xs text-blue-700">Critical Jobs</Label>
                           <div className="mt-1 flex items-center gap-2">
-                            <Input type="number" min={1} value={formData.calendarLeadDaysCritical} onChange={(e) => setFormData({...formData, calendarLeadDaysCritical: parseInt(e.target.value) || 1})} className="w-24" data-testid="input-vessel-cal-lead-critical" />
+                            <Input value={`${companyGraceSettings?.calendarLeadDaysCritical ?? 7}`} disabled className="w-24 bg-blue-100/50 text-blue-900" data-testid="display-std-cal-lead-critical" />
                             <span className="text-sm text-gray-500">days</span>
                           </div>
                         </div>
                         <div>
-                          <Label className="text-xs text-gray-500">Non-Critical Jobs</Label>
+                          <Label className="text-xs text-blue-700">Non-Critical Jobs</Label>
                           <div className="mt-1 flex items-center gap-2">
-                            <Input type="number" min={1} value={formData.calendarLeadDaysNonCritical} onChange={(e) => setFormData({...formData, calendarLeadDaysNonCritical: parseInt(e.target.value) || 1})} className="w-24" data-testid="input-vessel-cal-lead-noncritical" />
+                            <Input value={`${companyGraceSettings?.calendarLeadDaysNonCritical ?? 14}`} disabled className="w-24 bg-blue-100/50 text-blue-900" data-testid="display-std-cal-lead-noncritical" />
                             <span className="text-sm text-gray-500">days</span>
                           </div>
                         </div>
@@ -581,18 +582,19 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
                   <div className="space-y-4">
                     <div>
                       <Label className="text-sm font-semibold text-gray-700">Lead Time</Label>
+                      <p className="text-xs text-gray-500">Inherited from Company Standard settings.</p>
                       <div className="grid grid-cols-2 gap-4 mt-2">
                         <div>
-                          <Label className="text-xs text-gray-500">Critical Jobs</Label>
+                          <Label className="text-xs text-orange-700">Critical Jobs</Label>
                           <div className="mt-1 flex items-center gap-2">
-                            <Input type="number" min={1} value={formData.rhLeadHoursCritical} onChange={(e) => setFormData({...formData, rhLeadHoursCritical: parseInt(e.target.value) || 1})} className="w-24" data-testid="input-vessel-rh-lead-critical" />
+                            <Input value={`${companyGraceSettings?.rhLeadHoursCritical ?? 720}`} disabled className="w-24 bg-orange-100/50 text-orange-900" data-testid="display-std-rh-lead-critical" />
                             <span className="text-sm text-gray-500">hours</span>
                           </div>
                         </div>
                         <div>
-                          <Label className="text-xs text-gray-500">Non-Critical Jobs</Label>
+                          <Label className="text-xs text-orange-700">Non-Critical Jobs</Label>
                           <div className="mt-1 flex items-center gap-2">
-                            <Input type="number" min={1} value={formData.rhLeadHoursNonCritical} onChange={(e) => setFormData({...formData, rhLeadHoursNonCritical: parseInt(e.target.value) || 1})} className="w-24" data-testid="input-vessel-rh-lead-noncritical" />
+                            <Input value={`${companyGraceSettings?.rhLeadHoursNonCritical ?? 720}`} disabled className="w-24 bg-orange-100/50 text-orange-900" data-testid="display-std-rh-lead-noncritical" />
                             <span className="text-sm text-gray-500">hours</span>
                           </div>
                         </div>
