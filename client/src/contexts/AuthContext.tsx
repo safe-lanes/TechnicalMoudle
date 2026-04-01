@@ -11,27 +11,34 @@ import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { secureGetItem } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
 
-function resolveProfileName(profile: Record<string, any>): { fullName: string | null; username: string | null; userUuid: string | null } {
-  const fullName = profile.fullName
-    || profile.full_name
-    || profile.name
-    || profile.displayName
-    || profile.display_name
-    || [profile.firstname, profile.lastname].filter(Boolean).join(' ')
-    || [profile.first_name, profile.last_name].filter(Boolean).join(' ')
-    || [profile.firstName, profile.lastName].filter(Boolean).join(' ')
-    || profile.userName
-    || null;
-  const username = profile.username
-    || profile.user_name
-    || profile.userName
-    || profile.login
-    || null;
-  const userUuid = profile.userId
-    || profile.user_id
-    || profile.uuid
-    || profile.userUuid
-    || null;
+function resolveProfileName(profile: Record<string, any>): {
+  fullName: string | null;
+  username: string | null;
+  userUuid: string | null;
+} {
+  const fullName =
+    profile.fullName ||
+    profile.full_name ||
+    profile.name ||
+    profile.displayName ||
+    profile.display_name ||
+    [profile.firstname, profile.lastname].filter(Boolean).join(" ") ||
+    [profile.first_name, profile.last_name].filter(Boolean).join(" ") ||
+    [profile.firstName, profile.lastName].filter(Boolean).join(" ") ||
+    profile.userName ||
+    null;
+  const username =
+    profile.username ||
+    profile.user_name ||
+    profile.userName ||
+    profile.login ||
+    null;
+  const userUuid =
+    profile.userId ||
+    profile.user_id ||
+    profile.uuid ||
+    profile.userUuid ||
+    null;
   return { fullName, username, userUuid };
 }
 
@@ -40,8 +47,8 @@ const DEFAULT_USER: PublicUser = {
   username: "munawer.modak",
   fullName: "Munawer A. Modak",
   email: "ayush.agrawal@safe-lanes.com",
-  role: "Sail Admin",
-  userType: "Office",
+  role: "Vessel Admin",
+  userType: "Ship",
   vesselId: null,
   department: null,
   isActive: true,
@@ -85,8 +92,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const encryptedUserType = secureGetItem<string>("userType");
 
     if (encryptedProfile && import.meta.env.DEV) {
-      console.log('[AuthContext] userProfile keys:', Object.keys(encryptedProfile));
-      console.log('[AuthContext] name-related fields:', {
+      console.log(
+        "[AuthContext] userProfile keys:",
+        Object.keys(encryptedProfile),
+      );
+      console.log("[AuthContext] name-related fields:", {
         fullName: encryptedProfile.fullName,
         full_name: encryptedProfile.full_name,
         name: encryptedProfile.name,
@@ -140,8 +150,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       if (plainProfile && import.meta.env.DEV) {
-        console.log('[AuthContext] plain userProfile keys:', Object.keys(plainProfile));
-        console.log('[AuthContext] plain name-related fields:', {
+        console.log(
+          "[AuthContext] plain userProfile keys:",
+          Object.keys(plainProfile),
+        );
+        console.log("[AuthContext] plain name-related fields:", {
           fullName: plainProfile.fullName,
           full_name: plainProfile.full_name,
           name: plainProfile.name,
