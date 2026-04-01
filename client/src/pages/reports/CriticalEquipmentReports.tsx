@@ -203,7 +203,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
 
     switch (reportId) {
       case 'critical-components-list': {
-        if (!componentsData) {
+        if (!filteredComponentsData) {
           toast({ title: "No Data", description: "No components data available to export.", variant: "destructive" });
           return;
         }
@@ -224,7 +224,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
           { header: 'Active', field: 'isActive', width: 10 }
         ];
 
-        const components = componentsData.components || [];
+        const components = filteredComponentsData.components || [];
         const tableData = components.map((comp: any, idx: number) => ({
           sno: String(idx + 1),
           componentCode: comp.componentCode || '-',
@@ -241,13 +241,12 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
           isActive: comp.isActive || '-'
         }));
 
-        const summary = componentsData.summary || {};
         const summaryItems = [
-          { label: 'Total Components', value: summary.total ?? 0 },
-          { label: 'Class Items', value: summary.classItems ?? 0 },
-          { label: 'Non-Class Items', value: summary.nonClassItems ?? 0 },
-          { label: 'Active', value: summary.activeCount ?? 0 },
-          { label: 'Inactive', value: summary.inactiveCount ?? 0 }
+          { label: 'Total Components', value: components.length },
+          { label: 'Class Items', value: components.filter((c: any) => c.classItem === 'Yes' || c.classItem === true).length },
+          { label: 'Non-Class Items', value: components.filter((c: any) => c.classItem !== 'Yes' && c.classItem !== true).length },
+          { label: 'Active', value: components.filter((c: any) => c.isActive === 'Yes' || c.isActive === true).length },
+          { label: 'Inactive', value: components.filter((c: any) => c.isActive !== 'Yes' && c.isActive !== true).length }
         ];
 
         const finalData = tableData.length > 0 ? tableData : [{ sno: '-', componentCode: '-', componentName: 'No critical components found', parentName: '-', category: '-', location: '-', maker: '-', model: '-', serialNo: '-', installationDate: '-', classItem: '-', conditionBased: '-', isActive: '-' }];
@@ -502,7 +501,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
                   Total Critical Components
                 </CardDescription>
                 <CardTitle className="text-3xl text-blue-600" data-testid="text-total-components">
-                  {isLoading ? '...' : (componentsData?.summary?.total ?? 0)}
+                  {isLoading ? '...' : (filteredComponentsData?.components?.length ?? 0)}
                 </CardTitle>
               </CardHeader>
             </Card>

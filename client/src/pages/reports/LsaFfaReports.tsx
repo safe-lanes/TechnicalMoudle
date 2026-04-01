@@ -196,7 +196,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
     const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
 
     if (reportId === 'lsa-ffa-master-list') {
-      if (!masterListData) {
+      if (!filteredMasterList) {
         toast({ title: "No Data", description: "No LSA/FFA data available to export.", variant: "destructive" });
         return;
       }
@@ -216,7 +216,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
         { header: 'Active', field: 'isActive', width: 10 }
       ];
 
-      const components = masterListData.components || [];
+      const components = filteredMasterList.equipment || filteredMasterList.components || [];
       const tableData = components.map((comp: any, idx: number) => ({
         sno: String(idx + 1),
         componentCode: comp.componentCode || '-',
@@ -232,7 +232,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
         isActive: comp.isActive || '-'
       }));
 
-      const summary = masterListData.summary || {};
+      const summary = filteredMasterList.summary || {};
       const summaryItems = [
         { label: 'Total LSA', value: summary.lsaCount ?? 0 },
         { label: 'Total FFA', value: summary.ffaCount ?? 0 },
@@ -417,7 +417,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
   };
 
   const scheduleSummary = scheduleData?.summary || {};
-  const masterSummary = masterListData?.summary || {};
+  const masterSummary = filteredMasterList?.summary || {};
   const anyLoading = isLoading || isScheduleLoading;
 
   return (
@@ -541,7 +541,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
             </Card>
           </div>
 
-          {!masterListData && !scheduleData && !anyLoading && (
+          {!filteredMasterList && !scheduleData && !anyLoading && (
             <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg" data-testid="text-error-message">
               <p className="text-red-700 dark:text-red-300 text-sm">Failed to load report data. Please try again.</p>
             </div>

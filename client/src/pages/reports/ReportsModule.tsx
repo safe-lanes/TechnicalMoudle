@@ -257,11 +257,11 @@ const ReportsModule = () => {
 
   const handleFiltersReset = useCallback(() => {
     setGlobalFilters({
-      vessels: vesselId ? [vesselId] : [],
+      vessels: [],
       component: "",
       dateRange: { from: null, to: null },
     });
-  }, [vesselId]);
+  }, []);
 
   const handleClearAll = () => {
     handleFiltersReset();

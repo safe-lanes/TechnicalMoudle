@@ -76,6 +76,9 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
   const [pendingDateTo, setPendingDateTo] = useState<Date | undefined>(undefined);
 
   const [componentInput, setComponentInput] = useState(filters.component || "");
+  useEffect(() => {
+    setComponentInput(filters.component || "");
+  }, [filters.component]);
   const [componentDropdownOpen, setComponentDropdownOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const componentInputRef = useRef<HTMLInputElement>(null);

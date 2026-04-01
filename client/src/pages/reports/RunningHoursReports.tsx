@@ -127,7 +127,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
 
   const { data: runningHours = [] } = useQuery<any[]>({
     queryKey: ['/technical/api/running-hours', effectiveVesselId],
-    enabled: !!effectiveVesselId && effectiveVesselId !== 'all',
+    enabled: !!effectiveVesselId,
   });
 
   const filteredComponents = useMemo(() => {

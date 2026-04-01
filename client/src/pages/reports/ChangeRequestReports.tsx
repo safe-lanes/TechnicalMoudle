@@ -255,7 +255,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
     }
 
     const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
-    const summary = reportData.summary;
+    const requests = filteredRequests;
 
     switch (reportId) {
       case 'change-requests-status': {
@@ -275,7 +275,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
           { header: 'Reason', field: 'reason', width: 30 }
         ];
 
-        const tableData = reportData.requests.map(req => ({
+        const tableData = requests.map(req => ({
           id: String(req.id),
           title: req.title.length > 50 ? req.title.substring(0, 47) + '...' : req.title,
           category: CATEGORY_LABELS[req.category] || req.category,
@@ -312,7 +312,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
         if (mode === 'preview') {
           setPreviewData({
             title: 'Change Requests Status & Tracking',
-            subtitle: `Comprehensive tracking report - ${reportData.requests.length} requests`,
+            subtitle: `Comprehensive tracking report - ${requests.length} requests`,
             vessel: vesselName,
             dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to),
             columns,
@@ -325,7 +325,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
         pdfReportGenerator.generateReport(
           {
             title: 'Change Requests Status & Tracking',
-            subtitle: `Comprehensive tracking report - ${reportData.requests.length} requests`,
+            subtitle: `Comprehensive tracking report - ${requests.length} requests`,
             vessel: vesselName,
             orientation: 'landscape',
             dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
