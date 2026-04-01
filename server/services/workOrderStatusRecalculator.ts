@@ -133,9 +133,16 @@ export class WorkOrderStatusRecalculatorService {
 
       // Load company standard grace config once
       const companyGraceRow = await storage.getCompanyStandardGraceSettings();
-      const companyGraceConfig: CompanyStandardGraceConfig = companyGraceRow
-        ? { graceMethod: companyGraceRow.graceMethod as any, graceValue: companyGraceRow.graceValue, scope: companyGraceRow.scope as any, fallbackGraceDays: companyGraceRow.fallbackGraceDays }
-        : DEFAULT_COMPANY_GRACE_CONFIG;
+      const validGraceMethods = ['FIXED_DAYS', 'MONTH_END', 'SPECIFIC_DATE_NEXT_MONTH'] as const;
+      const validScopes = ['ALL_WORK_ORDERS', 'LAST_WEEK_OF_MONTH'] as const;
+      let companyGraceConfig: CompanyStandardGraceConfig = DEFAULT_COMPANY_GRACE_CONFIG;
+      if (companyGraceRow) {
+        const method = validGraceMethods.find(m => m === companyGraceRow.graceMethod);
+        const scope = validScopes.find(s => s === companyGraceRow.scope);
+        if (method && scope) {
+          companyGraceConfig = { graceMethod: method, graceValue: companyGraceRow.graceValue, scope, fallbackGraceDays: companyGraceRow.fallbackGraceDays };
+        }
+      }
 
       // Prefetch vessel settings
       const vesselIds = new Set<string>();
