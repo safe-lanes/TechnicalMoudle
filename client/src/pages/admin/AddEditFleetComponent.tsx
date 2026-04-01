@@ -653,7 +653,7 @@ export default function AddEditFleetComponent() {
                           {filteredMakers.map((maker) => (
                             <div
                               key={maker.id}
-                              className="px-3 py-2 text-sm cursor-pointer hover:bg-cyan-50 hover:text-cyan-700 border-b border-gray-100 last:border-b-0"
+                              className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 hover:text-blue-700 border-b border-gray-100 last:border-b-0"
                               onMouseDown={() => handleMakerSelect(maker)}
                               data-testid={`maker-suggestion-${maker.id}`}
                             >
