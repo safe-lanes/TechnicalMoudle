@@ -1,0 +1,247 @@
+We have already added checkboxes inside the vessel filter on the Reports sub-module page, but the feature is still only partially done.
+
+Current problem
+The vessel multi-select UI has been created, but it is not functional in real time.
+
+When I tick or untick a vessel checkbox:
+
+the report data does not refresh immediately,
+
+the selected vessel data is not fetched/applied,
+
+the reports are not reacting to the changed vessel selection.
+
+So right now the vessel filter looks correct visually, but the actual filtering/data update behavior is incomplete.
+
+What needs to be fixed
+Make the multi-vessel checkbox selector fully functional in real time.
+
+This means:
+
+As soon as a vessel checkbox is ticked, the Reports module must immediately apply that vessel to the universal filter state.
+
+As soon as a vessel checkbox is unticked, that vessel must immediately be removed from the universal filter state.
+
+The report data on the page must refresh immediately based on the updated selected vessel list.
+
+Do not require any extra manual step like clicking outside, pressing enter, or reopening the report.
+
+The behavior must feel live and responsive.
+
+Product expectation
+The vessel selector is a universal filter for the entire Reports sub-module.
+
+So when a user checks one or more vessels:
+
+all reports in the Reports module must react to that updated selection,
+
+the selected vessel set must become the active dataset for the page,
+
+all report queries, report cards, tables, totals, and lists should update accordingly.
+
+This must apply across all report categories shown in Reports, not just one report section. The current page structure shows the common Reports module with categories like Maintenance & Work Orders, Running Hours & Condition, Inventory - Spares, Inventory - Stores/Lubes/Chemicals, IHM, Modify PMS, Critical Equipment, and LSA/FFA Equipment, so the vessel filter must operate as one shared top-level filter for the entire page.
+
+Required realtime behavior
+Implement the vessel checkbox interaction like this:
+
+On check
+When the user checks a vessel:
+
+immediately add that vessel to the selected vessels state,
+
+immediately trigger refresh/re-fetch/re-filter of reports,
+
+immediately show data including that vessel.
+
+On uncheck
+When the user unchecks a vessel:
+
+immediately remove that vessel from selected vessels state,
+
+immediately trigger refresh/re-fetch/re-filter of reports,
+
+immediately remove that vessel’s data from the results.
+
+No delayed apply model
+Do not make this a staged selection that only works after clicking Apply, Save, or Close.
+
+The requirement here is:
+
+checkbox tick = immediate filter action
+
+checkbox untick = immediate filter action
+
+Functional expectations
+Please correct the wiring between:
+
+the vessel checkbox UI,
+
+the selected vessel state,
+
+the report data fetching/filtering logic,
+
+the rendered report results.
+
+At the moment, the missing piece appears to be that the checkbox state change is not propagating into live report data updates.
+
+The intended logic
+Whenever vessel selection changes:
+
+update the central universal filter state for the Reports page,
+
+use the latest selected vessel IDs/names in the report query/filter pipeline,
+
+re-render the affected reports immediately.
+
+This must be a single source of truth. Do not keep separate disconnected vessel states in different components.
+
+Expected filter architecture
+The universal top filters currently visible are:
+
+Vessel selector
+
+Search component
+
+Date range
+
+Clear All.
+
+The vessel selector must work inside this universal filter framework.
+
+That means:
+
+vessel selection should combine correctly with component search and date range,
+
+report data should always reflect the latest combination of all active universal filters,
+
+the vessel filter should not behave independently from the rest of the top filters.
+
+UX requirements
+Immediate visual response
+As soon as a checkbox is ticked or unticked:
+
+the selected state in the dropdown should update,
+
+the vessel summary shown in the closed selector should update,
+
+the reports should update immediately.
+
+Loading state
+If fetching data from backend/API takes time:
+
+show a small loading state/skeleton/spinner in the report area,
+
+do not freeze the interface,
+
+do not make the user wonder whether the selection worked.
+
+No stale data
+Do not continue showing old report results after the vessel selection changed.
+The page should clearly reflect the latest selected vessels.
+
+Multiple vessel support
+This must work for:
+
+one vessel selected,
+
+multiple vessels selected,
+
+all vessels selected,
+
+all vessels removed.
+
+Edge cases to handle
+Please make sure the implementation handles these properly:
+
+Single vessel
+If only one vessel is checked, reports should show only that vessel’s data.
+
+Multiple vessels
+If multiple vessels are checked, reports should show combined results for those vessels according to current report logic.
+
+Last vessel unchecked
+If the user unchecks the last selected vessel, define and handle the expected default behavior properly.
+
+Either show no filtered data until a vessel is selected, or fall back to default behavior if that is the existing business rule.
+
+But do not leave stale previous results on screen.
+
+Rapid selection changes
+If the user quickly checks multiple vessels one after another, the system must still remain stable.
+
+Avoid race conditions, duplicate fetches, or outdated results overriding newer results.
+
+Clear All
+When Clear All is clicked, all checked vessels must immediately reset and report data must refresh immediately as well. The page already shows a Clear All control in the universal filter area, so vessel state must be linked correctly to that reset action.
+
+Technical intent
+Please inspect the existing Reports module implementation and fix the actual event-to-data flow.
+
+Possible issue areas to verify:
+
+checkbox onChange/onClick not connected properly,
+
+selected vessel state not updating in parent/global state,
+
+report query function still using old single-vessel value,
+
+API payload not receiving selected vessels array,
+
+frontend filter still expecting one vessel instead of multiple,
+
+memoization/effect dependency issue preventing refresh,
+
+data fetch not triggered when selected vessels change.
+
+Do not just patch the UI. Make the feature structurally correct.
+
+Data contract expectation
+The vessel selector is no longer single-select. So make sure the report data logic supports:
+
+array of selected vessels, or
+
+normalized multi-vessel filter structure.
+
+Any old logic that still expects only one vessel must be updated.
+
+Final acceptance criteria
+This task is complete only when all of the following are true:
+
+Ticking a vessel checkbox immediately updates the selected vessels state.
+
+Unticking a vessel checkbox immediately updates the selected vessels state.
+
+Reports refresh in real time after every checkbox change.
+
+The fetched/filtered data actually corresponds to the selected vessels.
+
+No manual Apply step is required.
+
+No stale data remains visible after vessel selection changes.
+
+Clear All resets vessel selection and refreshes reports immediately.
+
+The behavior works consistently across the full Reports module.
+
+Developer instruction
+Please fix this in the existing Reports page implementation without changing the intended UI pattern. The checkbox-based multi-vessel selector is correct directionally; the problem is that it is not functionally connected to realtime report refresh yet. Use the current Reports page structure and make the universal vessel filter truly live.
+
+After implementing, verify manually with this test:
+
+Open Reports page.
+
+Tick one vessel checkbox.
+
+Confirm report data updates immediately for that vessel.
+
+Tick another vessel checkbox.
+
+Confirm report data updates immediately to include both vessels.
+
+Untick one vessel.
+
+Confirm report data updates immediately and removes that vessel’s data.
+
+Click Clear All.
+
+Confirm all vessel selections clear and reports reset immediately.
