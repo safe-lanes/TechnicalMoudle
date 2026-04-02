@@ -497,12 +497,10 @@ export default function ShipsCertificatesAdmin() {
     const targetVessels = (vesselMasterData || [])
       .filter(v => selectedVessels.includes(v.name))
       .map(v => ({ id: String(v.id), name: v.name }));
-    const newVesselCerts = vesselOnlyCerts.filter(c => !/^VES-\d+$/.test(c.masterId));
-    const newVesselMasterIds = vesselOnlyCertsWithIds
-      .filter(c => newVesselCerts.some(nv => nv.id === c.id))
-      .map(c => c.masterId);
+    const vesselMasterIds = vesselOnlyCertsWithIds.map(c => c.masterId);
     
-    if (newVesselMasterIds.length > 0 && targetVessels.length === 0) {
+    const newVesselCerts = vesselOnlyCerts.filter(c => !/^VES-\d+$/.test(c.masterId));
+    if (newVesselCerts.length > 0 && targetVessels.length === 0) {
       toast({
         title: "Please select a vessel first",
         description: "Vessel-specific certificates require at least one vessel to be selected on the Vessel tab.",
@@ -514,7 +512,7 @@ export default function ShipsCertificatesAdmin() {
     saveMutation.mutate({ 
       certificates: allCertificates,
       deletedMasterIds: deletedMasterIds.length > 0 ? deletedMasterIds : undefined,
-      vesselSpecificCerts: newVesselMasterIds,
+      vesselSpecificCerts: vesselMasterIds,
       targetVessels: targetVessels,
     });
   };
