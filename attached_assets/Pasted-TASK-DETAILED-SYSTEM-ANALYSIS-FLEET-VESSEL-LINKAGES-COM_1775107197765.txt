@@ -1,0 +1,224 @@
+TASK: DETAILED SYSTEM ANALYSIS – FLEET ↔ VESSEL LINKAGES (COMPONENTS FOCUS)
+
+Objective:
+
+Perform a **deep functional and technical analysis** of the **Fleet and Vessel linkage concept**, specifically for:
+
+• Fleet ↔ Vessel relationship  
+• Fleet Components ↔ Vessel Components linkage  
+• Data flow between Fleet and Vessel levels  
+• Data synchronization and reference handling  
+
+--------------------------------------------------
+
+1. Concept Understanding Required
+
+Analyze and explain:
+
+• Why Fleet and Vessel linkage is implemented  
+• Business purpose of maintaining Fleet-level master data  
+• Why Vessel-level data depends on Fleet data  
+
+Expected Understanding Areas:
+
+• Standardization across vessels  
+• Centralized control (Fleet level)  
+• Vessel-level customization vs inheritance  
+
+--------------------------------------------------
+
+2. Fleet ↔ Vessel Linkage Logic
+
+Explain:
+
+• How a Vessel is linked to a Fleet  
+• Whether:
+  - One Fleet → Multiple Vessels  
+  - One Vessel → Only one Fleet  
+
+• What happens when:
+  - Vessel is added to Fleet  
+  - Vessel is removed from Fleet  
+
+--------------------------------------------------
+
+3. Fleet Component ↔ Vessel Component Linkage
+
+Detailed Analysis Required:
+
+A. Purpose
+
+• Why Fleet Components are linked to Vessel Components  
+• Whether Fleet acts as:
+  - Master Template  
+  - Reference Model  
+
+--------------------------------------------------
+
+B. Mapping Logic
+
+• How mapping is done:
+
+  - Fleet Component → Vessel Component  
+
+• What is the key identifier:
+
+  - component_code?  
+  - unique_id?  
+  - hierarchy-based mapping?  
+
+--------------------------------------------------
+
+C. Data Dependency
+
+• Which fields in Vessel Component depend on Fleet Component  
+
+--------------------------------------------------
+
+4. Data Flow Analysis (Fleet → Vessel)
+
+Explain in detail:
+
+A. Data Flow Type
+
+• Is it:
+
+  - One-time copy (initial sync)?  
+  - Continuous sync (live reference)?  
+  - Controlled sync (manual trigger)?  
+
+--------------------------------------------------
+
+B. Column-Level Mapping
+
+Define:
+
+Which fields should be fetched from Fleet to Vessel:
+
+Example:
+
+• Component Code  
+• Component Name  
+• Parent Code  
+• Maker  
+• Specification  
+• Job Linkage  
+• Spare Linkage  
+
+--------------------------------------------------
+
+C. Reference Columns
+
+Identify:
+
+• Which columns act as reference keys:
+
+  - fleet_component_id  
+  - component_code  
+  - mapping_id  
+
+--------------------------------------------------
+
+5. Data Storage Strategy
+
+Analyze:
+
+Option 1 – Direct Reference
+
+• Vessel stores reference to Fleet record  
+• Always fetches live data  
+
+Pros/Cons:
+
+--------------------------------------------------
+
+Option 2 – Data Copy
+
+• Fleet data copied into Vessel tables  
+
+Pros/Cons:
+
+--------------------------------------------------
+
+Option 3 – Hybrid Model (Recommended Analysis)
+
+• Some fields copied  
+• Some fields referenced  
+
+--------------------------------------------------
+
+6. Sync Mechanism
+
+Explain:
+
+• How updates in Fleet affect Vessel:
+
+  - Auto update?  
+  - Manual sync?  
+  - No update after mapping?  
+
+--------------------------------------------------
+
+7. Control Mechanism
+
+Analyze whether system should have:
+
+• “Sync from Fleet” button  
+• “Re-map / Re-sync” option  
+• Event-based sync (on update)  
+
+--------------------------------------------------
+
+8. Edge Case Handling
+
+Consider:
+
+• Fleet component updated after mapping  
+• Vessel-specific modification required  
+• Component deleted/deactivated in Fleet  
+• New component added in Fleet  
+• Multiple vessels with different states  
+
+--------------------------------------------------
+
+9. Functional Behavior Plan (From Your Understanding)
+
+Based on analysis, define:
+
+• Ideal working model for:
+
+  - Component creation  
+  - Mapping  
+  - Sync  
+  - Update  
+
+--------------------------------------------------
+
+10. Validation Rules
+
+Define:
+
+• When mapping should be allowed  
+• When mapping should be blocked  
+• Data consistency checks  
+
+--------------------------------------------------
+
+11. Output Expectation
+
+Provide:
+
+• Clear explanation of linkage concept  
+• Data flow diagram (logical explanation)  
+• Column-level mapping plan  
+• Recommended architecture (reference vs copy vs hybrid)  
+• Identified gaps in current system  
+• Suggested improvements  
+
+--------------------------------------------------
+
+Important Instruction:
+
+This is a **pure analysis task**.  
+Do NOT assume current implementation is correct.  
+Think from **system design + scalability + data integrity perspective**.  
