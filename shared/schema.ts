@@ -2877,6 +2877,11 @@ export const shipSurveysMaster = pgTable("ship_surveys_master", {
   companyId: text("company_id"), // Default: "C" + masterId, but user-editable
   companyGroup: text("company_group"), // A-I company group key
   companySequence: integer("company_sequence"), // Sequence number for company tab ordering
+  sortOrder: integer("sort_order").default(0),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  isSync: boolean("is_sync").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -2887,6 +2892,11 @@ export const shipSurveysMaster = pgTable("ship_surveys_master", {
 
 export const insertShipSurveyMasterSchema = createInsertSchema(shipSurveysMaster).omit({
   id: true,
+  sortOrder: true,
+  createdByUuid: true,
+  updatedByUuid: true,
+  isDeleted: true,
+  isSync: true,
   createdAt: true,
   updatedAt: true,
 });
