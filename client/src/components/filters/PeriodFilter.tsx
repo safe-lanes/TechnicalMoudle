@@ -70,7 +70,11 @@ export function periodFilterToDateRange(value: PeriodFilterValue | null | undefi
   if (!value) return null;
 
   if (value.mode === 'date-range' && value.dateFrom && value.dateTo) {
-    return { from: value.dateFrom, to: value.dateTo };
+    const from = new Date(value.dateFrom);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(value.dateTo);
+    to.setHours(23, 59, 59, 999);
+    return { from, to };
   }
 
   if (value.mode === 'year-only' && value.year) {
