@@ -130,6 +130,11 @@ adminRouter.post('/import-errors', asyncHandler(adminCtrl.createImportErrors));
 adminRouter.get('/dashboard-metrics', asyncHandler(adminCtrl.getDashboardMetrics));
 adminRouter.get('/dashboard-stats', asyncHandler(adminCtrl.getDashboardStats));
 
+// ── Re-Sync: Fleet → Vessel field sync ──
+adminRouter.post('/resync/components', asyncHandler(adminCtrl.resyncComponents));
+adminRouter.post('/resync/jobs', asyncHandler(adminCtrl.resyncJobs));
+adminRouter.post('/resync/spares', asyncHandler(adminCtrl.resyncSpares));
+
 // ── Copy Vessel ──
 adminRouter.post('/copy-vessel', asyncHandler(adminCtrl.copyVessel));
 

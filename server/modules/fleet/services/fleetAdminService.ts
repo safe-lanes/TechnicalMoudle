@@ -206,7 +206,7 @@ export async function getFleetComponentById(id: number) {
 }
 
 export async function getFleetComponentByCode(code: string) {
-  const entry = await repo.getFleetComponentByCode(code);
+  const entry = await repo.getActiveFleetComponentByCode(code);
   if (!entry) {
     const err: any = new Error('Fleet component not found');
     err.statusCode = 404;
@@ -218,7 +218,7 @@ export async function getFleetComponentByCode(code: string) {
 export async function createFleetComponent(body: any) {
   const validatedData = insertFleetComponentsSchema.parse(body);
 
-  const existing = await repo.getFleetComponentByCode(validatedData.fleetEquipmentCode);
+  const existing = await repo.getActiveFleetComponentByCode(validatedData.fleetEquipmentCode);
   if (existing) {
     const err: any = new Error('Fleet component with this code already exists');
     err.statusCode = 409;
@@ -1007,4 +1007,235 @@ export async function copyVessel(body: any) {
     message: `Vessel data successfully replicated. ${totalCopied} record(s) copied.`,
     results: copyResults,
   };
+}
+
+// ══════════════════════════════════════════════════════════
+// Re-Sync: Copy fleet field values → mapped vessel records
+// ══════════════════════════════════════════════════════════
+
+interface ResyncDetail {
+  code: string;
+  fleetCode: string;
+  status: 'synced' | 'skipped' | 'failed' | 'no_changes';
+  changedFields: string[];
+  error?: string;
+}
+
+interface ResyncResult {
+  synced: number;
+  skipped: number;
+  failed: number;
+  noChanges: number;
+  details: ResyncDetail[];
+}
+
+// --- Helper: compare two values, treating null/undefined/empty-string as equivalent ---
+function fieldChanged(fleetVal: any, vesselVal: any): boolean {
+  const a = fleetVal ?? '';
+  const b = vesselVal ?? '';
+  return String(a) !== String(b);
+}
+
+// --- Components Re-Sync ---
+
+const COMPONENT_FIELD_MAP: Array<{ fleetKey: string; vesselKey: string; label: string }> = [
+  { fleetKey: 'fleetEquipmentName', vesselKey: 'fleetEquipmentName', label: 'fleet_equipment_name' },
+  { fleetKey: 'componentCategory',  vesselKey: 'componentCategory',  label: 'component_category' },
+  { fleetKey: 'makerName',          vesselKey: 'maker',              label: 'maker' },
+  { fleetKey: 'model',              vesselKey: 'model',              label: 'model' },
+  { fleetKey: 'modelCode',          vesselKey: 'modelCode',          label: 'model_code' },
+  { fleetKey: 'location',           vesselKey: 'location',           label: 'location' },
+  { fleetKey: 'rating',             vesselKey: 'rating',             label: 'rating' },
+  { fleetKey: 'eqptSystemDept',     vesselKey: 'eqptSystemDept',     label: 'eqpt_system_dept' },
+  { fleetKey: 'notes',              vesselKey: 'notes',              label: 'notes' },
+];
+
+export async function resyncComponents(vesselCode: string): Promise<ResyncResult> {
+  const mappings = await repo.getActiveComponentMappingsForVessel(vesselCode);
+  const result: ResyncResult = { synced: 0, skipped: 0, failed: 0, noChanges: 0, details: [] };
+
+  for (const m of mappings) {
+    const fleetComp = await repo.getActiveFleetComponentByCode(m.fleetEquipmentCode);
+    if (!fleetComp) {
+      result.skipped++;
+      result.details.push({ code: m.componentCode, fleetCode: m.fleetEquipmentCode, status: 'skipped', changedFields: [], error: 'Fleet component not found or inactive' });
+      continue;
+    }
+
+    if (!m.componentId) {
+      result.failed++;
+      result.details.push({ code: m.componentCode, fleetCode: m.fleetEquipmentCode, status: 'failed', changedFields: [], error: 'No component_id in mapping' });
+      continue;
+    }
+
+    const vesselComp = await repo.getComponentByCuuid(m.componentId);
+    if (!vesselComp) {
+      result.failed++;
+      result.details.push({ code: m.componentCode, fleetCode: m.fleetEquipmentCode, status: 'failed', changedFields: [], error: 'Vessel component not found' });
+      continue;
+    }
+
+    // Compare and build update payload
+    const updates: Record<string, any> = {};
+    const changedFields: string[] = [];
+    for (const f of COMPONENT_FIELD_MAP) {
+      if (fieldChanged((fleetComp as any)[f.fleetKey], (vesselComp as any)[f.vesselKey])) {
+        updates[f.vesselKey] = (fleetComp as any)[f.fleetKey];
+        changedFields.push(f.label);
+      }
+    }
+
+    if (changedFields.length === 0) {
+      result.noChanges++;
+      result.details.push({ code: m.componentCode, fleetCode: m.fleetEquipmentCode, status: 'no_changes', changedFields: [] });
+      continue;
+    }
+
+    try {
+      await repo.updateComponentResyncFields(m.componentId, updates);
+      result.synced++;
+      result.details.push({ code: m.componentCode, fleetCode: m.fleetEquipmentCode, status: 'synced', changedFields });
+    } catch (e: any) {
+      result.failed++;
+      result.details.push({ code: m.componentCode, fleetCode: m.fleetEquipmentCode, status: 'failed', changedFields, error: e.message });
+    }
+  }
+
+  return result;
+}
+
+// --- Jobs Re-Sync ---
+
+const JOB_FIELD_MAP: Array<{ fleetKey: string; vesselKey: string; label: string }> = [
+  { fleetKey: 'woTitle',          vesselKey: 'jobTitle',         label: 'job_title' },
+  { fleetKey: 'maintenanceBasis', vesselKey: 'maintenanceBasis', label: 'maintenance_basis' },
+  { fleetKey: 'intervalValue',    vesselKey: 'frequencyValue',   label: 'frequency_value' },
+  { fleetKey: 'unit',             vesselKey: 'frequencyUnit',    label: 'frequency_unit' },
+  { fleetKey: 'taskType',         vesselKey: 'maintenanceType',  label: 'maintenance_type' },
+  { fleetKey: 'assignedTo',       vesselKey: 'assignedTo',       label: 'assigned_to' },
+  { fleetKey: 'approver',         vesselKey: 'approver',         label: 'approver' },
+  { fleetKey: 'jobPriority',      vesselKey: 'jobPriority',      label: 'job_priority' },
+  { fleetKey: 'classRelated',     vesselKey: 'classRelated',     label: 'class_related' },
+  { fleetKey: 'department',       vesselKey: 'department',       label: 'department' },
+];
+
+export async function resyncJobs(vesselCode: string): Promise<ResyncResult> {
+  const mappings = await repo.getActiveJobMappingsForVessel(vesselCode);
+  const result: ResyncResult = { synced: 0, skipped: 0, failed: 0, noChanges: 0, details: [] };
+
+  for (const m of mappings) {
+    const fleetJob = await repo.getFleetJobByCode(m.jobCode);
+    if (!fleetJob) {
+      result.skipped++;
+      result.details.push({ code: m.jobCode, fleetCode: m.fleetEquipmentCode, status: 'skipped', changedFields: [], error: 'Fleet job not found or inactive' });
+      continue;
+    }
+
+    if (!m.jobId) {
+      result.failed++;
+      result.details.push({ code: m.jobCode, fleetCode: m.fleetEquipmentCode, status: 'failed', changedFields: [], error: 'No job_id in mapping' });
+      continue;
+    }
+
+    const vesselJob = await repo.getJobByJuuid(m.jobId);
+    if (!vesselJob) {
+      result.failed++;
+      result.details.push({ code: m.jobCode, fleetCode: m.fleetEquipmentCode, status: 'failed', changedFields: [], error: 'Vessel job not found' });
+      continue;
+    }
+
+    const updates: Record<string, any> = {};
+    const changedFields: string[] = [];
+    for (const f of JOB_FIELD_MAP) {
+      if (fieldChanged((fleetJob as any)[f.fleetKey], (vesselJob as any)[f.vesselKey])) {
+        updates[f.vesselKey] = (fleetJob as any)[f.fleetKey];
+        changedFields.push(f.label);
+      }
+    }
+
+    if (changedFields.length === 0) {
+      result.noChanges++;
+      result.details.push({ code: m.jobCode, fleetCode: m.fleetEquipmentCode, status: 'no_changes', changedFields: [] });
+      continue;
+    }
+
+    try {
+      await repo.updateJobResyncFields(m.jobId, updates);
+      result.synced++;
+      result.details.push({ code: m.jobCode, fleetCode: m.fleetEquipmentCode, status: 'synced', changedFields });
+    } catch (e: any) {
+      result.failed++;
+      result.details.push({ code: m.jobCode, fleetCode: m.fleetEquipmentCode, status: 'failed', changedFields, error: e.message });
+    }
+  }
+
+  return result;
+}
+
+// --- Spares Re-Sync ---
+
+const SPARE_FIELD_MAP: Array<{ fleetKey: string; vesselKey: string; label: string }> = [
+  { fleetKey: 'partName',           vesselKey: 'partName',       label: 'part_name' },
+  { fleetKey: 'partNumber',         vesselKey: 'partNumber',     label: 'part_number' },
+  { fleetKey: 'unitOfMeasurement',  vesselKey: 'uom',            label: 'uom' },
+  { fleetKey: 'maker',              vesselKey: 'maker',          label: 'maker' },
+  { fleetKey: 'drawingNumber',      vesselKey: 'drawingNumber',  label: 'drawing_number' },
+  { fleetKey: 'positionNumber',     vesselKey: 'positionNumber', label: 'position_number' },
+  { fleetKey: 'note',               vesselKey: 'note',           label: 'note' },
+  { fleetKey: 'criticality',        vesselKey: 'criticality',    label: 'criticality' },
+  { fleetKey: 'ihm',                vesselKey: 'ihm',            label: 'ihm' },
+  { fleetKey: 'evidenceType',       vesselKey: 'evidenceType',   label: 'evidence_type' },
+];
+
+export async function resyncSpares(vesselCode: string): Promise<ResyncResult> {
+  const mappings = await repo.getActiveSpareMappingsForVessel(vesselCode);
+  const result: ResyncResult = { synced: 0, skipped: 0, failed: 0, noChanges: 0, details: [] };
+
+  for (const m of mappings) {
+    const fleetSpare = await repo.getFleetSpareByPartCode(m.partCode);
+    if (!fleetSpare) {
+      result.skipped++;
+      result.details.push({ code: m.partCode, fleetCode: m.fleetEquipmentCode, status: 'skipped', changedFields: [], error: 'Fleet spare not found or inactive' });
+      continue;
+    }
+
+    if (!m.spareId) {
+      result.failed++;
+      result.details.push({ code: m.partCode, fleetCode: m.fleetEquipmentCode, status: 'failed', changedFields: [], error: 'No spare_id in mapping' });
+      continue;
+    }
+
+    const vesselSpare = await repo.getSpareBySuuid(m.spareId);
+    if (!vesselSpare) {
+      result.failed++;
+      result.details.push({ code: m.partCode, fleetCode: m.fleetEquipmentCode, status: 'failed', changedFields: [], error: 'Vessel spare not found' });
+      continue;
+    }
+
+    const updates: Record<string, any> = {};
+    const changedFields: string[] = [];
+    for (const f of SPARE_FIELD_MAP) {
+      if (fieldChanged((fleetSpare as any)[f.fleetKey], (vesselSpare as any)[f.vesselKey])) {
+        updates[f.vesselKey] = (fleetSpare as any)[f.fleetKey];
+        changedFields.push(f.label);
+      }
+    }
+
+    if (changedFields.length === 0) {
+      result.noChanges++;
+      result.details.push({ code: m.partCode, fleetCode: m.fleetEquipmentCode, status: 'no_changes', changedFields: [] });
+      continue;
+    }
+
+    try {
+      await repo.updateSpareResyncFields(m.spareId, updates);
+      result.synced++;
+      result.details.push({ code: m.partCode, fleetCode: m.fleetEquipmentCode, status: 'synced', changedFields });
+    } catch (e: any) {
+      result.failed++;
+      result.details.push({ code: m.partCode, fleetCode: m.fleetEquipmentCode, status: 'failed', changedFields, error: e.message });
+    }
+  }
+
+  return result;
 }

@@ -1086,25 +1086,67 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
     setSummaryDialogOpen(true);
   };
 
-  const handleResync = () => {
-    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-components"] });
-    queryClient.invalidateQueries({ queryKey: ["/technical/api/components", { vesselId: selectedVessel }] });
-    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-component-mappings", { vesselCode: selectedVessel }] });
-    toast({ title: "Re-syncing", description: "Refreshing component mapping data..." });
+  const handleResync = async () => {
+    if (!selectedVessel) {
+      toast({ title: "Error", description: "Please select a vessel first", variant: "destructive" });
+      return;
+    }
+    try {
+      toast({ title: "Re-syncing", description: "Syncing component fields from fleet..." });
+      const res = await apiRequest("POST", "/technical/api/fleet-admin/resync/components", { vesselCode: selectedVessel });
+      const result = await res.json();
+      toast({
+        title: "Component Re-Sync Complete",
+        description: `Synced: ${result.synced}, No changes: ${result.noChanges}, Skipped: ${result.skipped}, Failed: ${result.failed}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-components"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/components", { vesselId: selectedVessel }] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-component-mappings", { vesselCode: selectedVessel }] });
+    } catch (err: any) {
+      toast({ title: "Re-Sync Failed", description: err.message || "Failed to re-sync components", variant: "destructive" });
+    }
   };
 
-  const handleJobsResync = () => {
-    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet/jobs"] });
-    queryClient.invalidateQueries({ queryKey: ["/technical/api/jobs", { vesselId: selectedVessel }] });
-    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-job-mappings", { vesselCode: selectedVessel }] });
-    toast({ title: "Re-syncing", description: "Refreshing job mapping data..." });
+  const handleJobsResync = async () => {
+    if (!selectedVessel) {
+      toast({ title: "Error", description: "Please select a vessel first", variant: "destructive" });
+      return;
+    }
+    try {
+      toast({ title: "Re-syncing", description: "Syncing job fields from fleet..." });
+      const res = await apiRequest("POST", "/technical/api/fleet-admin/resync/jobs", { vesselCode: selectedVessel });
+      const result = await res.json();
+      toast({
+        title: "Job Re-Sync Complete",
+        description: `Synced: ${result.synced}, No changes: ${result.noChanges}, Skipped: ${result.skipped}, Failed: ${result.failed}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/jobs", { vesselId: selectedVessel }] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-job-mappings", { vesselCode: selectedVessel }] });
+    } catch (err: any) {
+      toast({ title: "Re-Sync Failed", description: err.message || "Failed to re-sync jobs", variant: "destructive" });
+    }
   };
 
-  const handleSparesResync = () => {
-    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet/spares"] });
-    queryClient.invalidateQueries({ queryKey: ["/technical/api/spares", selectedVessel] });
-    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-spare-mappings", { vesselCode: selectedVessel }] });
-    toast({ title: "Re-syncing", description: "Refreshing spare mapping data..." });
+  const handleSparesResync = async () => {
+    if (!selectedVessel) {
+      toast({ title: "Error", description: "Please select a vessel first", variant: "destructive" });
+      return;
+    }
+    try {
+      toast({ title: "Re-syncing", description: "Syncing spare fields from fleet..." });
+      const res = await apiRequest("POST", "/technical/api/fleet-admin/resync/spares", { vesselCode: selectedVessel });
+      const result = await res.json();
+      toast({
+        title: "Spare Re-Sync Complete",
+        description: `Synced: ${result.synced}, No changes: ${result.noChanges}, Skipped: ${result.skipped}, Failed: ${result.failed}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet/spares"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/spares", selectedVessel] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-spare-mappings", { vesselCode: selectedVessel }] });
+    } catch (err: any) {
+      toast({ title: "Re-Sync Failed", description: err.message || "Failed to re-sync spares", variant: "destructive" });
+    }
   };
 
   const toggleFleetNode = useCallback((code: string) => {

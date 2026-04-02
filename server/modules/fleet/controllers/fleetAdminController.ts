@@ -588,3 +588,49 @@ export async function copyVessel(req: Request, res: Response) {
     res.status(500).json({ error: 'Failed to copy vessel data' });
   }
 }
+
+// ══════════════════════════════════════════════════════════
+// Re-Sync: Fleet → Vessel field sync
+// ══════════════════════════════════════════════════════════
+
+export async function resyncComponents(req: Request, res: Response) {
+  try {
+    const { vesselCode } = req.body;
+    if (!vesselCode) {
+      return res.status(400).json({ error: 'Missing required parameter: vesselCode' });
+    }
+    const result = await adminService.resyncComponents(vesselCode);
+    res.json(result);
+  } catch (error) {
+    console.error('Error re-syncing components:', error);
+    res.status(500).json({ error: 'Failed to re-sync components' });
+  }
+}
+
+export async function resyncJobs(req: Request, res: Response) {
+  try {
+    const { vesselCode } = req.body;
+    if (!vesselCode) {
+      return res.status(400).json({ error: 'Missing required parameter: vesselCode' });
+    }
+    const result = await adminService.resyncJobs(vesselCode);
+    res.json(result);
+  } catch (error) {
+    console.error('Error re-syncing jobs:', error);
+    res.status(500).json({ error: 'Failed to re-sync jobs' });
+  }
+}
+
+export async function resyncSpares(req: Request, res: Response) {
+  try {
+    const { vesselCode } = req.body;
+    if (!vesselCode) {
+      return res.status(400).json({ error: 'Missing required parameter: vesselCode' });
+    }
+    const result = await adminService.resyncSpares(vesselCode);
+    res.json(result);
+  } catch (error) {
+    console.error('Error re-syncing spares:', error);
+    res.status(500).json({ error: 'Failed to re-sync spares' });
+  }
+}

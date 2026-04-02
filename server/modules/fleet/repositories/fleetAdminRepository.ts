@@ -11,6 +11,9 @@ import {
   spares,
   spareComponentLinks,
   storesItems,
+  fleetComponentMapping,
+  fleetJobVesselMapping,
+  fleetSpareVesselMapping,
 } from '@shared/schema';
 
 // ══════════════════════════════════════════════════════════
@@ -220,3 +223,109 @@ export async function getCopyVesselDb() {
 
 // Re-export table references needed by copy-vessel service
 export { components, jobs, spares, spareComponentLinks, storesItems };
+
+// ══════════════════════════════════════════════════════════
+// Re-Sync: Fleet → Vessel field sync
+// ══════════════════════════════════════════════════════════
+
+export async function getActiveComponentMappingsForVessel(vesselCode: string) {
+  const db = await getDb();
+  return db.select().from(fleetComponentMapping)
+    .where(and(
+      eq(fleetComponentMapping.vesselCode, vesselCode),
+      eq(fleetComponentMapping.isActive, true),
+    ));
+}
+
+export async function getActiveFleetComponentByCode(code: string) {
+  const db = await getDb();
+  const rows = await db.select().from(fleetComponents)
+    .where(and(
+      eq(fleetComponents.fleetEquipmentCode, code),
+      eq(fleetComponents.isActive, true),
+      eq(fleetComponents.isDeleted, false),
+    ));
+  return rows[0] || null;
+}
+
+export async function getComponentByCuuid(cuuid: string) {
+  const db = await getDb();
+  const rows = await db.select().from(components)
+    .where(eq(components.cuuid, cuuid));
+  return rows[0] || null;
+}
+
+export async function updateComponentResyncFields(cuuid: string, fields: Record<string, any>) {
+  const db = await getDb();
+  await db.update(components)
+    .set({ ...fields, updatedAt: new Date() })
+    .where(eq(components.cuuid, cuuid));
+}
+
+export async function getActiveJobMappingsForVessel(vesselCode: string) {
+  const db = await getDb();
+  return db.select().from(fleetJobVesselMapping)
+    .where(and(
+      eq(fleetJobVesselMapping.vesselCode, vesselCode),
+      eq(fleetJobVesselMapping.isActive, true),
+    ));
+}
+
+export async function getFleetJobByCode(jobCode: string) {
+  const db = await getDb();
+  const rows = await db.select().from(fleetJobs)
+    .where(and(
+      eq(fleetJobs.jobCode, jobCode),
+      eq(fleetJobs.isActive, true),
+      eq(fleetJobs.isDeleted, false),
+    ));
+  return rows[0] || null;
+}
+
+export async function getJobByJuuid(juuid: string) {
+  const db = await getDb();
+  const rows = await db.select().from(jobs)
+    .where(eq(jobs.juuid, juuid));
+  return rows[0] || null;
+}
+
+export async function updateJobResyncFields(juuid: string, fields: Record<string, any>) {
+  const db = await getDb();
+  await db.update(jobs)
+    .set({ ...fields, updatedAt: new Date() })
+    .where(eq(jobs.juuid, juuid));
+}
+
+export async function getActiveSpareMappingsForVessel(vesselCode: string) {
+  const db = await getDb();
+  return db.select().from(fleetSpareVesselMapping)
+    .where(and(
+      eq(fleetSpareVesselMapping.vesselCode, vesselCode),
+      eq(fleetSpareVesselMapping.isActive, true),
+    ));
+}
+
+export async function getFleetSpareByPartCode(partCode: string) {
+  const db = await getDb();
+  const rows = await db.select().from(fleetSpares)
+    .where(and(
+      eq(fleetSpares.partCode, partCode),
+      eq(fleetSpares.isActive, true),
+      eq(fleetSpares.isDeleted, false),
+    ));
+  return rows[0] || null;
+}
+
+export async function getSpareBySuuid(suuid: string) {
+  const db = await getDb();
+  const rows = await db.select().from(spares)
+    .where(eq(spares.suuid, suuid));
+  return rows[0] || null;
+}
+
+export async function updateSpareResyncFields(suuid: string, fields: Record<string, any>) {
+  const db = await getDb();
+  await db.update(spares)
+    .set({ ...fields, updatedAt: new Date() })
+    .where(eq(spares.suuid, suuid));
+}
