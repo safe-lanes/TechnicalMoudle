@@ -3316,7 +3316,7 @@ export type PlannerDate = typeof plannerDates.$inferSelect;
 // ====== REPORT FAVORITES TABLE ======
 export const reportFavorites = pgTable("report_favorites", {
   id: serial("id").primaryKey(),
-  rfuuid: text("rfuuid").notNull().unique().$defaultFn(() => crypto.randomUUID()),
+  rfuuid: text("rfuuid").notNull().unique().default(sql`gen_random_uuid()::text`),
   reportId: text("report_id").notNull(),
   createdByUuid: text("created_by_uuid").notNull(),
   updatedByUuid: text("updated_by_uuid"),

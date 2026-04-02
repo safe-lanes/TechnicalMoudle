@@ -1,6 +1,6 @@
 {
-  "id": "76419276-2cfe-42c4-9a6b-50db766039e0",
-  "prevId": "c3e6a662-c6df-424a-9126-d0ecc6ed38c6",
+  "id": "280079bd-6293-4f1e-ba99-b6994074b1f7",
+  "prevId": "96494f39-0388-4ac6-a67e-0dee81b0efb4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -10057,7 +10057,8 @@
           "name": "rfuuid",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "gen_random_uuid()::text"
         },
         "report_id": {
           "name": "report_id",
@@ -10796,39 +10797,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "sort_order": {
-          "name": "sort_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
-        },
-        "created_by_uuid": {
-          "name": "created_by_uuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_uuid": {
-          "name": "updated_by_uuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_deleted": {
-          "name": "is_deleted",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
-        },
-        "is_sync": {
-          "name": "is_sync",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -11063,39 +11031,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false
-        },
-        "sort_order": {
-          "name": "sort_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
-        },
-        "created_by_uuid": {
-          "name": "created_by_uuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_uuid": {
-          "name": "updated_by_uuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_deleted": {
-          "name": "is_deleted",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
-        },
-        "is_sync": {
-          "name": "is_sync",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -13307,39 +13242,6 @@
           "notNull": true,
           "default": true
         },
-        "sort_order": {
-          "name": "sort_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
-        },
-        "created_by_uuid": {
-          "name": "created_by_uuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_uuid": {
-          "name": "updated_by_uuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_deleted": {
-          "name": "is_deleted",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
-        },
-        "is_sync": {
-          "name": "is_sync",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -13510,39 +13412,6 @@
           "primaryKey": false,
           "notNull": false,
           "default": "'[]'::jsonb"
-        },
-        "sort_order": {
-          "name": "sort_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
-        },
-        "created_by_uuid": {
-          "name": "created_by_uuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_uuid": {
-          "name": "updated_by_uuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_deleted": {
-          "name": "is_deleted",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
-        },
-        "is_sync": {
-          "name": "is_sync",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
         },
         "created_at": {
           "name": "created_at",

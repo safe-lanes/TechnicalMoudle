@@ -10057,7 +10057,8 @@
           "name": "rfuuid",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "gen_random_uuid()"
         },
         "report_id": {
           "name": "report_id",
