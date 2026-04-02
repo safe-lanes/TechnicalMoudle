@@ -1,0 +1,405 @@
+We have now created the new Period filter pattern in the Work Orders module.
+
+We now want to extend the same filter concept to other PMS modules as well, so the product becomes more consistent and users do not face different date-filtering logic in every module.
+
+Please implement the same Period filter pattern in the following places:
+
+Running Hours module – replace / upgrade Utilization Period
+
+Reports module – replace Select date range
+
+Modify PMS module – add a new Period filter in the filter area, since currently there is no proper period filter there
+
+The attached images show the target direction.
+
+Main objective
+Standardize period-based filtering across PMS modules using the same reusable UI pattern already created in Work Orders.
+
+That means the same filter concept should now be available in:
+
+Work Orders
+
+Running Hours
+
+Reports
+
+Modify PMS
+
+The interaction should feel related and familiar across all these screens.
+
+Core filter pattern to reuse
+Use the same popup-based Period filter pattern already created in Work Orders.
+
+It should support the same two modes:
+
+Year + Quarter/Month
+
+Date Range
+
+Year + Quarter/Month mode
+single-select Year
+
+single-select Quarter
+
+multi-select Month
+
+selecting a Quarter clears selected Months
+
+selecting any Month clears selected Quarter
+
+valid states:
+
+Year only
+
+Year + Quarter
+
+Year + one or more Months
+
+Date Range mode
+Date From
+
+Date To
+
+validation required
+
+Shared behavior
+Apply button
+
+compact display summary on closed control
+
+clear/reset integration with page filters
+
+reopen should show currently selected values
+
+Important requirement
+Do not rebuild three separate custom widgets from scratch if avoidable.
+
+If possible, reuse the same component logic/pattern used in Work Orders and adapt only:
+
+label text
+
+placement
+
+module-specific filter application logic
+
+The product should feel like it uses a common PMS date/period filtering system.
+
+1) Running Hours module
+Current requirement
+In the Running Hours module, the existing Utilization Period control should be upgraded to this same Period filter behavior.
+
+The image shows the current label as something like:
+
+Utilization Period: Monthly (Last 30 day)
+
+We want that control to behave like the new Period filter instead of staying as a limited/basic period dropdown.
+
+What to implement
+Replace or upgrade the existing Utilization Period control so that clicking it opens the same popup structure:
+
+Year + Quarter/Month
+
+Date Range
+
+Module-specific business expectation
+In Running Hours, this period is being used in the context of:
+
+utilization calculations
+
+running hours history/overview interpretation
+
+So after applying the filter:
+
+the running hours data shown on the page must refresh according to the selected period,
+
+utilization values / derived display should use the selected period window,
+
+search and vessel filters must continue to work along with it.
+
+UI requirement
+Keep the label aligned with module context.
+
+Recommended label options:
+
+Utilization Period
+
+or keep the existing label but use the new popup behavior underneath it
+
+The control should remain in the current top filter row and not disturb page layout.
+
+Summary text
+After selection, the closed control should show a compact summary similar to Work Orders, such as:
+
+2026
+
+2026 / Q2
+
+APR, MAY, JUN - 2026
+
+01 Apr 2026 - 30 Apr 2026
+
+2) Reports module
+Current requirement
+In the Reports module, replace the current Select date range control with the new Period filter pattern.
+
+The attached screenshot clearly shows a top-level Select date range control in Reports.
+That should now become the same reusable Period filter instead of a basic date-only input.
+
+What to implement
+Replace Select date range with a period filter popup that supports:
+
+Year + Quarter/Month
+
+Date Range
+
+Important note for Reports
+Reports is broader than Work Orders, so the period filter should act as the global reporting time filter.
+
+That means:
+
+selected period should apply to the report data currently being viewed,
+
+it should work together with vessel filter and component search,
+
+Clear All should clear this period filter too.
+
+The Reports screen already has:
+
+vessel filter
+
+component search
+
+Clear All
+
+report tree / report content area
+
+So this Period filter must integrate naturally into that same top filter row.
+
+Display requirement
+The existing neutral “Select date range” button should now show the applied period summary once a selection is made.
+
+Examples:
+
+2026
+
+2026 / Q1
+
+JAN, FEB, MAR - 2026
+
+01 Apr 2026 - 15 Apr 2026
+
+Clear behavior
+Reports already has Clear All in the toolbar area.
+This must also reset the new Period filter.
+
+3) Modify PMS module
+Current requirement
+In the Modify PMS module, add this Period filter to the filter bar because currently there is no proper period filter there.
+
+The goal is to bring the same period-filtering capability into Modify PMS so users can filter change requests / modification-related data by meaningful time windows.
+
+What to implement
+Add a new filter control in the Modify PMS screen using the same Period popup pattern.
+
+It should support:
+
+Year + Quarter/Month
+
+Date Range
+
+Placement
+Add it in the filter row / top controls area in a clean place that matches the rest of the PMS design.
+
+Do not force awkward layout changes.
+
+If other filters already exist there, place Period among them in a natural order.
+
+Recommended order:
+
+Vessel (if present)
+
+Search (if present)
+
+Period
+
+other filters
+
+Clear
+
+Module-specific behavior
+In Modify PMS, the selected period should filter the relevant records based on the module’s date field used for modification/change request tracking.
+
+Please first confirm which business date field is correct in Modify PMS:
+
+request date,
+
+created date,
+
+modified date,
+
+approval date,
+or whichever field is actually intended for timeline filtering in that module.
+
+Do not guess randomly.
+
+Use the proper business date field already intended for the screen.
+
+Shared implementation rules for all 3 modules
+A. Same interaction pattern
+All three modules must use the same filter behavior as Work Orders:
+
+popup/dropdown panel
+
+two radio modes
+
+year/quarter/month structure
+
+month multi-select
+
+date range validation
+
+apply button
+
+compact summary display
+
+B. Same selection rules
+Year mandatory in Year + Quarter/Month mode
+
+Year only = valid
+
+Year + Quarter = valid
+
+Year + one or more Months = valid
+
+Quarter + Month together = not allowed
+
+Selecting Quarter clears Months
+
+Selecting any Month clears Quarter
+
+C. Same summary style
+Use compact, readable summary text across all modules.
+
+Examples:
+
+2026
+
+2026 / Q4
+
+APR - 2026
+
+APR, MAY, JUN - 2026
+
+01 Apr 2026 - 30 Apr 2026
+
+D. Same reset behavior
+Each page’s clear/reset action must reset the Period filter too.
+
+Running Hours → Clear
+
+Reports → Clear All
+
+Modify PMS → Clear / reset action if available
+
+If Modify PMS currently has no clear/reset behavior, introduce one only if needed and keep it consistent with the page.
+
+E. Preserve other filters
+Applying period must not reset:
+
+vessel
+
+search
+
+other module-specific filters
+
+Filters should combine normally.
+
+F. Reopen state
+If a period is already selected and the user opens the popup again:
+
+previously selected mode and values must be shown.
+
+Validation rules
+For all modules, ensure:
+
+Year + Quarter/Month mode
+Year only works
+
+Year + Quarter works
+
+Year + multiple Months works
+
+Quarter without Year not allowed
+
+Month(s) without Year not allowed
+
+Quarter and Months cannot remain selected together
+
+Date Range mode
+both Date From and Date To are required
+
+Date To cannot be before Date From
+
+one-day range may be allowed if business logic supports it
+
+UI behavior
+popup opens and closes correctly
+
+Apply works
+
+summary text updates correctly
+
+clear/reset works correctly
+
+layout does not break
+
+Reuse expectation
+Please reuse as much as possible from the existing Work Orders Period filter implementation.
+
+If there is already a reusable component for this pattern, extend and reuse it rather than duplicating separate logic in every module.
+
+The main idea is:
+
+common UI pattern,
+
+module-specific filtering application.
+
+Out of scope
+Do not change:
+
+unrelated business logic,
+
+table structure,
+
+export buttons,
+
+report tree behavior,
+
+planner behavior,
+
+unrelated module navigation.
+
+This task is specifically about extending the new Period filter pattern to:
+
+Running Hours
+
+Reports
+
+Modify PMS
+
+Final expected result
+After this task:
+
+Running Hours has a proper period popup instead of a limited utilization period control
+
+Reports no longer uses only a simple “Select date range” input; it uses the common Period filter
+
+Modify PMS now has a proper Period filter added
+
+all three modules feel aligned with Work Orders
+
+users get one consistent PMS filtering experience across modules
+
+Important note
+Do not treat these as three unrelated UI tasks.
+Treat this as a PMS-wide standardization of period filtering based on the pattern already introduced in Work Orders. The Work Orders page already demonstrates the new pattern inside a shared filter bar, so the same consistency should now be extended across the rest of the PMS workflow.
