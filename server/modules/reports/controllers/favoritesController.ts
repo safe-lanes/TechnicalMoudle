@@ -5,8 +5,7 @@ import { getDb } from '../../../db';
 import type { AuthenticatedRequest } from '../../../middleware/auth';
 
 function getUserUuid(req: AuthenticatedRequest): string | null {
-  const user = req.user;
-  return user?.userUuid || user?.id?.toString() || null;
+  return req.user?.userUuid || null;
 }
 
 export async function getFavorites(req: AuthenticatedRequest, res: Response) {
