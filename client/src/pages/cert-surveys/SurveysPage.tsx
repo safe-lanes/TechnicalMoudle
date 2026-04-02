@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Paperclip, Calendar, Download } from 'lucide-react';
 import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellEditingStoppedEvent } from 'ag-grid-community';
@@ -66,7 +66,7 @@ const EDITABLE_DATE_FIELDS = ['surveyDate', 'dueDate', 'firstRangeDate', 'second
 
 interface SurveyGridContext {
   onOpenAttachments?: (survey: SurveyData) => void;
-  onDateChange?: (compoundId: string, field: string, newValue: string) => void;
+  onDateChange?: (compoundId: string, field: string, newValue: string, rowData?: any) => void;
 }
 
 interface ActionsCellRendererProps extends ICellRendererParams {
@@ -115,6 +115,14 @@ export default function SurveysPage() {
   const pageSize = 100;
   const { toast } = useToast();
   const surveyInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (surveyInvalidateTimer.current) {
+        clearTimeout(surveyInvalidateTimer.current);
+      }
+    };
+  }, []);
 
   // Build API URL with vessel filter and pagination
   const apiUrl = useMemo(() => {

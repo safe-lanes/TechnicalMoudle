@@ -298,6 +298,14 @@ export default function CertificatesPage() {
   const { toast } = useToast();
   const certInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (certInvalidateTimer.current) {
+        clearTimeout(certInvalidateTimer.current);
+      }
+    };
+  }, []);
+
   // Build API URL with vessel filter, pagination, and sorting
   const apiUrl = useMemo(() => {
     const params = new URLSearchParams();
