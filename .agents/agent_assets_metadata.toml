@@ -38,7 +38,7 @@ type = "word_document"
 title = "PMS Data Review — Findings Report (Professional Version)"
 
 [[outputs]]
-id = "sZXm5n23BeGUh8KuuADTJ"
-uri = "file://pms_lead_grace_test_results.xlsx"
+id = "rsbxAenxzowQszOyATyQO"
+uri = "file://attached_assets/pms_lead_grace_test_cases_1775120888910.xlsx"
 type = "table"
 title = "PMS Lead Time & Grace Period Test Results"
