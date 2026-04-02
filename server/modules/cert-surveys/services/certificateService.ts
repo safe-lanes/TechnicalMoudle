@@ -91,11 +91,6 @@ export async function getCertificates(filters: CertificateFilters) {
       const master = masterMap.get(app.masterId);
       if (!master) continue;
 
-      const isCompanyWide = master.applicableToCompany === true || app.masterId.startsWith('CMP-');
-      const isVesselSpecific = app.masterId.startsWith('VES-');
-
-      if (!isCompanyWide && !isVesselSpecific) continue;
-
       const dataKey = `${app.vesselId}-${app.masterId}`;
       const certData = certDataMap.get(dataKey);
 
