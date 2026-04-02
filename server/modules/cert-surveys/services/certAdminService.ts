@@ -107,15 +107,8 @@ export async function saveMasterCertificates(body: any) {
 
   // Auto-create vessel_certificate_applicability records
   if (newlyInsertedMasterIds.length > 0) {
-    const certLookup = new Map(certificates.map((c: any) => [c.masterId, c]));
-    const companyWideMasterIds = newlyInsertedMasterIds.filter(id => {
-      const cert = certLookup.get(id);
-      return cert?.applicableToCompany === true || id.startsWith('CMP-');
-    });
-    const vesselOnlyMasterIds = newlyInsertedMasterIds.filter(id => {
-      const cert = certLookup.get(id);
-      return !(cert?.applicableToCompany === true || id.startsWith('CMP-'));
-    });
+    const vesselOnlyMasterIds = newlyInsertedMasterIds.filter(id => vesselSpecificSet.has(id) || id.startsWith('VES-'));
+    const nonVesselMasterIds = newlyInsertedMasterIds.filter(id => !vesselSpecificSet.has(id) && !id.startsWith('VES-'));
 
     if (vesselOnlyMasterIds.length > 0 && targetVessels.length === 0) {
       throw Object.assign(new Error("targetVessels is required when adding new vessel-specific certificates"), {
@@ -124,7 +117,6 @@ export async function saveMasterCertificates(body: any) {
       });
     }
 
-    // Get existing applicability records to avoid duplicates
     const existingApplicability = await certAdminRepo.getApplicabilityByMasterIds(newlyInsertedMasterIds);
     if (!existingApplicability) {
       throw Object.assign(new Error("Database not available"), { statusCode: 503 });
@@ -141,26 +133,20 @@ export async function saveMasterCertificates(body: any) {
       isApplicable: boolean;
     }> = [];
 
-    // Company-wide certificates - for ALL vessels
-    if (companyWideMasterIds.length > 0 && allVessels.length > 0) {
-      console.log(`Auto-creating applicability records for ${allVessels.length} vessels for ${companyWideMasterIds.length} company-wide certificate(s)`);
-
-      for (const masterId of companyWideMasterIds) {
-        for (const vessel of allVessels) {
-          const key = `${vessel.id}-${masterId}`;
-          if (!existingKeys.has(key)) {
-            applicabilityToInsert.push({
-              vesselId: vessel.id,
-              vesselName: vessel.name,
-              masterId: masterId,
-              isApplicable: true,
-            });
-          }
+    for (const masterId of nonVesselMasterIds) {
+      for (const vessel of allVessels) {
+        const key = `${vessel.id}-${masterId}`;
+        if (!existingKeys.has(key)) {
+          applicabilityToInsert.push({
+            vesselId: vessel.id,
+            vesselName: vessel.name,
+            masterId: masterId,
+            isApplicable: true,
+          });
         }
       }
     }
 
-    // Vessel-specific certificates (VES-) - only for target vessels
     if (vesselOnlyMasterIds.length > 0 && targetVessels.length > 0) {
       console.log(`Auto-creating applicability records for ${targetVessels.length} target vessel(s) for ${vesselOnlyMasterIds.length} vessel-specific certificate(s)`);
 
