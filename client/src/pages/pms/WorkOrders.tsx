@@ -273,30 +273,64 @@ const WorkOrders: React.FC = () => {
     }
     
     if (periodFilter) {
-      const woDueDate = wo.dueDate ? new Date(wo.dueDate) : null;
-      if (!woDueDate || isNaN(woDueDate.getTime())) {
-        return false;
-      }
+      const isRhBased = wo.maintenanceBasis === "Running Hours";
 
-      if (periodFilter.mode === 'year-only' && periodFilter.year) {
-        if (woDueDate.getFullYear() !== periodFilter.year) return false;
-      } else if (periodFilter.mode === 'year-quarter' && periodFilter.year && periodFilter.quarter) {
-        if (woDueDate.getFullYear() !== periodFilter.year) return false;
-        const woMonth = woDueDate.getMonth() + 1;
-        const qStart = (periodFilter.quarter - 1) * 3 + 1;
-        const qEnd = qStart + 2;
-        if (woMonth < qStart || woMonth > qEnd) return false;
-      } else if (periodFilter.mode === 'year-months' && periodFilter.year && periodFilter.months && periodFilter.months.length > 0) {
-        if (woDueDate.getFullYear() !== periodFilter.year) return false;
-        const woMonth = woDueDate.getMonth() + 1;
-        if (!periodFilter.months.includes(woMonth)) return false;
-      } else if (periodFilter.mode === 'date-range' && periodFilter.dateFrom && periodFilter.dateTo) {
-        const from = new Date(periodFilter.dateFrom);
-        from.setHours(0, 0, 0, 0);
-        const to = new Date(periodFilter.dateTo);
-        to.setHours(23, 59, 59, 999);
-        const woTime = woDueDate.getTime();
-        if (woTime < from.getTime() || woTime > to.getTime()) return false;
+      if (isRhBased) {
+        const rhTarget = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null);
+        const rhCurrent = wo.currentRH ?? (wo.currentReading != null ? Number(wo.currentReading) : null);
+        if (rhTarget == null || isNaN(rhTarget) || rhCurrent == null || isNaN(rhCurrent)) {
+          return false;
+        }
+        const rhRemaining = rhTarget - rhCurrent;
+        let periodDays = 0;
+        if (periodFilter.mode === 'year-only' && periodFilter.year) {
+          const isLeap = (periodFilter.year % 4 === 0 && periodFilter.year % 100 !== 0) || periodFilter.year % 400 === 0;
+          periodDays = isLeap ? 366 : 365;
+        } else if (periodFilter.mode === 'year-quarter' && periodFilter.year && periodFilter.quarter) {
+          const qStart = new Date(periodFilter.year, (periodFilter.quarter - 1) * 3, 1);
+          const qEnd = new Date(periodFilter.year, periodFilter.quarter * 3, 0);
+          periodDays = Math.round((qEnd.getTime() - qStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        } else if (periodFilter.mode === 'year-months' && periodFilter.year && periodFilter.months && periodFilter.months.length > 0) {
+          let totalDays = 0;
+          for (const m of periodFilter.months) {
+            const lastDay = new Date(periodFilter.year, m, 0).getDate();
+            totalDays += lastDay;
+          }
+          periodDays = totalDays;
+        } else if (periodFilter.mode === 'date-range' && periodFilter.dateFrom && periodFilter.dateTo) {
+          const from = new Date(periodFilter.dateFrom);
+          from.setHours(0, 0, 0, 0);
+          const to = new Date(periodFilter.dateTo);
+          to.setHours(0, 0, 0, 0);
+          periodDays = Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        }
+        const periodHours = periodDays * 24;
+        if (rhRemaining > periodHours) return false;
+      } else {
+        const woDueDate = wo.dueDate ? new Date(wo.dueDate) : null;
+        if (!woDueDate || isNaN(woDueDate.getTime())) {
+          return false;
+        }
+        if (periodFilter.mode === 'year-only' && periodFilter.year) {
+          if (woDueDate.getFullYear() !== periodFilter.year) return false;
+        } else if (periodFilter.mode === 'year-quarter' && periodFilter.year && periodFilter.quarter) {
+          if (woDueDate.getFullYear() !== periodFilter.year) return false;
+          const woMonth = woDueDate.getMonth() + 1;
+          const qStart = (periodFilter.quarter - 1) * 3 + 1;
+          const qEnd = qStart + 2;
+          if (woMonth < qStart || woMonth > qEnd) return false;
+        } else if (periodFilter.mode === 'year-months' && periodFilter.year && periodFilter.months && periodFilter.months.length > 0) {
+          if (woDueDate.getFullYear() !== periodFilter.year) return false;
+          const woMonth = woDueDate.getMonth() + 1;
+          if (!periodFilter.months.includes(woMonth)) return false;
+        } else if (periodFilter.mode === 'date-range' && periodFilter.dateFrom && periodFilter.dateTo) {
+          const from = new Date(periodFilter.dateFrom);
+          from.setHours(0, 0, 0, 0);
+          const to = new Date(periodFilter.dateTo);
+          to.setHours(23, 59, 59, 999);
+          const woTime = woDueDate.getTime();
+          if (woTime < from.getTime() || woTime > to.getTime()) return false;
+        }
       }
     }
     

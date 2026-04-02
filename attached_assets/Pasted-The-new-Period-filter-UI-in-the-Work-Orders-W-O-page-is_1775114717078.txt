@@ -1,0 +1,227 @@
+The new Period filter UI in the Work Orders (W.O) page is implemented, but the filtering is currently incomplete.
+
+It is filtering calendar-based work orders, but it is not properly filtering running-hours-based work orders.
+
+This must be corrected.
+
+Core issue
+The Period filter cannot behave as a calendar-only filter.
+
+The Work Orders module contains both:
+
+Calendar-based work orders
+
+Running-hours-based work orders
+
+If the filter only works for calendar jobs, then the data shown to the user is incomplete and misleading.
+
+That is not acceptable.
+
+Required correction
+Make the Period filter a complete filter for the Work Orders module by ensuring it also includes Running Hours based work orders using the proper PMS business logic.
+
+Required RH logic
+For Running Hours based work orders, the period filter must use the logic:
+
+number of days × 24 hours
+
+This logic must be used to determine future RH jobs within the selected period.
+
+Business understanding
+For calendar jobs, filtering by Due Date is straightforward.
+
+For RH jobs, the system cannot rely on a normal calendar due date in the same direct way.
+Instead, it must determine whether an RH work order falls within the selected future period by converting the selected time window into hours.
+
+Meaning
+If the selected period covers N days into the future, then for RH jobs the system should evaluate using:
+
+N days × 24 hours = N-hour equivalent window
+
+This is the core logic needed so RH jobs also appear correctly inside the selected period.
+
+What this means functionally
+When the user applies a Period filter:
+
+calendar-based jobs should continue to be filtered by the relevant work order due-date logic,
+
+running-hours-based jobs must also be evaluated against the selected period by translating that period into an hour window.
+
+Example understanding
+If user selects a future period equivalent to 30 days,
+then RH logic should treat that as:
+
+30 × 24 = 720 hours
+
+and RH-based work orders that fall due within that 720-hour equivalent window must also be included.
+
+This is the same principle that makes RH future planning meaningful in PMS.
+
+Why this matters
+Without RH inclusion:
+
+user sees only calendar-based work orders,
+
+RH-based future jobs are missing,
+
+filter output becomes misleading,
+
+planning decisions become wrong.
+
+The Period filter must therefore become a common operational planning filter, not just a date-only calendar filter.
+
+Expected behavior
+The Period filter should return a correct combined result set containing:
+
+calendar-based WOs matching the selected period
+
+RH-based WOs matching the same period through day-to-hour conversion logic
+
+Detailed implementation expectation
+Please review the current filtering logic in the Work Orders page and extend it so that:
+
+For Calendar-based jobs
+Use the current period filter logic based on the relevant due-date field already used in the module.
+
+For Running Hours based jobs
+Use equivalent future-window logic based on selected period length.
+
+Convert selected period to number of days
+From the selected Period filter, derive the total selected period span in days.
+
+Examples:
+
+Year only → selected date span of that year
+
+Year + Quarter → selected date span of that quarter
+
+Year + selected month(s) → selected date span covering those month selections
+
+Date Range → direct day difference between from-date and to-date
+
+Then convert to hours
+selectedPeriodDays × 24 = selectedPeriodHours
+
+Then apply RH inclusion logic
+RH work orders that are due within that computed future-hours window must be included in the filtered result.
+
+Important clarification
+Please do not take a shortcut by simply excluding RH jobs when Due Date is empty or non-standard.
+
+That is exactly the current problem.
+
+Instead, explicitly include RH-based WOs using RH period-equivalent logic.
+
+Logic expectation by filter type
+1. Year only
+If user selects only a year:
+
+calendar jobs within that year should be included
+
+RH jobs relevant within that selected year window should also be included based on converted day span
+
+2. Year + Quarter
+If user selects a quarter:
+
+calendar jobs in that quarter should be included
+
+RH jobs within equivalent quarter-duration horizon should also be included
+
+3. Year + one or more months
+If user selects months:
+
+calendar jobs in those months should be included
+
+RH jobs within that equivalent selected month-window should also be included
+
+4. Date Range
+If user selects Date From and Date To:
+
+calendar jobs in that date range should be included
+
+RH jobs due within the equivalent day-span-to-hour-span logic should also be included
+
+Need proper source field understanding
+Please review how RH work orders currently store and compute their due logic in this module.
+
+Do not guess.
+
+Use the existing RH work-order fields/business logic already present in the PMS implementation.
+
+The correction must align with current RH planning logic already used elsewhere in the system.
+
+UI behavior
+No major UI redesign is required in this task.
+
+The current new Period popup UI can remain.
+
+This task is specifically about fixing the filter result logic so it becomes complete.
+
+Important restrictions
+Do not:
+
+remove the new Period filter UI
+
+revert back to old dropdown behavior
+
+simplify by showing only calendar-based results
+
+change unrelated filters
+
+change work order tabs logic
+
+Only fix the Period filter so that it correctly includes both:
+
+calendar-based WOs
+
+RH-based WOs
+
+Validation expectation
+After implementing the correction, please test the following and report back:
+
+Test 1
+Apply a future period that should include some calendar jobs and some RH jobs.
+Confirm both appear.
+
+Test 2
+Apply a short period where RH jobs outside the equivalent hour window do not appear.
+Confirm RH filtering is actually working, not just showing all RH jobs.
+
+Test 3
+Apply a broader period and confirm additional RH jobs now appear as expected.
+
+Test 4
+Check that mixed result sets still work with:
+
+Vessel filter
+
+Search
+
+Rank
+
+Criticality
+
+current status tab
+
+Final expected result
+After this correction:
+
+Period filter works for calendar-based work orders
+
+Period filter also works for running-hours-based work orders
+
+RH jobs are included using selected days × 24 hours conversion logic
+
+filtered work order list becomes complete and trustworthy
+
+user gets true planning visibility instead of half information
+
+Key note
+This is not a small enhancement.
+This is a core correction.
+
+Because in PMS, future planning is not only calendar-based.
+If RH jobs are excluded from the period filter, then the filter is incomplete and operationally misleading.
+
+Please fix this properly and make the Period filter complete.
+
