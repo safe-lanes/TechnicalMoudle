@@ -1,0 +1,202 @@
+We now need a developer-facing test case Excel sheet for validating the new Lead Time & Grace Period business logic.
+
+This sheet is not for users; it is for developers and QA to run structured tests against the real implementation using existing data on Vessel 4 and Vessel 11 only.
+Do not invent “Vessel A/B” or dummy vessels.
+
+Objective
+Create an Excel workbook with a single sheet that lists detailed test cases to validate:
+
+Work order lifecycle: Planned → Due → Grace P → Overdue
+
+Correct use of:
+
+Company Standard vs Custom vessel settings
+
+Calendar-based jobs vs Running-hours-based jobs
+
+Lead time (days/hours)
+
+Grace period (all methods and scopes)
+
+We will later execute these test cases manually in the UI and via logs; this task is only to design the test matrix and put it into Excel.
+
+Excel structure
+Create a sheet with the following columns:
+
+Test Case ID
+
+Test Group (Baseline / Calendar grace methods / RH settings / Override logic / Mode switching / UI & data integrity)
+
+Test Vessel (only “Vessel 4” or “Vessel 11”)
+
+Settings Source (“Company Standard”, “Custom”, or “Switching”)
+
+Job Type (“Calendar”, “RH”, “Both”, or “Mixed”)
+
+Focus Area (Generation threshold, Planned state, Due state, Grace P, Overdue, Scope, Fallback, etc.)
+
+Precondition / Setup (what config to set, which vessel to use, which job type, due date or running-hour situation, etc.)
+
+Test Steps (clear, numbered steps a dev/QA can follow)
+
+Expected Result (precise status/tab/marker that should be seen)
+
+Developer Notes (any important nuance to watch, e.g. “must not affect RH jobs”)
+
+Status (default “Not Run”)
+
+Actual Result (to be filled after execution)
+
+Defect / Observation (to log issues found)
+
+Populate the sheet with concrete test cases as described below. Use Vessel 4 for calendar-focused tests and Vessel 11 for RH-focused tests. Do not refer to generic Vessel A/B.
+
+Test cases to include
+1. Baseline lifecycle – Calendar (Vessel 4, Company Standard)
+Create test cases such as:
+
+TC-01 – Calendar generation threshold
+
+Vessel: 4, Source: Company Standard, Job Type: Calendar
+
+Precondition: Choose a calendar-based job on Vessel 4 whose due date is more than 30 days away.
+
+Expected: No WO is generated yet (outside 30-day generation window).
+
+TC-02 – Calendar Planned state
+
+Job due within 30 days but outside lead time window.
+
+Expected: WO exists and appears under Planned.
+
+TC-03 – Calendar Due state
+
+Job due within configured calendar lead days.
+
+Expected: WO appears under Due.
+
+TC-04 – Calendar Grace P state
+
+WO just past due date but still within grace window.
+
+Expected: WO in Due tab with Grace P marker, not in Overdue.
+
+TC-05 – Calendar Overdue
+
+WO past grace period.
+
+Expected: WO appears under Overdue.
+
+2. Calendar grace methods – Company Standard (Vessel 4)
+Add test cases for each method:
+
+Fixed Days: verify grace ends exactly after configured days.
+
+Month End: verify grace lasts until end of due month.
+
+Specific Date of Next Month: e.g. date = 5 → grace until 5th of next month.
+
+Each case should specify:
+
+what to set in Company Standard – Calendar-Based Jobs tab,
+
+which kind of due date to pick,
+
+what exact end date is expected.
+
+3. Calendar scope & fallback – Company Standard (Vessel 4)
+Add test cases for:
+
+Scope = Apply to all Calendar-Based Work Orders
+
+Verify all calendar WOs follow the same grace rule; RH jobs unchanged.
+
+Scope = Apply only to Calendar-Based WOs due in last week of month + Fallback
+
+One WO with due date in last 7 days of month.
+
+One WO with due date outside last 7 days.
+
+Expected: last-week WO uses main method; other WO uses fallback grace value.
+
+4. Baseline lifecycle – Running Hours (Vessel 11, Company Standard)
+Create similar tests focused on RH:
+
+TC – RH generation threshold: remaining hours >720 → no WO yet.
+
+RH Planned: remaining hours ≤720 but > RH lead.
+
+RH Due: remaining hours within RH lead hours.
+
+RH Grace P: crossed due RH but within grace hours.
+
+RH Overdue: beyond grace hours.
+
+5. RH settings and scope – Company Standard (Vessel 11)
+Include tests to verify:
+
+RH lead hours cause proper Planned → Due transition.
+
+RH grace hours cause proper Grace P → Overdue timing.
+
+Scope = Apply to all RH-Based WOs affects only RH jobs.
+
+Scope = Apply only to RH-Based WOs due in last week of month + fallback for remaining RH WOs.
+
+6. Vessel override – Custom vs Company Standard
+Create override tests using actual vessel IDs:
+
+Vessel 4 – Calendar Custom override
+
+Set Company Standard to some baseline, then set Vessel 4 mode = Custom and change calendar lead/grace.
+
+Expected:
+
+Vessel 4 calendar WOs follow custom values.
+
+Other vessels (e.g., Vessel 11) still follow company standard.
+
+Vessel 11 – RH Custom override
+
+Similar pattern for RH lead/grace.
+
+Expected: only Vessel 11 RH jobs use custom RH values.
+
+7. Mode switching tests
+Add cases for:
+
+Vessel 4: Custom → Company Standard
+
+After switching back, calendar WOs should behave exactly per company standard (custom not applied).
+
+Vessel 11: Custom → Company Standard
+
+Same idea for RH.
+
+8. UI / data integrity tests
+Include cases for:
+
+Save & reload Company Standard popup: values persist correctly.
+
+Save & reload vessel popups for Vessel 4 and 11:
+
+mode (Company Standard / Custom) persists,
+
+lead/grace values persist,
+
+page summaries match stored values.
+
+Output
+Generate the Excel file in the repo (e.g. docs/pms_lead_grace_test_cases.xlsx or similar).
+
+Fill Status as “Not Run” for all rows initially.
+
+Do not execute the tests yet in this task; this task is only to design the test case sheet.
+
+Once the Excel is ready, confirm:
+
+file path,
+
+number of test cases,
+
+and provide a brief outline of coverage groups so we can review before actual execution.
