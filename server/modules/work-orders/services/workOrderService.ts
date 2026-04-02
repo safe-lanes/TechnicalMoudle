@@ -5,6 +5,9 @@ import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { computeSpareConsumptionDelta, ConsumedSpareEntry } from '../utils/spareConsumptionDelta';
 import { calculateMissedCycles, calculateMissedCyclesRH } from '@shared/dateUtils';
 import { storage } from '../../../storage';
+import { getDb } from '../../../db';
+import { plannerDates } from '@shared/schema';
+import { eq } from 'drizzle-orm';
 
 function calculateBackdatingDaysForApproval(completionDate: string | null | undefined, submittedDate: string | null | undefined): number {
   if (!completionDate) return 0;
@@ -163,6 +166,26 @@ export async function listWorkOrders(vesselId?: string) {
     }
   }
 
+  const database = await getDb();
+  const plannerDateMap = new Map<string, string>();
+  if (vesselId) {
+    const savedPlannerDates = await database.select().from(plannerDates).where(eq(plannerDates.vesselId, vesselId));
+    for (const pd of savedPlannerDates) {
+      if (pd.plannedDate) {
+        plannerDateMap.set(`${pd.jobId}::${pd.componentId}`, pd.plannedDate);
+      }
+    }
+  } else {
+    for (const vid of uniqueVesselIds) {
+      const savedPlannerDates = await database.select().from(plannerDates).where(eq(plannerDates.vesselId, vid));
+      for (const pd of savedPlannerDates) {
+        if (pd.plannedDate) {
+          plannerDateMap.set(`${pd.jobId}::${pd.componentId}`, pd.plannedDate);
+        }
+      }
+    }
+  }
+
   // Robust numeric parsing helper
   const parseRH = (value: string | number | null | undefined): number | undefined => {
     if (value == null || value === '') return undefined;
@@ -259,6 +282,9 @@ export async function listWorkOrders(vesselId?: string) {
       }
     }
 
+    const plannerKey = (wo.jobId && componentId) ? `${wo.jobId}::${componentId}` : null;
+    const plannedDate = plannerKey ? (plannerDateMap.get(plannerKey) || null) : null;
+
     return {
       ...wo,
       assignedTo: (wo.assignedTo && wo.assignedTo !== 'Unassigned')
@@ -270,7 +296,8 @@ export async function listWorkOrders(vesselId?: string) {
       leadTimeValue: job?.leadTimeValue ?? null,
       leadTimeUnit: job?.leadTimeUnit ?? null,
       dueRH: dueRH ?? null,
-      currentRH: currentRH ?? null
+      currentRH: currentRH ?? null,
+      plannedDate
     };
   });
 

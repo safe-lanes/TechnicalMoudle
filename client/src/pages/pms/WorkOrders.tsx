@@ -895,6 +895,9 @@ const WorkOrders: React.FC = () => {
                 <Marker id="C20" />
                 {activeTab === "Pending Approval" || activeTab === "Completed" ? "Submitted Date" : "Due Date"}
               </th>
+              {activeTab === "Planned" && (
+                <th className="text-left py-3 px-4 font-medium" data-testid="th-planned-date">Planned Date</th>
+              )}
               {activeTab === "Pending Approval" && (
                 <th className="text-left py-3 px-4 font-medium" data-testid="th-days-late">Days Late</th>
               )}
@@ -1032,6 +1035,13 @@ const WorkOrders: React.FC = () => {
                     }
                   </div>
                 </td>
+                {activeTab === "Planned" && (
+                  <td className="py-3 px-4 text-gray-900" data-testid={`cell-planned-date-${workOrder.id}`}>
+                    {(workOrder as any).plannedDate
+                      ? formatProfessionalDate((workOrder as any).plannedDate)
+                      : '—'}
+                  </td>
+                )}
                 {activeTab === "Pending Approval" && (
                   <td className="py-3 px-4" data-testid={`cell-days-late-${workOrder.id}`}>
                     {(() => {
