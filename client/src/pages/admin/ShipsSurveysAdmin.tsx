@@ -436,7 +436,7 @@ export default function ShipsSurveysAdmin() {
         category: 'Vessel',
         group: survey.companyGroup || 'Vessel Specific',
         requirementRef: survey.requirementRef || '',
-        applicableToCompany: true,
+        applicableToCompany: false,
         surveyLabel: survey.surveyLabel,
         companyId: survey.companyId || newMasterId.replace('VES-', 'VV'),
         companyGroup: survey.companyGroup || '',

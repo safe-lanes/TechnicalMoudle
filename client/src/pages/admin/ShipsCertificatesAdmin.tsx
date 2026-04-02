@@ -479,7 +479,7 @@ export default function ShipsCertificatesAdmin() {
         category: 'Vessel',
         group: cert.companyGroup || 'Vessel Specific',
         requirementRef: cert.requirementRef || '',
-        applicableToCompany: true,
+        applicableToCompany: false,
         certificateLabel: cert.certificateLabel,
         isActive: true,
         companyId: cert.companyId || newMasterId.replace('VES-', 'VV'),
