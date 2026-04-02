@@ -21,7 +21,6 @@ export async function getCertificates(filters: CertificateFilters) {
   const sortBy = filters.sortBy;
   const sortOrder = (filters.sortOrder)?.toLowerCase() === 'desc' ? 'desc' : 'asc';
 
-  // Step 1: Get applicable certificates
   const applicabilityRecords = await certRepo.getApplicableCertificates();
   if (!applicabilityRecords) {
     throw Object.assign(new Error("Database not available"), { statusCode: 500 });
@@ -31,7 +30,6 @@ export async function getCertificates(filters: CertificateFilters) {
     return { certificates: [], total: 0, page, limit };
   }
 
-  // Filter by vessel if specified
   let filteredApplicability = applicabilityRecords;
   if (filters.vesselId) {
     filteredApplicability = applicabilityRecords.filter(r => r.vesselId === filters.vesselId);
@@ -51,7 +49,6 @@ export async function getCertificates(filters: CertificateFilters) {
     return { certificates: [], total: 0, page, limit };
   }
 
-  // Step 2: Get all master certificates referenced by applicability records
   const masterIds = Array.from(new Set(filteredApplicability.map(r => r.masterId)));
   const masterRecords = await certRepo.getMasterCertificatesByIds(masterIds);
   if (!masterRecords) {
@@ -60,7 +57,6 @@ export async function getCertificates(filters: CertificateFilters) {
 
   const masterMap = new Map(masterRecords.map(m => [m.masterId, m]));
 
-  // Step 3: Get vessel certificate data (dates, attachments)
   const vesselCertDataRecords = await certRepo.getAllVesselCertificateData();
   if (!vesselCertDataRecords) {
     throw Object.assign(new Error("Database not available"), { statusCode: 500 });
@@ -72,10 +68,8 @@ export async function getCertificates(filters: CertificateFilters) {
     certDataMap.set(key, data);
   }
 
-  // Step 4: Build the certificate list
   const certificates: any[] = [];
 
-  // Group by vessel to maintain order
   const vesselGroups = new Map<string, typeof filteredApplicability>();
   for (const app of filteredApplicability) {
     if (!vesselGroups.has(app.vesselId)) {
@@ -84,7 +78,6 @@ export async function getCertificates(filters: CertificateFilters) {
     vesselGroups.get(app.vesselId)!.push(app);
   }
 
-  // Process each vessel's certificates in sequence order
   for (const [vesselId, apps] of Array.from(vesselGroups)) {
     const sortedApps = apps.sort((a: any, b: any) => {
       const masterA = masterMap.get(a.masterId);
@@ -97,6 +90,11 @@ export async function getCertificates(filters: CertificateFilters) {
     for (const app of sortedApps) {
       const master = masterMap.get(app.masterId);
       if (!master) continue;
+
+      const isCompanyWide = master.applicableToCompany === true || app.masterId.startsWith('CMP-');
+      const isVesselSpecific = app.masterId.startsWith('VES-');
+
+      if (!isCompanyWide && !isVesselSpecific) continue;
 
       const dataKey = `${app.vesselId}-${app.masterId}`;
       const certData = certDataMap.get(dataKey);
@@ -122,7 +120,6 @@ export async function getCertificates(filters: CertificateFilters) {
     }
   }
 
-  // Apply server-side sorting before pagination
   if (sortBy) {
     certificates.sort((a, b) => {
       let valA: any;
@@ -177,19 +174,16 @@ export async function getCertificates(filters: CertificateFilters) {
           valB = b.companySequence ?? 9999;
       }
 
-      // For string comparisons
       if (typeof valA === 'string' && typeof valB === 'string') {
         const comparison = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
         return sortOrder === 'desc' ? -comparison : comparison;
       }
 
-      // For numeric comparisons
       const diff = (valA as number) - (valB as number);
       return sortOrder === 'desc' ? -diff : diff;
     });
   }
 
-  // Apply pagination
   const total = certificates.length;
   const paginatedCerts = certificates.slice(offset, offset + limit);
 
@@ -213,7 +207,6 @@ export async function getCertificate(certId: string) {
     return null;
   }
 
-  // Get applicability record
   const appRecords = await certRepo.getCertificateApplicability(vesselId, masterId);
   if (!appRecords) {
     throw Object.assign(new Error("Database not available"), { statusCode: 500 });
@@ -223,14 +216,12 @@ export async function getCertificate(certId: string) {
   }
   const app = appRecords[0];
 
-  // Get master certificate
   const masterRecords = await certRepo.getMasterCertificateById(masterId);
   if (!masterRecords || masterRecords.length === 0) {
     throw Object.assign(new Error("Certificate master not found"), { statusCode: 404, code: 'MASTER_NOT_FOUND' });
   }
   const master = masterRecords[0];
 
-  // Get certificate data
   const dataRecords = await certRepo.getVesselCertificateDataByKey(vesselId, masterId);
   const certData = dataRecords ? dataRecords[0] : undefined;
 
@@ -267,14 +258,21 @@ export async function updateCertificate(certId: string, body: any) {
     throw Object.assign(new Error("vesselId and masterId are required"), { statusCode: 400 });
   }
 
-  // Get vessel name from applicability record
   const appRecords = await certRepo.getCertificateApplicability(vesselId, masterId);
   if (!appRecords) {
     throw Object.assign(new Error("Database not available"), { statusCode: 500 });
   }
-  const vesselName = appRecords[0]?.vesselName || '';
+  if (appRecords.length === 0) {
+    throw Object.assign(new Error("Certificate not applicable or has been deleted"), { statusCode: 404 });
+  }
+  const vesselName = appRecords[0].vesselName;
 
-  // Check if data record exists
+  const masterRecords = await certRepo.getMasterCertificateById(masterId);
+  if (!masterRecords || masterRecords.length === 0) {
+    throw Object.assign(new Error("Certificate master not found or has been deleted"), { statusCode: 404, code: 'MASTER_NOT_FOUND' });
+  }
+  const master = masterRecords[0];
+
   const existingData = await certRepo.getVesselCertificateDataByKey(vesselId, masterId);
   if (!existingData) {
     throw Object.assign(new Error("Database not available"), { statusCode: 500 });
@@ -296,14 +294,10 @@ export async function updateCertificate(certId: string, body: any) {
     throw Object.assign(new Error("Database not available"), { statusCode: 500 });
   }
 
-  // Get full certificate for response
-  const masterRecords = await certRepo.getMasterCertificateById(masterId);
-  const master = masterRecords ? masterRecords[0] : undefined;
-
   return {
-    id: master?.companyId || masterId,
-    certificateName: master?.certificateLabel || master?.certificateName || '',
-    type: master?.companyGroup || '',
+    id: master.companyId || masterId,
+    certificateName: master.certificateLabel || master.certificateName || '',
+    type: master.companyGroup || '',
     vessel: vesselName,
     vesselId,
     masterId,

@@ -115,8 +115,15 @@ export async function saveMasterCertificates(body: any) {
 
   // Auto-create vessel_certificate_applicability records
   if (newlyInsertedMasterIds.length > 0) {
-    const companyWideMasterIds = newlyInsertedMasterIds.filter(id => !vesselSpecificSet.has(id));
-    const vesselOnlyMasterIds = newlyInsertedMasterIds.filter(id => vesselSpecificSet.has(id));
+    const certLookup = new Map(certificates.map((c: any) => [c.masterId, c]));
+    const companyWideMasterIds = newlyInsertedMasterIds.filter(id => {
+      const cert = certLookup.get(id);
+      return cert?.applicableToCompany === true || id.startsWith('CMP-');
+    });
+    const vesselOnlyMasterIds = newlyInsertedMasterIds.filter(id => {
+      const cert = certLookup.get(id);
+      return !(cert?.applicableToCompany === true || id.startsWith('CMP-'));
+    });
 
     // Get existing applicability records to avoid duplicates
     const existingApplicability = await certAdminRepo.getApplicabilityByMasterIds(newlyInsertedMasterIds);

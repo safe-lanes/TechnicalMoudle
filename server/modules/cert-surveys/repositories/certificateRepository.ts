@@ -4,7 +4,7 @@ import {
   shipCertificatesMaster,
   vesselCertificateData,
 } from '@shared/schema';
-import { eq, and, asc, inArray } from 'drizzle-orm';
+import { eq, and, asc, inArray, or, isNull } from 'drizzle-orm';
 
 // ── Helpers ──
 
@@ -20,21 +20,35 @@ export async function getApplicableCertificates() {
   const db = await getDb();
   if (!db) return null;
   return db.select().from(vesselCertificateApplicability)
-    .where(eq(vesselCertificateApplicability.isApplicable, true));
+    .where(
+      and(
+        eq(vesselCertificateApplicability.isApplicable, true),
+        or(eq(vesselCertificateApplicability.isDeleted, false), isNull(vesselCertificateApplicability.isDeleted))
+      )
+    );
 }
 
 export async function getMasterCertificatesByIds(masterIds: string[]) {
   const db = await getDb();
   if (!db) return null;
   return db.select().from(shipCertificatesMaster)
-    .where(inArray(shipCertificatesMaster.masterId, masterIds))
+    .where(
+      and(
+        inArray(shipCertificatesMaster.masterId, masterIds),
+        eq(shipCertificatesMaster.isActive, true),
+        or(eq(shipCertificatesMaster.isDeleted, false), isNull(shipCertificatesMaster.isDeleted))
+      )
+    )
     .orderBy(asc(shipCertificatesMaster.companySequence));
 }
 
 export async function getAllVesselCertificateData() {
   const db = await getDb();
   if (!db) return null;
-  return db.select().from(vesselCertificateData);
+  return db.select().from(vesselCertificateData)
+    .where(
+      or(eq(vesselCertificateData.isDeleted, false), isNull(vesselCertificateData.isDeleted))
+    );
 }
 
 export async function getCertificateApplicability(vesselId: string, masterId: string) {
@@ -45,7 +59,8 @@ export async function getCertificateApplicability(vesselId: string, masterId: st
       and(
         eq(vesselCertificateApplicability.vesselId, vesselId),
         eq(vesselCertificateApplicability.masterId, masterId),
-        eq(vesselCertificateApplicability.isApplicable, true)
+        eq(vesselCertificateApplicability.isApplicable, true),
+        or(eq(vesselCertificateApplicability.isDeleted, false), isNull(vesselCertificateApplicability.isDeleted))
       )
     )
     .limit(1);
@@ -55,7 +70,13 @@ export async function getMasterCertificateById(masterId: string) {
   const db = await getDb();
   if (!db) return null;
   return db.select().from(shipCertificatesMaster)
-    .where(eq(shipCertificatesMaster.masterId, masterId))
+    .where(
+      and(
+        eq(shipCertificatesMaster.masterId, masterId),
+        eq(shipCertificatesMaster.isActive, true),
+        or(eq(shipCertificatesMaster.isDeleted, false), isNull(shipCertificatesMaster.isDeleted))
+      )
+    )
     .limit(1);
 }
 
@@ -66,7 +87,8 @@ export async function getVesselCertificateDataByKey(vesselId: string, masterId: 
     .where(
       and(
         eq(vesselCertificateData.vesselId, vesselId),
-        eq(vesselCertificateData.masterId, masterId)
+        eq(vesselCertificateData.masterId, masterId),
+        or(eq(vesselCertificateData.isDeleted, false), isNull(vesselCertificateData.isDeleted))
       )
     )
     .limit(1);
@@ -80,7 +102,8 @@ export async function updateCertificateData(vesselId: string, masterId: string, 
     .where(
       and(
         eq(vesselCertificateData.vesselId, vesselId),
-        eq(vesselCertificateData.masterId, masterId)
+        eq(vesselCertificateData.masterId, masterId),
+        or(eq(vesselCertificateData.isDeleted, false), isNull(vesselCertificateData.isDeleted))
       )
     )
     .returning();

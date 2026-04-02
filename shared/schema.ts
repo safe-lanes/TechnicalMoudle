@@ -2735,6 +2735,11 @@ export const shipCertificatesMaster = pgTable("ship_certificates_master", {
   companyId: text("company_id"), // Default: "C" + masterId, but user-editable
   companyGroup: text("company_group"), // A-I company group key
   companySequence: integer("company_sequence"), // Sequence number for company tab ordering
+  sortOrder: integer("sort_order").default(0),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  isSync: boolean("is_sync").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -2746,6 +2751,11 @@ export const shipCertificatesMaster = pgTable("ship_certificates_master", {
 export const insertShipCertificateMasterSchema = createInsertSchema(shipCertificatesMaster).omit({
   id: true,
   isSystemDefined: true,
+  sortOrder: true,
+  createdByUuid: true,
+  updatedByUuid: true,
+  isDeleted: true,
+  isSync: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2779,6 +2789,11 @@ export const vesselCertificateApplicability = pgTable("vessel_certificate_applic
   vesselName: text("vessel_name").notNull(), // Vessel name for display
   masterId: text("master_id").notNull(), // References ship_certificates_master.master_id
   isApplicable: boolean("is_applicable").notNull().default(true), // Whether this certificate is applicable to this vessel
+  sortOrder: integer("sort_order").default(0),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  isSync: boolean("is_sync").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -2789,6 +2804,11 @@ export const vesselCertificateApplicability = pgTable("vessel_certificate_applic
 
 export const insertVesselCertificateApplicabilitySchema = createInsertSchema(vesselCertificateApplicability).omit({
   id: true,
+  sortOrder: true,
+  createdByUuid: true,
+  updatedByUuid: true,
+  isDeleted: true,
+  isSync: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2809,6 +2829,11 @@ export const vesselCertificateData = pgTable("vessel_certificate_data", {
   endorsementDate: text("endorsement_date"), // Date of endorsement
   lastEditUpload: text("last_edit_upload"), // Date of last edit or file upload
   attachments: jsonb("attachments").$type<Array<{ name: string; size: number; key: string; uploadedAt: string }>>().default([]),
+  sortOrder: integer("sort_order").default(0),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  isSync: boolean("is_sync").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -2819,6 +2844,11 @@ export const vesselCertificateData = pgTable("vessel_certificate_data", {
 
 export const insertVesselCertificateDataSchema = createInsertSchema(vesselCertificateData).omit({
   id: true,
+  sortOrder: true,
+  createdByUuid: true,
+  updatedByUuid: true,
+  isDeleted: true,
+  isSync: true,
   createdAt: true,
   updatedAt: true,
 });
