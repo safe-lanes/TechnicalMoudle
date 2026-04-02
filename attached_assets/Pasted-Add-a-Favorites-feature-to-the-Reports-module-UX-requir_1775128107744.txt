@@ -1,0 +1,59 @@
+Add a Favorites feature to the Reports module.
+UX requirement
+Star icon on every report
+Show a small star icon to the left of each leaf report name in the left report tree (e.g., “Completed Jobs Register”, “Monthly Maintenance Summary”, etc.).
+States:
+Empty/outline star = not favorited
+Filled star = favorited
+Clicking the star toggles favorite on/off for that report.
+New “Favorites” group at the top
+Add a new top-level group/folder in the tree called Favorites.
+When a report is favorited, it should appear as a child item under Favorites as well as in its original category.
+The Favorites group should always be at the top of the tree, above “Maintenance & Work Orders”, “Running Hours & Condition”, etc.
+If the user has no favorites, show either:
+an empty state text like “No favorites yet – click the star beside a report to add it”, or
+hide the group until at least one favorite exists (choose whichever matches your current tree UX).
+Click behavior
+Clicking a report under Favorites should behave exactly the same as clicking it under its original category (loads same report, uses same filters, etc.).
+The active selection highlight should be consistent whether selected from Favorites or from the original node.
+Per‑user favorites
+Favorites must be tied to the logged‑in user, not global.
+Different users can have different favorite sets for the same vessel/company.
+On page load, Favorites should be built from that user’s saved preferences.
+Persistence
+When a user toggles a star:
+immediately update UI (optimistic), and
+persist the change to backend/user‑preferences store so that favorites survive reload and new sessions.
+If saving fails, revert the star state and show a small error toast.
+Search integration
+The existing “Search reports…” box should search across:
+normal tree nodes
+Favorites entries
+When a favorite matches a search, it can show under Favorites and/or normal group, but avoid duplicate confusing lines in the search result UX.
+Data / backend expectation
+Storage model
+Introduce a simple per‑user mapping:
+userId → list of reportIds favorited.
+If a report already has a stable internal ID, reuse it; do not depend on display text only.
+Provide API endpoints such as:
+GET /api/reports/favorites → current user’s favorites (list of report IDs).
+POST /api/reports/favorites/{reportId} → add favorite.
+DELETE /api/reports/favorites/{reportId} → remove favorite.
+Alternatively, extend existing user‑preferences API if one already exists; the key requirement is per‑user persistence.
+Tree building
+When building the Reports tree:
+load full report catalog as you do now,
+load current user’s favorite IDs,
+build a Favorites virtual group at the top by mapping those IDs back to their report definitions.
+Edge cases
+If a report is disabled/removed:
+automatically remove it from user favorites (or hide it), to avoid broken entries in Favorites.
+If a report exists multiple times in configuration, ensure one ID maps correctly.
+Visual details
+Use the same icon library as elsewhere in PMS (e.g., an outline star and filled star).
+Keep the star small and aligned so it doesn’t disturb the tree’s indentation.
+Clicking the report row (text) should select/open; clicking the star should toggle favorite without opening the report, if possible.
+Out of scope
+No changes to the report definitions themselves.
+No favorites for other modules (Work Orders, Running Hours, etc.) in this task.
+No global “company favorites” in this phase; only per‑user favorites.
