@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Search, FileSpreadsheet, Calendar, Users, Settings, Pencil, AlertTriangle, Download, Clock, History, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange, getPeriodLabel } from "@/components/filters/PeriodFilter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -92,7 +93,7 @@ const RunningHours = () => {
   const [, navigate] = useLocation();
   const { currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
-  const [utilizationPeriod, setUtilizationPeriod] = useState<string>("monthly");
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [selectedComponent, setSelectedComponent] = useState<RunningHoursData | null>(null);
   
@@ -190,10 +191,20 @@ const RunningHours = () => {
   };
   
   // Fetch parent components with RH-based child jobs
+  const periodDateRange = useMemo(() => periodFilterToDateRange(periodFilter), [periodFilter]);
+  const periodLabel = useMemo(() => getPeriodLabel(periodFilter) || 'Monthly', [periodFilter]);
+
   const { data: rawRunningHoursData = [], isLoading: isLoadingParents, refetch } = useQuery<any[]>({
-    queryKey: ['/technical/api/running-hours/parents', vesselId, utilizationPeriod],
+    queryKey: ['/technical/api/running-hours/parents', vesselId, periodFilter],
     queryFn: async () => {
-      const response = await fetch(`/technical/api/running-hours/parents?vesselId=${vesselId}&period=${utilizationPeriod}`);
+      const params = new URLSearchParams({ vesselId });
+      if (periodDateRange) {
+        params.append('periodFrom', periodDateRange.from.toISOString());
+        params.append('periodTo', periodDateRange.to.toISOString());
+      } else {
+        params.append('period', 'monthly');
+      }
+      const response = await fetch(`/technical/api/running-hours/parents?${params}`);
       if (!response.ok) throw new Error('Failed to fetch running hour parents');
       return response.json();
     },
@@ -467,6 +478,7 @@ const RunningHours = () => {
 
   const clearFilters = () => {
     setSearchTerm("");
+    setPeriodFilter(null);
   };
 
   // Export to CSV function
@@ -479,8 +491,8 @@ const RunningHours = () => {
       "Component Category",
       "Running Hours (cumulative)",
       "Last Updated (local)",
-      `Utilization Rate % (${periodShortLabels[utilizationPeriod] || 'Monthly'})`,
-      `Period Running Hours (${periodShortLabels[utilizationPeriod] || 'Monthly'})`,
+      `Utilization Rate % (${periodLabel})`,
+      `Period Running Hours (${periodLabel})`,
       "Last Updated By",
       "Notes"
     ];
@@ -1056,17 +1068,7 @@ const RunningHours = () => {
             <div className="flex items-center gap-2" data-testid="utilization-period-selector">
               <Clock className="h-4 w-4 text-gray-500" />
               <span className="text-sm text-gray-600 whitespace-nowrap">Utilization Period:</span>
-              <Select value={utilizationPeriod} onValueChange={setUtilizationPeriod}>
-                <SelectTrigger className="w-[180px]" data-testid="select-utilization-period">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="weekly" data-testid="period-weekly">Weekly (Last 7 days)</SelectItem>
-                  <SelectItem value="monthly" data-testid="period-monthly">Monthly (Last 30 days)</SelectItem>
-                  <SelectItem value="quarterly" data-testid="period-quarterly">Quarterly (Last 90 days)</SelectItem>
-                  <SelectItem value="yearly" data-testid="period-yearly">Yearly (Last 365 days)</SelectItem>
-                </SelectContent>
-              </Select>
+              <PeriodFilter value={periodFilter} onChange={setPeriodFilter} className="w-[200px]" />
             </div>
 
             <Button variant="outline" onClick={clearFilters} className="text-gray-600" data-testid="D4">
@@ -1346,7 +1348,7 @@ const RunningHours = () => {
               <th className="text-left py-3 px-4 font-medium" data-testid="D8"><Marker id="D8" />Component Category</th>
               <th className="text-left py-3 px-4 font-medium" data-testid="D9"><Marker id="D9" />Running Hours</th>
               <th className="text-left py-3 px-4 font-medium" data-testid="D10"><Marker id="D10" />Last Updated</th>
-              <th className="text-left py-3 px-4 font-medium" data-testid="D11"><Marker id="D11" />Utilization Rate ({periodShortLabels[utilizationPeriod] || 'Monthly'})</th>
+              <th className="text-left py-3 px-4 font-medium" data-testid="D11"><Marker id="D11" />Utilization Rate ({periodLabel})</th>
               <th className="text-left py-3 px-4 font-medium" data-testid="D22">Inherited RH</th>
               <th className="text-left py-3 px-4 font-medium" data-testid="D12"><Marker id="D12" />Update RH</th>
               <th className="text-left py-3 px-4 font-medium" data-testid="D24">Last Updated By</th>
@@ -1428,7 +1430,7 @@ const RunningHours = () => {
                       const rhAccum = item.periodRunningHours ?? 0;
                       const maxHrs = item.maxPossibleHours ?? 0;
                       const avgDaily = item.averageDailyHours ?? 0;
-                      const pLabel = periodShortLabels[utilizationPeriod] || 'Monthly';
+                      const pLabel = periodLabel;
                       let tooltip = `${pLabel} Utilization: ${rate.toFixed(1)}%\n\nCalculation Details:\n━━━━━━━━━━━━━━━━━━━━━━\nPeriod: ${periodStart} to ${today} (${days} days)\nCurrent RH: ${currentRH} hrs\nRH at Period Start: ${rhStart} hrs\nRH Accumulated: ${rhAccum} hrs\nMaximum Possible: ${maxHrs.toLocaleString()} hrs (${days} days × 24 hrs/day)\n\nFormula: (${rhAccum} / ${maxHrs.toLocaleString()}) × 100 = ${rate.toFixed(1)}%`;
                       if (avgDaily > 0) {
                         tooltip += `\n\nInterpretation: This machinery ran on average ${avgDaily} hours per day over the last ${days} days.`;

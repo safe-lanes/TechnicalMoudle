@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useLocation } from 'wouter';
+import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange } from '@/components/filters/PeriodFilter';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -102,6 +103,7 @@ export function ModifyPMS() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue | null>(null);
   const [isNewRequestModalOpen, setIsNewRequestModalOpen] = useState(false);
   const [viewingRequest, setViewingRequest] = useState<ChangeRequest | null>(null);
   const [location, setLocation] = useLocation();
@@ -129,14 +131,21 @@ export function ModifyPMS() {
     enabled: !!vesselId  // Only fetch when vesselId is defined
   });
 
-  // Filter requests based on search query and status filter
-  const filteredRequests = requests.filter((request: ChangeRequest) => {
-    const matchesSearch = searchQuery === '' ||
-      request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      request.status.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredRequests = useMemo(() => {
+    const dateRange = periodFilter ? periodFilterToDateRange(periodFilter) : null;
+    return requests.filter((request: ChangeRequest) => {
+      const matchesSearch = searchQuery === '' ||
+        request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        request.status.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
+      if (!matchesSearch || !matchesStatus) return false;
+      if (dateRange) {
+        const created = new Date(request.createdAt);
+        if (created < dateRange.from || created > dateRange.to) return false;
+      }
+      return true;
+    });
+  }, [requests, searchQuery, statusFilter, periodFilter]);
 
   // Approve mutation
   const approveMutation = useMutation({
@@ -257,6 +266,7 @@ export function ModifyPMS() {
             data-testid="input-search-status"
           />
         </div>
+        <PeriodFilter value={periodFilter} onChange={setPeriodFilter} className="w-[200px]" />
         <div className="flex items-center gap-1" data-testid="status-filter-tabs">
           {[
             { label: 'All', value: 'all' },
@@ -281,6 +291,7 @@ export function ModifyPMS() {
           onClick={() => {
             setSearchQuery("");
             setStatusFilter("all");
+            setPeriodFilter(null);
           }}
           data-testid="button-clear-filters-modify"
         >

@@ -66,6 +66,46 @@ function getDisplayText(value: PeriodFilterValue | null | undefined): string {
   return '';
 }
 
+export function periodFilterToDateRange(value: PeriodFilterValue | null | undefined): { from: Date; to: Date } | null {
+  if (!value) return null;
+
+  if (value.mode === 'date-range' && value.dateFrom && value.dateTo) {
+    return { from: value.dateFrom, to: value.dateTo };
+  }
+
+  if (value.mode === 'year-only' && value.year) {
+    return {
+      from: new Date(value.year, 0, 1),
+      to: new Date(value.year, 11, 31, 23, 59, 59, 999),
+    };
+  }
+
+  if (value.mode === 'year-quarter' && value.year && value.quarter) {
+    const startMonth = (value.quarter - 1) * 3;
+    return {
+      from: new Date(value.year, startMonth, 1),
+      to: new Date(value.year, startMonth + 3, 0, 23, 59, 59, 999),
+    };
+  }
+
+  if (value.mode === 'year-months' && value.year && value.months && value.months.length > 0) {
+    const sorted = [...value.months].sort((a, b) => a - b);
+    const firstMonth = sorted[0] - 1;
+    const lastMonth = sorted[sorted.length - 1] - 1;
+    return {
+      from: new Date(value.year, firstMonth, 1),
+      to: new Date(value.year, lastMonth + 1, 0, 23, 59, 59, 999),
+    };
+  }
+
+  return null;
+}
+
+export function getPeriodLabel(value: PeriodFilterValue | null | undefined): string {
+  if (!value) return '';
+  return getDisplayText(value);
+}
+
 export const PeriodFilter = ({ value, onChange, className }: PeriodFilterProps) => {
   const currentYear = new Date().getFullYear();
 

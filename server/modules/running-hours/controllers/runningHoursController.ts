@@ -71,11 +71,19 @@ export async function cascadeUpdate(req: Request, res: Response) {
 export async function listParents(req: Request, res: Response) {
   try {
     const vesselId = (req.query.vesselId as string) || 'V001';
-    const period = (req.query.period as string) || 'monthly';
-    const validPeriods = ['weekly', 'monthly', 'quarterly', 'yearly'];
-    const safePeriod = validPeriods.includes(period) ? period : 'monthly';
-    const result = await rhService.listParents(vesselId, safePeriod);
-    res.json(result);
+    const periodFrom = req.query.periodFrom as string | undefined;
+    const periodTo = req.query.periodTo as string | undefined;
+
+    if (periodFrom && periodTo) {
+      const result = await rhService.listParents(vesselId, 'custom', new Date(periodFrom), new Date(periodTo));
+      res.json(result);
+    } else {
+      const period = (req.query.period as string) || 'monthly';
+      const validPeriods = ['weekly', 'monthly', 'quarterly', 'yearly'];
+      const safePeriod = validPeriods.includes(period) ? period : 'monthly';
+      const result = await rhService.listParents(vesselId, safePeriod);
+      res.json(result);
+    }
   } catch (error: any) {
     console.error("Error fetching running hour parents:", error);
     res.status(500).json({ error: "Failed to fetch running hour parents" });

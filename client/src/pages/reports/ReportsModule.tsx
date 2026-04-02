@@ -153,6 +153,7 @@ const ReportsModule = () => {
     vessels: vesselId ? [vesselId] : [],
     component: "",
     dateRange: { from: null, to: null },
+    periodFilter: null,
   });
 
   useEffect(() => {
@@ -260,6 +261,7 @@ const ReportsModule = () => {
       vessels: [],
       component: "",
       dateRange: { from: null, to: null },
+      periodFilter: null,
     });
   }, []);
 

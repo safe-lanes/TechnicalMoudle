@@ -134,23 +134,32 @@ export async function cascadeUpdate(body: unknown) {
 // Running Hours Parents (from runningHoursRoutes.ts)
 // ══════════════════════════════════════════════════════════
 
-export async function listParents(vesselId: string, period: string = 'monthly') {
+export async function listParents(vesselId: string, period: string = 'monthly', customFrom?: Date, customTo?: Date) {
   const allComponents = await repo.getComponents(vesselId);
 
   const masterComponents = allComponents.filter(
     component => component.rhCounterType === 'MASTER' && component.isActive !== false
   );
 
-  const periodDaysMap: Record<string, number> = {
-    weekly: 7,
-    monthly: 30,
-    quarterly: 90,
-    yearly: 365
-  };
-  const periodDays = periodDaysMap[period] || periodDaysMap.monthly;
-  const totalPeriodHours = periodDays * 24;
+  let periodDays: number;
+  let periodStartDate: Date;
   const now = new Date();
-  const periodStartDate = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
+
+  if (period === 'custom' && customFrom && customTo) {
+    periodStartDate = customFrom;
+    const diffMs = customTo.getTime() - customFrom.getTime();
+    periodDays = Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+  } else {
+    const periodDaysMap: Record<string, number> = {
+      weekly: 7,
+      monthly: 30,
+      quarterly: 90,
+      yearly: 365
+    };
+    periodDays = periodDaysMap[period] || periodDaysMap.monthly;
+    periodStartDate = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
+  }
+  const totalPeriodHours = periodDays * 24;
 
   const parentsWithCounts = await Promise.all(
     masterComponents.map(async (component) => {
