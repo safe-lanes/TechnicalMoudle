@@ -1206,7 +1206,7 @@ const Dashboard = () => {
                     label="Overdue WOs"
                     displayValue={workOrderKPIs.overdue.toString()}
                     subtitle={`${overduePercent}% of total`}
-                    statLine={`Due: ${workOrderKPIs.due} · Pending: ${workOrderKPIs.pendingApproval}`}
+
                     onClick={() => navigateToWorkOrders('Overdue')}
                     testId="gauge-overdue-wo"
                   />
@@ -1220,7 +1220,7 @@ const Dashboard = () => {
                     label="Completion Rate"
                     displayValue={workOrderKPIs.completed.toString()}
                     subtitle={`${completionRate}% completion rate`}
-                    statLine={`Total: ${workOrderKPIs.total} · Active: ${workOrderKPIs.active}`}
+
                     onClick={() => navigateToWorkOrders('Completed')}
                     testId="gauge-completion-rate"
                   />
@@ -1234,7 +1234,7 @@ const Dashboard = () => {
                     label="Outstanding Tasks"
                     displayValue={`${outstandingTasksChartData.outstandingPercent}%`}
                     subtitle={`${outstandingTasksChartData.outstandingCount} of ${outstandingTasksChartData.totalMonthly} tasks`}
-                    statLine={`Tasks: ${outstandingTasksChartData.outstandingCount}/${outstandingTasksChartData.totalMonthly} · vs last month: ${maintenanceTrendData.delta > 0 ? '+' : ''}${maintenanceTrendData.delta}%`}
+
                     onClick={() => navigateToWorkOrders('Planned')}
                     testId="gauge-outstanding-tasks"
                   />
