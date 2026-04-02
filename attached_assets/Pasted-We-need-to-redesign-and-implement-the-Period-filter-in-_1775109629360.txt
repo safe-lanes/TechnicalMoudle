@@ -1,0 +1,418 @@
+We need to redesign and implement the Period filter in the Work Orders (W.O) module.
+
+The current Work Orders page already has a filter row containing:
+
+Vessel
+
+Search work orders
+
+Period
+
+All Ranks
+
+Criticality
+
+Clear
+
+Right now the Period dropdown is not useful enough. We want to replace it with a proper period filter popup/dropdown panel similar to the reference images, but with one important enhancement:
+
+Change from previous idea
+Do not restrict month selection to only one month.
+
+Instead, allow multiple month selection inside the Year + Quarter/Month mode.
+
+This will make the filter much more useful for users who want to review work orders across selected months in the same year.
+
+Main objective
+Turn the current Period dropdown into a practical filter popup with two filtering modes:
+
+Year + Quarter/Month
+
+Date Range
+
+The goal is to let users filter work orders quickly and intuitively.
+
+Current context
+The Work Orders page already includes:
+
+status tabs: Planned / Due / Overdue / Pending Approval / Completed
+
+filter row with Vessel, Search, Period, All Ranks, Criticality, Clear
+
+work order table below.
+
+The new Period filter must fit naturally into this existing filter bar and work together with the other filters.
+
+Replace current Period control
+The current Period control is a basic select/dropdown.
+
+We want it to become an interactive popup panel.
+
+On click
+When user clicks Period:
+
+open a popup/dropdown panel anchored to the Period field,
+
+not a plain HTML select,
+
+not a separate page,
+
+it should feel like a smart filter tool.
+
+Two modes inside Period popup
+At the top of the popup, provide two radio-button options:
+
+Year + Quarter/Month
+
+Date Range
+
+Only one mode can be active at a time.
+
+Mode 1: Year + Quarter/Month
+When this mode is selected, show a structured period selection panel.
+
+A. Year selection
+Show year options as clickable buttons/cards, for example:
+
+2026
+
+2025
+
+2024
+
+2023
+
+Only one year should be selectable at a time.
+
+B. Quarter selection
+Show quarter options:
+
+Q1
+
+Q2
+
+Q3
+
+Q4
+
+Only one quarter should be selectable at a time.
+
+C. Month selection
+Show month buttons:
+
+JAN
+
+FEB
+
+MAR
+
+APR
+
+MAY
+
+JUN
+
+JUL
+
+AUG
+
+SEP
+
+OCT
+
+NOV
+
+DEC
+
+Important month behavior
+Allow multiple month selection.
+
+This means:
+
+user can select one month,
+
+user can select multiple months,
+
+user can deselect selected months,
+
+selected months should remain visually highlighted.
+
+Examples:
+
+APR only
+
+APR + MAY + JUN
+
+JAN + MAR + DEC
+
+Interaction rules between Quarter and Month
+Quarter and Month must not conflict.
+
+Recommended behavior
+Year is mandatory in this mode.
+
+User can choose either:
+
+a single Quarter
+
+one or more Months
+
+Conflict handling
+If user selects a Quarter, clear all selected Months.
+
+If user selects any Month, clear selected Quarter.
+
+Quarter remains single-select.
+
+Months remain multi-select.
+
+This keeps the logic clear and avoids ambiguity.
+
+Valid Year + Quarter/Month combinations
+These should be valid:
+
+Year only
+
+Year + Quarter
+
+Year + one month
+
+Year + multiple months
+
+These should not be allowed:
+
+Quarter without year
+
+Month(s) without year
+
+Quarter plus Month(s) together
+
+Filtering behavior for multi-month selection
+If user selects:
+
+Year = 2026
+
+Months = APR, MAY, JUN
+
+then the work order filter should include work orders belonging to:
+
+April 2026
+
+May 2026
+
+June 2026
+
+This must behave as a combined OR-selection within the same selected year.
+
+Closed-field summary text
+After Apply, the Period control should display a compact summary.
+
+Examples:
+
+2026
+
+2026 / Q2
+
+APR-2026
+
+APR, MAY, JUN - 2026
+
+3 months - 2026 if space is limited
+
+Choose a readable compact format. If many months are selected, you may shorten intelligently.
+
+Mode 2: Date Range
+When Date Range mode is selected, show:
+
+Date From
+
+Date To
+
+Expected behavior
+user picks both dates,
+
+clicks Apply,
+
+work orders get filtered accordingly.
+
+Validation
+Date To cannot be earlier than Date From
+
+If only one date is filled, do not apply and show proper validation
+
+Apply button
+Popup must have an Apply button.
+
+Apply behavior
+When clicked:
+
+apply selected Period filter,
+
+close popup,
+
+update closed Period control summary,
+
+refresh work order list.
+
+Clear behavior
+The existing Clear button in the main filter row must also clear the Period filter. The current filter row already includes a Clear action, so the new Period filter must integrate with that reset flow.
+
+When cleared:
+
+selected mode resets,
+
+selected year/quarter/month/date range resets,
+
+closed label returns to Period,
+
+work order list reloads without period restriction.
+
+Business field to filter by
+Please verify which date field is currently intended for Work Orders period filtering — most likely the Due Date shown in the table — and apply the period filter consistently using that same field. The current table explicitly includes a Due Date column, so the period logic should be based on the correct work-order date field already used in the module.
+
+Do not mix different date fields unless the module already defines a specific business rule.
+
+Integration with existing filters
+The new Period filter must work together with:
+
+Vessel
+
+Search work orders
+
+All Ranks
+
+Criticality
+
+That means:
+
+filters combine correctly,
+
+applying Period does not reset the other filters,
+
+Clear resets all filters together.
+
+UI expectations
+The popup should be:
+
+clean,
+
+easy to scan,
+
+fast to use,
+
+aligned with current PMS UI style.
+
+Suggested structure
+Top:
+
+Radio: Year + Quarter/Month
+
+Radio: Date Range
+
+If Year + Quarter/Month selected:
+
+Year section
+
+Quarter section
+
+Month section
+
+Apply button
+
+If Date Range selected:
+
+Date From
+
+Date To
+
+Apply button
+
+Visual behavior
+selected year/quarter/month chips must be clearly highlighted
+
+multiple selected months must remain visually obvious
+
+switching between Quarter and Month should immediately clear the conflicting choice
+
+Edge cases
+Please handle these properly:
+
+Year + Quarter/Month mode
+Year only selected → valid, filters whole year
+
+Year + Quarter selected → valid
+
+Year + one month selected → valid
+
+Year + multiple months selected → valid
+
+Quarter without year → invalid
+
+Month(s) without year → invalid
+
+Quarter + Month(s) together → not allowed
+
+Date Range mode
+Only From selected → invalid
+
+Only To selected → invalid
+
+To earlier than From → invalid
+
+Same From and To → valid if one-day filter is supported
+
+Empty result
+If no work orders match:
+
+show empty state in table
+
+do not break layout
+
+Table and tab refresh behavior
+After applying the Period filter:
+
+work order table should refresh immediately
+
+counts/pagination should update
+
+currently selected status tab (Planned / Due / Overdue / etc.) should remain active unless there are no results. The current page already uses status tabs above the filter row, so Period should refine the current tab dataset, not reset user navigation.
+
+Out of scope
+Do not change:
+
+Vessel filter behavior
+
+Search behavior
+
+Rank filter
+
+Criticality filter
+
+Planner / Export / Unplanned WO buttons
+
+tab logic itself
+
+This task is only for improving the Period filter.
+
+Final expected result
+After implementation:
+
+Period becomes a useful popup filter instead of a useless dropdown
+
+user can filter by:
+
+Year
+
+Year + Quarter
+
+Year + one or multiple Months
+
+Date Range
+
+multiple month selection works properly
+
+Quarter and Month selections do not conflict
+
+selected period summary is clearly shown in closed field
+
+filter works cleanly with the rest of the Work Orders filters
