@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PeriodFilter, PeriodFilterValue } from "@/components/filters/PeriodFilter";
 import {
   Dialog,
   DialogContent,
@@ -71,7 +72,7 @@ const generateTemplateCode = (componentCode: string, taskType: string, basis: st
 
 const WorkOrders: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedPeriod, setSelectedPeriod] = useState("");
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue | null>(null);
   const [selectedRank, setSelectedRank] = useState("");
   const [selectedCriticality, setSelectedCriticality] = useState("");
   const [activeTab, setActiveTab] = useState(() => {
@@ -271,25 +272,31 @@ const WorkOrders: React.FC = () => {
       return false;
     }
     
-    // RH-based filter: "Due in next X hours" (when period is set to rh-250, rh-500, or rh-1000)
-    if (selectedPeriod && selectedPeriod.startsWith("rh-")) {
-      // When RH filter is selected, exclude non-RH work orders
-      if (wo.maintenanceBasis !== "Running Hours") {
+    if (periodFilter) {
+      const woDueDate = wo.dueDate ? new Date(wo.dueDate) : null;
+      if (!woDueDate || isNaN(woDueDate.getTime())) {
         return false;
       }
-      
-      const rhThreshold = parseInt(selectedPeriod.replace("rh-", ""));
-      // Exclude RH work orders with missing RH data
-      if (wo.dueRH == null || wo.currentRH == null) {
-        return false;
-      }
-      
-      if (!isNaN(rhThreshold)) {
-        const rhRemaining = wo.dueRH - wo.currentRH;
-        // Show work orders where remaining RH is positive (not yet due) and within threshold
-        if (rhRemaining < 0 || rhRemaining > rhThreshold) {
-          return false;
-        }
+
+      if (periodFilter.mode === 'year-only' && periodFilter.year) {
+        if (woDueDate.getFullYear() !== periodFilter.year) return false;
+      } else if (periodFilter.mode === 'year-quarter' && periodFilter.year && periodFilter.quarter) {
+        if (woDueDate.getFullYear() !== periodFilter.year) return false;
+        const woMonth = woDueDate.getMonth() + 1;
+        const qStart = (periodFilter.quarter - 1) * 3 + 1;
+        const qEnd = qStart + 2;
+        if (woMonth < qStart || woMonth > qEnd) return false;
+      } else if (periodFilter.mode === 'year-months' && periodFilter.year && periodFilter.months && periodFilter.months.length > 0) {
+        if (woDueDate.getFullYear() !== periodFilter.year) return false;
+        const woMonth = woDueDate.getMonth() + 1;
+        if (!periodFilter.months.includes(woMonth)) return false;
+      } else if (periodFilter.mode === 'date-range' && periodFilter.dateFrom && periodFilter.dateTo) {
+        const from = new Date(periodFilter.dateFrom);
+        from.setHours(0, 0, 0, 0);
+        const to = new Date(periodFilter.dateTo);
+        to.setHours(23, 59, 59, 999);
+        const woTime = woDueDate.getTime();
+        if (woTime < from.getTime() || woTime > to.getTime()) return false;
       }
     }
     
@@ -326,7 +333,7 @@ const WorkOrders: React.FC = () => {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchTerm, selectedPeriod, selectedRank, selectedCriticality, vesselId]);
+  }, [activeTab, searchTerm, periodFilter, selectedRank, selectedCriticality, vesselId]);
   
   // Clamp current page when total pages shrinks (e.g., after deletion or filter change)
   useEffect(() => {
@@ -756,20 +763,14 @@ const WorkOrders: React.FC = () => {
           />
         </div>
 
-        <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-          <SelectTrigger className="w-36" data-testid="C11">
-            <Marker id="C11" />
-            <SelectValue placeholder="Period" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="weekly">Weekly</SelectItem>
-            <SelectItem value="monthly">Monthly</SelectItem>
-            <SelectItem value="annual">Annual</SelectItem>
-            <SelectItem value="rh-250">Due in 250 hrs</SelectItem>
-            <SelectItem value="rh-500">Due in 500 hrs</SelectItem>
-            <SelectItem value="rh-1000">Due in 1000 hrs</SelectItem>
-          </SelectContent>
-        </Select>
+        <div data-testid="C11">
+          <Marker id="C11" />
+          <PeriodFilter
+            value={periodFilter}
+            onChange={setPeriodFilter}
+            className="w-40"
+          />
+        </div>
 
         <Select value={selectedRank} onValueChange={setSelectedRank}>
           <SelectTrigger className="w-40" data-testid="C12">
@@ -803,7 +804,7 @@ const WorkOrders: React.FC = () => {
           className="text-gray-600"
           onClick={() => {
             setSearchTerm("");
-            setSelectedPeriod("");
+            setPeriodFilter(null);
             setSelectedRank("");
             setSelectedCriticality("");
           }}
