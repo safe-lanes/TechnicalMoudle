@@ -47,14 +47,6 @@ export async function saveMasterCertificates(body: any) {
     }
   }
 
-  // Validate: if vessel-specific certs are provided, targetVessels must not be empty
-  if (vesselSpecificCerts.length > 0 && targetVessels.length === 0) {
-    throw Object.assign(new Error("targetVessels is required when adding vessel-specific certificates"), {
-      statusCode: 400,
-      details: "Please select at least one vessel before adding vessel-specific certificates"
-    });
-  }
-
   if (vesselSpecificCerts.length > 0) {
     console.log(`Vessel-specific certificates: ${vesselSpecificCerts.join(', ')} for vessels: ${targetVessels.map(v => v.name).join(', ')}`);
   }
@@ -124,6 +116,13 @@ export async function saveMasterCertificates(body: any) {
       const cert = certLookup.get(id);
       return !(cert?.applicableToCompany === true || id.startsWith('CMP-'));
     });
+
+    if (vesselOnlyMasterIds.length > 0 && targetVessels.length === 0) {
+      throw Object.assign(new Error("targetVessels is required when adding new vessel-specific certificates"), {
+        statusCode: 400,
+        details: "Please select at least one vessel before adding vessel-specific certificates"
+      });
+    }
 
     // Get existing applicability records to avoid duplicates
     const existingApplicability = await certAdminRepo.getApplicabilityByMasterIds(newlyInsertedMasterIds);
