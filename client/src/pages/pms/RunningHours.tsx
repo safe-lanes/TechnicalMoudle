@@ -61,33 +61,6 @@ interface RunningHoursData {
   currentCumulativeRHRaw?: number | null;
 }
 
-const periodLabels: Record<string, string> = {
-  weekly: 'Weekly (Last 7 days)',
-  monthly: 'Monthly (Last 30 days)',
-  quarterly: 'Quarterly (Last 90 days)',
-  yearly: 'Yearly (Last 365 days)'
-};
-
-const periodShortLabels: Record<string, string> = {
-  weekly: 'Weekly',
-  monthly: 'Monthly',
-  quarterly: 'Quarterly',
-  yearly: 'Yearly'
-};
-
-const periodTotalHours: Record<string, number> = {
-  weekly: 168,
-  monthly: 720,
-  quarterly: 2160,
-  yearly: 8760
-};
-
-const periodNoun: Record<string, string> = {
-  weekly: 'week',
-  monthly: 'month',
-  quarterly: 'quarter',
-  yearly: 'year'
-};
 
 const RunningHours = () => {
   const [, navigate] = useLocation();
