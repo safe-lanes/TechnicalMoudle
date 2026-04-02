@@ -25,7 +25,9 @@ export async function getChangeRequests(req: Request, res: Response) {
     vesselId: req.query.vesselId as string,
     status: req.query.status as string,
     category: req.query.category as string,
-    requestedBy: req.query.requestedBy as string
+    requestedBy: req.query.requestedBy as string,
+    periodFrom: req.query.periodFrom as string | undefined,
+    periodTo: req.query.periodTo as string | undefined
   };
   const requests = await crService.getChangeRequests(query);
   res.json(requests);

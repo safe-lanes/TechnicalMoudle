@@ -145,8 +145,11 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
   let periodStartDate: Date;
   const now = new Date();
 
+  let periodEndDate: Date | null = null;
+
   if (period === 'custom' && customFrom && customTo) {
     periodStartDate = customFrom;
+    periodEndDate = customTo;
     const diffMs = customTo.getTime() - customFrom.getTime();
     periodDays = Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
   } else {
@@ -171,10 +174,12 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
       const totalCumulativeRH = meterReplacedLastRh + currentMeterRH;
 
       const historicalEntry = await repo.getRunningHoursAtDate(component.cuuid, periodStartDate);
+      const endEntry = periodEndDate ? await repo.getRunningHoursAtDate(component.cuuid, periodEndDate) : null;
 
       let utilizationRate = 0;
       let periodRunningHours = 0;
       let rhAtPeriodStart = 0;
+      let rhAtPeriodEnd = totalCumulativeRH;
       let dataQualityWarning: string | null = null;
 
       if (totalCumulativeRH === 0) {
@@ -191,7 +196,11 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
         }
       }
 
-      const rhIncrease = totalCumulativeRH - rhAtPeriodStart;
+      if (periodEndDate && endEntry) {
+        rhAtPeriodEnd = endEntry.runningHours;
+      }
+
+      const rhIncrease = rhAtPeriodEnd - rhAtPeriodStart;
 
       if (rhIncrease < 0) {
         utilizationRate = 0;

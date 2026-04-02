@@ -99,8 +99,8 @@ export async function getTargetEntity(targetType: string, targetId: string) {
 
 // ── Change Request CRUD ──
 
-export async function getChangeRequests(query: { vesselId?: string; status?: string; category?: string; requestedBy?: string }) {
-  const { vesselId, status, category, requestedBy } = query;
+export async function getChangeRequests(query: { vesselId?: string; status?: string; category?: string; requestedBy?: string; periodFrom?: string; periodTo?: string }) {
+  const { vesselId, status, category, requestedBy, periodFrom, periodTo } = query;
 
   if (!vesselId) {
     throw new ValidationError('vesselId is required for change requests');
@@ -108,7 +108,6 @@ export async function getChangeRequests(query: { vesselId?: string; status?: str
 
   let requests = await crRepo.getChangeRequests({ vesselId });
 
-  // Apply filters
   if (status) {
     requests = requests.filter(r => r.status === status);
   }
@@ -118,8 +117,21 @@ export async function getChangeRequests(query: { vesselId?: string; status?: str
   if (requestedBy) {
     requests = requests.filter(r => r.requestedByUserId === requestedBy);
   }
+  if (periodFrom) {
+    const from = new Date(periodFrom);
+    requests = requests.filter(r => {
+      const created = r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt);
+      return created >= from;
+    });
+  }
+  if (periodTo) {
+    const to = new Date(periodTo);
+    requests = requests.filter(r => {
+      const created = r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt);
+      return created <= to;
+    });
+  }
 
-  // Sort by most recent first
   requests.sort((a, b) => {
     const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
     const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();

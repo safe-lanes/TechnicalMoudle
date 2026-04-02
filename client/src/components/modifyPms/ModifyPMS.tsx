@@ -112,10 +112,10 @@ export function ModifyPMS() {
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
   const { data: vessels = [] } = useVessels();
 
-  // Fetch change requests - filtered by selected vessel
-  // Only fetch when vesselId is available to ensure vessel isolation
+  const periodDateRange = useMemo(() => periodFilter ? periodFilterToDateRange(periodFilter) : null, [periodFilter]);
+
   const { data: requests = [], isLoading } = useQuery({
-    queryKey: ['/technical/api/change-requests', vesselId, categoryFilter],
+    queryKey: ['/technical/api/change-requests', vesselId, categoryFilter, periodDateRange?.from?.toISOString(), periodDateRange?.to?.toISOString()],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append('vesselId', vesselId);
@@ -123,29 +123,27 @@ export function ModifyPMS() {
       if (categoryFilter !== 'all') {
         params.append('category', categoryFilter);
       }
+      if (periodDateRange) {
+        params.append('periodFrom', periodDateRange.from.toISOString());
+        params.append('periodTo', periodDateRange.to.toISOString());
+      }
       
       const response = await fetch(`/technical/api/change-requests?${params}`);
       if (!response.ok) throw new Error('Failed to fetch requests');
       return response.json();
     },
-    enabled: !!vesselId  // Only fetch when vesselId is defined
+    enabled: !!vesselId
   });
 
   const filteredRequests = useMemo(() => {
-    const dateRange = periodFilter ? periodFilterToDateRange(periodFilter) : null;
     return requests.filter((request: ChangeRequest) => {
       const matchesSearch = searchQuery === '' ||
         request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         request.status.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
-      if (!matchesSearch || !matchesStatus) return false;
-      if (dateRange) {
-        const created = new Date(request.createdAt);
-        if (created < dateRange.from || created > dateRange.to) return false;
-      }
-      return true;
+      return matchesSearch && matchesStatus;
     });
-  }, [requests, searchQuery, statusFilter, periodFilter]);
+  }, [requests, searchQuery, statusFilter]);
 
   // Approve mutation
   const approveMutation = useMutation({
@@ -172,7 +170,7 @@ export function ModifyPMS() {
       }
       
       // Force refetch to ensure UI updates immediately - include vesselId for proper cache matching
-      queryClient.refetchQueries({ queryKey: ['/technical/api/change-requests', vesselId, categoryFilter] });
+      queryClient.refetchQueries({ queryKey: ['/technical/api/change-requests'] });
       
       setViewingRequest(null);
       toast({
@@ -207,7 +205,7 @@ export function ModifyPMS() {
       }
       
       // Force refetch to ensure UI updates immediately - include vesselId for proper cache matching
-      queryClient.refetchQueries({ queryKey: ['/technical/api/change-requests', vesselId, categoryFilter] });
+      queryClient.refetchQueries({ queryKey: ['/technical/api/change-requests'] });
       
       setViewingRequest(null);
       toast({
