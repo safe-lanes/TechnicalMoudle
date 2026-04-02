@@ -22,7 +22,9 @@ function getDb() {
 export async function getMasterCertificates() {
   const db = await getDb();
   if (!db) return null;
-  return db.select().from(shipCertificatesMaster).orderBy(shipCertificatesMaster.sequence);
+  return db.select().from(shipCertificatesMaster)
+    .where(eq(shipCertificatesMaster.isDeleted, false))
+    .orderBy(shipCertificatesMaster.sequence);
 }
 
 export async function getMasterCertificateByMasterId(masterId: string) {
@@ -59,7 +61,8 @@ export async function insertMasterCertificate(data: any) {
 export async function deleteMasterCertificate(masterId: string) {
   const db = await getDb();
   if (!db) return null;
-  return db.delete(shipCertificatesMaster)
+  return db.update(shipCertificatesMaster)
+    .set({ isDeleted: true, updatedAt: new Date() })
     .where(eq(shipCertificatesMaster.masterId, masterId));
 }
 
@@ -195,9 +198,12 @@ export async function getCompanyCertificates() {
   return db.select()
     .from(shipCertificatesMaster)
     .where(
-      or(
-        eq(shipCertificatesMaster.applicableToCompany, true),
-        like(shipCertificatesMaster.masterId, 'CMP-%')
+      and(
+        eq(shipCertificatesMaster.isDeleted, false),
+        or(
+          eq(shipCertificatesMaster.applicableToCompany, true),
+          like(shipCertificatesMaster.masterId, 'CMP-%')
+        )
       )
     );
 }

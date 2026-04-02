@@ -22,7 +22,9 @@ function getDb() {
 export async function getMasterSurveys() {
   const db = await getDb();
   if (!db) return null;
-  return db.select().from(shipSurveysMaster).orderBy(shipSurveysMaster.sequence);
+  return db.select().from(shipSurveysMaster)
+    .where(eq(shipSurveysMaster.isDeleted, false))
+    .orderBy(shipSurveysMaster.sequence);
 }
 
 export async function getMasterSurveyByMasterId(masterId: string) {
@@ -50,7 +52,8 @@ export async function insertMasterSurvey(data: any) {
 export async function deleteMasterSurvey(masterId: string) {
   const db = await getDb();
   if (!db) return null;
-  return db.delete(shipSurveysMaster)
+  return db.update(shipSurveysMaster)
+    .set({ isDeleted: true, updatedAt: new Date() })
     .where(eq(shipSurveysMaster.masterId, masterId));
 }
 
@@ -154,9 +157,12 @@ export async function getCompanySurveys() {
   return db.select()
     .from(shipSurveysMaster)
     .where(
-      or(
-        eq(shipSurveysMaster.applicableToCompany, true),
-        like(shipSurveysMaster.masterId, 'CMP-%')
+      and(
+        eq(shipSurveysMaster.isDeleted, false),
+        or(
+          eq(shipSurveysMaster.applicableToCompany, true),
+          like(shipSurveysMaster.masterId, 'CMP-%')
+        )
       )
     );
 }
