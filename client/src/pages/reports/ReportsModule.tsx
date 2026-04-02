@@ -24,8 +24,11 @@ import {
   Check,
   X,
   GripVertical,
+  Star,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import MaintenanceReports from "./MaintenanceReports";
 import RunningHoursReports from "./RunningHoursReports";
 import SparesReports from "./SparesReports";
@@ -131,6 +134,13 @@ const REPORT_CATEGORIES: ReportCategory[] = [
   },
 ];
 
+const REPORT_ID_TO_CATEGORY: Record<string, string> = {};
+for (const cat of REPORT_CATEGORIES) {
+  for (const r of cat.reports) {
+    REPORT_ID_TO_CATEGORY[r.id] = cat.id;
+  }
+}
+
 export interface ReportActionTrigger {
   type: 'pdf' | 'excel';
   ts: number;
@@ -165,8 +175,90 @@ const ReportsModule = () => {
     }
   }, [vesselId]);
 
+  const { data: favoritesData } = useQuery<{ reportIds: string[] }>({
+    queryKey: ['/technical/api/reports/favorites'],
+  });
+
+  const favoriteReportIds = useMemo(() => new Set(favoritesData?.reportIds || []), [favoritesData]);
+
+  const addFavoriteMutation = useMutation({
+    mutationFn: async (reportId: string) => {
+      await apiRequest('POST', `/technical/api/reports/favorites/${reportId}`);
+    },
+    onMutate: async (reportId: string) => {
+      await queryClient.cancelQueries({ queryKey: ['/technical/api/reports/favorites'] });
+      const previous = queryClient.getQueryData<{ reportIds: string[] }>(['/technical/api/reports/favorites']);
+      queryClient.setQueryData<{ reportIds: string[] }>(['/technical/api/reports/favorites'], (old) => ({
+        reportIds: [...(old?.reportIds || []), reportId],
+      }));
+      return { previous };
+    },
+    onError: (_err, _reportId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['/technical/api/reports/favorites'], context.previous);
+      }
+      toast({ title: "Error", description: "Failed to add favorite. Please try again.", variant: "destructive" });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/reports/favorites'] });
+    },
+  });
+
+  const removeFavoriteMutation = useMutation({
+    mutationFn: async (reportId: string) => {
+      await apiRequest('DELETE', `/technical/api/reports/favorites/${reportId}`);
+    },
+    onMutate: async (reportId: string) => {
+      await queryClient.cancelQueries({ queryKey: ['/technical/api/reports/favorites'] });
+      const previous = queryClient.getQueryData<{ reportIds: string[] }>(['/technical/api/reports/favorites']);
+      queryClient.setQueryData<{ reportIds: string[] }>(['/technical/api/reports/favorites'], (old) => ({
+        reportIds: (old?.reportIds || []).filter(id => id !== reportId),
+      }));
+      return { previous };
+    },
+    onError: (_err, _reportId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['/technical/api/reports/favorites'], context.previous);
+      }
+      toast({ title: "Error", description: "Failed to remove favorite. Please try again.", variant: "destructive" });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/reports/favorites'] });
+    },
+  });
+
+  const toggleFavorite = useCallback((e: React.MouseEvent, reportId: string) => {
+    e.stopPropagation();
+    if (favoriteReportIds.has(reportId)) {
+      removeFavoriteMutation.mutate(reportId);
+    } else {
+      addFavoriteMutation.mutate(reportId);
+    }
+  }, [favoriteReportIds, addFavoriteMutation, removeFavoriteMutation]);
+
+  const favoritesCategory: ReportCategory | null = useMemo(() => {
+    if (favoriteReportIds.size === 0) return null;
+    const favReports: ReportItem[] = [];
+    for (const cat of REPORT_CATEGORIES) {
+      for (const report of cat.reports) {
+        if (favoriteReportIds.has(report.id)) {
+          favReports.push(report);
+        }
+      }
+    }
+    if (favReports.length === 0) return null;
+    return {
+      id: "favorites",
+      title: "Favorites",
+      icon: Star,
+      reports: favReports,
+    };
+  }, [favoriteReportIds]);
+
   const expandAll = () => {
-    setExpandedCategories(new Set(categoryOrder.map(c => c.id)));
+    const allIds = categoryOrder.map(c => c.id);
+    if (favoritesCategory) allIds.push("favorites");
+    setExpandedCategories(new Set(allIds));
   };
 
   const collapseAll = () => {
@@ -241,7 +333,10 @@ const ReportsModule = () => {
   };
 
   const handleReportSelect = (categoryId: string, reportId: string) => {
-    setSelectedCategoryId(categoryId);
+    const actualCategoryId = categoryId === "favorites"
+      ? (REPORT_ID_TO_CATEGORY[reportId] || categoryId)
+      : categoryId;
+    setSelectedCategoryId(actualCategoryId);
     setSelectedReportId(reportId);
     setActionTrigger(null);
     if (!expandedCategories.has(categoryId)) {
@@ -270,9 +365,14 @@ const ReportsModule = () => {
   };
 
   const filteredCategories = useMemo(() => {
-    if (!searchQuery.trim()) return categoryOrder;
+    const baseCategories = categoryOrder;
+    const allCategories = favoritesCategory
+      ? [favoritesCategory, ...baseCategories]
+      : baseCategories;
+
+    if (!searchQuery.trim()) return allCategories;
     const q = searchQuery.toLowerCase();
-    return categoryOrder
+    return allCategories
       .map(cat => {
         const matchedReports = cat.reports.filter(r => r.name.toLowerCase().includes(q));
         const categoryMatches = cat.title.toLowerCase().includes(q);
@@ -281,7 +381,7 @@ const ReportsModule = () => {
         return null;
       })
       .filter(Boolean) as ReportCategory[];
-  }, [searchQuery, categoryOrder]);
+  }, [searchQuery, categoryOrder, favoritesCategory]);
 
   const selectedReportName = useMemo(() => {
     if (!selectedCategoryId || !selectedReportId) return null;
@@ -410,29 +510,32 @@ const ReportsModule = () => {
               const isExpanded = expandedCategories.has(category.id);
               const isCategorySelected = selectedCategoryId === category.id;
               const isDragOver = dragOverId === category.id;
+              const isFavoritesGroup = category.id === "favorites";
 
               return (
                 <div
                   key={category.id}
                   data-testid={`tree-category-${category.id}`}
-                  draggable={isEditMode}
-                  onDragStart={isEditMode ? (e) => handleDragStart(e, category.id) : undefined}
-                  onDragOver={isEditMode ? (e) => handleDragOver(e, category.id) : undefined}
-                  onDrop={isEditMode ? (e) => handleDrop(e, category.id) : undefined}
-                  onDragEnd={isEditMode ? handleDragEnd : undefined}
+                  draggable={isEditMode && !isFavoritesGroup}
+                  onDragStart={isEditMode && !isFavoritesGroup ? (e) => handleDragStart(e, category.id) : undefined}
+                  onDragOver={isEditMode && !isFavoritesGroup ? (e) => handleDragOver(e, category.id) : undefined}
+                  onDrop={isEditMode && !isFavoritesGroup ? (e) => handleDrop(e, category.id) : undefined}
+                  onDragEnd={isEditMode && !isFavoritesGroup ? handleDragEnd : undefined}
                 >
                   <div
                     className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium transition-colors border-b border-gray-100 dark:border-gray-800 ${
                       isDragOver
                         ? 'bg-blue-100 dark:bg-blue-900/40 border-t-2 border-t-blue-400'
-                        : isCategorySelected
-                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                    } ${isEditMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                        : isFavoritesGroup
+                          ? 'bg-amber-50/50 dark:bg-amber-900/10 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                          : isCategorySelected
+                            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    } ${isEditMode && !isFavoritesGroup ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
                     onClick={() => { if (!isEditMode) toggleCategory(category.id); }}
                     data-testid={`button-toggle-${category.id}`}
                   >
-                    {isEditMode && (
+                    {isEditMode && !isFavoritesGroup && (
                       <GripVertical className="h-3.5 w-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
                     )}
                     {!isEditMode && (isExpanded ? (
@@ -440,7 +543,7 @@ const ReportsModule = () => {
                     ) : (
                       <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
                     ))}
-                    <Icon className="h-4 w-4 flex-shrink-0 text-[#52baf3]" />
+                    <Icon className={`h-4 w-4 flex-shrink-0 ${isFavoritesGroup ? 'text-amber-500 fill-amber-500' : 'text-[#52baf3]'}`} />
                     <span className="truncate flex-1">{category.title}</span>
                     <span className="text-[11px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 rounded-full px-1.5 py-0.5 min-w-[20px] text-center flex-shrink-0">{category.reports.length}</span>
                   </div>
@@ -448,18 +551,33 @@ const ReportsModule = () => {
                   {!isEditMode && isExpanded && (
                     <div className="bg-gray-50/50 dark:bg-gray-800/30">
                       {category.reports.map((report) => {
-                        const isSelected = selectedCategoryId === category.id && selectedReportId === report.id;
+                        const actualCategoryId = isFavoritesGroup
+                          ? (REPORT_ID_TO_CATEGORY[report.id] || category.id)
+                          : category.id;
+                        const isSelected = selectedCategoryId === actualCategoryId && selectedReportId === report.id;
+                        const isFav = favoriteReportIds.has(report.id);
                         return (
                           <button
                             key={report.id}
-                            className={`w-full flex items-center gap-2 pl-10 pr-3 py-2 text-left text-[13px] transition-colors border-b border-gray-50 dark:border-gray-800/50 ${
+                            className={`w-full flex items-center gap-2 pl-10 pr-3 py-2 text-left text-[13px] transition-colors border-b border-gray-50 dark:border-gray-800/50 group ${
                               isSelected
                                 ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 font-medium border-l-2 border-l-blue-500'
                                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200'
                             }`}
                             onClick={() => handleReportSelect(category.id, report.id)}
-                            data-testid={`button-report-${report.id}`}
+                            data-testid={`button-report-${report.id}${isFavoritesGroup ? '-fav' : ''}`}
                           >
+                            <span
+                              className="flex-shrink-0 cursor-pointer"
+                              onClick={(e) => toggleFavorite(e, report.id)}
+                              data-testid={`button-star-${report.id}`}
+                            >
+                              <Star className={`h-3.5 w-3.5 transition-colors ${
+                                isFav
+                                  ? 'text-amber-500 fill-amber-500'
+                                  : 'text-gray-300 dark:text-gray-600 group-hover:text-gray-400 dark:group-hover:text-gray-500'
+                              }`} />
+                            </span>
                             <FileText className="h-3.5 w-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
                             <span className="truncate">{report.name}</span>
                           </button>

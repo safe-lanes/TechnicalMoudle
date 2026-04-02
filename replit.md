@@ -67,6 +67,7 @@ Preferred communication style: Simple, everyday language.
 -   **Live Missed Cycles on WO List**: `missedCycles` calculated on-the-fly for overdue/due WOs.
 -   **Auto-Populated Maintenance History Remarks**: Remarks are auto-populated for maintenance history based on `missedCycles`.
 -   **A4 Work History Display**: Displays the current WO's own maintenance history record and non-skipped records from other WOs.
+-   **Report Favorites**: Per-user favorites in the Reports module. Users can star reports via a star icon on each report row. Favorited reports appear in a dedicated "Favorites" group at the top of the tree and in their original category. Persisted in `report_favorites` table keyed by `created_by_uuid`. API: `GET/POST/DELETE /reports/favorites/:reportId`. Soft-delete pattern with optimistic UI updates.
 -   **UI Role Detection (Single Source of Truth)**: UI role is determined by `mapLoggedRoleToUIRole(userType, profileRole)` for consistent role mapping.
 -   **User Role System**: Supports 7 `UserRole` values.
 -   **Role Master Table (admn_role_master)**: Seeds 15 role records during migration.

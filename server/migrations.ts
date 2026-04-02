@@ -2488,7 +2488,44 @@ const migrations: Migration[] = [
         'A8-001','A8-002',
         'A9-001','A9-002','A9-003','A9-004','A9-005',
         'B10-001','B10-002','B10-003','B10-004'
-      )
+      );
+    `
+  },
+  {
+    id: '076_report_favorites_table',
+    name: 'Create report_favorites table',
+    description: 'Creates report_favorites table for per-user report favorites with unique constraint on (created_by_uuid, report_id)',
+    sql: `
+      CREATE TABLE IF NOT EXISTS report_favorites (
+        id SERIAL PRIMARY KEY,
+        rfuuid TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+        report_id TEXT NOT NULL,
+        created_by_uuid TEXT NOT NULL,
+        updated_by_uuid TEXT,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        is_sync BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'report_favorites_rfuuid_unique'
+        ) THEN
+          ALTER TABLE report_favorites ADD CONSTRAINT report_favorites_rfuuid_unique UNIQUE (rfuuid);
+        END IF;
+      END $$;
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'unique_user_report_favorite'
+        ) THEN
+          ALTER TABLE report_favorites ADD CONSTRAINT unique_user_report_favorite UNIQUE (created_by_uuid, report_id);
+        END IF;
+      END $$;
+      CREATE INDEX IF NOT EXISTS idx_report_favorites_user ON report_favorites (created_by_uuid);
     `
   }
 ];

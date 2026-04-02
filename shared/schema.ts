@@ -3313,5 +3313,29 @@ export const insertPlannerDateSchema = createInsertSchema(plannerDates).omit({
 export type InsertPlannerDate = z.infer<typeof insertPlannerDateSchema>;
 export type PlannerDate = typeof plannerDates.$inferSelect;
 
+// ====== REPORT FAVORITES TABLE ======
+export const reportFavorites = pgTable("report_favorites", {
+  id: serial("id").primaryKey(),
+  rfuuid: text("rfuuid").notNull().unique().$defaultFn(() => crypto.randomUUID()),
+  reportId: text("report_id").notNull(),
+  createdByUuid: text("created_by_uuid").notNull(),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdateFn(() => new Date()),
+}, (table) => ({
+  uniqueUserReport: unique("unique_user_report_favorite").on(table.createdByUuid, table.reportId),
+}));
+
+export const insertReportFavoriteSchema = createInsertSchema(reportFavorites).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertReportFavorite = z.infer<typeof insertReportFavoriteSchema>;
+export type ReportFavorite = typeof reportFavorites.$inferSelect;
+
 // ====== NOON REPORT MODULE SCHEMA — remove this line to disable ======
 export * from './schema-noon-report';

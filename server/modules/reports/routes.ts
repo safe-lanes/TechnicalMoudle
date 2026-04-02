@@ -8,6 +8,7 @@ import * as compCtrl from './controllers/complianceReportsController';
 import * as opsCtrl from './controllers/operationsReportsController';
 import * as snapCtrl from './controllers/snapshotController';
 import * as crCtrl from './controllers/changeRequestReportsController';
+import * as favCtrl from './controllers/favoritesController';
 
 const router = Router();
 
@@ -16,6 +17,11 @@ const router = Router();
 // IMPORTANT: Specific routes MUST come before the generic
 // /:reportType catch-all at the bottom
 // ══════════════════════════════════════════════════════════
+
+// ── Report Favorites ──
+router.get('/reports/favorites', asyncHandler(favCtrl.getFavorites));
+router.post('/reports/favorites/:reportId', asyncHandler(favCtrl.addFavorite));
+router.delete('/reports/favorites/:reportId', asyncHandler(favCtrl.removeFavorite));
 
 // ── Template Builder (outside /reports prefix) ──
 router.get('/template-builder/:templateType', asyncHandler(equipCtrl.getTemplate));
