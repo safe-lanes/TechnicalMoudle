@@ -1,0 +1,263 @@
+TASK: DETAILED SYSTEM ANALYSIS – FLEET ↔ VESSEL JOB LINKAGES
+
+Objective:
+
+Perform a **deep functional and technical analysis** of **Fleet Jobs ↔ Vessel Jobs linkage**, including:
+
+• Purpose of linkage  
+• Mapping logic  
+• Data flow (Fleet → Vessel)  
+• Column-level dependency  
+• Sync/control mechanism  
+
+--------------------------------------------------
+
+1. Concept Understanding Required
+
+Analyze and explain:
+
+• Why Fleet Jobs are created at Fleet level  
+• Why Vessel Jobs are linked to Fleet Jobs  
+• Business objective:
+
+  - Standardization of maintenance jobs  
+  - Centralized control  
+  - Uniform PMS structure across vessels  
+
+--------------------------------------------------
+
+2. Fleet ↔ Vessel Job Linkage Logic
+
+Explain:
+
+• Relationship:
+
+  - One Fleet Job → Multiple Vessel Jobs  
+  - One Vessel Job → Linked to one Fleet Job  
+
+• When linkage is created:
+
+  - During mapping?  
+  - During vessel onboarding?  
+  - During bulk import?  
+
+--------------------------------------------------
+
+3. Fleet Job ↔ Vessel Job Mapping
+
+A. Mapping Purpose
+
+• Fleet Job acts as:
+
+  - Master template  
+  - Standard job definition  
+
+• Vessel Job acts as:
+
+  - Execution-level instance  
+
+--------------------------------------------------
+
+B. Mapping Keys
+
+Identify:
+
+• Primary linkage fields:
+
+  - fleet_job_id  
+  - job_code  
+  - component_code (if component-based linkage exists)  
+
+--------------------------------------------------
+
+4. Data Flow Analysis (Fleet → Vessel)
+
+A. Flow Type
+
+Analyze which model is used or should be used:
+
+Option 1 – One-time Copy  
+Option 2 – Live Reference  
+Option 3 – Hybrid Model  
+
+--------------------------------------------------
+
+B. Column-Level Mapping
+
+Define which fields Vessel Job should fetch from Fleet Job:
+
+Core Fields:
+
+• Job Code  
+• Job Name / Description  
+• Task Type  
+• Interval Type (Hours / Days / Condition)  
+• Interval Value  
+• Criticality  
+• Maker / Specification (if linked)  
+
+--------------------------------------------------
+
+C. Vessel-Specific Fields (Should NOT come from Fleet)
+
+• Last Done Date  
+• Running Hours at last done  
+• Next Due Calculation  
+• Work Order Status  
+• Completion History  
+
+--------------------------------------------------
+
+D. Reference Columns
+
+Define:
+
+• fleet_job_id → primary linkage reference  
+• component_id / fleet_component_id (if component-based jobs)  
+
+--------------------------------------------------
+
+5. Data Storage Strategy
+
+Analyze:
+
+Option 1 – Direct Reference
+
+• Vessel Job always reads from Fleet Job  
+
+Issues:
+
+• No flexibility for vessel customization  
+
+--------------------------------------------------
+
+Option 2 – Full Copy
+
+• All Fleet Job data copied into Vessel Job  
+
+Issues:
+
+• Sync problem when Fleet Job updates  
+
+--------------------------------------------------
+
+Option 3 – Hybrid Model (Recommended for Analysis)
+
+• Static fields copied (job definition)  
+• Dynamic fields maintained at vessel level  
+• fleet_job_id maintained as reference  
+
+--------------------------------------------------
+
+6. Sync Mechanism
+
+Analyze:
+
+• When Fleet Job is updated:
+
+  - Should Vessel Jobs auto-update?  
+  - Should update require manual sync?  
+  - Should changes apply only to new vessels?  
+
+--------------------------------------------------
+
+7. Control Mechanism
+
+Define whether system should have:
+
+• “Sync Jobs from Fleet” button  
+• “Update existing mapped jobs” option  
+• “Apply only to unmapped jobs” option  
+
+--------------------------------------------------
+
+8. Job Lifecycle Behavior
+
+Analyze:
+
+• When Fleet Job is:
+
+  A. Updated  
+  B. Deactivated  
+  C. Deleted  
+
+What happens to Vessel Jobs?
+
+--------------------------------------------------
+
+9. Work Order Impact
+
+Analyze:
+
+• If Vessel Job is deactivated:
+
+  - Existing Work Orders → must remain  
+  - New Work Orders → should be blocked  
+
+• Link between:
+
+  - Vessel Job → Work Orders  
+
+--------------------------------------------------
+
+10. Edge Case Handling
+
+Consider:
+
+• Multiple vessels under same fleet with different job states  
+• Manual modification at vessel level  
+• Re-mapping after unlinking  
+• Duplicate job creation during sync  
+• Job interval changes at Fleet level  
+
+--------------------------------------------------
+
+11. Functional Behavior Plan (From Analysis)
+
+Define ideal workflow:
+
+• Fleet Job Creation  
+• Mapping to Vessel  
+• Data Sync  
+• Vessel Execution  
+• Update Handling  
+
+--------------------------------------------------
+
+12. Validation Rules
+
+Define:
+
+• When mapping should be allowed  
+• When mapping should be blocked  
+• Duplicate prevention logic  
+• Interval consistency checks  
+
+--------------------------------------------------
+
+13. Output Expectation
+
+Provide:
+
+• Complete functional explanation  
+• Data flow architecture (Fleet → Vessel)  
+• Column-level mapping structure  
+• Recommended storage model  
+• Sync mechanism design  
+• Identified gaps and risks  
+• Suggested improvements  
+
+--------------------------------------------------
+
+Important Instruction:
+
+• This is a **deep analysis task**  
+• Do NOT assume current system is correct  
+• Think from:
+
+  - PMS domain logic  
+  - Data integrity  
+  - Scalability  
+  - Maintainability  
+
+• Provide a structured and system-level explanation  
