@@ -1,12 +1,17 @@
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 import { eq, and } from 'drizzle-orm';
 import { reportFavorites } from '@shared/schema';
 import { getDb } from '../../../db';
+import type { AuthenticatedRequest } from '../../../middleware/auth';
 
-export async function getFavorites(req: Request, res: Response) {
+function getUserUuid(req: AuthenticatedRequest): string | null {
+  const user = req.user;
+  return user?.userUuid || user?.id?.toString() || null;
+}
+
+export async function getFavorites(req: AuthenticatedRequest, res: Response) {
   try {
-    const user = (req as any).user;
-    const userUuid = user?.userUuid || user?.id?.toString();
+    const userUuid = getUserUuid(req);
     if (!userUuid) {
       return res.status(401).json({ error: 'Authentication required' });
     }
@@ -29,10 +34,9 @@ export async function getFavorites(req: Request, res: Response) {
   }
 }
 
-export async function addFavorite(req: Request, res: Response) {
+export async function addFavorite(req: AuthenticatedRequest, res: Response) {
   try {
-    const user = (req as any).user;
-    const userUuid = user?.userUuid || user?.id?.toString();
+    const userUuid = getUserUuid(req);
     if (!userUuid) {
       return res.status(401).json({ error: 'Authentication required' });
     }
@@ -81,10 +85,9 @@ export async function addFavorite(req: Request, res: Response) {
   }
 }
 
-export async function removeFavorite(req: Request, res: Response) {
+export async function removeFavorite(req: AuthenticatedRequest, res: Response) {
   try {
-    const user = (req as any).user;
-    const userUuid = user?.userUuid || user?.id?.toString();
+    const userUuid = getUserUuid(req);
     if (!userUuid) {
       return res.status(401).json({ error: 'Authentication required' });
     }
