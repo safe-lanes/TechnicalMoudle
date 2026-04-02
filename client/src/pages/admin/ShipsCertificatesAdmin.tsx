@@ -499,7 +499,8 @@ export default function ShipsCertificatesAdmin() {
       .map(v => ({ id: String(v.id), name: v.name }));
     const vesselMasterIds = vesselOnlyCertsWithIds.map(c => c.masterId);
     
-    if (vesselMasterIds.length > 0 && targetVessels.length === 0) {
+    const newVesselCerts = vesselOnlyCerts.filter(c => !/^VES-\d+$/.test(c.masterId));
+    if (newVesselCerts.length > 0 && targetVessels.length === 0) {
       toast({
         title: "Please select a vessel first",
         description: "Vessel-specific certificates require at least one vessel to be selected on the Vessel tab.",
