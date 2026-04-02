@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Paperclip, Calendar, Download } from 'lucide-react';
 import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellEditingStoppedEvent } from 'ag-grid-community';
@@ -114,6 +114,7 @@ export default function SurveysPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 100;
   const { toast } = useToast();
+  const surveyInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Build API URL with vessel filter and pagination
   const apiUrl = useMemo(() => {
@@ -260,10 +261,13 @@ export default function SurveysPage() {
         title: 'Updated',
         description: 'Survey updated successfully.',
       });
-      // Debounced background refetch to eventually sync with server
-      setTimeout(() => {
+      if (surveyInvalidateTimer.current) {
+        clearTimeout(surveyInvalidateTimer.current);
+      }
+      surveyInvalidateTimer.current = setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['/technical/api/surveys'] });
-      }, 3000);
+        surveyInvalidateTimer.current = null;
+      }, 5000);
     },
     onError: (error: any) => {
       toast({
@@ -320,7 +324,7 @@ export default function SurveysPage() {
     }
   }, [updateSurveyMutation]);
 
-  const handleDateChange = useCallback((compoundId: string, field: string, newValue: string) => {
+  const handleDateChange = useCallback((compoundId: string, field: string, newValue: string, _rowData?: any) => {
     console.log('[SurveysPage] handleDateChange called:', { compoundId, field, newValue });
     
     updateSurveyMutation.mutate({

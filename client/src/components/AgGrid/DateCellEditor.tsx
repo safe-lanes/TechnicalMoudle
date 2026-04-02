@@ -93,13 +93,16 @@ const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((prop
     
     const newDisplayValue = formatToDisplayDate(valueRef.current);
     const field = props.colDef?.field;
-    const rowId = props.data?.id;
+    const data = props.data;
+    const compoundId = data?.vesselId && data?.masterId
+      ? `${data.vesselId}::${data.masterId}`
+      : data?.id;
     
-    console.log('[DateCellEditor] Committing value:', newDisplayValue, 'for field:', field, 'row:', rowId);
+    console.log('[DateCellEditor] Committing value:', newDisplayValue, 'for field:', field, 'id:', compoundId);
     
-    if (field && rowId && props.node && props.context?.onDateChange) {
+    if (field && compoundId && props.node && props.context?.onDateChange) {
       props.node.setDataValue(field, newDisplayValue);
-      props.context.onDateChange(rowId, field, newDisplayValue);
+      props.context.onDateChange(compoundId, field, newDisplayValue, data);
     }
     
     props.stopEditing();

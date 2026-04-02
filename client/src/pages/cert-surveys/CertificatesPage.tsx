@@ -80,6 +80,7 @@ const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((prop
       if (blurTimeoutRef.current) {
         clearTimeout(blurTimeoutRef.current);
       }
+      isCommittingRef.current = false;
     };
   }, []);
   
@@ -116,17 +117,20 @@ const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((prop
     
     const newDisplayValue = formatToDisplayDate(valueRef.current);
     const field = props.colDef?.field;
-    const rowId = props.data?.id;
-    const rowData = props.data;
+    const data = props.data;
+    const compoundId = data?.vesselId && data?.masterId
+      ? `${data.vesselId}::${data.masterId}`
+      : data?.id;
     
-    console.log('[DateCellEditor] Committing value:', newDisplayValue, 'for field:', field, 'row:', rowId, 'rowData:', rowData);
+    console.log('[DateCellEditor] Committing value:', newDisplayValue, 'for field:', field, 'id:', compoundId);
     
-    if (field && rowId && props.node && props.context?.onDateChange) {
+    if (field && compoundId && props.node && props.context?.onDateChange) {
       props.node.setDataValue(field, newDisplayValue);
-      props.context.onDateChange(rowId, field, newDisplayValue, rowData);
+      props.context.onDateChange(compoundId, field, newDisplayValue, data);
     }
     
     props.stopEditing();
+    isCommittingRef.current = false;
   }, [props]);
   
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -292,6 +296,7 @@ export default function CertificatesPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const pageSize = 100;
   const { toast } = useToast();
+  const certInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Build API URL with vessel filter, pagination, and sorting
   const apiUrl = useMemo(() => {
@@ -369,10 +374,13 @@ export default function CertificatesPage() {
         title: 'Updated',
         description: 'Certificate updated successfully.',
       });
-      // Debounced background refetch to eventually sync with server
-      setTimeout(() => {
+      if (certInvalidateTimer.current) {
+        clearTimeout(certInvalidateTimer.current);
+      }
+      certInvalidateTimer.current = setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['/technical/api/certificates'] });
-      }, 3000);
+        certInvalidateTimer.current = null;
+      }, 5000);
     },
     onError: (error: any) => {
       toast({
