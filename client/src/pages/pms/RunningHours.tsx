@@ -1396,7 +1396,7 @@ const RunningHours = () => {
                     title={(() => {
                       const rate = item.utilizationRate ?? 0;
                       const periodStart = item.periodStartDate ? new Date(item.periodStartDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-                      const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                      const periodEnd = periodDateRange ? periodDateRange.to.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
                       const days = item.periodDays ?? 0;
                       const currentRH = item.currentCumulativeRHRaw?.toLocaleString() ?? '0';
                       const rhStart = item.rhAtPeriodStart?.toLocaleString() ?? '0';
@@ -1404,7 +1404,7 @@ const RunningHours = () => {
                       const maxHrs = item.maxPossibleHours ?? 0;
                       const avgDaily = item.averageDailyHours ?? 0;
                       const pLabel = periodLabel;
-                      let tooltip = `${pLabel} Utilization: ${rate.toFixed(1)}%\n\nCalculation Details:\n━━━━━━━━━━━━━━━━━━━━━━\nPeriod: ${periodStart} to ${today} (${days} days)\nCurrent RH: ${currentRH} hrs\nRH at Period Start: ${rhStart} hrs\nRH Accumulated: ${rhAccum} hrs\nMaximum Possible: ${maxHrs.toLocaleString()} hrs (${days} days × 24 hrs/day)\n\nFormula: (${rhAccum} / ${maxHrs.toLocaleString()}) × 100 = ${rate.toFixed(1)}%`;
+                      let tooltip = `${pLabel} Utilization: ${rate.toFixed(1)}%\n\nCalculation Details:\n━━━━━━━━━━━━━━━━━━━━━━\nPeriod: ${periodStart} to ${periodEnd} (${days} days)\nCurrent RH: ${currentRH} hrs\nRH at Period Start: ${rhStart} hrs\nRH Accumulated: ${rhAccum} hrs\nMaximum Possible: ${maxHrs.toLocaleString()} hrs (${days} days × 24 hrs/day)\n\nFormula: (${rhAccum} / ${maxHrs.toLocaleString()}) × 100 = ${rate.toFixed(1)}%`;
                       if (avgDaily > 0) {
                         tooltip += `\n\nInterpretation: This machinery ran on average ${avgDaily} hours per day over the last ${days} days.`;
                       }
