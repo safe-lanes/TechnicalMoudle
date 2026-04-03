@@ -1191,14 +1191,15 @@ const Dashboard = () => {
         {activeTab === 'overview' && (
           <div className="p-4 space-y-4">
 
-            {/* ROW 1: Three cards side by side */}
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_3fr_1fr] gap-4">
+            {/* DASHBOARD GRID: 3 columns (20% / 60% / 20%), 4 conceptual rows */}
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_3fr_1fr] gap-4" style={{ alignItems: 'start' }}>
 
-              {/* Card 1: Work Order KPIs + Status Distribution */}
-              <div className={cardStyle} data-testid="column-wo-kpis">
-                <div className="p-4">
-                  <div style={sectionHeaderBar} className="!pt-0">WORK ORDER KPIs</div>
+              {/* LEFT COLUMN: Work Orders card — spans all rows internally */}
+              <div className={cardStyle} style={{ overflow: 'hidden' }} data-testid="column-wo-kpis">
+                <div className="p-3">
+                  <div style={sectionHeaderBar} className="!pt-0 !pb-2">WORK ORDERS</div>
 
+                  {/* Row 1: Overdue WOs Gauge */}
                   <SemiCircleGauge
                     value={workOrderKPIs.overdue}
                     max={workOrderKPIs.total || 10}
@@ -1212,19 +1213,22 @@ const Dashboard = () => {
 
                   <div style={dividerH} />
 
-                  <div style={subTitle} className="mb-1">Status Distribution</div>
-                  <div style={{ height: '200px' }} data-testid="card-wo-status-chart">
+                  {/* Row 2: WO Status Distribution Donut */}
+                  <div style={subTitle} className="mb-1 mt-2">WO Status - All Eqpt</div>
+                  <div style={{ height: '180px', overflow: 'hidden' }} data-testid="card-wo-status-chart">
                     {workOrderStatusChartData.length > 0 ? (
                       <AgCharts options={{
                         data: workOrderStatusChartData,
-                        padding: { top: 20, right: 20, bottom: 10, left: 20 },
+                        padding: { top: 0, right: 0, bottom: 0, left: 0 },
                         series: [{
                           type: 'donut',
                           angleKey: 'count',
+                          calloutLabelKey: 'status',
+                          calloutLabel: { fontSize: 9, offset: 6, minAngle: 15 },
                           sectorLabelKey: 'count',
-                          sectorLabel: { color: '#ffffff', fontWeight: 'bold', fontSize: 12 },
-                          innerRadiusRatio: 0.45,
-                          outerRadiusRatio: 0.65,
+                          sectorLabel: { color: '#ffffff', fontWeight: 'bold', fontSize: 11 },
+                          innerRadiusRatio: 0.55,
+                          outerRadiusOffset: -30,
                           fills: workOrderStatusChartData.map(d => d.color),
                           strokes: workOrderStatusChartData.map(d => d.color),
                           listeners: {
@@ -1238,99 +1242,112 @@ const Dashboard = () => {
                             }
                           }
                         } as any],
-                        legend: { enabled: true, position: 'bottom' }
+                        legend: { enabled: true, position: 'bottom', item: { label: { fontSize: 9 } } }
                       } as AgChartOptions} />
                     ) : (
-                      <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E' }}>No work orders to display</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 2: 6-Month Maintenance Trend */}
-              <div className={cardStyle} data-testid="column-maintenance-trend" style={{ display: 'flex', flexDirection: 'column' }}>
-                <div className="p-4" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                  <div style={sectionHeaderBar} className="!pt-0">6-MONTH MAINTENANCE TREND</div>
-
-                  <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
-                    {maintenanceTrendData.months.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minHeight: 0 }}>
-                        <div style={{ flex: 1, minHeight: 0, borderRadius: '8px', padding: '8px 4px' }} data-testid="chart-maintenance-trend">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={maintenanceTrendData.months} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
-                              <XAxis dataKey="monthShort" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={{ stroke: '#e5e7eb' }} tickLine={false} />
-                              <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} width={38} />
-                              <Tooltip
-                                content={({ active, payload }) => {
-                                  if (active && payload && payload.length) {
-                                    const d = payload[0].payload;
-                                    return (
-                                      <div style={{ background: '#FFFFFF', border: '1px solid #E0E0E0', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '8px 12px' }} data-testid="tooltip-trend-line">
-                                        <div className="font-semibold text-xs mb-1" style={{ color: '#212121' }}>{d.month}</div>
-                                        <div className="text-xs" style={{ color: '#616161' }}>Total planned: {d.totalPlanned}</div>
-                                        <div className="text-xs" style={{ color: '#2ecc71' }}>Completed: {d.completedPercent}% ({d.completed})</div>
-                                        <div className="text-xs" style={{ color: '#f39c12' }}>Outstanding: {d.outstandingPercent}% ({d.outstanding})</div>
-                                        <div className="text-xs" style={{ color: '#e74c3c' }}>Overdue: {d.overduePercent}% ({d.overdue})</div>
-                                      </div>
-                                    );
-                                  }
-                                  return null;
-                                }}
-                              />
-                              <Line type="monotone" dataKey="completedPercent" name="Completed %" stroke="#2ecc71" strokeWidth={2} dot={{ r: 4, fill: '#2ecc71', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#2ecc71' }} />
-                              <Line type="monotone" dataKey="outstandingPercent" name="Outstanding %" stroke="#f39c12" strokeWidth={2} dot={{ r: 4, fill: '#f39c12', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#f39c12' }} />
-                              <Line type="monotone" dataKey="overduePercent" name="Overdue %" stroke="#e74c3c" strokeWidth={2} dot={{ r: 4, fill: '#e74c3c', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#e74c3c' }} />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </div>
-                        <div className="flex items-center justify-center gap-4 text-xs" style={{ color: '#6b7280' }} data-testid="legend-maintenance-trend">
-                          <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#2ecc71' }} /><span>Completed %</span></div>
-                          <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#f39c12' }} /><span>Outstanding %</span></div>
-                          <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#e74c3c' }} /><span>Overdue %</span></div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ flex: 1 }} className="flex items-center justify-center"><span style={{ color: '#9E9E9E', fontSize: '12px' }}>No trend data available</span></div>
+                      <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>No work orders to display</div>
                     )}
                   </div>
 
+                  {/* Row 3-4: Future — Overdue WO Critical gauge + WO Status Critical donut */}
                 </div>
               </div>
 
-              {/* Card 3: Spares Stock Status */}
-              <div className={cardStyle} data-testid="column-inventory-fleet">
-                <div className="p-4">
-                  <div style={sectionHeaderBar} className="!pt-0">SPARES STOCK STATUS</div>
+              {/* CENTER COLUMN: Trend chart spanning rows 1-2, future charts in rows 3-4 */}
+              <div className="flex flex-col gap-4" style={{ minHeight: 0 }}>
+                {/* Rows 1-2: 6-Month Maintenance Trend */}
+                <div className={cardStyle} data-testid="column-maintenance-trend" style={{ display: 'flex', flexDirection: 'column', minHeight: '380px' }}>
+                  <div className="p-4" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                    <div style={sectionHeaderBar} className="!pt-0">6-MONTH MAINTENANCE TREND</div>
 
-                  <div data-testid="card-spares-status-chart">
-                    <div style={{ height: '200px' }}>
-                      {sparesStockChartData.length > 0 ? (
-                        <AgCharts options={{
-                          data: sparesStockChartData,
-                          padding: { top: 20, right: 20, bottom: 10, left: 20 },
-                          series: [{
-                            type: 'donut',
-                            angleKey: 'count',
-                            sectorLabelKey: 'count',
-                            sectorLabel: { color: '#ffffff', fontWeight: 'bold', fontSize: 12 },
-                            innerRadiusRatio: 0.45,
-                            outerRadiusRatio: 0.65,
-                            fills: sparesStockChartData.map(d => d.color),
-                            strokes: sparesStockChartData.map(d => d.color),
-                            listeners: {
-                              nodeClick: (event: any) => {
-                                navigateToSpares(event.datum.status);
-                              }
-                            }
-                          } as any],
-                          legend: { enabled: true, position: 'bottom' }
-                        } as AgChartOptions} />
+                    <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
+                      {maintenanceTrendData.months.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minHeight: 0 }}>
+                          <div style={{ flex: 1, minHeight: 0, borderRadius: '8px', padding: '8px 4px' }} data-testid="chart-maintenance-trend">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <LineChart data={maintenanceTrendData.months} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
+                                <XAxis dataKey="monthShort" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={{ stroke: '#e5e7eb' }} tickLine={false} />
+                                <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} width={38} />
+                                <Tooltip
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const d = payload[0].payload;
+                                      return (
+                                        <div style={{ background: '#FFFFFF', border: '1px solid #E0E0E0', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '8px 12px' }} data-testid="tooltip-trend-line">
+                                          <div className="font-semibold text-xs mb-1" style={{ color: '#212121' }}>{d.month}</div>
+                                          <div className="text-xs" style={{ color: '#616161' }}>Total planned: {d.totalPlanned}</div>
+                                          <div className="text-xs" style={{ color: '#2ecc71' }}>Completed: {d.completedPercent}% ({d.completed})</div>
+                                          <div className="text-xs" style={{ color: '#f39c12' }}>Outstanding: {d.outstandingPercent}% ({d.outstanding})</div>
+                                          <div className="text-xs" style={{ color: '#e74c3c' }}>Overdue: {d.overduePercent}% ({d.overdue})</div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Line type="monotone" dataKey="completedPercent" name="Completed %" stroke="#2ecc71" strokeWidth={2} dot={{ r: 4, fill: '#2ecc71', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#2ecc71' }} />
+                                <Line type="monotone" dataKey="outstandingPercent" name="Outstanding %" stroke="#f39c12" strokeWidth={2} dot={{ r: 4, fill: '#f39c12', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#f39c12' }} />
+                                <Line type="monotone" dataKey="overduePercent" name="Overdue %" stroke="#e74c3c" strokeWidth={2} dot={{ r: 4, fill: '#e74c3c', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#e74c3c' }} />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+                          <div className="flex items-center justify-center gap-4 text-xs" style={{ color: '#6b7280' }} data-testid="legend-maintenance-trend">
+                            <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#2ecc71' }} /><span>Completed %</span></div>
+                            <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#f39c12' }} /><span>Outstanding %</span></div>
+                            <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#e74c3c' }} /><span>Overdue %</span></div>
+                          </div>
+                        </div>
                       ) : (
-                        <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '12px' }}>No spares data</div>
+                        <div style={{ flex: 1 }} className="flex items-center justify-center"><span style={{ color: '#9E9E9E', fontSize: '12px' }}>No trend data available</span></div>
                       )}
                     </div>
+
                   </div>
+                </div>
+
+                {/* Row 3: Future — Postponed WOs gauge + Unplanned Maintenance gauge (side by side) */}
+                {/* Row 4: Future — Top 5 Reason for Postponement/Overdue YTD bar chart */}
+              </div>
+
+              {/* RIGHT COLUMN: Spares Stock Status card — spans all rows internally */}
+              <div className={cardStyle} style={{ overflow: 'hidden' }} data-testid="column-inventory-fleet">
+                <div className="p-3">
+                  <div style={sectionHeaderBar} className="!pt-0 !pb-2">SPARES STOCK STATUS</div>
+
+                  {/* Row 1: Spare Parts Donut */}
+                  <div style={subTitle} className="mb-1">Spare Parts</div>
+                  <div style={{ height: '180px', overflow: 'hidden' }} data-testid="card-spares-status-chart">
+                    {sparesStockChartData.length > 0 ? (
+                      <AgCharts options={{
+                        data: sparesStockChartData,
+                        padding: { top: 0, right: 0, bottom: 0, left: 0 },
+                        series: [{
+                          type: 'donut',
+                          angleKey: 'count',
+                          calloutLabelKey: 'status',
+                          calloutLabel: { fontSize: 9, offset: 6, minAngle: 15 },
+                          sectorLabelKey: 'count',
+                          sectorLabel: { color: '#ffffff', fontWeight: 'bold', fontSize: 11 },
+                          innerRadiusRatio: 0.55,
+                          outerRadiusOffset: -30,
+                          fills: sparesStockChartData.map(d => d.color),
+                          strokes: sparesStockChartData.map(d => d.color),
+                          listeners: {
+                            nodeClick: (event: any) => {
+                              navigateToSpares(event.datum.status);
+                            }
+                          }
+                        } as any],
+                        legend: { enabled: true, position: 'bottom', item: { label: { fontSize: 9 } } }
+                      } as AgChartOptions} />
+                    ) : (
+                      <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>No spares data</div>
+                    )}
+                  </div>
+
+                  {/* Row 2: Future — Critical Spare Parts donut */}
+                  {/* Row 3: Future — Modify PMS Requests YTD gauge */}
                 </div>
               </div>
             </div>
