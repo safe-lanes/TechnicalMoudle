@@ -1211,33 +1211,6 @@ const Dashboard = () => {
                     testId="gauge-overdue-wo"
                   />
 
-                  <div style={dividerH} />
-
-                  <SemiCircleGauge
-                    value={workOrderKPIs.completed}
-                    max={workOrderKPIs.total || 10}
-                    color="#16a34a"
-                    label="Completion Rate"
-                    displayValue={workOrderKPIs.completed.toString()}
-                    subtitle={`${completionRate}% completion rate`}
-
-                    onClick={() => navigateToWorkOrders('Completed')}
-                    testId="gauge-completion-rate"
-                  />
-
-                  <div style={dividerH} />
-
-                  <SemiCircleGauge
-                    value={outstandingTasksChartData.outstandingCount}
-                    max={outstandingTasksChartData.totalMonthly || 10}
-                    color="#f59e0b"
-                    label="Outstanding Tasks"
-                    displayValue={`${outstandingTasksChartData.outstandingPercent}%`}
-                    subtitle={`${outstandingTasksChartData.outstandingCount} of ${outstandingTasksChartData.totalMonthly} tasks`}
-
-                    onClick={() => navigateToWorkOrders('Planned')}
-                    testId="gauge-outstanding-tasks"
-                  />
                 </div>
               </div>
 
