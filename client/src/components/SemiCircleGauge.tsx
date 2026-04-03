@@ -49,10 +49,10 @@ export function SemiCircleGauge({
       className={onClick ? "cursor-pointer" : ""}
       onClick={onClick}
       data-testid={testId}
-      style={{ textAlign: 'center', padding: '16px 16px 12px' }}
+      style={{ textAlign: 'center', padding: '8px 8px 6px' }}
     >
-      <div style={{ fontSize: '11px', fontWeight: 700, color: '#4a4a4a', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</div>
-      <svg width="200" height="110" viewBox="0 0 200 110" style={{ display: 'block', margin: '0 auto' }}>
+      <div style={{ fontSize: '10px', fontWeight: 700, color: '#4a4a4a', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</div>
+      <svg viewBox="0 0 200 110" style={{ display: 'block', margin: '0 auto', maxWidth: '160px', width: '100%' }}>
         <path
           d={trackPath}
           fill="none"
@@ -81,10 +81,10 @@ export function SemiCircleGauge({
         <text x={cx + radius + 2} y={cy + 16} textAnchor="end" style={{ fontSize: '10px', fill: '#9E9E9E' }}>{max > 0 ? max : 10}</text>
       </svg>
       {subtitle && (
-        <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '-4px', marginBottom: '4px' }}>{subtitle}</div>
+        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '-2px', marginBottom: '2px' }}>{subtitle}</div>
       )}
       {statLine && (
-        <div style={{ fontSize: '12px', color: '#6b7280', textAlign: 'center' }}>{statLine}</div>
+        <div style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center' }}>{statLine}</div>
       )}
     </div>
   );

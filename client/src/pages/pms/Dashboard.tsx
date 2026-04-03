@@ -1192,7 +1192,7 @@ const Dashboard = () => {
           <div className="p-4 space-y-4">
 
             {/* ROW 1: Three cards side by side */}
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr_2fr] gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_3fr_1fr] gap-4">
 
               {/* Card 1: Work Order KPIs + Status Distribution */}
               <div className={cardStyle} data-testid="column-wo-kpis">
@@ -1213,7 +1213,7 @@ const Dashboard = () => {
                   <div style={dividerH} />
 
                   <div style={subTitle} className="mb-1">Status Distribution</div>
-                  <div style={{ height: '300px' }} data-testid="card-wo-status-chart">
+                  <div style={{ height: '220px' }} data-testid="card-wo-status-chart">
                     {workOrderStatusChartData.length > 0 ? (
                       <AgCharts options={{
                         data: workOrderStatusChartData,
@@ -1302,7 +1302,7 @@ const Dashboard = () => {
                   <div style={sectionHeaderBar} className="!pt-0">SPARES STOCK STATUS</div>
 
                   <div data-testid="card-spares-status-chart">
-                    <div style={{ height: '250px' }}>
+                    <div style={{ height: '220px' }}>
                       {sparesStockChartData.length > 0 ? (
                         <AgCharts options={{
                           data: sparesStockChartData,
