@@ -20,9 +20,7 @@ import {
   Loader2,
   Filter
 } from "lucide-react";
-import { AgCharts } from "ag-charts-react";
-import { AgChartOptions } from "ag-charts-community";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1222,35 +1220,48 @@ const Dashboard = () => {
 
                   {/* Row 2: WO Status Distribution Donut */}
                   <div style={subTitle} className="mb-1 mt-2">WO Status - All Eqpt</div>
-                  <div style={{ height: '180px', overflow: 'hidden' }} data-testid="card-wo-status-chart">
+                  <div style={{ height: '170px' }} data-testid="card-wo-status-chart">
                     {workOrderStatusChartData.length > 0 ? (
-                      <AgCharts options={{
-                        data: workOrderStatusChartData,
-                        padding: { top: 0, right: 5, bottom: 0, left: 5 },
-                        series: [{
-                          type: 'donut',
-                          angleKey: 'count',
-                          calloutLabelKey: 'status',
-                          calloutLabel: { fontSize: 10, offset: 8, minAngle: 20 },
-                          sectorLabelKey: 'count',
-                          sectorLabel: { color: '#ffffff', fontWeight: 'bold', fontSize: 11 },
-                          innerRadiusRatio: 0.5,
-                          outerRadiusOffset: -30,
-                          fills: workOrderStatusChartData.map(d => d.color),
-                          strokes: workOrderStatusChartData.map(d => d.color),
-                          listeners: {
-                            nodeClick: (event: any) => {
-                              const status = event.datum.status;
+                      <ResponsiveContainer width="100%" height={170}>
+                        <PieChart>
+                          <Pie
+                            data={workOrderStatusChartData}
+                            dataKey="count"
+                            nameKey="status"
+                            cx="50%"
+                            cy="45%"
+                            innerRadius={35}
+                            outerRadius={58}
+                            paddingAngle={2}
+                            label={({ cx, cy, midAngle, innerRadius, outerRadius, count }) => {
+                              const RADIAN = Math.PI / 180;
+                              const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                              const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                              const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                              return (
+                                <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight="bold">
+                                  {count}
+                                </text>
+                              );
+                            }}
+                            labelLine={false}
+                            onClick={(entry: any) => {
+                              const status = entry.status;
                               if (status === 'Overdue') navigateToWorkOrders('Overdue');
                               else if (status === 'Due') navigateToWorkOrders('Due');
                               else if (status === 'Pending Approval') navigateToWorkOrders('Pending Approval');
                               else if (status === 'Completed') navigateToWorkOrders('Completed');
                               else navigateToWorkOrders('Planned');
-                            }
-                          }
-                        } as any],
-                        legend: { enabled: true, position: 'bottom', item: { label: { fontSize: 10 } } }
-                      } as AgChartOptions} />
+                            }}
+                            cursor="pointer"
+                          >
+                            {workOrderStatusChartData.map((entry, index) => (
+                              <Cell key={`wo-cell-${index}`} fill={entry.color} stroke={entry.color} />
+                            ))}
+                          </Pie>
+                          <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '2px' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
                     ) : (
                       <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>No work orders to display</div>
                     )}
@@ -1339,30 +1350,43 @@ const Dashboard = () => {
                   <div style={sectionHeaderBar} className="!pt-0 !pb-2">SPARES STOCK STATUS</div>
 
                   {/* Row 1: Spare Parts Donut */}
-                  <div style={{ height: '180px', overflow: 'hidden' }} data-testid="card-spares-status-chart">
+                  <div style={{ height: '170px' }} data-testid="card-spares-status-chart">
                     {sparesStockChartData.length > 0 ? (
-                      <AgCharts options={{
-                        data: sparesStockChartData,
-                        padding: { top: 0, right: 5, bottom: 0, left: 5 },
-                        series: [{
-                          type: 'donut',
-                          angleKey: 'count',
-                          calloutLabelKey: 'status',
-                          calloutLabel: { fontSize: 10, offset: 8, minAngle: 20 },
-                          sectorLabelKey: 'count',
-                          sectorLabel: { color: '#ffffff', fontWeight: 'bold', fontSize: 11 },
-                          innerRadiusRatio: 0.5,
-                          outerRadiusOffset: -30,
-                          fills: sparesStockChartData.map(d => d.color),
-                          strokes: sparesStockChartData.map(d => d.color),
-                          listeners: {
-                            nodeClick: (event: any) => {
-                              navigateToSpares(event.datum.status);
-                            }
-                          }
-                        } as any],
-                        legend: { enabled: true, position: 'bottom', item: { label: { fontSize: 10 } } }
-                      } as AgChartOptions} />
+                      <ResponsiveContainer width="100%" height={170}>
+                        <PieChart>
+                          <Pie
+                            data={sparesStockChartData}
+                            dataKey="count"
+                            nameKey="status"
+                            cx="50%"
+                            cy="45%"
+                            innerRadius={35}
+                            outerRadius={58}
+                            paddingAngle={2}
+                            label={({ cx, cy, midAngle, innerRadius, outerRadius, count }) => {
+                              const RADIAN = Math.PI / 180;
+                              const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                              const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                              const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                              return (
+                                <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight="bold">
+                                  {count}
+                                </text>
+                              );
+                            }}
+                            labelLine={false}
+                            onClick={(entry: any) => {
+                              navigateToSpares(entry.status);
+                            }}
+                            cursor="pointer"
+                          >
+                            {sparesStockChartData.map((entry, index) => (
+                              <Cell key={`spares-cell-${index}`} fill={entry.color} stroke={entry.color} />
+                            ))}
+                          </Pie>
+                          <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '2px' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
                     ) : (
                       <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>No spares data</div>
                     )}
