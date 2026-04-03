@@ -652,7 +652,7 @@ const Dashboard = () => {
   const workOrderStatusChartData = useMemo(() => {
     return [
       { status: 'Overdue', count: workOrderKPIs.overdue, color: '#ff6961' },
-      { status: 'Due', count: workOrderKPIs.due, color: '#FAC898' },
+      { status: 'Due', count: workOrderKPIs.due, color: '#FF964f' },
       { status: 'Pending Approval', count: workOrderKPIs.pendingApproval, color: '#1565C0' },
       { status: 'Completed', count: workOrderKPIs.completed, color: '#5dc86f' }
     ].filter(d => d.count > 0);
@@ -666,7 +666,7 @@ const Dashboard = () => {
     
     return [
       { status: 'OK', count: ok, color: '#5dc86f' },
-      { status: 'At Min', count: atMin, color: '#F57C00' },
+      { status: 'At Min', count: atMin, color: '#FF964f' },
       { status: 'Low', count: low, color: '#ff6961' }
     ].filter(d => d.count > 0);
   }, [filteredSparesData]);
