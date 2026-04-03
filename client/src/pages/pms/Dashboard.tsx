@@ -77,6 +77,8 @@ interface SparesHistoryItem {
   partName: string;
 }
 
+type EnrichedWorkOrder = WorkOrder & { computedStatus?: string; criticality?: string };
+
 type SortField = 'vessel' | 'overduePercent' | 'outstandingPercent' | 'compliancePercent' | 'lowStockItems' | 'overdueCount';
 type SortDir = 'asc' | 'desc';
 
@@ -913,6 +915,47 @@ const Dashboard = () => {
   }, [isAllVessels, currentVessel, workOrderKPIs.total, sparesKPIs.total, componentsKPIs.total, vessels.length, lastUpdated]);
 
   const overduePercent = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.overdue / workOrderKPIs.total) * 100) : 0;
+
+  const criticalWorkOrderKPIs = useMemo(() => {
+    const criticalWOs = (workOrdersData as EnrichedWorkOrder[]).filter(wo => {
+      return (wo.criticality ?? '').toLowerCase() === "yes";
+    });
+    const safeWOs = criticalWOs.filter(wo => wo !== null && wo !== undefined);
+
+    const due = safeWOs.filter(wo =>
+      (wo.computedStatus === 'Due' || wo.computedStatus === 'Due (Grace P)') && !wo.isExecution
+    );
+    const overdue = safeWOs.filter(wo =>
+      wo.computedStatus === 'Overdue' && !wo.isExecution
+    );
+    const pendingApproval = safeWOs.filter(wo =>
+      wo.computedStatus === 'Pending Approval'
+    );
+    const completed = safeWOs.filter(wo =>
+      wo.computedStatus === 'Completed'
+    );
+
+    return {
+      total: safeWOs.filter(wo => !wo.isExecution).length,
+      overdue: overdue.length,
+      due: due.length,
+      pendingApproval: pendingApproval.length,
+      completed: completed.length,
+    };
+  }, [workOrdersData]);
+
+  const criticalWorkOrderStatusChartData = useMemo(() => {
+    return [
+      { status: 'Overdue', count: criticalWorkOrderKPIs.overdue, color: '#ff6961' },
+      { status: 'Due', count: criticalWorkOrderKPIs.due, color: '#FF964f' },
+      { status: 'Pending Approval', count: criticalWorkOrderKPIs.pendingApproval, color: '#1565C0' },
+      { status: 'Completed', count: criticalWorkOrderKPIs.completed, color: '#5dc86f' }
+    ].filter(d => d.count > 0);
+  }, [criticalWorkOrderKPIs]);
+
+  const criticalOverduePercent = criticalWorkOrderKPIs.total > 0
+    ? Math.round((criticalWorkOrderKPIs.overdue / criticalWorkOrderKPIs.total) * 100)
+    : 0;
   const completionRate = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.completed / workOrderKPIs.total) * 100) : 0;
 
   const HEADER_BLUE = '#1a3a5c';
@@ -1203,7 +1246,7 @@ const Dashboard = () => {
                 data-testid="column-wo-kpis"
               >
                 <div className="p-3">
-                  <div style={sectionHeaderBar} className="!pt-0 !pb-2">WORK ORDERS</div>
+                  <div style={sectionHeaderBar} className="!pt-0 !pb-2">OVERDUE W.O - ALL EQPT.</div>
 
                   {/* Row 1: Overdue WOs Gauge */}
                   <SemiCircleGauge
@@ -1271,13 +1314,70 @@ const Dashboard = () => {
 
                   <div style={dividerH} />
 
-                  {/* Row 3: Future — Overdue WO Critical gauge */}
-                  <div style={{ minHeight: '160px' }} data-testid="cell-left-row3" />
+                  {/* Row 3: Overdue WO Critical gauge */}
+                  <div style={subTitle} className="mb-1 mt-2">OVERDUE W.O - CRITICAL EQPT.</div>
+                  <SemiCircleGauge
+                    value={criticalWorkOrderKPIs.overdue}
+                    max={criticalWorkOrderKPIs.total || 10}
+                    color="#e74c3c"
+                    displayValue={criticalWorkOrderKPIs.overdue.toString()}
+                    subtitle={`${criticalOverduePercent}% of total`}
+                    onClick={() => navigateToWorkOrders('Overdue')}
+                    testId="gauge-overdue-wo-critical"
+                  />
 
                   <div style={dividerH} />
 
-                  {/* Row 4: Future — WO Status Critical donut */}
-                  <div style={{ minHeight: '180px' }} data-testid="cell-left-row4" />
+                  {/* Row 4: WO Status Critical donut */}
+                  <div style={subTitle} className="mb-1 mt-2">WO STATUS - CRITICAL EQPT.</div>
+                  <div style={{ height: '170px' }} data-testid="card-wo-status-critical-chart">
+                    {criticalWorkOrderStatusChartData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={170}>
+                        <PieChart>
+                          <Pie
+                            data={criticalWorkOrderStatusChartData}
+                            dataKey="count"
+                            nameKey="status"
+                            cx="50%"
+                            cy="45%"
+                            innerRadius={35}
+                            outerRadius={58}
+                            paddingAngle={2}
+                            label={({ cx, cy, midAngle, innerRadius, outerRadius, payload }: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; payload: { count: number } }) => {
+                              const RADIAN = Math.PI / 180;
+                              const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                              const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                              const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                              return (
+                                <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight="bold">
+                                  {payload.count}
+                                </text>
+                              );
+                            }}
+                            labelLine={false}
+                            onClick={(_data: Record<string, unknown>, index: number) => {
+                              const entry = criticalWorkOrderStatusChartData[index];
+                              if (!entry) return;
+                              const status = entry.status;
+                              if (status === 'Overdue') navigateToWorkOrders('Overdue');
+                              else if (status === 'Due') navigateToWorkOrders('Due');
+                              else if (status === 'Pending Approval') navigateToWorkOrders('Pending Approval');
+                              else if (status === 'Completed') navigateToWorkOrders('Completed');
+                              else navigateToWorkOrders('Planned');
+                            }}
+                            cursor="pointer"
+                          >
+                            {criticalWorkOrderStatusChartData.map((entry, index) => (
+                              <Cell key={`wo-critical-cell-${index}`} fill={entry.color} stroke={entry.color} />
+                            ))}
+                          </Pie>
+                          <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '2px' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>No critical work orders to display</div>
+                    )}
+                  </div>
                 </div>
               </div>
 
