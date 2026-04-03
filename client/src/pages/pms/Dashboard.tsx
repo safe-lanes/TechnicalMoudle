@@ -1288,7 +1288,7 @@ const Dashboard = () => {
 
             {/* DASHBOARD GRID: 3 columns (25% / 50% / 25%), 4 explicit rows */}
             <div
-              className="grid grid-cols-1 lg:grid-cols-[1fr_2fr_1fr] lg:[grid-template-rows:180px_140px_180px_200px]"
+              className="grid grid-cols-1 lg:grid-cols-[1fr_2fr_1fr] lg:[grid-template-rows:180px_112px_180px_200px]"
               style={{ gap: '16px' }}
               data-testid="dashboard-grid"
             >
