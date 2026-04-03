@@ -652,7 +652,7 @@ const Dashboard = () => {
   const workOrderStatusChartData = useMemo(() => {
     return [
       { status: 'Overdue', count: workOrderKPIs.overdue, color: '#ff6961' },
-      { status: 'Due', count: workOrderKPIs.due, color: '#F57C00' },
+      { status: 'Due', count: workOrderKPIs.due, color: '#FAC898' },
       { status: 'Pending Approval', count: workOrderKPIs.pendingApproval, color: '#1565C0' },
       { status: 'Completed', count: workOrderKPIs.completed, color: '#5dc86f' }
     ].filter(d => d.count > 0);
