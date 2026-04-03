@@ -1194,7 +1194,7 @@ const Dashboard = () => {
             {/* ROW 1: Three cards side by side */}
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr_2fr] gap-4">
 
-              {/* Card 1: Work Order KPIs */}
+              {/* Card 1: Work Order KPIs + Status Distribution */}
               <div className={cardStyle} data-testid="column-wo-kpis">
                 <div className="p-4">
                   <div style={sectionHeaderBar} className="!pt-0">WORK ORDER KPIs</div>
@@ -1206,56 +1206,51 @@ const Dashboard = () => {
                     label="Overdue WOs"
                     displayValue={workOrderKPIs.overdue.toString()}
                     subtitle={`${overduePercent}% of total`}
-
                     onClick={() => navigateToWorkOrders('Overdue')}
                     testId="gauge-overdue-wo"
                   />
 
+                  <div style={dividerH} />
+
+                  <div style={subTitle} className="mb-1">Status Distribution</div>
+                  <div style={{ height: '250px' }} data-testid="card-wo-status-chart">
+                    {workOrderStatusChartData.length > 0 ? (
+                      <AgCharts options={{
+                        data: workOrderStatusChartData,
+                        series: [{
+                          type: 'donut',
+                          angleKey: 'count',
+                          calloutLabelKey: 'status',
+                          sectorLabelKey: 'count',
+                          innerRadiusRatio: 0.82,
+                          fills: workOrderStatusChartData.map(d => d.color),
+                          strokes: workOrderStatusChartData.map(d => d.color),
+                          listeners: {
+                            nodeClick: (event: any) => {
+                              const status = event.datum.status;
+                              if (status === 'Overdue') navigateToWorkOrders('Overdue');
+                              else if (status === 'Due') navigateToWorkOrders('Due');
+                              else if (status === 'Pending Approval') navigateToWorkOrders('Pending Approval');
+                              else if (status === 'Completed') navigateToWorkOrders('Completed');
+                              else navigateToWorkOrders('Planned');
+                            }
+                          }
+                        } as any],
+                        legend: { enabled: true, position: 'bottom' }
+                      } as AgChartOptions} />
+                    ) : (
+                      <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E' }}>No work orders to display</div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Card 2: Work Order Status & Trends */}
+              {/* Card 2: 6-Month Maintenance Trend */}
               <div className={cardStyle} data-testid="column-wo-status-trends" style={{ display: 'flex', flexDirection: 'column' }}>
                 <div className="p-4" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                  <div style={sectionHeaderBar} className="!pt-0">WORK ORDER STATUS & TRENDS</div>
-
-                  <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                    <div style={subTitle} className="mb-1">Status Distribution</div>
-                    <div style={{ flex: 1, minHeight: 0 }} data-testid="card-wo-status-chart">
-                      {workOrderStatusChartData.length > 0 ? (
-                        <AgCharts options={{
-                          data: workOrderStatusChartData,
-                          series: [{
-                            type: 'donut',
-                            angleKey: 'count',
-                            calloutLabelKey: 'status',
-                            sectorLabelKey: 'count',
-                            innerRadiusRatio: 0.82,
-                            fills: workOrderStatusChartData.map(d => d.color),
-                            strokes: workOrderStatusChartData.map(d => d.color),
-                            listeners: {
-                              nodeClick: (event: any) => {
-                                const status = event.datum.status;
-                                if (status === 'Overdue') navigateToWorkOrders('Overdue');
-                                else if (status === 'Due') navigateToWorkOrders('Due');
-                                else if (status === 'Pending Approval') navigateToWorkOrders('Pending Approval');
-                                else if (status === 'Completed') navigateToWorkOrders('Completed');
-                                else navigateToWorkOrders('Planned');
-                              }
-                            }
-                          } as any],
-                          legend: { enabled: true, position: 'bottom' }
-                        } as AgChartOptions} />
-                      ) : (
-                        <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E' }}>No work orders to display</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div style={dividerH} />
+                  <div style={sectionHeaderBar} className="!pt-0">6-MONTH MAINTENANCE TREND</div>
 
                   <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
-                    <div style={subTitle} className="mb-1">6-MONTH MAINTENANCE TREND</div>
                     {maintenanceTrendData.months.length > 0 ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minHeight: 0 }}>
                         <div style={{ flex: 1, minHeight: 0, borderRadius: '8px', padding: '8px 4px' }} data-testid="chart-maintenance-trend">
