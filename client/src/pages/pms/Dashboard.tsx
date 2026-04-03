@@ -1222,11 +1222,11 @@ const Dashboard = () => {
 
                   {/* Row 2: WO Status Distribution Donut */}
                   <div style={subTitle} className="mb-1 mt-2">WO Status - All Eqpt</div>
-                  <div style={{ height: '200px', overflow: 'hidden' }} data-testid="card-wo-status-chart">
+                  <div style={{ height: '180px', overflow: 'hidden' }} data-testid="card-wo-status-chart">
                     {workOrderStatusChartData.length > 0 ? (
                       <AgCharts options={{
                         data: workOrderStatusChartData,
-                        padding: { top: 5, right: 5, bottom: 5, left: 5 },
+                        padding: { top: 0, right: 5, bottom: 0, left: 5 },
                         series: [{
                           type: 'donut',
                           angleKey: 'count',
@@ -1235,7 +1235,7 @@ const Dashboard = () => {
                           sectorLabelKey: 'count',
                           sectorLabel: { color: '#ffffff', fontWeight: 'bold', fontSize: 11 },
                           innerRadiusRatio: 0.5,
-                          outerRadiusOffset: -40,
+                          outerRadiusOffset: -30,
                           fills: workOrderStatusChartData.map(d => d.color),
                           strokes: workOrderStatusChartData.map(d => d.color),
                           listeners: {
@@ -1339,11 +1339,11 @@ const Dashboard = () => {
                   <div style={sectionHeaderBar} className="!pt-0 !pb-2">SPARES STOCK STATUS</div>
 
                   {/* Row 1: Spare Parts Donut */}
-                  <div style={{ height: '200px', overflow: 'hidden' }} data-testid="card-spares-status-chart">
+                  <div style={{ height: '180px', overflow: 'hidden' }} data-testid="card-spares-status-chart">
                     {sparesStockChartData.length > 0 ? (
                       <AgCharts options={{
                         data: sparesStockChartData,
-                        padding: { top: 5, right: 5, bottom: 5, left: 5 },
+                        padding: { top: 0, right: 5, bottom: 0, left: 5 },
                         series: [{
                           type: 'donut',
                           angleKey: 'count',
@@ -1352,7 +1352,7 @@ const Dashboard = () => {
                           sectorLabelKey: 'count',
                           sectorLabel: { color: '#ffffff', fontWeight: 'bold', fontSize: 11 },
                           innerRadiusRatio: 0.5,
-                          outerRadiusOffset: -40,
+                          outerRadiusOffset: -30,
                           fills: sparesStockChartData.map(d => d.color),
                           strokes: sparesStockChartData.map(d => d.color),
                           listeners: {
