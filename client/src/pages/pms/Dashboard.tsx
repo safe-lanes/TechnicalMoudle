@@ -1629,6 +1629,7 @@ const Dashboard = () => {
                     <SemiCircleGauge
                       value={ytdKPIs.changeRequests}
                       max={ytdKPIs.total || 10}
+                      color="#e74c3c"
                       displayValue={ytdKPIs.changeRequests.toString()}
                       subtitle={`${ytdKPIs.changeRequestPercent}% of total`}
                     />
