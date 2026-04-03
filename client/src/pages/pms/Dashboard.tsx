@@ -1223,20 +1223,20 @@ const Dashboard = () => {
 
                   {/* Row 2: WO Status Distribution Donut */}
                   <div style={subTitle} className="mb-1 mt-2">WO Status - All Eqpt</div>
-                  <div style={{ height: '180px', overflow: 'hidden' }} data-testid="card-wo-status-chart">
+                  <div style={{ height: '200px', overflow: 'hidden' }} data-testid="card-wo-status-chart">
                     {workOrderStatusChartData.length > 0 ? (
                       <AgCharts options={{
                         data: workOrderStatusChartData,
-                        padding: { top: 5, right: 10, bottom: 5, left: 10 },
+                        padding: { top: 5, right: 5, bottom: 5, left: 5 },
                         series: [{
                           type: 'donut',
                           angleKey: 'count',
                           calloutLabelKey: 'status',
-                          calloutLabel: { fontSize: 10, offset: 8, minAngle: 15 },
+                          calloutLabel: { fontSize: 10, offset: 8, minAngle: 20 },
                           sectorLabelKey: 'count',
                           sectorLabel: { color: '#ffffff', fontWeight: 'bold', fontSize: 11 },
-                          innerRadiusRatio: 0.55,
-                          outerRadiusOffset: -30,
+                          innerRadiusOffset: -20,
+                          outerRadiusOffset: -40,
                           fills: workOrderStatusChartData.map(d => d.color),
                           strokes: workOrderStatusChartData.map(d => d.color),
                           listeners: {
@@ -1341,20 +1341,20 @@ const Dashboard = () => {
 
                   {/* Row 1: Spare Parts Donut */}
                   <div style={subTitle} className="mb-1">Spare Parts</div>
-                  <div style={{ height: '180px', overflow: 'hidden' }} data-testid="card-spares-status-chart">
+                  <div style={{ height: '200px', overflow: 'hidden' }} data-testid="card-spares-status-chart">
                     {sparesStockChartData.length > 0 ? (
                       <AgCharts options={{
                         data: sparesStockChartData,
-                        padding: { top: 5, right: 10, bottom: 5, left: 10 },
+                        padding: { top: 5, right: 5, bottom: 5, left: 5 },
                         series: [{
                           type: 'donut',
                           angleKey: 'count',
                           calloutLabelKey: 'status',
-                          calloutLabel: { fontSize: 10, offset: 8, minAngle: 15 },
+                          calloutLabel: { fontSize: 10, offset: 8, minAngle: 20 },
                           sectorLabelKey: 'count',
                           sectorLabel: { color: '#ffffff', fontWeight: 'bold', fontSize: 11 },
-                          innerRadiusRatio: 0.55,
-                          outerRadiusOffset: -30,
+                          innerRadiusOffset: -20,
+                          outerRadiusOffset: -40,
                           fills: sparesStockChartData.map(d => d.color),
                           strokes: sparesStockChartData.map(d => d.color),
                           listeners: {
