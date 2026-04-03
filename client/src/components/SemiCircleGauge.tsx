@@ -2,7 +2,7 @@ interface SemiCircleGaugeProps {
   value: number;
   max: number;
   color: string;
-  label: string;
+  label?: string;
   displayValue?: string;
   subtitle?: string;
   statLine?: string;

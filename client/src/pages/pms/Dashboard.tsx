@@ -1212,7 +1212,6 @@ const Dashboard = () => {
                     value={workOrderKPIs.overdue}
                     max={workOrderKPIs.total || 10}
                     color="#e74c3c"
-                    label=""
                     displayValue={workOrderKPIs.overdue.toString()}
                     subtitle={`${overduePercent}% of total`}
                     onClick={() => navigateToWorkOrders('Overdue')}
