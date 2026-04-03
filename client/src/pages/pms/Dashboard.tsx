@@ -1213,16 +1213,19 @@ const Dashboard = () => {
                   <div style={dividerH} />
 
                   <div style={subTitle} className="mb-1">Status Distribution</div>
-                  <div style={{ height: '220px' }} data-testid="card-wo-status-chart">
+                  <div style={{ height: '280px' }} data-testid="card-wo-status-chart">
                     {workOrderStatusChartData.length > 0 ? (
                       <AgCharts options={{
                         data: workOrderStatusChartData,
+                        padding: { top: 5, right: 5, bottom: 5, left: 5 },
                         series: [{
                           type: 'donut',
                           angleKey: 'count',
                           calloutLabelKey: 'status',
                           sectorLabelKey: 'count',
-                          innerRadiusRatio: 0.82,
+                          sectorLabel: { color: '#ffffff', fontWeight: 'bold', fontSize: 12 },
+                          innerRadiusRatio: 0.55,
+                          outerRadiusRatio: 0.85,
                           fills: workOrderStatusChartData.map(d => d.color),
                           strokes: workOrderStatusChartData.map(d => d.color),
                           listeners: {
@@ -1302,16 +1305,19 @@ const Dashboard = () => {
                   <div style={sectionHeaderBar} className="!pt-0">SPARES STOCK STATUS</div>
 
                   <div data-testid="card-spares-status-chart">
-                    <div style={{ height: '220px' }}>
+                    <div style={{ height: '280px' }}>
                       {sparesStockChartData.length > 0 ? (
                         <AgCharts options={{
                           data: sparesStockChartData,
+                          padding: { top: 5, right: 5, bottom: 5, left: 5 },
                           series: [{
                             type: 'donut',
                             angleKey: 'count',
                             calloutLabelKey: 'status',
                             sectorLabelKey: 'count',
-                            innerRadiusRatio: 0.82,
+                            sectorLabel: { color: '#ffffff', fontWeight: 'bold', fontSize: 12 },
+                            innerRadiusRatio: 0.55,
+                            outerRadiusRatio: 0.85,
                             fills: sparesStockChartData.map(d => d.color),
                             strokes: sparesStockChartData.map(d => d.color),
                             listeners: {
