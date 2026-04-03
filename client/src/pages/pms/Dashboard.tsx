@@ -1227,7 +1227,7 @@ const Dashboard = () => {
                     {workOrderStatusChartData.length > 0 ? (
                       <AgCharts options={{
                         data: workOrderStatusChartData,
-                        padding: { top: 0, right: 0, bottom: 0, left: 0 },
+                        padding: { top: 5, right: 10, bottom: 5, left: 10 },
                         series: [{
                           type: 'donut',
                           angleKey: 'count',
@@ -1257,8 +1257,15 @@ const Dashboard = () => {
                     )}
                   </div>
 
+                  <div style={dividerH} />
+
                   {/* Row 3: Future — Overdue WO Critical gauge */}
+                  <div style={{ minHeight: '160px' }} data-testid="cell-left-row3" />
+
+                  <div style={dividerH} />
+
                   {/* Row 4: Future — WO Status Critical donut */}
+                  <div style={{ minHeight: '180px' }} data-testid="cell-left-row4" />
                 </div>
               </div>
 
@@ -1338,7 +1345,7 @@ const Dashboard = () => {
                     {sparesStockChartData.length > 0 ? (
                       <AgCharts options={{
                         data: sparesStockChartData,
-                        padding: { top: 0, right: 0, bottom: 0, left: 0 },
+                        padding: { top: 5, right: 10, bottom: 5, left: 10 },
                         series: [{
                           type: 'donut',
                           angleKey: 'count',
@@ -1363,8 +1370,15 @@ const Dashboard = () => {
                     )}
                   </div>
 
+                  <div style={dividerH} />
+
                   {/* Row 2: Future — Critical Spare Parts donut */}
+                  <div style={{ minHeight: '180px' }} data-testid="cell-right-row2" />
+
+                  <div style={dividerH} />
+
                   {/* Row 3: Future — Modify PMS Requests YTD gauge */}
+                  <div style={{ minHeight: '160px' }} data-testid="cell-right-row3" />
                 </div>
               </div>
             </div>
