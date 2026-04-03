@@ -653,10 +653,10 @@ const Dashboard = () => {
   // Note: Active status is excluded as the dashboard focuses on items needing attention
   const workOrderStatusChartData = useMemo(() => {
     return [
-      { status: 'Overdue', count: workOrderKPIs.overdue, color: '#E53935' },
+      { status: 'Overdue', count: workOrderKPIs.overdue, color: '#ff6961' },
       { status: 'Due', count: workOrderKPIs.due, color: '#F57C00' },
       { status: 'Pending Approval', count: workOrderKPIs.pendingApproval, color: '#1565C0' },
-      { status: 'Completed', count: workOrderKPIs.completed, color: '#2E7D32' }
+      { status: 'Completed', count: workOrderKPIs.completed, color: '#5dc86f' }
     ].filter(d => d.count > 0);
   }, [workOrderKPIs]);
 
@@ -667,9 +667,9 @@ const Dashboard = () => {
     const low = filteredSparesData.filter(s => getStockStatus(s.rob, s.min).label === 'Low').length;
     
     return [
-      { status: 'OK', count: ok, color: '#2E7D32' },
+      { status: 'OK', count: ok, color: '#5dc86f' },
       { status: 'At Min', count: atMin, color: '#F57C00' },
-      { status: 'Low', count: low, color: '#E53935' }
+      { status: 'Low', count: low, color: '#ff6961' }
     ].filter(d => d.count > 0);
   }, [filteredSparesData]);
 
@@ -1229,13 +1229,13 @@ const Dashboard = () => {
                         data: workOrderStatusChartData,
                         padding: { top: 5, right: 10, bottom: 5, left: 10 },
                         series: [{
-                          type: 'pie',
+                          type: 'donut',
                           angleKey: 'count',
-                          radiusKey: 'count',
                           calloutLabelKey: 'status',
                           calloutLabel: { fontSize: 10, offset: 8, minAngle: 15 },
                           sectorLabelKey: 'count',
                           sectorLabel: { color: '#ffffff', fontWeight: 'bold', fontSize: 11 },
+                          innerRadiusRatio: 0.55,
                           outerRadiusOffset: -30,
                           fills: workOrderStatusChartData.map(d => d.color),
                           strokes: workOrderStatusChartData.map(d => d.color),
@@ -1347,13 +1347,13 @@ const Dashboard = () => {
                         data: sparesStockChartData,
                         padding: { top: 5, right: 10, bottom: 5, left: 10 },
                         series: [{
-                          type: 'pie',
+                          type: 'donut',
                           angleKey: 'count',
-                          radiusKey: 'count',
                           calloutLabelKey: 'status',
                           calloutLabel: { fontSize: 10, offset: 8, minAngle: 15 },
                           sectorLabelKey: 'count',
                           sectorLabel: { color: '#ffffff', fontWeight: 'bold', fontSize: 11 },
+                          innerRadiusRatio: 0.55,
                           outerRadiusOffset: -30,
                           fills: sparesStockChartData.map(d => d.color),
                           strokes: sparesStockChartData.map(d => d.color),
