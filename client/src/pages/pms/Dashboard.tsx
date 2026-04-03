@@ -1213,19 +1213,18 @@ const Dashboard = () => {
                   <div style={dividerH} />
 
                   <div style={subTitle} className="mb-1">Status Distribution</div>
-                  <div style={{ height: '280px' }} data-testid="card-wo-status-chart">
+                  <div style={{ height: '200px' }} data-testid="card-wo-status-chart">
                     {workOrderStatusChartData.length > 0 ? (
                       <AgCharts options={{
                         data: workOrderStatusChartData,
-                        padding: { top: 5, right: 5, bottom: 5, left: 5 },
+                        padding: { top: 20, right: 20, bottom: 10, left: 20 },
                         series: [{
                           type: 'donut',
                           angleKey: 'count',
-                          calloutLabelKey: 'status',
                           sectorLabelKey: 'count',
                           sectorLabel: { color: '#ffffff', fontWeight: 'bold', fontSize: 12 },
-                          innerRadiusRatio: 0.55,
-                          outerRadiusRatio: 0.85,
+                          innerRadiusRatio: 0.45,
+                          outerRadiusRatio: 0.65,
                           fills: workOrderStatusChartData.map(d => d.color),
                           strokes: workOrderStatusChartData.map(d => d.color),
                           listeners: {
@@ -1305,19 +1304,18 @@ const Dashboard = () => {
                   <div style={sectionHeaderBar} className="!pt-0">SPARES STOCK STATUS</div>
 
                   <div data-testid="card-spares-status-chart">
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '200px' }}>
                       {sparesStockChartData.length > 0 ? (
                         <AgCharts options={{
                           data: sparesStockChartData,
-                          padding: { top: 5, right: 5, bottom: 5, left: 5 },
+                          padding: { top: 20, right: 20, bottom: 10, left: 20 },
                           series: [{
                             type: 'donut',
                             angleKey: 'count',
-                            calloutLabelKey: 'status',
                             sectorLabelKey: 'count',
                             sectorLabel: { color: '#ffffff', fontWeight: 'bold', fontSize: 12 },
-                            innerRadiusRatio: 0.55,
-                            outerRadiusRatio: 0.85,
+                            innerRadiusRatio: 0.45,
+                            outerRadiusRatio: 0.65,
                             fills: sparesStockChartData.map(d => d.color),
                             strokes: sparesStockChartData.map(d => d.color),
                             listeners: {
