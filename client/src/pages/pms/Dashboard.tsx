@@ -1246,7 +1246,7 @@ const Dashboard = () => {
               </div>
 
               {/* Card 2: 6-Month Maintenance Trend */}
-              <div className={cardStyle} data-testid="column-wo-status-trends" style={{ display: 'flex', flexDirection: 'column' }}>
+              <div className={cardStyle} data-testid="column-maintenance-trend" style={{ display: 'flex', flexDirection: 'column' }}>
                 <div className="p-4" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                   <div style={sectionHeaderBar} className="!pt-0">6-MONTH MAINTENANCE TREND</div>
 
