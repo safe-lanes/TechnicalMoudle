@@ -673,6 +673,18 @@ const Dashboard = () => {
     ].filter(d => d.count > 0);
   }, [filteredSparesData]);
 
+  const criticalSparesStockChartData = useMemo(() => {
+    const criticalSpares = sparesData.filter(s => s.critical === 'Critical' || s.critical === 'Yes');
+    const ok = criticalSpares.filter(s => getStockStatus(s.rob, s.min).label === 'OK').length;
+    const atMin = criticalSpares.filter(s => getStockStatus(s.rob, s.min).label === 'At Min').length;
+    const low = criticalSpares.filter(s => getStockStatus(s.rob, s.min).label === 'Low').length;
+    return [
+      { status: 'OK', count: ok, color: '#5dc86f' },
+      { status: 'At Min', count: atMin, color: '#FF964f' },
+      { status: 'Low', count: low, color: '#ff6961' }
+    ].filter(d => d.count > 0);
+  }, [sparesData]);
+
   // Helper to parse dates in both ISO (YYYY-MM-DD) and legacy (DD-MMM-YYYY) formats
   const parseFlexibleDate = (dateStr: string | null | undefined): Date | null => {
     if (!dateStr || dateStr === '' || dateStr === '—') return null;
@@ -1497,8 +1509,50 @@ const Dashboard = () => {
 
                   <div style={dividerH} />
 
-                  {/* Row 2: Future — Critical Spare Parts donut */}
-                  <div style={{ minHeight: '180px' }} data-testid="cell-right-row2" />
+                  {/* Row 2: Critical Spare Parts donut */}
+                  <div style={subTitle} className="mb-1 mt-2">CRITICAL SPARES STOCK STATUS</div>
+                  <div style={{ height: '170px' }} data-testid="card-critical-spares-status-chart">
+                    {criticalSparesStockChartData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={170}>
+                        <PieChart>
+                          <Pie
+                            data={criticalSparesStockChartData}
+                            dataKey="count"
+                            nameKey="status"
+                            cx="50%"
+                            cy="45%"
+                            innerRadius={35}
+                            outerRadius={58}
+                            paddingAngle={2}
+                            label={({ cx, cy, midAngle, innerRadius, outerRadius, payload }: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; payload: { count: number } }) => {
+                              const RADIAN = Math.PI / 180;
+                              const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                              const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                              const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                              return (
+                                <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight="bold">
+                                  {payload.count}
+                                </text>
+                              );
+                            }}
+                            labelLine={false}
+                            onClick={(_data: Record<string, unknown>, index: number) => {
+                              const entry = criticalSparesStockChartData[index];
+                              if (entry) navigateToSpares(entry.status);
+                            }}
+                            cursor="pointer"
+                          >
+                            {criticalSparesStockChartData.map((entry, index) => (
+                              <Cell key={`critical-spares-cell-${index}`} fill={entry.color} stroke={entry.color} />
+                            ))}
+                          </Pie>
+                          <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '2px' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>No critical spares data</div>
+                    )}
+                  </div>
 
                   <div style={dividerH} />
 
