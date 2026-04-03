@@ -1193,18 +1193,15 @@ const Dashboard = () => {
 
             {/* DASHBOARD GRID: 3 columns (20% / 60% / 20%), 4 explicit rows */}
             <div
-              className="grid grid-cols-1 lg:grid-cols-[1fr_3fr_1fr]"
-              style={{
-                gap: '16px',
-                gridTemplateRows: '180px 200px 180px 200px',
-              }}
+              className="grid grid-cols-1 lg:grid-cols-[1fr_3fr_1fr] lg:[grid-template-rows:180px_200px_180px_200px]"
+              style={{ gap: '16px' }}
               data-testid="dashboard-grid"
             >
 
               {/* LEFT COLUMN: Work Orders card — spans all 4 rows */}
               <div
-                className={cardStyle}
-                style={{ overflow: 'hidden', gridRow: '1 / 5', gridColumn: '1' }}
+                className={`${cardStyle} lg:[grid-row:1/5] lg:[grid-column:1]`}
+                style={{ overflow: 'hidden' }}
                 data-testid="column-wo-kpis"
               >
                 <div className="p-3">
@@ -1267,8 +1264,8 @@ const Dashboard = () => {
 
               {/* CENTER COLUMN: Trend chart spanning rows 1-2 */}
               <div
-                className={cardStyle}
-                style={{ overflow: 'hidden', gridRow: '1 / 3', gridColumn: '2', display: 'flex', flexDirection: 'column' }}
+                className={`${cardStyle} lg:[grid-row:1/3] lg:[grid-column:2]`}
+                style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
                 data-testid="column-maintenance-trend"
               >
                 <div className="p-4" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
@@ -1321,15 +1318,15 @@ const Dashboard = () => {
               </div>
 
               {/* CENTER COLUMN Row 3: Future — Postponed WOs + Unplanned Maintenance gauges */}
-              <div style={{ gridRow: '3', gridColumn: '2' }} data-testid="cell-center-row3" />
+              <div className="hidden lg:block lg:[grid-row:3] lg:[grid-column:2]" data-testid="cell-center-row3" />
 
               {/* CENTER COLUMN Row 4: Future — Top 5 Reasons bar chart */}
-              <div style={{ gridRow: '4', gridColumn: '2' }} data-testid="cell-center-row4" />
+              <div className="hidden lg:block lg:[grid-row:4] lg:[grid-column:2]" data-testid="cell-center-row4" />
 
               {/* RIGHT COLUMN: Spares Stock Status card — spans all 4 rows */}
               <div
-                className={cardStyle}
-                style={{ overflow: 'hidden', gridRow: '1 / 5', gridColumn: '3' }}
+                className={`${cardStyle} lg:[grid-row:1/5] lg:[grid-column:3]`}
+                style={{ overflow: 'hidden' }}
                 data-testid="column-inventory-fleet"
               >
                 <div className="p-3">
