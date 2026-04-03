@@ -24,7 +24,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { WorkOrder } from "@shared/schema";
+import { WorkOrder, ChangeRequest } from "@shared/schema";
 import { useVessels } from "@/hooks/useVessels";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
@@ -486,6 +486,17 @@ const Dashboard = () => {
       return response.json();
     },
     enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
+  });
+
+  const { data: changeRequestsData = [] } = useQuery<ChangeRequest[]>({
+    queryKey: ['/api/change-requests', vesselId],
+    queryFn: async () => {
+      const url = `/api/change-requests?vesselId=${vesselId}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch change requests');
+      return response.json();
+    },
+    enabled: !!vesselId,
   });
 
   const { data: superintendentSummary } = useQuery<{ pendingCount: number; acknowledgedThisMonthCount: number }>({
@@ -984,14 +995,22 @@ const Dashboard = () => {
     ).length;
     const unplanned = ytdWOs.filter(wo => !wo.jobId && !wo.templateCode).length;
 
+    const changeRequestCountYTD = changeRequestsData.filter(cr => {
+      const created = cr.createdAt ? new Date(cr.createdAt) : null;
+      return created !== null && created.getFullYear() === currentYear;
+    }).length;
+    const changeRequestPercent = total > 0 ? Math.round((changeRequestCountYTD / total) * 100) : 0;
+
     return {
       total,
       postponed,
       postponedPercent: total > 0 ? Math.round((postponed / total) * 100) : 0,
       unplanned,
       unplannedPercent: total > 0 ? Math.round((unplanned / total) * 100) : 0,
+      changeRequests: changeRequestCountYTD,
+      changeRequestPercent,
     };
-  }, [workOrdersData]);
+  }, [workOrdersData, changeRequestsData]);
 
   const HEADER_BLUE = '#1a3a5c';
 
@@ -1604,8 +1623,16 @@ const Dashboard = () => {
 
                   <div style={dividerH} />
 
-                  {/* Row 3: Future — Modify PMS Requests YTD gauge */}
-                  <div style={{ minHeight: '160px' }} data-testid="cell-right-row3" />
+                  {/* Row 3: Modify PMS Requests YTD gauge */}
+                  <div style={subTitle} className="mb-1 mt-2">MODIFY PMS REQUESTS YTD</div>
+                  <div data-testid="cell-right-row3">
+                    <SemiCircleGauge
+                      value={ytdKPIs.changeRequests}
+                      max={ytdKPIs.total || 10}
+                      displayValue={ytdKPIs.changeRequests.toString()}
+                      subtitle={`${ytdKPIs.changeRequestPercent}% of total`}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
