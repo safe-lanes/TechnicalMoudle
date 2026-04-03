@@ -1233,19 +1233,21 @@ const Dashboard = () => {
                             innerRadius={35}
                             outerRadius={58}
                             paddingAngle={2}
-                            label={({ cx, cy, midAngle, innerRadius, outerRadius, count }) => {
+                            label={({ cx, cy, midAngle, innerRadius, outerRadius, payload }: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; payload: { count: number } }) => {
                               const RADIAN = Math.PI / 180;
                               const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
                               const x = cx + radius * Math.cos(-midAngle * RADIAN);
                               const y = cy + radius * Math.sin(-midAngle * RADIAN);
                               return (
                                 <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight="bold">
-                                  {count}
+                                  {payload.count}
                                 </text>
                               );
                             }}
                             labelLine={false}
-                            onClick={(entry: any) => {
+                            onClick={(_data: Record<string, unknown>, index: number) => {
+                              const entry = workOrderStatusChartData[index];
+                              if (!entry) return;
                               const status = entry.status;
                               if (status === 'Overdue') navigateToWorkOrders('Overdue');
                               else if (status === 'Due') navigateToWorkOrders('Due');
@@ -1363,20 +1365,21 @@ const Dashboard = () => {
                             innerRadius={35}
                             outerRadius={58}
                             paddingAngle={2}
-                            label={({ cx, cy, midAngle, innerRadius, outerRadius, count }) => {
+                            label={({ cx, cy, midAngle, innerRadius, outerRadius, payload }: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; payload: { count: number } }) => {
                               const RADIAN = Math.PI / 180;
                               const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
                               const x = cx + radius * Math.cos(-midAngle * RADIAN);
                               const y = cy + radius * Math.sin(-midAngle * RADIAN);
                               return (
                                 <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight="bold">
-                                  {count}
+                                  {payload.count}
                                 </text>
                               );
                             }}
                             labelLine={false}
-                            onClick={(entry: any) => {
-                              navigateToSpares(entry.status);
+                            onClick={(_data: Record<string, unknown>, index: number) => {
+                              const entry = sparesStockChartData[index];
+                              if (entry) navigateToSpares(entry.status);
                             }}
                             cursor="pointer"
                           >
