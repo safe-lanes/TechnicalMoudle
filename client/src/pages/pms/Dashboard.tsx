@@ -919,7 +919,7 @@ const Dashboard = () => {
 
   const sectionHeaderBar: React.CSSProperties = {
     background: 'transparent',
-    color: '#1a6eb5',
+    color: '#4a4a4a',
     fontWeight: 700,
     fontSize: '11px',
     textTransform: 'uppercase' as const,
