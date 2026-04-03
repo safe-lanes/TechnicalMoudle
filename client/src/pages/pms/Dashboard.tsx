@@ -970,6 +970,29 @@ const Dashboard = () => {
     : 0;
   const completionRate = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.completed / workOrderKPIs.total) * 100) : 0;
 
+  const ytdKPIs = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const ytdWOs = (workOrdersData as EnrichedWorkOrder[]).filter(wo => {
+      if (!wo || wo.isExecution) return false;
+      const createdDate = wo.createdAt ? new Date(wo.createdAt) : null;
+      return createdDate !== null && createdDate.getFullYear() === currentYear;
+    });
+
+    const total = ytdWOs.length;
+    const postponed = ytdWOs.filter(wo =>
+      wo.computedStatus === 'Postponed'
+    ).length;
+    const unplanned = ytdWOs.filter(wo => !wo.jobId && !wo.templateCode).length;
+
+    return {
+      total,
+      postponed,
+      postponedPercent: total > 0 ? Math.round((postponed / total) * 100) : 0,
+      unplanned,
+      unplannedPercent: total > 0 ? Math.round((unplanned / total) * 100) : 0,
+    };
+  }, [workOrdersData]);
+
   const HEADER_BLUE = '#1a3a5c';
 
   const sectionHeaderBar: React.CSSProperties = {
@@ -1448,11 +1471,36 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* CENTER COLUMN Row 3: Future — Postponed WOs + Unplanned Maintenance gauges */}
-              <div className="hidden lg:block lg:[grid-row:3] lg:[grid-column:2]" data-testid="cell-center-row3" />
-
-              {/* CENTER COLUMN Row 4: Future — Top 5 Reasons bar chart */}
-              <div className="hidden lg:block lg:[grid-row:4] lg:[grid-column:2]" data-testid="cell-center-row4" />
+              {/* CENTER COLUMN Rows 3-4: Postponed WOs + Unplanned Maintenance gauges */}
+              <div
+                className={`${cardStyle} lg:[grid-row:3/5] lg:[grid-column:2]`}
+                data-testid="cell-center-row3"
+              >
+                <div className="p-3 grid grid-cols-2 gap-4 h-full">
+                  <div className="flex flex-col items-center">
+                    <div style={subTitle} className="mb-1 text-center">Postponed Work Orders</div>
+                    <SemiCircleGauge
+                      value={ytdKPIs.postponed}
+                      max={ytdKPIs.total || 10}
+                      color="#e74c3c"
+                      displayValue={ytdKPIs.postponed.toString()}
+                      subtitle={`${ytdKPIs.postponedPercent}% of total`}
+                      testId="gauge-postponed-wo"
+                    />
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <div style={subTitle} className="mb-1 text-center">Unplanned Maintenance %</div>
+                    <SemiCircleGauge
+                      value={ytdKPIs.unplanned}
+                      max={ytdKPIs.total || 10}
+                      color="#e74c3c"
+                      displayValue={ytdKPIs.unplanned.toString()}
+                      subtitle={`${ytdKPIs.unplannedPercent}% of total`}
+                      testId="gauge-unplanned-wo"
+                    />
+                  </div>
+                </div>
+              </div>
 
               {/* RIGHT COLUMN: Spares Stock Status card — spans all 4 rows */}
               <div
