@@ -1191,9 +1191,9 @@ const Dashboard = () => {
         {activeTab === 'overview' && (
           <div className="p-4 space-y-4">
 
-            {/* DASHBOARD GRID: 3 columns (20% / 60% / 20%), 4 explicit rows */}
+            {/* DASHBOARD GRID: 3 columns (25% / 50% / 25%), 4 explicit rows */}
             <div
-              className="grid grid-cols-1 lg:grid-cols-[1fr_3fr_1fr] lg:[grid-template-rows:180px_200px_180px_200px]"
+              className="grid grid-cols-1 lg:grid-cols-[1fr_2fr_1fr] lg:[grid-template-rows:180px_200px_180px_200px]"
               style={{ gap: '16px' }}
               data-testid="dashboard-grid"
             >
