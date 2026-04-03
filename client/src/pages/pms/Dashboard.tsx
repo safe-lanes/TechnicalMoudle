@@ -1212,7 +1212,7 @@ const Dashboard = () => {
                     value={workOrderKPIs.overdue}
                     max={workOrderKPIs.total || 10}
                     color="#e74c3c"
-                    label="Overdue WOs"
+                    label=""
                     displayValue={workOrderKPIs.overdue.toString()}
                     subtitle={`${overduePercent}% of total`}
                     onClick={() => navigateToWorkOrders('Overdue')}
@@ -1340,7 +1340,6 @@ const Dashboard = () => {
                   <div style={sectionHeaderBar} className="!pt-0 !pb-2">SPARES STOCK STATUS</div>
 
                   {/* Row 1: Spare Parts Donut */}
-                  <div style={subTitle} className="mb-1">Spare Parts</div>
                   <div style={{ height: '200px', overflow: 'hidden' }} data-testid="card-spares-status-chart">
                     {sparesStockChartData.length > 0 ? (
                       <AgCharts options={{

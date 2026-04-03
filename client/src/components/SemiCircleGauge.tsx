@@ -51,7 +51,7 @@ export function SemiCircleGauge({
       data-testid={testId}
       style={{ textAlign: 'center', padding: '8px 8px 6px' }}
     >
-      <div style={{ fontSize: '10px', fontWeight: 700, color: '#4a4a4a', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</div>
+      {label && <div style={{ fontSize: '10px', fontWeight: 700, color: '#4a4a4a', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</div>}
       <svg viewBox="0 0 200 110" style={{ display: 'block', margin: '0 auto', maxWidth: '160px', width: '100%' }}>
         <path
           d={trackPath}
