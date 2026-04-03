@@ -1213,7 +1213,7 @@ const Dashboard = () => {
                   <div style={dividerH} />
 
                   <div style={subTitle} className="mb-1">Status Distribution</div>
-                  <div style={{ height: '250px' }} data-testid="card-wo-status-chart">
+                  <div style={{ height: '300px' }} data-testid="card-wo-status-chart">
                     {workOrderStatusChartData.length > 0 ? (
                       <AgCharts options={{
                         data: workOrderStatusChartData,
