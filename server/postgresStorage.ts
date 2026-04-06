@@ -7147,7 +7147,22 @@ export class PostgresStorage {
   
   async getComponentVesselMappings(): Promise<any[]> {
     const db = await getDb();
-    return await db.select().from(fleetComponentMapping);
+    const rows = await db
+      .select({
+        id: fleetComponentMapping.id,
+        fleetEquipmentCode: fleetComponentMapping.fleetEquipmentCode,
+        vesselCode: fleetComponentMapping.vesselCode,
+        componentCode: fleetComponentMapping.componentCode,
+        componentId: fleetComponentMapping.componentId,
+        componentName: fleetComponentMapping.componentName,
+        mappedBy: fleetComponentMapping.mappedBy,
+        mappedAt: fleetComponentMapping.mappedAt,
+        isActive: fleetComponentMapping.isActive,
+        vesselName: vessels.name,
+      })
+      .from(fleetComponentMapping)
+      .leftJoin(vessels, eq(fleetComponentMapping.vesselCode, vessels.vuuid));
+    return rows;
   }
 
   async createComponentVesselMapping(data: { 

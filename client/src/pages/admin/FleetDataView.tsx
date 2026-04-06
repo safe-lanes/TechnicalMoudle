@@ -770,11 +770,14 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                m.componentId === String(selectedComponent.id)
       );
       if (mappings.length > 0) {
-        return mappings.map(m => ({
-          id: m.vesselCode,
-          name: m.vesselName,
-          mapping: m
-        }));
+        return mappings.map(m => {
+          const resolvedName = m.vesselName || (vessels || []).find(v => v.id === m.vesselCode)?.name || m.vesselCode;
+          return {
+            id: m.vesselCode,
+            name: resolvedName,
+            mapping: m,
+          };
+        });
       }
     }
     
