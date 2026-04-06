@@ -212,7 +212,8 @@ export function WorkOrdersListModal({ open, onClose, title, workOrders }: WorkOr
           isOpen={viewModal.open}
           onClose={() => setViewModal({ open: false, workOrder: null })}
           workOrder={viewModal.workOrder}
-          mode="history"
+          mode="template"
+          isApprovalMode
         />
       )}
     </>
