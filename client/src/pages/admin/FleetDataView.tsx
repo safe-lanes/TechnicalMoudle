@@ -1931,7 +1931,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
           setSelectedJobIds(new Set());
         }
       }}>
-        <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
+        <DialogContent className="w-[calc(100vw-200px)] max-w-[calc(100vw-200px)] h-[calc(100vh-140px)] max-h-[calc(100vh-140px)] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Fleet Job Information</DialogTitle>
           <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-3">
@@ -2212,7 +2212,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
 
       {/* Job Details Dialog */}
       <Dialog open={isJobDetailsDialogOpen} onOpenChange={setIsJobDetailsDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
+        <DialogContent className="w-[calc(100vw-200px)] max-w-[calc(100vw-200px)] h-[calc(100vh-140px)] max-h-[calc(100vh-140px)] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Job Details</DialogTitle>
           <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-3">
@@ -2535,7 +2535,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
 
       {/* Edit Job Dialog */}
       <Dialog open={isEditJobDialogOpen} onOpenChange={setIsEditJobDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
+        <DialogContent className="w-[calc(100vw-200px)] max-w-[calc(100vw-200px)] h-[calc(100vh-140px)] max-h-[calc(100vh-140px)] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Edit Job Details</DialogTitle>
           <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-3">
@@ -2931,7 +2931,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
         setIsAddJobDialogOpen(open);
         if (!open) setNewJobFormData({});
       }}>
-        <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
+        <DialogContent className="w-[calc(100vw-200px)] max-w-[calc(100vw-200px)] h-[calc(100vh-140px)] max-h-[calc(100vh-140px)] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Add New Job Information</DialogTitle>
           <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-3">
@@ -3316,7 +3316,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
           setSelectedSpareIds(new Set());
         }
       }}>
-        <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
+        <DialogContent className="w-[calc(100vw-200px)] max-w-[calc(100vw-200px)] h-[calc(100vh-140px)] max-h-[calc(100vh-140px)] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Fleet Spares Information</DialogTitle>
           <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-3">
@@ -3590,7 +3590,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
 
       {/* Spare Details Dialog */}
       <Dialog open={isSpareDetailsDialogOpen} onOpenChange={setIsSpareDetailsDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
+        <DialogContent className="w-[calc(100vw-200px)] max-w-[calc(100vw-200px)] h-[calc(100vh-140px)] max-h-[calc(100vh-140px)] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Spare Details</DialogTitle>
           <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-3">
@@ -3773,7 +3773,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
 
       {/* Edit Spare Dialog */}
       <Dialog open={isEditSpareDialogOpen} onOpenChange={setIsEditSpareDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
+        <DialogContent className="w-[calc(100vw-200px)] max-w-[calc(100vw-200px)] h-[calc(100vh-140px)] max-h-[calc(100vh-140px)] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Edit Spare Details</DialogTitle>
           <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-3">
@@ -4017,7 +4017,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
 
       {/* Add New Spare Dialog */}
       <Dialog open={isAddSpareDialogOpen} onOpenChange={setIsAddSpareDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
+        <DialogContent className="w-[calc(100vw-200px)] max-w-[calc(100vw-200px)] h-[calc(100vh-140px)] max-h-[calc(100vh-140px)] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Add New Spare Information</DialogTitle>
           <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-3">
