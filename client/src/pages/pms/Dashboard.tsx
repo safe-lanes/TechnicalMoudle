@@ -1612,7 +1612,7 @@ const Dashboard = () => {
                               const entry = sparesStockChartData[index];
                               if (!entry) return;
                               const filtered = filteredSparesData.filter(s => getStockStatus(s.rob, s.min).label === entry.status);
-                              setSparesListModal({ open: true, title: `${entry.status} Stock Spares - All`, spares: filtered });
+                              setSparesListModal({ open: true, title: `${entry.status} Stock Spares - All Equipment`, spares: filtered });
                             }}
                             cursor="pointer"
                           >
@@ -1662,7 +1662,7 @@ const Dashboard = () => {
                               if (!entry) return;
                               const criticalSparesList = sparesData.filter(s => s.critical === 'Critical' || s.critical === 'Yes');
                               const filtered = criticalSparesList.filter(s => getStockStatus(s.rob, s.min).label === entry.status);
-                              setSparesListModal({ open: true, title: `${entry.status} Stock Spares - Critical`, spares: filtered });
+                              setSparesListModal({ open: true, title: `${entry.status} Stock Spares - Critical Equipment`, spares: filtered });
                             }}
                             cursor="pointer"
                           >
