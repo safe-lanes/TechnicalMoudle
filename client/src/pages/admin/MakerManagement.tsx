@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { type MakerList } from "@shared/schema";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Search, Pencil, Trash2, Download, ArrowLeft, Building2, Package, Info } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -463,193 +461,185 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
   }
 
   return (
-    <div className="p-6">
-      <Card className="overflow-hidden">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Building2 className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">Maker Management</h1>
-                <p className="text-cyan-100 text-sm mt-0.5">Manage equipment manufacturers and suppliers</p>
-              </div>
-            </div>
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
-                data-testid="button-back-to-dashboard"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </button>
-            )}
-          </div>
+    <div className="flex flex-col h-full space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="I4.QL.1.10">
+            <Marker id="I4.QL.1.10" />Maker Management
+          </h1>
+          <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-makers">
+            <Package className="h-3 w-3 mr-1" />
+            {totalMakers} Total
+          </Badge>
+          <Badge variant="secondary" className="bg-blue-100 text-blue-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-filtered-makers">
+            {filteredMakers.length} Shown
+          </Badge>
         </div>
-
-        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <h2 className="text-base font-semibold text-gray-800" data-testid="I4.QL.1.10"><Marker id="I4.QL.1.10" />All Makers</h2>
-              <div className="flex items-center gap-3">
-                <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-makers">
-                  <Package className="h-3 w-3 mr-1" />
-                  {totalMakers} Total
-                </Badge>
-                <Badge variant="secondary" className="bg-blue-100 text-blue-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-filtered-makers">
-                  {filteredMakers.length} Shown
-                </Badge>
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
-              <div className="relative flex-1 sm:min-w-[250px]">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Search by name or code..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                  data-testid="I4.QL.1.11"
-                />
-                <Marker id="I4.QL.1.11" />
-              </div>
-
-              <Button
-                variant="outline"
-                onClick={handleExport}
-                className="border-gray-300 text-gray-700"
-                data-testid="button-export-makers"
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
-              <Button
-                onClick={handleAddNew}
-                className="bg-cyan-600 whitespace-nowrap"
-                data-testid="I4.QL.1.12"
-              >
-                <Marker id="I4.QL.1.12" />
-                <Plus className="mr-2 h-4 w-4" />
-                Add New Maker
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className="px-6 py-4">
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-14 bg-gray-100 animate-pulse rounded-md"></div>
-              ))}
-            </div>
-          ) : error ? (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-              <Building2 className="h-10 w-10 text-red-300 mx-auto mb-2" />
-              <p className="text-red-700 font-medium">Failed to load makers</p>
-              <p className="text-red-500 text-sm mt-1">Please try refreshing the page</p>
-            </div>
-          ) : filteredMakers.length === 0 ? (
-            <div className="text-center py-12">
-              <Building2 className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 font-medium">
-                {searchQuery ? "No makers found matching your search" : "No makers yet"}
-              </p>
-              <p className="text-gray-400 text-sm mt-1">
-                {searchQuery ? "Try adjusting your search terms" : "Add your first maker to get started"}
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border border-gray-200">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50 border-b border-gray-200">
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.1.13"><Marker id="I4.QL.1.13" />S.No</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.1.14"><Marker id="I4.QL.1.14" />Maker Code</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.1.15"><Marker id="I4.QL.1.15" />Maker Name</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.1.16"><Marker id="I4.QL.1.16" />Address</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.1.17"><Marker id="I4.QL.1.17" />Address ID</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Status</TableHead>
-                    <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.1.18"><Marker id="I4.QL.1.18" />Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredMakers.map((maker, index) => {
-                    const isFirstRow = index === 0;
-                    return (
-                      <TableRow
-                        key={maker.id}
-                        data-testid={`row-maker-${maker.id}`}
-                        className="cursor-pointer"
-                        onDoubleClick={() => handleRowDoubleClick(maker)}
-                      >
-                        <TableCell className="font-medium" data-testid={isFirstRow ? "I4.QL.1.19" : undefined}>
-                          {isFirstRow && <Marker id="I4.QL.1.19" />}
-                          {index + 1}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL.1.20" : undefined}>
-                          {isFirstRow && <Marker id="I4.QL.1.20" />}
-                          {maker.makerCode}
-                        </TableCell>
-                        <TableCell className="font-medium max-w-xs truncate" data-testid={isFirstRow ? "I4.QL.1.21" : undefined}>
-                          {isFirstRow && <Marker id="I4.QL.1.21" />}
-                          {maker.makerName}
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate" data-testid={isFirstRow ? "I4.QL.1.22" : undefined}>
-                          {isFirstRow && <Marker id="I4.QL.1.22" />}
-                          {maker.address || "-"}
-                        </TableCell>
-                        <TableCell data-testid={isFirstRow ? "I4.QL.1.23" : undefined}>
-                          {isFirstRow && <Marker id="I4.QL.1.23" />}
-                          {maker.addressId || "-"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={`no-default-hover-elevate no-default-active-elevate ${
-                              maker.isActive !== false
-                                ? 'bg-green-50 text-green-700 border-green-200'
-                                : 'bg-gray-50 text-gray-600 border-gray-200'
-                            }`}
-                          >
-                            {maker.isActive !== false ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => { e.stopPropagation(); handleEdit(maker); }}
-                              data-testid={isFirstRow ? "I4.QL.1.24" : `button-edit-${maker.id}`}
-                            >
-                              {isFirstRow && <Marker id="I4.QL.1.24" />}
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => { e.stopPropagation(); handleDeleteClick(maker); }}
-                              className="text-red-600"
-                              data-testid={isFirstRow ? "I4.QL.1.25" : `button-delete-${maker.id}`}
-                            >
-                              {isFirstRow && <Marker id="I4.QL.1.25" />}
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+        <div className="flex gap-2 items-center">
+          {onBack && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
+              onClick={onBack}
+              data-testid="button-back-to-dashboard"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
+            onClick={handleExport}
+            data-testid="button-export-makers"
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+          <Button
+            size="sm"
+            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+            onClick={handleAddNew}
+            data-testid="I4.QL.1.12"
+          >
+            <Marker id="I4.QL.1.12" />
+            <Plus className="h-4 w-4 mr-1" />
+            Add New Maker
+          </Button>
         </div>
-      </Card>
+      </div>
+
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative w-72" data-testid="I4.QL.1.11">
+          <Marker id="I4.QL.1.11" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Search by name or code..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        {searchQuery && (
+          <Button
+            variant="outline"
+            className="text-gray-600"
+            onClick={() => setSearchQuery("")}
+            data-testid="button-clear-filters"
+          >
+            Clear
+          </Button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-14 bg-gray-100 animate-pulse rounded-md"></div>
+          ))}
+        </div>
+      ) : error ? (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <Building2 className="h-10 w-10 text-red-300 mx-auto mb-2" />
+          <p className="text-red-700 font-medium">Failed to load makers</p>
+          <p className="text-red-500 text-sm mt-1">Please try refreshing the page</p>
+        </div>
+      ) : filteredMakers.length === 0 ? (
+        <div className="text-center py-12">
+          <Building2 className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500 font-medium">
+            {searchQuery ? "No makers found matching your search" : "No makers yet"}
+          </p>
+          <p className="text-gray-400 text-sm mt-1">
+            {searchQuery ? "Try adjusting your search terms" : "Add your first maker to get started"}
+          </p>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
+          <table className="w-full text-sm">
+            <thead className="bg-[#52baf3] text-white sticky top-0">
+              <tr>
+                <th className="text-left py-3 px-4 font-medium" data-testid="I4.QL.1.13"><Marker id="I4.QL.1.13" />S.No</th>
+                <th className="text-left py-3 px-4 font-medium" data-testid="I4.QL.1.14"><Marker id="I4.QL.1.14" />Maker Code</th>
+                <th className="text-left py-3 px-4 font-medium" data-testid="I4.QL.1.15"><Marker id="I4.QL.1.15" />Maker Name</th>
+                <th className="text-left py-3 px-4 font-medium" data-testid="I4.QL.1.16"><Marker id="I4.QL.1.16" />Address</th>
+                <th className="text-left py-3 px-4 font-medium" data-testid="I4.QL.1.17"><Marker id="I4.QL.1.17" />Address ID</th>
+                <th className="text-left py-3 px-4 font-medium">Status</th>
+                <th className="text-center py-3 px-4 font-medium" data-testid="I4.QL.1.18"><Marker id="I4.QL.1.18" />Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredMakers.map((maker, index) => {
+                const isFirstRow = index === 0;
+                return (
+                  <tr
+                    key={maker.id}
+                    data-testid={`row-maker-${maker.id}`}
+                    className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} cursor-pointer hover:bg-gray-100`}
+                    onDoubleClick={() => handleRowDoubleClick(maker)}
+                  >
+                    <td className="py-3 px-4 text-gray-900 font-medium" data-testid={isFirstRow ? "I4.QL.1.19" : undefined}>
+                      {isFirstRow && <Marker id="I4.QL.1.19" />}
+                      {index + 1}
+                    </td>
+                    <td className="py-3 px-4 text-gray-900 font-mono" data-testid={isFirstRow ? "I4.QL.1.20" : undefined}>
+                      {isFirstRow && <Marker id="I4.QL.1.20" />}
+                      {maker.makerCode}
+                    </td>
+                    <td className="py-3 px-4 text-gray-900 font-medium max-w-xs truncate" data-testid={isFirstRow ? "I4.QL.1.21" : undefined}>
+                      {isFirstRow && <Marker id="I4.QL.1.21" />}
+                      {maker.makerName}
+                    </td>
+                    <td className="py-3 px-4 text-gray-900 max-w-xs truncate" data-testid={isFirstRow ? "I4.QL.1.22" : undefined}>
+                      {isFirstRow && <Marker id="I4.QL.1.22" />}
+                      {maker.address || "—"}
+                    </td>
+                    <td className="py-3 px-4 text-gray-900" data-testid={isFirstRow ? "I4.QL.1.23" : undefined}>
+                      {isFirstRow && <Marker id="I4.QL.1.23" />}
+                      {maker.addressId || "—"}
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge
+                        variant="outline"
+                        className={`no-default-hover-elevate no-default-active-elevate ${
+                          maker.isActive !== false
+                            ? 'bg-green-50 text-green-700 border-green-200'
+                            : 'bg-gray-50 text-gray-600 border-gray-200'
+                        }`}
+                      >
+                        {maker.isActive !== false ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex justify-center gap-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleEdit(maker); }}
+                          className="p-1.5 rounded-md text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          data-testid={isFirstRow ? "I4.QL.1.24" : `button-edit-${maker.id}`}
+                        >
+                          {isFirstRow && <Marker id="I4.QL.1.24" />}
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteClick(maker); }}
+                          className="p-1.5 rounded-md text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          data-testid={isFirstRow ? "I4.QL.1.25" : `button-delete-${maker.id}`}
+                        >
+                          {isFirstRow && <Marker id="I4.QL.1.25" />}
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent data-testid="dialog-delete-maker">
