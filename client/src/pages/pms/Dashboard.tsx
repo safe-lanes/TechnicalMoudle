@@ -1464,8 +1464,9 @@ const Dashboard = () => {
                     value={criticalWorkOrderKPIs.overdue}
                     max={criticalWorkOrderKPIs.total || 10}
                     color="#e74c3c"
-                    displayValue={criticalWorkOrderKPIs.overdue.toString()}
-                    subtitle={`${criticalOverduePercent}% of total`}
+                    arcFillColor={criticalOverduePercent <= 1 ? '#FFEEAA' : '#e74c3c'}
+                    displayValue={`${criticalOverduePercent}%`}
+                    subtitle={`${criticalWorkOrderKPIs.overdue} out of ${criticalWorkOrderKPIs.total}`}
                     onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - Critical Equipment', workOrders: criticalWorkOrderKPIs.overdueFull })}
                     testId="gauge-overdue-wo-critical"
                   />
