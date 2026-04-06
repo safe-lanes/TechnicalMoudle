@@ -763,25 +763,24 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   const relatedVessels = useMemo(() => {
     if (!selectedComponent) return [];
     
-    // First check if we have component-vessel mappings
     if (componentVesselMappings && componentVesselMappings.length > 0) {
       const mappings = componentVesselMappings.filter(
         (m) => m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
                m.componentId === String(selectedComponent.id)
       );
       if (mappings.length > 0) {
-        return mappings.map(m => {
-          const resolvedName = m.vesselName || (vessels || []).find(v => v.id === m.vesselCode)?.name || m.vesselCode;
-          return {
-            id: m.vesselCode,
-            name: resolvedName,
-            mapping: m,
-          };
-        });
+        const vesselMap = new Map<string, { id: string; name: string; mapping: any }>();
+        for (const m of mappings) {
+          const key = m.vesselCode || m.vesselId || "";
+          if (!vesselMap.has(key)) {
+            const resolvedName = m.vesselName || (vessels || []).find(v => v.id === m.vesselCode)?.name || m.vesselCode;
+            vesselMap.set(key, { id: key, name: resolvedName, mapping: m });
+          }
+        }
+        return Array.from(vesselMap.values());
       }
     }
     
-    // Fallback: if component has vesselId, find that vessel
     if (selectedComponent.vesselId && vessels) {
       const vessel = vessels.find((v) => v.id === selectedComponent.vesselId);
       if (vessel) {
@@ -811,17 +810,27 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       );
     }
     
-    return mappings;
-  }, [selectedComponent, componentVesselMappings, mappingSearchQuery]);
+    const vesselMap = new Map<string, { vesselCode: string; vesselName: string; allMappingIds: number[]; mapping: any }>();
+    for (const m of mappings) {
+      const key = m.vesselCode || m.vesselId || "";
+      const existing = vesselMap.get(key);
+      if (existing) {
+        existing.allMappingIds.push(m.id);
+      } else {
+        const resolvedName = m.vesselName || (vessels || []).find(v => v.id === m.vesselCode)?.name || key;
+        vesselMap.set(key, { vesselCode: key, vesselName: resolvedName, allMappingIds: [m.id], mapping: m });
+      }
+    }
+    return Array.from(vesselMap.values());
+  }, [selectedComponent, componentVesselMappings, mappingSearchQuery, vessels]);
 
   const filteredDetailMappings = useMemo(() => {
     if (!selectedVesselForDetail || !selectedComponent || !componentVesselMappings) return [];
     
+    const targetVesselCode = selectedVesselForDetail.vesselCode || selectedVesselForDetail.vesselId;
     let mappings = componentVesselMappings.filter(
-      (m) => (m.vesselCode === selectedVesselForDetail.vesselCode || 
-              m.vesselId === selectedVesselForDetail.vesselId) &&
-             (m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
-              m.componentId === String(selectedComponent.id))
+      (m) => (m.vesselCode === targetVesselCode) &&
+             (m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode)
     );
     
     if (detailSearchQuery.trim()) {
@@ -998,13 +1007,15 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
     });
   };
 
-  const handleMappingCheckboxChange = (mappingId: number, checked: boolean) => {
+  const handleMappingCheckboxChange = (mappingIds: number[], checked: boolean) => {
     setSelectedMappingIds((prev) => {
       const newSet = new Set(prev);
-      if (checked) {
-        newSet.add(mappingId);
-      } else {
-        newSet.delete(mappingId);
+      for (const id of mappingIds) {
+        if (checked) {
+          newSet.add(id);
+        } else {
+          newSet.delete(id);
+        }
       }
       return newSet;
     });
@@ -1012,7 +1023,13 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
 
   const handleSelectAllMappings = (checked: boolean) => {
     if (checked) {
-      setSelectedMappingIds(new Set(filteredMappingsForDialog.map((m) => m.id)));
+      const allIds = new Set<number>();
+      for (const entry of filteredMappingsForDialog) {
+        for (const id of entry.allMappingIds) {
+          allIds.add(id);
+        }
+      }
+      setSelectedMappingIds(allIds);
     } else {
       setSelectedMappingIds(new Set());
     }
@@ -1591,7 +1608,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                     <Checkbox
                       checked={
                         filteredMappingsForDialog.length > 0 &&
-                        filteredMappingsForDialog.every((m) => selectedMappingIds.has(m.id))
+                        filteredMappingsForDialog.every((entry) => entry.allMappingIds.every(id => selectedMappingIds.has(id)))
                       }
                       onCheckedChange={handleSelectAllMappings}
                       className="h-3.5 w-3.5"
@@ -1604,30 +1621,30 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
               </thead>
               <tbody>
                 {filteredMappingsForDialog.length > 0 ? (
-                  filteredMappingsForDialog.map((mapping) => (
-                    <tr key={mapping.id} className="border-b last:border-0 hover:bg-blue-50/50">
+                  filteredMappingsForDialog.map((entry) => (
+                    <tr key={entry.vesselCode} className="border-b last:border-0 hover:bg-blue-50/50">
                       <td className="py-1.5 px-2">
                         <Checkbox
-                          checked={selectedMappingIds.has(mapping.id)}
+                          checked={entry.allMappingIds.every(id => selectedMappingIds.has(id))}
                           onCheckedChange={(checked) =>
-                            handleMappingCheckboxChange(mapping.id, checked as boolean)
+                            handleMappingCheckboxChange(entry.allMappingIds, checked as boolean)
                           }
                           className="h-3.5 w-3.5"
-                          data-testid={`checkbox-mapping-${mapping.id}`}
+                          data-testid={`checkbox-mapping-${entry.vesselCode}`}
                         />
                       </td>
-                      <td className="py-1.5 px-2 text-gray-600">{mapping.vesselCode || mapping.vesselId}</td>
+                      <td className="py-1.5 px-2 text-gray-600">{entry.vesselCode}</td>
                       <td 
                         className="py-1.5 px-2 cursor-pointer text-blue-600 hover:underline font-medium"
                         onClick={() => {
-                          setSelectedVesselForDetail(mapping);
+                          setSelectedVesselForDetail(entry.mapping);
                           setSelectedDetailMappingIds(new Set());
                           setDetailSearchQuery("");
                           setIsDetailDialogOpen(true);
                         }}
-                        data-testid={`vessel-name-${mapping.id}`}
+                        data-testid={`vessel-name-${entry.vesselCode}`}
                       >
-                        {mapping.vesselName}
+                        {entry.vesselName}
                       </td>
                     </tr>
                   ))
