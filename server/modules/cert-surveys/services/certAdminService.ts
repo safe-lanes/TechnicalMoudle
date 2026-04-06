@@ -70,6 +70,7 @@ export async function saveMasterCertificates(body: any) {
 
     if (existing.length > 0) {
       const wasDeleted = existing[0].isDeleted === true;
+      const preservedSystemFlag = existing[0].isSystemDefined || cert.isSystemDefined || false;
       await certAdminRepo.updateMasterCertificate(cert.masterId, {
         sequence: cert.sequence,
         certificateName: cert.certificateName,
@@ -80,7 +81,7 @@ export async function saveMasterCertificates(body: any) {
         certificateLabel: cert.certificateLabel || null,
         isActive: cert.isActive !== false,
         isDeleted: false,
-        isSystemDefined: cert.isSystemDefined || false,
+        isSystemDefined: preservedSystemFlag,
         companyId: cert.companyId || null,
         companyGroup: cert.companyGroup || null,
         companySequence: cert.companySequence || null,
