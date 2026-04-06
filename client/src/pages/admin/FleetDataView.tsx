@@ -769,7 +769,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                m.componentId === String(selectedComponent.id)
       );
       if (mappings.length > 0) {
-        const vesselMap = new Map<string, { id: string; name: string; mapping: any }>();
+        const vesselMap = new Map<string, { id: string; name: string; mapping: ComponentVesselMapping }>();
         for (const m of mappings) {
           const key = m.vesselCode || m.vesselId || "";
           if (!vesselMap.has(key)) {
@@ -810,7 +810,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       );
     }
     
-    const vesselMap = new Map<string, { vesselCode: string; vesselName: string; allMappingIds: number[]; mapping: any }>();
+    const vesselMap = new Map<string, { vesselCode: string; vesselName: string; allMappingIds: number[]; mapping: ComponentVesselMapping }>();
     for (const m of mappings) {
       const key = m.vesselCode || m.vesselId || "";
       const existing = vesselMap.get(key);
@@ -827,10 +827,10 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   const filteredDetailMappings = useMemo(() => {
     if (!selectedVesselForDetail || !selectedComponent || !componentVesselMappings) return [];
     
-    const targetVesselCode = selectedVesselForDetail.vesselCode || selectedVesselForDetail.vesselId;
+    const targetVesselKey = selectedVesselForDetail.vesselCode || selectedVesselForDetail.vesselId;
     let mappings = componentVesselMappings.filter(
-      (m) => (m.vesselCode === targetVesselCode) &&
-             (m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode)
+      (m) => (m.vesselCode || m.vesselId) === targetVesselKey &&
+             m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode
     );
     
     if (detailSearchQuery.trim()) {
