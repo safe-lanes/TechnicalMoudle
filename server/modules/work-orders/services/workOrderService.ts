@@ -8,7 +8,6 @@ import { storage } from '../../../storage';
 import { getDb } from '../../../db';
 import { plannerDates } from '@shared/schema';
 import { eq } from 'drizzle-orm';
-import { POSTPONEMENT_REASONS } from '@shared/postponementReasons';
 
 function calculateBackdatingDaysForApproval(completionDate: string | null | undefined, submittedDate: string | null | undefined): number {
   if (!completionDate) return 0;
@@ -1002,18 +1001,9 @@ export async function updateWorkOrder(id: string, body: any) {
     }
   }
 
-  // POSTPONEMENT VALIDATION: Validate reason is from the predefined list
+  // POSTPONEMENT VALIDATION: Require a non-empty trimmed reason when postponing
   const isBeingPostponed = updateData.status === 'Postponed';
-  if (isBeingPostponed && updateData.postponementReason) {
-    const validReasons: readonly string[] = POSTPONEMENT_REASONS;
-    if (!validReasons.includes(updateData.postponementReason as string)) {
-      throw new ValidationError(
-        `Invalid postponement reason. Must be one of the ${POSTPONEMENT_REASONS.length} predefined reasons.`,
-        { code: 'INVALID_POSTPONEMENT_REASON', provided: updateData.postponementReason }
-      );
-    }
-  }
-  if (isBeingPostponed && !updateData.postponementReason) {
+  if (isBeingPostponed && !updateData.postponementReason?.trim()) {
     throw new ValidationError(
       'Postponement reason is required when postponing a work order.',
       { code: 'POSTPONEMENT_REASON_REQUIRED' }

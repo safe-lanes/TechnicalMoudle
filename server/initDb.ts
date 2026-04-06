@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { resolvePostgres } from './postgresClient';
+import { POSTPONEMENT_REASONS } from '../shared/postponementReasons';
 
 /**
  * Ensure immutability trigger exists for component_maintenance_history
@@ -271,6 +272,17 @@ export async function initializeDatabase() {
           `);
         }
         console.log('✓ Ensured department master list (6 values)');
+
+        // Seed postponement reason master list values (idempotent — DO NOTHING preserves admin edits)
+        for (let i = 0; i < POSTPONEMENT_REASONS.length; i++) {
+          const reason = POSTPONEMENT_REASONS[i];
+          await db.execute(sql`
+            INSERT INTO master_lists (list_type, list_key, list_value, display_order, is_active)
+            VALUES ('postponementReason', ${reason}, ${reason}, ${i + 1}, true)
+            ON CONFLICT (list_type, list_key) DO NOTHING
+          `);
+        }
+        console.log(`✓ Ensured postponement reason master list (${POSTPONEMENT_REASONS.length} values)`);
       }
       
       return true;

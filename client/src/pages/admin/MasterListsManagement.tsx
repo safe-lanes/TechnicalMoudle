@@ -28,6 +28,7 @@ const LIST_TYPES = [
   { value: "intervalUnit", label: "Interval Unit" },
   { value: "componentCategory", label: "Component Category" },
   { value: "location", label: "Location" },
+  { value: "postponementReason", label: "Postponement Reason" },
 ];
 
 export default function MasterListsManagement({ onBack }: { onBack?: () => void }) {

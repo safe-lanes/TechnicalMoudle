@@ -125,7 +125,21 @@ const WorkOrders: React.FC = () => {
     },
     enabled: !!vesselId,
   });
-  
+
+  const { data: postponementReasonMasterList = [] } = useQuery<{ listValue: string; displayOrder: number; isActive: boolean }[]>({
+    queryKey: ['/technical/api/fleet/master-lists', 'postponementReason'],
+    queryFn: () =>
+      fetch('/technical/api/fleet/master-lists?listType=postponementReason').then((r) => r.json()),
+  });
+
+  const filterPostponementReasons: string[] =
+    postponementReasonMasterList.filter((i) => i.isActive).length > 0
+      ? postponementReasonMasterList
+          .filter((i) => i.isActive)
+          .sort((a, b) => a.displayOrder - b.displayOrder)
+          .map((i) => i.listValue)
+      : [...POSTPONEMENT_REASONS];
+
   // Create work order mutation
   const createWorkOrderMutation = useMutation({
     mutationFn: async (data: InsertWorkOrder) => {
@@ -859,7 +873,7 @@ const WorkOrders: React.FC = () => {
             </SelectTrigger>
             <SelectContent className="max-h-72">
               <SelectItem value="all">All Reasons</SelectItem>
-              {POSTPONEMENT_REASONS.map((reason) => (
+              {filterPostponementReasons.map((reason) => (
                 <SelectItem key={reason} value={reason}>
                   {reason}
                 </SelectItem>

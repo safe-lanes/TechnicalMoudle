@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +18,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2 } from "lucide-react";
 import { POSTPONEMENT_REASONS } from "@shared/postponementReasons";
+
+interface MasterListItem {
+  id: number;
+  listType: string;
+  listKey: string;
+  listValue: string;
+  displayOrder: number;
+  isActive: boolean;
+}
 
 interface PostponeWorkOrderDialogProps {
   isOpen: boolean;
@@ -56,6 +67,21 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
   });
 
   const [validationError, setValidationError] = useState("");
+
+  const { data: masterListItems, isLoading: reasonsLoading } = useQuery<MasterListItem[]>({
+    queryKey: ["/technical/api/fleet/master-lists", "postponementReason"],
+    queryFn: () =>
+      fetch("/technical/api/fleet/master-lists?listType=postponementReason")
+        .then((r) => r.json()),
+  });
+
+  const activeReasons: string[] =
+    masterListItems && masterListItems.filter((i) => i.isActive).length > 0
+      ? masterListItems
+          .filter((i) => i.isActive)
+          .sort((a, b) => a.displayOrder - b.displayOrder)
+          .map((i) => i.listValue)
+      : [...POSTPONEMENT_REASONS];
 
   React.useEffect(() => {
     if (workOrder) {
@@ -228,11 +254,18 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
                   <SelectValue placeholder="Select a reason for postponement..." />
                 </SelectTrigger>
                 <SelectContent className="max-h-64">
-                  {POSTPONEMENT_REASONS.map((reason) => (
-                    <SelectItem key={reason} value={reason}>
-                      {reason}
-                    </SelectItem>
-                  ))}
+                  {reasonsLoading ? (
+                    <div className="flex items-center justify-center py-3 text-sm text-muted-foreground">
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading reasons...
+                    </div>
+                  ) : (
+                    activeReasons.map((reason) => (
+                      <SelectItem key={reason} value={reason}>
+                        {reason}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               {validationError && (
