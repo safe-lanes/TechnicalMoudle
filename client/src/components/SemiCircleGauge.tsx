@@ -6,6 +6,7 @@ interface SemiCircleGaugeProps {
   displayValue?: string;
   subtitle?: string;
   statLine?: string;
+  arcFillColor?: string;
   onClick?: () => void;
   testId?: string;
 }
@@ -18,6 +19,7 @@ export function SemiCircleGauge({
   displayValue,
   subtitle,
   statLine,
+  arcFillColor,
   onClick,
   testId,
 }: SemiCircleGaugeProps) {
@@ -41,7 +43,7 @@ export function SemiCircleGauge({
 
   const trackPath = describeArc(startAngle, endAngle);
 
-  const arcColor = '#d1d5db';
+  const arcColor = arcFillColor || '#d1d5db';
   const valueColor = color;
 
   return (

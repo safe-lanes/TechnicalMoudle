@@ -1310,6 +1310,7 @@ const Dashboard = () => {
                     value={workOrderKPIs.overdue}
                     max={workOrderKPIs.total || 10}
                     color="#e74c3c"
+                    arcFillColor={overduePercent <= 1 ? '#FFEEAA' : '#e74c3c'}
                     displayValue={`${overduePercent}%`}
                     subtitle={`${workOrderKPIs.overdue} out of ${workOrderKPIs.total}`}
                     onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - All Equipment', workOrders: workOrderKPIs.overdueFull })}
