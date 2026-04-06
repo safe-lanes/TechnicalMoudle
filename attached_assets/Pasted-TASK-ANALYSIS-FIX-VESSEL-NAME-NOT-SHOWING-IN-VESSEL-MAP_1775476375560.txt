@@ -1,0 +1,175 @@
+TASK: ANALYSIS & FIX – VESSEL NAME NOT SHOWING IN VESSEL MAPPING OVERVIEW
+
+Objective:
+
+Identify why **only Vessel Code is displayed** in  
+**Fleet Components → D. Vessel Mapping Overview**,  
+and implement a fix to also display **Vessel Name**.
+
+--------------------------------------------------
+
+1. Current Issue
+
+• In Vessel Mapping Overview:
+
+  - Vessel Code → Visible  
+  - Vessel Name → NOT visible  
+
+• Expected:
+
+  - Both Vessel Code and Vessel Name should be shown  
+
+--------------------------------------------------
+
+2. Expected Behavior
+
+Display format:
+
+• Vessel Code – Vessel Name  
+
+Example:
+
+• VSL001 – MV Ocean Star  
+
+--------------------------------------------------
+
+3. Root Cause Analysis
+
+Investigate the following:
+
+--------------------------------------------------
+
+A. Backend Query Issue
+
+Check API query:
+
+• Is Vessel Name being fetched?
+
+Possible issue:
+
+• Query only selecting:
+
+  vessel_code  
+
+Missing:
+
+  vessel_name  
+
+--------------------------------------------------
+
+B. Table Join Missing
+
+Verify:
+
+• Is mapping table joined with Vessel Master table?
+
+Required:
+
+  fleet_component_mapping  
+  JOIN vessel_master  
+  ON vessel_id  
+
+--------------------------------------------------
+
+C. API Response Issue
+
+Check API response:
+
+• Does it include:
+
+  vessel_name  
+
+If NOT:
+
+→ Backend issue  
+
+--------------------------------------------------
+
+D. UI Binding Issue
+
+If API returns vessel_name but UI not showing:
+
+• UI only binding:
+
+  vessel_code  
+
+• vessel_name not mapped to display  
+
+--------------------------------------------------
+
+E. Incorrect Field Mapping
+
+Check:
+
+• Field name mismatch:
+
+  vesselName vs vessel_name  
+
+--------------------------------------------------
+
+4. Corrective Plan
+
+--------------------------------------------------
+
+A. Backend Fix
+
+Update query to include:
+
+SELECT  
+  v.vessel_code,  
+  v.vessel_name  
+
+FROM  
+  vessel_master v  
+JOIN  
+  mapping_table m  
+ON  
+  v.vessel_id = m.vessel_id  
+
+--------------------------------------------------
+
+B. API Update
+
+Ensure response includes:
+
+• vessel_code  
+• vessel_name  
+
+--------------------------------------------------
+
+C. UI Update
+
+Update display logic:
+
+• Show both:
+
+  vessel_code + " - " + vessel_name  
+
+--------------------------------------------------
+
+D. Fallback Handling
+
+If vessel_name is NULL:
+
+• Show:
+
+  vessel_code only  
+
+--------------------------------------------------
+
+5. Validation
+
+Test:
+
+• Vessel with valid name → both shown  
+• Vessel with missing name → only code shown  
+• Multiple vessels → all show correctly  
+• After refresh → data persists  
+
+--------------------------------------------------
+
+Expected Result:
+
+• Vessel Mapping Overview shows both Vessel Code and Vessel Name  
+• Clear and user-friendly display  
+• No missing data in UI  
