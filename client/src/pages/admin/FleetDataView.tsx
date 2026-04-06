@@ -794,24 +794,13 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   const filteredMappingsForDialog = useMemo(() => {
     if (!selectedComponent || !componentVesselMappings) return [];
     
-    let mappings = componentVesselMappings.filter(
+    const componentMappings = componentVesselMappings.filter(
       (m) => m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
              m.componentId === String(selectedComponent.id)
     );
     
-    if (mappingSearchQuery.trim()) {
-      const query = mappingSearchQuery.toLowerCase();
-      mappings = mappings.filter(
-        (m) => 
-          m.vesselName?.toLowerCase().includes(query) ||
-          m.vesselCode?.toLowerCase().includes(query) ||
-          m.componentCode?.toLowerCase().includes(query) ||
-          m.componentName?.toLowerCase().includes(query)
-      );
-    }
-    
     const vesselMap = new Map<string, { vesselCode: string; vesselName: string; allMappingIds: number[]; mapping: ComponentVesselMapping }>();
-    for (const m of mappings) {
+    for (const m of componentMappings) {
       const key = m.vesselCode || m.vesselId || "";
       const existing = vesselMap.get(key);
       if (existing) {
@@ -821,7 +810,19 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
         vesselMap.set(key, { vesselCode: key, vesselName: resolvedName, allMappingIds: [m.id], mapping: m });
       }
     }
-    return Array.from(vesselMap.values());
+    
+    let result = Array.from(vesselMap.values());
+    
+    if (mappingSearchQuery.trim()) {
+      const query = mappingSearchQuery.toLowerCase();
+      result = result.filter(
+        (entry) => 
+          entry.vesselName?.toLowerCase().includes(query) ||
+          entry.vesselCode?.toLowerCase().includes(query)
+      );
+    }
+    
+    return result;
   }, [selectedComponent, componentVesselMappings, mappingSearchQuery, vessels]);
 
   const filteredDetailMappings = useMemo(() => {
