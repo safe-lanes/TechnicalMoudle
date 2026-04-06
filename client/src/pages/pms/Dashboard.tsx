@@ -714,12 +714,16 @@ const Dashboard = () => {
     const completed = monthlyWOs.filter(wo =>
       (wo as EnrichedWorkOrder).computedStatus === 'Completed'
     ).length;
+    const pendingApproval = monthlyWOs.filter(wo =>
+      (wo as EnrichedWorkOrder).computedStatus === 'Pending Approval'
+    ).length;
 
     return [
       { status: 'Planned', count: planned, color: '#9E9E9E' },
       { status: 'Due', count: due, color: '#FF964f' },
       { status: 'Overdue', count: overdue, color: '#ff6961' },
-      { status: 'Completed', count: completed, color: '#5dc86f' }
+      { status: 'Completed', count: completed, color: '#5dc86f' },
+      { status: 'Pending Approval', count: pendingApproval, color: '#FFEEAA' }
     ].filter(d => d.count > 0);
   }, [filteredWorkOrdersData]);
 
@@ -1377,6 +1381,7 @@ const Dashboard = () => {
                               if (status === 'Overdue') navigateToWorkOrders('Overdue');
                               else if (status === 'Due') navigateToWorkOrders('Due');
                               else if (status === 'Completed') navigateToWorkOrders('Completed');
+                              else if (status === 'Pending Approval') navigateToWorkOrders('Pending Approval');
                               else navigateToWorkOrders('Planned');
                             }}
                             cursor="pointer"
