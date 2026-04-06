@@ -68,7 +68,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
 
   const [validationError, setValidationError] = useState("");
 
-  const { data: masterListItems } = useQuery<MasterListItem[]>({
+  const { data: masterListItems, isLoading: reasonsLoading, isError: reasonsError } = useQuery<MasterListItem[]>({
     queryKey: ["/technical/api/fleet/master-lists", "postponementReason"],
     queryFn: async () => {
       const r = await fetch("/technical/api/fleet/master-lists?listType=postponementReason");
@@ -78,10 +78,8 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     },
   });
 
-  const reasonsLoading = masterListItems === undefined;
-
   const activeReasons: string[] =
-    masterListItems && masterListItems.length > 0
+    !reasonsError && masterListItems && masterListItems.length > 0
       ? masterListItems
           .filter((i) => i.isActive)
           .sort((a, b) => a.displayOrder - b.displayOrder)
