@@ -663,16 +663,65 @@ const Dashboard = () => {
     };
   }, [componentsData]);
 
-  // Work Order Status chart data
-  // Note: Active status is excluded as the dashboard focuses on items needing attention
+  // Helper to parse dates in both ISO (YYYY-MM-DD) and legacy (DD-MMM-YYYY) formats
+  const parseFlexibleDate = (dateStr: string | null | undefined): Date | null => {
+    if (!dateStr || dateStr === '' || dateStr === '—') return null;
+    
+    let parsed = new Date(dateStr);
+    if (!isNaN(parsed.getTime())) return parsed;
+    
+    const legacyMatch = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+    if (legacyMatch) {
+      const [, day, monthStr, year] = legacyMatch;
+      const monthMap: Record<string, number> = {
+        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+      };
+      const month = monthMap[monthStr];
+      if (month !== undefined) {
+        return new Date(parseInt(year), month, parseInt(day));
+      }
+    }
+    
+    return null;
+  };
+
+  // Work Order Status chart data - filtered to current calendar month
   const workOrderStatusChartData = useMemo(() => {
+    const safeWOs = filteredWorkOrdersData.filter(wo => wo !== null && wo !== undefined);
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const monthlyWOs = safeWOs.filter(wo => {
+      if (wo.isExecution) return false;
+      const dueDate = parseFlexibleDate(wo.dueDate);
+      if (!dueDate) return false;
+      return dueDate.getMonth() === currentMonth && dueDate.getFullYear() === currentYear;
+    });
+
+    const planned = monthlyWOs.filter(wo => {
+      const s = (wo as EnrichedWorkOrder).computedStatus;
+      return s === 'Active' || s === 'Postponed';
+    }).length;
+    const due = monthlyWOs.filter(wo => {
+      const s = (wo as EnrichedWorkOrder).computedStatus;
+      return s === 'Due' || s === 'Due (Grace P)';
+    }).length;
+    const overdue = monthlyWOs.filter(wo =>
+      (wo as EnrichedWorkOrder).computedStatus === 'Overdue'
+    ).length;
+    const completed = monthlyWOs.filter(wo =>
+      (wo as EnrichedWorkOrder).computedStatus === 'Completed'
+    ).length;
+
     return [
-      { status: 'Overdue', count: workOrderKPIs.overdue, color: '#ff6961' },
-      { status: 'Due', count: workOrderKPIs.due, color: '#FF964f' },
-      { status: 'Pending Approval', count: workOrderKPIs.pendingApproval, color: '#1565C0' },
-      { status: 'Completed', count: workOrderKPIs.completed, color: '#5dc86f' }
+      { status: 'Planned', count: planned, color: '#9E9E9E' },
+      { status: 'Due', count: due, color: '#FF964f' },
+      { status: 'Overdue', count: overdue, color: '#ff6961' },
+      { status: 'Completed', count: completed, color: '#5dc86f' }
     ].filter(d => d.count > 0);
-  }, [workOrderKPIs]);
+  }, [filteredWorkOrdersData]);
 
   // Spares Stock Status chart data
   const sparesStockChartData = useMemo(() => {
@@ -698,31 +747,6 @@ const Dashboard = () => {
       { status: 'Low', count: low, color: '#ff6961' }
     ].filter(d => d.count > 0);
   }, [sparesData]);
-
-  // Helper to parse dates in both ISO (YYYY-MM-DD) and legacy (DD-MMM-YYYY) formats
-  const parseFlexibleDate = (dateStr: string | null | undefined): Date | null => {
-    if (!dateStr || dateStr === '' || dateStr === '—') return null;
-    
-    // Try ISO format first (YYYY-MM-DD or full ISO timestamp)
-    let parsed = new Date(dateStr);
-    if (!isNaN(parsed.getTime())) return parsed;
-    
-    // Try DD-MMM-YYYY format (e.g., "22-Nov-2025")
-    const legacyMatch = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
-    if (legacyMatch) {
-      const [, day, monthStr, year] = legacyMatch;
-      const monthMap: Record<string, number> = {
-        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
-      };
-      const month = monthMap[monthStr];
-      if (month !== undefined) {
-        return new Date(parseInt(year), month, parseInt(day));
-      }
-    }
-    
-    return null;
-  };
 
   // Outstanding Tasks as Percentage of Monthly Planned Maintenance Tasks
   const outstandingTasksChartData = useMemo(() => {
@@ -1352,7 +1376,6 @@ const Dashboard = () => {
                               const status = entry.status;
                               if (status === 'Overdue') navigateToWorkOrders('Overdue');
                               else if (status === 'Due') navigateToWorkOrders('Due');
-                              else if (status === 'Pending Approval') navigateToWorkOrders('Pending Approval');
                               else if (status === 'Completed') navigateToWorkOrders('Completed');
                               else navigateToWorkOrders('Planned');
                             }}
