@@ -1038,9 +1038,10 @@ const Dashboard = () => {
     });
 
     const total = ytdWOs.length;
-    const postponed = ytdWOs.filter(wo =>
+    const postponedFull = ytdWOs.filter(wo =>
       wo.computedStatus === 'Postponed'
-    ).length;
+    );
+    const postponed = postponedFull.length;
     const unplanned = ytdWOs.filter(wo => !wo.jobId && !wo.templateCode).length;
 
     const changeRequestCountYTD = changeRequestsData.filter(cr => {
@@ -1052,6 +1053,7 @@ const Dashboard = () => {
     return {
       total,
       postponed,
+      postponedFull,
       postponedPercent: total > 0 ? Math.round((postponed / total) * 100) : 0,
       unplanned,
       unplannedPercent: total > 0 ? Math.round((unplanned / total) * 100) : 0,
@@ -1594,6 +1596,7 @@ const Dashboard = () => {
                       color="#e74c3c"
                       displayValue={ytdKPIs.postponed.toString()}
                       subtitle={`${ytdKPIs.postponedPercent}% of total`}
+                      onClick={() => setWoListModal({ open: true, title: 'Postponed Work Orders YTD', workOrders: ytdKPIs.postponedFull })}
                       testId="gauge-postponed-wo"
                     />
                   </div>
