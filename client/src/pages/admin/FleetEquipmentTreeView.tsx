@@ -220,7 +220,7 @@ export default function FleetEquipmentTreeView({ onBack }: { onBack?: () => void
   }
   
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="flex flex-col h-full space-y-4 overflow-hidden">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Fleet Equipment Data Tree View</h1>
         <div className="flex gap-2 items-center">

@@ -562,8 +562,8 @@ export default function AddEditFleetComponent() {
         </Button>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="w-[30%] flex flex-col border-r">
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        <div className="w-[30%] min-w-0 shrink-0 flex flex-col border-r">
           <div className="px-3 py-2 bg-sky-500">
             <span className="text-white font-semibold text-sm">FLEET COMPONENTS</span>
           </div>
@@ -605,7 +605,7 @@ export default function AddEditFleetComponent() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 min-w-0 overflow-y-auto p-6">
           {(selectedNode || isAddingNew || editId) ? (
             <>
               <h2 className="text-lg font-semibold text-gray-900 mb-4" data-testid="text-component-title">

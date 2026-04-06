@@ -1072,10 +1072,10 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   };
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
-      <div className="flex-1 overflow-y-auto min-h-0">
+    <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 120px)' }}>
+      <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
         <div className="flex gap-6 h-full min-h-0">
-          <div className="w-[30%]" data-testid="fleet-tree-panel">
+          <div className="w-[30%] min-w-0 shrink-0" data-testid="fleet-tree-panel">
             <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
               <div className="flex-1 overflow-auto">
                 <div className="bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm flex items-center justify-between gap-2">
@@ -1182,7 +1182,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
             </div>
           </div>
 
-          <div className="w-[70%]" data-testid="fleet-detail-panel">
+          <div className="flex-1 min-w-0" data-testid="fleet-detail-panel">
         {selectedComponent ? (
           <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
             <div className="p-4 border-b-2 border-[#52baf3] flex-shrink-0">
@@ -1314,6 +1314,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                   {!collapsedSections.B && (
                     <CardContent className="pt-4 border-t border-gray-100">
                       {relatedJobs.length > 0 ? (
+                        <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-gray-200">
@@ -1346,6 +1347,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                             ))}
                           </tbody>
                         </table>
+                        </div>
                       ) : (
                         <p className="text-gray-500 text-sm">No jobs linked to this component</p>
                       )}
@@ -1383,6 +1385,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                   {!collapsedSections.C && (
                     <CardContent className="pt-4 border-t border-gray-100">
                       {relatedSpares.length > 0 ? (
+                        <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-gray-200">
@@ -1420,6 +1423,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                             ))}
                           </tbody>
                         </table>
+                        </div>
                       ) : (
                         <p className="text-gray-500 text-sm">No spares linked to this component</p>
                       )}
@@ -1457,6 +1461,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                   {!collapsedSections.D && (
                     <CardContent className="pt-4 border-t border-gray-100">
                       {relatedVessels.length > 0 ? (
+                        <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-gray-200">
@@ -1486,6 +1491,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                             ))}
                           </tbody>
                         </table>
+                        </div>
                       ) : (
                         <p className="text-gray-500 text-sm">No vessels mapped to this component</p>
                       )}
