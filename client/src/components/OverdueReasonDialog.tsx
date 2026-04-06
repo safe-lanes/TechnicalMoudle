@@ -108,7 +108,7 @@ export default function OverdueReasonDialog({
       onSaved();
       onClose();
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       toast({ title: "Failed to save", description: err?.message || "An error occurred", variant: "destructive" });
     },
   });

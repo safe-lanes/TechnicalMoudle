@@ -2800,6 +2800,25 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           </div>
         );
       })()}
+      {!embedded && (() => {
+        const ctx = workOrderContext as { workOrder?: { overdueReason?: string | null; overdueReasonDetails?: string | null } } | undefined;
+        const overdueReason = ctx?.workOrder?.overdueReason || '';
+        const overdueDetails = ctx?.workOrder?.overdueReasonDetails || '';
+        if (!overdueReason) return null;
+        return (
+          <div className="sticky top-0 z-50 bg-amber-50 border-b border-amber-200 px-4 py-2" data-testid="banner-overdue-reason">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-amber-800">⚠ OVERDUE</span>
+              <span className="text-sm text-amber-700">— Reason: {overdueReason}</span>
+            </div>
+            {overdueDetails && (
+              <div className="text-sm text-amber-600 mt-0.5" data-testid="text-overdue-reason-details">
+                Details: {overdueDetails}
+              </div>
+            )}
+          </div>
+        );
+      })()}
       {!embedded && workOrderId && (() => {
         const anomalyData = woAnomalies;
         if (!anomalyData || anomalyData.length === 0) return null;

@@ -92,7 +92,7 @@ const WorkOrders: React.FC = () => {
   const [showPlanner, setShowPlanner] = useState(false);
   const [postponeDialogOpen, setPostponeDialogOpen] = useState(false);
   const [overdueReasonDialogOpen, setOverdueReasonDialogOpen] = useState(false);
-  const [overdueReasonWorkOrder, setOverdueReasonWorkOrder] = useState<any | null>(null);
+  const [overdueReasonWorkOrder, setOverdueReasonWorkOrder] = useState<WorkOrderWithHydratedData | null>(null);
   const [unplannedWorkOrderFormOpen, setUnplannedWorkOrderFormOpen] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
   
