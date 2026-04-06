@@ -509,10 +509,28 @@ export default function ShipsCertificatesAdmin() {
       };
     });
     
-    // Send Master data + Company certs + Vessel certs as separate items but in one payload
-    // Company certs have category='Company' — on reload they route to companyOnlyCerts, not masterData
     const deletedSet = new Set(deletedMasterIds);
-    const allCertificates = [...masterData.filter(c => !deletedSet.has(c.masterId)), ...companyCertsForSave, ...vesselOnlyCertsWithIds];
+    const activeMasterData = masterData.filter(c => !deletedSet.has(c.masterId));
+    const sortedMaster = [...activeMasterData].sort((a, b) => a.sequence - b.sequence);
+    sortedMaster.forEach((c, i) => { c.sequence = i + 1; });
+
+    const companyFromMaster = sortedMaster.filter(c => c.applicableToCompany);
+    const allCompanyItems = [
+      ...companyFromMaster.map(c => ({ id: c.id, seq: c.companySequence ?? c.sequence, source: 'master' as const })),
+      ...companyCertsForSave.map(c => ({ id: c.id, seq: c.companySequence ?? c.sequence, source: 'company' as const })),
+    ].sort((a, b) => a.seq - b.seq);
+    allCompanyItems.forEach((item, i) => {
+      const newSeq = i + 1;
+      if (item.source === 'master') {
+        const cert = sortedMaster.find(c => c.id === item.id);
+        if (cert) cert.companySequence = newSeq;
+      } else {
+        const cert = companyCertsForSave.find(c => c.id === item.id);
+        if (cert) { cert.companySequence = newSeq; cert.sequence = newSeq; }
+      }
+    });
+
+    const allCertificates = [...sortedMaster, ...companyCertsForSave, ...vesselOnlyCertsWithIds];
     
     // Get selected vessel info (ID and name) for vessel-specific certificate applicability
     const targetVessels = (vesselMasterData || [])
@@ -772,11 +790,12 @@ export default function ShipsCertificatesAdmin() {
   };
   
   // Function to update sequence with auto-adjustment for conflicts
-  const updateMasterSequence = (certId: number, newSequence: number) => {
+  const updateMasterSequence = (certId: number, rawSequence: number) => {
     setMasterData(prevData => {
       const currentCert = prevData.find(c => c.id === certId);
       if (!currentCert) return prevData;
       
+      const newSequence = Math.max(1, Math.min(rawSequence, prevData.length));
       const oldSequence = currentCert.sequence;
       if (newSequence === oldSequence) return prevData;
       
@@ -1658,11 +1677,13 @@ export default function ShipsCertificatesAdmin() {
   };
 
   // Handler for Company tab sequence reordering - mirrors updateMasterSequence logic
-  const updateCompanySequence = (certId: number, newSequence: number) => {
+  const updateCompanySequence = (certId: number, rawSequence: number) => {
     const companyCerts = masterData.filter(c => c.applicableToCompany);
+    const totalCompanyCount = companyCerts.length + companyOnlyCerts.length;
     const currentCert = companyCerts.find(c => c.id === certId);
     if (!currentCert) return;
 
+    const newSequence = Math.max(1, Math.min(rawSequence, totalCompanyCount));
     const oldSequence = currentCert.companySequence ?? currentCert.sequence;
     if (newSequence === oldSequence) return;
 
@@ -1711,11 +1732,13 @@ export default function ShipsCertificatesAdmin() {
     setHasUnsavedChanges(true);
   };
 
-  const updateCompanyOnlySequence = (certId: number, newSequence: number) => {
+  const updateCompanyOnlySequence = (certId: number, rawSequence: number) => {
     const masterCompanyCerts = masterData.filter(c => c.applicableToCompany);
+    const totalCompanyCount = masterCompanyCerts.length + companyOnlyCerts.length;
     const currentCert = companyOnlyCerts.find(c => c.id === certId);
     if (!currentCert) return;
 
+    const newSequence = Math.max(1, Math.min(rawSequence, totalCompanyCount));
     const oldSequence = currentCert.sequence ?? 999999;
     if (newSequence === oldSequence) return;
 

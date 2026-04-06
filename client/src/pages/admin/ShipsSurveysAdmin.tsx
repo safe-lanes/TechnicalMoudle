@@ -451,8 +451,27 @@ export default function ShipsSurveysAdmin() {
     const includeCompany = activeTab === "company";
     const includeVessel = activeTab === "vessel";
 
+    const sortedDataToSave = [...dataToSave].sort((a, b) => a.sequence - b.sequence);
+    sortedDataToSave.forEach((s, i) => { s.sequence = i + 1; });
+
+    const companyFromMaster = sortedDataToSave.filter(s => s.applicableToCompany);
+    const allCompanyItems = [
+      ...companyFromMaster.map(s => ({ id: s.id, seq: s.companySequence ?? s.sequence, source: 'master' as const })),
+      ...companyOnlySurveysWithIds.map(s => ({ id: s.id, seq: s.companySequence ?? s.sequence, source: 'company' as const })),
+    ].sort((a, b) => a.seq - b.seq);
+    allCompanyItems.forEach((item, i) => {
+      const newSeq = i + 1;
+      if (item.source === 'master') {
+        const survey = sortedDataToSave.find(s => s.id === item.id);
+        if (survey) survey.companySequence = newSeq;
+      } else {
+        const survey = companyOnlySurveysWithIds.find(s => s.id === item.id);
+        if (survey) { survey.companySequence = newSeq; survey.sequence = newSeq; }
+      }
+    });
+
     const allSurveys = [
-      ...dataToSave,
+      ...sortedDataToSave,
       ...(includeCompany ? companyOnlySurveysWithIds : []),
       ...(includeVessel ? vesselOnlySurveysWithIds : []),
     ];
@@ -606,12 +625,13 @@ export default function ShipsSurveysAdmin() {
     setHasUnsavedChanges(true);
   };
 
-  const updateSequence = (surveyId: number, newSequence: number) => {
+  const updateSequence = (surveyId: number, rawSequence: number) => {
     setDraftMasterData(prevData => {
       if (!prevData) return prevData;
       const currentSurvey = prevData.find(s => s.id === surveyId);
       if (!currentSurvey) return prevData;
       
+      const newSequence = Math.max(1, Math.min(rawSequence, prevData.length));
       const oldSequence = currentSurvey.sequence;
       if (newSequence === oldSequence) return prevData;
       
@@ -676,12 +696,14 @@ export default function ShipsSurveysAdmin() {
     setHasUnsavedChanges(true);
   };
 
-  const updateCompanySequence = (surveyId: number, newSequence: number) => {
+  const updateCompanySequence = (surveyId: number, rawSequence: number) => {
     setMasterData(prevData => {
       const companySurveys = prevData.filter(s => s.applicableToCompany);
+      const totalCompanyCount = companySurveys.length + companyOnlySurveys.length;
       const currentSurvey = companySurveys.find(s => s.id === surveyId);
       if (!currentSurvey) return prevData;
 
+      const newSequence = Math.max(1, Math.min(rawSequence, totalCompanyCount));
       const oldSequence = currentSurvey.companySequence ?? currentSurvey.sequence;
       if (newSequence === oldSequence) return prevData;
 
