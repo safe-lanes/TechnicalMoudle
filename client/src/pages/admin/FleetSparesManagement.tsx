@@ -612,35 +612,27 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   if (isAddMode) {
     return (
       <div className="flex flex-col h-full">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Plus className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white" data-testid="title-add-spare">Add New Spare</h1>
-              <p className="text-cyan-100 text-sm mt-0.5">
-                {spareFormData.partName || "Create a new fleet spare part"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
+        <div className="px-6 py-3 flex items-center justify-between border-b border-gray-200">
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="title-add-spare">Add New Spare</h1>
+          <div className="flex items-center gap-2">
             <Button
-              className="bg-white/20 text-white border-white/30 hover:bg-white/30 h-9 px-4 text-sm font-medium rounded-md"
               variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
               onClick={handleCancelAdd}
               data-testid="btn-cancel-add-spare"
             >
-              <X className="h-4 w-4 mr-1.5" />
+              <X className="h-4 w-4 mr-1" />
               Cancel
             </Button>
             <Button
-              className="bg-white text-blue-600 hover:bg-blue-50 h-9 px-5 text-sm font-medium rounded-md"
+              size="sm"
+              className="h-8 gap-2 bg-[#5dc86f] hover:bg-[#4db85f] text-white"
               onClick={handleSaveAdd}
               disabled={createSpareMutation.isPending}
               data-testid="btn-save-add-spare"
             >
-              <Save className="h-4 w-4 mr-1.5" />
+              <Save className="h-4 w-4 mr-1" />
               {createSpareMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </div>
@@ -656,35 +648,27 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   if (detailSpare && isEditMode) {
     return (
       <div className="flex flex-col h-full">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Pencil className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white" data-testid="title-edit-spare">Edit Spare Details</h1>
-              <p className="text-cyan-100 text-sm mt-0.5">
-                {spareFormData.partName || detailSpare.partName || "Edit spare information"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
+        <div className="px-6 py-3 flex items-center justify-between border-b border-gray-200">
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="title-edit-spare">Edit Spare Details</h1>
+          <div className="flex items-center gap-2">
             <Button
-              className="bg-white/20 text-white border-white/30 hover:bg-white/30 h-9 px-4 text-sm font-medium rounded-md"
               variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
               onClick={handleCancelEdit}
               data-testid="btn-cancel-edit-spare"
             >
-              <X className="h-4 w-4 mr-1.5" />
+              <X className="h-4 w-4 mr-1" />
               Cancel
             </Button>
             <Button
-              className="bg-white text-blue-600 hover:bg-blue-50 h-9 px-5 text-sm font-medium rounded-md"
+              size="sm"
+              className="h-8 gap-2 bg-[#5dc86f] hover:bg-[#4db85f] text-white"
               onClick={handleSaveEdit}
               disabled={updateSpareMutation.isPending}
               data-testid="btn-save-edit-spare"
             >
-              <Save className="h-4 w-4 mr-1.5" />
+              <Save className="h-4 w-4 mr-1" />
               {updateSpareMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </div>
@@ -700,32 +684,27 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   if (detailSpare) {
     return (
       <div className="flex flex-col h-full">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Info className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white" data-testid="title-spare-details">Spare Details</h1>
-              <p className="text-cyan-100 text-sm mt-0.5">{detailSpare.partName || "View spare information"}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
+        <div className="px-6 py-3 flex items-center justify-between border-b border-gray-200">
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="title-spare-details">Spare Details</h1>
+          <div className="flex items-center gap-2">
             <Button
-              className="bg-white/20 text-white border-white/30 hover:bg-white/30 h-9 px-4 text-sm font-medium rounded-md"
               variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
               onClick={handleBackToList}
               data-testid="btn-back-spare-list"
             >
-              <ArrowLeft className="h-4 w-4 mr-1.5" />
+              <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
             <Button
-              className="bg-white text-blue-600 hover:bg-blue-50 h-9 px-5 text-sm font-medium rounded-md"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
               onClick={() => handleEdit(detailSpare)}
               data-testid="btn-edit-spare"
             >
-              <Pencil className="h-4 w-4 mr-1.5" />
+              <Pencil className="h-4 w-4" />
               Edit
             </Button>
           </div>

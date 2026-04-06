@@ -372,40 +372,33 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
     return (
       <div className="p-6">
         <Card className="overflow-hidden">
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
+          <div className="px-6 py-3 border-b border-gray-200">
             <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-lg">
-                  <Info className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-white" data-testid="title-job-details">Job Details</h1>
-                  <p className="text-cyan-100 text-sm mt-0.5">
-                    {detailJob.jobCode} - {detailJob.woTitle}
-                  </p>
-                </div>
-              </div>
+              <h1 className="text-2xl font-bold text-gray-900" data-testid="title-job-details">Job Details</h1>
               <div className="flex items-center gap-2">
                 <Button
-                  className="bg-white/20 text-white border-white/30"
                   variant="outline"
+                  size="sm"
+                  className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
+                  onClick={() => setDetailJob(null)}
+                  data-testid="button-back-to-job-list"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to List
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
                   onClick={() => {
                     setDetailJob(null);
                     handleEdit(detailJob);
                   }}
                   data-testid="btn-edit-job-detail"
                 >
-                  <Pencil className="mr-2 h-4 w-4" />
+                  <Pencil className="mr-1 h-4 w-4" />
                   Edit
                 </Button>
-                <button
-                  onClick={() => setDetailJob(null)}
-                  className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
-                  data-testid="button-back-to-job-list"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to List
-                </button>
               </div>
             </div>
           </div>
@@ -558,29 +551,21 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
   if (isAddMode) {
     return (
       <div className="flex flex-col h-full">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Plus className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white" data-testid="title-add-job">Add New Job</h1>
-              <p className="text-cyan-100 text-sm mt-0.5">
-                {jobFormData.woTitle || "Create a new fleet job"}
-              </p>
-            </div>
-          </div>
+        <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="title-add-job">Add New Job</h1>
           <div className="flex items-center gap-2">
             <Button
-              className="bg-white/20 text-white border-white/30"
               variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
               onClick={handleCancelAdd}
               data-testid="btn-cancel-add-job"
             >
               Cancel
             </Button>
             <Button
-              className="bg-white text-blue-600"
+              size="sm"
+              className="h-8 gap-2 bg-[#5dc86f] hover:bg-[#4db85f] text-white"
               onClick={handleSaveAdd}
               disabled={createJobMutation.isPending}
               data-testid="btn-save-add-job"
@@ -960,29 +945,21 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
   if (editingJob) {
     return (
       <div className="flex flex-col h-full">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Pencil className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white" data-testid="title-edit-job">Edit Job Details</h1>
-              <p className="text-cyan-100 text-sm mt-0.5">
-                {jobFormData.woTitle || editingJob.woTitle || "Edit job information"}
-              </p>
-            </div>
-          </div>
+        <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="title-edit-job">Edit Job Details</h1>
           <div className="flex items-center gap-2">
             <Button
-              className="bg-white/20 text-white border-white/30"
               variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
               onClick={handleCancelEdit}
               data-testid="btn-cancel-edit-job"
             >
               Cancel
             </Button>
             <Button
-              className="bg-white text-blue-600"
+              size="sm"
+              className="h-8 gap-2 bg-[#5dc86f] hover:bg-[#4db85f] text-white"
               onClick={handleSaveEdit}
               disabled={updateJobMutation.isPending}
               data-testid="btn-save-job"

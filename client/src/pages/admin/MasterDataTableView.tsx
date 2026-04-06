@@ -98,25 +98,19 @@ export default function MasterDataTableView({ onBack }: { onBack?: () => void })
     return (
       <div className="p-6">
         <Card className="overflow-hidden">
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
+          <div className="px-6 py-3 border-b border-gray-200">
             <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-lg">
-                  <Info className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-white" data-testid="text-detail-title">Equipment Detail</h1>
-                  <p className="text-cyan-100 text-sm mt-0.5">{selectedComponent.fleetEquipmentCode} - {selectedComponent.fleetEquipmentName}</p>
-                </div>
-              </div>
-              <button
+              <h1 className="text-2xl font-bold text-gray-900" data-testid="text-detail-title">Equipment Detail</h1>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
                 onClick={handleBackToList}
-                className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
                 data-testid="button-back-to-list"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to List
-              </button>
+              </Button>
             </div>
           </div>
 

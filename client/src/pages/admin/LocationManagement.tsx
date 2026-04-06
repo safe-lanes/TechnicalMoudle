@@ -3,7 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import {
@@ -190,7 +189,7 @@ export default function LocationManagement({ onBack }: { onBack?: () => void }) 
             </SelectContent>
           </Select>
           {selectedVesselId && (
-            <Button onClick={handleOpenAdd} data-testid="button-add-location">
+            <Button className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={handleOpenAdd} data-testid="button-add-location">
               <Plus className="h-4 w-4 mr-2" />
               Add Location
             </Button>
@@ -244,55 +243,53 @@ export default function LocationManagement({ onBack }: { onBack?: () => void }) 
               </div>
             ) : (
               <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50">
-                      <TableHead className="w-12 text-center">#</TableHead>
-                      <TableHead>Location Name</TableHead>
-                      <TableHead>Location Type</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead className="w-24 text-center">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-[#52baf3]">
+                      <th className="text-white font-semibold text-xs whitespace-nowrap px-3 py-2 text-center w-12">#</th>
+                      <th className="text-white font-semibold text-xs whitespace-nowrap px-3 py-2 text-left">Location Name</th>
+                      <th className="text-white font-semibold text-xs whitespace-nowrap px-3 py-2 text-left">Location Type</th>
+                      <th className="text-white font-semibold text-xs whitespace-nowrap px-3 py-2 text-left">Created</th>
+                      <th className="text-white font-semibold text-xs whitespace-nowrap px-3 py-2 text-center w-24">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {filteredLocations.map((location, index) => (
-                      <TableRow key={location.id} data-testid={`row-location-${location.id}`}>
-                        <TableCell className="text-center text-gray-500 text-sm">{index + 1}</TableCell>
-                        <TableCell className="font-medium">{location.locationName}</TableCell>
-                        <TableCell>
+                      <tr key={location.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"} data-testid={`row-location-${location.id}`}>
+                        <td className="text-center text-gray-500 text-sm px-3 py-2">{index + 1}</td>
+                        <td className="font-medium px-3 py-2">{location.locationName}</td>
+                        <td className="px-3 py-2">
                           {location.locationType ? (
                             <Badge variant="outline">{location.locationType}</Badge>
                           ) : (
                             <span className="text-gray-400 text-sm">-</span>
                           )}
-                        </TableCell>
-                        <TableCell className="text-sm text-gray-500">
+                        </td>
+                        <td className="text-sm text-gray-500 px-3 py-2">
                           {location.createdAt ? new Date(location.createdAt).toLocaleDateString() : '-'}
-                        </TableCell>
-                        <TableCell className="text-center">
+                        </td>
+                        <td className="text-center px-3 py-2">
                           <div className="flex items-center justify-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
+                            <button
+                              className="p-1 rounded hover:bg-gray-200 transition-colors"
                               onClick={() => handleOpenEdit(location)}
                               data-testid={`button-edit-location-${location.id}`}
                             >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
+                              <Pencil className="h-3.5 w-3.5 text-gray-600" />
+                            </button>
+                            <button
+                              className="p-1 rounded hover:bg-gray-200 transition-colors"
                               onClick={() => setDeleteLocation(location)}
                               data-testid={`button-delete-location-${location.id}`}
                             >
                               <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                            </Button>
+                            </button>
                           </div>
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     ))}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
             )}
           </CardContent>
@@ -327,8 +324,8 @@ export default function LocationManagement({ onBack }: { onBack?: () => void }) 
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveAdd} disabled={addMutation.isPending} data-testid="button-save-add-location">
+            <Button variant="outline" className="bg-white text-[#0f172a] border-gray-300" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+            <Button className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={handleSaveAdd} disabled={addMutation.isPending} data-testid="button-save-add-location">
               {addMutation.isPending ? "Saving..." : "Add Location"}
             </Button>
           </DialogFooter>
@@ -363,8 +360,8 @@ export default function LocationManagement({ onBack }: { onBack?: () => void }) 
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingLocation(null)}>Cancel</Button>
-            <Button onClick={handleSaveEdit} disabled={updateMutation.isPending} data-testid="button-save-edit-location">
+            <Button variant="outline" className="bg-white text-[#0f172a] border-gray-300" onClick={() => setEditingLocation(null)}>Cancel</Button>
+            <Button className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={handleSaveEdit} disabled={updateMutation.isPending} data-testid="button-save-edit-location">
               {updateMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>

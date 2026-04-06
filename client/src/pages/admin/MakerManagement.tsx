@@ -285,29 +285,21 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
   if (isAddMode) {
     return (
       <div className="flex flex-col h-full">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Plus className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white" data-testid="title-add-maker">Add New Maker</h1>
-              <p className="text-cyan-100 text-sm mt-0.5">
-                {makerFormData.makerName || "Create a new manufacturer"}
-              </p>
-            </div>
-          </div>
+        <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="title-add-maker">Add New Maker</h1>
           <div className="flex items-center gap-2">
             <Button
-              className="bg-white/20 text-white border-white/30"
               variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
               onClick={handleCancelAdd}
               data-testid="btn-cancel-add-maker"
             >
               Cancel
             </Button>
             <Button
-              className="bg-white text-blue-600"
+              size="sm"
+              className="h-8 gap-2 bg-[#5dc86f] hover:bg-[#4db85f] text-white"
               onClick={handleSaveAdd}
               disabled={createMakerMutation.isPending}
               data-testid="btn-save-add-maker"
@@ -327,29 +319,21 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
   if (detailMaker && isEditMode) {
     return (
       <div className="flex flex-col h-full">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Pencil className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white" data-testid="title-edit-maker">Edit Maker Details</h1>
-              <p className="text-cyan-100 text-sm mt-0.5">
-                {makerFormData.makerName || detailMaker.makerName || "Edit manufacturer information"}
-              </p>
-            </div>
-          </div>
+        <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="title-edit-maker">Edit Maker Details</h1>
           <div className="flex items-center gap-2">
             <Button
-              className="bg-white/20 text-white border-white/30"
               variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
               onClick={handleCancelEdit}
               data-testid="btn-cancel-edit-maker"
             >
               Cancel
             </Button>
             <Button
-              className="bg-white text-blue-600"
+              size="sm"
+              className="h-8 gap-2 bg-[#5dc86f] hover:bg-[#4db85f] text-white"
               onClick={handleSaveEdit}
               disabled={updateMakerMutation.isPending}
               data-testid="btn-save-edit-maker"
@@ -369,32 +353,27 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
   if (detailMaker) {
     return (
       <div className="flex flex-col h-full">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Info className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white" data-testid="title-maker-details">Maker Details</h1>
-              <p className="text-cyan-100 text-sm mt-0.5">{detailMaker.makerName || "View manufacturer information"}</p>
-            </div>
-          </div>
+        <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="title-maker-details">Maker Details</h1>
           <div className="flex items-center gap-2">
             <Button
-              className="bg-white/20 text-white border-white/30"
               variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
               onClick={handleBackToList}
               data-testid="btn-back-maker-list"
             >
-              <ArrowLeft className="h-4 w-4 mr-1" />
+              <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
             <Button
-              className="bg-white text-blue-600"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
               onClick={() => handleEdit(detailMaker)}
               data-testid="btn-edit-maker"
             >
-              <Pencil className="h-4 w-4 mr-1" />
+              <Pencil className="h-4 w-4" />
               Edit
             </Button>
           </div>

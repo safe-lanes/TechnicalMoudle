@@ -1361,28 +1361,20 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
 
   return (
     <div className="space-y-4">
-      <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3 rounded-lg">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Ship className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white" data-testid="text-page-title">Fleet Vessel Mapping</h1>
-              <p className="text-cyan-100 text-sm mt-0.5">Map fleet components to vessels</p>
-            </div>
-          </div>
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
-              data-testid="button-back-to-dashboard"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Dashboard
-            </button>
-          )}
-        </div>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold text-gray-900" data-testid="text-page-title">Fleet Vessel Mapping</h1>
+        {onBack && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
+            onClick={onBack}
+            data-testid="button-back-to-dashboard"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+        )}
       </div>
 
       <div className="flex items-center gap-4 flex-wrap">
@@ -2230,17 +2222,17 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
 
       <Dialog open={autoMatchDialogOpen} onOpenChange={setAutoMatchDialogOpen}>
         <DialogContent className="p-0 gap-0" style={{ width: "50vw", maxWidth: "50vw", maxHeight: "85vh" }}>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 flex items-center justify-between gap-2 rounded-t-lg flex-wrap">
+          <div className="pl-4 pr-10 py-2.5 flex items-center justify-between gap-2 rounded-t-lg flex-wrap border-b border-gray-200">
             <div className="flex items-center gap-2">
-              <Ship className="h-3.5 w-3.5 text-white" />
-              <DialogTitle className="text-xs font-semibold text-white m-0">Auto-Match Results (Is Parent = No only)</DialogTitle>
-              <span className="text-[10px] text-white/80 ml-2" data-testid="text-auto-match-summary">
+              <Ship className="h-3.5 w-3.5 text-gray-700" />
+              <DialogTitle className="text-xs font-semibold text-gray-900 m-0">Auto-Match Results (Is Parent = No only)</DialogTitle>
+              <span className="text-[10px] text-gray-500 ml-2" data-testid="text-auto-match-summary">
                 Matching: {autoMatchEntries.filter((e) => e.matched).length} | Not Matching: {autoMatchEntries.filter((e) => !e.matched).length}
               </span>
             </div>
             <Button
               onClick={handleCreateAutoMappings}
-              className="h-6 px-2 text-[10px] bg-white text-blue-700 hover:bg-gray-100"
+              className="h-6 px-2 text-[10px] bg-[#5dc86f] hover:bg-[#4db85f] text-white"
               disabled={!!autoMatchProgress}
               data-testid="button-create-auto-mappings"
             >
@@ -2308,14 +2300,14 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
 
       <Dialog open={jobAutoMatchDialogOpen} onOpenChange={setJobAutoMatchDialogOpen}>
         <DialogContent className="p-0 gap-0" style={{ width: "60vw", maxWidth: "60vw", maxHeight: "85vh" }}>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 flex items-center justify-between gap-2 rounded-t-lg flex-wrap">
+          <div className="pl-4 pr-10 py-2.5 flex items-center justify-between gap-2 rounded-t-lg flex-wrap border-b border-gray-200">
             <div className="flex items-center gap-2">
-              <Wrench className="h-3.5 w-3.5 text-white" />
-              <DialogTitle className="text-xs font-semibold text-white m-0">Auto-Match Results — Jobs Mapping</DialogTitle>
+              <Wrench className="h-3.5 w-3.5 text-gray-700" />
+              <DialogTitle className="text-xs font-semibold text-gray-900 m-0">Auto-Match Results — Jobs Mapping</DialogTitle>
             </div>
             <Button
               onClick={handleCreateJobAutoMappings}
-              className="h-6 px-2 text-[10px] bg-white text-blue-700 hover:bg-gray-100"
+              className="h-6 px-2 text-[10px] bg-[#5dc86f] hover:bg-[#4db85f] text-white"
               data-testid="button-create-job-auto-mappings"
             >
               Create Mapping
@@ -2386,14 +2378,14 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
 
       <Dialog open={spareAutoMatchDialogOpen} onOpenChange={setSpareAutoMatchDialogOpen}>
         <DialogContent className="p-0 gap-0" style={{ width: "60vw", maxWidth: "60vw", maxHeight: "85vh" }}>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 flex items-center justify-between gap-2 rounded-t-lg flex-wrap">
+          <div className="pl-4 pr-10 py-2.5 flex items-center justify-between gap-2 rounded-t-lg flex-wrap border-b border-gray-200">
             <div className="flex items-center gap-2">
-              <Package className="h-3.5 w-3.5 text-white" />
-              <DialogTitle className="text-xs font-semibold text-white m-0">Auto-Match Results — Spares Mapping</DialogTitle>
+              <Package className="h-3.5 w-3.5 text-gray-700" />
+              <DialogTitle className="text-xs font-semibold text-gray-900 m-0">Auto-Match Results — Spares Mapping</DialogTitle>
             </div>
             <Button
               onClick={handleCreateSpareAutoMappings}
-              className="h-6 px-2 text-[10px] bg-white text-blue-700"
+              className="h-6 px-2 text-[10px] bg-[#5dc86f] hover:bg-[#4db85f] text-white"
               data-testid="button-create-spare-auto-mappings"
             >
               Create Mapping
@@ -2464,10 +2456,10 @@ export default function FleetVesselMapping({ onBack }: { onBack?: () => void }) 
 
       <Dialog open={summaryDialogOpen} onOpenChange={setSummaryDialogOpen}>
         <DialogContent className="p-0 gap-0" style={{ maxWidth: "400px" }}>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 rounded-t-lg">
+          <div className="pl-4 pr-10 py-2.5 rounded-t-lg border-b border-gray-200">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-3.5 w-3.5 text-white" />
-              <DialogTitle className="text-xs font-semibold text-white m-0">Auto-Match Summary</DialogTitle>
+              <CheckCircle2 className="h-3.5 w-3.5 text-gray-700" />
+              <DialogTitle className="text-xs font-semibold text-gray-900 m-0">Auto-Match Summary</DialogTitle>
             </div>
           </div>
           <div className="p-6 space-y-4">

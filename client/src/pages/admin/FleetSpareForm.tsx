@@ -620,6 +620,7 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
             <Button
               type="button"
               variant="outline"
+              className="bg-white text-[#0f172a] border-gray-300"
               onClick={() => onOpenChange(false)}
               disabled={isPending}
               data-testid={m("I4.QL5.5.14.28", "I4.QL5.5.28.28")}
@@ -629,6 +630,7 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
             </Button>
             <Button
               type="submit"
+              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
               disabled={isPending}
               data-testid={m("I4.QL5.5.14.29", "I4.QL5.5.28.29")}
             >

@@ -326,6 +326,7 @@ export default function FleetComponentForm({ open, onOpenChange, component }: Fl
             <Button
               type="button"
               variant="outline"
+              className="bg-white text-[#0f172a] border-gray-300"
               onClick={() => onOpenChange(false)}
               disabled={isPending}
               data-testid="button-cancel"
@@ -334,6 +335,7 @@ export default function FleetComponentForm({ open, onOpenChange, component }: Fl
             </Button>
             <Button
               type="submit"
+              className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
               disabled={isPending}
               data-testid="button-save-component"
             >
