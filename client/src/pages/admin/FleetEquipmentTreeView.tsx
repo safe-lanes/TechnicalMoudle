@@ -273,10 +273,10 @@ export default function FleetEquipmentTreeView({ onBack }: { onBack?: () => void
             </div>
             
             <div className="flex gap-2">
-              <Button variant="ghost" size="sm" onClick={expandAll} data-testid="btn-expand-all">
+              <Button variant="outline" size="sm" onClick={expandAll} data-testid="btn-expand-all">
                 Expand All
               </Button>
-              <Button variant="ghost" size="sm" onClick={collapseAll} data-testid="btn-collapse-all">
+              <Button variant="outline" size="sm" onClick={collapseAll} data-testid="btn-collapse-all">
                 Collapse All
               </Button>
             </div>

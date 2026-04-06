@@ -847,17 +847,17 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
       <>
         <TableRow
           key={nodeKey}
-          className="hover:bg-blue-50/40 transition-colors border-b border-gray-100 cursor-pointer"
+          className="hover:bg-gray-100 transition-colors border-b border-gray-100 cursor-pointer"
           data-testid={`row-component-${nodeKey}`}
           onDoubleClick={() => handleRowDoubleClick(node)}
         >
-          <TableCell style={{ paddingLeft: `${level * 28 + 16}px` }} className="font-mono text-sm py-3" data-testid={isFirstRoot ? "I4.QL.3.20" : undefined}>
+          <TableCell style={{ paddingLeft: `${level * 28 + 16}px` }} className="font-mono text-sm py-3 px-4" data-testid={isFirstRoot ? "I4.QL.3.20" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.20" />}
             <div className="flex items-center gap-2">
               {hasChildren ? (
                 <button
                   onClick={(e) => { e.stopPropagation(); toggleNode(nodeKey); }}
-                  className="p-1 rounded-md hover:bg-cyan-100 text-cyan-700 transition-colors"
+                  className="p-1 rounded-md hover:bg-gray-200 transition-colors"
                   data-testid={`button-toggle-${nodeKey}`}
                 >
                   {isExpanded ? (
@@ -872,23 +872,23 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
               <span className="text-gray-700 font-semibold">{node.fleetEquipmentCode}</span>
             </div>
           </TableCell>
-          <TableCell className="py-3" data-testid={isFirstRoot ? "I4.QL.3.21" : undefined}>
+          <TableCell className="py-3 px-4" data-testid={isFirstRoot ? "I4.QL.3.21" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.21" />}
             <span className="font-medium text-gray-800">{node.fleetEquipmentName}</span>
           </TableCell>
-          <TableCell className="font-mono text-sm text-gray-500 py-3" data-testid={isFirstRoot ? "I4.QL.3.22" : undefined}>
+          <TableCell className="font-mono text-sm text-gray-500 py-3 px-4" data-testid={isFirstRoot ? "I4.QL.3.22" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.22" />}
             {node.componentCategory || "-"}
           </TableCell>
-          <TableCell className="text-gray-600 py-3" data-testid={isFirstRoot ? "I4.QL.3.23" : undefined}>
+          <TableCell className="text-gray-600 py-3 px-4" data-testid={isFirstRoot ? "I4.QL.3.23" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.23" />}
             {node.makerName || "-"}
           </TableCell>
-          <TableCell className="text-gray-600 py-3" data-testid={isFirstRoot ? "I4.QL.3.24" : undefined}>
+          <TableCell className="text-gray-600 py-3 px-4" data-testid={isFirstRoot ? "I4.QL.3.24" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.24" />}
             {node.model || "-"}
           </TableCell>
-          <TableCell className="text-right py-3">
+          <TableCell className="text-right py-3 px-4">
             <div className="flex justify-end gap-1">
               <button
                 onClick={(e) => { e.stopPropagation(); handleAddNew(node.fleetEquipmentCode); }}
