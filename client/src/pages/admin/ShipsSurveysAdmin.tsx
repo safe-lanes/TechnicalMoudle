@@ -486,7 +486,12 @@ export default function ShipsSurveysAdmin() {
     const enteringEdit = viewModes[activeTab] === "view";
     if (enteringEdit && activeTab === "master") {
       setMasterSnapshot(masterData.map(s => ({ ...s })));
-      setDraftMasterData(masterData.map(s => ({ ...s })));
+      const draft = masterData.map(s => ({ ...s }));
+      const masterOnly = draft
+        .filter(s => !(s.masterId ?? '').startsWith('VES-') && !(s.masterId ?? '').startsWith('CMP-'))
+        .sort((a, b) => a.sequence - b.sequence);
+      masterOnly.forEach((s, idx) => { s.sequence = idx + 1; });
+      setDraftMasterData(draft);
       setDeletedDraftIds([]);
       setHasUnsavedChanges(false);
       setMasterValidationError("");
