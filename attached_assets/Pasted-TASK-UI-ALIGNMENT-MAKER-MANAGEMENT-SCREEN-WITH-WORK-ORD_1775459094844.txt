@@ -1,0 +1,141 @@
+TASK: UI ALIGNMENT – MAKER MANAGEMENT SCREEN WITH WORK ORDER SCREEN
+
+Objective:
+
+Align the **Maker Management screen UI** with the **Work Order screen (reference)** to achieve a **consistent visual design**, without changing any functionality.
+
+--------------------------------------------------
+
+1. Scope (STRICT)
+
+Apply ONLY:
+
+• Padding  
+• Colors  
+• Formatting  
+• Field sizes  
+• Button colors  
+
+Ensure **visual similarity only**, DO NOT copy:
+
+• Functional behavior  
+• Additional buttons  
+• Extra fields  
+• Workflows  
+
+--------------------------------------------------
+
+2. Layout Alignment
+
+• Match overall container width and alignment  
+• Ensure same content centering  
+• Maintain same section spacing as Work Order screen  
+
+--------------------------------------------------
+
+3. Padding & Spacing
+
+Apply consistent spacing as per Work Order:
+
+• Internal padding inside containers  
+• Spacing between form fields  
+• Spacing between sections  
+• Margin from screen edges  
+
+--------------------------------------------------
+
+4. Color Scheme
+
+Match Work Order screen:
+
+• Background color (page + container)  
+• Section background color  
+• Border colors  
+• Input field background  
+• Label color  
+• Placeholder text color  
+
+--------------------------------------------------
+
+5. Field Sizes & Inputs
+
+Ensure all input elements match:
+
+• Input height  
+• Input width (full-width / grid alignment)  
+• Border radius  
+• Border thickness  
+• Dropdown size and style  
+• Checkbox / toggle styling  
+
+--------------------------------------------------
+
+6. Typography
+
+Match:
+
+• Font size (labels, inputs, headings)  
+• Font weight  
+• Line height  
+• Text alignment  
+
+--------------------------------------------------
+
+7. Button Styling
+
+Apply Work Order button design:
+
+• Primary button color  
+• Secondary button style (if present)  
+• Button height and width  
+• Border radius  
+• Font size and weight  
+• Hover and active states  
+
+--------------------------------------------------
+
+8. Section Formatting
+
+• Align section headers style  
+• Use same divider lines or spacing  
+• Maintain consistent grouping of fields  
+
+--------------------------------------------------
+
+9. Additional Visual Elements (Often Missed)
+
+Also ensure alignment of:
+
+• Icons (size, color, alignment)  
+• Focus states (input highlight on click)  
+• Error message styling (color, spacing)  
+• Disabled field styling  
+• Scrollbar appearance (if visible)  
+• Table/grid styling (if present)  
+
+--------------------------------------------------
+
+10. Responsiveness
+
+• Ensure layout behaves same as Work Order screen on different resolutions  
+• Maintain consistent spacing and scaling  
+
+--------------------------------------------------
+
+11. Validation
+
+Compare Maker Management vs Work Order:
+
+• Field alignment matches  
+• Button colors match  
+• Spacing is consistent  
+• Overall look and feel is identical  
+
+--------------------------------------------------
+
+Expected Result:
+
+• Maker Management screen visually matches Work Order screen  
+• Clean, consistent, and professional UI  
+• No functional or behavioral changes  
+• Uniform design across PMS module  
