@@ -329,7 +329,18 @@ export default function ShipsCertificatesAdmin() {
       }
 
       setMasterData(masterRecords);
-      setCompanyOnlyCerts(companyRecords);
+      
+      const masterCompanyMaxSeq = masterRecords
+        .filter(c => c.applicableToCompany)
+        .reduce((max, c) => Math.max(max, c.companySequence ?? c.sequence), 0);
+      let nextAutoSeq = masterCompanyMaxSeq;
+      const normalizedCompanyRecords = companyRecords.map(c => {
+        if (c.sequence !== undefined) return c;
+        nextAutoSeq++;
+        return { ...c, sequence: nextAutoSeq };
+      });
+      
+      setCompanyOnlyCerts(normalizedCompanyRecords);
       setVesselOnlyCerts(vesselRecords);
       setHasUnsavedChanges(false);
     }
@@ -445,10 +456,15 @@ export default function ShipsCertificatesAdmin() {
 
     // Convert new company-only certificates (ones without CMP- masterId) to save format
     let nextCmpSeq = maxCmpSeq + 1;
+    const allCompanySeqs = [
+      ...masterData.filter(c => c.applicableToCompany).map(c => c.companySequence ?? c.sequence),
+      ...companyOnlyCerts.filter(c => c.sequence !== undefined).map(c => c.sequence as number),
+    ];
+    const maxCompanySeqForSave = allCompanySeqs.length > 0 ? Math.max(...allCompanySeqs) : 0;
     const companyCertsForSave: MasterCertificate[] = companyOnlyCerts.map((cert, idx) => {
       const hasCmpId = /^CMP-\d+$/.test(cert.masterId);
       const newMasterId = hasCmpId ? cert.masterId : `CMP-${String(nextCmpSeq++).padStart(3, '0')}`;
-      const savedSequence = cert.sequence ?? (masterData.length + idx + 1);
+      const savedSequence = cert.sequence ?? (maxCompanySeqForSave + idx + 1);
 
       return {
         id: cert.id,
