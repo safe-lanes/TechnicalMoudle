@@ -844,99 +844,93 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   }
 
   return (
-    <div className="p-6">
-      <Card className="overflow-hidden">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Wrench className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white" data-testid="I4.QL5.5.8"><Marker id="I4.QL5.5.8" />Fleet Spares Management</h1>
-                <p className="text-cyan-100 text-sm mt-0.5" data-testid="I4.QL5.5.9"><Marker id="I4.QL5.5.9" />Manage fleet-level spare parts inventory</p>
-              </div>
-            </div>
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
-                data-testid="button-back-to-dashboard"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </button>
-            )}
-          </div>
+    <div className="flex flex-col h-full space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900" data-testid="I4.QL5.5.8"><Marker id="I4.QL5.5.8" />Fleet Spares Management</h1>
+        <div className="flex gap-2 items-center">
+          {onBack && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
+              onClick={onBack}
+              data-testid="button-back-to-dashboard"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
+            onClick={handleExport}
+            data-testid="I4.QL5.5.13"
+          >
+            <Marker id="I4.QL5.5.13" />
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+          <Button
+            size="sm"
+            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+            onClick={handleAddNew}
+            data-testid="I4.QL5.5.14"
+          >
+            <Marker id="I4.QL5.5.14" />
+            <Plus className="h-4 w-4 mr-1" />
+            Add New Spare
+          </Button>
         </div>
+      </div>
 
-        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <h2 className="text-base font-semibold text-gray-800" data-testid="I4.QL5.5.10"><Marker id="I4.QL5.5.10" />All Fleet Spares</h2>
-              <div className="flex items-center gap-3">
-                <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-spares">
-                  <Package className="h-3 w-3 mr-1" />
-                  {totalSpares} Total
-                </Badge>
-                <Badge variant="secondary" className="bg-blue-100 text-blue-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-filtered-spares">
-                  {filteredSpares.length} Shown
-                </Badge>
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
-              <Select value={selectedEquipment} onValueChange={setSelectedEquipment}>
-                <SelectTrigger className="w-full sm:w-[200px]" data-testid="I4.QL5.5.11">
-                  <Marker id="I4.QL5.5.11" />
-                  <SelectValue placeholder="All Equipment" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Equipment</SelectItem>
-                  {equipmentOptions.map((comp) => (
-                    <SelectItem key={comp.id} value={comp.fleetEquipmentCode || ""}>
-                      {comp.fleetEquipmentCode} - {comp.fleetEquipmentName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <div className="relative flex-1 sm:min-w-[250px]">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Search spares..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                  data-testid="I4.QL5.5.12"
-                />
-                <Marker id="I4.QL5.5.12" />
-              </div>
-
-              <Button
-                variant="outline"
-                onClick={handleExport}
-                className="border-gray-300 text-gray-700"
-                data-testid="I4.QL5.5.13"
-              >
-                <Marker id="I4.QL5.5.13" />
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
-              <Button
-                onClick={handleAddNew}
-                className="bg-cyan-600 whitespace-nowrap"
-                data-testid="I4.QL5.5.14"
-              >
-                <Marker id="I4.QL5.5.14" />
-                <Plus className="mr-2 h-4 w-4" />
-                Add New Spare
-              </Button>
-            </div>
-          </div>
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative w-72">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Search spares..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+            data-testid="I4.QL5.5.12"
+          />
+          <Marker id="I4.QL5.5.12" />
         </div>
+        <Select value={selectedEquipment} onValueChange={setSelectedEquipment}>
+          <SelectTrigger className="w-[200px]" data-testid="I4.QL5.5.11">
+            <Marker id="I4.QL5.5.11" />
+            <SelectValue placeholder="All Equipment" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Equipment</SelectItem>
+            {equipmentOptions.map((comp) => (
+              <SelectItem key={comp.id} value={comp.fleetEquipmentCode || ""}>
+                {comp.fleetEquipmentCode} - {comp.fleetEquipmentName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-spares">
+          <Package className="h-3 w-3 mr-1" />
+          {totalSpares} Total
+        </Badge>
+        <Badge variant="secondary" className="bg-blue-100 text-blue-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-filtered-spares">
+          {filteredSpares.length} Shown
+        </Badge>
+        {(searchQuery || selectedEquipment !== "all") && (
+          <Button
+            variant="outline"
+            className="text-gray-600"
+            onClick={() => { setSearchQuery(""); setSelectedEquipment("all"); }}
+            data-testid="button-clear-filters"
+          >
+            Clear
+          </Button>
+        )}
+      </div>
 
-        <div className="px-6 py-4">
+      <div>
           {isLoading ? (
             <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
@@ -962,18 +956,18 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <div className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50 border-b border-gray-200">
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL5.5.15"><Marker id="I4.QL5.5.15" />Part Code</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL5.5.16"><Marker id="I4.QL5.5.16" />Part Name</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL5.5.17"><Marker id="I4.QL5.5.17" />Fleet Equipment Code</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL5.5.fleet-eq-name">Fleet Equipment Name</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL5.5.18"><Marker id="I4.QL5.5.18" />Maker Reference</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL5.5.19"><Marker id="I4.QL5.5.19" />Unit</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL5.5.20"><Marker id="I4.QL5.5.20" />Location</TableHead>
-                    <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL5.5.21"><Marker id="I4.QL5.5.21" />Actions</TableHead>
+                  <TableRow className="bg-[#52baf3] hover:bg-[#52baf3]">
+                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.15"><Marker id="I4.QL5.5.15" />Part Code</TableHead>
+                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.16"><Marker id="I4.QL5.5.16" />Part Name</TableHead>
+                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.17"><Marker id="I4.QL5.5.17" />Fleet Equipment Code</TableHead>
+                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.fleet-eq-name">Fleet Equipment Name</TableHead>
+                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.18"><Marker id="I4.QL5.5.18" />Maker Reference</TableHead>
+                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.19"><Marker id="I4.QL5.5.19" />Unit</TableHead>
+                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.20"><Marker id="I4.QL5.5.20" />Location</TableHead>
+                    <TableHead className="text-right text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.21"><Marker id="I4.QL5.5.21" />Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -984,7 +978,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                       <TableRow
                         key={spare.id}
                         data-testid={`row-spare-${spare.id}`}
-                        className="cursor-pointer"
+                        className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} cursor-pointer hover:bg-gray-100`}
                         onDoubleClick={() => handleRowDoubleClick(spare)}
                       >
                         <TableCell className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL5.5.22" : undefined}>
@@ -1015,26 +1009,23 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                           -
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
+                          <div className="flex justify-end gap-1">
+                            <button
                               onClick={(e) => { e.stopPropagation(); handleEdit(spare); }}
+                              className="p-1 hover:bg-gray-200 rounded"
                               data-testid={isFirstRow ? "I4.QL5.5.28" : `button-edit-${spare.id}`}
                             >
                               {isFirstRow && <Marker id="I4.QL5.5.28" />}
                               <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
+                            </button>
+                            <button
                               onClick={(e) => { e.stopPropagation(); handleDeleteClick(spare); }}
-                              className="text-red-600"
+                              className="p-1 hover:bg-gray-200 rounded text-red-500"
                               data-testid={isFirstRow ? "I4.QL5.5.29" : `button-delete-${spare.id}`}
                             >
                               {isFirstRow && <Marker id="I4.QL5.5.29" />}
                               <Trash2 className="h-4 w-4" />
-                            </Button>
+                            </button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1045,7 +1036,6 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
             </div>
           )}
         </div>
-      </Card>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent data-testid="dialog-delete-spare">

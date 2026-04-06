@@ -209,7 +209,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                     <div className="p-2 bg-gray-100 rounded-lg">
                       <Building2 className="h-4 w-4 text-gray-600" />
                     </div>
-                    <Button size="sm" onClick={() => setCurrentView('makers')} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 px-3" data-testid="button-view-makers">
+                    <Button variant="outline" size="sm" onClick={() => setCurrentView('makers')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-makers">
                       View
                     </Button>
                   </div>
@@ -228,7 +228,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                     <div className="p-2 bg-gray-100 rounded-lg">
                       <Box className="h-4 w-4 text-gray-600" />
                     </div>
-                    <Button size="sm" onClick={() => setCurrentView('components')} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 px-3" data-testid="button-view-components">
+                    <Button variant="outline" size="sm" onClick={() => setCurrentView('components')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-components">
                       View
                     </Button>
                   </div>
@@ -251,7 +251,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                     <div className="p-2 bg-gray-100 rounded-lg">
                       <Wrench className="h-4 w-4 text-gray-600" />
                     </div>
-                    <Button size="sm" onClick={() => setCurrentView('jobs')} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 px-3" data-testid="button-view-jobs">
+                    <Button variant="outline" size="sm" onClick={() => setCurrentView('jobs')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-jobs">
                       View
                     </Button>
                   </div>
@@ -274,7 +274,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                     <div className="p-2 bg-gray-100 rounded-lg">
                       <Package className="h-4 w-4 text-gray-600" />
                     </div>
-                    <Button size="sm" onClick={() => setCurrentView('spares')} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 px-3" data-testid="button-view-spares">
+                    <Button variant="outline" size="sm" onClick={() => setCurrentView('spares')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-spares">
                       View
                     </Button>
                   </div>
@@ -301,7 +301,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                 <div className="p-2 bg-gray-100 rounded-lg">
                   <List className="h-4 w-4 text-gray-600" />
                 </div>
-                <Button size="sm" onClick={() => setCurrentView('master-lists')} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 px-3" data-testid="button-view-master-lists">
+                <Button variant="outline" size="sm" onClick={() => setCurrentView('master-lists')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-master-lists">
                   View
                 </Button>
               </div>
@@ -314,7 +314,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                 <div className="p-2 bg-gray-100 rounded-lg">
                   <FileCode2 className="h-4 w-4 text-gray-600" />
                 </div>
-                <Button size="sm" onClick={() => setCurrentView('master-data-table')} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 px-3" data-testid="button-view-master-data">
+                <Button variant="outline" size="sm" onClick={() => setCurrentView('master-data-table')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-master-data">
                   View
                 </Button>
               </div>
@@ -327,7 +327,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                 <div className="p-2 bg-gray-100 rounded-lg">
                   <Clock className="h-4 w-4 text-gray-600" />
                 </div>
-                <Button size="sm" onClick={() => setCurrentView('pms-settings')} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 px-3" data-testid="button-view-pms-settings">
+                <Button variant="outline" size="sm" onClick={() => setCurrentView('pms-settings')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-pms-settings">
                   Configure
                 </Button>
               </div>
@@ -343,7 +343,7 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
                 <div className="p-2 bg-gray-100 rounded-lg">
                   <Anchor className="h-4 w-4 text-gray-600" />
                 </div>
-                <Button size="sm" onClick={() => setCurrentView('fleet-vessel-manager')} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 px-3" data-testid="button-view-fleet-vessel">
+                <Button variant="outline" size="sm" onClick={() => setCurrentView('fleet-vessel-manager')} className="h-7 px-3 text-xs bg-white text-[#0f172a] border-gray-300" data-testid="button-view-fleet-vessel">
                   Manage
                 </Button>
               </div>

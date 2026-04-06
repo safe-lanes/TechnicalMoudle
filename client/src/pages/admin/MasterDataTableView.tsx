@@ -209,113 +209,101 @@ export default function MasterDataTableView({ onBack }: { onBack?: () => void })
   }
 
   return (
-    <div className="p-6">
-      <Card className="overflow-hidden">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Table2 className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white" data-testid="text-master-data-title">Master Data Table View</h1>
-                <p className="text-cyan-100 text-sm mt-0.5">Fleet component master data (Read-Only)</p>
-              </div>
-            </div>
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
-                data-testid="button-back-to-dashboard"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </button>
-            )}
-          </div>
-        </div>
-        <CardHeader className="pb-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <CardTitle className="text-xl font-semibold">Master Data</CardTitle>
-              <Badge variant="secondary" data-testid="badge-total-count">
-                {filteredData.length} Records
-              </Badge>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative min-w-[220px] sm:min-w-[280px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search master data..."
-                  className="pl-10"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  data-testid="input-search-master-data"
-                />
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExport}
-                disabled={!filteredData.length}
-                data-testid="button-export-master-data"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-[#52baf3] hover:bg-[#52baf3]">
-                    <TableHead className="text-white font-semibold text-xs whitespace-nowrap w-16">Sl No</TableHead>
-                    <TableHead className="text-white font-semibold text-xs whitespace-nowrap">Fleet Equipment Code</TableHead>
-                    <TableHead className="text-white font-semibold text-xs whitespace-nowrap">Fleet Equipment Name</TableHead>
-                    <TableHead className="text-white font-semibold text-xs whitespace-nowrap">Maker</TableHead>
-                    <TableHead className="text-white font-semibold text-xs whitespace-nowrap">Maker Code</TableHead>
-                    <TableHead className="text-white font-semibold text-xs whitespace-nowrap">Model</TableHead>
-                    <TableHead className="text-white font-semibold text-xs whitespace-nowrap">Model Code</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredData.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-gray-500" data-testid="text-no-data">
-                        No fleet component master data found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredData.map((item, index) => (
-                      <TableRow
-                        key={item.id}
-                        className="hover:bg-gray-50 cursor-pointer"
-                        onDoubleClick={() => handleRowDoubleClick(item)}
-                        data-testid={`row-master-data-${item.id}`}
-                      >
-                        <TableCell className="text-sm text-gray-500">{index + 1}</TableCell>
-                        <TableCell className="text-sm font-mono">{item.fleetEquipmentCode || '-'}</TableCell>
-                        <TableCell className="text-sm">{item.fleetEquipmentName || '-'}</TableCell>
-                        <TableCell className="text-sm">{item.makerName || '-'}</TableCell>
-                        <TableCell className="text-sm">{item.makerCode || '-'}</TableCell>
-                        <TableCell className="text-sm">{item.model || '-'}</TableCell>
-                        <TableCell className="text-sm">{item.modelCode || '-'}</TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+    <div className="flex flex-col h-full space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900" data-testid="text-master-data-title">Master Data Table View</h1>
+        <div className="flex gap-2 items-center">
+          {onBack && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
+              onClick={onBack}
+              data-testid="button-back-to-dashboard"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </Button>
           )}
-        </CardContent>
-      </Card>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
+            onClick={handleExport}
+            disabled={!filteredData.length}
+            data-testid="button-export-master-data"
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search master data..."
+            className="pl-10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            data-testid="input-search-master-data"
+          />
+        </div>
+        <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-count">
+          {filteredData.length} Records
+        </Badge>
+      </div>
+
+      <div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-[#52baf3] hover:bg-[#52baf3]">
+                  <TableHead className="text-left text-white py-3 px-4 font-medium w-16">Sl No</TableHead>
+                  <TableHead className="text-left text-white py-3 px-4 font-medium">Fleet Equipment Code</TableHead>
+                  <TableHead className="text-left text-white py-3 px-4 font-medium">Fleet Equipment Name</TableHead>
+                  <TableHead className="text-left text-white py-3 px-4 font-medium">Maker</TableHead>
+                  <TableHead className="text-left text-white py-3 px-4 font-medium">Maker Code</TableHead>
+                  <TableHead className="text-left text-white py-3 px-4 font-medium">Model</TableHead>
+                  <TableHead className="text-left text-white py-3 px-4 font-medium">Model Code</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-gray-500" data-testid="text-no-data">
+                      No fleet component master data found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredData.map((item, index) => (
+                    <TableRow
+                      key={item.id}
+                      className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} cursor-pointer hover:bg-gray-100`}
+                      onDoubleClick={() => handleRowDoubleClick(item)}
+                      data-testid={`row-master-data-${item.id}`}
+                    >
+                      <TableCell className="py-3 px-4 text-sm text-gray-500">{index + 1}</TableCell>
+                      <TableCell className="py-3 px-4 text-sm font-mono">{item.fleetEquipmentCode || '-'}</TableCell>
+                      <TableCell className="py-3 px-4 text-sm">{item.fleetEquipmentName || '-'}</TableCell>
+                      <TableCell className="py-3 px-4 text-sm">{item.makerName || '-'}</TableCell>
+                      <TableCell className="py-3 px-4 text-sm">{item.makerCode || '-'}</TableCell>
+                      <TableCell className="py-3 px-4 text-sm">{item.model || '-'}</TableCell>
+                      <TableCell className="py-3 px-4 text-sm">{item.modelCode || '-'}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

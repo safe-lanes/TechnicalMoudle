@@ -890,42 +890,36 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
           </TableCell>
           <TableCell className="text-right py-3">
             <div className="flex justify-end gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
+              <button
                 onClick={(e) => { e.stopPropagation(); handleAddNew(node.fleetEquipmentCode); }}
                 onDoubleClick={(e) => e.stopPropagation()}
-                className="text-cyan-600"
+                className="p-1 hover:bg-gray-200 rounded"
                 data-testid={isFirstRoot ? "I4.QL.3.25" : `button-add-child-${nodeKey}`}
                 title="Add Child"
               >
                 {isFirstRoot && <Marker id="I4.QL.3.25" />}
                 <Plus className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
+              </button>
+              <button
                 onClick={(e) => { e.stopPropagation(); handleEdit(node); }}
                 onDoubleClick={(e) => e.stopPropagation()}
-                className="text-blue-600"
+                className="p-1 hover:bg-gray-200 rounded"
                 data-testid={isFirstRoot ? "I4.QL.3.26" : `button-edit-${nodeKey}`}
                 title="Edit"
               >
                 {isFirstRoot && <Marker id="I4.QL.3.26" />}
                 <Pencil className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
+              </button>
+              <button
                 onClick={(e) => { e.stopPropagation(); handleDeleteClick(node); }}
                 onDoubleClick={(e) => e.stopPropagation()}
-                className="text-red-500"
+                className="p-1 hover:bg-gray-200 rounded text-red-500"
                 data-testid={isFirstRoot ? "I4.QL.3.27" : `button-delete-${nodeKey}`}
                 title="Delete"
               >
                 {isFirstRoot && <Marker id="I4.QL.3.27" />}
                 <Trash2 className="h-4 w-4" />
-              </Button>
+              </button>
             </div>
           </TableCell>
         </TableRow>
@@ -935,83 +929,80 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
   };
 
   return (
-    <div className="p-6">
-      <Card className="overflow-hidden">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Settings className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">Fleet Components Management</h1>
-                <p className="text-cyan-100 text-sm mt-0.5" data-testid="I4.QL.3.9"><Marker id="I4.QL.3.9" />Manage fleet-level equipment hierarchy (SFI structure)</p>
-              </div>
-            </div>
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
-                data-testid="button-back-to-dashboard"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </button>
-            )}
-          </div>
+    <div className="flex flex-col h-full space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Fleet Components Management</h1>
+        <div className="flex gap-2 items-center">
+          {onBack && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
+              onClick={onBack}
+              data-testid="button-back-to-dashboard"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
+            onClick={handleExport}
+            data-testid="I4.QL.3.12"
+          >
+            <Marker id="I4.QL.3.12" />
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+          <Button
+            size="sm"
+            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+            onClick={() => handleAddNew()}
+            data-testid="I4.QL.3.13"
+          >
+            <Marker id="I4.QL.3.13" />
+            <Plus className="h-4 w-4 mr-1" />
+            Add New Component
+          </Button>
         </div>
+      </div>
 
-        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <h2 className="text-base font-semibold text-gray-800" data-testid="I4.QL.3.10"><Marker id="I4.QL.3.10" />All Fleet Components</h2>
-              <div className="flex items-center gap-3">
-                <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-components">
-                  <Package className="h-3 w-3 mr-1" />
-                  {totalComponents} Total
-                </Badge>
-                <Badge variant="secondary" className="bg-blue-100 text-blue-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-root-components">
-                  {rootComponents} Root
-                </Badge>
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1 sm:min-w-[280px]">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Search by name, code, or SFI..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-white border-gray-300"
-                  data-testid="I4.QL.3.11"
-                />
-                <Marker id="I4.QL.3.11" />
-              </div>
-              <Button
-                variant="outline"
-                onClick={handleExport}
-                className="border-gray-300 text-gray-700"
-                data-testid="I4.QL.3.12"
-              >
-                <Marker id="I4.QL.3.12" />
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
-              <Button
-                onClick={() => handleAddNew()}
-                className="bg-cyan-600 whitespace-nowrap"
-                data-testid="I4.QL.3.13"
-              >
-                <Marker id="I4.QL.3.13" />
-                <Plus className="mr-2 h-4 w-4" />
-                Add New Component
-              </Button>
-            </div>
-          </div>
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative w-72" data-testid="I4.QL.3.10">
+          <Marker id="I4.QL.3.10" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Search by name, code, or SFI..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+            data-testid="I4.QL.3.11"
+          />
+          <Marker id="I4.QL.3.11" />
         </div>
+        <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-components">
+          <Package className="h-3 w-3 mr-1" />
+          {totalComponents} Total
+        </Badge>
+        <Badge variant="secondary" className="bg-blue-100 text-blue-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-root-components">
+          {rootComponents} Root
+        </Badge>
+        {searchQuery && (
+          <Button
+            variant="outline"
+            className="text-gray-600"
+            onClick={() => setSearchQuery("")}
+            data-testid="button-clear-filters"
+          >
+            Clear
+          </Button>
+        )}
+      </div>
 
-        <div className="px-6 py-4">
+      <div>
           {isLoading ? (
             <div className="space-y-3">
               {[...Array(6)].map((_, i) => (
@@ -1044,16 +1035,16 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <div className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50 border-b border-gray-200">
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.3.14"><Marker id="I4.QL.3.14" />Fleet Code</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.3.15"><Marker id="I4.QL.3.15" />Equipment Name</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.3.16"><Marker id="I4.QL.3.16" />Category</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.3.17"><Marker id="I4.QL.3.17" />Maker</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.3.18"><Marker id="I4.QL.3.18" />Model</TableHead>
-                    <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wider py-3" data-testid="I4.QL.3.19"><Marker id="I4.QL.3.19" />Actions</TableHead>
+                  <TableRow className="bg-[#52baf3] hover:bg-[#52baf3]">
+                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.3.14"><Marker id="I4.QL.3.14" />Fleet Code</TableHead>
+                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.3.15"><Marker id="I4.QL.3.15" />Equipment Name</TableHead>
+                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.3.16"><Marker id="I4.QL.3.16" />Category</TableHead>
+                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.3.17"><Marker id="I4.QL.3.17" />Maker</TableHead>
+                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.3.18"><Marker id="I4.QL.3.18" />Model</TableHead>
+                    <TableHead className="text-right text-white py-3 px-4 font-medium" data-testid="I4.QL.3.19"><Marker id="I4.QL.3.19" />Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1063,7 +1054,6 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
             </div>
           )}
         </div>
-      </Card>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent data-testid="dialog-delete-component">

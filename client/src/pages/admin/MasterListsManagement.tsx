@@ -188,85 +188,71 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
   const totalItems = masterLists?.length || 0;
 
   return (
-    <div className="p-6">
-      <Card className="overflow-hidden">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <List className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white" data-testid="I4.QL.2.7"><Marker id="I4.QL.2.7" />Master Lists Management</h1>
-                <p className="text-cyan-100 text-sm mt-0.5" data-testid="I4.QL.2.9"><Marker id="I4.QL.2.9" />Configure dropdown options and system classifications</p>
-              </div>
-            </div>
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
-                data-testid="button-back-to-dashboard"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </button>
-            )}
-          </div>
+    <div className="flex flex-col h-full space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900" data-testid="I4.QL.2.7"><Marker id="I4.QL.2.7" />Master Lists Management</h1>
+        <div className="flex gap-2 items-center">
+          {onBack && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
+              onClick={onBack}
+              data-testid="button-back-to-dashboard"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </Button>
+          )}
+          <Button
+            onClick={() => selectedRowItem && handleEdit(selectedRowItem)}
+            disabled={!selectedRowItem}
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300 disabled:opacity-50"
+            data-testid="I4.QL.2.11"
+          >
+            <Marker id="I4.QL.2.11" />
+            <Pencil className="h-4 w-4" />
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+            onClick={handleAddNew}
+            data-testid="I4.QL.2.12"
+          >
+            <Marker id="I4.QL.2.12" />
+            <Plus className="h-4 w-4 mr-1" />
+            Add New
+          </Button>
         </div>
+      </div>
 
-        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <h2 className="text-base font-semibold text-gray-800" data-testid="I4.QL.2.8"><Marker id="I4.QL.2.8" />Master List Items</h2>
-              <div className="flex items-center gap-3">
-                <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-items">
-                  <Package className="h-3 w-3 mr-1" />
-                  {totalItems} Total
-                </Badge>
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <Select value={selectedListType} onValueChange={(value) => {
-                setSelectedListType(value);
-                setSelectedRowItem(null);
-              }}>
-                <SelectTrigger className="w-full sm:w-[200px] bg-white border-gray-300" data-testid="I4.QL.2.10">
-                  <Marker id="I4.QL.2.10" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LIST_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                onClick={() => selectedRowItem && handleEdit(selectedRowItem)}
-                disabled={!selectedRowItem}
-                variant="outline"
-                className="whitespace-nowrap border-gray-300 text-gray-700 disabled:opacity-50"
-                data-testid="I4.QL.2.11"
-              >
-                <Marker id="I4.QL.2.11" />
-                <Pencil className="mr-1 h-4 w-4" />
-                Edit
-              </Button>
-              <Button
-                onClick={handleAddNew}
-                className="whitespace-nowrap bg-cyan-600"
-                data-testid="I4.QL.2.12"
-              >
-                <Marker id="I4.QL.2.12" />
-                <Plus className="mr-1 h-4 w-4" />
-                Add New
-              </Button>
-            </div>
-          </div>
-        </div>
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select value={selectedListType} onValueChange={(value) => {
+          setSelectedListType(value);
+          setSelectedRowItem(null);
+        }}>
+          <SelectTrigger className="w-[200px] bg-white border-gray-300" data-testid="I4.QL.2.10">
+            <Marker id="I4.QL.2.10" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {LIST_TYPES.map((type) => (
+              <SelectItem key={type.value} value={type.value}>
+                {type.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-items">
+          <Package className="h-3 w-3 mr-1" />
+          {totalItems} Total
+        </Badge>
+      </div>
 
-        <div className="px-6 py-4">
+      <div>
           {isLoading ? (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
@@ -284,15 +270,15 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-gray-50">
-                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600" data-testid="I4.QL.2.13"><Marker id="I4.QL.2.13" />Key</TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600" data-testid="I4.QL.2.14"><Marker id="I4.QL.2.14" />Value</TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600" data-testid="I4.QL.2.15"><Marker id="I4.QL.2.15" />Display Order</TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600" data-testid="I4.QL.2.16"><Marker id="I4.QL.2.16" />Active</TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-600 text-right" data-testid="I4.QL.2.17"><Marker id="I4.QL.2.17" />Actions</TableHead>
+                    <TableRow className="bg-[#52baf3] hover:bg-[#52baf3]">
+                      <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.2.13"><Marker id="I4.QL.2.13" />Key</TableHead>
+                      <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.2.14"><Marker id="I4.QL.2.14" />Value</TableHead>
+                      <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.2.15"><Marker id="I4.QL.2.15" />Display Order</TableHead>
+                      <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.2.16"><Marker id="I4.QL.2.16" />Active</TableHead>
+                      <TableHead className="text-right text-white py-3 px-4 font-medium" data-testid="I4.QL.2.17"><Marker id="I4.QL.2.17" />Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -304,8 +290,8 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
                         className={`cursor-pointer ${
                           selectedRowItem?.id === item.id 
                             ? 'bg-blue-50' 
-                            : ''
-                        }`}
+                            : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+                        } hover:bg-gray-100`}
                       >
                         <TableCell className="font-mono text-sm text-blue-600" data-testid={index === 0 ? "I4.QL.2.18" : undefined}>
                           {index === 0 && <Marker id="I4.QL.2.18" />}
@@ -332,33 +318,29 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
+                          <div className="flex justify-end gap-1">
+                            <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleEdit(item);
                               }}
-                              className="text-gray-500"
+                              className="p-1 hover:bg-gray-200 rounded"
                               data-testid={index === 0 ? "I4.QL.2.22" : `button-edit-${item.id}`}
                             >
                               {index === 0 && <Marker id="I4.QL.2.22" />}
                               <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
+                            </button>
+                            <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteClick(item);
                               }}
-                              className="text-red-500"
+                              className="p-1 hover:bg-gray-200 rounded text-red-500"
                               data-testid={index === 0 ? "I4.QL.2.23" : `button-delete-${item.id}`}
                             >
                               {index === 0 && <Marker id="I4.QL.2.23" />}
                               <Trash2 className="h-4 w-4" />
-                            </Button>
+                            </button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -368,7 +350,6 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
               </div>
             )}
         </div>
-      </Card>
 
       {/* Add/Edit Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>

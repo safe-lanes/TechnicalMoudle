@@ -310,62 +310,46 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
   });
 
   return (
-    <div className="p-6">
-      <Card className="overflow-hidden">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Clock className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white" data-testid="I4.QL7.1"><Marker id="I4.QL7.1" />Lead Time & Grace Period Settings</h1>
-                <p className="text-cyan-100 text-sm mt-0.5" data-testid="I4.QL7.2">
-                  <Marker id="I4.QL7.2" />Configure vessel-specific lead times for work order generation and grace periods for status calculation
-                </p>
-              </div>
-            </div>
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
-                data-testid="button-back-to-dashboard"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </button>
-            )}
-          </div>
+    <div className="flex flex-col h-full space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900" data-testid="I4.QL7.1"><Marker id="I4.QL7.1" />Lead Time & Grace Period Settings</h1>
+        <div className="flex gap-2 items-center">
+          {onBack && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
+              onClick={onBack}
+              data-testid="button-back-to-dashboard"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </Button>
+          )}
         </div>
+      </div>
 
-        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <h2 className="text-base font-semibold text-gray-800">All Vessels</h2>
-              <div className="flex items-center gap-3">
-                <Badge variant="secondary" className="bg-green-100 text-green-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-configured-count">
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  {configuredCount} Configured
-                </Badge>
-                <Badge variant="secondary" className="bg-gray-100 text-gray-600 no-default-hover-elevate no-default-active-elevate" data-testid="badge-not-set-count">
-                  {notSetCount} Not Set
-                </Badge>
-              </div>
-            </div>
-            <div className="relative min-w-[200px] sm:min-w-[260px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search by vessel name or ID..."
-                className="pl-10 bg-white border-gray-300"
-                value={vesselSearch}
-                onChange={(e) => setVesselSearch(e.target.value)}
-                data-testid="input-search-vessels"
-              />
-            </div>
-          </div>
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search by vessel name or ID..."
+            className="pl-10"
+            value={vesselSearch}
+            onChange={(e) => setVesselSearch(e.target.value)}
+            data-testid="input-search-vessels"
+          />
         </div>
+        <Badge variant="secondary" className="bg-green-100 text-green-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-configured-count">
+          <CheckCircle2 className="h-3 w-3 mr-1" />
+          {configuredCount} Configured
+        </Badge>
+        <Badge variant="secondary" className="bg-gray-100 text-gray-600 no-default-hover-elevate no-default-active-elevate" data-testid="badge-not-set-count">
+          {notSetCount} Not Set
+        </Badge>
+      </div>
 
-        <div className="p-6">
+      <div>
           <div className="flex items-center gap-4 mb-6 p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
             <Button
               variant="outline"
@@ -449,7 +433,6 @@ export default function PmsVesselSettingsManagement({ onBack }: { onBack?: () =>
             </div>
           )}
         </div>
-      </Card>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
