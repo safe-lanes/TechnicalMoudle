@@ -41,7 +41,11 @@ function maskUrl(url: string): string {
 
 export const APP_ENV = resolveAppEnv();
 
+let _cachedBaseUrl: string | null = null;
+
 function getExternalMasterDataBaseUrl(): string {
+  if (_cachedBaseUrl !== null) return _cachedBaseUrl;
+
   const devUrl = process.env.EXTERNAL_MASTER_DATA_URL_DEV;
   const prodUrl = process.env.EXTERNAL_MASTER_DATA_URL_PROD;
 
@@ -50,30 +54,29 @@ function getExternalMasterDataBaseUrl(): string {
   if (APP_ENV === 'local' || APP_ENV === 'dev') {
     if (!devUrl) {
       throw new Error(
-        `[ExternalAPI] FATAL: EXTERNAL_MASTER_DATA_URL_DEV is not set. Required when APP_ENV="${APP_ENV}". Set this environment variable before starting the server.`
+        `[ExternalAPI] EXTERNAL_MASTER_DATA_URL_DEV is not set. Required when APP_ENV="${APP_ENV}". Set this environment variable before using the sync endpoint.`
       );
     }
     selectedUrl = devUrl;
   } else {
     if (!prodUrl) {
       throw new Error(
-        `[ExternalAPI] FATAL: EXTERNAL_MASTER_DATA_URL_PROD is not set. Required when APP_ENV="production". Set this environment variable before starting the server.`
+        `[ExternalAPI] EXTERNAL_MASTER_DATA_URL_PROD is not set. Required when APP_ENV="production". Set this environment variable before using the sync endpoint.`
       );
     }
     selectedUrl = prodUrl;
   }
 
-  const cleanUrl = selectedUrl.replace(/\/+$/, '');
+  _cachedBaseUrl = selectedUrl.replace(/\/+$/, '');
 
   console.log(`[Environment] APP_ENV=${APP_ENV}`);
-  console.log(`[ExternalAPI] Using ${APP_ENV === 'production' ? 'PRODUCTION' : 'DEV'} master data URL (${maskUrl(cleanUrl)})`);
+  console.log(`[ExternalAPI] Using ${APP_ENV === 'production' ? 'PRODUCTION' : 'DEV'} master data URL (${maskUrl(_cachedBaseUrl)})`);
 
-  return cleanUrl;
+  return _cachedBaseUrl;
 }
 
-export const EXTERNAL_MASTER_DATA_BASE_URL = getExternalMasterDataBaseUrl();
-
 export function buildExternalMasterDataUrl(endpoint: string, domain: string): string {
+  const baseUrl = getExternalMasterDataBaseUrl();
   const cleanEndpoint = endpoint.replace(/^\/+/, '');
-  return `${EXTERNAL_MASTER_DATA_BASE_URL}/${cleanEndpoint}?domain=${encodeURIComponent(domain)}`;
+  return `${baseUrl}/${cleanEndpoint}?domain=${encodeURIComponent(domain)}`;
 }
