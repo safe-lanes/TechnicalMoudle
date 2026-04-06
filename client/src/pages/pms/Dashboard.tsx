@@ -1373,14 +1373,14 @@ const Dashboard = () => {
 
             {/* DASHBOARD GRID: 3 columns (25% / 50% / 25%), 4 explicit rows */}
             <div
-              className="grid grid-cols-1 lg:grid-cols-[1fr_2fr_1fr] lg:[grid-template-rows:180px_90px_180px_200px_280px]"
+              className="grid grid-cols-1 lg:grid-cols-[1fr_2fr_1fr] lg:[grid-template-rows:180px_90px_200px_250px]"
               style={{ gap: '16px' }}
               data-testid="dashboard-grid"
             >
 
               {/* LEFT COLUMN: Work Orders card — spans all 4 rows */}
               <div
-                className={`${cardStyle} lg:[grid-row:1/6] lg:[grid-column:1]`}
+                className={`${cardStyle} lg:[grid-row:1/5] lg:[grid-column:1]`}
                 style={{ overflow: 'hidden' }}
                 data-testid="column-wo-kpis"
               >
@@ -1582,7 +1582,7 @@ const Dashboard = () => {
 
               {/* CENTER COLUMN Rows 3-4: Postponed WOs + Unplanned Maintenance gauges */}
               <div
-                className={`${cardStyle} lg:[grid-row:3/5] lg:[grid-column:2]`}
+                className={`${cardStyle} lg:[grid-row:3/4] lg:[grid-column:2]`}
                 data-testid="cell-center-row3"
               >
                 <div className="p-3 grid grid-cols-2 gap-4 h-full">
@@ -1613,7 +1613,7 @@ const Dashboard = () => {
 
               {/* CENTER COLUMN ROW 5: Top 5 Reasons Chart */}
               <div
-                className={`${cardStyle} lg:[grid-row:5/6] lg:[grid-column:2]`}
+                className={`${cardStyle} lg:[grid-row:4/5] lg:[grid-column:2]`}
                 data-testid="cell-center-reasons-chart"
               >
                 <div className="p-3 h-full flex flex-col">
@@ -1679,7 +1679,7 @@ const Dashboard = () => {
 
               {/* RIGHT COLUMN: Spares Stock Status card — spans all rows */}
               <div
-                className={`${cardStyle} lg:[grid-row:1/6] lg:[grid-column:3]`}
+                className={`${cardStyle} lg:[grid-row:1/5] lg:[grid-column:3]`}
                 style={{ overflow: 'hidden' }}
                 data-testid="column-inventory-fleet"
               >
