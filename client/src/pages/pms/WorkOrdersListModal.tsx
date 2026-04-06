@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -28,9 +28,15 @@ interface WorkOrdersListModalProps {
   onClose: () => void;
   title: string;
   workOrders: EnrichedWorkOrder[];
+  vessels?: { id: string; name: string }[];
 }
 
-export function WorkOrdersListModal({ open, onClose, title, workOrders }: WorkOrdersListModalProps) {
+export function WorkOrdersListModal({ open, onClose, title, workOrders, vessels = [] }: WorkOrdersListModalProps) {
+  const vesselMap = useMemo(() => {
+    const map = new Map<string, string>();
+    vessels.forEach(v => map.set(v.id, v.name));
+    return map;
+  }, [vessels]);
   const [viewModal, setViewModal] = useState<{ open: boolean; workOrder: EnrichedWorkOrder | null }>({
     open: false,
     workOrder: null,
@@ -42,6 +48,7 @@ export function WorkOrdersListModal({ open, onClose, title, workOrders }: WorkOr
 
   const handleExportPdf = () => {
     const columns: TableColumn[] = [
+      { header: 'Vessel', field: 'vessel', width: 20 },
       { header: 'Component', field: 'component', width: 30 },
       { header: 'Work Order No', field: 'workOrderNo', width: 30 },
       { header: 'Job Title', field: 'jobTitle', width: 40 },
@@ -52,6 +59,7 @@ export function WorkOrdersListModal({ open, onClose, title, workOrders }: WorkOr
     ];
 
     const data = workOrders.map((wo) => ({
+      vessel: (wo.vesselId ? vesselMap.get(wo.vesselId) : undefined) || '-',
       component: wo.component || '-',
       workOrderNo: wo.workOrderNo || '-',
       jobTitle: wo.jobTitle || '-',
@@ -128,6 +136,7 @@ export function WorkOrdersListModal({ open, onClose, title, workOrders }: WorkOr
             <Table>
               <TableHeader className="sticky top-0 bg-[#eff6ff] z-10">
                 <TableRow>
+                  <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81]">Vessel</TableHead>
                   <TableHead className="font-medium w-[160px] bg-[#eff6ff] text-[#0e4c81]">Component</TableHead>
                   <TableHead className="font-medium w-[160px] bg-[#eff6ff] text-[#0e4c81]">Work Order No</TableHead>
                   <TableHead className="font-medium min-w-[200px] bg-[#eff6ff] text-[#0e4c81]">Job Title</TableHead>
@@ -141,7 +150,7 @@ export function WorkOrdersListModal({ open, onClose, title, workOrders }: WorkOr
               <TableBody>
                 {workOrders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                       No work orders found
                     </TableCell>
                   </TableRow>
@@ -150,6 +159,7 @@ export function WorkOrdersListModal({ open, onClose, title, workOrders }: WorkOr
                     const effectiveStatus = wo.computedStatus || wo.status || 'Active';
                     return (
                       <TableRow key={wo.id} className="hover:bg-gray-50">
+                        <TableCell>{wo.vesselId ? vesselMap.get(wo.vesselId) || wo.vesselId : '-'}</TableCell>
                         <TableCell className="font-medium text-blue-600">
                           {wo.component || '-'}
                         </TableCell>

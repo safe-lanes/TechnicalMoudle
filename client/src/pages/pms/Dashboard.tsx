@@ -1743,6 +1743,7 @@ const Dashboard = () => {
         onClose={() => setWoListModal({ open: false, title: '', workOrders: [] })}
         title={woListModal.title}
         workOrders={woListModal.workOrders}
+        vessels={vessels}
       />
     </div>
   );
