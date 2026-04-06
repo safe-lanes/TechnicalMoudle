@@ -29,6 +29,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
 import { ComplianceAnomalyPanel } from "./ComplianceAnomalyPanel";
+import { WorkOrdersListModal } from "./WorkOrdersListModal";
 
 interface Spare {
   id: number;
@@ -345,6 +346,7 @@ const Dashboard = () => {
   const [, setLocation] = useLocation();
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
+  const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: WorkOrder[] }>({ open: false, title: '', workOrders: [] });
   const [activeTab, setActiveTab] = useState('overview');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedCriticality, setSelectedCriticality] = useState("");
@@ -564,6 +566,7 @@ const Dashboard = () => {
       total: safeWOs.filter(wo => !wo.isExecution).length,
       overdue: overdue.length,
       overdueList: overdue.slice(0, 5),
+      overdueFull: overdue,
       due: due.length,
       dueList: due.slice(0, 5),
       pendingApproval: pendingApproval.length,
@@ -1309,7 +1312,7 @@ const Dashboard = () => {
                     color="#e74c3c"
                     displayValue={workOrderKPIs.overdue.toString()}
                     subtitle={`${overduePercent}% of total`}
-                    onClick={() => navigateToWorkOrders('Overdue')}
+                    onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - All Equipment', workOrders: workOrderKPIs.overdueFull })}
                     testId="gauge-overdue-wo"
                   />
 
@@ -1733,6 +1736,13 @@ const Dashboard = () => {
         workOrders={workOrderKPIs.pendingApprovalFull || []}
         vesselId={vesselId}
         vesselName={currentVessel?.name}
+      />
+
+      <WorkOrdersListModal
+        open={woListModal.open}
+        onClose={() => setWoListModal({ open: false, title: '', workOrders: [] })}
+        title={woListModal.title}
+        workOrders={woListModal.workOrders}
       />
     </div>
   );
