@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Search, Pencil, Trash2, ChevronRight, ChevronDown, Upload, Download, Settings, Package, ArrowLeft, Info, MapPin, Star, FileText, CheckCircle, XCircle, Save, X } from "lucide-react";
@@ -845,13 +844,13 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
 
     return (
       <>
-        <TableRow
+        <tr
           key={nodeKey}
-          className="hover:bg-gray-100 transition-colors border-b border-gray-100 cursor-pointer"
+          className="even:bg-gray-50 odd:bg-white hover:bg-gray-100 transition-colors border-b border-gray-100 cursor-pointer"
           data-testid={`row-component-${nodeKey}`}
           onDoubleClick={() => handleRowDoubleClick(node)}
         >
-          <TableCell style={{ paddingLeft: `${level * 28 + 16}px` }} className="font-mono text-sm py-3 px-4" data-testid={isFirstRoot ? "I4.QL.3.20" : undefined}>
+          <td style={{ paddingLeft: `${level * 28 + 16}px` }} className="font-mono text-sm py-3 px-4" data-testid={isFirstRoot ? "I4.QL.3.20" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.20" />}
             <div className="flex items-center gap-2">
               {hasChildren ? (
@@ -871,24 +870,24 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
               )}
               <span className="text-gray-700 font-semibold">{node.fleetEquipmentCode}</span>
             </div>
-          </TableCell>
-          <TableCell className="py-3 px-4" data-testid={isFirstRoot ? "I4.QL.3.21" : undefined}>
+          </td>
+          <td className="py-3 px-4" data-testid={isFirstRoot ? "I4.QL.3.21" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.21" />}
             <span className="font-medium text-gray-800">{node.fleetEquipmentName}</span>
-          </TableCell>
-          <TableCell className="font-mono text-sm text-gray-500 py-3 px-4" data-testid={isFirstRoot ? "I4.QL.3.22" : undefined}>
+          </td>
+          <td className="font-mono text-sm text-gray-500 py-3 px-4" data-testid={isFirstRoot ? "I4.QL.3.22" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.22" />}
             {node.componentCategory || "-"}
-          </TableCell>
-          <TableCell className="text-gray-600 py-3 px-4" data-testid={isFirstRoot ? "I4.QL.3.23" : undefined}>
+          </td>
+          <td className="text-gray-600 py-3 px-4" data-testid={isFirstRoot ? "I4.QL.3.23" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.23" />}
             {node.makerName || "-"}
-          </TableCell>
-          <TableCell className="text-gray-600 py-3 px-4" data-testid={isFirstRoot ? "I4.QL.3.24" : undefined}>
+          </td>
+          <td className="text-gray-600 py-3 px-4" data-testid={isFirstRoot ? "I4.QL.3.24" : undefined}>
             {isFirstRoot && <Marker id="I4.QL.3.24" />}
             {node.model || "-"}
-          </TableCell>
-          <TableCell className="text-right py-3 px-4">
+          </td>
+          <td className="text-right py-3 px-4">
             <div className="flex justify-end gap-1">
               <button
                 onClick={(e) => { e.stopPropagation(); handleAddNew(node.fleetEquipmentCode); }}
@@ -921,8 +920,8 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
-          </TableCell>
-        </TableRow>
+          </td>
+        </tr>
         {isExpanded && hasChildren && node.children.map((child) => renderTreeNode(child, level + 1, false))}
       </>
     );
@@ -1036,21 +1035,21 @@ export default function FleetComponentsManagement({ onBack }: { onBack?: () => v
             </div>
           ) : (
             <div className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-[#52baf3] hover:bg-[#52baf3]">
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.3.14"><Marker id="I4.QL.3.14" />Fleet Code</TableHead>
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.3.15"><Marker id="I4.QL.3.15" />Equipment Name</TableHead>
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.3.16"><Marker id="I4.QL.3.16" />Category</TableHead>
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.3.17"><Marker id="I4.QL.3.17" />Maker</TableHead>
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.3.18"><Marker id="I4.QL.3.18" />Model</TableHead>
-                    <TableHead className="text-right text-white py-3 px-4 font-medium" data-testid="I4.QL.3.19"><Marker id="I4.QL.3.19" />Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#52baf3] hover:bg-[#52baf3]">
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.3.14"><Marker id="I4.QL.3.14" />Fleet Code</th>
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.3.15"><Marker id="I4.QL.3.15" />Equipment Name</th>
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.3.16"><Marker id="I4.QL.3.16" />Category</th>
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.3.17"><Marker id="I4.QL.3.17" />Maker</th>
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.3.18"><Marker id="I4.QL.3.18" />Model</th>
+                    <th className="text-right text-white py-3 px-4 font-medium" data-testid="I4.QL.3.19"><Marker id="I4.QL.3.19" />Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {treeData.map((node, index) => renderTreeNode(node, 0, index === 0))}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
           )}
         </div>

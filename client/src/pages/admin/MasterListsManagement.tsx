@@ -4,7 +4,6 @@ import { type MasterList, insertMasterListSchema } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -271,19 +270,19 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
               </div>
             ) : (
               <div className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-[#52baf3] hover:bg-[#52baf3]">
-                      <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.2.13"><Marker id="I4.QL.2.13" />Key</TableHead>
-                      <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.2.14"><Marker id="I4.QL.2.14" />Value</TableHead>
-                      <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.2.15"><Marker id="I4.QL.2.15" />Display Order</TableHead>
-                      <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.2.16"><Marker id="I4.QL.2.16" />Active</TableHead>
-                      <TableHead className="text-right text-white py-3 px-4 font-medium" data-testid="I4.QL.2.17"><Marker id="I4.QL.2.17" />Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-[#52baf3] hover:bg-[#52baf3]">
+                      <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.2.13"><Marker id="I4.QL.2.13" />Key</th>
+                      <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.2.14"><Marker id="I4.QL.2.14" />Value</th>
+                      <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.2.15"><Marker id="I4.QL.2.15" />Display Order</th>
+                      <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.2.16"><Marker id="I4.QL.2.16" />Active</th>
+                      <th className="text-right text-white py-3 px-4 font-medium" data-testid="I4.QL.2.17"><Marker id="I4.QL.2.17" />Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {masterLists.map((item, index) => (
-                      <TableRow 
+                      <tr 
                         key={item.id} 
                         data-testid={`row-master-list-${item.id}`}
                         onClick={() => setSelectedRowItem(selectedRowItem?.id === item.id ? null : item)}
@@ -293,19 +292,19 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
                             : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
                         } hover:bg-gray-100`}
                       >
-                        <TableCell className="font-mono text-sm text-blue-600" data-testid={index === 0 ? "I4.QL.2.18" : undefined}>
+                        <td className="font-mono text-sm text-blue-600" data-testid={index === 0 ? "I4.QL.2.18" : undefined}>
                           {index === 0 && <Marker id="I4.QL.2.18" />}
                           {item.listKey}
-                        </TableCell>
-                        <TableCell className="font-medium" data-testid={index === 0 ? "I4.QL.2.19" : undefined}>
+                        </td>
+                        <td className="font-medium" data-testid={index === 0 ? "I4.QL.2.19" : undefined}>
                           {index === 0 && <Marker id="I4.QL.2.19" />}
                           {item.listValue}
-                        </TableCell>
-                        <TableCell data-testid={index === 0 ? "I4.QL.2.20" : undefined}>
+                        </td>
+                        <td data-testid={index === 0 ? "I4.QL.2.20" : undefined}>
                           {index === 0 && <Marker id="I4.QL.2.20" />}
                           {item.displayOrder}
-                        </TableCell>
-                        <TableCell data-testid={index === 0 ? "I4.QL.2.21" : undefined}>
+                        </td>
+                        <td data-testid={index === 0 ? "I4.QL.2.21" : undefined}>
                           {index === 0 && <Marker id="I4.QL.2.21" />}
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -316,8 +315,8 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
                           >
                             {item.isActive ? "Active" : "Inactive"}
                           </span>
-                        </TableCell>
-                        <TableCell className="text-right">
+                        </td>
+                        <td className="text-right">
                           <div className="flex justify-end gap-1">
                             <button
                               onClick={(e) => {
@@ -342,11 +341,11 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     ))}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
             )}
         </div>

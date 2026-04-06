@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import {
   Dialog,
@@ -1467,51 +1466,51 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
             </div>
           ) : (
             <div className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-[#52baf3] hover:bg-[#52baf3]">
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.4.15"><Marker id="I4.QL.4.15" />Job Code</TableHead>
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.4.16"><Marker id="I4.QL.4.16" />Job Title</TableHead>
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.4.fleet-eq-code">Fleet Equipment Code</TableHead>
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.4.fleet-eq-name">Fleet Equipment Name</TableHead>
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.4.18"><Marker id="I4.QL.4.18" />Interval</TableHead>
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.4.19"><Marker id="I4.QL.4.19" />Task Type</TableHead>
-                    <TableHead className="text-right text-white py-3 px-4 font-medium" data-testid="I4.QL.4.20"><Marker id="I4.QL.4.20" />Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#52baf3] hover:bg-[#52baf3]">
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.4.15"><Marker id="I4.QL.4.15" />Job Code</th>
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.4.16"><Marker id="I4.QL.4.16" />Job Title</th>
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.4.fleet-eq-code">Fleet Equipment Code</th>
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.4.fleet-eq-name">Fleet Equipment Name</th>
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.4.18"><Marker id="I4.QL.4.18" />Interval</th>
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL.4.19"><Marker id="I4.QL.4.19" />Task Type</th>
+                    <th className="text-right text-white py-3 px-4 font-medium" data-testid="I4.QL.4.20"><Marker id="I4.QL.4.20" />Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {filteredJobs.map((job, index) => {
                     const isFirstRow = index === 0;
                     return (
-                      <TableRow key={job.id} data-testid={`row-job-${job.id}`} className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} cursor-pointer hover:bg-gray-100`} onDoubleClick={() => setDetailJob(job)}>
-                        <TableCell className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL.4.21" : undefined}>
+                      <tr key={job.id} data-testid={`row-job-${job.id}`} className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} cursor-pointer hover:bg-gray-100`} onDoubleClick={() => setDetailJob(job)}>
+                        <td className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL.4.21" : undefined}>
                           {isFirstRow && <Marker id="I4.QL.4.21" />}
                           {job.jobCode}
-                        </TableCell>
-                        <TableCell className="font-medium max-w-xs truncate" data-testid={isFirstRow ? "I4.QL.4.22" : undefined}>
+                        </td>
+                        <td className="font-medium max-w-xs truncate" data-testid={isFirstRow ? "I4.QL.4.22" : undefined}>
                           {isFirstRow && <Marker id="I4.QL.4.22" />}
                           {job.woTitle}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL.4.23" : undefined}>
+                        </td>
+                        <td className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL.4.23" : undefined}>
                           {isFirstRow && <Marker id="I4.QL.4.23" />}
                           {job.fleetEquipmentCode || "-"}
-                        </TableCell>
-                        <TableCell className="text-sm" data-testid={isFirstRow ? "I4.QL.4.fleet-eq-name-val" : undefined}>
+                        </td>
+                        <td className="text-sm" data-testid={isFirstRow ? "I4.QL.4.fleet-eq-name-val" : undefined}>
                           {job.fleetEquipmentName || "-"}
-                        </TableCell>
-                        <TableCell data-testid={isFirstRow ? "I4.QL.4.24" : undefined}>
+                        </td>
+                        <td data-testid={isFirstRow ? "I4.QL.4.24" : undefined}>
                           {isFirstRow && <Marker id="I4.QL.4.24" />}
                           {job.intervalValue && job.unit
                             ? `${job.intervalValue} ${job.unit}`
                             : "-"}
-                        </TableCell>
-                        <TableCell data-testid={isFirstRow ? "I4.QL.4.25" : undefined}>
+                        </td>
+                        <td data-testid={isFirstRow ? "I4.QL.4.25" : undefined}>
                           {isFirstRow && <Marker id="I4.QL.4.25" />}
                           <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate" data-testid={isFirstRow ? "badge-task-type" : undefined}>
                             {job.taskType || "-"}
                           </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
+                        </td>
+                        <td className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="outline"
@@ -1542,12 +1541,12 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     );
                   })}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
           )}
         </div>

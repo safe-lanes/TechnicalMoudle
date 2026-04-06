@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Search, Pencil, Trash2, Download, Wrench, Package, ArrowLeft, Info, Save, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -957,58 +956,58 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
             </div>
           ) : (
             <div className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-[#52baf3] hover:bg-[#52baf3]">
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.15"><Marker id="I4.QL5.5.15" />Part Code</TableHead>
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.16"><Marker id="I4.QL5.5.16" />Part Name</TableHead>
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.17"><Marker id="I4.QL5.5.17" />Fleet Equipment Code</TableHead>
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.fleet-eq-name">Fleet Equipment Name</TableHead>
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.18"><Marker id="I4.QL5.5.18" />Maker Reference</TableHead>
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.19"><Marker id="I4.QL5.5.19" />Unit</TableHead>
-                    <TableHead className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.20"><Marker id="I4.QL5.5.20" />Location</TableHead>
-                    <TableHead className="text-right text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.21"><Marker id="I4.QL5.5.21" />Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#52baf3] hover:bg-[#52baf3]">
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.15"><Marker id="I4.QL5.5.15" />Part Code</th>
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.16"><Marker id="I4.QL5.5.16" />Part Name</th>
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.17"><Marker id="I4.QL5.5.17" />Fleet Equipment Code</th>
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.fleet-eq-name">Fleet Equipment Name</th>
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.18"><Marker id="I4.QL5.5.18" />Maker Reference</th>
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.19"><Marker id="I4.QL5.5.19" />Unit</th>
+                    <th className="text-left text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.20"><Marker id="I4.QL5.5.20" />Location</th>
+                    <th className="text-right text-white py-3 px-4 font-medium" data-testid="I4.QL5.5.21"><Marker id="I4.QL5.5.21" />Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {filteredSpares.map((spare, index) => {
                     const equipment = components?.find(c => c.fleetEquipmentCode === spare.fleetEquipmentCode);
                     const isFirstRow = index === 0;
                     return (
-                      <TableRow
+                      <tr
                         key={spare.id}
                         data-testid={`row-spare-${spare.id}`}
                         className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} cursor-pointer hover:bg-gray-100`}
                         onDoubleClick={() => handleRowDoubleClick(spare)}
                       >
-                        <TableCell className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL5.5.22" : undefined}>
+                        <td className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL5.5.22" : undefined}>
                           {isFirstRow && <Marker id="I4.QL5.5.22" />}
                           {spare.partCode}
-                        </TableCell>
-                        <TableCell className="font-medium" data-testid={isFirstRow ? "I4.QL5.5.23" : undefined}>
+                        </td>
+                        <td className="font-medium" data-testid={isFirstRow ? "I4.QL5.5.23" : undefined}>
                           {isFirstRow && <Marker id="I4.QL5.5.23" />}
                           {spare.partName}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL5.5.24" : undefined}>
+                        </td>
+                        <td className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL5.5.24" : undefined}>
                           {isFirstRow && <Marker id="I4.QL5.5.24" />}
                           {spare.fleetEquipmentCode || "-"}
-                        </TableCell>
-                        <TableCell className="text-sm" data-testid={isFirstRow ? "I4.QL5.5.fleet-eq-name-val" : undefined}>
+                        </td>
+                        <td className="text-sm" data-testid={isFirstRow ? "I4.QL5.5.fleet-eq-name-val" : undefined}>
                           {equipment?.fleetEquipmentName || "-"}
-                        </TableCell>
-                        <TableCell className="text-sm" data-testid={isFirstRow ? "I4.QL5.5.25" : undefined}>
+                        </td>
+                        <td className="text-sm" data-testid={isFirstRow ? "I4.QL5.5.25" : undefined}>
                           {isFirstRow && <Marker id="I4.QL5.5.25" />}
                           {spare.maker || "-"}
-                        </TableCell>
-                        <TableCell data-testid={isFirstRow ? "I4.QL5.5.26" : undefined}>
+                        </td>
+                        <td data-testid={isFirstRow ? "I4.QL5.5.26" : undefined}>
                           {isFirstRow && <Marker id="I4.QL5.5.26" />}
                           {spare.unitOfMeasurement || "-"}
-                        </TableCell>
-                        <TableCell data-testid={isFirstRow ? "I4.QL5.5.27" : undefined}>
+                        </td>
+                        <td data-testid={isFirstRow ? "I4.QL5.5.27" : undefined}>
                           {isFirstRow && <Marker id="I4.QL5.5.27" />}
                           -
-                        </TableCell>
-                        <TableCell className="text-right">
+                        </td>
+                        <td className="text-right">
                           <div className="flex justify-end gap-1">
                             <button
                               onClick={(e) => { e.stopPropagation(); handleEdit(spare); }}
@@ -1027,12 +1026,12 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     );
                   })}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
           )}
         </div>

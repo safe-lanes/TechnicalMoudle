@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Download, ArrowLeft, Table2, Ship, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -168,36 +167,36 @@ export default function MasterDataTableView({ onBack }: { onBack?: () => void })
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-[#52baf3] hover:bg-[#52baf3]">
-                          <TableHead className="text-white font-semibold text-xs whitespace-nowrap w-16">Sl No</TableHead>
-                          <TableHead className="text-white font-semibold text-xs whitespace-nowrap">Vessel Name</TableHead>
-                          <TableHead className="text-white font-semibold text-xs whitespace-nowrap">Vessel Code</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-[#52baf3] hover:bg-[#52baf3]">
+                          <th className="text-white font-semibold text-xs whitespace-nowrap w-16">Sl No</th>
+                          <th className="text-white font-semibold text-xs whitespace-nowrap">Vessel Name</th>
+                          <th className="text-white font-semibold text-xs whitespace-nowrap">Vessel Code</th>
+                        </tr>
+                      </thead>
+                      <tbody>
                         {vesselMappings.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={3} className="text-center py-8 text-gray-500" data-testid="text-no-vessels">
+                          <tr>
+                            <td colSpan={3} className="text-center py-8 text-gray-500" data-testid="text-no-vessels">
                               No vessels linked to this equipment code.
-                            </TableCell>
-                          </TableRow>
+                            </td>
+                          </tr>
                         ) : (
                           vesselMappings.map((mapping, index) => (
-                            <TableRow
+                            <tr
                               key={mapping.id}
                               className="hover:bg-gray-50"
                               data-testid={`row-vessel-mapping-${mapping.id}`}
                             >
-                              <TableCell className="text-sm text-gray-500">{index + 1}</TableCell>
-                              <TableCell className="text-sm font-medium">{mapping.vesselName || '-'}</TableCell>
-                              <TableCell className="text-sm font-mono">{mapping.vesselCode}</TableCell>
-                            </TableRow>
+                              <td className="text-sm text-gray-500">{index + 1}</td>
+                              <td className="text-sm font-medium">{mapping.vesselName || '-'}</td>
+                              <td className="text-sm font-mono">{mapping.vesselCode}</td>
+                            </tr>
                           ))
                         )}
-                      </TableBody>
-                    </Table>
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>
@@ -262,45 +261,45 @@ export default function MasterDataTableView({ onBack }: { onBack?: () => void })
           </div>
         ) : (
           <div className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-[#52baf3] hover:bg-[#52baf3]">
-                  <TableHead className="text-left text-white py-3 px-4 font-medium w-16">Sl No</TableHead>
-                  <TableHead className="text-left text-white py-3 px-4 font-medium">Fleet Equipment Code</TableHead>
-                  <TableHead className="text-left text-white py-3 px-4 font-medium">Fleet Equipment Name</TableHead>
-                  <TableHead className="text-left text-white py-3 px-4 font-medium">Maker</TableHead>
-                  <TableHead className="text-left text-white py-3 px-4 font-medium">Maker Code</TableHead>
-                  <TableHead className="text-left text-white py-3 px-4 font-medium">Model</TableHead>
-                  <TableHead className="text-left text-white py-3 px-4 font-medium">Model Code</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-[#52baf3] hover:bg-[#52baf3]">
+                  <th className="text-left text-white py-3 px-4 font-medium w-16">Sl No</th>
+                  <th className="text-left text-white py-3 px-4 font-medium">Fleet Equipment Code</th>
+                  <th className="text-left text-white py-3 px-4 font-medium">Fleet Equipment Name</th>
+                  <th className="text-left text-white py-3 px-4 font-medium">Maker</th>
+                  <th className="text-left text-white py-3 px-4 font-medium">Maker Code</th>
+                  <th className="text-left text-white py-3 px-4 font-medium">Model</th>
+                  <th className="text-left text-white py-3 px-4 font-medium">Model Code</th>
+                </tr>
+              </thead>
+              <tbody>
                 {filteredData.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-gray-500" data-testid="text-no-data">
+                  <tr>
+                    <td colSpan={7} className="text-center py-8 text-gray-500" data-testid="text-no-data">
                       No fleet component master data found.
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ) : (
                   filteredData.map((item, index) => (
-                    <TableRow
+                    <tr
                       key={item.id}
                       className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} cursor-pointer hover:bg-gray-100`}
                       onDoubleClick={() => handleRowDoubleClick(item)}
                       data-testid={`row-master-data-${item.id}`}
                     >
-                      <TableCell className="py-3 px-4 text-sm text-gray-500">{index + 1}</TableCell>
-                      <TableCell className="py-3 px-4 text-sm font-mono">{item.fleetEquipmentCode || '-'}</TableCell>
-                      <TableCell className="py-3 px-4 text-sm">{item.fleetEquipmentName || '-'}</TableCell>
-                      <TableCell className="py-3 px-4 text-sm">{item.makerName || '-'}</TableCell>
-                      <TableCell className="py-3 px-4 text-sm">{item.makerCode || '-'}</TableCell>
-                      <TableCell className="py-3 px-4 text-sm">{item.model || '-'}</TableCell>
-                      <TableCell className="py-3 px-4 text-sm">{item.modelCode || '-'}</TableCell>
-                    </TableRow>
+                      <td className="py-3 px-4 text-sm text-gray-500">{index + 1}</td>
+                      <td className="py-3 px-4 text-sm font-mono">{item.fleetEquipmentCode || '-'}</td>
+                      <td className="py-3 px-4 text-sm">{item.fleetEquipmentName || '-'}</td>
+                      <td className="py-3 px-4 text-sm">{item.makerName || '-'}</td>
+                      <td className="py-3 px-4 text-sm">{item.makerCode || '-'}</td>
+                      <td className="py-3 px-4 text-sm">{item.model || '-'}</td>
+                      <td className="py-3 px-4 text-sm">{item.modelCode || '-'}</td>
+                    </tr>
                   ))
                 )}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
           </div>
         )}
       </div>
