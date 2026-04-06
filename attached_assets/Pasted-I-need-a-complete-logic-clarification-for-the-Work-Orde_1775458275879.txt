@@ -1,0 +1,193 @@
+I need a complete logic clarification for the Work Orders module regarding the relationship between tabs and status.
+
+Context
+In the Work Orders page, we have separate tabs such as:
+
+Planned
+
+Due
+
+Overdue
+
+Pending Approval
+
+Completed
+
+At the same time, each work order row also has a Status field/column showing values such as Due or Overdue.
+​
+
+Clarification needed
+Please review the current frontend and backend logic and explain clearly:
+
+Main question
+Are Planned / Due / Overdue / Pending Approval / Completed treated as:
+
+System-derived output states
+meaning the application calculates the status first and then places the work order into the matching tab,
+
+or
+
+Input / category states
+meaning when a work order is assigned to a tab/category, that tab selection itself sets or controls the status?
+
+I need explicit answers to these points
+1. Source of truth
+What is the actual source of truth for a work order’s current bucket:
+
+database status field,
+
+computed logic,
+
+due date comparison,
+
+approval state,
+
+planner state,
+
+or frontend tab filtering logic?
+
+2. Tab logic
+For each tab (Planned, Due, Overdue, Pending Approval, Completed), explain:
+
+what exact condition makes a work order appear in that tab
+
+whether the tab is based on a stored DB value or dynamically calculated
+
+whether a single work order can qualify for more than one tab
+
+if not, what is the precedence/order of evaluation
+
+3. Status column logic
+Explain how the Status value shown in the table is generated:
+
+Is it read directly from the database?
+
+Is it computed on the fly?
+
+Is it derived from due date / planned date / postponement / approval / completion logic?
+
+Is the visible status chip only a display label, or is it a saved status field?
+
+4. Direction of dependency
+I want a direct answer to this:
+
+Does status decide the tab?
+
+Or does tab decide the status?
+
+Or are both derived independently from some third logic?
+
+5. Trigger points
+Please identify what actions or events can move a work order from one tab/status bucket to another, for example:
+
+creating a work order
+
+planner generation
+
+due date reaching threshold
+
+becoming overdue
+
+postponement
+
+approval submission
+
+approval completion
+
+completion of job
+
+manual edit
+
+background scheduler / cron / batch job
+
+API response transformation
+
+6. Planned vs Due vs Overdue
+I specifically want clarification on these three:
+
+What exactly makes a work order Planned
+
+What exactly changes it from Planned to Due
+
+What exactly changes it from Due to Overdue
+
+Is this transition date-driven, cycle-driven, running-hours-driven, or manually assigned?
+
+Is there any tolerance window or grace logic?
+
+7. Database fields involved
+Please list the actual fields currently used in the logic, such as any of these if applicable:
+
+status
+
+workOrderStatus
+
+dueDate
+
+plannedDate
+
+completedAt
+
+approvalStatus
+
+postponed status / postponement fields
+
+cycle skipped / running hours logic
+
+any derived flags
+
+Please mention the exact file(s), function(s), query logic, or service methods where this tab/status behavior is implemented.
+
+8. Frontend vs backend responsibility
+Please clearly separate:
+
+what logic is handled in backend
+
+what logic is handled in frontend
+
+whether frontend is only rendering filtered results
+
+or whether frontend is itself deciding which tab/status a work order belongs to
+
+9. Edge cases
+Please also confirm how the system behaves in edge cases:
+
+postponed work order
+
+overdue but pending approval
+
+completed after being overdue
+
+due work order with skipped cycles
+
+manually edited due date
+
+inactive or archived work order if applicable
+
+Expected output format
+Please respond in this exact structure:
+
+Summary answer — one paragraph stating whether tab is input or output
+
+Tab mapping table — each tab and exact rule for inclusion
+
+Status field logic — how the status column is populated
+
+Source code references — relevant files/functions/APIs
+
+State transition explanation — what events move a work order between tabs
+
+Edge cases / ambiguities — anything inconsistent or risky in current implementation
+
+Important requirement
+Do not give assumptions. Please inspect the actual code paths and state clearly:
+
+what is stored
+
+what is computed
+
+what is displayed
+
+and what drives what
+
+If the current implementation is inconsistent between frontend and backend, explicitly point that out.
