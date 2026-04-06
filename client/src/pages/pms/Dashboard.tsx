@@ -1310,8 +1310,8 @@ const Dashboard = () => {
                     value={workOrderKPIs.overdue}
                     max={workOrderKPIs.total || 10}
                     color="#e74c3c"
-                    displayValue={workOrderKPIs.overdue.toString()}
-                    subtitle={`${overduePercent}% of total`}
+                    displayValue={`${overduePercent}%`}
+                    subtitle={`${workOrderKPIs.overdue} out of ${workOrderKPIs.total}`}
                     onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - All Equipment', workOrders: workOrderKPIs.overdueFull })}
                     testId="gauge-overdue-wo"
                   />
