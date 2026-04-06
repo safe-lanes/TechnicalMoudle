@@ -1009,7 +1009,8 @@ export const workOrders = pgTable("work_orders", {
   scopeNotes: text("scope_notes"), // Notes about scope applicability
   // Postponement fields (Rule #5 - Postponed WO Reappearance)
   postponementEndDate: text("postponement_end_date"), // When postponement expires, WO should revert to Due status
-  postponementReason: text("postponement_reason"), // Reason for postponement
+  postponementReason: text("postponement_reason"), // Reason for postponement (structured dropdown value)
+  postponementRemarks: text("postponement_remarks"), // Optional additional remarks for postponement
   postponementAuthorizedBy: text("postponement_authorized_by"), // Who authorized the postponement
   // On-demand WO generation fields (Rule #4)
   onDemandReason: text("on_demand_reason"), // 'Planning' | 'Breakdown' | 'Other' - for WOs generated before frequency reached
@@ -2985,7 +2986,8 @@ export const workOrderPostponements = pgTable("work_order_postponements", {
   postponementNumber: integer("postponement_number").notNull().default(1), // 1st, 2nd, 3rd postponement, etc.
   originalDueDate: text("original_due_date"), // Original due date before postponement
   newDueDate: text("new_due_date"), // New due date after postponement
-  postponementReason: text("postponement_reason"), // Reason for postponement
+  postponementReason: text("postponement_reason"), // Reason for postponement (structured dropdown value)
+  postponementRemarks: text("postponement_remarks"), // Optional additional remarks for postponement
   authorizedBy: text("authorized_by"), // Who authorized the postponement
   approvalRemarks: text("approval_remarks"), // Remarks from approver
   durationDays: integer("duration_days"), // Number of days postponed

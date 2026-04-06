@@ -2781,6 +2781,24 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           </div>
         );
       })()}
+      {!embedded && currentWorkOrderStatus === 'Postponed' && (() => {
+        const postponeReason = (workOrderContext as any)?.workOrder?.postponementReason || '';
+        const postponeRemarks = (workOrderContext as any)?.workOrder?.postponementRemarks || '';
+        if (!postponeReason) return null;
+        return (
+          <div className="sticky top-0 z-50 bg-blue-50 border-b border-blue-200 px-4 py-2" data-testid="banner-postponed">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-blue-800">⏸ POSTPONED</span>
+              <span className="text-sm text-blue-700">— Reason: {postponeReason}</span>
+            </div>
+            {postponeRemarks && (
+              <div className="text-sm text-blue-600 mt-0.5" data-testid="text-postponement-remarks">
+                Remarks: {postponeRemarks}
+              </div>
+            )}
+          </div>
+        );
+      })()}
       {!embedded && workOrderId && (() => {
         const anomalyData = woAnomalies;
         if (!anomalyData || anomalyData.length === 0) return null;

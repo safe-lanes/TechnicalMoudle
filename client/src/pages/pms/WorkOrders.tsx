@@ -36,6 +36,7 @@ import { useUIRole } from "@/contexts/UIRoleContext";
 import * as XLSX from "xlsx";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import { format } from "date-fns";
+import { POSTPONEMENT_REASONS } from "@shared/postponementReasons";
 
 // Extend WorkOrderWithLeadTime to include computed status and RH data from backend
 type WorkOrderWithHydratedData = WorkOrderWithLeadTime & {
@@ -75,6 +76,7 @@ const WorkOrders: React.FC = () => {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue | null>(null);
   const [selectedRank, setSelectedRank] = useState("");
   const [selectedCriticality, setSelectedCriticality] = useState("");
+  const [selectedPostponementReason, setSelectedPostponementReason] = useState("");
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = sessionStorage.getItem('workOrdersActiveTab');
     if (savedTab) {
@@ -356,6 +358,13 @@ const WorkOrders: React.FC = () => {
         }
       }
     }
+
+    // Postponement reason filter: only applies to Postponed work orders
+    if (selectedPostponementReason && selectedPostponementReason !== "all") {
+      if ((wo as any).postponementReason !== selectedPostponementReason) {
+        return false;
+      }
+    }
     
     return true;
   });
@@ -367,7 +376,7 @@ const WorkOrders: React.FC = () => {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchTerm, periodFilter, selectedRank, selectedCriticality, vesselId]);
+  }, [activeTab, searchTerm, periodFilter, selectedRank, selectedCriticality, selectedPostponementReason, vesselId]);
   
   // Clamp current page when total pages shrinks (e.g., after deletion or filter change)
   useEffect(() => {
@@ -494,6 +503,7 @@ const WorkOrders: React.FC = () => {
       dueDate: postponeData.nextDueDate,
       postponementEndDate: postponeData.postponementEndDate,
       postponementReason: postponeData.reason,
+      postponementRemarks: postponeData.postponementRemarks,
       postponementAuthorizedBy: postponeData.authorizedBy
     };
     
@@ -531,12 +541,15 @@ const WorkOrders: React.FC = () => {
         'Criticality': wo.criticality || '-',
         'Maintenance Basis': wo.maintenanceBasis || '-',
         'Frequency': wo.frequencyValue ? `${wo.frequencyValue} ${wo.frequencyUnit || ''}`.trim() : '-',
+        'Postponement Reason': (wo as any).postponementReason || '-',
+        'Postponement Remarks': (wo as any).postponementRemarks || '-',
       }));
 
       const ws = XLSX.utils.json_to_sheet(rows);
       ws['!cols'] = [
         { wch: 6 }, { wch: 30 }, { wch: 35 }, { wch: 40 }, { wch: 18 },
         { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 14 },
+        { wch: 50 }, { wch: 40 },
       ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'All Work Orders');
@@ -554,13 +567,14 @@ const WorkOrders: React.FC = () => {
     try {
       const columns = [
         { header: 'S.No', field: 'sNo', width: 10 },
-        { header: 'Component', field: 'component', width: 40 },
-        { header: 'Work Order No', field: 'workOrderNo', width: 45 },
-        { header: 'Job Title', field: 'jobTitle', width: 50 },
-        { header: 'Assigned To', field: 'assignedTo', width: 25 },
-        { header: 'Due Date', field: 'dueDate', width: 22 },
-        { header: 'Status', field: 'status', width: 18 },
-        { header: 'Criticality', field: 'criticality', width: 16 },
+        { header: 'Component', field: 'component', width: 35 },
+        { header: 'Work Order No', field: 'workOrderNo', width: 40 },
+        { header: 'Job Title', field: 'jobTitle', width: 45 },
+        { header: 'Assigned To', field: 'assignedTo', width: 22 },
+        { header: 'Due Date', field: 'dueDate', width: 20 },
+        { header: 'Status', field: 'status', width: 16 },
+        { header: 'Criticality', field: 'criticality', width: 14 },
+        { header: 'Postponement Reason', field: 'postponementReason', width: 50 },
       ];
 
       const data = safeWorkOrdersList.map((wo, idx) => ({
@@ -574,6 +588,7 @@ const WorkOrders: React.FC = () => {
           : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-'),
         status: getEffectiveStatus(wo),
         criticality: wo.criticality || '-',
+        postponementReason: (wo as any).postponementReason || '-',
       }));
 
       const statusCounts = safeWorkOrdersList.reduce((acc, wo) => {
@@ -833,6 +848,22 @@ const WorkOrders: React.FC = () => {
           </SelectContent>
         </Select>
 
+        {activeTab === "Planned" && (
+          <Select value={selectedPostponementReason} onValueChange={setSelectedPostponementReason}>
+            <SelectTrigger className="w-52" data-testid="select-filter-postponement-reason">
+              <SelectValue placeholder="Postponement Reason" />
+            </SelectTrigger>
+            <SelectContent className="max-h-72">
+              <SelectItem value="all">All Reasons</SelectItem>
+              {POSTPONEMENT_REASONS.map((reason) => (
+                <SelectItem key={reason} value={reason}>
+                  {reason}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
         <Button
           variant="outline"
           className="text-gray-600"
@@ -841,6 +872,7 @@ const WorkOrders: React.FC = () => {
             setPeriodFilter(null);
             setSelectedRank("");
             setSelectedCriticality("");
+            setSelectedPostponementReason("");
           }}
           data-testid="button-clear-filters"
         >

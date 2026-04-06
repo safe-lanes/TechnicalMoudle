@@ -1,0 +1,1 @@
+ALTER TABLE "work_order_postponements" ADD COLUMN "postponement_remarks" text;

@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { POSTPONEMENT_REASONS } from "@shared/postponementReasons";
 
 interface PostponeWorkOrderDialogProps {
   isOpen: boolean;
@@ -45,6 +46,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     jobTitle: "",
     originalDueDate: "",
     reasonForPostponement: "",
+    postponementRemarks: "",
     authorizedBy: "",
     approvalRemarks: "",
     nextDueDate: "",
@@ -52,6 +54,8 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     informOfficer: false,
     attachDocument: false,
   });
+
+  const [validationError, setValidationError] = useState("");
 
   React.useEffect(() => {
     if (workOrder) {
@@ -61,6 +65,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
         jobTitle: workOrder.jobTitle,
         originalDueDate: workOrder.dueDate || "",
         reasonForPostponement: "",
+        postponementRemarks: "",
         authorizedBy: "superintendent",
         approvalRemarks: "",
         nextDueDate: "",
@@ -68,6 +73,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
         informOfficer: false,
         attachDocument: false,
       });
+      setValidationError("");
     }
   }, [workOrder]);
 
@@ -103,12 +109,19 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
   };
 
   const handleSubmit = () => {
+    if (!formData.reasonForPostponement) {
+      setValidationError("Please select a reason for postponement.");
+      return;
+    }
+    setValidationError("");
+
     if (onConfirm && workOrder) {
       const postponementEndDate = calculatePostponementEndDate(formData.durationOfPostponement);
       
       onConfirm(workOrder.id || "", {
         nextDueDate: formData.nextDueDate,
         reason: formData.reasonForPostponement,
+        postponementRemarks: formData.postponementRemarks,
         authorizedBy: formData.authorizedBy,
         duration: formData.durationOfPostponement,
         approvalRemarks: formData.approvalRemarks,
@@ -195,15 +208,48 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
               <div></div>
             </div>
 
-            {/* Row 4: Reason for Postponement */}
+            {/* Row 4: Reason for Postponement — mandatory dropdown */}
             <div className="space-y-1">
-              <Label htmlFor="reasonForPostponement" className="text-sm">Reason for Postponement</Label>
-              <Textarea
-                id="reasonForPostponement"
+              <Label htmlFor="reasonForPostponement" className="text-sm">
+                Reason for Postponement <span className="text-red-500">*</span>
+              </Label>
+              <Select
                 value={formData.reasonForPostponement}
-                onChange={(e) => setFormData({ ...formData, reasonForPostponement: e.target.value })}
+                onValueChange={(value) => {
+                  setFormData({ ...formData, reasonForPostponement: value });
+                  if (value) setValidationError("");
+                }}
+              >
+                <SelectTrigger
+                  id="reasonForPostponement"
+                  data-testid="select-postponement-reason"
+                  className={validationError ? "border-red-500" : ""}
+                >
+                  <SelectValue placeholder="Select a reason for postponement..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-64">
+                  {POSTPONEMENT_REASONS.map((reason) => (
+                    <SelectItem key={reason} value={reason}>
+                      {reason}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {validationError && (
+                <p className="text-sm text-red-500" data-testid="postponement-reason-error">{validationError}</p>
+              )}
+            </div>
+
+            {/* Row 4b: Remarks / Additional Details — optional */}
+            <div className="space-y-1">
+              <Label htmlFor="postponementRemarks" className="text-sm">Remarks / Additional Details (Optional)</Label>
+              <Textarea
+                id="postponementRemarks"
+                data-testid="textarea-postponement-remarks"
+                value={formData.postponementRemarks}
+                onChange={(e) => setFormData({ ...formData, postponementRemarks: e.target.value })}
                 className="min-h-[60px] resize-none"
-                placeholder="Enter reason for postponement..."
+                placeholder="Enter additional remarks or details..."
               />
             </div>
 
@@ -295,12 +341,14 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
           <Button
             variant="outline"
             onClick={onClose}
+            data-testid="button-postpone-cancel"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
+            data-testid="button-postpone-confirm"
           >
             Confirm Postpone
           </Button>
