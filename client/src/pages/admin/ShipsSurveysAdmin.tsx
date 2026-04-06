@@ -903,23 +903,18 @@ export default function ShipsSurveysAdmin() {
       .map((v: any) => String(v.id));
   };
 
-  // Get company surveys for vessel tab display
-  // For VES-xxx surveys, only show if selected vessels have applicability records
-  const companySurveys = masterData.filter(survey => {
+  const companySurveys = [...masterData, ...companyOnlySurveys].filter(survey => {
     if (!survey.applicableToCompany) return false;
     
-    // For vessel-specific surveys (VES-xxx), only show if at least one selected vessel has an applicability record
     if (survey.masterId.startsWith('VES-')) {
       const vesselIds = getSelectedVesselIdsArray();
       if (vesselIds.length === 0) return false;
       
-      // Check if any selected vessel has an applicability record for this VES- survey
       return vesselIds.some(vesselId => 
         vesselApplicabilityData?.some((a: any) => a.vesselId === vesselId && a.masterId === survey.masterId)
       );
     }
     
-    // Non-VES surveys (CMP-, category-based Master surveys) show for all vessels
     return true;
   });
 
