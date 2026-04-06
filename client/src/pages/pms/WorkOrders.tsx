@@ -43,6 +43,8 @@ type WorkOrderWithHydratedData = WorkOrderWithLeadTime & {
   computedStatus?: ComputedWorkOrderStatus;
   dueRH?: number | null;
   currentRH?: number | null;
+  postponementReason?: string | null;
+  postponementRemarks?: string | null;
 };
 
 // Using WorkOrder type from shared schema
@@ -361,7 +363,7 @@ const WorkOrders: React.FC = () => {
 
     // Postponement reason filter: only applies to Postponed work orders
     if (selectedPostponementReason && selectedPostponementReason !== "all") {
-      if ((wo as any).postponementReason !== selectedPostponementReason) {
+      if (wo.postponementReason !== selectedPostponementReason) {
         return false;
       }
     }
@@ -541,8 +543,8 @@ const WorkOrders: React.FC = () => {
         'Criticality': wo.criticality || '-',
         'Maintenance Basis': wo.maintenanceBasis || '-',
         'Frequency': wo.frequencyValue ? `${wo.frequencyValue} ${wo.frequencyUnit || ''}`.trim() : '-',
-        'Postponement Reason': (wo as any).postponementReason || '-',
-        'Postponement Remarks': (wo as any).postponementRemarks || '-',
+        'Postponement Reason': wo.postponementReason || '-',
+        'Postponement Remarks': wo.postponementRemarks || '-',
       }));
 
       const ws = XLSX.utils.json_to_sheet(rows);
@@ -574,7 +576,8 @@ const WorkOrders: React.FC = () => {
         { header: 'Due Date', field: 'dueDate', width: 20 },
         { header: 'Status', field: 'status', width: 16 },
         { header: 'Criticality', field: 'criticality', width: 14 },
-        { header: 'Postponement Reason', field: 'postponementReason', width: 50 },
+        { header: 'Postponement Reason', field: 'postponementReason', width: 45 },
+        { header: 'Postponement Remarks', field: 'postponementRemarks', width: 45 },
       ];
 
       const data = safeWorkOrdersList.map((wo, idx) => ({
@@ -588,7 +591,8 @@ const WorkOrders: React.FC = () => {
           : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-'),
         status: getEffectiveStatus(wo),
         criticality: wo.criticality || '-',
-        postponementReason: (wo as any).postponementReason || '-',
+        postponementReason: wo.postponementReason || '-',
+        postponementRemarks: wo.postponementRemarks || '-',
       }));
 
       const statusCounts = safeWorkOrdersList.reduce((acc, wo) => {

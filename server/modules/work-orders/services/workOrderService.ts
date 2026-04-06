@@ -8,6 +8,7 @@ import { storage } from '../../../storage';
 import { getDb } from '../../../db';
 import { plannerDates } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { POSTPONEMENT_REASONS } from '@shared/postponementReasons';
 
 function calculateBackdatingDaysForApproval(completionDate: string | null | undefined, submittedDate: string | null | undefined): number {
   if (!completionDate) return 0;
@@ -1001,7 +1002,61 @@ export async function updateWorkOrder(id: string, body: any) {
     }
   }
 
+  // POSTPONEMENT VALIDATION: Validate reason is from the predefined list
+  const isBeingPostponed = updateData.status === 'Postponed';
+  if (isBeingPostponed && updateData.postponementReason) {
+    const validReasons: readonly string[] = POSTPONEMENT_REASONS;
+    if (!validReasons.includes(updateData.postponementReason as string)) {
+      throw new ValidationError(
+        `Invalid postponement reason. Must be one of the ${POSTPONEMENT_REASONS.length} predefined reasons.`,
+        { code: 'INVALID_POSTPONEMENT_REASON', provided: updateData.postponementReason }
+      );
+    }
+  }
+  if (isBeingPostponed && !updateData.postponementReason) {
+    throw new ValidationError(
+      'Postponement reason is required when postponing a work order.',
+      { code: 'POSTPONEMENT_REASON_REQUIRED' }
+    );
+  }
+
   const workOrder = await repo.update(id, updateData);
+
+  // POSTPONEMENT AUDIT: Create a record in work_order_postponements when transitioning to Postponed
+  if (isBeingPostponed && existingWO.status !== 'Postponed') {
+    try {
+      const existingCount = await storage.getWorkOrderPostponementCount(workOrder.wouuid);
+      const postponementNumber = existingCount + 1;
+      const postponementId = `pp-${workOrder.id}-${Date.now()}`;
+      const originalDueDate = existingWO.dueDate || null;
+      const newDueDate = workOrder.postponementEndDate || workOrder.dueDate || null;
+      let durationDays: number | null = null;
+      if (originalDueDate && newDueDate) {
+        const orig = new Date(originalDueDate);
+        const next = new Date(newDueDate);
+        if (!isNaN(orig.getTime()) && !isNaN(next.getTime())) {
+          durationDays = Math.ceil((next.getTime() - orig.getTime()) / (1000 * 60 * 60 * 24));
+        }
+      }
+      await storage.createWorkOrderPostponement({
+        id: postponementId,
+        workOrderId: workOrder.wouuid,
+        vesselId: workOrder.vesselId || existingWO.vesselId || '',
+        postponementNumber,
+        originalDueDate,
+        newDueDate,
+        postponementReason: workOrder.postponementReason || '',
+        postponementRemarks: workOrder.postponementRemarks || null,
+        authorizedBy: workOrder.postponementAuthorizedBy || null,
+        durationDays,
+        status: 'Approved',
+        informOffice: false,
+      });
+      console.log(`📝 [Postponement] Audit record #${postponementNumber} created for WO ${workOrder.workOrderNo}`);
+    } catch (auditErr) {
+      console.error(`⚠️ [Postponement] Failed to create audit record for WO ${workOrder.workOrderNo}:`, auditErr);
+    }
+  }
 
   // ========== SPARE CONSUMPTION ON SAVE (Real-time ROB update) ==========
   const isApprovalAction = updateData.approvalAction === 'approved' && updateData.status === 'Completed';

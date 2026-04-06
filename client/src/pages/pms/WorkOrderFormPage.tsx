@@ -2782,8 +2782,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         );
       })()}
       {!embedded && currentWorkOrderStatus === 'Postponed' && (() => {
-        const postponeReason = (workOrderContext as any)?.workOrder?.postponementReason || '';
-        const postponeRemarks = (workOrderContext as any)?.workOrder?.postponementRemarks || '';
+        const ctx = workOrderContext as { workOrder?: { postponementReason?: string | null; postponementRemarks?: string | null } } | undefined;
+        const postponeReason = ctx?.workOrder?.postponementReason || '';
+        const postponeRemarks = ctx?.workOrder?.postponementRemarks || '';
         if (!postponeReason) return null;
         return (
           <div className="sticky top-0 z-50 bg-blue-50 border-b border-blue-200 px-4 py-2" data-testid="banner-postponed">
