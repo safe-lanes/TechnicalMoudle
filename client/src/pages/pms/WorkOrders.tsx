@@ -1153,7 +1153,7 @@ const WorkOrders: React.FC = () => {
                         </span>
                       )}
                       {activeTab === "Overdue" && getEffectiveStatus(workOrder) === "Overdue" && (
-                        (workOrder as any).overdueReason ? (
+                        workOrder.overdueReason ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1161,7 +1161,7 @@ const WorkOrders: React.FC = () => {
                               setOverdueReasonDialogOpen(true);
                             }}
                             className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 text-left"
-                            title={`Reason: ${(workOrder as any).overdueReason}`}
+                            title={`Reason: ${workOrder.overdueReason}`}
                             data-testid={`badge-overdue-reason-set-${workOrder.id}`}
                           >
                             ✓ Reason set
