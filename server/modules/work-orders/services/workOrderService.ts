@@ -1009,6 +1009,12 @@ export async function updateWorkOrder(id: string, body: any) {
       { code: 'POSTPONEMENT_REASON_REQUIRED' }
     );
   }
+  if (isBeingPostponed && updateData.postponementReason?.trim() === 'Other Reason' && !updateData.postponementRemarks?.trim()) {
+    throw new ValidationError(
+      'A custom postponement reason is required when selecting Other Reason.',
+      { code: 'OTHER_REASON_REMARKS_REQUIRED' }
+    );
+  }
 
   const workOrder = await repo.update(id, updateData);
 

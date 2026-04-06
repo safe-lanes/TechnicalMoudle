@@ -144,8 +144,10 @@ const WorkOrders: React.FC = () => {
           .map((i) => i.listValue)
       : [];
 
-  const filterPostponementReasons: string[] =
-    dbActivePostponementReasons.length > 0 ? dbActivePostponementReasons : [...POSTPONEMENT_REASONS];
+  const filterPostponementReasons: string[] = [
+    ...(dbActivePostponementReasons.length > 0 ? dbActivePostponementReasons : [...POSTPONEMENT_REASONS]),
+    "Other Reason",
+  ];
 
   // Create work order mutation
   const createWorkOrderMutation = useMutation({
