@@ -523,15 +523,15 @@ export default function ShipsSurveysAdmin() {
     const currentData = draftMasterData;
     const nextSeq = currentData.length > 0 ? Math.max(...currentData.map(s => s.sequence)) + 1 : 1;
     const nextId = currentData.length > 0 ? Math.max(...currentData.map(s => s.id)) + 1 : 1;
-    const newMasterId = `A1-${String(nextSeq).padStart(3, '0')}`;
+    const newMasterId = `NEW-${String(nextSeq).padStart(3, '0')}`;
     
     const newSurvey: MasterSurvey = {
       id: nextId,
       sequence: nextSeq,
       masterId: newMasterId,
       surveyName: "",
-      category: "A",
-      group: "1",
+      category: "",
+      group: "",
       requirementRef: "",
       applicableToCompany: false,
       surveyLabel: "",
@@ -545,7 +545,9 @@ export default function ShipsSurveysAdmin() {
     return surveys.map((s, idx) => ({
       ...s,
       sequence: idx + 1,
-      masterId: `${s.category}${s.group}-${String(idx + 1).padStart(3, '0')}`
+      masterId: s.category && s.group
+        ? `${s.category}${s.group}-${String(idx + 1).padStart(3, '0')}`
+        : `NEW-${String(idx + 1).padStart(3, '0')}`
     }));
   };
 
@@ -572,7 +574,9 @@ export default function ShipsSurveysAdmin() {
           if (field === "category" || field === "group") {
             const cat = field === "category" ? value : s.category;
             const grp = field === "group" ? value : s.group;
-            updated.masterId = `${cat}${grp}-${String(s.sequence).padStart(3, '0')}`;
+            updated.masterId = cat && grp
+              ? `${cat}${grp}-${String(s.sequence).padStart(3, '0')}`
+              : `NEW-${String(s.sequence).padStart(3, '0')}`;
           }
           return updated;
         }
@@ -1240,9 +1244,9 @@ export default function ShipsSurveysAdmin() {
                         </td>
                         <td className="px-4 py-2">
                           {isEditMode ? (
-                            <Select value={survey.category} onValueChange={(v) => updateField(survey.id, "category", v)}>
+                            <Select value={survey.category || undefined} onValueChange={(v) => updateField(survey.id, "category", v)}>
                               <SelectTrigger className={`h-8 ${invalidSurveyIds.has(survey.id) && !survey.category?.trim() ? 'border-red-500 focus:border-red-500' : ''}`} data-testid={`select-category-${survey.id}`}>
-                                <SelectValue />
+                                <SelectValue placeholder="Select…" />
                               </SelectTrigger>
                               <SelectContent>
                                 {CATEGORY_OPTIONS.map(cat => (
@@ -1256,9 +1260,9 @@ export default function ShipsSurveysAdmin() {
                         </td>
                         <td className="px-4 py-2">
                           {isEditMode ? (
-                            <Select value={survey.group} onValueChange={(v) => updateField(survey.id, "group", v)}>
+                            <Select value={survey.group || undefined} onValueChange={(v) => updateField(survey.id, "group", v)}>
                               <SelectTrigger className={`h-8 ${invalidSurveyIds.has(survey.id) && !survey.group?.trim() ? 'border-red-500 focus:border-red-500' : ''}`} data-testid={`select-group-${survey.id}`}>
-                                <SelectValue />
+                                <SelectValue placeholder="Select…" />
                               </SelectTrigger>
                               <SelectContent>
                                 {GROUP_OPTIONS.map(grp => (
