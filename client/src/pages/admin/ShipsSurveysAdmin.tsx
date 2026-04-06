@@ -448,8 +448,8 @@ export default function ShipsSurveysAdmin() {
       };
     });
     
-    const includeCompany = activeTab !== "vessel";
-    const includeVessel = activeTab !== "company";
+    const includeCompany = activeTab === "company";
+    const includeVessel = activeTab === "vessel";
 
     const allSurveys = [
       ...dataToSave,
