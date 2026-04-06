@@ -292,19 +292,19 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
                             : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
                         } hover:bg-gray-100`}
                       >
-                        <td className="font-mono text-sm text-blue-600" data-testid={index === 0 ? "I4.QL.2.18" : undefined}>
+                        <td className="py-3 px-4 font-mono text-sm text-blue-600" data-testid={index === 0 ? "I4.QL.2.18" : undefined}>
                           {index === 0 && <Marker id="I4.QL.2.18" />}
                           {item.listKey}
                         </td>
-                        <td className="font-medium" data-testid={index === 0 ? "I4.QL.2.19" : undefined}>
+                        <td className="py-3 px-4 font-medium" data-testid={index === 0 ? "I4.QL.2.19" : undefined}>
                           {index === 0 && <Marker id="I4.QL.2.19" />}
                           {item.listValue}
                         </td>
-                        <td data-testid={index === 0 ? "I4.QL.2.20" : undefined}>
+                        <td className="py-3 px-4" data-testid={index === 0 ? "I4.QL.2.20" : undefined}>
                           {index === 0 && <Marker id="I4.QL.2.20" />}
                           {item.displayOrder}
                         </td>
-                        <td data-testid={index === 0 ? "I4.QL.2.21" : undefined}>
+                        <td className="py-3 px-4" data-testid={index === 0 ? "I4.QL.2.21" : undefined}>
                           {index === 0 && <Marker id="I4.QL.2.21" />}
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -316,7 +316,7 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
                             {item.isActive ? "Active" : "Inactive"}
                           </span>
                         </td>
-                        <td className="text-right">
+                        <td className="py-3 px-4 text-right">
                           <div className="flex justify-end gap-1">
                             <button
                               onClick={(e) => {

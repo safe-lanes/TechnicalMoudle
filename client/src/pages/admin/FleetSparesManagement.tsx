@@ -980,34 +980,34 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                         className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} cursor-pointer hover:bg-gray-100`}
                         onDoubleClick={() => handleRowDoubleClick(spare)}
                       >
-                        <td className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL5.5.22" : undefined}>
+                        <td className="py-3 px-4 font-mono text-sm" data-testid={isFirstRow ? "I4.QL5.5.22" : undefined}>
                           {isFirstRow && <Marker id="I4.QL5.5.22" />}
                           {spare.partCode}
                         </td>
-                        <td className="font-medium" data-testid={isFirstRow ? "I4.QL5.5.23" : undefined}>
+                        <td className="py-3 px-4 font-medium" data-testid={isFirstRow ? "I4.QL5.5.23" : undefined}>
                           {isFirstRow && <Marker id="I4.QL5.5.23" />}
                           {spare.partName}
                         </td>
-                        <td className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL5.5.24" : undefined}>
+                        <td className="py-3 px-4 font-mono text-sm" data-testid={isFirstRow ? "I4.QL5.5.24" : undefined}>
                           {isFirstRow && <Marker id="I4.QL5.5.24" />}
                           {spare.fleetEquipmentCode || "-"}
                         </td>
-                        <td className="text-sm" data-testid={isFirstRow ? "I4.QL5.5.fleet-eq-name-val" : undefined}>
+                        <td className="py-3 px-4 text-sm" data-testid={isFirstRow ? "I4.QL5.5.fleet-eq-name-val" : undefined}>
                           {equipment?.fleetEquipmentName || "-"}
                         </td>
-                        <td className="text-sm" data-testid={isFirstRow ? "I4.QL5.5.25" : undefined}>
+                        <td className="py-3 px-4 text-sm" data-testid={isFirstRow ? "I4.QL5.5.25" : undefined}>
                           {isFirstRow && <Marker id="I4.QL5.5.25" />}
                           {spare.maker || "-"}
                         </td>
-                        <td data-testid={isFirstRow ? "I4.QL5.5.26" : undefined}>
+                        <td className="py-3 px-4" data-testid={isFirstRow ? "I4.QL5.5.26" : undefined}>
                           {isFirstRow && <Marker id="I4.QL5.5.26" />}
                           {spare.unitOfMeasurement || "-"}
                         </td>
-                        <td data-testid={isFirstRow ? "I4.QL5.5.27" : undefined}>
+                        <td className="py-3 px-4" data-testid={isFirstRow ? "I4.QL5.5.27" : undefined}>
                           {isFirstRow && <Marker id="I4.QL5.5.27" />}
                           -
                         </td>
-                        <td className="text-right">
+                        <td className="py-3 px-4 text-right">
                           <div className="flex justify-end gap-1">
                             <button
                               onClick={(e) => { e.stopPropagation(); handleEdit(spare); }}

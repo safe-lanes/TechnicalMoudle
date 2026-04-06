@@ -1483,34 +1483,34 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
                     const isFirstRow = index === 0;
                     return (
                       <tr key={job.id} data-testid={`row-job-${job.id}`} className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} cursor-pointer hover:bg-gray-100`} onDoubleClick={() => setDetailJob(job)}>
-                        <td className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL.4.21" : undefined}>
+                        <td className="py-3 px-4 font-mono text-sm" data-testid={isFirstRow ? "I4.QL.4.21" : undefined}>
                           {isFirstRow && <Marker id="I4.QL.4.21" />}
                           {job.jobCode}
                         </td>
-                        <td className="font-medium max-w-xs truncate" data-testid={isFirstRow ? "I4.QL.4.22" : undefined}>
+                        <td className="py-3 px-4 font-medium max-w-xs truncate" data-testid={isFirstRow ? "I4.QL.4.22" : undefined}>
                           {isFirstRow && <Marker id="I4.QL.4.22" />}
                           {job.woTitle}
                         </td>
-                        <td className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL.4.23" : undefined}>
+                        <td className="py-3 px-4 font-mono text-sm" data-testid={isFirstRow ? "I4.QL.4.23" : undefined}>
                           {isFirstRow && <Marker id="I4.QL.4.23" />}
                           {job.fleetEquipmentCode || "-"}
                         </td>
-                        <td className="text-sm" data-testid={isFirstRow ? "I4.QL.4.fleet-eq-name-val" : undefined}>
+                        <td className="py-3 px-4 text-sm" data-testid={isFirstRow ? "I4.QL.4.fleet-eq-name-val" : undefined}>
                           {job.fleetEquipmentName || "-"}
                         </td>
-                        <td data-testid={isFirstRow ? "I4.QL.4.24" : undefined}>
+                        <td className="py-3 px-4" data-testid={isFirstRow ? "I4.QL.4.24" : undefined}>
                           {isFirstRow && <Marker id="I4.QL.4.24" />}
                           {job.intervalValue && job.unit
                             ? `${job.intervalValue} ${job.unit}`
                             : "-"}
                         </td>
-                        <td data-testid={isFirstRow ? "I4.QL.4.25" : undefined}>
+                        <td className="py-3 px-4" data-testid={isFirstRow ? "I4.QL.4.25" : undefined}>
                           {isFirstRow && <Marker id="I4.QL.4.25" />}
                           <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate" data-testid={isFirstRow ? "badge-task-type" : undefined}>
                             {job.taskType || "-"}
                           </Badge>
                         </td>
-                        <td className="text-right">
+                        <td className="py-3 px-4 text-right">
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="outline"
