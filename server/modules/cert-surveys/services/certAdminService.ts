@@ -69,7 +69,7 @@ export async function saveMasterCertificates(body: any) {
     }
 
     if (existing.length > 0) {
-      // Update existing
+      const wasDeleted = existing[0].isDeleted === true;
       await certAdminRepo.updateMasterCertificate(cert.masterId, {
         sequence: cert.sequence,
         certificateName: cert.certificateName,
@@ -79,13 +79,18 @@ export async function saveMasterCertificates(body: any) {
         applicableToCompany: cert.applicableToCompany || false,
         certificateLabel: cert.certificateLabel || null,
         isActive: cert.isActive !== false,
+        isDeleted: false,
         companyId: cert.companyId || null,
         companyGroup: cert.companyGroup || null,
         companySequence: cert.companySequence || null,
       });
-      updatedCount++;
+      if (wasDeleted) {
+        insertedCount++;
+        newlyInsertedMasterIds.push(cert.masterId);
+      } else {
+        updatedCount++;
+      }
     } else {
-      // Insert new
       await certAdminRepo.insertMasterCertificate({
         sequence: cert.sequence,
         masterId: cert.masterId,

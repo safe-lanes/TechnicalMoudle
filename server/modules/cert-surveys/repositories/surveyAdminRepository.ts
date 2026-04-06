@@ -31,7 +31,7 @@ export async function getMasterSurveyByMasterId(masterId: string) {
   const db = await getDb();
   if (!db) return null;
   return db.select().from(shipSurveysMaster)
-    .where(and(eq(shipSurveysMaster.masterId, masterId), eq(shipSurveysMaster.isDeleted, false)))
+    .where(eq(shipSurveysMaster.masterId, masterId))
     .limit(1);
 }
 

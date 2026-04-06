@@ -31,7 +31,7 @@ export async function getMasterCertificateByMasterId(masterId: string) {
   const db = await getDb();
   if (!db) return null;
   return db.select().from(shipCertificatesMaster)
-    .where(and(eq(shipCertificatesMaster.masterId, masterId), eq(shipCertificatesMaster.isDeleted, false)))
+    .where(eq(shipCertificatesMaster.masterId, masterId))
     .limit(1);
 }
 
