@@ -309,8 +309,12 @@ export default function ShipsSurveysAdmin() {
       }
       setHasUnsavedChanges(false);
       setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
-      setCompanyOnlySurveys([]);
-      setVesselOnlySurveys([]);
+      if (activeTab !== "vessel") {
+        setCompanyOnlySurveys([]);
+      }
+      if (activeTab !== "company") {
+        setVesselOnlySurveys([]);
+      }
       setMasterValidationError("");
       setInvalidSurveyIds(new Set());
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
@@ -444,24 +448,33 @@ export default function ShipsSurveysAdmin() {
       };
     });
     
-    const allSurveys = [...dataToSave, ...companyOnlySurveysWithIds, ...vesselOnlySurveysWithIds];
+    const includeCompany = activeTab !== "vessel";
+    const includeVessel = activeTab !== "company";
+
+    const allSurveys = [
+      ...dataToSave,
+      ...(includeCompany ? companyOnlySurveysWithIds : []),
+      ...(includeVessel ? vesselOnlySurveysWithIds : []),
+    ];
     
-    // Get selected vessel info for vessel-specific survey applicability
-    const targetVessels = (vesselMasterData || [])
-      .filter((v: any) => selectedVessels.includes(v.name))
-      .map((v: any) => ({ id: String(v.id), name: v.name }));
-    const vesselMasterIds = vesselOnlySurveysWithIds.map(s => s.masterId);
-    
-    if (vesselMasterIds.length > 0 && targetVessels.length === 0) {
-      toast({
-        title: "Please select a vessel first",
-        description: "Vessel-specific surveys require at least one vessel to be selected on the Vessel tab.",
-        variant: "destructive",
-      });
-      return;
+    const vesselMasterIds = includeVessel ? vesselOnlySurveysWithIds.map(s => s.masterId) : [];
+
+    let targetVessels: { id: string; name: string }[] = [];
+    if (vesselMasterIds.length > 0) {
+      targetVessels = (vesselMasterData || [])
+        .filter((v: any) => selectedVessels.includes(v.name))
+        .map((v: any) => ({ id: String(v.id), name: v.name }));
+
+      if (targetVessels.length === 0) {
+        toast({
+          title: "Please select a vessel first",
+          description: "Vessel-specific surveys require at least one vessel to be selected on the Vessel tab.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
     
-    // Then save all surveys
     saveMutation.mutate({ 
       surveys: allSurveys,
       vesselSpecificSurveys: vesselMasterIds,
