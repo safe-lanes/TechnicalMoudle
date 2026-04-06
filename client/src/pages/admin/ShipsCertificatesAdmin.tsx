@@ -193,6 +193,8 @@ const STARTER_KIT_MASTER_DATA: MasterCertificate[] = [
   { id: 71, sequence: 71, masterId: "B10-004", certificateName: "ISO 50001", category: "B", group: "10", requirementRef: "", applicableToCompany: false, certificateLabel: "", isSystemDefined: true },
 ];
 
+const SYSTEM_MASTER_IDS = new Set(STARTER_KIT_MASTER_DATA.map(c => c.masterId));
+
 const mockCompanyData: CompanyCertificate[] = [
   { id: 1, masterId: "CA001", companyId: "L0001", certificateLabel: "Safety Equi. Cert.", requirementRef: "SOLAS XXX", companyGroup: "A. Statutory", ranking: "-" },
   { id: 2, masterId: "C0002", companyId: "L0002", certificateLabel: "Safety Const. Cert.", requirementRef: "SOLAS XXX", companyGroup: "A. Statutory", ranking: "-" },
@@ -404,7 +406,7 @@ export default function ShipsCertificatesAdmin() {
   
   const deleteCertificateRow = (id: number) => {
     const cert = masterData.find(c => c.id === id);
-    if (!cert || cert.isSystemDefined) return;
+    if (!cert || cert.isSystemDefined || SYSTEM_MASTER_IDS.has(cert.masterId)) return;
     if (cert.masterId) {
       setDeletedMasterIds(prev => [...prev, cert.masterId]);
     }
@@ -1492,7 +1494,7 @@ export default function ShipsCertificatesAdmin() {
                             <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600" onClick={() => undoDeleteRow(cert.masterId)} data-testid={`button-undo-delete-${cert.id}`} title="Undo deletion">
                               <Undo2 className="h-4 w-4" />
                             </Button>
-                          ) : cert.isSystemDefined ? (
+                          ) : (cert.isSystemDefined || SYSTEM_MASTER_IDS.has(cert.masterId)) ? (
                             <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground opacity-30 cursor-not-allowed" disabled data-testid={`button-delete-disabled-${cert.id}`}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
