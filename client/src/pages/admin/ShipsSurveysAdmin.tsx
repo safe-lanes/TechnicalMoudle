@@ -309,10 +309,10 @@ export default function ShipsSurveysAdmin() {
       }
       setHasUnsavedChanges(false);
       setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
-      if (activeTab !== "vessel") {
+      if (activeTab === "company") {
         setCompanyOnlySurveys([]);
       }
-      if (activeTab !== "company") {
+      if (activeTab === "vessel") {
         setVesselOnlySurveys([]);
       }
       setMasterValidationError("");
