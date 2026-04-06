@@ -491,6 +491,7 @@ export default function ShipsSurveysAdmin() {
         .filter(s => !(s.masterId ?? '').startsWith('VES-') && !(s.masterId ?? '').startsWith('CMP-'))
         .sort((a, b) => a.sequence - b.sequence);
       masterOnly.forEach((s, idx) => { s.sequence = idx + 1; });
+      draft.sort((a, b) => a.sequence - b.sequence);
       setDraftMasterData(draft);
       setDeletedDraftIds([]);
       setHasUnsavedChanges(false);
