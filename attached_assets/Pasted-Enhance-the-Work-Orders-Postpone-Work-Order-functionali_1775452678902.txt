@@ -1,0 +1,174 @@
+Enhance the Work Orders > Postpone Work Order functionality in the PMS module.
+
+Objective
+Currently, the Postpone Work Order popup has a free-text field for Reason for Postponement. Replace this with a structured reason selection system so users can choose from predefined postponement reasons, and the selected reason can be stored, displayed, filtered, and reported later.
+​
+​
+
+Functional requirement
+When a user clicks the Postpone Work Order action from the Work Orders list, the postponement modal should include:
+
+A dropdown/select field named Reason for Postponement
+
+A textarea below it for optional additional remarks/details
+
+The dropdown must be mandatory
+
+The remarks textarea can remain optional unless current business rules already require it
+​
+
+Dropdown reasons to add
+Use the following exact options in the dropdown:
+
+Awaiting spare parts onboard.
+
+Required consumables unavailable.
+
+Vessel in port operations.
+
+Vessel in transit.
+
+Vessel under pilotage / manoeuvring.
+
+Rough weather / adverse sea conditions.
+
+Operationally critical equipment in continuous use.
+
+Job postponed due to operational priority.
+
+Dry dock / repair window awaited.
+
+Riding squad / technician required.
+
+Maker’s service engineer required.
+
+Shore assistance required.
+
+Class / flag / owner attendance awaited.
+
+Permit to work not available.
+
+Machinery shutdown opportunity not available.
+
+Main engine stoppage not available.
+
+Equipment isolation not possible.
+
+Cargo operations in progress.
+
+Bunkering operations in progress.
+
+Tank cleaning / gas-freeing in progress.
+
+Inspection / audit preparations in progress.
+
+Vessel staff workload / manpower limitation.
+
+Work in progress, not yet completed.
+
+Shore management instruction awaited.
+
+Dry dock / next port planning.
+
+To be carried out at next suitable opportunity.
+
+To be carried out during voyage leg.
+
+To be carried out during harbour stay.
+
+UI behavior
+Keep the existing popup layout and styling consistent with the PMS design
+
+Replace the current single free-text reason field with:
+
+Reason for Postponement dropdown
+
+Remarks / Additional Details textarea underneath
+
+Add validation so the user cannot confirm postponement without selecting a dropdown reason
+
+Show a clear validation message if no reason is selected
+
+Preserve existing fields like Work Order ID, Component, Job Title, Original Due Date, Authorized By, Inform Office, Approval Remarks, etc.
+​
+
+Data/storage requirement
+Update the backend/database so that each postponed work order stores:
+
+postponement_reason = selected dropdown value
+
+postponement_remarks = optional text entered by user
+
+Keep compatibility with existing postponement records if older records only contain free text
+
+If migration is needed, do not break old data
+​
+
+Listing and tracking requirement
+Once a work order is postponed:
+
+Store the selected postponement reason in the record
+
+Make the reason available in:
+
+Work Order details view
+
+Postponed/Planned/Overdue tracking wherever relevant
+
+Export/reporting data
+
+Add the ability to filter postponed jobs by postponement reason
+
+If there is already an Export feature in Work Orders, include postponement reason and remarks in export output as appropriate
+​
+
+Reporting requirement
+Prepare the system so we can later analyze postponed jobs by reason. At minimum:
+
+Each postponed work order should have a structured reason value
+
+Reason should be queryable for dashboards, reports, and summaries
+
+Keep the reason values standardized exactly as per the dropdown list, so reporting is consistent
+
+Suggested implementation approach
+Use a master list/constant/enumeration for postponement reasons instead of hardcoding the values in multiple places
+
+Reuse the same master list in frontend form, backend validation, and reporting filters
+
+Ensure selected value is saved as a clean standard string
+
+Keep code modular so more reasons can be added later from admin/config if needed
+
+Validation and edge cases
+User must not be able to submit postponement without selecting a dropdown reason
+
+Existing postponed jobs should still load correctly even if they do not yet have a structured reason
+
+If old free-text reason data exists, preserve it as legacy remarks or map it carefully without data loss
+
+Ensure no UI break on mobile or smaller modal heights
+
+Ensure dropdown values display properly without truncation
+
+Acceptance criteria
+The task is complete only if:
+
+The postponement popup shows a mandatory Reason for Postponement dropdown
+
+The above 28 reasons are available exactly as listed
+
+The selected reason is saved in the database
+
+Optional remarks can also be saved
+
+Postponed jobs can be filtered/tracked by selected reason
+
+Existing postponement functionality continues to work without regression
+
+Export/reporting includes the postponement reason where relevant
+
+UI remains consistent with the existing PMS module
+
+Important note
+Do not redesign the whole Work Orders page. Only enhance the current postponement functionality and related storage/filter/report support while keeping the existing UI flow intact.
