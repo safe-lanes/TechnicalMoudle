@@ -1539,7 +1539,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
         }}
       >
         <DialogContent className="p-0 gap-0" style={{ width: '40vw', maxWidth: '40vw', maxHeight: '85vh' }}>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 rounded-t-lg">
+          <div className="bg-[#52baf3] pl-4 pr-10 py-2.5 rounded-t-lg">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Ship className="h-3.5 w-3.5 text-white" />
@@ -1560,7 +1560,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                 </Button>
                 <Button
                   size="sm"
-                  className="h-6 px-2 text-[10px] bg-white text-blue-700 hover:bg-blue-50"
+                  className="h-6 px-2 text-[10px] bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                   onClick={() => {
                     setSelectedVesselsToMap(new Set());
                     setVesselMappingSearchQuery("");
@@ -1647,7 +1647,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
         }}
       >
         <DialogContent className="p-0 gap-0" style={{ width: '50vw', maxWidth: '50vw', maxHeight: '85vh' }}>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 rounded-t-lg">
+          <div className="bg-[#52baf3] pl-4 pr-10 py-2.5 rounded-t-lg">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Anchor className="h-3.5 w-3.5 text-white" />
@@ -1679,7 +1679,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                 </Button>
                 <Button
                   size="sm"
-                  className="h-6 px-2 text-[10px] bg-white text-blue-700 hover:bg-blue-50"
+                  className="h-6 px-2 text-[10px] bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                   onClick={() => {
                     setSelectedComponentsToMap(new Set());
                     setComponentMappingSearchQuery("");
@@ -1756,7 +1756,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
         }}
       >
         <DialogContent className="p-0 gap-0" style={{ width: '40vw', maxWidth: '40vw', maxHeight: '85vh' }}>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 rounded-t-lg">
+          <div className="bg-[#52baf3] pl-4 pr-10 py-2.5 rounded-t-lg">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Ship className="h-3.5 w-3.5 text-white" />
@@ -1778,7 +1778,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                 </div>
                 <Button
                   size="sm"
-                  className="h-6 px-3 text-[10px] bg-white text-blue-700 hover:bg-blue-50"
+                  className="h-6 px-3 text-[10px] bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                   onClick={handleMapVessels}
                   disabled={selectedVesselsToMap.size === 0 || addMappingMutation.isPending}
                   data-testid="btn-map-vessels"
@@ -1842,7 +1842,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
         }}
       >
         <DialogContent className="p-0 gap-0" style={{ width: '40vw', maxWidth: '40vw', maxHeight: '85vh' }}>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 rounded-t-lg">
+          <div className="bg-[#52baf3] pl-4 pr-10 py-2.5 rounded-t-lg">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Anchor className="h-3.5 w-3.5 text-white" />
@@ -1864,7 +1864,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                 </div>
                 <Button
                   size="sm"
-                  className="h-6 px-3 text-[10px] bg-white text-blue-700 hover:bg-blue-50"
+                  className="h-6 px-3 text-[10px] bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                   onClick={handleMapComponents}
                   disabled={selectedComponentsToMap.size === 0 || addMappingMutation.isPending}
                   data-testid="btn-map-components"
@@ -1927,14 +1927,12 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       }}>
         <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Fleet Job Information</DialogTitle>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5">
+          <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Briefcase className="h-5 w-5 text-white" />
-              </div>
+              <Briefcase className="h-5 w-5 text-gray-500" />
               <div>
-                <h1 className="text-xl font-bold text-white" data-testid="title-fleet-job-info">Fleet Job Information</h1>
-                <p className="text-cyan-100 text-sm mt-0.5">
+                <h1 className="text-2xl font-bold text-gray-900" data-testid="title-fleet-job-info">Fleet Job Information</h1>
+                <p className="text-gray-500 text-sm mt-0.5">
                   Jobs linked to: {selectedComponent?.fleetEquipmentName || selectedComponent?.name || "Selected Component"}
                 </p>
               </div>
@@ -1978,7 +1976,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                   <Trash2 className="h-5 w-5" />
                 </Button>
                 <Button
-                  className="bg-cyan-600 whitespace-nowrap"
+                  className="bg-[#5dc86f] hover:bg-[#4db85f] text-white whitespace-nowrap"
                   onClick={() => {
                     setNewJobFormData({});
                     setIsAddJobDialogOpen(true);
@@ -1989,7 +1987,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                   Add New Job
                 </Button>
                 <Button
-                  className="bg-cyan-600 whitespace-nowrap"
+                  className="bg-[#5dc86f] hover:bg-[#4db85f] text-white whitespace-nowrap"
                   onClick={() => setIsJobVesselMappingDialogOpen(true)}
                   data-testid="btn-job-vessel-mapping"
                 >
@@ -2130,7 +2128,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       {/* Job Vessel Mapping Dialog */}
       <Dialog open={isJobVesselMappingDialogOpen} onOpenChange={setIsJobVesselMappingDialogOpen}>
         <DialogContent className="p-0 gap-0" style={{ width: '40vw', maxWidth: '40vw', maxHeight: '85vh' }}>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 rounded-t-lg">
+          <div className="bg-[#52baf3] pl-4 pr-10 py-2.5 rounded-t-lg">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Ship className="h-3.5 w-3.5 text-white" />
@@ -2150,7 +2148,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                 </Button>
                 <Button
                   size="sm"
-                  className="h-6 px-3 text-[10px] bg-white text-blue-700 hover:bg-blue-50"
+                  className="h-6 px-3 text-[10px] bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                   disabled={selectedJobVesselIds.size === 0}
                   data-testid="btn-job-map-vessel"
                 >
@@ -2208,23 +2206,22 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
 
       {/* Job Details Dialog */}
       <Dialog open={isJobDetailsDialogOpen} onOpenChange={setIsJobDetailsDialogOpen}>
-        <DialogContent className="w-screen max-w-screen h-screen max-h-screen p-0 overflow-hidden flex flex-col rounded-none" aria-describedby={undefined}>
+        <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Job Details</DialogTitle>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+          <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Briefcase className="h-5 w-5 text-white" />
-              </div>
+              <Briefcase className="h-5 w-5 text-gray-500" />
               <div>
-                <h1 className="text-xl font-bold text-white" data-testid="title-job-details">Job Details</h1>
-                <p className="text-cyan-100 text-sm mt-0.5">
+                <h1 className="text-2xl font-bold text-gray-900" data-testid="title-job-details">Job Details</h1>
+                <p className="text-gray-500 text-sm mt-0.5">
                   {selectedJobForDetail?.woTitle || "Job Information"}
                 </p>
               </div>
             </div>
             <Button
-              className="bg-white/20 text-white border-white/30"
               variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
               onClick={() => {
                 if (selectedJobForDetail) {
                   setJobFormData({ ...selectedJobForDetail, jobPriority: normalizeJobPriority(selectedJobForDetail.jobPriority) });
@@ -2532,31 +2529,29 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
 
       {/* Edit Job Dialog */}
       <Dialog open={isEditJobDialogOpen} onOpenChange={setIsEditJobDialogOpen}>
-        <DialogContent className="w-screen max-w-screen h-screen max-h-screen p-0 overflow-hidden flex flex-col rounded-none" aria-describedby={undefined}>
+        <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Edit Job Details</DialogTitle>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+          <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Pencil className="h-5 w-5 text-white" />
-              </div>
+              <Pencil className="h-5 w-5 text-gray-500" />
               <div>
-                <h1 className="text-xl font-bold text-white" data-testid="title-edit-job">Edit Job Details</h1>
-                <p className="text-cyan-100 text-sm mt-0.5">
+                <h1 className="text-2xl font-bold text-gray-900" data-testid="title-edit-job">Edit Job Details</h1>
+                <p className="text-gray-500 text-sm mt-0.5">
                   {jobFormData.woTitle || selectedJobForDetail?.woTitle || "Edit job information"}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <Button
-                className="bg-white/20 text-white border-white/30"
                 variant="outline"
+                className="bg-white text-[#0f172a] border-gray-300"
                 onClick={() => setIsEditJobDialogOpen(false)}
                 data-testid="btn-cancel-edit-job"
               >
                 Cancel
               </Button>
               <Button
-                className="bg-white text-blue-600"
+                className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                 onClick={handleSaveEditJob}
                 disabled={updateFleetJobMutation.isPending}
                 data-testid="btn-save-job"
@@ -2930,24 +2925,22 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
         setIsAddJobDialogOpen(open);
         if (!open) setNewJobFormData({});
       }}>
-        <DialogContent className="w-screen max-w-screen h-screen max-h-screen p-0 overflow-hidden flex flex-col rounded-none" aria-describedby={undefined}>
+        <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Add New Job Information</DialogTitle>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+          <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Plus className="h-5 w-5 text-white" />
-              </div>
+              <Plus className="h-5 w-5 text-gray-500" />
               <div>
-                <h1 className="text-xl font-bold text-white" data-testid="title-add-new-job">Add New Job Information</h1>
-                <p className="text-cyan-100 text-sm mt-0.5">
+                <h1 className="text-2xl font-bold text-gray-900" data-testid="title-add-new-job">Add New Job Information</h1>
+                <p className="text-gray-500 text-sm mt-0.5">
                   {selectedComponent?.fleetEquipmentName || "Create a new job"}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <Button
-                className="bg-white/20 text-white border-white/30"
                 variant="outline"
+                className="bg-white text-[#0f172a] border-gray-300"
                 onClick={() => {
                   setIsAddJobDialogOpen(false);
                   setNewJobFormData({});
@@ -2957,7 +2950,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                 Cancel
               </Button>
               <Button
-                className="bg-white text-blue-600"
+                className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                 disabled={createFleetJobMutation.isPending || !selectedComponent}
                 onClick={() => {
                   if (!selectedComponent) {
@@ -3319,14 +3312,12 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       }}>
         <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Fleet Spares Information</DialogTitle>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-5">
+          <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Anchor className="h-5 w-5 text-white" />
-              </div>
+              <Anchor className="h-5 w-5 text-gray-500" />
               <div>
-                <h1 className="text-xl font-bold text-white" data-testid="title-fleet-spare-info">Fleet Spares Information</h1>
-                <p className="text-cyan-100 text-sm mt-0.5">
+                <h1 className="text-2xl font-bold text-gray-900" data-testid="title-fleet-spare-info">Fleet Spares Information</h1>
+                <p className="text-gray-500 text-sm mt-0.5">
                   Spares linked to: {selectedComponent?.fleetEquipmentName || selectedComponent?.name || "Selected Component"}
                 </p>
               </div>
@@ -3370,7 +3361,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                   <Trash2 className="h-5 w-5" />
                 </Button>
                 <Button
-                  className="bg-cyan-600 whitespace-nowrap"
+                  className="bg-[#5dc86f] hover:bg-[#4db85f] text-white whitespace-nowrap"
                   onClick={() => {
                     setSpareFormData({});
                     setMakerSearchText("");
@@ -3382,7 +3373,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                   Add New Spare
                 </Button>
                 <Button
-                  className="bg-cyan-600 whitespace-nowrap"
+                  className="bg-[#5dc86f] hover:bg-[#4db85f] text-white whitespace-nowrap"
                   onClick={() => setIsSpareVesselMappingDialogOpen(true)}
                   data-testid="btn-spare-vessel-mapping"
                 >
@@ -3515,7 +3506,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       {/* Spare Vessel Mapping Dialog */}
       <Dialog open={isSpareVesselMappingDialogOpen} onOpenChange={setIsSpareVesselMappingDialogOpen}>
         <DialogContent className="p-0 gap-0" style={{ width: '40vw', maxWidth: '40vw', maxHeight: '85vh' }}>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 pl-4 pr-10 py-2.5 rounded-t-lg">
+          <div className="bg-[#52baf3] pl-4 pr-10 py-2.5 rounded-t-lg">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Ship className="h-3.5 w-3.5 text-white" />
@@ -3535,7 +3526,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                 </Button>
                 <Button
                   size="sm"
-                  className="h-6 px-3 text-[10px] bg-white text-blue-700 hover:bg-blue-50"
+                  className="h-6 px-3 text-[10px] bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                   disabled={selectedSpareVesselIds.size === 0}
                   data-testid="btn-spare-map-vessel"
                 >
@@ -3595,20 +3586,18 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       <Dialog open={isSpareDetailsDialogOpen} onOpenChange={setIsSpareDetailsDialogOpen}>
         <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Spare Details</DialogTitle>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+          <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Info className="h-5 w-5 text-white" />
-              </div>
+              <Info className="h-5 w-5 text-gray-500" />
               <div>
-                <h1 className="text-xl font-bold text-white" data-testid="title-spare-details">Spare Details</h1>
-                <p className="text-cyan-100 text-sm mt-0.5">{selectedSpareForDetail?.partName || "View spare information"}</p>
+                <h1 className="text-2xl font-bold text-gray-900" data-testid="title-spare-details">Spare Details</h1>
+                <p className="text-gray-500 text-sm mt-0.5">{selectedSpareForDetail?.partName || "View spare information"}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <Button
-                className="bg-white/20 text-white border-white/30"
                 variant="outline"
+                className="bg-white text-[#0f172a] border-gray-300"
                 onClick={() => setIsSpareDetailsDialogOpen(false)}
                 data-testid="btn-back-spare-detail"
               >
@@ -3616,7 +3605,9 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                 Back
               </Button>
               <Button
-                className="bg-white text-blue-600"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-2 bg-white text-[#0f172a] border-gray-300"
                 onClick={() => {
                   setSpareFormData(selectedSpareForDetail || {});
                   setMakerSearchText(selectedSpareForDetail?.maker || "");
@@ -3778,27 +3769,25 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       <Dialog open={isEditSpareDialogOpen} onOpenChange={setIsEditSpareDialogOpen}>
         <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Edit Spare Details</DialogTitle>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+          <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Pencil className="h-5 w-5 text-white" />
-              </div>
+              <Pencil className="h-5 w-5 text-gray-500" />
               <div>
-                <h1 className="text-xl font-bold text-white" data-testid="title-edit-spare">Edit Spare Details</h1>
-                <p className="text-cyan-100 text-sm mt-0.5">{spareFormData.partName || "Update spare information"}</p>
+                <h1 className="text-2xl font-bold text-gray-900" data-testid="title-edit-spare">Edit Spare Details</h1>
+                <p className="text-gray-500 text-sm mt-0.5">{spareFormData.partName || "Update spare information"}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <Button
-                className="bg-white/20 text-white border-white/30"
                 variant="outline"
+                className="bg-white text-[#0f172a] border-gray-300"
                 onClick={() => setIsEditSpareDialogOpen(false)}
                 data-testid="btn-cancel-edit-spare"
               >
                 Cancel
               </Button>
               <Button
-                className="bg-white text-blue-600"
+                className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                 onClick={() => {
                   toast({ title: "Success", description: "Spare updated successfully" });
                   setIsEditSpareDialogOpen(false);
@@ -4024,27 +4013,25 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       <Dialog open={isAddSpareDialogOpen} onOpenChange={setIsAddSpareDialogOpen}>
         <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Add New Spare Information</DialogTitle>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+          <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Plus className="h-5 w-5 text-white" />
-              </div>
+              <Plus className="h-5 w-5 text-gray-500" />
               <div>
-                <h1 className="text-xl font-bold text-white" data-testid="title-add-spare">Add New Spare Information</h1>
-                <p className="text-cyan-100 text-sm mt-0.5">Create a new spare part entry</p>
+                <h1 className="text-2xl font-bold text-gray-900" data-testid="title-add-spare">Add New Spare Information</h1>
+                <p className="text-gray-500 text-sm mt-0.5">Create a new spare part entry</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <Button
-                className="bg-white/20 text-white border-white/30"
                 variant="outline"
+                className="bg-white text-[#0f172a] border-gray-300"
                 onClick={() => setIsAddSpareDialogOpen(false)}
                 data-testid="btn-cancel-add-spare"
               >
                 Cancel
               </Button>
               <Button
-                className="bg-white text-blue-600"
+                className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                 onClick={() => {
                   toast({ title: "Success", description: "New spare added successfully" });
                   setIsAddSpareDialogOpen(false);

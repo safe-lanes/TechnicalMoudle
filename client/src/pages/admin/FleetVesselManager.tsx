@@ -1216,12 +1216,12 @@ export default function FleetVesselManager({ onBack }: { onBack?: () => void }) 
 
       <Dialog open={isCopyVesselDialogOpen} onOpenChange={(open) => { if (!open) { setIsCopyVesselDialogOpen(false); } }}>
         <DialogContent className="p-0 gap-0" style={{ width: "480px", maxWidth: "90vw" }}>
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-5 py-3 rounded-t-lg">
+          <div className="bg-[#52baf3] px-5 py-3 rounded-t-lg">
             <div className="flex items-center gap-2">
               <Copy className="h-4 w-4 text-white" />
               <h3 className="text-white font-semibold text-sm">Copy Vessel Configuration</h3>
             </div>
-            <p className="text-cyan-100 text-xs mt-0.5">Replicate mapping data from one vessel to another</p>
+            <p className="text-white/80 text-xs mt-0.5">Replicate mapping data from one vessel to another</p>
           </div>
 
           <div className="p-5 space-y-5">

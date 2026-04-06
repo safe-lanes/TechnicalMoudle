@@ -258,28 +258,24 @@ export default function MasterDataManagement({ onBack }: { onBack?: () => void }
   return (
     <div className="p-6">
       <Card className="overflow-hidden">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <FileCode2 className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">Fleet Equipment Code Master Data</h1>
-                <p className="text-cyan-100 text-sm mt-0.5">Manage Fleet Equipment Codes that link fleet-level components to vessels</p>
-              </div>
+        <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <FileCode2 className="h-5 w-5 text-gray-500" />
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Fleet Equipment Code Master Data</h1>
+              <p className="text-gray-500 text-sm mt-0.5">Manage Fleet Equipment Codes that link fleet-level components to vessels</p>
             </div>
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="flex items-center gap-1 text-cyan-100 hover:text-white text-sm transition-colors"
-                data-testid="button-back-to-dashboard"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </button>
-            )}
           </div>
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1 text-gray-500 hover:text-gray-900 text-sm transition-colors"
+              data-testid="button-back-to-dashboard"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </button>
+          )}
         </div>
 
         <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
