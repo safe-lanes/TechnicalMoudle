@@ -30,15 +30,18 @@ import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
 import { ComplianceAnomalyPanel } from "./ComplianceAnomalyPanel";
 import { WorkOrdersListModal } from "./WorkOrdersListModal";
+import { SparesListModal } from "./SparesListModal";
 
 interface Spare {
   id: number;
   partNumber: string;
   partName: string;
+  partCode?: string;
   rob: number;
   min: number;
   critical: string;
   componentName?: string;
+  vesselId?: string;
 }
 
 interface StoresItem {
@@ -347,6 +350,7 @@ const Dashboard = () => {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
   const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: EnrichedWorkOrder[] }>({ open: false, title: '', workOrders: [] });
+  const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
   const [activeTab, setActiveTab] = useState('overview');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedCriticality, setSelectedCriticality] = useState("");
@@ -569,11 +573,14 @@ const Dashboard = () => {
       overdueFull: overdue as EnrichedWorkOrder[],
       due: due.length,
       dueList: due.slice(0, 5),
+      dueFull: due as EnrichedWorkOrder[],
       pendingApproval: pendingApproval.length,
       pendingApprovalList: pendingApproval.slice(0, 5),
-      pendingApprovalFull: pendingApproval, // Full list for bulk approve modal
+      pendingApprovalFull: pendingApproval as EnrichedWorkOrder[],
       completed: completed.length,
-      active: planned.length  // Keep 'active' property name for backwards compatibility
+      completedFull: completed as EnrichedWorkOrder[],
+      active: planned.length,
+      plannedFull: planned as EnrichedWorkOrder[],
     };
   }, [filteredWorkOrdersData]);
 
@@ -989,12 +996,21 @@ const Dashboard = () => {
       wo.computedStatus === 'Completed'
     );
 
+    const planned = safeWOs.filter(wo =>
+      (wo.computedStatus === 'Active' || wo.computedStatus === 'Postponed') && !wo.isExecution
+    );
+
     return {
       total: safeWOs.filter(wo => !wo.isExecution).length,
       overdue: overdue.length,
+      overdueFull: overdue as EnrichedWorkOrder[],
       due: due.length,
+      dueFull: due as EnrichedWorkOrder[],
       pendingApproval: pendingApproval.length,
+      pendingApprovalFull: pendingApproval as EnrichedWorkOrder[],
       completed: completed.length,
+      completedFull: completed as EnrichedWorkOrder[],
+      plannedFull: planned as EnrichedWorkOrder[],
     };
   }, [workOrdersData]);
 
@@ -1378,11 +1394,13 @@ const Dashboard = () => {
                               const entry = workOrderStatusChartData[index];
                               if (!entry) return;
                               const status = entry.status;
-                              if (status === 'Overdue') navigateToWorkOrders('Overdue');
-                              else if (status === 'Due') navigateToWorkOrders('Due');
-                              else if (status === 'Completed') navigateToWorkOrders('Completed');
-                              else if (status === 'Pending Approval') navigateToWorkOrders('Pending Approval');
-                              else navigateToWorkOrders('Planned');
+                              let wos: EnrichedWorkOrder[] = [];
+                              if (status === 'Overdue') wos = workOrderKPIs.overdueFull;
+                              else if (status === 'Due') wos = workOrderKPIs.dueFull;
+                              else if (status === 'Completed') wos = workOrderKPIs.completedFull;
+                              else if (status === 'Pending Approval') wos = workOrderKPIs.pendingApprovalFull;
+                              else wos = workOrderKPIs.plannedFull;
+                              setWoListModal({ open: true, title: `${status} Work Orders - All Equipment`, workOrders: wos });
                             }}
                             cursor="pointer"
                           >
@@ -1408,7 +1426,7 @@ const Dashboard = () => {
                     color="#e74c3c"
                     displayValue={criticalWorkOrderKPIs.overdue.toString()}
                     subtitle={`${criticalOverduePercent}% of total`}
-                    onClick={() => navigateToWorkOrders('Overdue')}
+                    onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - Critical Equipment', workOrders: criticalWorkOrderKPIs.overdueFull })}
                     testId="gauge-overdue-wo-critical"
                   />
 
@@ -1445,11 +1463,13 @@ const Dashboard = () => {
                               const entry = criticalWorkOrderStatusChartData[index];
                               if (!entry) return;
                               const status = entry.status;
-                              if (status === 'Overdue') navigateToWorkOrders('Overdue');
-                              else if (status === 'Due') navigateToWorkOrders('Due');
-                              else if (status === 'Pending Approval') navigateToWorkOrders('Pending Approval');
-                              else if (status === 'Completed') navigateToWorkOrders('Completed');
-                              else navigateToWorkOrders('Planned');
+                              let wos: EnrichedWorkOrder[] = [];
+                              if (status === 'Overdue') wos = criticalWorkOrderKPIs.overdueFull;
+                              else if (status === 'Due') wos = criticalWorkOrderKPIs.dueFull;
+                              else if (status === 'Pending Approval') wos = criticalWorkOrderKPIs.pendingApprovalFull;
+                              else if (status === 'Completed') wos = criticalWorkOrderKPIs.completedFull;
+                              else wos = criticalWorkOrderKPIs.plannedFull;
+                              setWoListModal({ open: true, title: `${status} Work Orders - Critical Equipment`, workOrders: wos });
                             }}
                             cursor="pointer"
                           >
@@ -1590,7 +1610,9 @@ const Dashboard = () => {
                             labelLine={false}
                             onClick={(_data: Record<string, unknown>, index: number) => {
                               const entry = sparesStockChartData[index];
-                              if (entry) navigateToSpares(entry.status);
+                              if (!entry) return;
+                              const filtered = filteredSparesData.filter(s => getStockStatus(s.rob, s.min).label === entry.status);
+                              setSparesListModal({ open: true, title: `${entry.status} Stock Spares - All`, spares: filtered });
                             }}
                             cursor="pointer"
                           >
@@ -1637,7 +1659,10 @@ const Dashboard = () => {
                             labelLine={false}
                             onClick={(_data: Record<string, unknown>, index: number) => {
                               const entry = criticalSparesStockChartData[index];
-                              if (entry) navigateToSpares(entry.status);
+                              if (!entry) return;
+                              const criticalSparesList = sparesData.filter(s => s.critical === 'Critical' || s.critical === 'Yes');
+                              const filtered = criticalSparesList.filter(s => getStockStatus(s.rob, s.min).label === entry.status);
+                              setSparesListModal({ open: true, title: `${entry.status} Stock Spares - Critical`, spares: filtered });
                             }}
                             cursor="pointer"
                           >
@@ -1773,6 +1798,15 @@ const Dashboard = () => {
         title={woListModal.title}
         workOrders={woListModal.workOrders}
         vessels={vessels}
+      />
+
+      <SparesListModal
+        open={sparesListModal.open}
+        onClose={() => setSparesListModal({ open: false, title: '', spares: [] })}
+        title={sparesListModal.title}
+        spares={sparesListModal.spares}
+        vessels={vessels}
+        getStockStatus={getStockStatus}
       />
     </div>
   );
