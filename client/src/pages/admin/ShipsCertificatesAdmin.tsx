@@ -105,6 +105,7 @@ interface CompanyCertificate {
   requirementRef: string;
   companyGroup: string;
   ranking: string;
+  sequence?: number;
 }
 
 interface VesselCertificate {
@@ -296,6 +297,7 @@ export default function ShipsCertificatesAdmin() {
             requirementRef: cert.requirementRef || cert.requirement_ref || "",
             companyGroup: cert.companyGroup || cert.company_group || "",
             ranking: "-",
+            sequence: cert.companySequence || cert.company_sequence || cert.sequence || undefined,
           });
         } else if (category === 'Vessel' || masterId?.startsWith('VES-')) {
           vesselRecords.push({
@@ -446,10 +448,11 @@ export default function ShipsCertificatesAdmin() {
     const companyCertsForSave: MasterCertificate[] = companyOnlyCerts.map((cert, idx) => {
       const hasCmpId = /^CMP-\d+$/.test(cert.masterId);
       const newMasterId = hasCmpId ? cert.masterId : `CMP-${String(nextCmpSeq++).padStart(3, '0')}`;
+      const savedSequence = cert.sequence ?? (masterData.length + idx + 1);
 
       return {
         id: cert.id,
-        sequence: masterData.length + idx + 1,
+        sequence: savedSequence,
         masterId: newMasterId,
         certificateName: cert.certificateLabel,
         category: 'Company',
@@ -460,7 +463,7 @@ export default function ShipsCertificatesAdmin() {
         isActive: true,
         companyId: cert.companyId || newMasterId.replace('CMP-', 'CV'),
         companyGroup: cert.companyGroup || '',
-        companySequence: masterData.length + idx + 1,
+        companySequence: savedSequence,
       };
     });
     
@@ -1101,6 +1104,12 @@ export default function ShipsCertificatesAdmin() {
     
     const newId = Math.max(...companyOnlyCerts.map(c => c.id), 0) + 1000;
     
+    const masterDerivedMaxSeq = masterData
+      .filter(c => c.applicableToCompany)
+      .reduce((max, c) => Math.max(max, c.companySequence ?? c.sequence), 0);
+    const companyOnlyMaxSeq = companyOnlyCerts.reduce((max, c) => Math.max(max, c.sequence ?? 0), 0);
+    const nextSequence = Math.max(masterDerivedMaxSeq, companyOnlyMaxSeq) + 1;
+    
     const newCert: CompanyCertificate = {
       id: newId,
       masterId: "",
@@ -1109,6 +1118,7 @@ export default function ShipsCertificatesAdmin() {
       requirementRef: newCompanyEntryData.requirementRef || "",
       companyGroup: newCompanyEntryData.companyGroup || "",
       ranking: "-",
+      sequence: nextSequence,
     };
     
     setCompanyOnlyCerts(prev => [...prev, newCert]);
@@ -1631,76 +1641,134 @@ export default function ShipsCertificatesAdmin() {
 
   // Handler for Company tab sequence reordering - mirrors updateMasterSequence logic
   const updateCompanySequence = (certId: number, newSequence: number) => {
-    setMasterData(prevData => {
-      // Get only certificates applicable to Company tab
-      const companyCerts = prevData.filter(c => c.applicableToCompany);
-      const currentCert = companyCerts.find(c => c.id === certId);
-      if (!currentCert) return prevData;
+    const companyCerts = masterData.filter(c => c.applicableToCompany);
+    const currentCert = companyCerts.find(c => c.id === certId);
+    if (!currentCert) return;
 
-      const oldSequence = currentCert.companySequence ?? currentCert.sequence;
-      if (newSequence === oldSequence) return prevData;
+    const oldSequence = currentCert.companySequence ?? currentCert.sequence;
+    if (newSequence === oldSequence) return;
 
-      // Get IDs of certificates in Company tab
-      const companyIds = new Set(companyCerts.map(c => c.id));
+    const companyIds = new Set(companyCerts.map(c => c.id));
 
-      // First, ensure all company certs have companySequence initialized
-      // Then apply the reordering logic
-      return prevData.map(c => {
-        // Only affect Company-applicable certificates
-        if (!companyIds.has(c.id)) return c;
+    setMasterData(prevData => prevData.map(c => {
+      if (!companyIds.has(c.id)) return c;
 
-        // Get the effective sequence for this cert
-        const certOldSeq = c.companySequence ?? c.sequence;
+      const certOldSeq = c.companySequence ?? c.sequence;
 
-        if (c.id === certId) {
-          return { ...c, companySequence: newSequence };
+      if (c.id === certId) {
+        return { ...c, companySequence: newSequence };
+      }
+
+      if (newSequence < oldSequence) {
+        if (certOldSeq >= newSequence && certOldSeq < oldSequence) {
+          return { ...c, companySequence: certOldSeq + 1 };
         }
-
-        // Moving up (e.g., 4 → 2): shift items in [newSequence, oldSequence-1] down by 1
-        if (newSequence < oldSequence) {
-          if (certOldSeq >= newSequence && certOldSeq < oldSequence) {
-            return { ...c, companySequence: certOldSeq + 1 };
-          }
+      } else {
+        if (certOldSeq > oldSequence && certOldSeq <= newSequence) {
+          return { ...c, companySequence: certOldSeq - 1 };
         }
-        // Moving down (e.g., 1 → 4): shift items in [oldSequence+1, newSequence] up by 1
-        else {
-          if (certOldSeq > oldSequence && certOldSeq <= newSequence) {
-            return { ...c, companySequence: certOldSeq - 1 };
-          }
-        }
+      }
 
-        // If not in the shift range, still initialize companySequence to its current effective value
-        // to ensure consistency for future reordering operations
-        if (c.companySequence === undefined) {
-          return { ...c, companySequence: certOldSeq };
-        }
+      if (c.companySequence === undefined) {
+        return { ...c, companySequence: certOldSeq };
+      }
 
-        return c;
-      });
-    });
+      return c;
+    }));
+
+    setCompanyOnlyCerts(prev => prev.map(c => {
+      const certOldSeq = c.sequence ?? 999999;
+      if (newSequence < oldSequence) {
+        if (certOldSeq >= newSequence && certOldSeq < oldSequence) {
+          return { ...c, sequence: certOldSeq + 1 };
+        }
+      } else {
+        if (certOldSeq > oldSequence && certOldSeq <= newSequence) {
+          return { ...c, sequence: certOldSeq - 1 };
+        }
+      }
+      return c;
+    }));
+
+    setHasUnsavedChanges(true);
+  };
+
+  const updateCompanyOnlySequence = (certId: number, newSequence: number) => {
+    const masterCompanyCerts = masterData.filter(c => c.applicableToCompany);
+    const currentCert = companyOnlyCerts.find(c => c.id === certId);
+    if (!currentCert) return;
+
+    const oldSequence = currentCert.sequence ?? 999999;
+    if (newSequence === oldSequence) return;
+
+    const masterCompanyIds = new Set(masterCompanyCerts.map(c => c.id));
+
+    setMasterData(prevData => prevData.map(c => {
+      if (!masterCompanyIds.has(c.id)) return c;
+      const certOldSeq = c.companySequence ?? c.sequence;
+      if (newSequence < oldSequence) {
+        if (certOldSeq >= newSequence && certOldSeq < oldSequence) {
+          return { ...c, companySequence: certOldSeq + 1 };
+        }
+      } else {
+        if (certOldSeq > oldSequence && certOldSeq <= newSequence) {
+          return { ...c, companySequence: certOldSeq - 1 };
+        }
+      }
+      if (c.companySequence === undefined) {
+        return { ...c, companySequence: certOldSeq };
+      }
+      return c;
+    }));
+
+    setCompanyOnlyCerts(prev => prev.map(c => {
+      const certOldSeq = c.sequence ?? 999999;
+      if (c.id === certId) {
+        return { ...c, sequence: newSequence };
+      }
+      if (newSequence < oldSequence) {
+        if (certOldSeq >= newSequence && certOldSeq < oldSequence) {
+          return { ...c, sequence: certOldSeq + 1 };
+        }
+      } else {
+        if (certOldSeq > oldSequence && certOldSeq <= newSequence) {
+          return { ...c, sequence: certOldSeq - 1 };
+        }
+      }
+      return c;
+    }));
+
     setHasUnsavedChanges(true);
   };
 
   const renderCompanyTab = () => {
-    // Derive company data from Master tab - only certificates with applicableToCompany checked
     const companyDataFromMaster = masterData
       .filter((cert: MasterCertificate) => cert.applicableToCompany)
       .map((cert: MasterCertificate, idx: number) => ({
         id: cert.id,
         masterId: cert.masterId,
         certificateLabel: cert.certificateLabel,
-        // Use stored companyId if exists, otherwise default to "C" + Master ID
         companyId: cert.companyId || ("C" + cert.masterId),
-        requirementRef: cert.requirementRef, // Pre-filled from Master, but editable
-        // Use stored companyGroup if exists
+        requirementRef: cert.requirementRef,
         companyGroup: cert.companyGroup || "",
-        // Use stored companySequence if exists, or fall back to companySequences state, or inherit from Master
         sequence: cert.companySequence ?? companySequences[cert.id] ?? cert.sequence,
+        source: 'master' as const,
       }));
 
-    const sortedCompanyData = [...companyDataFromMaster].sort((a, b) => a.sequence - b.sequence);
+    const companyOnlyMapped = companyOnlyCerts.map((cert) => ({
+      id: cert.id,
+      masterId: cert.masterId && /^CMP-/.test(cert.masterId) ? cert.masterId : "",
+      certificateLabel: cert.certificateLabel,
+      companyId: cert.companyId || "",
+      requirementRef: cert.requirementRef || "",
+      companyGroup: cert.companyGroup || "",
+      sequence: cert.sequence ?? 999999,
+      source: 'company-only' as const,
+    }));
 
-    const filteredData = sortedCompanyData.filter(cert => {
+    const allCompanyData = [...companyDataFromMaster, ...companyOnlyMapped].sort((a, b) => a.sequence - b.sequence);
+
+    const filteredData = allCompanyData.filter(cert => {
       const matchesSearch = cert.certificateLabel.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            cert.masterId.toLowerCase().includes(searchTerm.toLowerCase());
       return matchesSearch;
@@ -1738,12 +1806,15 @@ export default function ShipsCertificatesAdmin() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filteredData.map((cert, idx) => (
-                  <tr key={cert.id} className="hover:bg-gray-50">
+                {filteredData.map((cert, idx) => {
+                  const isCompanyOnly = cert.source === 'company-only';
+                  const testIdSuffix = isCompanyOnly ? `only-${cert.id}` : `${cert.id}`;
+                  return (
+                  <tr key={isCompanyOnly ? `company-only-${cert.id}` : cert.id} className={`hover:bg-gray-50 ${isCompanyOnly ? 'bg-green-50' : ''}`}>
                     {viewModes.company === "edit" && (
                       <td className="px-3 py-3 text-sm text-center">
                         <Input
-                          key={`seq-company-${cert.id}-${cert.sequence}`}
+                          key={`seq-company-${cert.id}-${cert.source}-${cert.sequence}`}
                           type="number"
                           defaultValue={cert.sequence}
                           className="h-8 text-sm w-16 text-center"
@@ -1751,72 +1822,21 @@ export default function ShipsCertificatesAdmin() {
                           onBlur={(e) => {
                             const newSeq = parseInt(e.target.value, 10);
                             if (!isNaN(newSeq) && newSeq > 0) {
-                              updateCompanySequence(cert.id, newSeq);
+                              if (isCompanyOnly) {
+                                updateCompanyOnlySequence(cert.id, newSeq);
+                              } else {
+                                updateCompanySequence(cert.id, newSeq);
+                              }
                             }
                           }}
-                          data-testid={`input-sequence-company-${cert.id}`}
+                          data-testid={`input-sequence-company-${testIdSuffix}`}
                         />
                       </td>
                     )}
                     <td className="px-3 py-3 text-sm">{idx + 1}</td>
-                    <td className="px-3 py-3 text-sm font-medium text-blue-600">{cert.masterId}</td>
-                    <td className="px-3 py-3 text-sm">
-                      {viewModes.company === "edit" ? (
-                        <Input 
-                          defaultValue={cert.companyId}
-                          className="h-8 text-sm"
-                          placeholder=""
-                          onBlur={(e) => updateCompanyField(cert.id, 'companyId', e.target.value)}
-                          data-testid={`input-companyid-${cert.id}`}
-                        />
-                      ) : (
-                        cert.companyId || "-"
-                      )}
+                    <td className="px-3 py-3 text-sm font-medium text-blue-600">
+                      {isCompanyOnly ? (cert.masterId || "-") : cert.masterId}
                     </td>
-                    <td className="px-3 py-3 text-sm">{cert.certificateLabel}</td>
-                    <td className="px-3 py-3 text-sm">
-                      {viewModes.company === "edit" ? (
-                        <Input 
-                          defaultValue={cert.requirementRef}
-                          className="h-8 text-sm"
-                          data-testid={`input-requirement-company-${cert.id}`}
-                        />
-                      ) : (
-                        cert.requirementRef
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-sm">
-                      {viewModes.company === "edit" ? (
-                        <Select 
-                          defaultValue={cert.companyGroup}
-                          onValueChange={(value) => updateCompanyField(cert.id, 'companyGroup', value)}
-                        >
-                          <SelectTrigger className="h-8 text-sm" data-testid={`select-companygroup-${cert.id}`}>
-                            <SelectValue placeholder={getFormattedCompanyGroupLabel("A")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {companyGroupLabels.map((grp: LabelConfig) => (
-                              <SelectItem key={grp.key} value={grp.key}>
-                                {getFormattedCompanyGroupLabel(grp.key)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        cert.companyGroup ? getFormattedCompanyGroupLabel(cert.companyGroup) : "-"
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                
-                {/* Company-only certificates (not from Master) */}
-                {companyOnlyCerts.map((cert, idx) => (
-                  <tr key={`company-only-${cert.id}`} className="hover:bg-gray-50 bg-green-50">
-                    {viewModes.company === "edit" && (
-                      <td className="px-3 py-3 text-sm text-center">-</td>
-                    )}
-                    <td className="px-3 py-3 text-sm">{filteredData.length + idx + 1}</td>
-                    <td className="px-3 py-3 text-sm font-medium text-gray-400">{cert.masterId && /^CMP-/.test(cert.masterId) ? cert.masterId : "-"}</td>
                     <td className="px-3 py-3 text-sm">
                       {viewModes.company === "edit" ? (
                         <Input 
@@ -1824,18 +1844,22 @@ export default function ShipsCertificatesAdmin() {
                           className="h-8 text-sm"
                           placeholder=""
                           onBlur={(e) => {
-                            setCompanyOnlyCerts(prev => prev.map(c => 
-                              c.id === cert.id ? { ...c, companyId: e.target.value } : c
-                            ));
+                            if (isCompanyOnly) {
+                              setCompanyOnlyCerts(prev => prev.map(c => 
+                                c.id === cert.id ? { ...c, companyId: e.target.value } : c
+                              ));
+                            } else {
+                              updateCompanyField(cert.id, 'companyId', e.target.value);
+                            }
                           }}
-                          data-testid={`input-companyid-only-${cert.id}`}
+                          data-testid={`input-companyid-${testIdSuffix}`}
                         />
                       ) : (
                         cert.companyId || "-"
                       )}
                     </td>
                     <td className="px-3 py-3 text-sm">
-                      {viewModes.company === "edit" ? (
+                      {viewModes.company === "edit" && isCompanyOnly ? (
                         <Input 
                           defaultValue={cert.certificateLabel}
                           className="h-8 text-sm"
@@ -1844,7 +1868,7 @@ export default function ShipsCertificatesAdmin() {
                               c.id === cert.id ? { ...c, certificateLabel: e.target.value } : c
                             ));
                           }}
-                          data-testid={`input-label-only-${cert.id}`}
+                          data-testid={`input-label-${testIdSuffix}`}
                         />
                       ) : (
                         cert.certificateLabel
@@ -1856,11 +1880,13 @@ export default function ShipsCertificatesAdmin() {
                           defaultValue={cert.requirementRef}
                           className="h-8 text-sm"
                           onBlur={(e) => {
-                            setCompanyOnlyCerts(prev => prev.map(c => 
-                              c.id === cert.id ? { ...c, requirementRef: e.target.value } : c
-                            ));
+                            if (isCompanyOnly) {
+                              setCompanyOnlyCerts(prev => prev.map(c => 
+                                c.id === cert.id ? { ...c, requirementRef: e.target.value } : c
+                              ));
+                            }
                           }}
-                          data-testid={`input-requirement-only-${cert.id}`}
+                          data-testid={`input-requirement-company-${testIdSuffix}`}
                         />
                       ) : (
                         cert.requirementRef
@@ -1871,12 +1897,16 @@ export default function ShipsCertificatesAdmin() {
                         <Select 
                           defaultValue={cert.companyGroup}
                           onValueChange={(value) => {
-                            setCompanyOnlyCerts(prev => prev.map(c => 
-                              c.id === cert.id ? { ...c, companyGroup: value } : c
-                            ));
+                            if (isCompanyOnly) {
+                              setCompanyOnlyCerts(prev => prev.map(c => 
+                                c.id === cert.id ? { ...c, companyGroup: value } : c
+                              ));
+                            } else {
+                              updateCompanyField(cert.id, 'companyGroup', value);
+                            }
                           }}
                         >
-                          <SelectTrigger className="h-8 text-sm" data-testid={`select-companygroup-only-${cert.id}`}>
+                          <SelectTrigger className="h-8 text-sm" data-testid={`select-companygroup-${testIdSuffix}`}>
                             <SelectValue placeholder={getFormattedCompanyGroupLabel("A")} />
                           </SelectTrigger>
                           <SelectContent>
@@ -1892,7 +1922,8 @@ export default function ShipsCertificatesAdmin() {
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
                 
                 {/* New entry row for Company-specific certificate */}
                 {viewModes.company === "edit" && isAddingNewCompany && (
