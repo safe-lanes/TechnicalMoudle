@@ -126,14 +126,18 @@ const WorkOrders: React.FC = () => {
     enabled: !!vesselId,
   });
 
-  const { data: postponementReasonMasterList = [] } = useQuery<{ listValue: string; displayOrder: number; isActive: boolean }[]>({
+  const { data: postponementReasonMasterList } = useQuery<{ listValue: string; displayOrder: number; isActive: boolean }[]>({
     queryKey: ['/technical/api/fleet/master-lists', 'postponementReason'],
-    queryFn: () =>
-      fetch('/technical/api/fleet/master-lists?listType=postponementReason').then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch('/technical/api/fleet/master-lists?listType=postponementReason');
+      if (!r.ok) throw new Error(`Failed to fetch postponement reasons: ${r.status}`);
+      const json = await r.json();
+      return Array.isArray(json) ? json : [];
+    },
   });
 
   const filterPostponementReasons: string[] =
-    postponementReasonMasterList.filter((i) => i.isActive).length > 0
+    postponementReasonMasterList && postponementReasonMasterList.length > 0
       ? postponementReasonMasterList
           .filter((i) => i.isActive)
           .sort((a, b) => a.displayOrder - b.displayOrder)

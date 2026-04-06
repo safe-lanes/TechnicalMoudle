@@ -739,6 +739,17 @@ export async function initializeDatabase() {
     }
     console.log('✓ Seeded department master list (6 values)');
 
+    // Seed postponement reason master list (fresh-schema path, idempotent)
+    for (let i = 0; i < POSTPONEMENT_REASONS.length; i++) {
+      const reason = POSTPONEMENT_REASONS[i];
+      await db.execute(sql`
+        INSERT INTO master_lists (list_type, list_key, list_value, display_order, is_active)
+        VALUES ('postponementReason', ${reason}, ${reason}, ${i + 1}, true)
+        ON CONFLICT (list_type, list_key) DO NOTHING
+      `);
+    }
+    console.log(`✓ Seeded postponement reason master list (${POSTPONEMENT_REASONS.length} values)`);
+
     // Alert Policies
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS alert_policies (
