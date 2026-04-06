@@ -240,16 +240,24 @@ export async function createFleetSpare(req: Request, res: Response) {
 
 export async function updateFleetSpare(req: Request, res: Response) {
   try {
-    const spare = await fleetService.updateFleetSpare(parseInt(req.params.id), req.body);
+    const id = parseInt(req.params.id);
+    console.log(`[FleetSpare] PATCH /fleet/spares/${id} — payload keys:`, Object.keys(req.body));
+    const spare = await fleetService.updateFleetSpare(id, req.body);
+    if (!spare) {
+      console.warn(`[FleetSpare] Update returned no result for id=${id}`);
+      return res.status(404).json({ error: `Fleet spare with id ${id} not found` });
+    }
+    console.log(`[FleetSpare] Successfully updated spare id=${id}, partCode=${spare.partCode}`);
     res.json(spare);
   } catch (error: any) {
     if (error.name === 'ZodError') {
+      console.error(`[FleetSpare] Zod validation failed:`, error.errors);
       return res.status(400).json({ error: "Invalid spare data", details: error.errors });
     }
     if (error.message?.includes('not found')) {
       return res.status(404).json({ error: error.message });
     }
-    console.error("Error updating fleet spare:", error);
+    console.error("[FleetSpare] Error updating fleet spare:", error);
     res.status(500).json({ error: "Failed to update fleet spare" });
   }
 }

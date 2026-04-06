@@ -63,11 +63,13 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
       const res = await apiRequest('PATCH', `/technical/api/fleet/spares/${id}`, data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedSpare: FleetSpares) => {
       queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/spares'], exact: false });
       toast({ title: "Success", description: "Spare updated successfully" });
       setIsEditMode(false);
-      setDetailSpare(null);
+      if (updatedSpare && updatedSpare.id) {
+        setDetailSpare(updatedSpare);
+      }
       setSpareFormData({});
       setMakerSearchText("");
       setEquipSearchText("");
@@ -217,6 +219,11 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
         return;
       }
     }
+    const normalize = (val: any): any => {
+      if (val === undefined || val === null) return null;
+      if (typeof val === 'string' && val.trim() === '') return null;
+      return val;
+    };
     const EDITABLE_FIELDS: (keyof FleetSpares)[] = [
       'partCode', 'partName', 'partNumber', 'unitOfMeasurement',
       'fleetEquipmentCode', 'fleetEquipmentName', 'drawingNumber',
@@ -226,11 +233,20 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
     ];
     const changedFields: Record<string, any> = {};
     for (const field of EDITABLE_FIELDS) {
-      const oldVal = detailSpare[field];
-      const newVal = spareFormData[field];
-      if (newVal !== oldVal) {
-        changedFields[field] = newVal;
+      const oldVal = normalize(detailSpare[field]);
+      const newVal = normalize(spareFormData[field]);
+      if (field === 'isActive') {
+        const oldBool = detailSpare.isActive ?? true;
+        const newBool = spareFormData.isActive ?? true;
+        if (oldBool !== newBool) {
+          changedFields[field] = newBool;
+        }
+      } else if (newVal !== oldVal) {
+        changedFields[field] = spareFormData[field] ?? null;
       }
+    }
+    if (changedFields.fleetEquipmentCode && !changedFields.fleetEquipmentName) {
+      changedFields.fleetEquipmentName = spareFormData.fleetEquipmentName || detailSpare.fleetEquipmentName;
     }
     if (Object.keys(changedFields).length === 0) {
       toast({ title: "No Changes", description: "No changes were made" });
@@ -316,11 +332,11 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   const totalSpares = spares?.length || 0;
 
   const renderSpareFormSections = (formData: Partial<FleetSpares>, setFormData: (fn: (prev: Partial<FleetSpares>) => Partial<FleetSpares>) => void) => (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-5">
       <SectionBlock id="spare-basic-info" number="A1" title="Basic Information" description="Core identification and classification details">
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-1">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+            <div className="space-y-1.5">
               <Label className="text-sm text-[#8798ad]">Part Code *</Label>
               <Input
                 placeholder="Enter part code"
@@ -329,7 +345,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                 data-testid="input-spare-part-code"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label className="text-sm text-[#8798ad]">Part Name *</Label>
               <Input
                 placeholder="Enter part name"
@@ -338,7 +354,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                 data-testid="input-spare-part-name"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label className="text-sm text-[#8798ad]">Part Number</Label>
               <Input
                 placeholder="Enter part number"
@@ -347,7 +363,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                 data-testid="input-spare-part-number"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label className="text-sm text-[#8798ad]">UOM *</Label>
               <Input
                 placeholder="Enter unit of measurement"
@@ -356,7 +372,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                 data-testid="input-spare-uom"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label className="text-sm text-[#8798ad]">Fleet Equipment Code *</Label>
               <div className="relative">
                 <div className="relative">
@@ -399,7 +415,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
                 )}
               </div>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label className="text-sm text-[#8798ad]">Equipment Name</Label>
               <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid="field-spare-equipment-code">
                 {formData.fleetEquipmentName || '-'}
@@ -410,8 +426,8 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
       </SectionBlock>
 
       <SectionBlock id="spare-status" number="A2" title="Status & Classification" description="Status flags and classification details">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-1">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+          <div className="space-y-1.5">
             <Label className="text-sm text-[#8798ad]">Criticality</Label>
             <Select
               value={formData.criticality || ""}
@@ -426,7 +442,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label className="text-sm text-[#8798ad]">Is Active</Label>
             <Select
               value={formData.isActive === true ? "Yes" : formData.isActive === false ? "No" : ""}
@@ -441,7 +457,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label className="text-sm text-[#8798ad]">IHM</Label>
             <Select
               value={formData.ihm || ""}
@@ -456,7 +472,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label className="text-sm text-[#8798ad]">Evidence Type</Label>
             <Input
               placeholder="Enter evidence type"
@@ -469,8 +485,8 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
       </SectionBlock>
 
       <SectionBlock id="spare-technical" number="A3" title="Technical Details" description="Maker and technical specifications">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-1 relative">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+          <div className="space-y-1.5 relative">
             <Label className="text-sm text-[#8798ad]">Maker</Label>
             <div className="relative">
               <Input
@@ -520,7 +536,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
               </div>
             )}
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label className="text-sm text-[#8798ad]">Maker Code</Label>
             <Input
               placeholder="Auto-filled from maker selection"
@@ -530,7 +546,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
               data-testid="input-spare-maker-code"
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label className="text-sm text-[#8798ad]">Drawing Number</Label>
             <Input
               placeholder="Enter drawing number"
@@ -539,7 +555,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
               data-testid="input-spare-drawing-number"
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label className="text-sm text-[#8798ad]">Position Number</Label>
             <Input
               placeholder="Enter position number"
@@ -548,7 +564,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
               data-testid="input-spare-position-number"
             />
           </div>
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1.5 md:col-span-2">
             <Label className="text-sm text-[#8798ad]">Specification</Label>
             <Input
               placeholder="Enter specification"
@@ -561,8 +577,8 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
       </SectionBlock>
 
       <SectionBlock id="spare-manual" number="A4" title="Manual Reference" description="Manual and documentation references">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-1">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+          <div className="space-y-1.5">
             <Label className="text-sm text-[#8798ad]">Manual Name</Label>
             <Input
               placeholder="Enter manual name"
@@ -571,7 +587,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
               data-testid="input-spare-manual-name"
             />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label className="text-sm text-[#8798ad]">Page Number</Label>
             <Input
               placeholder="Enter page number"
@@ -581,7 +597,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
             />
           </div>
         </div>
-        <div className="mt-4 space-y-1">
+        <div className="mt-4 space-y-1.5">
           <Label className="text-sm text-[#8798ad]">Note</Label>
           <Input
             placeholder="Enter notes"
@@ -597,7 +613,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   if (isAddMode) {
     return (
       <div className="flex flex-col h-full">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg">
               <Plus className="h-5 w-5 text-white" />
@@ -609,27 +625,29 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Button
-              className="bg-white/20 text-white border-white/30"
+              className="bg-white/20 text-white border-white/30 hover:bg-white/30 h-9 px-4 text-sm font-medium rounded-md"
               variant="outline"
               onClick={handleCancelAdd}
               data-testid="btn-cancel-add-spare"
             >
+              <X className="h-4 w-4 mr-1.5" />
               Cancel
             </Button>
             <Button
-              className="bg-white text-blue-600"
+              className="bg-white text-blue-600 hover:bg-blue-50 h-9 px-5 text-sm font-medium rounded-md"
               onClick={handleSaveAdd}
               disabled={createSpareMutation.isPending}
               data-testid="btn-save-add-spare"
             >
+              <Save className="h-4 w-4 mr-1.5" />
               {createSpareMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto px-6 py-6">
+        <div className="flex-1 overflow-auto px-6 py-6 bg-gray-50">
           {renderSpareFormSections(spareFormData, setSpareFormData)}
         </div>
       </div>
@@ -639,7 +657,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   if (detailSpare && isEditMode) {
     return (
       <div className="flex flex-col h-full">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg">
               <Pencil className="h-5 w-5 text-white" />
@@ -651,27 +669,29 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Button
-              className="bg-white/20 text-white border-white/30"
+              className="bg-white/20 text-white border-white/30 hover:bg-white/30 h-9 px-4 text-sm font-medium rounded-md"
               variant="outline"
               onClick={handleCancelEdit}
               data-testid="btn-cancel-edit-spare"
             >
+              <X className="h-4 w-4 mr-1.5" />
               Cancel
             </Button>
             <Button
-              className="bg-white text-blue-600"
+              className="bg-white text-blue-600 hover:bg-blue-50 h-9 px-5 text-sm font-medium rounded-md"
               onClick={handleSaveEdit}
               disabled={updateSpareMutation.isPending}
               data-testid="btn-save-edit-spare"
             >
-              {updateSpareMutation.isPending ? "Saving..." : "Save"}
+              <Save className="h-4 w-4 mr-1.5" />
+              {updateSpareMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto px-6 py-6">
+        <div className="flex-1 overflow-auto px-6 py-6 bg-gray-50">
           {renderSpareFormSections(spareFormData, setSpareFormData)}
         </div>
       </div>
@@ -681,7 +701,7 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
   if (detailSpare) {
     return (
       <div className="flex flex-col h-full">
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg">
               <Info className="h-5 w-5 text-white" />
@@ -691,28 +711,28 @@ export default function FleetSparesManagement({ onBack }: { onBack?: () => void 
               <p className="text-cyan-100 text-sm mt-0.5">{detailSpare.partName || "View spare information"}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Button
-              className="bg-white/20 text-white border-white/30"
+              className="bg-white/20 text-white border-white/30 hover:bg-white/30 h-9 px-4 text-sm font-medium rounded-md"
               variant="outline"
               onClick={handleBackToList}
               data-testid="btn-back-spare-list"
             >
-              <ArrowLeft className="h-4 w-4 mr-1" />
+              <ArrowLeft className="h-4 w-4 mr-1.5" />
               Back
             </Button>
             <Button
-              className="bg-white text-blue-600"
+              className="bg-white text-blue-600 hover:bg-blue-50 h-9 px-5 text-sm font-medium rounded-md"
               onClick={() => handleEdit(detailSpare)}
               data-testid="btn-edit-spare"
             >
-              <Pencil className="h-4 w-4 mr-1" />
+              <Pencil className="h-4 w-4 mr-1.5" />
               Edit
             </Button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto px-6 py-6">
+        <div className="flex-1 overflow-auto px-6 py-6 bg-gray-50">
           <div className="max-w-5xl mx-auto space-y-6">
             <SectionBlock id="detail-basic-info" number="A1" title="Basic Information" description="Core identification and classification details">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
