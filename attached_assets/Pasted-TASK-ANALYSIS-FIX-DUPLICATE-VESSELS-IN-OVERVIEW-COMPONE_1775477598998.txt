@@ -1,0 +1,207 @@
+TASK: ANALYSIS & FIX – DUPLICATE VESSELS IN OVERVIEW + COMPONENT FILTERING ISSUE
+
+Objective:
+
+1. Identify why **duplicate vessel names** are appearing in **Vessel Mapping Overview**  
+2. Ensure only **unique vessels** are displayed  
+3. Fix **Vessel Component Mapping Overview** to load ONLY correctly linked components  
+
+--------------------------------------------------
+
+1. Issue 1 – Duplicate Vessel Names in Vessel Mapping Overview
+
+--------------------------------------------------
+
+Current Behavior:
+
+• Same vessel is displayed multiple times  
+• Duplication occurs in list/grid  
+
+--------------------------------------------------
+
+Expected Behavior:
+
+• Each vessel should appear **ONLY ONCE**  
+• No duplicate entries  
+
+--------------------------------------------------
+
+2. Root Cause Analysis – Duplication
+
+Check:
+
+A. Backend Query Issue
+
+• Query likely fetching from:
+
+  mapping_table  
+
+• If one vessel has multiple component mappings → multiple rows returned  
+
+Example:
+
+vessel_id | component_id  
+V1        | C1  
+V1        | C2  
+
+→ Results in duplicate vessel rows  
+
+--------------------------------------------------
+
+B. Missing DISTINCT / GROUP BY
+
+• Query may not be using:
+
+  DISTINCT vessel_id  
+
+--------------------------------------------------
+
+C. UI Rendering Issue
+
+• UI rendering raw dataset without deduplication  
+
+--------------------------------------------------
+
+3. Corrective Plan – Unique Vessel Display
+
+--------------------------------------------------
+
+A. Backend Fix (Preferred)
+
+Update query:
+
+SELECT DISTINCT  
+  v.vessel_id,  
+  v.vessel_code,  
+  v.vessel_name  
+FROM  
+  mapping_table m  
+JOIN  
+  vessel_master v  
+ON  
+  m.vessel_id = v.vessel_id  
+
+--------------------------------------------------
+
+OR
+
+Use GROUP BY:
+
+GROUP BY v.vessel_id, v.vessel_code, v.vessel_name  
+
+--------------------------------------------------
+
+B. API Response Validation
+
+• Ensure only unique vessels returned  
+
+--------------------------------------------------
+
+C. Frontend Safeguard (Optional)
+
+• Deduplicate using vessel_id before rendering  
+
+--------------------------------------------------
+
+4. Issue 2 – Incorrect Component Loading in Vessel Component Mapping Overview
+
+--------------------------------------------------
+
+Current Behavior:
+
+• When opening Vessel Component Mapping Overview  
+• It loads multiple/unrelated components  
+
+--------------------------------------------------
+
+Expected Behavior:
+
+• Load ONLY components where:
+
+  fleet_equipment_code → linked to selected vessel  
+
+--------------------------------------------------
+
+5. Root Cause Analysis – Component Loading
+
+Check:
+
+A. Missing Filter Condition
+
+• Query may not be filtering by:
+
+  vessel_id  
+
+--------------------------------------------------
+
+B. Incorrect Join Logic
+
+• Mapping table not properly joined with:
+
+  fleet_component  
+
+--------------------------------------------------
+
+C. Loading Full Dataset
+
+• UI/API returning all components instead of mapped ones  
+
+--------------------------------------------------
+
+6. Corrective Plan – Component Filtering
+
+--------------------------------------------------
+
+A. Backend Query Fix
+
+Ensure query includes:
+
+WHERE  
+  m.vessel_id = <selected_vessel_id>  
+  AND m.fleet_equipment_code IS NOT NULL  
+
+--------------------------------------------------
+
+B. Proper Join
+
+JOIN:
+
+• fleet_component (using fleet_equipment_code)  
+• vessel_component  
+
+--------------------------------------------------
+
+C. Data Restriction
+
+Only return:
+
+• Components mapped via fleet_equipment_code  
+• For selected vessel ONLY  
+
+--------------------------------------------------
+
+7. Validation
+
+--------------------------------------------------
+
+Vessel Overview:
+
+• Each vessel appears once  
+• No duplication  
+
+--------------------------------------------------
+
+Component Mapping Overview:
+
+• Only selected vessel data shown  
+• Only mapped components shown  
+• No extra/unlinked components  
+
+--------------------------------------------------
+
+Expected Result:
+
+• Vessel Mapping Overview shows unique vessels only  
+• No repeated vessel entries  
+• Component Mapping Overview loads only valid linked components for selected vessel  
+• Clean and accurate mapping visibility  
