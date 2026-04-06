@@ -1,0 +1,205 @@
+TASK: FIX REMAINING OVERFLOW ISSUES – FLEET COMPONENT SCREENS & POPUPS
+
+Objective:
+
+Ensure ALL **screens and popups under Fleet Data → Fleet Components** are fully contained **within the fixed layout boundaries (top header + side bar)** and do NOT overflow outside the red highlighted area.
+
+--------------------------------------------------
+
+1. Current Issue
+
+• Some screens and popups are still:
+
+  - Extending beyond right boundary  
+  - Overlapping sidebar  
+  - Going behind top header  
+  - Creating horizontal scroll  
+
+• Layout is breaking container constraints  
+
+--------------------------------------------------
+
+2. Expected Behavior
+
+• ALL UI elements must:
+
+  - Stay within content container  
+  - Respect fixed header and sidebar  
+  - Be fully visible without overflow  
+  - Not create horizontal scrolling  
+
+--------------------------------------------------
+
+3. Root Cause Analysis
+
+Check for:
+
+A. Incorrect Width Usage
+
+• Usage of:
+
+  width: 100vw  
+
+→ Causes overflow beyond sidebar  
+
+--------------------------------------------------
+
+B. Missing Parent Container Constraint
+
+• Screen not wrapped inside main layout container  
+
+--------------------------------------------------
+
+C. Absolute / Fixed Position Misuse
+
+• Popups or sections using:
+
+  position: absolute / fixed  
+
+→ Ignoring layout boundaries  
+
+--------------------------------------------------
+
+D. Large Tables / Grids
+
+• Wide tables in Jobs / Spares tabs  
+→ Forcing horizontal overflow  
+
+--------------------------------------------------
+
+E. Popup Sizing Issue
+
+• Popups exceeding viewport width/height  
+• No max-width or max-height  
+
+--------------------------------------------------
+
+4. Corrective Plan
+
+--------------------------------------------------
+
+A. Main Container Fix (MANDATORY)
+
+Apply to ALL Fleet Component screens:
+
+• width: 100%  
+• max-width: 100%  
+• margin: 0 auto  
+• box-sizing: border-box  
+
+Ensure container is inside:
+
+• Main content wrapper (excluding sidebar & header)
+
+--------------------------------------------------
+
+B. Remove Viewport-Based Width
+
+Replace everywhere:
+
+❌ width: 100vw  
+✔ width: 100%  
+
+--------------------------------------------------
+
+C. Layout Wrapper Enforcement
+
+Ensure all screens use:
+
+• Parent layout container with padding  
+• Proper left offset (after sidebar)  
+• Proper top offset (below header)  
+
+--------------------------------------------------
+
+D. Overflow Control
+
+• Add:
+
+  overflow-x: hidden (page level)  
+
+• For tables:
+
+  overflow-x: auto (inside container only)  
+
+--------------------------------------------------
+
+E. Popup Fix
+
+For ALL popups:
+
+• max-width: 90% (or standard modal width)  
+• max-height: 90vh  
+• overflow-y: auto  
+
+• Center align:
+
+  display: flex  
+  align-items: center  
+  justify-content: center  
+
+--------------------------------------------------
+
+F. Prevent Header Overlap
+
+• Ensure top spacing:
+
+  margin-top / padding-top = header height  
+
+--------------------------------------------------
+
+G. Sidebar Respect
+
+• Ensure left spacing:
+
+  margin-left = sidebar width  
+  OR use proper layout wrapper  
+
+--------------------------------------------------
+
+H. Table Handling
+
+• Wrap large tables:
+
+  container → overflow-x: auto  
+
+• Avoid full page stretch  
+
+--------------------------------------------------
+
+5. Validation Checklist
+
+For EACH screen/popup:
+
+Layout:
+
+• No overflow beyond right edge  
+• No overlap with sidebar  
+• No content behind header  
+• No horizontal page scroll  
+
+Popup:
+
+• Fully visible inside viewport  
+• Scroll inside popup if needed  
+
+--------------------------------------------------
+
+6. Affected Areas (Re-check)
+
+Focus on:
+
+• Add Fleet Component screen  
+• Edit Fleet Component screen  
+• Jobs tab  
+• Spares tab  
+• All popups (Add/Edit/Selection)  
+
+--------------------------------------------------
+
+Expected Result:
+
+• All Fleet Component screens fit within layout  
+• No UI crosses red highlighted boundary  
+• Clean, controlled, responsive layout  
+• Consistent behavior across all screens and popups  
