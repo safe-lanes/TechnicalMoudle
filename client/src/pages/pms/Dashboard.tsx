@@ -1620,20 +1620,24 @@ const Dashboard = () => {
                   <div className="flex items-center justify-between mb-2">
                     <div style={subTitle}>Top 5 Reason for Postponement / Overdue YTD</div>
                     <div className="flex items-center gap-2 text-xs">
-                      <span
-                        className={`cursor-pointer font-semibold px-2 py-0.5 rounded ${reasonsToggle === 'overdue' ? 'bg-[#0e4c81] text-white' : 'text-gray-500 bg-gray-100'}`}
+                      <button
+                        type="button"
+                        className={`font-semibold px-2 py-0.5 rounded transition-colors ${reasonsToggle === 'overdue' ? 'bg-[#0e4c81] text-white' : 'text-gray-500 bg-gray-100 hover:bg-gray-200'}`}
                         onClick={() => setReasonsToggle('overdue')}
+                        aria-pressed={reasonsToggle === 'overdue'}
                         data-testid="toggle-overdue-reasons"
                       >
                         Overdue
-                      </span>
-                      <span
-                        className={`cursor-pointer font-semibold px-2 py-0.5 rounded ${reasonsToggle === 'postponement' ? 'bg-[#0e4c81] text-white' : 'text-gray-500 bg-gray-100'}`}
+                      </button>
+                      <button
+                        type="button"
+                        className={`font-semibold px-2 py-0.5 rounded transition-colors ${reasonsToggle === 'postponement' ? 'bg-[#0e4c81] text-white' : 'text-gray-500 bg-gray-100 hover:bg-gray-200'}`}
                         onClick={() => setReasonsToggle('postponement')}
+                        aria-pressed={reasonsToggle === 'postponement'}
                         data-testid="toggle-postponement-reasons"
                       >
                         Postponement
-                      </span>
+                      </button>
                     </div>
                   </div>
                   <div className="flex-1">
