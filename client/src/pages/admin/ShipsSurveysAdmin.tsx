@@ -347,7 +347,6 @@ export default function ShipsSurveysAdmin() {
   });
 
   const handleSave = async () => {
-    console.log('[DEBUG handleSave] activeTab:', activeTab, 'masterData.length:', masterData.length, 'companyOnlySurveys.length:', companyOnlySurveys.length, 'vesselOnlySurveys.length:', vesselOnlySurveys.length);
     if (activeTab === "master" && !draftMasterData) return;
     const dataToSave = activeTab === "master" ? draftMasterData! : masterData;
     const idsToDelete = activeTab === "master" ? deletedDraftIds : deletedMasterIds;
@@ -357,7 +356,6 @@ export default function ShipsSurveysAdmin() {
     );
     
     if (invalidSurveys.length > 0) {
-      console.log('[DEBUG handleSave] VALIDATION FAILED - invalid surveys:', invalidSurveys.map(s => ({ id: s.id, masterId: s.masterId, surveyName: s.surveyName, category: s.category, group: s.group })));
       setInvalidSurveyIds(new Set(invalidSurveys.map(s => s.id)));
       setMasterValidationError("Survey Name, Category, Group are Mandatory");
       return;
@@ -461,8 +459,6 @@ export default function ShipsSurveysAdmin() {
     
     const vesselMasterIds = includeVessel ? vesselOnlySurveysWithIds.map(s => s.masterId) : [];
 
-    console.log('[DEBUG handleSave] includeCompany:', includeCompany, 'includeVessel:', includeVessel, 'allSurveys.length:', allSurveys.length, 'vesselMasterIds:', vesselMasterIds);
-
     let targetVessels: { id: string; name: string }[] = [];
     if (vesselMasterIds.length > 0) {
       targetVessels = (vesselMasterData || [])
@@ -470,7 +466,6 @@ export default function ShipsSurveysAdmin() {
         .map((v: any) => ({ id: String(v.id), name: v.name }));
 
       if (targetVessels.length === 0) {
-        console.log('[DEBUG handleSave] BLOCKED - vessel selection required but none selected');
         toast({
           title: "Please select a vessel first",
           description: "Vessel-specific surveys require at least one vessel to be selected on the Vessel tab.",
@@ -480,7 +475,6 @@ export default function ShipsSurveysAdmin() {
       }
     }
     
-    console.log('[DEBUG handleSave] CALLING saveMutation with', allSurveys.length, 'surveys');
     saveMutation.mutate({ 
       surveys: allSurveys,
       vesselSpecificSurveys: vesselMasterIds,
