@@ -78,13 +78,16 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     },
   });
 
-  const activeReasons: string[] =
+  const dbActiveReasons: string[] =
     !reasonsError && masterListItems && masterListItems.length > 0
       ? masterListItems
           .filter((i) => i.isActive)
           .sort((a, b) => a.displayOrder - b.displayOrder)
           .map((i) => i.listValue)
-      : [...POSTPONEMENT_REASONS];
+      : [];
+
+  const activeReasons: string[] =
+    dbActiveReasons.length > 0 ? dbActiveReasons : [...POSTPONEMENT_REASONS];
 
   React.useEffect(() => {
     if (workOrder) {
