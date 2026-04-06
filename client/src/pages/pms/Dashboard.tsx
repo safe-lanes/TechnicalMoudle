@@ -20,7 +20,7 @@ import {
   Loader2,
   Filter
 } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend, BarChart, Bar } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -354,6 +354,7 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedCriticality, setSelectedCriticality] = useState("");
+  const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isHeadOfDept } = useUIRole();
@@ -1059,6 +1060,43 @@ const Dashboard = () => {
     };
   }, [workOrdersData, changeRequestsData]);
 
+  const top5ReasonsData = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const ytdWOs = (workOrdersData as EnrichedWorkOrder[]).filter(wo => {
+      if (!wo || wo.isExecution) return false;
+      const createdDate = wo.createdAt ? new Date(wo.createdAt) : null;
+      return createdDate !== null && createdDate.getFullYear() === currentYear;
+    });
+
+    const overdueWOs = ytdWOs.filter(wo => wo.computedStatus === 'Overdue');
+    const overdueCounts = new Map<string, number>();
+    overdueWOs.forEach(wo => {
+      const reason = String(wo.overdueReason ?? '').trim();
+      if (reason) {
+        overdueCounts.set(reason, (overdueCounts.get(reason) || 0) + 1);
+      }
+    });
+    const overdueTop5 = Array.from(overdueCounts.entries())
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const postponedWOs = ytdWOs.filter(wo => wo.computedStatus === 'Postponed');
+    const postponeCounts = new Map<string, number>();
+    postponedWOs.forEach(wo => {
+      const reason = String(wo.postponementReason ?? '').trim();
+      if (reason) {
+        postponeCounts.set(reason, (postponeCounts.get(reason) || 0) + 1);
+      }
+    });
+    const postponeTop5 = Array.from(postponeCounts.entries())
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    return { overdueTop5, postponeTop5 };
+  }, [workOrdersData]);
+
   const HEADER_BLUE = '#1a3a5c';
 
   const sectionHeaderBar: React.CSSProperties = {
@@ -1335,14 +1373,14 @@ const Dashboard = () => {
 
             {/* DASHBOARD GRID: 3 columns (25% / 50% / 25%), 4 explicit rows */}
             <div
-              className="grid grid-cols-1 lg:grid-cols-[1fr_2fr_1fr] lg:[grid-template-rows:180px_90px_180px_200px]"
+              className="grid grid-cols-1 lg:grid-cols-[1fr_2fr_1fr] lg:[grid-template-rows:180px_90px_180px_200px_280px]"
               style={{ gap: '16px' }}
               data-testid="dashboard-grid"
             >
 
               {/* LEFT COLUMN: Work Orders card — spans all 4 rows */}
               <div
-                className={`${cardStyle} lg:[grid-row:1/5] lg:[grid-column:1]`}
+                className={`${cardStyle} lg:[grid-row:1/6] lg:[grid-column:1]`}
                 style={{ overflow: 'hidden' }}
                 data-testid="column-wo-kpis"
               >
@@ -1573,9 +1611,71 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* RIGHT COLUMN: Spares Stock Status card — spans all 4 rows */}
+              {/* CENTER COLUMN ROW 5: Top 5 Reasons Chart */}
               <div
-                className={`${cardStyle} lg:[grid-row:1/5] lg:[grid-column:3]`}
+                className={`${cardStyle} lg:[grid-row:5/6] lg:[grid-column:2]`}
+                data-testid="cell-center-reasons-chart"
+              >
+                <div className="p-3 h-full flex flex-col">
+                  <div className="flex items-center justify-between mb-2">
+                    <div style={subTitle}>Top 5 Reason for Postponement / Overdue YTD</div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span
+                        className={`cursor-pointer font-semibold px-2 py-0.5 rounded ${reasonsToggle === 'overdue' ? 'bg-[#0e4c81] text-white' : 'text-gray-500 bg-gray-100'}`}
+                        onClick={() => setReasonsToggle('overdue')}
+                        data-testid="toggle-overdue-reasons"
+                      >
+                        Overdue
+                      </span>
+                      <span
+                        className={`cursor-pointer font-semibold px-2 py-0.5 rounded ${reasonsToggle === 'postponement' ? 'bg-[#0e4c81] text-white' : 'text-gray-500 bg-gray-100'}`}
+                        onClick={() => setReasonsToggle('postponement')}
+                        data-testid="toggle-postponement-reasons"
+                      >
+                        Postponement
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    {(reasonsToggle === 'overdue' ? top5ReasonsData.overdueTop5 : top5ReasonsData.postponeTop5).length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          layout="vertical"
+                          data={reasonsToggle === 'overdue' ? top5ReasonsData.overdueTop5 : top5ReasonsData.postponeTop5}
+                          margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                          <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
+                          <YAxis
+                            dataKey="reason"
+                            type="category"
+                            width={160}
+                            tick={{ fontSize: 9 }}
+                          />
+                          <Tooltip
+                            contentStyle={{ fontSize: '11px' }}
+                            formatter={(value: number) => [value, 'Count']}
+                          />
+                          <Bar
+                            dataKey="count"
+                            fill={reasonsToggle === 'overdue' ? '#5B9BD5' : '#FF964f'}
+                            radius={[0, 4, 4, 0]}
+                            barSize={18}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>
+                        No {reasonsToggle === 'overdue' ? 'overdue' : 'postponement'} reasons recorded
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN: Spares Stock Status card — spans all rows */}
+              <div
+                className={`${cardStyle} lg:[grid-row:1/6] lg:[grid-column:3]`}
                 style={{ overflow: 'hidden' }}
                 data-testid="column-inventory-fleet"
               >
