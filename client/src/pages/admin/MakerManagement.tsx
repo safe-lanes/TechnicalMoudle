@@ -463,18 +463,9 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
   return (
     <div className="flex flex-col h-full space-y-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold text-gray-900" data-testid="I4.QL.1.10">
-            <Marker id="I4.QL.1.10" />Maker Management
-          </h1>
-          <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-makers">
-            <Package className="h-3 w-3 mr-1" />
-            {totalMakers} Total
-          </Badge>
-          <Badge variant="secondary" className="bg-blue-100 text-blue-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-filtered-makers">
-            {filteredMakers.length} Shown
-          </Badge>
-        </div>
+        <h1 className="text-2xl font-bold text-gray-900" data-testid="I4.QL.1.10">
+          <Marker id="I4.QL.1.10" />Maker Management
+        </h1>
         <div className="flex gap-2 items-center">
           {onBack && (
             <Button
@@ -523,6 +514,13 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
             className="pl-10"
           />
         </div>
+        <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-makers">
+          <Package className="h-3 w-3 mr-1" />
+          {totalMakers} Total
+        </Badge>
+        <Badge variant="secondary" className="bg-blue-100 text-blue-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-filtered-makers">
+          {filteredMakers.length} Shown
+        </Badge>
         {searchQuery && (
           <Button
             variant="outline"
@@ -617,7 +615,7 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
                       <div className="flex justify-center gap-1">
                         <button
                           onClick={(e) => { e.stopPropagation(); handleEdit(maker); }}
-                          className="p-1.5 rounded-md text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          className="p-1 hover:bg-gray-200 rounded"
                           data-testid={isFirstRow ? "I4.QL.1.24" : `button-edit-${maker.id}`}
                         >
                           {isFirstRow && <Marker id="I4.QL.1.24" />}
@@ -625,7 +623,7 @@ export default function MakerManagement({ onBack }: { onBack?: () => void }) {
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleDeleteClick(maker); }}
-                          className="p-1.5 rounded-md text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          className="p-1 hover:bg-gray-200 rounded text-red-500"
                           data-testid={isFirstRow ? "I4.QL.1.25" : `button-delete-${maker.id}`}
                         >
                           {isFirstRow && <Marker id="I4.QL.1.25" />}
