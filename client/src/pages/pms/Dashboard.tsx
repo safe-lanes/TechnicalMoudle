@@ -346,7 +346,7 @@ const Dashboard = () => {
   const [, setLocation] = useLocation();
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
-  const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: WorkOrder[] }>({ open: false, title: '', workOrders: [] });
+  const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: EnrichedWorkOrder[] }>({ open: false, title: '', workOrders: [] });
   const [activeTab, setActiveTab] = useState('overview');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedCriticality, setSelectedCriticality] = useState("");
@@ -566,7 +566,7 @@ const Dashboard = () => {
       total: safeWOs.filter(wo => !wo.isExecution).length,
       overdue: overdue.length,
       overdueList: overdue.slice(0, 5),
-      overdueFull: overdue,
+      overdueFull: overdue as EnrichedWorkOrder[],
       due: due.length,
       dueList: due.slice(0, 5),
       pendingApproval: pendingApproval.length,

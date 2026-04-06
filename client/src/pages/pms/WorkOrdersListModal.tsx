@@ -21,20 +21,22 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import WorkOrderForm from "@/components/WorkOrderForm";
 import type { WorkOrder } from "@shared/schema";
 
+type EnrichedWorkOrder = WorkOrder & { computedStatus?: string };
+
 interface WorkOrdersListModalProps {
   open: boolean;
   onClose: () => void;
   title: string;
-  workOrders: WorkOrder[];
+  workOrders: EnrichedWorkOrder[];
 }
 
 export function WorkOrdersListModal({ open, onClose, title, workOrders }: WorkOrdersListModalProps) {
-  const [viewModal, setViewModal] = useState<{ open: boolean; workOrder: WorkOrder | null }>({
+  const [viewModal, setViewModal] = useState<{ open: boolean; workOrder: EnrichedWorkOrder | null }>({
     open: false,
     workOrder: null,
   });
 
-  const handleViewClick = (wo: WorkOrder) => {
+  const handleViewClick = (wo: EnrichedWorkOrder) => {
     setViewModal({ open: true, workOrder: wo });
   };
 
@@ -55,7 +57,7 @@ export function WorkOrdersListModal({ open, onClose, title, workOrders }: WorkOr
       jobTitle: wo.jobTitle || '-',
       assignedTo: wo.assignedTo || '-',
       dueDate: formatDate(wo.dueDate),
-      status: (wo as any).computedStatus || wo.status || '-',
+      status: wo.computedStatus || wo.status || '-',
       criticality: wo.jobPriority || '-',
     }));
 
@@ -145,7 +147,7 @@ export function WorkOrdersListModal({ open, onClose, title, workOrders }: WorkOr
                   </TableRow>
                 ) : (
                   workOrders.map((wo) => {
-                    const effectiveStatus = (wo as any).computedStatus || wo.status || 'Active';
+                    const effectiveStatus = wo.computedStatus || wo.status || 'Active';
                     return (
                       <TableRow key={wo.id} className="hover:bg-gray-50">
                         <TableCell className="font-medium text-blue-600">
@@ -210,7 +212,7 @@ export function WorkOrdersListModal({ open, onClose, title, workOrders }: WorkOr
           isOpen={viewModal.open}
           onClose={() => setViewModal({ open: false, workOrder: null })}
           workOrder={viewModal.workOrder}
-          mode="template"
+          mode="history"
         />
       )}
     </>
