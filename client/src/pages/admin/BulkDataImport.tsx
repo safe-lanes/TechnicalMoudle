@@ -16,7 +16,7 @@ import FleetSparesUpload from "./bulk/FleetSparesUpload";
 import MasterListsUpload from "./bulk/MasterListsUpload";
 import LocationsUpload from "./bulk/LocationsUpload";
 import BulkImportHistory from "./bulk/BulkImportHistory";
-import { useExternalVessels } from "@/hooks/useExternalMasterData";
+import { useVessels } from "@/hooks/useVessels";
 import { useUIRole } from "@/contexts/UIRoleContext";
 
 type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs' | 'locations';
@@ -215,19 +215,9 @@ const PAGE_MARKERS_BY_TEMPLATE: Record<VesselTemplateType, PageMarkers> = {
   locations: LOCATIONS_PAGE_MARKERS,
 };
 
-// Helper to get Vessel Entry Id from vessel master entry
-const getVesselEntryId = (entry: any): string => {
-  return String(entry.vuid || entry.vesselId || '');
-};
-
-// Helper to get vessel name from vessel master entry
-const getVesselName = (entry: any): string => {
-  return String(entry.vessel || entry.vesselName || entry.name || '');
-};
-
 export default function BulkDataImport() {
   const { isSailAdmin, isClientAdmin } = useUIRole();
-  const { data: vesselMasterEntries = [] } = useExternalVessels();
+  const { data: vessels = [], isLoading: isLoadingVessels } = useVessels();
   // Fleet mode is only available for Sail Admin
   const [isFleetModeState, setIsFleetModeState] = useState(false);
   const isFleetMode = isSailAdmin ? isFleetModeState : false;
@@ -267,20 +257,14 @@ export default function BulkDataImport() {
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
             <Select value={selectedVessel} onValueChange={(value) => setSelectedVessel(value)}>
               <SelectTrigger className="w-[200px]" data-testid={currentMarkers.vesselDropdown}>
-                <SelectValue placeholder="Choose vessel..." />
+                <SelectValue placeholder={isLoadingVessels ? "Loading vessels..." : "Choose vessel..."} />
               </SelectTrigger>
               <SelectContent>
-                {vesselMasterEntries
-                  .filter((entry: any) => getVesselEntryId(entry))
-                  .map((entry: any) => {
-                    const entryId = getVesselEntryId(entry);
-                    const vesselName = getVesselName(entry);
-                    return (
-                      <SelectItem key={entryId} value={entryId} data-testid={`vessel-${entryId}`}>
-                        {vesselName}
-                      </SelectItem>
-                    );
-                  })}
+                {vessels.map((vessel) => (
+                  <SelectItem key={vessel.id} value={vessel.id} data-testid={`vessel-${vessel.id}`}>
+                    {vessel.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
