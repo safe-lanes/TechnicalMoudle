@@ -457,3 +457,21 @@ export async function exportPlannerFromItems(req: Request, res: Response) {
     res.status(500).json({ error: 'Failed to export planner data' });
   }
 }
+
+// ── Overdue Reason ──
+
+export async function saveOverdueReason(req: Request, res: Response) {
+  const { id } = req.params;
+  const { overdueReason, overdueReasonDetails } = req.body;
+
+  if (!overdueReason || !overdueReason.trim()) {
+    return res.status(400).json({ error: 'overdueReason is required' });
+  }
+
+  if (overdueReason === 'Other Reason' && (!overdueReasonDetails || !overdueReasonDetails.trim())) {
+    return res.status(400).json({ error: 'overdueReasonDetails is required when overdueReason is "Other Reason"' });
+  }
+
+  const result = await woService.saveOverdueReason(id, overdueReason.trim(), overdueReasonDetails?.trim() ?? null);
+  res.json(result);
+}

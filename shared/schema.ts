@@ -1012,6 +1012,9 @@ export const workOrders = pgTable("work_orders", {
   postponementReason: text("postponement_reason"), // Reason for postponement (structured dropdown value)
   postponementRemarks: text("postponement_remarks"), // Optional additional remarks for postponement
   postponementAuthorizedBy: text("postponement_authorized_by"), // Who authorized the postponement
+  // Overdue Reason fields
+  overdueReason: text("overdue_reason"), // Selected master-list value or 'Other Reason'
+  overdueReasonDetails: text("overdue_reason_details"), // Free-text custom reason or additional remarks
   // On-demand WO generation fields (Rule #4)
   onDemandReason: text("on_demand_reason"), // 'Planning' | 'Breakdown' | 'Other' - for WOs generated before frequency reached
   // Work Order Form Arrays (Part A - Template)

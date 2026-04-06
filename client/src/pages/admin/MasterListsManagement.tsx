@@ -29,6 +29,7 @@ const LIST_TYPES = [
   { value: "componentCategory", label: "Component Category" },
   { value: "location", label: "Location" },
   { value: "postponementReason", label: "Postponement Reason" },
+  { value: "overdueReason", label: "Overdue Reason" },
 ];
 
 export default function MasterListsManagement({ onBack }: { onBack?: () => void }) {

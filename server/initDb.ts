@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { resolvePostgres } from './postgresClient';
 import { POSTPONEMENT_REASONS } from '../shared/postponementReasons';
+import { OVERDUE_REASONS } from '../shared/overdueReasons';
 
 /**
  * Ensure immutability trigger exists for component_maintenance_history
@@ -283,6 +284,22 @@ export async function initializeDatabase() {
           `);
         }
         console.log(`✓ Ensured postponement reason master list (${POSTPONEMENT_REASONS.length} values)`);
+
+        // Seed overdue reason master list values (idempotent — DO NOTHING preserves admin edits)
+        for (let i = 0; i < OVERDUE_REASONS.length; i++) {
+          const reason = OVERDUE_REASONS[i];
+          await db.execute(sql`
+            INSERT INTO master_lists (list_type, list_key, list_value, display_order, is_active)
+            VALUES ('overdueReason', ${reason}, ${reason}, ${i + 1}, true)
+            ON CONFLICT (list_type, list_key) DO NOTHING
+          `);
+        }
+        console.log(`✓ Ensured overdue reason master list (${OVERDUE_REASONS.length} values)`);
+
+        // Migration: Add overdue reason columns to work_orders table
+        await db.execute(sql`ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS overdue_reason TEXT`);
+        await db.execute(sql`ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS overdue_reason_details TEXT`);
+        console.log('✓ Ensured overdue_reason and overdue_reason_details columns on work_orders');
       }
       
       return true;

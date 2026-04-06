@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import PostponeWorkOrderDialog from "@/components/PostponeWorkOrderDialog";
+import OverdueReasonDialog from "@/components/OverdueReasonDialog";
 import UnplannedWorkOrderForm from "@/components/UnplannedWorkOrderForm";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
@@ -90,6 +91,8 @@ const WorkOrders: React.FC = () => {
   });
   const [showPlanner, setShowPlanner] = useState(false);
   const [postponeDialogOpen, setPostponeDialogOpen] = useState(false);
+  const [overdueReasonDialogOpen, setOverdueReasonDialogOpen] = useState(false);
+  const [overdueReasonWorkOrder, setOverdueReasonWorkOrder] = useState<any | null>(null);
   const [unplannedWorkOrderFormOpen, setUnplannedWorkOrderFormOpen] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
   
@@ -1149,6 +1152,34 @@ const WorkOrders: React.FC = () => {
                           ⚠ {(workOrder as any).missedCycles} Cycle{(workOrder as any).missedCycles > 1 ? 's' : ''} Skipped
                         </span>
                       )}
+                      {activeTab === "Overdue" && getEffectiveStatus(workOrder) === "Overdue" && (
+                        (workOrder as any).overdueReason ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOverdueReasonWorkOrder(workOrder);
+                              setOverdueReasonDialogOpen(true);
+                            }}
+                            className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 text-left"
+                            title={`Reason: ${(workOrder as any).overdueReason}`}
+                            data-testid={`badge-overdue-reason-set-${workOrder.id}`}
+                          >
+                            ✓ Reason set
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOverdueReasonWorkOrder(workOrder);
+                              setOverdueReasonDialogOpen(true);
+                            }}
+                            className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 border border-dashed border-gray-400 text-left"
+                            data-testid={`button-set-overdue-reason-${workOrder.id}`}
+                          >
+                            + Set Reason
+                          </button>
+                        )
+                      )}
                     </div>
                   )}
                 </td>
@@ -1327,6 +1358,19 @@ const WorkOrders: React.FC = () => {
         onClose={() => setPostponeDialogOpen(false)}
         workOrder={selectedWorkOrder}
         onConfirm={handlePostponeConfirm}
+      />
+
+      {/* Overdue Reason Dialog */}
+      <OverdueReasonDialog
+        workOrder={overdueReasonWorkOrder}
+        open={overdueReasonDialogOpen}
+        onClose={() => {
+          setOverdueReasonDialogOpen(false);
+          setOverdueReasonWorkOrder(null);
+        }}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+        }}
       />
 
       {/* Unplanned Work Order Form */}

@@ -117,6 +117,11 @@ router.post('/work-orders/auto-generate', asyncHandler(woCtrl.autoGenerate));
 // POST /work-orders/backfill-job-ids — backfill missing jobId fields
 router.post('/work-orders/backfill-job-ids', asyncHandler(woCtrl.backfillJobIds));
 
+// ── Overdue Reason ──
+
+// POST /work-orders/:id/overdue-reason — save overdue reason for a work order
+router.post('/work-orders/:id/overdue-reason', asyncHandler(woCtrl.saveOverdueReason));
+
 // ── Status Recalculation & Postponements ──
 
 // POST /work-orders/recalculate-statuses — force status recalculation

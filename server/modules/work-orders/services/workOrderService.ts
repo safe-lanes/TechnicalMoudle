@@ -1588,3 +1588,15 @@ export async function updateWorkOrder(id: string, body: any) {
 export async function deleteWorkOrder(id: string) {
   await repo.remove(id);
 }
+
+// ── Save Overdue Reason ──
+
+export async function saveOverdueReason(id: string, overdueReason: string, overdueReasonDetails: string | null) {
+  const workOrder = await repo.findById(id);
+  if (!workOrder) {
+    throw new NotFoundError('Work order not found');
+  }
+
+  const updated = await repo.update(id, { overdueReason, overdueReasonDetails });
+  return updated;
+}
