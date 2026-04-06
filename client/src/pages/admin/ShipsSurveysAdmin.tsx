@@ -699,11 +699,10 @@ export default function ShipsSurveysAdmin() {
   const updateCompanySequence = (surveyId: number, rawSequence: number) => {
     setMasterData(prevData => {
       const companySurveys = prevData.filter(s => s.applicableToCompany);
-      const totalCompanyCount = companySurveys.length + companyOnlySurveys.length;
       const currentSurvey = companySurveys.find(s => s.id === surveyId);
       if (!currentSurvey) return prevData;
 
-      const newSequence = Math.max(1, Math.min(rawSequence, totalCompanyCount));
+      const newSequence = Math.max(1, Math.min(rawSequence, companySurveys.length));
       const oldSequence = currentSurvey.companySequence ?? currentSurvey.sequence;
       if (newSequence === oldSequence) return prevData;
 
