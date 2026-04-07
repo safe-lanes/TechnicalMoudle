@@ -6100,8 +6100,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </>
           )}
 
-          {/* Save Button at Bottom - Hidden for Pending Approval (unless rejected), Completed work orders, and embedded mode */}
-          {!embedded && (currentWorkOrderStatus !== 'Pending Approval' || isRejectedWO) && currentWorkOrderStatus !== 'Completed' && (() => {
+          {/* Save Button at Bottom - Hidden for Pending Approval (unless rejected), Completed work orders, embedded mode, and unplanned draft workflows (use sticky header actions instead) */}
+          {!embedded && !showDraftActions && (currentWorkOrderStatus !== 'Pending Approval' || isRejectedWO) && currentWorkOrderStatus !== 'Completed' && (() => {
             const isRHBased = (workOrderContext as any)?.maintenanceBasis === 'Running Hours';
             const currentRHVal = executionData.currentReading;
             const capRH = rhValidation.componentActualRH;
