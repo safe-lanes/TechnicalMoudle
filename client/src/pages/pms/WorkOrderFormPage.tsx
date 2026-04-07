@@ -2729,6 +2729,42 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           `${b1Warnings.join(', ')} ${b1Warnings.length === 1 ? 'is' : 'are'} marked as "No". Please complete the required assessments or select "NA" if not applicable.`
         );
       }
+
+      // B1 document-required checks (mirrors handleSave pipeline).
+      // If any B1 item is marked "Yes", a supporting document must be uploaded.
+      // In unplanned-create, documents must be attached after the WO is created by reopening it;
+      // select "NA" if the assessment was not applicable at the time of creation.
+      const b1DocChecks = [
+        { field: executionData.riskAssessment, type: 'riskAssessment', label: 'Risk Assessment' },
+        { field: executionData.safetyChecklists, type: 'safetyChecklist', label: 'Safety Checklists' },
+        { field: executionData.operationalForms, type: 'operationalForm', label: 'Operational Forms' },
+      ];
+      for (const check of b1DocChecks) {
+        if (check.field === 'Yes' && getDocsByType(check.type).length === 0) {
+          hardErrors.push(`${check.label} is marked as "Yes" but no supporting document has been uploaded. Please upload the document or save as a draft first and attach it after the work order is created.`);
+        }
+      }
+    }
+
+    // RH validation state checks (mirrors handleSave pipeline).
+    // Unplanned WOs use maintenanceBasis='Calendar' so these are no-ops in practice,
+    // but are included for full parity with the execution save path.
+    if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours') {
+      if (componentActualRHStatus === 'loading') {
+        hardErrors.push('Component running hours are still loading. Please wait for the value to load before saving.');
+      } else if (componentActualRHStatus === 'error') {
+        hardErrors.push('Unable to verify component running hours. Please refresh the page or retry loading the component RH before saving.');
+      }
+      if (currentRHValue) {
+        const enteredRH = Number(currentRHValue);
+        const capRH = rhValidation.componentActualRH ?? (executionData.previousReading ? Number(executionData.previousReading) : null);
+        if (capRH !== null && !isNaN(enteredRH) && !isNaN(capRH) && enteredRH > capRH) {
+          hardErrors.push(`Running hours entered (${enteredRH}) exceeds the component's actual running hours (${capRH}). Please update the component's running hours in the Running Hours module first, or enter a value ≤ ${capRH} hours.`);
+        }
+      }
+    }
+    if (rhValidation.status === 'invalid' && !isRejectedWO) {
+      hardErrors.push(rhValidation.message || 'Running hours validation failed. Please correct the Current Reading value.');
     }
 
     const sparesWithInvalidQty = executionData.consumedSpareParts.filter(spare => {
