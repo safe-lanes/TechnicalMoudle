@@ -1031,7 +1031,7 @@ const WorkOrders: React.FC = () => {
           <Button 
             size="sm" 
             className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
-            onClick={() => setUnplannedWorkOrderFormOpen(true)}
+            onClick={() => setLocation('/pms/work-order/unplanned/new')}
             data-testid="C3"
           >
             <Marker id="C3" />

@@ -16,6 +16,7 @@ import Alerts from "./pages/admin/Alerts";
 import TestE2E from "./pages/TestE2E";
 import DefectFormWizard from "./pages/defects/DefectFormWizard";
 import WorkOrderFormPage from "./pages/pms/WorkOrderFormPage";
+import UnplannedWorkOrderFormPage from "./pages/pms/UnplannedWorkOrderFormPage";
 import JobsFormPage from "./pages/pms/JobsFormPage";
 import AnomaliesPage from "./pages/pms/AnomaliesPage";
 import BulkUpdateSpares from "./pages/spares/BulkUpdateSpares";
@@ -50,6 +51,9 @@ function App() {
                 {/* Work Order form routes - standalone, no TechnicalModule layout */}
                 <Route path="/pms/work-order/new/:componentId">
                   {() => <ProtectedRoute><WorkOrderFormPage mode="new" /></ProtectedRoute>}
+                </Route>
+                <Route path="/pms/work-order/unplanned/new">
+                  {() => <ProtectedRoute><UnplannedWorkOrderFormPage /></ProtectedRoute>}
                 </Route>
                 <Route path="/pms/work-order/:id">
                   {() => <ProtectedRoute><WorkOrderFormPage mode="execution" /></ProtectedRoute>}
