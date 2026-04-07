@@ -836,7 +836,8 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
     const parentCode = selectedComponent.fleetEquipmentCode;
     let mappings = componentVesselMappings.filter(
       (m) => (m.vesselCode || m.vesselId) === targetVesselKey &&
-             (m.fleetEquipmentCode === parentCode || m.fleetEquipmentCode?.startsWith(parentCode + "."))
+             (m.fleetEquipmentCode === parentCode || m.fleetEquipmentCode?.startsWith(parentCode + ".")) &&
+             m.componentCode !== m.fleetEquipmentCode
     );
     
     const seen = new Set<string>();
