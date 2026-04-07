@@ -534,6 +534,7 @@ export default function ShipsSurveysAdmin() {
     queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
     setDeletedMasterIds([]);
     
+    setViewModes(prev => ({ ...prev, [activeTab]: "view" }));
     setHasUnsavedChanges(false);
   };
 
