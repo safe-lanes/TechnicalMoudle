@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -668,17 +668,29 @@ export default function ShipsCertificatesAdmin() {
   // Skip if master certificates haven't been saved to the database yet
   const hasSavedMasterData = savedCertificates && Array.isArray(savedCertificates) && savedCertificates.length > 0;
   
+  const companyApplicableMasterIds = useMemo(() => {
+    return masterData
+      .filter(cert => cert.applicableToCompany && !cert.masterId.startsWith('VES-'))
+      .map(cert => cert.masterId);
+  }, [masterData]);
+
   useEffect(() => {
     if (!hasSavedMasterData) return;
     if (selectedVessels.length > 0 && vesselMasterData.length > 0 && !isLoadingApplicability) {
-      const existingVesselIds = new Set(vesselApplicabilityData.map((a: {vesselId: string}) => a.vesselId));
-      
       const vesselsToInit: Array<{ vesselId: string; vesselName: string }> = [];
+      
       selectedVessels.forEach(vesselName => {
         const vesselData = vesselMasterData.find(v => v.name === vesselName);
         if (vesselData) {
           const vesselId = String(vesselData.id);
-          if (!existingVesselIds.has(vesselId) && !initializedVesselIds.has(vesselId)) {
+          if (initializedVesselIds.has(vesselId)) return;
+
+          const vesselRecords = vesselApplicabilityData.filter((a: {vesselId: string}) => a.vesselId === vesselId);
+          const hasNoRecords = vesselRecords.length === 0;
+          const existingMasterIds = new Set(vesselRecords.map((a: {masterId: string}) => a.masterId));
+          const hasMissingCerts = companyApplicableMasterIds.some(id => !existingMasterIds.has(id));
+
+          if (hasNoRecords || hasMissingCerts) {
             vesselsToInit.push({ vesselId, vesselName });
           }
         }
@@ -695,7 +707,7 @@ export default function ShipsCertificatesAdmin() {
         });
       }
     }
-  }, [selectedVessels, vesselMasterData, vesselApplicabilityData, isLoadingApplicability, hasSavedMasterData]);
+  }, [selectedVessels, vesselMasterData, vesselApplicabilityData, isLoadingApplicability, hasSavedMasterData, companyApplicableMasterIds]);
   
   // Get Company certificates (those with applicableToCompany = true)
   // For VES-xxx certificates, only show if selected vessels have applicability records
