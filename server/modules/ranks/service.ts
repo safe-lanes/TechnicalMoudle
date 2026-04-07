@@ -10,6 +10,16 @@ export async function getAllRanks() {
   return ranks;
 }
 
+export async function getRankByRankId(rankId: string) {
+  const rank = await repo.getRankByRankId(rankId);
+  if (!rank) {
+    const err: any = new Error("Rank not found");
+    err.statusCode = 404;
+    throw err;
+  }
+  return rank;
+}
+
 export async function saveRanks(ranks: any[]) {
   let inserted = 0;
   let updated = 0;
@@ -31,6 +41,26 @@ export async function saveRanks(ranks: any[]) {
   }
 
   return { success: true, message: `Saved ${ranks.length} ranks`, inserted, updated };
+}
+
+export async function updateRank(rankId: string, data: any) {
+  const existing = await repo.getRankByRankId(rankId);
+  if (!existing) {
+    const err: any = new Error("Rank not found");
+    err.statusCode = 404;
+    throw err;
+  }
+  const result = await repo.upsertRank({
+    name: data.name ?? existing.name,
+    category: data.category ?? existing.category,
+    rankId,
+    label: data.label ?? existing.label,
+    applicableToCompany: data.applicableToCompany ?? existing.applicableToCompany,
+    isSystemRank: data.isSystemRank ?? existing.isSystemRank,
+    sortOrder: data.sortOrder ?? existing.sortOrder,
+    isDeleted: false,
+  });
+  return { success: true, rank: result?.[0] || null };
 }
 
 export async function deleteRank(rankId: string) {
@@ -59,6 +89,16 @@ export async function getAllOrgChart() {
   return chart;
 }
 
+export async function getOrgChartById(id: number) {
+  const entry = await repo.getOrgChartById(id);
+  if (!entry) {
+    const err: any = new Error("Org chart entry not found");
+    err.statusCode = 404;
+    throw err;
+  }
+  return entry;
+}
+
 export async function saveOrgChart(entries: any[]) {
   let inserted = 0;
   let updated = 0;
@@ -77,6 +117,24 @@ export async function saveOrgChart(entries: any[]) {
   }
 
   return { success: true, message: `Saved ${entries.length} org chart entries`, inserted, updated };
+}
+
+export async function updateOrgChartEntry(id: number, data: any) {
+  const existing = await repo.getOrgChartById(id);
+  if (!existing) {
+    const err: any = new Error("Org chart entry not found");
+    err.statusCode = 404;
+    throw err;
+  }
+  const result = await repo.upsertOrgChartEntry({
+    id,
+    rank: data.rank ?? existing.rank,
+    rankId: data.rankId ?? existing.rankId,
+    parentRankId: data.parentRankId ?? existing.parentRankId,
+    sortOrder: data.sortOrder ?? existing.sortOrder,
+    isDeleted: false,
+  });
+  return { success: true, entry: result?.[0] || null };
 }
 
 export async function deleteOrgChartEntry(id: number) {

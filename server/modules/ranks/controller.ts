@@ -12,6 +12,17 @@ export async function getRanks(req: Request, res: Response) {
   }
 }
 
+export async function getRankById(req: Request, res: Response) {
+  try {
+    const rank = await service.getRankByRankId(req.params.rankId);
+    res.json(rank);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("Error fetching rank:", error);
+    res.status(500).json({ error: "Failed to fetch rank" });
+  }
+}
+
 export async function saveRanks(req: Request, res: Response) {
   try {
     const { ranks } = req.body;
@@ -22,6 +33,17 @@ export async function saveRanks(req: Request, res: Response) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error("Error saving ranks:", error);
     res.status(500).json({ error: "Failed to save ranks", details: error.message });
+  }
+}
+
+export async function updateRank(req: Request, res: Response) {
+  try {
+    const result = await service.updateRank(req.params.rankId, req.body);
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("Error updating rank:", error);
+    res.status(500).json({ error: "Failed to update rank" });
   }
 }
 
@@ -47,6 +69,17 @@ export async function getOrgChart(req: Request, res: Response) {
   }
 }
 
+export async function getOrgChartById(req: Request, res: Response) {
+  try {
+    const entry = await service.getOrgChartById(parseInt(req.params.id, 10));
+    res.json(entry);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("Error fetching org chart entry:", error);
+    res.status(500).json({ error: "Failed to fetch org chart entry" });
+  }
+}
+
 export async function saveOrgChart(req: Request, res: Response) {
   try {
     const { entries } = req.body;
@@ -57,6 +90,17 @@ export async function saveOrgChart(req: Request, res: Response) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error("Error saving org chart:", error);
     res.status(500).json({ error: "Failed to save org chart", details: error.message });
+  }
+}
+
+export async function updateOrgChartEntry(req: Request, res: Response) {
+  try {
+    const result = await service.updateOrgChartEntry(parseInt(req.params.id, 10), req.body);
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("Error updating org chart entry:", error);
+    res.status(500).json({ error: "Failed to update org chart entry" });
   }
 }
 
