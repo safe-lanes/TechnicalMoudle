@@ -1,0 +1,151 @@
+TASK: ANALYSIS & FIX – INCORRECT VESSEL DISPLAY IN FLEET JOB MAPPED VESSEL DETAILS
+
+Objective:
+
+Analyze why **A5. Job Mapped Vessel Details** is showing all vessels instead of only linked vessels, and implement a fix to ensure only correctly mapped vessels are displayed.
+
+--------------------------------------------------
+
+1. Current Issue
+
+• A5. Job Mapped Vessel Details is showing all vessels  
+• It is not restricted to vessels linked with the selected Fleet Job  
+
+--------------------------------------------------
+
+2. Expected Behavior
+
+• Display ONLY vessels that are:
+
+  - Explicitly linked to the selected Fleet Job  
+
+• No unrelated vessels should be shown  
+
+--------------------------------------------------
+
+3. Required Analysis
+
+Investigate across layers:
+
+--------------------------------------------------
+
+A. Data Fetch Logic
+
+• Verify whether vessel data is being filtered by:
+
+  - Selected Fleet Job  
+
+• Check if current logic is:
+
+  - Fetching all vessels without filtering  
+
+--------------------------------------------------
+
+B. Mapping Logic
+
+• Verify if Fleet Job ↔ Vessel linkage exists  
+
+• Check:
+
+  - Whether mapping table is being used  
+  - Whether linkage is correctly stored  
+
+--------------------------------------------------
+
+C. Filtering Condition
+
+• Validate whether condition exists to restrict vessels based on:
+
+  - Selected Fleet Job  
+
+--------------------------------------------------
+
+D. UI Binding
+
+• Check if UI is:
+
+  - Rendering full vessel list  
+  - Ignoring filtered dataset  
+
+--------------------------------------------------
+
+E. API Response
+
+• Verify if API returns:
+
+  - All vessels OR  
+  - Only mapped vessels  
+
+--------------------------------------------------
+
+4. Root Cause Possibilities
+
+• Missing filter for Fleet Job  
+• Incorrect mapping reference  
+• API returning full dataset  
+• UI not applying filter  
+• Linkage not properly implemented  
+
+--------------------------------------------------
+
+5. Corrective Plan
+
+--------------------------------------------------
+
+A. Enforce Mapping-Based Filtering
+
+• Ensure vessels are fetched ONLY based on:
+
+  - Fleet Job linkage  
+
+--------------------------------------------------
+
+B. Restrict Data at Source
+
+• Data returned must include ONLY:
+
+  - Vessels linked to selected Fleet Job  
+
+--------------------------------------------------
+
+C. UI Rendering Fix
+
+• Ensure UI displays:
+
+  - Only filtered dataset  
+
+--------------------------------------------------
+
+D. Validation Check
+
+• If no vessels are linked:
+
+  - Show empty state  
+
+--------------------------------------------------
+
+E. Consistency with Other Mapping Screens
+
+• Align logic with:
+
+  - Component Mapping  
+  - Vessel Mapping Overview  
+
+--------------------------------------------------
+
+6. Validation
+
+Verify:
+
+• Only linked vessels are shown  
+• No unrelated vessels appear  
+• Data remains consistent after refresh  
+• Behavior matches mapping logic  
+
+--------------------------------------------------
+
+Expected Result:
+
+• A5. Job Mapped Vessel Details shows only vessels linked to the selected Fleet Job  
+• No extra/unmapped vessels displayed  
+• Accurate and consistent mapping visibility  
