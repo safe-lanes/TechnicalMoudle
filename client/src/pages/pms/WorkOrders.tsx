@@ -117,8 +117,9 @@ function compareWorkOrders(a: WorkOrderWithHydratedData, b: WorkOrderWithHydrate
     case "jobTitle": cmp = (a.jobTitle || "").localeCompare(b.jobTitle || ""); break;
     case "assignedTo": cmp = (a.assignedTo || "").localeCompare(b.assignedTo || ""); break;
     case "dueDate": {
-      const aVal = a.submittedDate || a.dueDate || "";
-      const bVal = b.submittedDate || b.dueDate || "";
+      const useSubmitted = activeTab === "Pending Approval" || activeTab === "Completed";
+      const aVal = useSubmitted ? (a.submittedDate || "") : (a.dueDate || "");
+      const bVal = useSubmitted ? (b.submittedDate || "") : (b.dueDate || "");
       cmp = aVal.localeCompare(bVal);
       break;
     }
