@@ -1263,7 +1263,7 @@ const WorkOrders: React.FC = () => {
                   {index === 0 && <Marker id="C27" />}
                   {workOrder.assignedTo}
                 </td>
-                <td className="py-3 px-4 whitespace-nowrap overflow-visible" data-testid={index === 0 ? "C28" : undefined}>
+                <td className="py-3 px-4 whitespace-nowrap overflow-hidden" data-testid={index === 0 ? "C28" : undefined}>
                   {index === 0 && <Marker id="C28" />}
                   <div className="flex items-center gap-2">
                     {(activeTab === "Pending Approval" || activeTab === "Completed")
@@ -1385,7 +1385,7 @@ const WorkOrders: React.FC = () => {
                 <td className="py-3 px-4 whitespace-nowrap overflow-hidden" data-testid={index === 0 ? "C29" : undefined}>
                   {index === 0 && <Marker id="C29" />}
                   {workOrder.status === 'Rejected' ? (
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-row items-center gap-1">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor('rejected')}`}>
                         Rejected
                       </span>
@@ -1394,7 +1394,7 @@ const WorkOrders: React.FC = () => {
                       </span>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-row items-center gap-1">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(getEffectiveStatus(workOrder))}`}>
                         {getEffectiveStatus(workOrder) === 'Due (Grace P)' 
                           ? 'Grace P' 
@@ -1453,7 +1453,7 @@ const WorkOrders: React.FC = () => {
                     {formatProfessionalDate(workOrder.dateCompleted)}
                   </td>
                 )}
-                <td className="py-3 px-4">
+                <td className="py-3 px-4 whitespace-nowrap overflow-hidden">
                   <div className="flex items-center justify-center gap-2">
                     {activeTab === "Pending Approval" && workOrder.approvalTier === "superintendent_locked" ? (
                       <div className="relative group" data-testid={`locked-action-${workOrder.id}`}>
