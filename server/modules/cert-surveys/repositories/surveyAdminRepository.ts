@@ -5,7 +5,7 @@ import {
   vesselSurveyApplicability,
   vessels,
 } from '@shared/schema';
-import { eq, and, inArray, or, like } from 'drizzle-orm';
+import { eq, and, inArray, or, like, sql, notInArray } from 'drizzle-orm';
 
 // ── Helpers ──
 
@@ -165,4 +165,44 @@ export async function getCompanySurveys() {
         )
       )
     );
+}
+
+export async function getCompanyApplicableMasterIds() {
+  const db = await getDb();
+  if (!db) return null;
+  return db.select({
+    masterId: shipSurveysMaster.masterId,
+  }).from(shipSurveysMaster)
+    .where(
+      and(
+        eq(shipSurveysMaster.isActive, true),
+        eq(shipSurveysMaster.isDeleted, false),
+        or(
+          eq(shipSurveysMaster.applicableToCompany, true),
+          like(shipSurveysMaster.masterId, 'CMP-%'),
+          like(shipSurveysMaster.masterId, 'VES-%')
+        )
+      )
+    );
+}
+
+export async function getAllApplicabilityRecords() {
+  const db = await getDb();
+  if (!db) return null;
+  return db.select({
+    vesselId: vesselSurveyApplicability.vesselId,
+    masterId: vesselSurveyApplicability.masterId,
+  }).from(vesselSurveyApplicability);
+}
+
+export async function deactivateApplicabilityByMasterIds(masterIds: string[]) {
+  const db = await getDb();
+  if (!db) return null;
+  if (masterIds.length === 0) return [];
+  return db.update(vesselSurveyApplicability)
+    .set({ isApplicable: false, updatedAt: new Date() })
+    .where(
+      inArray(vesselSurveyApplicability.masterId, masterIds)
+    )
+    .returning({ masterId: vesselSurveyApplicability.masterId });
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -891,28 +891,56 @@ export default function ShipsSurveysAdmin() {
     }
   };
 
-  // Auto-initialize vessel applicability when vessels are selected
+  const hasSavedMasterData = savedSurveys && Array.isArray(savedSurveys) && savedSurveys.length > 0;
+
+  const companyApplicableMasterIds = useMemo(() => {
+    return masterData
+      .filter(survey => survey.applicableToCompany && !survey.masterId.startsWith('VES-'))
+      .map(survey => survey.masterId);
+  }, [masterData]);
+
   useEffect(() => {
+    if (!hasSavedMasterData) return;
     if (selectedVessels.length > 0 && vesselMasterData && vesselMasterData.length > 0 && !isLoadingApplicability) {
-      // Initialize any vessels that haven't been initialized yet
-      const vesselsToInit = vesselMasterData
-        .filter((v: any) => selectedVessels.includes(v.name))
-        .filter((v: any) => !initializedVesselIds.has(v.id));
-      
-      vesselsToInit.forEach(async (vessel: any) => {
-        try {
-          await apiRequest('POST', '/technical/api/admin/vessel-survey-applicability/initialize', {
-            vesselId: vessel.id,
-            vesselName: vessel.name,
-          });
-          setInitializedVesselIds(prev => new Set(Array.from(prev).concat(vessel.id)));
-          queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-survey-applicability', selectedVesselIds] });
-        } catch (err) {
-          console.error('Failed to initialize vessel survey applicability:', err);
+      const vesselsToInit: Array<{ vesselId: string; vesselName: string }> = [];
+
+      selectedVessels.forEach(vesselName => {
+        const vesselData = vesselMasterData.find((v: any) => v.name === vesselName);
+        if (vesselData) {
+          const vesselId = String(vesselData.id);
+          if (initializedVesselIds.has(vesselId)) return;
+
+          const vesselRecords = (vesselApplicabilityData || []).filter((a: any) => a.vesselId === vesselId);
+          const hasNoRecords = vesselRecords.length === 0;
+          const existingMasterIds = new Set(vesselRecords.map((a: any) => a.masterId));
+          const hasMissingSurveys = companyApplicableMasterIds.some(id => !existingMasterIds.has(id));
+
+          if (hasNoRecords || hasMissingSurveys) {
+            vesselsToInit.push({ vesselId, vesselName });
+          }
         }
       });
+
+      if (vesselsToInit.length > 0) {
+        setInitializedVesselIds(prev => {
+          const newSet = new Set(Array.from(prev));
+          vesselsToInit.forEach(v => newSet.add(v.vesselId));
+          return newSet;
+        });
+        vesselsToInit.forEach(async (vessel) => {
+          try {
+            await apiRequest('POST', '/technical/api/admin/vessel-survey-applicability/initialize', {
+              vesselId: vessel.vesselId,
+              vesselName: vessel.vesselName,
+            });
+            queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-survey-applicability', selectedVesselIds] });
+          } catch (err) {
+            console.error('Failed to initialize vessel survey applicability:', err);
+          }
+        });
+      }
     }
-  }, [selectedVessels, vesselMasterData, vesselApplicabilityData, isLoadingApplicability, initializedVesselIds]);
+  }, [selectedVessels, vesselMasterData, vesselApplicabilityData, isLoadingApplicability, hasSavedMasterData, companyApplicableMasterIds]);
 
   // Detect applicability conflicts across selected vessels
   const hasApplicabilityConflict = (): { hasConflict: boolean; conflictingMasterIds: string[] } => {
@@ -943,10 +971,10 @@ export default function ShipsSurveysAdmin() {
 
   // Get applicability for a survey
   const getSurveyApplicability = (masterId: string): boolean | 'mixed' => {
-    if (!vesselApplicabilityData || !Array.isArray(vesselApplicabilityData)) return true;
+    if (!vesselApplicabilityData || !Array.isArray(vesselApplicabilityData)) return false;
     
     const relevantRecords = vesselApplicabilityData.filter((r: any) => r.masterId === masterId);
-    if (relevantRecords.length === 0) return true; // Default to applicable
+    if (relevantRecords.length === 0) return false;
     
     const applicableValues = relevantRecords.map((r: any) => r.isApplicable);
     const uniqueValues = new Set(applicableValues);

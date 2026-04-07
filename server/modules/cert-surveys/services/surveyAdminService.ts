@@ -120,10 +120,14 @@ export async function saveMasterSurveys(body: any) {
 
     // Separate vessel-only (VES-) and non-vessel-only master IDs
     const vesselOnlyMasterIds = newlyInsertedMasterIds.filter(id => vesselSpecificSet.has(id) || id.startsWith('VES-'));
-    const nonVesselMasterIds = newlyInsertedMasterIds.filter(id => !vesselSpecificSet.has(id) && !id.startsWith('VES-'));
+    const companyApplicableNewIds = newlyInsertedMasterIds.filter(id => {
+      if (vesselSpecificSet.has(id) || id.startsWith('VES-')) return false;
+      const survey = surveys.find((s: any) => s.masterId === id);
+      return survey?.applicableToCompany === true;
+    });
 
-    // Create applicability for non-vessel-specific surveys - for ALL vessels
-    for (const masterId of nonVesselMasterIds) {
+    // Create applicability for company-applicable surveys only - for ALL vessels
+    for (const masterId of companyApplicableNewIds) {
       for (const vessel of allVessels) {
         const key = `${vessel.id}-${masterId}`;
         if (!existingKeys.has(key)) {
@@ -160,6 +164,64 @@ export async function saveMasterSurveys(body: any) {
       await surveyAdminRepo.insertApplicabilityBulk(applicabilityToInsert);
       console.log(`Created ${applicabilityToInsert.length} survey applicability records`);
     }
+  }
+
+  // Sync: ensure ALL company-applicable master surveys have applicability records for all vessels
+  const companyApplicableResult = await surveyAdminRepo.getCompanyApplicableMasterIds();
+  if (!companyApplicableResult) {
+    throw Object.assign(new Error("Database not available"), { statusCode: 503 });
+  }
+  const companyApplicableIds = new Set(companyApplicableResult.map(r => r.masterId));
+
+  const allApplicabilityRecords = await surveyAdminRepo.getAllApplicabilityRecords();
+  if (!allApplicabilityRecords) {
+    throw Object.assign(new Error("Database not available"), { statusCode: 503 });
+  }
+
+  const existingApplicabilityKeys = new Set(
+    allApplicabilityRecords.map(r => `${r.vesselId}-${r.masterId}`)
+  );
+
+  const syncInserts: Array<{
+    vesselId: string;
+    vesselName: string;
+    masterId: string;
+    isApplicable: boolean;
+  }> = [];
+
+  for (const masterId of companyApplicableIds) {
+    if (masterId.startsWith('VES-')) continue;
+    for (const vessel of allVessels) {
+      const key = `${vessel.id}-${masterId}`;
+      if (!existingApplicabilityKeys.has(key)) {
+        syncInserts.push({
+          vesselId: vessel.id,
+          vesselName: vessel.name,
+          masterId,
+          isApplicable: true,
+        });
+      }
+    }
+  }
+
+  if (syncInserts.length > 0) {
+    await surveyAdminRepo.insertApplicabilityBulk(syncInserts);
+    console.log(`Synced ${syncInserts.length} missing applicability records for company-applicable surveys`);
+  }
+
+  // Cleanup: deactivate applicability records for non-company-applicable, non-VES surveys
+  const staleApplicabilityMasterIds: string[] = [];
+  const masterIdsInApplicability = new Set(allApplicabilityRecords.map(r => r.masterId));
+  for (const masterId of masterIdsInApplicability) {
+    if (masterId.startsWith('VES-')) continue;
+    if (!companyApplicableIds.has(masterId)) {
+      staleApplicabilityMasterIds.push(masterId);
+    }
+  }
+
+  if (staleApplicabilityMasterIds.length > 0) {
+    await surveyAdminRepo.deactivateApplicabilityByMasterIds(staleApplicabilityMasterIds);
+    console.log(`Deactivated ${staleApplicabilityMasterIds.length} stale non-company applicability master IDs: ${staleApplicabilityMasterIds.join(', ')}`);
   }
 
   console.log(`Ship surveys master saved: ${insertedCount} inserted, ${updatedCount} updated`);
