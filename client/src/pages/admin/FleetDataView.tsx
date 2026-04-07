@@ -276,6 +276,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   const [isAddJobDialogOpen, setIsAddJobDialogOpen] = useState(false);
   const [selectedJobForDetail, setSelectedJobForDetail] = useState<FleetJob | null>(null);
   const [selectedJobVesselIds, setSelectedJobVesselIds] = useState<Set<string>>(new Set());
+  const [jobVesselSearchQuery, setJobVesselSearchQuery] = useState("");
   const [jobFormData, setJobFormData] = useState<Partial<FleetJob>>({});
   const [newJobFormData, setNewJobFormData] = useState<Partial<FleetJob>>({});
   const [jobSearchQuery, setJobSearchQuery] = useState("");
@@ -297,6 +298,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   const [isAddSpareDialogOpen, setIsAddSpareDialogOpen] = useState(false);
   const [selectedSpareForDetail, setSelectedSpareForDetail] = useState<FleetSpare | null>(null);
   const [selectedSpareVesselIds, setSelectedSpareVesselIds] = useState<Set<string>>(new Set());
+  const [spareVesselSearchQuery, setSpareVesselSearchQuery] = useState("");
   const [spareFormData, setSpareFormData] = useState<Partial<FleetSpare>>({});
   const [spareSearchQuery, setSpareSearchQuery] = useState("");
   const [selectedSpareIds, setSelectedSpareIds] = useState<Set<string>>(new Set());
@@ -2272,81 +2274,133 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       </Dialog>
 
       {/* Job Vessel Mapping Dialog */}
-      <Dialog open={isJobVesselMappingDialogOpen} onOpenChange={setIsJobVesselMappingDialogOpen}>
-        <DialogContent className="p-0 gap-0" style={{ width: '40vw', maxWidth: '40vw', maxHeight: '85vh' }}>
-          <div className="bg-[#52baf3] pl-4 pr-10 py-2.5 rounded-t-lg">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Ship className="h-3.5 w-3.5 text-white" />
-                <DialogTitle className="text-xs font-semibold text-white">
-                  Vessel Mapping
-                </DialogTitle>
+      <Dialog open={isJobVesselMappingDialogOpen} onOpenChange={(open) => {
+        setIsJobVesselMappingDialogOpen(open);
+        if (!open) {
+          setJobVesselSearchQuery("");
+          setSelectedJobVesselIds(new Set());
+        }
+      }}>
+        <DialogContent className="w-[calc(100vw-200px)] max-w-[calc(100vw-200px)] h-[calc(100vh-140px)] max-h-[calc(100vh-140px)] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
+          <DialogTitle className="sr-only">Vessel Mapping</DialogTitle>
+          <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              <Ship className="h-5 w-5 text-gray-500" />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900" data-testid="title-job-vessel-mapping">Vessel Mapping</h1>
+                <p className="text-gray-500 text-sm mt-0.5">
+                  Select vessels to map to: {selectedComponent?.fleetEquipmentName || selectedComponent?.name || "Selected Component"}
+                </p>
               </div>
-              <div className="flex items-center gap-1.5">
+            </div>
+          </div>
+
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <h2 className="text-base font-semibold text-gray-800">Available Vessels</h2>
+                <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate">
+                  <Ship className="h-3 w-3 mr-1" />
+                  {relatedVessels.filter((v) => {
+                    if (!jobVesselSearchQuery.trim()) return true;
+                    const q = jobVesselSearchQuery.toLowerCase();
+                    return v.id.toLowerCase().includes(q) || v.name.toLowerCase().includes(q);
+                  }).length} Total
+                </Badge>
+                {selectedJobVesselIds.size > 0 && (
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-700 no-default-hover-elevate no-default-active-elevate">
+                    {selectedJobVesselIds.size} Selected
+                  </Badge>
+                )}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1 sm:min-w-[280px]">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search Vessel Code/Name..."
+                    value={jobVesselSearchQuery}
+                    onChange={(e) => setJobVesselSearchQuery(e.target.value)}
+                    className="pl-10 bg-white border-gray-300"
+                    data-testid="input-job-vessel-search"
+                  />
+                </div>
                 <Button
                   variant="outline"
-                  size="sm"
+                  className="border-gray-300 text-gray-700 whitespace-nowrap"
                   disabled={selectedJobVesselIds.size === 0}
-                  className="h-6 px-2 text-[10px] bg-white/10 border-white/30 text-white hover:bg-white/20"
                   data-testid="btn-job-remove-vessel"
                 >
+                  <Trash2 className="mr-2 h-4 w-4" />
                   Remove
                 </Button>
                 <Button
-                  size="sm"
-                  className="h-6 px-3 text-[10px] bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+                  className="bg-[#5dc86f] hover:bg-[#4db85f] text-white whitespace-nowrap"
                   disabled={selectedJobVesselIds.size === 0}
                   data-testid="btn-job-map-vessel"
                 >
+                  <Anchor className="mr-2 h-4 w-4" />
                   Map
                 </Button>
               </div>
             </div>
           </div>
-          <ScrollArea className="h-[400px]">
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-gray-50 z-10">
-                <tr className="border-b text-gray-500">
-                  <th className="text-left py-1.5 px-2 font-medium w-10">
-                    <span className="text-gray-500 text-[10px]">Select</span>
-                  </th>
-                  <th className="text-left py-1.5 px-2 font-medium">Vessel Code</th>
-                  <th className="text-left py-1.5 px-2 font-medium">Vessel Name</th>
-                </tr>
-              </thead>
-              <tbody>
-                {relatedVessels.length > 0 ? (
-                  relatedVessels.map((vessel, index) => (
-                    <tr key={index} className="border-b last:border-0 hover:bg-blue-50/50">
-                      <td className="py-1.5 px-2">
-                        <Checkbox
-                          checked={selectedJobVesselIds.has(vessel.id)}
-                          onCheckedChange={(checked) => {
-                            setSelectedJobVesselIds(prev => {
-                              const newSet = new Set(prev);
-                              if (checked) newSet.add(vessel.id);
-                              else newSet.delete(vessel.id);
-                              return newSet;
-                            });
-                          }}
-                          className="h-3.5 w-3.5"
-                          data-testid={`checkbox-job-vessel-${vessel.id}`}
-                        />
-                      </td>
-                      <td className="py-1.5 px-2 text-gray-600">{vessel.id}</td>
-                      <td className="py-1.5 px-2 text-gray-600">{vessel.name}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={3} className="py-6 text-center text-gray-400 text-xs">
-                      No vessels linked to this equipment
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </ScrollArea>
+
+          <div className="flex-1 overflow-auto px-6 py-4">
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50 border-b border-gray-200">
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3 w-12">Select</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Vessel Code</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Vessel Name</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(() => {
+                    const filtered = relatedVessels.filter((v) => {
+                      if (!jobVesselSearchQuery.trim()) return true;
+                      const q = jobVesselSearchQuery.toLowerCase();
+                      return v.id.toLowerCase().includes(q) || v.name.toLowerCase().includes(q);
+                    });
+                    return filtered.length > 0 ? (
+                      filtered.map((vessel, index) => (
+                        <TableRow key={index} className="border-b border-gray-100">
+                          <TableCell className="py-3 px-2">
+                            <Checkbox
+                              checked={selectedJobVesselIds.has(vessel.id)}
+                              onCheckedChange={(checked) => {
+                                setSelectedJobVesselIds(prev => {
+                                  const newSet = new Set(prev);
+                                  if (checked) newSet.add(vessel.id);
+                                  else newSet.delete(vessel.id);
+                                  return newSet;
+                                });
+                              }}
+                              data-testid={`checkbox-job-vessel-${vessel.id}`}
+                            />
+                          </TableCell>
+                          <TableCell className="py-3 font-mono text-sm text-gray-700">{vessel.id}</TableCell>
+                          <TableCell className="py-3 text-gray-600">{vessel.name}</TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={3} className="py-16 text-center">
+                          <div className="flex flex-col items-center">
+                            <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                              <Ship className="h-8 w-8 text-gray-400" />
+                            </div>
+                            <p className="text-gray-600 font-medium">No vessels linked to this equipment</p>
+                            <p className="text-gray-400 text-sm mt-1">Map vessels from the component level first</p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })()}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -3650,81 +3704,133 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       </Dialog>
 
       {/* Spare Vessel Mapping Dialog */}
-      <Dialog open={isSpareVesselMappingDialogOpen} onOpenChange={setIsSpareVesselMappingDialogOpen}>
-        <DialogContent className="p-0 gap-0" style={{ width: '40vw', maxWidth: '40vw', maxHeight: '85vh' }}>
-          <div className="bg-[#52baf3] pl-4 pr-10 py-2.5 rounded-t-lg">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Ship className="h-3.5 w-3.5 text-white" />
-                <DialogTitle className="text-xs font-semibold text-white">
-                  Vessel Mapping
-                </DialogTitle>
+      <Dialog open={isSpareVesselMappingDialogOpen} onOpenChange={(open) => {
+        setIsSpareVesselMappingDialogOpen(open);
+        if (!open) {
+          setSpareVesselSearchQuery("");
+          setSelectedSpareVesselIds(new Set());
+        }
+      }}>
+        <DialogContent className="w-[calc(100vw-200px)] max-w-[calc(100vw-200px)] h-[calc(100vh-140px)] max-h-[calc(100vh-140px)] p-0 overflow-hidden flex flex-col" aria-describedby={undefined}>
+          <DialogTitle className="sr-only">Vessel Mapping</DialogTitle>
+          <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              <Ship className="h-5 w-5 text-gray-500" />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900" data-testid="title-spare-vessel-mapping">Vessel Mapping</h1>
+                <p className="text-gray-500 text-sm mt-0.5">
+                  Select vessels to map to: {selectedComponent?.fleetEquipmentName || selectedComponent?.name || "Selected Component"}
+                </p>
               </div>
-              <div className="flex items-center gap-1.5">
+            </div>
+          </div>
+
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <h2 className="text-base font-semibold text-gray-800">Available Vessels</h2>
+                <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate">
+                  <Ship className="h-3 w-3 mr-1" />
+                  {relatedVessels.filter((v) => {
+                    if (!spareVesselSearchQuery.trim()) return true;
+                    const q = spareVesselSearchQuery.toLowerCase();
+                    return v.id.toLowerCase().includes(q) || v.name.toLowerCase().includes(q);
+                  }).length} Total
+                </Badge>
+                {selectedSpareVesselIds.size > 0 && (
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-700 no-default-hover-elevate no-default-active-elevate">
+                    {selectedSpareVesselIds.size} Selected
+                  </Badge>
+                )}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1 sm:min-w-[280px]">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search Vessel Code/Name..."
+                    value={spareVesselSearchQuery}
+                    onChange={(e) => setSpareVesselSearchQuery(e.target.value)}
+                    className="pl-10 bg-white border-gray-300"
+                    data-testid="input-spare-vessel-search"
+                  />
+                </div>
                 <Button
                   variant="outline"
-                  size="sm"
+                  className="border-gray-300 text-gray-700 whitespace-nowrap"
                   disabled={selectedSpareVesselIds.size === 0}
-                  className="h-6 px-2 text-[10px] bg-white/10 border-white/30 text-white hover:bg-white/20"
                   data-testid="btn-spare-remove-vessel"
                 >
+                  <Trash2 className="mr-2 h-4 w-4" />
                   Remove
                 </Button>
                 <Button
-                  size="sm"
-                  className="h-6 px-3 text-[10px] bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+                  className="bg-[#5dc86f] hover:bg-[#4db85f] text-white whitespace-nowrap"
                   disabled={selectedSpareVesselIds.size === 0}
                   data-testid="btn-spare-map-vessel"
                 >
+                  <Anchor className="mr-2 h-4 w-4" />
                   Map
                 </Button>
               </div>
             </div>
           </div>
-          <ScrollArea className="h-[400px]">
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-gray-50 z-10">
-                <tr className="border-b text-gray-500">
-                  <th className="text-left py-1.5 px-2 font-medium w-10">
-                    <span className="text-gray-500 text-[10px]">Select</span>
-                  </th>
-                  <th className="text-left py-1.5 px-2 font-medium">Vessel Code</th>
-                  <th className="text-left py-1.5 px-2 font-medium">Vessel Name</th>
-                </tr>
-              </thead>
-              <tbody>
-                {relatedVessels.length > 0 ? (
-                  relatedVessels.map((vessel, index) => (
-                    <tr key={index} className="border-b last:border-0 hover:bg-blue-50/50">
-                      <td className="py-1.5 px-2">
-                        <Checkbox
-                          checked={selectedSpareVesselIds.has(vessel.id)}
-                          onCheckedChange={(checked) => {
-                            setSelectedSpareVesselIds(prev => {
-                              const newSet = new Set(prev);
-                              if (checked) newSet.add(vessel.id);
-                              else newSet.delete(vessel.id);
-                              return newSet;
-                            });
-                          }}
-                          className="h-3.5 w-3.5"
-                          data-testid={`checkbox-spare-vessel-${vessel.id}`}
-                        />
-                      </td>
-                      <td className="py-1.5 px-2 text-gray-600">{vessel.id}</td>
-                      <td className="py-1.5 px-2 text-gray-600">{vessel.name}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={3} className="py-6 text-center text-gray-400 text-xs">
-                      No vessels linked to this equipment
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </ScrollArea>
+
+          <div className="flex-1 overflow-auto px-6 py-4">
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50 border-b border-gray-200">
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3 w-12">Select</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Vessel Code</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Vessel Name</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(() => {
+                    const filtered = relatedVessels.filter((v) => {
+                      if (!spareVesselSearchQuery.trim()) return true;
+                      const q = spareVesselSearchQuery.toLowerCase();
+                      return v.id.toLowerCase().includes(q) || v.name.toLowerCase().includes(q);
+                    });
+                    return filtered.length > 0 ? (
+                      filtered.map((vessel, index) => (
+                        <TableRow key={index} className="border-b border-gray-100">
+                          <TableCell className="py-3 px-2">
+                            <Checkbox
+                              checked={selectedSpareVesselIds.has(vessel.id)}
+                              onCheckedChange={(checked) => {
+                                setSelectedSpareVesselIds(prev => {
+                                  const newSet = new Set(prev);
+                                  if (checked) newSet.add(vessel.id);
+                                  else newSet.delete(vessel.id);
+                                  return newSet;
+                                });
+                              }}
+                              data-testid={`checkbox-spare-vessel-${vessel.id}`}
+                            />
+                          </TableCell>
+                          <TableCell className="py-3 font-mono text-sm text-gray-700">{vessel.id}</TableCell>
+                          <TableCell className="py-3 text-gray-600">{vessel.name}</TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={3} className="py-16 text-center">
+                          <div className="flex flex-col items-center">
+                            <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                              <Ship className="h-8 w-8 text-gray-400" />
+                            </div>
+                            <p className="text-gray-600 font-medium">No vessels linked to this equipment</p>
+                            <p className="text-gray-400 text-sm mt-1">Map vessels from the component level first</p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })()}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
