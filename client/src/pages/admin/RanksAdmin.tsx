@@ -69,31 +69,39 @@ export default function RanksAdmin() {
   });
 
   useEffect(() => {
-    if (savedRanks && Array.isArray(savedRanks) && savedRanks.length > 0) {
-      const mapped: RankRow[] = savedRanks.map((r: any) => ({
-        id: r.id,
-        rankId: r.rankId || r.rank_id,
-        name: r.name,
-        label: r.label || "",
-        category: r.category || "",
-        applicableToCompany: r.applicableToCompany ?? r.applicable_to_company ?? true,
-        isSystemRank: r.isSystemRank ?? r.is_system_rank ?? true,
-        sortOrder: r.sortOrder ?? r.sort_order ?? 0,
-      }));
-      setRanksData(mapped);
+    if (savedRanks && Array.isArray(savedRanks)) {
+      if (savedRanks.length > 0) {
+        const mapped: RankRow[] = savedRanks.map((r: any) => ({
+          id: r.id,
+          rankId: r.rankId || r.rank_id,
+          name: r.name,
+          label: r.label || "",
+          category: r.category || "",
+          applicableToCompany: r.applicableToCompany ?? r.applicable_to_company ?? true,
+          isSystemRank: r.isSystemRank ?? r.is_system_rank ?? true,
+          sortOrder: r.sortOrder ?? r.sort_order ?? 0,
+        }));
+        setRanksData(mapped);
+      } else {
+        setRanksData([]);
+      }
     }
   }, [savedRanks]);
 
   useEffect(() => {
-    if (savedOrgChart && Array.isArray(savedOrgChart) && savedOrgChart.length > 0) {
-      const mapped: OrgChartRow[] = savedOrgChart.map((o: any) => ({
-        id: o.id,
-        rank: o.rank || "",
-        rankId: o.rankId || o.rank_id,
-        parentRankId: o.parentRankId || o.parent_rank_id || null,
-        sortOrder: o.sortOrder ?? o.sort_order ?? 0,
-      }));
-      setOrgChartData(mapped);
+    if (savedOrgChart && Array.isArray(savedOrgChart)) {
+      if (savedOrgChart.length > 0) {
+        const mapped: OrgChartRow[] = savedOrgChart.map((o: any) => ({
+          id: o.id,
+          rank: o.rank || "",
+          rankId: o.rankId || o.rank_id,
+          parentRankId: o.parentRankId || o.parent_rank_id || null,
+          sortOrder: o.sortOrder ?? o.sort_order ?? 0,
+        }));
+        setOrgChartData(mapped);
+      } else {
+        setOrgChartData([]);
+      }
     }
   }, [savedOrgChart]);
 
