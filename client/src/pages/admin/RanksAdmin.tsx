@@ -258,32 +258,8 @@ export default function RanksAdmin() {
   const isSaving = saveRanksMutation.isPending || saveOrgChartMutation.isPending;
 
   const renderRanksTab = () => (
-    <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center gap-4 mb-4 flex-shrink-0">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search ranks..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-            data-testid="input-search-ranks"
-          />
-        </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
-            <SelectValue placeholder="All Categories" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {categories.map(c => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex-1 min-h-0 overflow-auto border rounded-lg">
+    <div className="bg-white rounded-lg border overflow-hidden">
+      <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-[#52baf3] text-white sticky top-0 z-10">
             <tr>
@@ -355,20 +331,12 @@ export default function RanksAdmin() {
           </tbody>
         </table>
       </div>
-
-      {isEditMode && (
-        <div className="flex-shrink-0 mt-3">
-          <Button variant="outline" size="sm" onClick={addNewRank} className="gap-2" data-testid="button-add-rank">
-            <Plus className="h-4 w-4" /> Add Rank
-          </Button>
-        </div>
-      )}
     </div>
   );
 
   const renderOrgChartTab = () => (
-    <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex-1 min-h-0 overflow-auto border rounded-lg">
+    <div className="bg-white rounded-lg border overflow-hidden">
+      <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-[#52baf3] text-white sticky top-0 z-10">
             <tr>
@@ -428,19 +396,12 @@ export default function RanksAdmin() {
           </tbody>
         </table>
       </div>
-
-      {isEditMode && (
-        <div className="flex-shrink-0 mt-3">
-          <Button variant="outline" size="sm" onClick={addNewOrgChartEntry} className="gap-2" data-testid="button-add-org-chart">
-            <Plus className="h-4 w-4" /> Add Org Chart Entry
-          </Button>
-        </div>
-      )}
     </div>
   );
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+      {/* Header - Fixed */}
       <div className="flex-shrink-0 mb-6">
         <div className="flex items-center justify-between relative">
           <h1 className="text-2xl font-semibold text-gray-800" data-testid="text-ranks-admin-title">Ranks Admin</h1>
@@ -486,13 +447,53 @@ export default function RanksAdmin() {
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   Save
                 </Button>
+                {isEditMode && activeTab === "available-ranks" && (
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700 gap-1" onClick={addNewRank} data-testid="button-add-rank">
+                    <Plus className="h-4 w-4" /> New
+                  </Button>
+                )}
+                {isEditMode && activeTab === "org-chart" && (
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700 gap-1" onClick={addNewOrgChartEntry} data-testid="button-add-org-chart">
+                    <Plus className="h-4 w-4" /> New
+                  </Button>
+                )}
               </>
             )}
           </div>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col px-1">
+      {/* Search/Filter bar - Fixed (Available Ranks tab only) */}
+      {activeTab === "available-ranks" && (
+        <div className="flex-shrink-0 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search ranks..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-ranks"
+              />
+            </div>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map(c => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content - Scrollable */}
+      <div className="flex-1 overflow-y-auto">
         {activeTab === "available-ranks" ? renderRanksTab() : renderOrgChartTab()}
       </div>
     </div>
