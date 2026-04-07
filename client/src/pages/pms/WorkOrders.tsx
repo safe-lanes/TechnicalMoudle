@@ -936,7 +936,7 @@ const WorkOrders: React.FC = () => {
           </SelectContent>
         </Select>
 
-        {(activeTab === "Planned" || activeTab === "Postponed") && (
+        {activeTab === "Postponed" && (
           <Select value={selectedPostponementReason} onValueChange={setSelectedPostponementReason}>
             <SelectTrigger className="w-52" data-testid="select-filter-postponement-reason">
               <SelectValue placeholder="Postponement Reason" />
