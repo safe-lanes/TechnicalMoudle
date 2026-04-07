@@ -2619,6 +2619,137 @@ const migrations: Migration[] = [
         (26, gen_random_uuid(), 'admin-ranks', 'Ranks', '/admin/ranks', (SELECT muid FROM adm_menumaster_ac WHERE id = 4), true, 26, NOW(), NOW(), false, false)
       ON CONFLICT (id) DO NOTHING;
     `
+  },
+  {
+    id: '079_seed_ranks_master_data',
+    name: 'Seed ranks and vessel org chart master data',
+    description: 'Inserts 25 default ranks into adm_available_ranks and 18 org chart hierarchy entries into adm_vessel_org_chart. Idempotent: checks table existence first, uses ON CONFLICT DO NOTHING, hierarchy-safe insertion order.',
+    sql: `
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.tables
+          WHERE table_schema = 'public' AND table_name = 'adm_available_ranks'
+        ) THEN
+          RAISE NOTICE 'Table adm_available_ranks does not exist, skipping seed';
+          RETURN;
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.tables
+          WHERE table_schema = 'public' AND table_name = 'adm_vessel_org_chart'
+        ) THEN
+          RAISE NOTICE 'Table adm_vessel_org_chart does not exist, skipping seed';
+          RETURN;
+        END IF;
+
+        INSERT INTO adm_available_ranks (name, category, rank_id, label, applicable_to_company, is_system_rank, sort_order, is_deleted, is_sync, created_at, updated_at)
+        VALUES
+          ('Master', 'Senior Officers', 'R001', 'Master', true, true, 1, false, false, NOW(), NOW()),
+          ('Chief Officer', 'Senior Officers', 'R002', 'Chief Officer', true, true, 2, false, false, NOW(), NOW()),
+          ('Second Officer', 'Senior Officers', 'R003', '2nd Officer', true, true, 3, false, false, NOW(), NOW()),
+          ('Third Officer', 'Senior Officers', 'R004', '3rd Officer', true, true, 4, false, false, NOW(), NOW()),
+          ('Chief Engineer', 'Senior Officers', 'R005', 'Chief Engineer', true, true, 5, false, false, NOW(), NOW()),
+          ('Second Engineer', 'Senior Officers', 'R006', '2nd Engineer', true, true, 6, false, false, NOW(), NOW()),
+          ('Third Engineer', 'Senior Officers', 'R007', '3rd Engineer', true, true, 7, false, false, NOW(), NOW()),
+          ('Fourth Engineer', 'Senior Officers', 'R008', '4th Engineer', true, true, 9, false, false, NOW(), NOW()),
+          ('Fifth Engineer', 'Senior Officers', 'R009', 'Fifth Engineer', true, true, 10, false, false, NOW(), NOW()),
+          ('Electrical Officer', 'Senior Officers', 'R010', 'Electrical Officer', true, true, 8, false, false, NOW(), NOW()),
+          ('Gas Engineer', 'Senior Officers', 'R011', 'Gas Engineer', true, true, 11, false, false, NOW(), NOW()),
+          ('Deck Cadet', 'Senior Officers', 'R012', 'Deck Cadet', true, true, 12, false, false, NOW(), NOW()),
+          ('Engine Cadet', 'Senior Officers', 'R013', 'Engine Cadet', true, true, 14, false, false, NOW(), NOW()),
+          ('Bosun', 'Ratings', 'R014', 'Bosun', true, true, 13, false, false, NOW(), NOW()),
+          ('Able Bodied Seaman', 'Senior Officers', 'R015', 'AB', true, true, 16, false, false, NOW(), NOW()),
+          ('Ordinary Seaman', 'Senior Officers', 'R016', 'OS', true, true, 17, false, false, NOW(), NOW()),
+          ('Pumpman', 'Ratings', 'R017', 'Pumpman', true, true, 15, false, false, NOW(), NOW()),
+          ('Fitter', 'Ratings', 'R018', 'Fitter', true, true, 18, false, false, NOW(), NOW()),
+          ('Motorman', 'Senior Officers', 'R019', 'Motorman', true, true, 19, false, false, NOW(), NOW()),
+          ('Wiper', 'Senior Officers', 'R020', 'Wiper', true, true, 20, false, false, NOW(), NOW()),
+          ('Oiler', 'Ratings', 'R021', 'Oiler', true, true, 21, false, false, NOW(), NOW()),
+          ('Chief Cook', 'Catering', 'R022', 'Chief Cook', true, true, 22, false, false, NOW(), NOW()),
+          ('Messman', 'Catering', 'R023', 'Messman', true, true, 24, false, false, NOW(), NOW()),
+          ('Junior officer', 'Senior Officers', 'R024', 'Junior officer', true, false, 23, false, false, NOW(), NOW()),
+          ('Test', 'Senior Officers', 'R025', NULL, false, false, 25, false, false, NOW(), NOW())
+        ON CONFLICT (rank_id) DO NOTHING;
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT 'Master', 'R001', NULL, 0, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R001');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT 'Chief Officer', 'R002', 'R001', 0, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R002');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT 'Chief Engineer', 'R005', 'R001', 1, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R005');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT 'Chief Cook', 'R022', 'R001', 2, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R022');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT 'Tester', 'R024', 'R001', 3, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R024');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT '2nd Officer', 'R003', 'R002', 0, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R003');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT '3rd Officer', 'R004', 'R002', 1, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R004');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT 'Bosun', 'R014', 'R002', 2, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R014');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT 'Pumpman', 'R017', 'R002', 3, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R017');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT 'AB', 'R015', 'R002', 4, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R015');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT 'OS', 'R016', 'R002', 5, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R016');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT '2nd Engineer', 'R006', 'R005', 0, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R006');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT '3rd Engineer', 'R007', 'R005', 1, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R007');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT '4th Engineer', 'R008', 'R005', 2, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R008');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT 'Electrical Officer', 'R010', 'R005', 3, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R010');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT 'Messman', 'R023', 'R022', 0, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R023');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT 'Fitter', 'R018', 'R006', 0, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R018');
+
+        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
+        SELECT 'Oiler', 'R021', 'R006', 1, false, false, NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R021');
+
+      END $$;
+
+      CREATE INDEX IF NOT EXISTS idx_adm_available_ranks_ar_uuid ON adm_available_ranks (ar_uuid);
+      CREATE INDEX IF NOT EXISTS idx_adm_vessel_org_chart_rank_id ON adm_vessel_org_chart (rank_id);
+      CREATE INDEX IF NOT EXISTS idx_adm_vessel_org_chart_parent_rank_id ON adm_vessel_org_chart (parent_rank_id);
+    `
   }
 ];
 
