@@ -4013,7 +4013,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           <div data-testid="WOF.A4.2"><Marker id="WOF.A4.2" /></div>
           <SectionBlock
             id="safety"
-            number="A3"
+            number={isUnplannedCreate ? "A2" : "A3"}
             title="Safety Requirements"
             description="Safety requirements and permits for this work order"
           >
@@ -4122,7 +4122,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           <div data-testid="WOF.A5.2"><Marker id="WOF.A5.2" /></div>
           <SectionBlock
             id="history"
-            number="A4"
+            number={isUnplannedCreate ? "A3" : "A4"}
             title="Work History"
             description="Previous executions and completion history for this work order"
             headerActions={
