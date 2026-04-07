@@ -2958,7 +2958,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
     }
 
-    const woStatus = isReadyForSubmission ? 'Pending Approval' : 'Draft';
+    if (!isReadyForSubmission) {
+      toast({
+        title: 'Validation Error',
+        description: `The following Part B fields are required to submit for approval: ${missingFields.join(', ')}. Use "Save" to save as a draft instead.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const woStatus = 'Pending Approval';
 
     const woPayload = {
       vesselId: contextVesselId,
@@ -3389,7 +3398,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       Saving...
                     </>
                   ) : (
-                    'save'
+                    'Save'
                   )}
                 </Button>
               )}
