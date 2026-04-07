@@ -122,6 +122,7 @@ export async function saveMasterSurveys(body: any) {
     const vesselOnlyMasterIds = newlyInsertedMasterIds.filter(id => vesselSpecificSet.has(id) || id.startsWith('VES-'));
     const companyApplicableNewIds = newlyInsertedMasterIds.filter(id => {
       if (vesselSpecificSet.has(id) || id.startsWith('VES-')) return false;
+      if (id.startsWith('CMP-')) return true;
       const survey = surveys.find((s: any) => s.masterId === id);
       return survey?.applicableToCompany === true;
     });
