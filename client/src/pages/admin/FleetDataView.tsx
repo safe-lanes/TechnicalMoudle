@@ -361,7 +361,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
     return Array.from(vesselMap.values());
   }, [jobVesselMappings, vessels]);
 
-  const activePartCode = selectedSpareForDetail?.partCode || (isEditSpareDialogOpen ? spareFormData.partCode : null);
+  const activePartCode = (selectedSpareForDetail ? selectedSpareForDetail.partCode : null) || (isEditSpareDialogOpen ? spareFormData.partCode : null);
   const { data: spareVesselMappings } = useQuery<FleetSpareVesselMapping[]>({
     queryKey: ["/technical/api/fleet-admin/fleet-spare-mappings/by-spare", activePartCode],
     queryFn: async () => {
