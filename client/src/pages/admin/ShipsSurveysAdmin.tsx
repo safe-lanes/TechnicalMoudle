@@ -300,23 +300,19 @@ export default function ShipsSurveysAdmin() {
         title: "Saved successfully",
         description: `${data.inserted || 0} new surveys added, ${data.updated || 0} updated`,
       });
-      if (activeTab === "master" && draftMasterData) {
-        const committedData = [...draftMasterData];
-        setMasterData(committedData);
-        setMasterSnapshot(committedData.map(s => ({ ...s })));
-        setDraftMasterData(committedData.map(s => ({ ...s })));
+      if (activeTab === "master") {
+        setDraftMasterData(null);
+        setMasterSnapshot(null);
         setDeletedDraftIds([]);
       }
       setHasUnsavedChanges(false);
       setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
-      if (activeTab === "company") {
-        setCompanyOnlySurveys([]);
-      }
-      if (activeTab === "vessel") {
-        setVesselOnlySurveys([]);
-      }
+      setCompanyOnlySurveys([]);
+      setVesselOnlySurveys([]);
+      setDeletedMasterIds([]);
       setMasterValidationError("");
       setInvalidSurveyIds(new Set());
+      setViewModes(prev => ({ ...prev, [activeTab]: "view" }));
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-survey-applicability', selectedVesselIds] });
     },
