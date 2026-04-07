@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Component, Job, Spare, FleetComponents, FleetJobs, FleetSpares, Maker } from "@shared/schema";
+import type { Component, Job, Spare, FleetComponents, FleetJobs, FleetSpares, Maker, FleetJobVesselMapping } from "@shared/schema";
 
 interface MappedFleetComponent {
   id: string | number;
@@ -336,6 +336,30 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   const { data: componentVesselMappings } = useQuery<ComponentVesselMapping[]>({
     queryKey: ["/technical/api/fleet-admin/component-vessel-mappings"],
   });
+
+  const activeJobCode = selectedJobForDetail?.jobCode || (isEditJobDialogOpen ? jobFormData.jobCode : null);
+  const { data: jobVesselMappings } = useQuery<FleetJobVesselMapping[]>({
+    queryKey: ["/technical/api/fleet-admin/fleet-job-mappings/by-job", activeJobCode],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/fleet-admin/fleet-job-mappings/by-job/${encodeURIComponent(activeJobCode!)}`);
+      if (!res.ok) throw new Error("Failed to fetch job vessel mappings");
+      return res.json();
+    },
+    enabled: !!activeJobCode,
+  });
+
+  const jobMappedVessels = useMemo(() => {
+    if (!jobVesselMappings || jobVesselMappings.length === 0) return [];
+    const vesselMap = new Map<string, { id: string; name: string }>();
+    for (const m of jobVesselMappings) {
+      const key = m.vesselCode;
+      if (!vesselMap.has(key)) {
+        const resolvedName = m.vesselName || (vessels || []).find(v => v.id === m.vesselCode)?.name || m.vesselCode;
+        vesselMap.set(key, { id: key, name: resolvedName });
+      }
+    }
+    return Array.from(vesselMap.values());
+  }, [jobVesselMappings, vessels]);
 
   const removeMappingsMutation = useMutation({
     mutationFn: async (ids: number[]) => {
@@ -2703,9 +2727,9 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {relatedVessels.length > 0 ? (
-                          relatedVessels.map((vessel, index) => (
-                            <tr key={index} className="border-b border-gray-200" data-testid={`vessel-mapping-row-${index}`}>
+                        {jobMappedVessels.length > 0 ? (
+                          jobMappedVessels.map((vessel, index) => (
+                            <tr key={vessel.id} className="border-b border-gray-200" data-testid={`job-vessel-mapping-row-${index}`}>
                               <td className="p-2">{vessel.id}</td>
                               <td className="p-2">{vessel.name}</td>
                             </tr>
@@ -3106,11 +3130,20 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td colSpan={2} className="text-center p-4 text-gray-500 italic">
-                          No vessels mapped to this job
-                        </td>
-                      </tr>
+                      {jobMappedVessels.length > 0 ? (
+                        jobMappedVessels.map((vessel, index) => (
+                          <tr key={vessel.id} className="border-b border-gray-200" data-testid={`edit-job-vessel-mapping-row-${index}`}>
+                            <td className="p-2">{vessel.id}</td>
+                            <td className="p-2">{vessel.name}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={2} className="text-center p-4 text-gray-500 italic">
+                            No vessels mapped to this job
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
