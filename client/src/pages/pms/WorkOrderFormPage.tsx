@@ -190,8 +190,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     enabled: !!workOrderId && resolvedMode !== 'template',
   });
 
-  // Extract vesselId from context for spares query
-  const vesselId = workOrderContext ? (workOrderContext as any).templateData?.vesselId || (workOrderContext as any).workOrder?.vesselId : null;
+  // Extract vesselId from context for spares query; fall back to contextVesselId for unplanned-create (no workOrderContext yet)
+  const vesselId = workOrderContext
+    ? (workOrderContext as any).templateData?.vesselId || (workOrderContext as any).workOrder?.vesselId
+    : (isUnplannedCreate ? contextVesselId : null);
 
   // Fetch spares inventory for location auto-selection in Part B4
   // IMPORTANT: Uses location/location2 and robLocationA/robLocationB from Spares table per spec
@@ -2754,9 +2756,81 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       hardErrors.push(`Please select a location for: ${parts}. A location is required when consuming spare parts.`);
     }
 
+    // Inventory-loaded and stock availability checks (mirrors handleSave pipeline)
+    const hasConsumedSpares = executionData.consumedSpareParts.some(
+      spare => spare.partNo && spare.quantityConsumed && parseFloat(spare.quantityConsumed) > 0
+    );
+    if (hasConsumedSpares && vesselId) {
+      if (!isSparesInventoryFetched) {
+        hardErrors.push('Please wait for inventory data to load before submitting.');
+      }
+      if (isSparesInventoryError) {
+        hardErrors.push('Failed to load inventory data. Stock validation cannot be performed.');
+      }
+    }
+
+    if (hasConsumedSpares && isSparesInventoryFetched && !isSparesInventoryError) {
+      const sparesWithInsufficientStock = executionData.consumedSpareParts.filter(spare => {
+        const qty = parseFloat(spare.quantityConsumed);
+        if (!qty || qty <= 0 || !spare.location) return false;
+        const lookupKey = spare.partCode || spare.partNo;
+        if (!lookupKey) return false;
+        const spareInInventory = sparesInventory.find(s => s.partCode === lookupKey);
+        if (!spareInInventory) return false;
+        const stockAtLocation = getRobByLocationName(lookupKey, spare.location);
+        return qty > stockAtLocation;
+      });
+      if (sparesWithInsufficientStock.length > 0) {
+        const insufficientParts = sparesWithInsufficientStock.map(s => {
+          const lookupKey = s.partCode || s.partNo;
+          const stockAtLoc = getRobByLocationName(lookupKey, s.location);
+          return `${s.partNo || s.partCode} (need ${s.quantityConsumed}, have ${stockAtLoc} at ${s.location})`;
+        }).join(', ');
+        hardErrors.push(`Consumption cannot exceed available ROB: ${insufficientParts}`);
+      }
+
+      const sparesNeedingComments = executionData.consumedSpareParts.filter(spare => {
+        const qty = parseFloat(spare.quantityConsumed || '0');
+        if (qty <= 0 || !spare.location) return false;
+        if (spare.comments && spare.comments.trim().length > 0) return false;
+        const lookupKey = spare.partCode || spare.partNo;
+        if (!lookupKey) return false;
+        const rob = getRobByLocationName(lookupKey, spare.location);
+        if (rob <= 0) return qty > 0;
+        return qty > (rob * 0.5);
+      });
+      if (sparesNeedingComments.length > 0) {
+        const parts = sparesNeedingComments.map(s => s.partNo || s.description).join(', ');
+        hardErrors.push(`High consumption detected for: ${parts}. Please add a comment explaining the usage when consuming more than 50% of available stock.`);
+      }
+    }
+
     if (hardErrors.length > 0) {
       toast({ title: 'Validation Error', description: hardErrors[0], variant: 'destructive' });
       return;
+    }
+
+    // Current vs previous RH regression and large-jump acknowledgment (mirrors handleSave)
+    if (currentRHValue && executionData.previousReading) {
+      const currentRH = parseFloat(currentRHValue);
+      const previousRH = parseFloat(executionData.previousReading);
+      if (!isNaN(currentRH) && !isNaN(previousRH) && currentRH < previousRH) {
+        toast({
+          title: 'Validation Error',
+          description: `Current Reading (${currentRH}) cannot be less than Previous Reading (${previousRH}). Running hours can only increase.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (!isNaN(currentRH) && !isNaN(previousRH) && (currentRH - previousRH) > 2000 && !currentReadingWarningAcknowledged) {
+        toast({
+          title: 'Warning — Large Reading Jump',
+          description: `Current Reading (${currentRH}) exceeds Previous Reading (${previousRH}) by ${(currentRH - previousRH).toFixed(2)} hrs. Please verify this value is correct and save again to confirm.`,
+          variant: 'destructive',
+        });
+        setCurrentReadingWarningAcknowledged(true);
+        return;
+      }
     }
 
     // Determine submission status based on Part B completeness
