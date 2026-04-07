@@ -66,7 +66,7 @@ export interface HistoryWorkOrderPayload {
 }
 
 interface WorkOrderFormPageProps {
-  mode?: 'template' | 'execution' | 'history' | 'new';
+  mode?: 'template' | 'execution' | 'history' | 'new' | 'unplanned-create';
   embedded?: boolean;
   workOrderIdOverride?: string;
   onClose?: () => void;
@@ -95,9 +95,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const urlParams = new URLSearchParams(window.location.search);
   const modeFromUrl = urlParams.get('mode') as 'template' | 'execution' | null;
   const resolvedMode = modeFromUrl || mode;
+  const isUnplannedCreate = mode === 'unplanned-create';
 
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isUnplannedSaving, setIsUnplannedSaving] = useState(false);
+  const [unplannedComponentId, setUnplannedComponentId] = useState('');
 
   // Minimal A/B navigation matching reference design (hide Part B in template mode)
   const navSteps = resolvedMode === 'template'
@@ -227,6 +230,36 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     enabled: !!vesselId
   });
   const sparesWithInventory = sparesWithInventoryResponse?.data || [];
+
+  // Fetch vessel components for unplanned-create mode (component dropdown)
+  const { data: unplannedComponents = [] } = useQuery<Array<{
+    id: string;
+    name: string;
+    componentCode: string;
+    isActive: boolean;
+    isParent: boolean;
+    currentCumulativeRH?: number;
+  }>>({
+    queryKey: [`/technical/api/components/${contextVesselId}`],
+    enabled: isUnplannedCreate && !!contextVesselId,
+  });
+  const filteredUnplannedComponents = unplannedComponents.filter(c => c.isActive && !c.isParent);
+
+  const handleUnplannedComponentSelect = (componentId: string) => {
+    setUnplannedComponentId(componentId);
+    const selected = filteredUnplannedComponents.find(c => c.id === componentId);
+    if (selected) {
+      setTemplateData(prev => ({
+        ...prev,
+        componentName: selected.name || '',
+        component: selected.name || '',
+        componentCode: selected.componentCode || '',
+      }));
+      if (selected.currentCumulativeRH != null) {
+        setExecutionData(prev => ({ ...prev, previousReading: String(selected.currentCumulativeRH) }));
+      }
+    }
+  };
 
   // Helper to get stock at a specific location for a part
   const getStockAtLocation = (partCode: string, locationId: number): number => {
@@ -429,6 +462,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     classRelated: "No",
     department: "",
     criticality: "",
+    jobCategory: "",
     isActive: "Yes",
     briefWorkDescription: "",
     nextDueDate: "",
@@ -792,6 +826,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       setExecutionData(prev => ({ ...prev, woExecutionId: generateWOExecutionId() }));
     }
   }, []);
+
+  useEffect(() => {
+    if (isUnplannedCreate) {
+      setTemplateData(prev => ({ ...prev, taskType: 'Unplanned Maintenance' }));
+    }
+  }, [isUnplannedCreate]);
 
   useEffect(() => {
     if (pendingSaveAfterJustification && rhJustificationText.length >= 20) {
@@ -2598,6 +2638,113 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   };
 
+  const handleSaveUnplannedCreate = async () => {
+    if (!templateData.woTitle?.trim()) {
+      toast({ title: 'Validation Error', description: 'Job Title is required.', variant: 'destructive' });
+      return;
+    }
+    if (!templateData.componentName?.trim()) {
+      toast({ title: 'Validation Error', description: 'Please select a Component.', variant: 'destructive' });
+      return;
+    }
+    if (!templateData.briefWorkDescription?.trim()) {
+      toast({ title: 'Validation Error', description: 'Brief Work Description is required.', variant: 'destructive' });
+      return;
+    }
+
+    const startDate = executionData.startDateTime ? executionData.startDateTime.split('T')[0] : '';
+    const completionDate =
+      executionData.dateOfCompletion ||
+      (executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : '');
+    const hasPartBComplete = !!(
+      startDate &&
+      completionDate &&
+      executionData.performedBy &&
+      executionData.noOfPersons &&
+      executionData.workCarriedOut?.trim()
+    );
+
+    const woStatus = hasPartBComplete ? 'Pending Approval' : 'Draft';
+
+    const woPayload = {
+      vesselId: contextVesselId,
+      component: templateData.componentName,
+      componentCode: templateData.componentCode,
+      jobTitle: templateData.woTitle,
+      workOrderType: 'Unplanned',
+      maintenanceType: templateData.taskType || 'Unplanned Maintenance',
+      assignedTo: templateData.assignedTo || '',
+      approver: templateData.approver || '',
+      jobCategory: templateData.jobCategory || '',
+      jobPriority: templateData.jobPriority || 'Medium',
+      classRelated: templateData.classRelated || 'No',
+      department: templateData.department || '',
+      criticality: templateData.criticality || '',
+      status: woStatus,
+      briefWorkDescription: templateData.briefWorkDescription,
+      dataScope: 'vessel',
+      maintenanceBasis: 'Calendar',
+      frequencyValue: '',
+      frequencyUnit: '',
+    };
+
+    setIsUnplannedSaving(true);
+    try {
+      const createRes = await apiRequest('POST', '/technical/api/work-orders', woPayload);
+      const createdWO = await createRes.json();
+      const newWoId = createdWO?.id || createdWO?.workOrderId;
+
+      if (!newWoId) {
+        throw new Error('Failed to create work order — no ID returned.');
+      }
+
+      if (hasPartBComplete) {
+        const execPayload = {
+          riskAssessment: executionData.riskAssessment || null,
+          safetyChecklists: executionData.safetyChecklists || null,
+          operationalForms: executionData.operationalForms || null,
+          startDateTime: executionData.startDateTime || null,
+          completionDateTime: executionData.completionDateTime || null,
+          dateOfCompletion: completionDate || null,
+          performedBy: executionData.performedBy || null,
+          noOfPersons: executionData.noOfPersons || null,
+          totalTimeHours: executionData.totalTimeHours || null,
+          manhours: executionData.manhours || null,
+          workCarriedOut: executionData.workCarriedOut || null,
+          jobExperienceNotes: executionData.jobExperienceNotes || null,
+          previousReading: executionData.previousReading || null,
+          currentReading: executionData.currentReading || null,
+          consumedSpareParts: executionData.consumedSpareParts.filter(
+            (s) => s.description?.trim() || s.partNo?.trim()
+          ),
+          status: woStatus,
+        };
+        await apiRequest('PATCH', `/technical/api/work-orders/${newWoId}`, execPayload);
+      }
+
+      toast({
+        title: 'Work Order Created',
+        description:
+          woStatus === 'Pending Approval'
+            ? 'Unplanned work order submitted for approval.'
+            : 'Unplanned work order saved as draft.',
+      });
+
+      if (woStatus === 'Pending Approval') {
+        sessionStorage.setItem('workOrdersActiveTab', 'Pending Approval');
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+      navigate('/pms/work-orders');
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to create work order. Please try again.';
+      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+    } finally {
+      setIsUnplannedSaving(false);
+    }
+  };
+
   // Approver actions
   const handleApprove = async () => {
     if (embedded) return;
@@ -2917,7 +3064,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               <div className="flex flex-col">
                 <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate" data-testid="WOF1">
                   <Marker id="WOF1" />
-                  {isNewJobCreation ? 'Job Form' : 'Work Order Form'}
+                  {isNewJobCreation ? 'Job Form' : isUnplannedCreate ? 'Work Order Form — Unplanned' : 'Work Order Form'}
                 </h1>
                 {!isNewJobCreation && workOrderNo && (
                   <span className="text-sm text-blue-600 font-medium" data-testid="WOF-wo-number">
@@ -3058,14 +3205,30 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.5"><Marker id="WOF.A1.5" />Component Name</Label>
-                  <Input
-                    value={templateData.componentName || templateData.component}
-                    onChange={(e) => handleTemplateChange('componentName', e.target.value)}
-                    className="text-sm"
-                    placeholder="Enter component"
-                    disabled={isPartAReadOnly}
-                    data-testid="WOF.A1.6"
-                  />
+                  {isUnplannedCreate ? (
+                    <Select
+                      value={unplannedComponentId}
+                      onValueChange={handleUnplannedComponentSelect}
+                    >
+                      <SelectTrigger className="text-sm" data-testid="WOF.A1.6">
+                        <SelectValue placeholder="Select component" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredUnplannedComponents.map(c => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      value={templateData.componentName || templateData.component}
+                      onChange={(e) => handleTemplateChange('componentName', e.target.value)}
+                      className="text-sm"
+                      placeholder="Enter component"
+                      disabled={isPartAReadOnly}
+                      data-testid="WOF.A1.6"
+                    />
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -3075,76 +3238,82 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     onChange={(e) => handleTemplateChange('componentCode', e.target.value)}
                     className="text-sm"
                     placeholder="Enter component code"
-                    disabled={isPartAReadOnly}
+                    disabled={isPartAReadOnly || isUnplannedCreate}
                     data-testid="WOF.A1.8"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.9"><Marker id="WOF.A1.9" />Job Code</Label>
-                  <Input
-                    value={templateData.woTemplateCode}
-                    onChange={(e) => handleTemplateChange('woTemplateCode', e.target.value)}
-                    className="text-sm"
-                    placeholder="Enter job code"
-                    disabled={isPartAReadOnly}
-                    data-testid="WOF.A1.10"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.11"><Marker id="WOF.A1.11" />Maintenance Basis</Label>
-                  <Select
-                    value={templateData.maintenanceBasis}
-                    onValueChange={(value) => handleTemplateChange('maintenanceBasis', value)}
-                    disabled={isPartAReadOnly}
-                  >
-                    <SelectTrigger className="text-sm" data-testid="WOF.A1.12">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Calendar">Calendar</SelectItem>
-                      <SelectItem value="Running Hours">Running Hours</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.13"><Marker id="WOF.A1.13" />Frequency</Label>
-                  <div className="flex gap-2">
+                {!isUnplannedCreate && (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.9"><Marker id="WOF.A1.9" />Job Code</Label>
                     <Input
-                      type="number"
-                      min="1"
-                      value={templateData.frequencyValue}
-                      onChange={(e) => handleTemplateChange('frequencyValue', e.target.value)}
-                      className="text-sm flex-1"
-                      placeholder="Value"
+                      value={templateData.woTemplateCode}
+                      onChange={(e) => handleTemplateChange('woTemplateCode', e.target.value)}
+                      className="text-sm"
+                      placeholder="Enter job code"
                       disabled={isPartAReadOnly}
-                      data-testid="WOF.A1.14"
+                      data-testid="WOF.A1.10"
                     />
+                  </div>
+                )}
+
+                {!isUnplannedCreate && (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.11"><Marker id="WOF.A1.11" />Maintenance Basis</Label>
                     <Select
-                      value={templateData.maintenanceBasis === 'Running Hours' ? 'Hours' : templateData.frequencyUnit}
-                      onValueChange={(value) => handleTemplateChange('frequencyUnit', value)}
-                      disabled={isPartAReadOnly || templateData.maintenanceBasis === 'Running Hours'}
+                      value={templateData.maintenanceBasis}
+                      onValueChange={(value) => handleTemplateChange('maintenanceBasis', value)}
+                      disabled={isPartAReadOnly}
                     >
-                      <SelectTrigger className="text-sm w-32" data-testid="WOF.A1.15">
+                      <SelectTrigger className="text-sm" data-testid="WOF.A1.12">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {templateData.maintenanceBasis === 'Running Hours' ? (
-                          <SelectItem value="Hours">Hours</SelectItem>
-                        ) : (
-                          <>
-                            <SelectItem value="Days">Days</SelectItem>
-                            <SelectItem value="Weeks">Weeks</SelectItem>
-                            <SelectItem value="Months">Months</SelectItem>
-                            <SelectItem value="Years">Years</SelectItem>
-                          </>
-                        )}
+                        <SelectItem value="Calendar">Calendar</SelectItem>
+                        <SelectItem value="Running Hours">Running Hours</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
+                )}
+
+                {!isUnplannedCreate && (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.13"><Marker id="WOF.A1.13" />Frequency</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        min="1"
+                        value={templateData.frequencyValue}
+                        onChange={(e) => handleTemplateChange('frequencyValue', e.target.value)}
+                        className="text-sm flex-1"
+                        placeholder="Value"
+                        disabled={isPartAReadOnly}
+                        data-testid="WOF.A1.14"
+                      />
+                      <Select
+                        value={templateData.maintenanceBasis === 'Running Hours' ? 'Hours' : templateData.frequencyUnit}
+                        onValueChange={(value) => handleTemplateChange('frequencyUnit', value)}
+                        disabled={isPartAReadOnly || templateData.maintenanceBasis === 'Running Hours'}
+                      >
+                        <SelectTrigger className="text-sm w-32" data-testid="WOF.A1.15">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {templateData.maintenanceBasis === 'Running Hours' ? (
+                            <SelectItem value="Hours">Hours</SelectItem>
+                          ) : (
+                            <>
+                              <SelectItem value="Days">Days</SelectItem>
+                              <SelectItem value="Weeks">Weeks</SelectItem>
+                              <SelectItem value="Months">Months</SelectItem>
+                              <SelectItem value="Years">Years</SelectItem>
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.16"><Marker id="WOF.A1.16" />Task Type</Label>
@@ -3157,18 +3326,29 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Inspection">Inspection</SelectItem>
-                      <SelectItem value="Overhaul">Overhaul</SelectItem>
-                      <SelectItem value="Service">Service</SelectItem>
-                      <SelectItem value="Test">Test</SelectItem>
-                      <SelectItem value="Renew/Replace">Renew/Replace</SelectItem>
-                      <SelectItem value="Measurement/Calibration">Measurement/Calibration</SelectItem>
-                      <SelectItem value="Megger Test">Megger Test</SelectItem>
-                      <SelectItem value="Cleaning">Cleaning</SelectItem>
-                      <SelectItem value="Lubrication">Lubrication</SelectItem>
-                      <SelectItem value="Survey">Survey</SelectItem>
-                      <SelectItem value="Analysis">Analysis</SelectItem>
-                      <SelectItem value="Checks">Checks</SelectItem>
+                      {isUnplannedCreate ? (
+                        <>
+                          <SelectItem value="Unplanned Maintenance">Unplanned Maintenance</SelectItem>
+                          <SelectItem value="Emergency">Emergency</SelectItem>
+                          <SelectItem value="Breakdown">Breakdown</SelectItem>
+                          <SelectItem value="Corrective Maintenance">Corrective Maintenance</SelectItem>
+                        </>
+                      ) : (
+                        <>
+                          <SelectItem value="Inspection">Inspection</SelectItem>
+                          <SelectItem value="Overhaul">Overhaul</SelectItem>
+                          <SelectItem value="Service">Service</SelectItem>
+                          <SelectItem value="Test">Test</SelectItem>
+                          <SelectItem value="Renew/Replace">Renew/Replace</SelectItem>
+                          <SelectItem value="Measurement/Calibration">Measurement/Calibration</SelectItem>
+                          <SelectItem value="Megger Test">Megger Test</SelectItem>
+                          <SelectItem value="Cleaning">Cleaning</SelectItem>
+                          <SelectItem value="Lubrication">Lubrication</SelectItem>
+                          <SelectItem value="Survey">Survey</SelectItem>
+                          <SelectItem value="Analysis">Analysis</SelectItem>
+                          <SelectItem value="Checks">Checks</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -3246,7 +3426,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </div>
 
                 {/* Conditional Next Due field based on Maintenance Basis */}
-                {templateData.maintenanceBasis === 'Running Hours' ? (
+                {!isUnplannedCreate && (templateData.maintenanceBasis === 'Running Hours' ? (
                   <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.26"><Marker id="WOF.A1.26" />Next Due RH</Label>
                     <Input
@@ -3269,9 +3449,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       data-testid="WOF.A1.27"
                     />
                   </div>
-                )}
+                ))}
 
-                {templateData.maintenanceBasis === 'Running Hours' && (
+                {!isUnplannedCreate && templateData.maintenanceBasis === 'Running Hours' && (
                   <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad] flex items-center gap-1" data-testid="WOF.A1.lastDoneRHLabel">
                       <Clock className="h-3.5 w-3.5" />
@@ -3289,24 +3469,26 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad] flex items-center gap-1" data-testid="WOF.A1.lastDoneLabel">
-                    <Clock className="h-3.5 w-3.5" />
-                    Last Completed On
-                  </Label>
-                  <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-date">
-                    {(lastDoneDate || lastDoneDateForRH) ? (
-                      <>
-                        {normalizeDateToDDMMMYYYY(lastDoneDateForRH || lastDoneDate) || lastDoneDateForRH || lastDoneDate}
-                        {formatRelativeTime(lastDoneDateForRH || lastDoneDate) && (
-                          <span className="text-gray-500"> ({formatRelativeTime(lastDoneDateForRH || lastDoneDate)})</span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-gray-400 italic">First maintenance cycle</span>
-                    )}
+                {!isUnplannedCreate && (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad] flex items-center gap-1" data-testid="WOF.A1.lastDoneLabel">
+                      <Clock className="h-3.5 w-3.5" />
+                      Last Completed On
+                    </Label>
+                    <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-date">
+                      {(lastDoneDate || lastDoneDateForRH) ? (
+                        <>
+                          {normalizeDateToDDMMMYYYY(lastDoneDateForRH || lastDoneDate) || lastDoneDateForRH || lastDoneDate}
+                          {formatRelativeTime(lastDoneDateForRH || lastDoneDate) && (
+                            <span className="text-gray-500"> ({formatRelativeTime(lastDoneDateForRH || lastDoneDate)})</span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-gray-400 italic">First maintenance cycle</span>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.28"><Marker id="WOF.A1.28" />Department</Label>
@@ -3337,22 +3519,48 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.32"><Marker id="WOF.A1.32" />Is Active</Label>
-                  <Select
-                    value={templateData.isActive}
-                    onValueChange={(value) => handleTemplateChange('isActive', value)}
-                    disabled={isPartAReadOnly}
-                  >
-                    <SelectTrigger className="text-sm" data-testid="WOF.A1.33">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Yes">Yes</SelectItem>
-                      <SelectItem value="No">No</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {!isUnplannedCreate && (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.32"><Marker id="WOF.A1.32" />Is Active</Label>
+                    <Select
+                      value={templateData.isActive}
+                      onValueChange={(value) => handleTemplateChange('isActive', value)}
+                      disabled={isPartAReadOnly}
+                    >
+                      <SelectTrigger className="text-sm" data-testid="WOF.A1.33">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Yes">Yes</SelectItem>
+                        <SelectItem value="No">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {isUnplannedCreate && (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.jobCategory">Job Category</Label>
+                    <Select
+                      value={templateData.jobCategory}
+                      onValueChange={(value) => handleTemplateChange('jobCategory', value)}
+                    >
+                      <SelectTrigger className="text-sm" data-testid="select-job-category">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Safety">Safety</SelectItem>
+                        <SelectItem value="Machinery">Machinery</SelectItem>
+                        <SelectItem value="Hull">Hull</SelectItem>
+                        <SelectItem value="Electrical">Electrical</SelectItem>
+                        <SelectItem value="Navigation">Navigation</SelectItem>
+                        <SelectItem value="Cargo">Cargo</SelectItem>
+                        <SelectItem value="Accommodation">Accommodation</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -5495,17 +5703,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               <div className="flex justify-end mt-6 pb-6" data-testid="WOF6"><Marker id="WOF6" />
                 <div title={isRHSaveBlocked ? rhBlockReason : ''}>
                   <Button
-                    onClick={isNewJobCreation ? handleSaveNewJob : handleSave}
-                    disabled={!!isRHSaveBlocked}
+                    onClick={isNewJobCreation ? handleSaveNewJob : isUnplannedCreate ? handleSaveUnplannedCreate : handleSave}
+                    disabled={isUnplannedCreate ? isUnplannedSaving : !!isRHSaveBlocked}
                     className={`font-bold px-12 py-2.5 h-auto text-sm shadow-md ${
-                      isRHSaveBlocked
+                      (isUnplannedCreate ? isUnplannedSaving : isRHSaveBlocked)
                         ? 'bg-gray-400 text-gray-200 cursor-not-allowed hover:bg-gray-400'
                         : 'bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white'
                     }`}
                     data-testid="WOF6.1"
                   >
                     <Marker id="WOF6.1" />
-                    {isNewJobCreation ? 'Create Job' : 'Save'}
+                    {isNewJobCreation ? 'Create Job' : isUnplannedCreate ? (isUnplannedSaving ? 'Saving...' : 'Submit Work Order') : 'Save'}
                   </Button>
                 </div>
               </div>
