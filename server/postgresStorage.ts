@@ -7175,6 +7175,20 @@ export class PostgresStorage {
     const db = await getDb();
     const componentCode = data.componentCode || data.fleetEquipmentCode;
 
+    const result = await db.insert(fleetComponentMapping).values({
+      fleetEquipmentCode: data.fleetEquipmentCode,
+      vesselCode: data.vesselCode,
+      componentCode: componentCode,
+      componentName: data.componentName,
+      mappedBy: 'admin',
+    }).onConflictDoNothing({
+      target: [fleetComponentMapping.fleetEquipmentCode, fleetComponentMapping.vesselCode, fleetComponentMapping.componentCode],
+    }).returning();
+
+    if (result.length > 0) {
+      return result[0];
+    }
+
     const existing = await db.select().from(fleetComponentMapping)
       .where(
         and(
@@ -7184,19 +7198,7 @@ export class PostgresStorage {
         )
       )
       .limit(1);
-
-    if (existing.length > 0) {
-      return existing[0];
-    }
-
-    const result = await db.insert(fleetComponentMapping).values({
-      fleetEquipmentCode: data.fleetEquipmentCode,
-      vesselCode: data.vesselCode,
-      componentCode: componentCode,
-      componentName: data.componentName,
-      mappedBy: 'admin',
-    }).returning();
-    return result[0];
+    return existing[0];
   }
 
   async deleteComponentVesselMapping(id: number): Promise<void> {
