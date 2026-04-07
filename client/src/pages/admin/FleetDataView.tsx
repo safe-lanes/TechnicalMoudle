@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Component, Job, Spare, FleetComponents, FleetJobs, FleetSpares, Maker, FleetJobVesselMapping } from "@shared/schema";
+import type { Component, Job, Spare, FleetComponents, FleetJobs, FleetSpares, Maker, FleetJobVesselMapping, FleetSpareVesselMapping } from "@shared/schema";
 
 interface MappedFleetComponent {
   id: string | number;
@@ -360,6 +360,30 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
     }
     return Array.from(vesselMap.values());
   }, [jobVesselMappings, vessels]);
+
+  const activePartCode = selectedSpareForDetail?.partCode || (isEditSpareDialogOpen ? spareFormData.partCode : null);
+  const { data: spareVesselMappings } = useQuery<FleetSpareVesselMapping[]>({
+    queryKey: ["/technical/api/fleet-admin/fleet-spare-mappings/by-spare", activePartCode],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/fleet-admin/fleet-spare-mappings/by-spare/${encodeURIComponent(activePartCode!)}`);
+      if (!res.ok) throw new Error("Failed to fetch spare vessel mappings");
+      return res.json();
+    },
+    enabled: !!activePartCode,
+  });
+
+  const spareMappedVessels = useMemo(() => {
+    if (!spareVesselMappings || spareVesselMappings.length === 0) return [];
+    const vesselMap = new Map<string, { id: string; name: string }>();
+    for (const m of spareVesselMappings) {
+      const key = m.vesselCode;
+      if (!vesselMap.has(key)) {
+        const resolvedName = m.vesselName || (vessels || []).find(v => v.id === m.vesselCode)?.name || m.vesselCode;
+        vesselMap.set(key, { id: key, name: resolvedName });
+      }
+    }
+    return Array.from(vesselMap.values());
+  }, [spareVesselMappings, vessels]);
 
   const removeMappingsMutation = useMutation({
     mutationFn: async (ids: number[]) => {
@@ -4014,35 +4038,32 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                 </SectionBlock>
 
                 <SectionBlock id="spare-detail-vessels" number="A5" title="Spare Mapped Vessel Details" description="Vessels linked to this spare part">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left">
-                        <th className="py-2 text-gray-600 font-medium">Vessel Code</th>
-                        <th className="py-2 text-gray-600 font-medium">Vessel Name</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        const mappedVessels = (vessels || []).filter((v: any) => 
-                          v.id === (selectedSpareForDetail as any).vesselId
-                        );
-                        return mappedVessels.length > 0 ? (
-                          mappedVessels.map((vessel: any, idx: number) => (
-                            <tr key={idx} className="border-b last:border-0">
-                              <td className="py-2">{vessel.id}</td>
-                              <td className="py-2">{vessel.name}</td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border border-gray-200">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          <th className="text-left p-2 font-medium text-gray-700 w-[40%]">VESSEL CODE</th>
+                          <th className="text-left p-2 font-medium text-gray-700 w-[60%]">VESSEL NAME</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {spareMappedVessels.length > 0 ? (
+                          spareMappedVessels.map((vessel, index) => (
+                            <tr key={vessel.id} className="border-b border-gray-200" data-testid={`spare-vessel-mapping-row-${index}`}>
+                              <td className="p-2">{vessel.id}</td>
+                              <td className="p-2">{vessel.name}</td>
                             </tr>
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={2} className="py-4 text-center text-gray-500">
+                            <td colSpan={2} className="text-center p-4 text-gray-500 italic">
                               No vessels mapped to this spare
                             </td>
                           </tr>
-                        );
-                      })()}
-                    </tbody>
-                  </table>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </SectionBlock>
               </div>
             )}
@@ -4287,6 +4308,35 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                       data-testid="input-edit-note"
                     />
                   </div>
+                </div>
+              </SectionBlock>
+
+              <SectionBlock id="edit-spare-vessels" number="A5" title="Spare Mapped Vessel Details" description="Vessels linked to this spare part">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border border-gray-200">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left p-2 font-medium text-gray-700 w-[40%]">VESSEL CODE</th>
+                        <th className="text-left p-2 font-medium text-gray-700 w-[60%]">VESSEL NAME</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {spareMappedVessels.length > 0 ? (
+                        spareMappedVessels.map((vessel, index) => (
+                          <tr key={vessel.id} className="border-b border-gray-200" data-testid={`edit-spare-vessel-mapping-row-${index}`}>
+                            <td className="p-2">{vessel.id}</td>
+                            <td className="p-2">{vessel.name}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={2} className="text-center p-4 text-gray-500 italic">
+                            No vessels mapped to this spare
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </SectionBlock>
             </div>
