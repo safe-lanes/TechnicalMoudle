@@ -100,6 +100,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isUnplannedSaving, setIsUnplannedSaving] = useState(false);
+  const forceSubmitOnly = useRef(false);
   const [unplannedComponentId, setUnplannedComponentId] = useState('');
 
   // Minimal A/B navigation matching reference design (hide Part B in template mode)
@@ -2328,53 +2329,65 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const isReadyForSubmission = missingFields.length === 0;
       const isDraftSave = hasAnyPartBData && !isReadyForSubmission;
 
-      if (isDraftSave && !hasCompletionData) {
-        const saveExecutionData = {
-          ...executionData,
-          runningHours: currentRHValue || executionData.runningHours,
-          riskAssessmentStatus: executionData.riskAssessment,
-          safetyChecklistsStatus: executionData.safetyChecklists,
-          operationalFormsStatus: executionData.operationalForms,
-        };
+      if (forceSubmitOnly.current) {
+        forceSubmitOnly.current = false;
+        if (!isReadyForSubmission) {
+          toast({
+            title: "Validation Error",
+            description: `The following Part B fields are required to submit for approval: ${missingFields.join(', ')}. Use "Save" to save your progress as a draft instead.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      } else {
+        if (isDraftSave && !hasCompletionData) {
+          const saveExecutionData = {
+            ...executionData,
+            runningHours: currentRHValue || executionData.runningHours,
+            riskAssessmentStatus: executionData.riskAssessment,
+            safetyChecklistsStatus: executionData.safetyChecklists,
+            operationalFormsStatus: executionData.operationalForms,
+          };
 
-        const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...templateData,
-            ...saveExecutionData,
-          })
-        });
+          const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...templateData,
+              ...saveExecutionData,
+            })
+          });
 
-        const result = await response.json();
-        if (!response.ok) {
-          if (result.code === 'INVALID_RUNNING_HOURS') {
-            throw new Error(`Current Reading (${result.enteredValue} hrs) exceeds component actual RH (${result.componentActualRH} hrs). Update running hours in the RH module first, or enter a value ≤ ${result.maxAllowed} hrs.`);
+          const result = await response.json();
+          if (!response.ok) {
+            if (result.code === 'INVALID_RUNNING_HOURS') {
+              throw new Error(`Current Reading (${result.enteredValue} hrs) exceeds component actual RH (${result.componentActualRH} hrs). Update running hours in the RH module first, or enter a value ≤ ${result.maxAllowed} hrs.`);
+            }
+            throw new Error(result.error || 'Failed to save work order');
           }
-          throw new Error(result.error || 'Failed to save work order');
+
+          await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+          await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+          if (hasConsumedSparesData && vesselId) {
+            await queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/${vesselId}`] });
+            await queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/spares-with-inventory/${vesselId}`] });
+          }
+
+          toast({
+            title: "Draft Saved",
+            description: `Work order saved as draft. Complete these fields before submitting for approval: ${missingFields.join(', ')}.`,
+          });
+          return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
-        await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
-        if (hasConsumedSparesData && vesselId) {
-          await queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/${vesselId}`] });
-          await queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/spares-with-inventory/${vesselId}`] });
+        if (!isReadyForSubmission) {
+          toast({
+            title: "Validation Error",
+            description: `The following fields are required: ${missingFields.join(', ')}.`,
+            variant: "destructive",
+          });
+          return;
         }
-
-        toast({
-          title: "Draft Saved",
-          description: `Work order saved as draft. Complete these fields before submitting for approval: ${missingFields.join(', ')}.`,
-        });
-        return;
-      }
-
-      if (!isReadyForSubmission) {
-        toast({
-          title: "Validation Error",
-          description: `The following fields are required: ${missingFields.join(', ')}.`,
-          variant: "destructive",
-        });
-        return;
       }
 
       if (currentRHValue && executionData.previousReading) {
@@ -3422,7 +3435,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               {showDraftActions && (
                 <Button
                   size="sm"
-                  onClick={isUnplannedCreate ? handleSaveUnplannedCreate : handleSave}
+                  onClick={() => {
+                    if (isUnplannedCreate) {
+                      handleSaveUnplannedCreate();
+                    } else {
+                      forceSubmitOnly.current = true;
+                      handleSave();
+                    }
+                  }}
                   disabled={isUnplannedCreate ? isUnplannedSaving : false}
                   className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white font-medium px-4 h-9"
                   data-testid="button-submit-wo"
