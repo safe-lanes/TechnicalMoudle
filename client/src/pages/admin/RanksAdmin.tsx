@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Search, Save, Loader2 } from "lucide-react";
+import { Plus, Trash2, Search, Save, Loader2, ChevronUp, ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -166,7 +166,8 @@ export default function RanksAdmin() {
       sorted.forEach((r, i) => { r.sortOrder = i + 1; });
       saveRanksMutation.mutate({ ranks: sorted, deletedIds: deletedRankIds });
     } else {
-      saveOrgChartMutation.mutate({ entries: orgChartData, deletedIds: deletedOrgChartIds });
+      const validEntries = orgChartData.filter(e => e.rankId);
+      saveOrgChartMutation.mutate({ entries: validEntries, deletedIds: deletedOrgChartIds });
     }
   };
 
@@ -241,6 +242,111 @@ export default function RanksAdmin() {
   const getRankLabel = (rankId: string) => {
     const rank = ranksData.find(r => r.rankId === rankId);
     return rank ? (rank.label || rank.name) : rankId;
+  };
+
+  interface TreeNode {
+    entry: OrgChartRow;
+    index: number;
+    children: TreeNode[];
+  }
+
+  const buildOrgTree = (entries: OrgChartRow[]): { tree: TreeNode[]; unassigned: { entry: OrgChartRow; index: number }[] } => {
+    const validEntries: { entry: OrgChartRow; index: number }[] = [];
+    const unassigned: { entry: OrgChartRow; index: number }[] = [];
+
+    entries.forEach((entry, index) => {
+      if (entry.rankId) {
+        validEntries.push({ entry, index });
+      } else {
+        unassigned.push({ entry, index });
+      }
+    });
+
+    const nodeMap = new Map<string, TreeNode>();
+    const roots: TreeNode[] = [];
+
+    validEntries.forEach(({ entry, index }) => {
+      if (!nodeMap.has(entry.rankId)) {
+        nodeMap.set(entry.rankId, { entry, index, children: [] });
+      }
+    });
+
+    validEntries.forEach(({ entry }) => {
+      const node = nodeMap.get(entry.rankId)!;
+      if (entry.parentRankId && nodeMap.has(entry.parentRankId)) {
+        nodeMap.get(entry.parentRankId)!.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    });
+
+    const sortChildren = (nodes: TreeNode[]) => {
+      nodes.sort((a, b) => a.entry.sortOrder - b.entry.sortOrder);
+      nodes.forEach(n => sortChildren(n.children));
+    };
+    sortChildren(roots);
+    return { tree: roots, unassigned };
+  };
+
+  const isEngineDepartment = (rankId: string, entries: OrgChartRow[], visited = new Set<string>()): boolean => {
+    if (rankId === "R005") return true;
+    if (visited.has(rankId)) return false;
+    visited.add(rankId);
+    const entry = entries.find(e => e.rankId === rankId);
+    if (!entry || !entry.parentRankId) return false;
+    return isEngineDepartment(entry.parentRankId, entries, visited);
+  };
+
+  const isCateringDepartment = (rankId: string, entries: OrgChartRow[], visited = new Set<string>()): boolean => {
+    if (rankId === "R022") return true;
+    if (visited.has(rankId)) return false;
+    visited.add(rankId);
+    const entry = entries.find(e => e.rankId === rankId);
+    if (!entry || !entry.parentRankId) return false;
+    return isCateringDepartment(entry.parentRankId, entries, visited);
+  };
+
+  const getBadgeColor = (rankId: string): string => {
+    if (isEngineDepartment(rankId, orgChartData)) return "bg-green-500";
+    if (isCateringDepartment(rankId, orgChartData)) return "bg-amber-500";
+    return "bg-blue-500";
+  };
+
+  const getDescendantRankIds = (rankId: string, entries: OrgChartRow[]): Set<string> => {
+    const descendants = new Set<string>();
+    const collect = (parentId: string) => {
+      entries.forEach(e => {
+        if (e.parentRankId === parentId && !descendants.has(e.rankId)) {
+          descendants.add(e.rankId);
+          collect(e.rankId);
+        }
+      });
+    };
+    collect(rankId);
+    return descendants;
+  };
+
+  const moveOrgChartEntry = (entryRankId: string, direction: 'up' | 'down') => {
+    setOrgChartData(prev => {
+      const entry = prev.find(e => e.rankId === entryRankId);
+      if (!entry) return prev;
+      const siblings = prev.filter(e => e.parentRankId === entry.parentRankId);
+      siblings.sort((a, b) => a.sortOrder - b.sortOrder);
+      const idx = siblings.findIndex(s => s.rankId === entryRankId);
+      if (direction === 'up' && idx <= 0) return prev;
+      if (direction === 'down' && idx >= siblings.length - 1) return prev;
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+      const swapEntry = siblings[swapIdx];
+      const tempSort = entry.sortOrder;
+      const swapSort = swapEntry.sortOrder;
+      const finalSort = tempSort === swapSort ? tempSort + 1 : swapSort;
+      return prev.map(e => {
+        if (e.rankId === entryRankId) return { ...e, sortOrder: finalSort };
+        if (e.rankId === swapEntry.rankId) return { ...e, sortOrder: tempSort };
+        return e;
+      });
+    });
+    setHasUnsavedChanges(true);
   };
 
   const filteredRanks = ranksData.filter(r => {
@@ -334,70 +440,170 @@ export default function RanksAdmin() {
     </div>
   );
 
-  const renderOrgChartTab = () => (
-    <div className="bg-white rounded-lg border overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-[#52baf3] text-white sticky top-0 z-10">
-            <tr>
-              <th className="px-4 py-3 text-left font-medium text-sm w-16">#</th>
-              <th className="px-4 py-3 text-left font-medium text-sm">Rank</th>
-              <th className="px-4 py-3 text-left font-medium text-sm w-28">Rank ID</th>
-              <th className="px-4 py-3 text-left font-medium text-sm">Reports To</th>
-              <th className="px-4 py-3 text-left font-medium text-sm w-28">Parent Rank ID</th>
-              <th className="px-4 py-3 text-center font-medium text-sm w-24">Sort Order</th>
-              {isEditMode && <th className="px-4 py-3 text-center font-medium text-sm w-20">Actions</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {orgChartData.map((entry, idx) => (
-              <tr key={entry.id || `new-${idx}`} className={cn("border-b hover:bg-gray-50", idx % 2 === 0 ? "bg-white" : "bg-gray-50/50")}>
-                <td className="px-4 py-3 text-sm text-gray-600" data-testid={`text-oc-seq-${idx}`}>{idx + 1}</td>
-                <td className="px-4 py-3 text-sm" data-testid={`text-oc-rank-${idx}`}>
-                  {isEditMode ? (
-                    <Select value={entry.rankId} onValueChange={(v) => updateOrgChartEntry(idx, 'rankId', v)}>
-                      <SelectTrigger className="h-8" data-testid={`select-oc-rank-${idx}`}><SelectValue placeholder="Select rank" /></SelectTrigger>
-                      <SelectContent>
-                        {ranksData.map(r => <SelectItem key={r.rankId} value={r.rankId}>{r.label || r.name} ({r.rankId})</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  ) : (entry.rank || getRankLabel(entry.rankId))}
-                </td>
-                <td className="px-4 py-3 text-sm font-mono text-blue-600" data-testid={`text-oc-rankid-${idx}`}>{entry.rankId}</td>
-                <td className="px-4 py-3 text-sm" data-testid={`text-oc-parent-${idx}`}>
-                  {isEditMode ? (
-                    <Select value={entry.parentRankId || "__none__"} onValueChange={(v) => updateOrgChartEntry(idx, 'parentRankId', v === "__none__" ? null : v)}>
-                      <SelectTrigger className="h-8" data-testid={`select-oc-parent-${idx}`}><SelectValue placeholder="None (top level)" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">None (top level)</SelectItem>
-                        {ranksData.filter(r => r.rankId !== entry.rankId).map(r => <SelectItem key={r.rankId} value={r.rankId}>{r.label || r.name} ({r.rankId})</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  ) : (entry.parentRankId ? getRankLabel(entry.parentRankId) : "—")}
-                </td>
-                <td className="px-4 py-3 text-sm font-mono text-gray-500" data-testid={`text-oc-parentid-${idx}`}>{entry.parentRankId || "—"}</td>
-                <td className="px-4 py-3 text-center" data-testid={`text-oc-sort-${idx}`}>
-                  {isEditMode ? (
-                    <Input type="number" value={entry.sortOrder} onChange={(e) => updateOrgChartEntry(idx, 'sortOrder', parseInt(e.target.value, 10) || 0)} className="h-8 w-20 text-center mx-auto" data-testid={`input-oc-sort-${idx}`} />
-                  ) : entry.sortOrder}
-                </td>
-                {isEditMode && (
-                  <td className="px-4 py-3 text-center">
-                    <Button variant="ghost" size="sm" onClick={() => deleteOrgChartEntry(idx)} className="text-red-500 hover:text-red-700" data-testid={`button-delete-oc-${idx}`}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </td>
-                )}
-              </tr>
-            ))}
-            {orgChartData.length === 0 && (
-              <tr><td colSpan={isEditMode ? 7 : 6} className="px-4 py-8 text-center text-gray-500">No org chart entries found</td></tr>
+  const renderTreeNode = (node: TreeNode, depth: number, isLast: boolean, parentDepths: number[] = []): JSX.Element => {
+    const { entry, index } = node;
+    const label = entry.rank || getRankLabel(entry.rankId);
+    const badgeColor = getBadgeColor(entry.rankId);
+    const indent = depth * 36;
+    const nextParentDepths = isLast ? parentDepths : [...parentDepths, depth];
+
+    return (
+      <div key={entry.rankId || `new-${index}`} data-testid={`tree-node-${entry.rankId}`}>
+        <div className="flex items-center py-1.5 relative" style={{ paddingLeft: indent }}>
+          {parentDepths.map(d => (
+            <div
+              key={`vline-${d}`}
+              className="absolute border-l border-gray-300"
+              style={{ left: d * 36 + 18, top: 0, height: '100%' }}
+            />
+          ))}
+          {depth > 0 && (
+            <div
+              className="absolute border-l border-gray-300"
+              style={{ left: indent - 18, top: 0, height: isLast ? '50%' : '100%' }}
+            />
+          )}
+          {depth > 0 && (
+            <div
+              className="absolute border-t border-gray-300"
+              style={{ left: indent - 18, top: '50%', width: 18 }}
+            />
+          )}
+
+          {isEditMode && (
+            <div className="flex flex-col mr-1 flex-shrink-0" data-testid={`reorder-oc-${entry.rankId}`}>
+              <button
+                onClick={() => moveOrgChartEntry(entry.rankId, 'up')}
+                className="text-gray-400 hover:text-gray-700 p-0 leading-none"
+                data-testid={`button-move-up-${entry.rankId}`}
+              >
+                <ChevronUp className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => moveOrgChartEntry(entry.rankId, 'down')}
+                className="text-gray-400 hover:text-gray-700 p-0 leading-none"
+                data-testid={`button-move-down-${entry.rankId}`}
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          <span
+            className={cn(
+              "inline-block px-4 py-1.5 rounded text-white text-sm font-medium whitespace-nowrap",
+              badgeColor
             )}
-          </tbody>
-        </table>
+            data-testid={`badge-oc-${entry.rankId}`}
+          >
+            {label}
+          </span>
+
+          {isEditMode && (
+            <>
+              <Select
+                value={entry.parentRankId || "__none__"}
+                onValueChange={(v) => updateOrgChartEntry(index, 'parentRankId', v === "__none__" ? null : v)}
+              >
+                <SelectTrigger className="h-8 w-[180px] ml-3 text-sm" data-testid={`select-oc-parent-${entry.rankId}`}>
+                  <SelectValue placeholder="Root (No Parent)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Root (No Parent)</SelectItem>
+                  {(() => {
+                    const descendants = getDescendantRankIds(entry.rankId, orgChartData);
+                    return orgChartData
+                      .filter(r => r.rankId && r.rankId !== entry.rankId && !descendants.has(r.rankId))
+                      .map(r => (
+                        <SelectItem key={r.rankId} value={r.rankId}>
+                          {r.rank || getRankLabel(r.rankId)}
+                        </SelectItem>
+                      ));
+                  })()}
+                </SelectContent>
+              </Select>
+              <button
+                onClick={() => deleteOrgChartEntry(index)}
+                className="ml-3 text-red-400 hover:text-red-600 flex-shrink-0"
+                data-testid={`button-delete-oc-${entry.rankId}`}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </>
+          )}
+        </div>
+
+        {node.children.length > 0 && (
+          <div className="relative">
+            {node.children.map((child, childIdx) =>
+              renderTreeNode(child, depth + 1, childIdx === node.children.length - 1, nextParentDepths)
+            )}
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
+
+  const usedRankIds = new Set(orgChartData.filter(e => e.rankId).map(e => e.rankId));
+  const availableRanksForOrgChart = ranksData.filter(r => !usedRankIds.has(r.rankId));
+
+  const renderOrgChartTab = () => {
+    const { tree, unassigned } = buildOrgTree(orgChartData);
+
+    if (orgChartData.length === 0) {
+      return (
+        <div className="bg-white rounded-lg border p-8 text-center text-gray-500" data-testid="text-oc-empty">
+          No org chart entries found
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white rounded-lg border p-6">
+        {tree.map((rootNode, idx) =>
+          renderTreeNode(rootNode, 0, idx === tree.length - 1)
+        )}
+        {isEditMode && unassigned.map(({ entry, index }) => (
+          <div key={`unassigned-${index}`} className="flex items-center py-1.5 gap-2 border-t border-dashed border-gray-200 mt-2 pt-2" data-testid={`tree-node-unassigned-${index}`}>
+            <span className="inline-block px-4 py-1.5 rounded bg-gray-400 text-white text-sm font-medium">
+              New Entry
+            </span>
+            <Select value={entry.rankId || "__unset__"} onValueChange={(v) => {
+              if (v !== "__unset__") updateOrgChartEntry(index, 'rankId', v);
+            }}>
+              <SelectTrigger className="h-8 w-[200px] text-sm" data-testid={`select-oc-rank-new-${index}`}>
+                <SelectValue placeholder="Select rank..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__unset__" disabled>Select rank...</SelectItem>
+                {availableRanksForOrgChart.map(r => (
+                  <SelectItem key={r.rankId} value={r.rankId}>{r.label || r.name} ({r.rankId})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={entry.parentRankId || "__none__"} onValueChange={(v) => updateOrgChartEntry(index, 'parentRankId', v === "__none__" ? null : v)}>
+              <SelectTrigger className="h-8 w-[180px] text-sm" data-testid={`select-oc-parent-new-${index}`}>
+                <SelectValue placeholder="Root (No Parent)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Root (No Parent)</SelectItem>
+                {orgChartData.filter(r => r.rankId).map(r => (
+                  <SelectItem key={r.rankId} value={r.rankId}>{r.rank || getRankLabel(r.rankId)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <button
+              onClick={() => deleteOrgChartEntry(index)}
+              className="text-red-400 hover:text-red-600 flex-shrink-0"
+              data-testid={`button-delete-oc-new-${index}`}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
