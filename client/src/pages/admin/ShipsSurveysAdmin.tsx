@@ -312,7 +312,6 @@ export default function ShipsSurveysAdmin() {
       setDeletedMasterIds([]);
       setMasterValidationError("");
       setInvalidSurveyIds(new Set());
-      setViewModes(prev => ({ ...prev, [activeTab]: "view" }));
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-survey-applicability', selectedVesselIds] });
     },
@@ -535,7 +534,6 @@ export default function ShipsSurveysAdmin() {
     queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
     setDeletedMasterIds([]);
     
-    setViewModes(prev => ({ ...prev, [activeTab]: "view" }));
     setHasUnsavedChanges(false);
   };
 

@@ -369,7 +369,6 @@ export default function ShipsCertificatesAdmin() {
       setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
       setCompanyOnlyCerts([]);
       setVesselOnlyCerts([]);
-      setViewModes(prev => ({ ...prev, [activeTab]: "view" }));
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-certificates-master'] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-certificate-applicability'] });
     },
