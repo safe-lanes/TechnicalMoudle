@@ -335,15 +335,17 @@ export default function RanksAdmin() {
       const idx = siblings.findIndex(s => s.rankId === entryRankId);
       if (direction === 'up' && idx <= 0) return prev;
       if (direction === 'down' && idx >= siblings.length - 1) return prev;
-      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-      const swapEntry = siblings[swapIdx];
-      const tempSort = entry.sortOrder;
-      const swapSort = swapEntry.sortOrder;
-      const finalSort = tempSort === swapSort ? tempSort + 1 : swapSort;
+
+      const reordered = [...siblings];
+      const [moved] = reordered.splice(idx, 1);
+      reordered.splice(direction === 'up' ? idx - 1 : idx + 1, 0, moved);
+
+      const sortMap = new Map<string, number>();
+      reordered.forEach((s, i) => sortMap.set(s.rankId, i + 1));
+
       return prev.map(e => {
-        if (e.rankId === entryRankId) return { ...e, sortOrder: finalSort };
-        if (e.rankId === swapEntry.rankId) return { ...e, sortOrder: tempSort };
-        return e;
+        const newSort = sortMap.get(e.rankId);
+        return newSort !== undefined ? { ...e, sortOrder: newSort } : e;
       });
     });
     setHasUnsavedChanges(true);
