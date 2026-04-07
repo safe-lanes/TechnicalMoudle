@@ -1042,7 +1042,7 @@ const Dashboard = () => {
       wo.computedStatus === 'Postponed'
     );
     const postponed = postponedFull.length;
-    const unplanned = ytdWOs.filter(wo => !wo.jobId && !wo.templateCode).length;
+    const unplanned = ytdWOs.filter(wo => wo.workOrderType === 'Unplanned').length;
 
     const changeRequestCountYTD = changeRequestsData.filter(cr => {
       const created = cr.createdAt ? new Date(cr.createdAt) : null;
