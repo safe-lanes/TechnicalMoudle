@@ -3343,5 +3343,60 @@ export const insertReportFavoriteSchema = createInsertSchema(reportFavorites).om
 export type InsertReportFavorite = z.infer<typeof insertReportFavoriteSchema>;
 export type ReportFavorite = typeof reportFavorites.$inferSelect;
 
+// ====== AVAILABLE RANKS TABLE ======
+export const admAvailableRanks = pgTable("adm_available_ranks", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  arUuid: text("ar_uuid").unique().default(sql`gen_random_uuid()::text`),
+  name: text("name").notNull(),
+  category: text("category"),
+  rankId: text("rank_id").notNull().unique(),
+  label: text("label"),
+  applicableToCompany: boolean("applicable_to_company").default(true),
+  isSystemRank: boolean("is_system_rank").default(true),
+  sortOrder: integer("sort_order"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  isSync: boolean("is_sync").default(false),
+});
+
+export const insertAdmAvailableRanksSchema = createInsertSchema(admAvailableRanks).omit({
+  id: true,
+  arUuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAdmAvailableRanks = z.infer<typeof insertAdmAvailableRanksSchema>;
+export type AdmAvailableRanks = typeof admAvailableRanks.$inferSelect;
+
+// ====== VESSEL ORG CHART TABLE ======
+export const admVesselOrgChart = pgTable("adm_vessel_org_chart", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  ocUuid: text("oc_uuid").unique().default(sql`gen_random_uuid()::text`),
+  rank: text("rank"),
+  rankId: text("rank_id").notNull().references(() => admAvailableRanks.rankId),
+  parentRankId: text("parent_rank_id").references(() => admAvailableRanks.rankId),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  isSync: boolean("is_sync").default(false),
+});
+
+export const insertAdmVesselOrgChartSchema = createInsertSchema(admVesselOrgChart).omit({
+  id: true,
+  ocUuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAdmVesselOrgChart = z.infer<typeof insertAdmVesselOrgChartSchema>;
+export type AdmVesselOrgChart = typeof admVesselOrgChart.$inferSelect;
+
 // ====== NOON REPORT MODULE SCHEMA — remove this line to disable ======
 export * from './schema-noon-report';

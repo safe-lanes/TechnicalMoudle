@@ -2527,6 +2527,17 @@ const migrations: Migration[] = [
       END $$;
       CREATE INDEX IF NOT EXISTS idx_report_favorites_user ON report_favorites (created_by_uuid);
     `
+  },
+  {
+    id: '077_seed_admin_ranks_menu',
+    name: 'Add Ranks menu entry under Admin',
+    description: 'Adds admin-ranks sub-module under Admin (id=26, sort_order=26)',
+    sql: `
+      INSERT INTO adm_menumaster_ac (id, muid, name, display_name, route, parent_menu, is_active, sort_order, created_at, updated_at, is_deleted, is_sync)
+      VALUES
+        (26, gen_random_uuid(), 'admin-ranks', 'Ranks', '/admin/ranks', (SELECT muid FROM adm_menumaster_ac WHERE id = 4), true, 26, NOW(), NOW(), false, false)
+      ON CONFLICT (id) DO NOTHING;
+    `
   }
 ];
 

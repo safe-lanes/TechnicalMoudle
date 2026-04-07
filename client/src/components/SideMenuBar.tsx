@@ -32,6 +32,7 @@ import {
   Fuel,
   FileDown,
   Ship,
+  UserCog,
 } from "lucide-react";
 
 interface SideMenuBarProps {
@@ -81,6 +82,7 @@ const menuConfigs: Record<string, MenuItem[]> = {
     { id: "masters", label: "Masters", icon: FileSpreadsheet },
     { id: "ships-certificates", label: "Ship's Certificates", icon: Shield },
     { id: "ships-surveys", label: "Ship's Surveys", icon: ClipboardCheck },
+    { id: "ranks", label: "Ranks", icon: UserCog },
     { id: "access-control", label: "Access Control", icon: ShieldCheck },
     // { id: "permissions", label: "Permissions", icon: Shield },
     // { id: "bulk-data-import", label: "Data Management", icon: FileSpreadsheet },
