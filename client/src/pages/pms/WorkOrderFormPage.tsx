@@ -3432,31 +3432,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   )}
                 </Button>
               )}
-              {showDraftActions && (
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    if (isUnplannedCreate) {
-                      handleSaveUnplannedCreate();
-                    } else {
-                      forceSubmitOnly.current = true;
-                      handleSave();
-                    }
-                  }}
-                  disabled={isUnplannedCreate ? isUnplannedSaving : false}
-                  className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white font-medium px-4 h-9"
-                  data-testid="button-submit-wo"
-                >
-                  {(isUnplannedCreate ? isUnplannedSaving : false) ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                      Submitting...
-                    </>
-                  ) : (
-                    'Submit Work Order'
-                  )}
-                </Button>
-              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -6100,8 +6075,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </>
           )}
 
-          {/* Save Button at Bottom - Hidden for Pending Approval (unless rejected), Completed work orders, embedded mode, and unplanned draft workflows (use sticky header actions instead) */}
-          {!embedded && !showDraftActions && (currentWorkOrderStatus !== 'Pending Approval' || isRejectedWO) && currentWorkOrderStatus !== 'Completed' && (() => {
+          {/* Save/Submit Button at Bottom - Hidden for Pending Approval (unless rejected), Completed work orders, and embedded mode */}
+          {!embedded && (currentWorkOrderStatus !== 'Pending Approval' || isRejectedWO) && currentWorkOrderStatus !== 'Completed' && (() => {
             const isRHBased = (workOrderContext as any)?.maintenanceBasis === 'Running Hours';
             const currentRHVal = executionData.currentReading;
             const capRH = rhValidation.componentActualRH;
@@ -6114,21 +6089,31 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               rhNotLoaded ? 'Cannot save: Component running hours are still loading' :
               rhFetchFailed ? 'Cannot save: Unable to verify component running hours' :
               rhInvalid ? 'Cannot save: Running hours validation failed' : '';
+            const handleBottomSubmit = () => {
+              if (isUnplannedCreate) {
+                handleSaveUnplannedCreate();
+              } else if (isExistingDraftUnplanned) {
+                forceSubmitOnly.current = true;
+                handleSave();
+              } else {
+                handleSave();
+              }
+            };
             return (
               <div className="flex justify-end mt-6 pb-6" data-testid="WOF6"><Marker id="WOF6" />
-                <div title={isRHSaveBlocked ? rhBlockReason : ''}>
+                <div title={isRHSaveBlocked && !showDraftActions ? rhBlockReason : ''}>
                   <Button
-                    onClick={isNewJobCreation ? handleSaveNewJob : isUnplannedCreate ? handleSaveUnplannedCreate : handleSave}
-                    disabled={isUnplannedCreate ? isUnplannedSaving : !!isRHSaveBlocked}
+                    onClick={isNewJobCreation ? handleSaveNewJob : showDraftActions ? handleBottomSubmit : handleSave}
+                    disabled={showDraftActions ? (isUnplannedCreate ? isUnplannedSaving : false) : !!isRHSaveBlocked}
                     className={`font-bold px-12 py-2.5 h-auto text-sm shadow-md ${
-                      (isUnplannedCreate ? isUnplannedSaving : isRHSaveBlocked)
+                      (showDraftActions ? (isUnplannedCreate ? isUnplannedSaving : false) : isRHSaveBlocked)
                         ? 'bg-gray-400 text-gray-200 cursor-not-allowed hover:bg-gray-400'
                         : 'bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white'
                     }`}
                     data-testid="WOF6.1"
                   >
                     <Marker id="WOF6.1" />
-                    {isNewJobCreation ? 'Create Job' : isUnplannedCreate ? (isUnplannedSaving ? 'Saving...' : 'Submit Work Order') : 'Save'}
+                    {isNewJobCreation ? 'Create Job' : showDraftActions ? (isUnplannedSaving ? 'Submitting...' : 'Submit Work Order') : 'Save'}
                   </Button>
                 </div>
               </div>
