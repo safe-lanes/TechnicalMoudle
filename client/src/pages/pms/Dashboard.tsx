@@ -1276,7 +1276,7 @@ const Dashboard = () => {
               }`}
               data-testid="tab-overview"
             >
-              Overview
+              Management
             </button>
             <button
               onClick={() => setActiveTab('management')}
@@ -1285,7 +1285,7 @@ const Dashboard = () => {
               }`}
               data-testid="tab-management"
             >
-              Management
+              Operation
             </button>
           </div>
 
