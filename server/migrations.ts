@@ -2643,16 +2643,14 @@ const migrations: Migration[] = [
           RETURN;
         END IF;
 
+        DELETE FROM adm_vessel_org_chart a
+        USING adm_vessel_org_chart b
+        WHERE a.id > b.id AND a.rank_id = b.rank_id;
+
         IF NOT EXISTS (
           SELECT 1 FROM pg_constraint WHERE conname = 'adm_vessel_org_chart_rank_id_unique'
         ) THEN
-          IF EXISTS (
-            SELECT rank_id FROM adm_vessel_org_chart GROUP BY rank_id HAVING COUNT(*) > 1
-          ) THEN
-            RAISE NOTICE 'Duplicate rank_id values found in adm_vessel_org_chart, skipping unique constraint creation';
-          ELSE
-            ALTER TABLE adm_vessel_org_chart ADD CONSTRAINT adm_vessel_org_chart_rank_id_unique UNIQUE (rank_id);
-          END IF;
+          ALTER TABLE adm_vessel_org_chart ADD CONSTRAINT adm_vessel_org_chart_rank_id_unique UNIQUE (rank_id);
         END IF;
 
         INSERT INTO adm_available_ranks (name, category, rank_id, label, applicable_to_company, is_system_rank, sort_order, is_deleted, is_sync, created_at, updated_at)
