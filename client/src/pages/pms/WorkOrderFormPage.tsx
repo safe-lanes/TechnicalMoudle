@@ -2639,6 +2639,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleSaveUnplannedCreate = async () => {
+    // === Part A validation ===
     if (!templateData.woTitle?.trim()) {
       toast({ title: 'Validation Error', description: 'Job Title is required.', variant: 'destructive' });
       return;
@@ -2652,19 +2653,125 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       return;
     }
 
+    // === Part B validation (mirrors handleSave validation pipeline) ===
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
     const startDate = executionData.startDateTime ? executionData.startDateTime.split('T')[0] : '';
-    const completionDate =
-      executionData.dateOfCompletion ||
-      (executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : '');
-    const hasPartBComplete = !!(
-      startDate &&
-      completionDate &&
-      executionData.performedBy &&
-      executionData.noOfPersons &&
-      executionData.workCarriedOut?.trim()
+    const startTime = executionData.startDateTime ? executionData.startDateTime.split('T')[1]?.substring(0, 5) || '' : '';
+    const completionDate = executionData.completionDateTime
+      ? executionData.completionDateTime.split('T')[0]
+      : (executionData.dateOfCompletion || '');
+    const completionTime = executionData.completionDateTime
+      ? executionData.completionDateTime.split('T')[1]?.substring(0, 5) || ''
+      : '';
+    const workCarriedOutTrimmed = (executionData.workCarriedOut || '').trim();
+    const noOfPersonsStr = (executionData.noOfPersons || '').trim();
+    const totalTimeVal = parseFloat(executionData.totalTimeHours);
+    const currentRHValue = executionData.currentReading || executionData.runningHours;
+    const hasConsumedSparesData = executionData.consumedSpareParts.some(
+      s => s.partNo && s.quantityConsumed && parseFloat(s.quantityConsumed) > 0
+    );
+    const hasAnyPartBData = !!(
+      startDate || completionDate || executionData.performedBy || noOfPersonsStr ||
+      executionData.totalTimeHours || workCarriedOutTrimmed || currentRHValue || hasConsumedSparesData
     );
 
-    const woStatus = hasPartBComplete ? 'Pending Approval' : 'Draft';
+    const hardErrors: string[] = [];
+
+    if (startTime && !timeRegex.test(startTime)) hardErrors.push('Start Time must be in HH:MM 24-hour format (00:00–23:59).');
+    if (completionTime && !timeRegex.test(completionTime)) hardErrors.push('Completion Time must be in HH:MM 24-hour format (00:00–23:59).');
+
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    if (startDate && new Date(startDate) > today) hardErrors.push('Start Date cannot be in the future.');
+    if (completionDate) {
+      const completionDateObj = new Date(completionDate);
+      if (completionDateObj > today) hardErrors.push('Completion Date cannot be in the future.');
+      if (startDate && completionDateObj < new Date(startDate)) hardErrors.push('Completion Date cannot be before Start Date.');
+      if (startDate === completionDate && startTime && completionTime && completionTime < startTime) {
+        hardErrors.push('Completion Time cannot be before Start Time on the same day.');
+      }
+    }
+
+    const hodRanks = ['Chief Engineer', 'Chief Officer', 'Master'];
+    if (executionData.performedBy && hodRanks.includes(executionData.performedBy) && executionData.performedBy === templateData.approver) {
+      hardErrors.push(`The same Head of Department rank (${executionData.performedBy}) cannot both perform and approve the work.`);
+    }
+
+    if (noOfPersonsStr && !/^[1-9]\d*$/.test(noOfPersonsStr)) hardErrors.push('No. of Persons must be a positive whole number (≥ 1).');
+    if (noOfPersonsStr && parseInt(noOfPersonsStr, 10) > 50) hardErrors.push('No. of Persons cannot exceed 50.');
+
+    if (executionData.totalTimeHours && !isNaN(totalTimeVal)) {
+      if (totalTimeVal <= 0) hardErrors.push('Total Time Taken must be greater than 0.');
+      if (totalTimeVal > 720) hardErrors.push('Total Time Taken cannot exceed 720 hours (30 days).');
+    }
+
+    const manhoursVal = parseFloat(executionData.manhours);
+    if (executionData.manhours && !isNaN(manhoursVal) && manhoursVal <= 0) hardErrors.push('Manhours must be a positive number.');
+
+    if (workCarriedOutTrimmed && workCarriedOutTrimmed.length < 20) {
+      hardErrors.push('Work Carried Out must be at least 20 characters to provide a meaningful description.');
+    }
+
+    if (currentRHValue) {
+      const currentRHNum = parseFloat(currentRHValue);
+      if (isNaN(currentRHNum) || currentRHNum < 0) hardErrors.push('Current Reading must be a positive number (≥ 0).');
+    }
+
+    if (hasAnyPartBData) {
+      const b1Warnings: string[] = [];
+      if (executionData.riskAssessment === 'No') b1Warnings.push('Risk Assessment');
+      if (executionData.safetyChecklists === 'No') b1Warnings.push('Safety Checklists');
+      if (executionData.operationalForms === 'No') b1Warnings.push('Operational Forms');
+      if (b1Warnings.length > 0) {
+        hardErrors.push(
+          `${b1Warnings.join(', ')} ${b1Warnings.length === 1 ? 'is' : 'are'} marked as "No". Please complete the required assessments or select "NA" if not applicable.`
+        );
+      }
+    }
+
+    const sparesWithInvalidQty = executionData.consumedSpareParts.filter(spare => {
+      const hasData = spare.partNo || spare.description;
+      if (!hasData) return false;
+      const qty = spare.quantityConsumed;
+      if (!qty || qty.trim() === '') return true;
+      const qtyNum = parseFloat(qty);
+      return isNaN(qtyNum) || qtyNum < 1 || !Number.isInteger(qtyNum);
+    });
+    if (sparesWithInvalidQty.length > 0) {
+      const parts = sparesWithInvalidQty.map(s => s.partNo || s.description).join(', ');
+      hardErrors.push(`Qty Used must be a positive whole number (≥ 1) for: ${parts}. Remove the row if no spares were consumed.`);
+    }
+
+    const sparesWithMissingLocation = executionData.consumedSpareParts.filter(spare => {
+      const qty = parseFloat(spare.quantityConsumed || '0');
+      if (qty <= 0) return false;
+      const hasLocationId = spare.locationId != null && spare.locationId > 0;
+      const hasLocationName = spare.location && spare.location.trim().length > 0;
+      return !hasLocationId && !hasLocationName;
+    });
+    if (sparesWithMissingLocation.length > 0) {
+      const parts = sparesWithMissingLocation.map(s => s.partNo || s.description).join(', ');
+      hardErrors.push(`Please select a location for: ${parts}. A location is required when consuming spare parts.`);
+    }
+
+    if (hardErrors.length > 0) {
+      toast({ title: 'Validation Error', description: hardErrors[0], variant: 'destructive' });
+      return;
+    }
+
+    // Determine submission status based on Part B completeness
+    const missingFields: string[] = [];
+    if (!startDate) missingFields.push('Start Date');
+    if (!startTime) missingFields.push('Start Time');
+    if (!completionDate) missingFields.push('Completion Date');
+    if (!completionTime) missingFields.push('Completion Time');
+    if (!executionData.performedBy?.trim()) missingFields.push('Performed By');
+    if (!noOfPersonsStr) missingFields.push('No. of Persons');
+    if (!executionData.totalTimeHours || isNaN(totalTimeVal)) missingFields.push('Total Time Taken');
+    if (!workCarriedOutTrimmed) missingFields.push('Work Carried Out');
+
+    const isReadyForSubmission = missingFields.length === 0;
+    const woStatus = isReadyForSubmission ? 'Pending Approval' : 'Draft';
 
     const woPayload = {
       vesselId: contextVesselId,
@@ -2680,6 +2787,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       classRelated: templateData.classRelated || 'No',
       department: templateData.department || '',
       criticality: templateData.criticality || '',
+      isActive: templateData.isActive === 'Yes',
       status: woStatus,
       briefWorkDescription: templateData.briefWorkDescription,
       dataScope: 'vessel',
@@ -2694,11 +2802,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const createdWO = await createRes.json();
       const newWoId = createdWO?.id || createdWO?.workOrderId;
 
-      if (!newWoId) {
-        throw new Error('Failed to create work order — no ID returned.');
-      }
+      if (!newWoId) throw new Error('Failed to create work order — no ID returned.');
 
-      if (hasPartBComplete) {
+      // Always PATCH execution data if any Part B data exists (preserves partial drafts)
+      if (hasAnyPartBData) {
         const execPayload = {
           riskAssessment: executionData.riskAssessment || null,
           safetyChecklists: executionData.safetyChecklists || null,
@@ -2722,23 +2829,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         await apiRequest('PATCH', `/technical/api/work-orders/${newWoId}`, execPayload);
       }
 
-      toast({
-        title: 'Work Order Created',
-        description:
-          woStatus === 'Pending Approval'
-            ? 'Unplanned work order submitted for approval.'
-            : 'Unplanned work order saved as draft.',
-      });
-
-      if (woStatus === 'Pending Approval') {
+      if (isReadyForSubmission) {
+        toast({ title: 'Work Order Created', description: 'Unplanned work order submitted for approval.' });
         sessionStorage.setItem('workOrdersActiveTab', 'Pending Approval');
+      } else if (hasAnyPartBData) {
+        toast({
+          title: 'Draft Saved',
+          description: `Unplanned work order saved as draft. Complete these fields before submitting: ${missingFields.join(', ')}.`,
+        });
+      } else {
+        toast({ title: 'Work Order Created', description: 'Unplanned work order saved as draft.' });
       }
 
       queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
       navigate('/pms/work-orders');
     } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to create work order. Please try again.';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create work order. Please try again.';
       toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
     } finally {
       setIsUnplannedSaving(false);
@@ -3519,24 +3625,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </Select>
                 </div>
 
-                {!isUnplannedCreate && (
-                  <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.32"><Marker id="WOF.A1.32" />Is Active</Label>
-                    <Select
-                      value={templateData.isActive}
-                      onValueChange={(value) => handleTemplateChange('isActive', value)}
-                      disabled={isPartAReadOnly}
-                    >
-                      <SelectTrigger className="text-sm" data-testid="WOF.A1.33">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Yes">Yes</SelectItem>
-                        <SelectItem value="No">No</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+                <div className="space-y-2">
+                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.32"><Marker id="WOF.A1.32" />Is Active</Label>
+                  <Select
+                    value={templateData.isActive}
+                    onValueChange={(value) => handleTemplateChange('isActive', value)}
+                    disabled={isPartAReadOnly}
+                  >
+                    <SelectTrigger className="text-sm" data-testid="WOF.A1.33">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
                 {isUnplannedCreate && (
                   <div className="space-y-2">
