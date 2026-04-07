@@ -1282,6 +1282,16 @@ const WorkOrders: React.FC = () => {
                             : '—'}
                         </span>
                       )
+                      : activeTab === "Unplanned"
+                      ? (
+                        <span className="text-gray-900">
+                          {workOrder.dueDate
+                            ? formatProfessionalDate(workOrder.dueDate)
+                            : workOrder.submittedDate
+                              ? formatProfessionalDate(workOrder.submittedDate)
+                              : '—'}
+                        </span>
+                      )
                       : workOrder.maintenanceBasis === "Running Hours"
                         ? (() => {
                           const rhTarget = workOrder.dueRH ?? (workOrder.nextDueReading != null ? Number(workOrder.nextDueReading) : null);

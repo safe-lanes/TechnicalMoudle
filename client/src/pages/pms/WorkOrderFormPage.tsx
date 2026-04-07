@@ -2642,6 +2642,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const [isDraftSaving, setIsDraftSaving] = useState(false);
 
+  const isExistingDraftUnplanned = !isUnplannedCreate && workOrderType === 'Unplanned' && currentWorkOrderStatus === 'Draft';
+  const showDraftActions = isUnplannedCreate || isExistingDraftUnplanned;
+
   const handleSaveDraftUnplanned = async () => {
     if (!templateData.woTitle?.trim()) {
       toast({ title: 'Validation Error', description: 'Job Title is required.', variant: 'destructive' });
@@ -2682,13 +2685,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
     setIsDraftSaving(true);
     try {
-      const createRes = await apiRequest('POST', '/technical/api/work-orders', woPayload);
-      const createdWO = await createRes.json();
-      const newWoId = createdWO?.id || createdWO?.workOrderId;
-      if (!newWoId) throw new Error('Failed to create work order — no ID returned.');
-
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
-      toast({ title: 'Draft Saved', description: 'Unplanned work order saved as draft. You can resume editing from the Unplanned tab.' });
+      if (isExistingDraftUnplanned && workOrderId) {
+        await apiRequest('PATCH', `/technical/api/work-orders/${workOrderId}`, woPayload);
+        queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+        queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+        toast({ title: 'Draft Updated', description: 'Unplanned work order draft updated successfully.' });
+      } else {
+        const createRes = await apiRequest('POST', '/technical/api/work-orders', woPayload);
+        const createdWO = await createRes.json();
+        const newWoId = createdWO?.id || createdWO?.workOrderId;
+        if (!newWoId) throw new Error('Failed to create work order — no ID returned.');
+        queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+        toast({ title: 'Draft Saved', description: 'Unplanned work order saved as draft. You can resume editing from the Unplanned tab.' });
+      }
       sessionStorage.setItem('workOrdersActiveTab', 'Unplanned');
       navigate('/pms/work-orders');
     } catch (err: unknown) {
@@ -3290,7 +3299,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         );
       })()}
       {/* Top Header Bar - Professional maritime header with logo and actions */}
-      <div className={`bg-white border-b border-gray-200 shadow-sm ${(isUnplannedCreate || (workOrderType === 'Unplanned' && currentWorkOrderStatus === 'Draft')) ? 'sticky top-0 z-30' : ''}`}>
+      <div className={`bg-white border-b border-gray-200 shadow-sm ${showDraftActions ? 'sticky top-0 z-30' : ''}`}>
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4 md:gap-6">
@@ -3355,7 +3364,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               <div className="flex flex-col">
                 <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate" data-testid="WOF1">
                   <Marker id="WOF1" />
-                  {isNewJobCreation ? 'Job Form' : isUnplannedCreate ? 'Work Order Form — Unplanned' : 'Work Order Form'}
+                  {isNewJobCreation ? 'Job Form' : (isUnplannedCreate || isExistingDraftUnplanned) ? 'Work Order Form — Unplanned' : 'Work Order Form'}
                 </h1>
                 {!isNewJobCreation && workOrderNo && (
                   <span className="text-sm text-blue-600 font-medium" data-testid="WOF-wo-number">
@@ -3365,7 +3374,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {isUnplannedCreate && (
+              {showDraftActions && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -3381,6 +3390,24 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </>
                   ) : (
                     'save'
+                  )}
+                </Button>
+              )}
+              {showDraftActions && (
+                <Button
+                  size="sm"
+                  onClick={isUnplannedCreate ? handleSaveUnplannedCreate : handleSave}
+                  disabled={isUnplannedCreate ? isUnplannedSaving : false}
+                  className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white font-medium px-4 h-9"
+                  data-testid="button-submit-wo"
+                >
+                  {(isUnplannedCreate ? isUnplannedSaving : false) ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Work Order'
                   )}
                 </Button>
               )}
