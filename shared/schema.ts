@@ -2215,6 +2215,7 @@ export const fleetComponentMapping = pgTable("fleet_component_mapping", {
   fleetCodeIdx: index("idx_fleet_comp_mapping_fleet").on(table.fleetEquipmentCode),
   vesselCodeIdx: index("idx_fleet_comp_mapping_vessel").on(table.vesselCode),
   componentCodeIdx: index("idx_fleet_comp_mapping_component").on(table.componentCode),
+  uniqueMapping: unique("unique_fleet_comp_vessel_component").on(table.fleetEquipmentCode, table.vesselCode, table.componentCode),
 }));
 
 export const insertFleetComponentMappingSchema = createInsertSchema(fleetComponentMapping).omit({

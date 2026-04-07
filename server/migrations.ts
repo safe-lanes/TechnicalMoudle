@@ -2987,9 +2987,33 @@ export async function runDrizzleMigrations(): Promise<{ applied: number; skipped
   return { applied, skipped };
 }
 
+async function cleanupDuplicateFleetComponentMappings(): Promise<void> {
+  const postgres = await resolvePostgres();
+  if (!postgres) return;
+  const { db } = postgres;
+
+  try {
+    const result = await db.execute(sql.raw(`
+      DELETE FROM fleet_component_mapping a
+      USING fleet_component_mapping b
+      WHERE a.id > b.id
+        AND a.fleet_equipment_code = b.fleet_equipment_code
+        AND a.component_code = b.component_code
+        AND a.vessel_code = b.vessel_code
+    `));
+    const count = (result as any)?.rowCount || 0;
+    if (count > 0) {
+      console.log(`🧹 Removed ${count} duplicate fleet_component_mapping row(s)`);
+    }
+  } catch (error: any) {
+    console.log('⚠️  Fleet component mapping cleanup skipped:', error.message);
+  }
+}
+
 export async function runBackupAndMigrations(): Promise<void> {
   await createDatabaseBackup();
   await runMigrations();
+  await cleanupDuplicateFleetComponentMappings();
   await generateDrizzleMigrations();
   await runDrizzleMigrations();
 }

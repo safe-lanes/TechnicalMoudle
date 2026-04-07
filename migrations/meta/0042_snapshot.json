@@ -1,5 +1,5 @@
 {
-  "id": "6f2aebd1-c680-49c9-98df-dd2789876c6f",
+  "id": "7309f6ce-4520-40b2-8fff-2e261cbbeb65",
   "prevId": "35fd8e41-63a7-4b9f-a681-1b20abbd9266",
   "version": "7",
   "dialect": "postgresql",
@@ -5568,7 +5568,17 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "unique_fleet_comp_vessel_component": {
+          "name": "unique_fleet_comp_vessel_component",
+          "nullsNotDistinct": false,
+          "columns": [
+            "fleet_equipment_code",
+            "vessel_code",
+            "component_code"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -13679,13 +13689,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
-        },
-        "is_deleted": {
-          "name": "is_deleted",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
         },
         "created_at": {
           "name": "created_at",

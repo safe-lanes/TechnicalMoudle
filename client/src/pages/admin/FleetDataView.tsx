@@ -834,6 +834,14 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
              m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode
     );
     
+    const seen = new Set<string>();
+    mappings = mappings.filter((m) => {
+      const key = m.componentCode || m.fleetEquipmentCode || String(m.id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    
     if (detailSearchQuery.trim()) {
       const query = detailSearchQuery.toLowerCase();
       mappings = mappings.filter(

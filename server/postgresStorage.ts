@@ -7173,10 +7173,28 @@ export class PostgresStorage {
     componentName?: string;
   }): Promise<any> {
     const db = await getDb();
+    const componentCode = data.componentCode || data.fleetEquipmentCode;
+
+    const existing = await db.select().from(fleetComponentMapping)
+      .where(
+        and(
+          eq(fleetComponentMapping.fleetEquipmentCode, data.fleetEquipmentCode),
+          eq(fleetComponentMapping.vesselCode, data.vesselCode),
+          eq(fleetComponentMapping.componentCode, componentCode),
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      return existing[0];
+    }
+
     const result = await db.insert(fleetComponentMapping).values({
       fleetEquipmentCode: data.fleetEquipmentCode,
       vesselCode: data.vesselCode,
-      vesselComponentCode: data.componentCode,
+      componentCode: componentCode,
+      componentName: data.componentName,
+      mappedBy: 'admin',
     }).returning();
     return result[0];
   }
