@@ -258,8 +258,8 @@ export default function RanksAdmin() {
   const isSaving = saveRanksMutation.isPending || saveOrgChartMutation.isPending;
 
   const renderRanksTab = () => (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="flex items-center gap-4 mb-4 flex-shrink-0">
+    <div className="flex flex-col">
+      <div className="flex items-center gap-4 mb-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
@@ -283,9 +283,9 @@ export default function RanksAdmin() {
         </Select>
       </div>
 
-      <div className="flex-1 overflow-auto border rounded-lg">
+      <div className="border rounded-lg">
         <table className="w-full">
-          <thead className="bg-[#52baf3] text-white sticky top-0 z-10">
+          <thead className="bg-[#52baf3] text-white">
             <tr>
               <th className="px-4 py-3 text-left font-medium text-sm w-16">#</th>
               <th className="px-4 py-3 text-left font-medium text-sm w-28">Rank ID</th>
@@ -367,10 +367,10 @@ export default function RanksAdmin() {
   );
 
   const renderOrgChartTab = () => (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="flex-1 overflow-auto border rounded-lg">
+    <div className="flex flex-col">
+      <div className="border rounded-lg">
         <table className="w-full">
-          <thead className="bg-[#52baf3] text-white sticky top-0 z-10">
+          <thead className="bg-[#52baf3] text-white">
             <tr>
               <th className="px-4 py-3 text-left font-medium text-sm w-16">#</th>
               <th className="px-4 py-3 text-left font-medium text-sm">Rank</th>
@@ -440,7 +440,7 @@ export default function RanksAdmin() {
   );
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+    <div className="flex flex-col">
       <div className="flex-shrink-0 mb-6">
         <div className="flex items-center justify-between relative">
           <h1 className="text-2xl font-semibold text-gray-800" data-testid="text-ranks-admin-title">Ranks Admin</h1>
@@ -492,7 +492,7 @@ export default function RanksAdmin() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden px-1">
+      <div className="px-1">
         {activeTab === "available-ranks" ? renderRanksTab() : renderOrgChartTab()}
       </div>
     </div>
