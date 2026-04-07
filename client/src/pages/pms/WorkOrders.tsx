@@ -48,6 +48,7 @@ type WorkOrderWithHydratedData = WorkOrderWithLeadTime & {
   postponementRemarks?: string | null;
   postponementEndDate?: string | null;
   postponementAuthorizedBy?: string | null;
+  plannedDate?: string | null;
 };
 
 // Using WorkOrder type from shared schema
@@ -101,12 +102,12 @@ const DEFAULT_WO_COL_WIDTHS: Record<string, number> = {
   actions: 110,
 };
 
-function compareWorkOrders(a: any, b: any, field: WOSortField, dir: WOSortDir, activeTab = ""): number {
+function compareWorkOrders(a: WorkOrderWithHydratedData, b: WorkOrderWithHydratedData, field: WOSortField, dir: WOSortDir, activeTab = ""): number {
   let cmp = 0;
   switch (field) {
     case "component": cmp = (a.component || "").localeCompare(b.component || ""); break;
     case "workOrderNo": {
-      const getWoNo = (wo: any) =>
+      const getWoNo = (wo: WorkOrderWithHydratedData) =>
         (activeTab === "Pending Approval" || activeTab === "Completed") && wo.executionId
           ? wo.executionId
           : wo.workOrderNo || wo.templateCode || "";
@@ -135,7 +136,7 @@ function compareWorkOrders(a: any, b: any, field: WOSortField, dir: WOSortDir, a
       cmp = (a.dateCompleted || "9999").localeCompare(b.dateCompleted || "9999");
       break;
     case "plannedDate":
-      cmp = ((a as any).plannedDate || "9999").localeCompare((b as any).plannedDate || "9999");
+      cmp = (a.plannedDate || "9999").localeCompare(b.plannedDate || "9999");
       break;
     case "postponeUntil":
       cmp = (a.postponementEndDate || "9999").localeCompare(b.postponementEndDate || "9999");
@@ -144,10 +145,10 @@ function compareWorkOrders(a: any, b: any, field: WOSortField, dir: WOSortDir, a
       cmp = (a.postponementReason || "").localeCompare(b.postponementReason || "");
       break;
     case "daysLate":
-      cmp = ((a as any).daysLate || 0) - ((b as any).daysLate || 0);
+      cmp = (a.daysLate || 0) - (b.daysLate || 0);
       break;
     case "approvalTier":
-      cmp = ((a as any).approvalTier || "").localeCompare((b as any).approvalTier || "");
+      cmp = (a.approvalTier || "").localeCompare(b.approvalTier || "");
       break;
   }
   return dir === "desc" ? -cmp : cmp;
@@ -536,9 +537,12 @@ const WorkOrders: React.FC = () => {
   }, []);
 
   // ─── Sorted work orders (applied after filter, before pagination) ───────────
-  const sortedWorkOrders = woSortField
-    ? [...filteredWorkOrders].sort((a, b) => compareWorkOrders(a, b, woSortField, woSortDir, activeTab))
-    : filteredWorkOrders;
+  const sortedWorkOrders = useMemo(
+    () => woSortField
+      ? [...filteredWorkOrders].sort((a, b) => compareWorkOrders(a, b, woSortField, woSortDir, activeTab))
+      : filteredWorkOrders,
+    [filteredWorkOrders, woSortField, woSortDir, activeTab]
+  );
 
   // Pagination calculations
   const totalItems = filteredWorkOrders.length;
@@ -1108,10 +1112,10 @@ const WorkOrders: React.FC = () => {
 
       {/* Pending Approval Summary Stat Bar */}
       {activeTab === "Pending Approval" && (() => {
-        const lockedCount = filteredWorkOrders.filter(wo => (wo as any).approvalTier === "superintendent_locked").length;
-        const notifiedCount = filteredWorkOrders.filter(wo => (wo as any).approvalTier === "superintendent_notification").length;
-        const ceRemarksCount = filteredWorkOrders.filter(wo => (wo as any).approvalTier === "ce_with_justification").length;
-        const standardCount = filteredWorkOrders.filter(wo => !(wo as any).approvalTier || (wo as any).approvalTier === "standard").length;
+        const lockedCount = filteredWorkOrders.filter(wo => wo.approvalTier === "superintendent_locked").length;
+        const notifiedCount = filteredWorkOrders.filter(wo => wo.approvalTier === "superintendent_notification").length;
+        const ceRemarksCount = filteredWorkOrders.filter(wo => wo.approvalTier === "ce_with_justification").length;
+        const standardCount = filteredWorkOrders.filter(wo => !wo.approvalTier || wo.approvalTier === "standard").length;
         const statCards = [
           { icon: Lock, label: "Locked (Supt. Required)", count: lockedCount, bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-800 dark:text-red-300", testId: "stat-locked" },
           { icon: AlertTriangle, label: "Supt. Notified", count: notifiedCount, bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-800 dark:text-orange-300", testId: "stat-supt-notified" },
@@ -1144,7 +1148,7 @@ const WorkOrders: React.FC = () => {
             <tr>
               {/* Component */}
               <th
-                className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                className="text-left py-3 px-4 font-medium relative select-none"
                 style={{ width: colWidths.component }}
                 onClick={() => handleWoSort("component")}
                 data-testid="C16"
@@ -1155,7 +1159,7 @@ const WorkOrders: React.FC = () => {
               </th>
               {/* Work Order No */}
               <th
-                className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                className="text-left py-3 px-4 font-medium relative select-none"
                 style={{ width: colWidths.workOrderNo }}
                 onClick={() => handleWoSort("workOrderNo")}
                 data-testid="C17"
@@ -1176,7 +1180,7 @@ const WorkOrders: React.FC = () => {
               )}
               {/* Job Title */}
               <th
-                className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                className="text-left py-3 px-4 font-medium relative select-none"
                 style={{ width: colWidths.jobTitle }}
                 onClick={() => handleWoSort("jobTitle")}
                 data-testid="C18"
@@ -1187,7 +1191,7 @@ const WorkOrders: React.FC = () => {
               </th>
               {/* Assigned To */}
               <th
-                className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                className="text-left py-3 px-4 font-medium relative select-none"
                 style={{ width: colWidths.assignedTo }}
                 onClick={() => handleWoSort("assignedTo")}
                 data-testid="C19"
@@ -1198,7 +1202,7 @@ const WorkOrders: React.FC = () => {
               </th>
               {/* Due Date / Submitted Date */}
               <th
-                className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                className="text-left py-3 px-4 font-medium relative select-none"
                 style={{ width: colWidths.dueDate }}
                 onClick={() => handleWoSort("dueDate")}
                 data-testid="C20"
@@ -1213,7 +1217,7 @@ const WorkOrders: React.FC = () => {
               {/* Planned Date — Planned tab only */}
               {activeTab === "Planned" && (
                 <th
-                  className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                  className="text-left py-3 px-4 font-medium relative select-none"
                   style={{ width: colWidths.plannedDate }}
                   onClick={() => handleWoSort("plannedDate")}
                   data-testid="th-planned-date"
@@ -1225,7 +1229,7 @@ const WorkOrders: React.FC = () => {
               {/* Postpone Until — Postponed tab only */}
               {activeTab === "Postponed" && (
                 <th
-                  className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                  className="text-left py-3 px-4 font-medium relative select-none"
                   style={{ width: colWidths.postponeUntil }}
                   onClick={() => handleWoSort("postponeUntil")}
                   data-testid="th-postpone-until"
@@ -1237,7 +1241,7 @@ const WorkOrders: React.FC = () => {
               {/* Postponement Reason — Postponed tab only */}
               {activeTab === "Postponed" && (
                 <th
-                  className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                  className="text-left py-3 px-4 font-medium relative select-none"
                   style={{ width: colWidths.postponementReason }}
                   onClick={() => handleWoSort("postponementReason")}
                   data-testid="th-postponement-reason"
@@ -1249,7 +1253,7 @@ const WorkOrders: React.FC = () => {
               {/* Days Late — Pending Approval tab only */}
               {activeTab === "Pending Approval" && (
                 <th
-                  className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                  className="text-left py-3 px-4 font-medium relative select-none"
                   style={{ width: colWidths.daysLate }}
                   onClick={() => handleWoSort("daysLate")}
                   data-testid="th-days-late"
@@ -1261,7 +1265,7 @@ const WorkOrders: React.FC = () => {
               {/* Approval Tier — Pending Approval tab only */}
               {activeTab === "Pending Approval" && (
                 <th
-                  className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                  className="text-left py-3 px-4 font-medium relative select-none"
                   style={{ width: colWidths.approvalTier }}
                   onClick={() => handleWoSort("approvalTier")}
                   data-testid="th-approval-tier"
@@ -1272,7 +1276,7 @@ const WorkOrders: React.FC = () => {
               )}
               {/* Status */}
               <th
-                className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                className="text-left py-3 px-4 font-medium relative select-none"
                 style={{ width: colWidths.status }}
                 onClick={() => handleWoSort("status")}
                 data-testid="C21"
@@ -1284,7 +1288,7 @@ const WorkOrders: React.FC = () => {
               {/* Approval Tier — Completed tab only */}
               {activeTab === "Completed" && (
                 <th
-                  className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                  className="text-left py-3 px-4 font-medium relative select-none"
                   style={{ width: colWidths.completedApprovalTier }}
                   onClick={() => handleWoSort("approvalTier")}
                   data-testid="th-completed-approval-tier"
@@ -1296,7 +1300,7 @@ const WorkOrders: React.FC = () => {
               {/* Date Completed — Completed tab only */}
               {activeTab === "Completed" && (
                 <th
-                  className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                  className="text-left py-3 px-4 font-medium relative select-none"
                   style={{ width: colWidths.dateCompleted }}
                   onClick={() => handleWoSort("dateCompleted")}
                   data-testid="C22"
@@ -1329,8 +1333,8 @@ const WorkOrders: React.FC = () => {
                 onClick={() => handleWorkOrderClick(workOrder)}
                 data-testid={`row-work-order-${workOrder.id}`}
               >
-                {/* Component */}
-                <td className={`py-3 px-4 ${textColorClass} overflow-hidden`} data-testid={index === 0 ? "C24" : undefined}>
+                {/* Component — inner span uses truncate; whitespace-nowrap keeps row single-line */}
+                <td className={`py-3 px-4 whitespace-nowrap overflow-hidden ${textColorClass}`} data-testid={index === 0 ? "C24" : undefined}>
                   {index === 0 && <Marker id="C24" />}
                   <div className="flex items-center gap-1 min-w-0">
                     <span className="truncate">{workOrder.component}</span>
@@ -1350,8 +1354,8 @@ const WorkOrders: React.FC = () => {
                 {activeTab === "Pending Approval" && (
                   <td className={`py-3 px-4 whitespace-nowrap overflow-hidden ${textColorClass}`} style={{ textOverflow: 'ellipsis' }}>{workOrder.templateCode}</td>
                 )}
-                {/* Job Title */}
-                <td className={`py-3 px-4 ${textColorClass} overflow-hidden`} data-testid={index === 0 ? "C26" : undefined}>
+                {/* Job Title — inner span uses truncate; whitespace-nowrap keeps row single-line */}
+                <td className={`py-3 px-4 whitespace-nowrap overflow-hidden ${textColorClass}`} data-testid={index === 0 ? "C26" : undefined}>
                   {index === 0 && <Marker id="C26" />}
                   <div className="flex items-center gap-1 min-w-0">
                     <span className="truncate">{workOrder.jobTitle}</span>
@@ -1449,8 +1453,8 @@ const WorkOrders: React.FC = () => {
                 {/* Planned Date */}
                 {activeTab === "Planned" && (
                   <td className="py-3 px-4 text-gray-900 whitespace-nowrap overflow-hidden" style={{ textOverflow: 'ellipsis' }} data-testid={`cell-planned-date-${workOrder.id}`}>
-                    {(workOrder as any).plannedDate
-                      ? formatProfessionalDate((workOrder as any).plannedDate)
+                    {workOrder.plannedDate
+                      ? formatProfessionalDate(workOrder.plannedDate)
                       : '—'}
                   </td>
                 )}
@@ -1472,7 +1476,7 @@ const WorkOrders: React.FC = () => {
                 {activeTab === "Pending Approval" && (
                   <td className="py-3 px-4 whitespace-nowrap" data-testid={`cell-days-late-${workOrder.id}`}>
                     {(() => {
-                      const daysLate = (workOrder as any).daysLate;
+                      const daysLate = workOrder.daysLate;
                       if (daysLate == null || daysLate === 0) return <span className="text-green-600 text-xs font-medium">On Time</span>;
                       if (daysLate >= 1 && daysLate <= 6) return <span className="text-yellow-600 text-xs font-medium">{daysLate} days late</span>;
                       if (daysLate >= 7 && daysLate <= 14) return <span className="text-orange-600 text-xs font-medium">{daysLate} days late</span>;
@@ -1484,7 +1488,7 @@ const WorkOrders: React.FC = () => {
                 {activeTab === "Pending Approval" && (
                   <td className="py-3 px-4 whitespace-nowrap" data-testid={`cell-approval-tier-${workOrder.id}`}>
                     {(() => {
-                      const tier = (workOrder as any).approvalTier;
+                      const tier = workOrder.approvalTier;
                       if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
                       if (tier === "superintendent_notification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Supt. Notified</span>;
                       if (tier === "ce_with_justification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">CE + Remarks</span>;
@@ -1513,9 +1517,9 @@ const WorkOrders: React.FC = () => {
                           ? 'Grace P' 
                           : getEffectiveStatus(workOrder)}
                       </span>
-                      {(workOrder as any).missedCycles >= 1 && (
+                      {(workOrder.missedCycles ?? 0) >= 1 && (
                         <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-500 text-white" data-testid={`badge-skipped-cycles-${workOrder.id}`}>
-                          ⚠ {(workOrder as any).missedCycles} Cycle{(workOrder as any).missedCycles > 1 ? 's' : ''} Skipped
+                          ⚠ {workOrder.missedCycles} Cycle{(workOrder.missedCycles ?? 0) > 1 ? 's' : ''} Skipped
                         </span>
                       )}
                       {activeTab === "Overdue" && getEffectiveStatus(workOrder) === "Overdue" && (
@@ -1553,7 +1557,7 @@ const WorkOrders: React.FC = () => {
                 {activeTab === "Completed" && (
                   <td className="py-3 px-4 whitespace-nowrap" data-testid={`cell-completed-approval-tier-${workOrder.id}`}>
                     {(() => {
-                      const tier = (workOrder as any).approvalTier;
+                      const tier = workOrder.approvalTier;
                       if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
                       if (tier === "superintendent_notification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Supt. Notified</span>;
                       if (tier === "ce_with_justification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">CE + Remarks</span>;
@@ -1570,7 +1574,7 @@ const WorkOrders: React.FC = () => {
                 )}
                 <td className="py-3 px-4">
                   <div className="flex items-center justify-center gap-2">
-                    {activeTab === "Pending Approval" && (workOrder as any).approvalTier === "superintendent_locked" ? (
+                    {activeTab === "Pending Approval" && workOrder.approvalTier === "superintendent_locked" ? (
                       <div className="relative group" data-testid={`locked-action-${workOrder.id}`}>
                         <Lock className="h-4 w-4 text-gray-400" />
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
