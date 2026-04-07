@@ -9,13 +9,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Search, Save, Loader2, ChevronUp, ChevronDown, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Plus, Trash2, Search, Save, Loader2, ChevronUp, ChevronDown, X, Network } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-
-type TabType = "available-ranks" | "org-chart";
 
 interface RankRow {
   id?: number;
@@ -48,8 +53,9 @@ const RANK_CATEGORIES = [
 
 export default function RanksAdmin() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<TabType>("available-ranks");
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isOrgChartModalOpen, setIsOrgChartModalOpen] = useState(false);
+  const [isOrgChartEditMode, setIsOrgChartEditMode] = useState(false);
   const [hasSavedInSession, setHasSavedInSession] = useState<Record<string, boolean>>({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -116,7 +122,7 @@ export default function RanksAdmin() {
     onSuccess: (data) => {
       toast({ title: "Saved successfully", description: `${data.inserted || 0} new ranks added, ${data.updated || 0} updated` });
       setHasUnsavedChanges(false);
-      setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
+      setHasSavedInSession(prev => ({ ...prev, ranks: true }));
       setDeletedRankIds([]);
       setRanksData([]);
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/available-ranks'] });
@@ -137,7 +143,7 @@ export default function RanksAdmin() {
     onSuccess: (data) => {
       toast({ title: "Saved successfully", description: `${data.inserted || 0} new entries added, ${data.updated || 0} updated` });
       setHasUnsavedChanges(false);
-      setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
+      setHasSavedInSession(prev => ({ ...prev, orgChart: true }));
       setDeletedOrgChartIds([]);
       setOrgChartData([]);
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-org-chart'] });
@@ -153,22 +159,34 @@ export default function RanksAdmin() {
     setHasUnsavedChanges(false);
     setHasSavedInSession({});
     setDeletedRankIds([]);
-    setDeletedOrgChartIds([]);
     setRanksData([]);
-    setOrgChartData([]);
     queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/available-ranks'] });
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-org-chart'] });
   };
 
   const handleSave = () => {
-    if (activeTab === "available-ranks") {
-      const sorted = [...ranksData].sort((a, b) => a.sortOrder - b.sortOrder);
-      sorted.forEach((r, i) => { r.sortOrder = i + 1; });
-      saveRanksMutation.mutate({ ranks: sorted, deletedIds: deletedRankIds });
-    } else {
-      const validEntries = orgChartData.filter(e => e.rankId);
-      saveOrgChartMutation.mutate({ entries: validEntries, deletedIds: deletedOrgChartIds });
+    const sorted = [...ranksData].sort((a, b) => a.sortOrder - b.sortOrder);
+    sorted.forEach((r, i) => { r.sortOrder = i + 1; });
+    saveRanksMutation.mutate({ ranks: sorted, deletedIds: deletedRankIds });
+  };
+
+  const handleOrgChartSave = () => {
+    const validEntries = orgChartData.filter(e => e.rankId);
+    saveOrgChartMutation.mutate({ entries: validEntries, deletedIds: deletedOrgChartIds });
+  };
+
+  const exitOrgChartEditMode = () => {
+    setIsOrgChartEditMode(false);
+    setHasUnsavedChanges(false);
+    setDeletedOrgChartIds([]);
+    setOrgChartData([]);
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-org-chart'] });
+  };
+
+  const closeOrgChartModal = () => {
+    if (isOrgChartEditMode) {
+      exitOrgChartEditMode();
     }
+    setIsOrgChartModalOpen(false);
   };
 
   const addNewRank = () => {
@@ -472,7 +490,7 @@ export default function RanksAdmin() {
             />
           )}
 
-          {isEditMode && (
+          {isOrgChartEditMode && (
             <div className="flex flex-col mr-1 flex-shrink-0" data-testid={`reorder-oc-${entry.rankId}`}>
               <button
                 onClick={() => moveOrgChartEntry(entry.rankId, 'up')}
@@ -501,7 +519,7 @@ export default function RanksAdmin() {
             {label}
           </span>
 
-          {isEditMode && (
+          {isOrgChartEditMode && (
             <>
               <Select
                 value={entry.parentRankId || "__none__"}
@@ -549,23 +567,23 @@ export default function RanksAdmin() {
   const usedRankIds = new Set(orgChartData.filter(e => e.rankId).map(e => e.rankId));
   const availableRanksForOrgChart = ranksData.filter(r => !usedRankIds.has(r.rankId));
 
-  const renderOrgChartTab = () => {
+  const renderOrgChartContent = () => {
     const { tree, unassigned } = buildOrgTree(orgChartData);
 
     if (orgChartData.length === 0) {
       return (
-        <div className="bg-white rounded-lg border p-8 text-center text-gray-500" data-testid="text-oc-empty">
+        <div className="p-8 text-center text-gray-500" data-testid="text-oc-empty">
           No org chart entries found
         </div>
       );
     }
 
     return (
-      <div className="bg-white rounded-lg border p-6">
+      <div className="p-4">
         {tree.map((rootNode, idx) =>
           renderTreeNode(rootNode, 0, idx === tree.length - 1)
         )}
-        {isEditMode && unassigned.map(({ entry, index }) => (
+        {isOrgChartEditMode && unassigned.map(({ entry, index }) => (
           <div key={`unassigned-${index}`} className="flex items-center py-1.5 gap-2 border-t border-dashed border-gray-200 mt-2 pt-2" data-testid={`tree-node-unassigned-${index}`}>
             <span className="inline-block px-4 py-1.5 rounded bg-gray-400 text-white text-sm font-medium">
               New Entry
@@ -609,33 +627,9 @@ export default function RanksAdmin() {
 
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
-      {/* Header - Fixed */}
       <div className="flex-shrink-0 mb-6">
-        <div className="flex items-center justify-between relative">
+        <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-gray-800" data-testid="text-ranks-admin-title">Ranks Admin</h1>
-
-          <div className="absolute left-1/2 -translate-x-1/2 flex bg-gray-100 rounded-lg p-1">
-            <button
-              className={cn(
-                "px-6 py-1.5 rounded-md text-sm font-medium transition-colors",
-                activeTab === "available-ranks" ? "bg-[#52baf3] text-white" : "text-gray-600 hover:text-gray-800"
-              )}
-              onClick={() => setActiveTab("available-ranks")}
-              data-testid="tab-available-ranks"
-            >
-              Available Ranks
-            </button>
-            <button
-              className={cn(
-                "px-6 py-1.5 rounded-md text-sm font-medium transition-colors",
-                activeTab === "org-chart" ? "bg-[#52baf3] text-white" : "text-gray-600 hover:text-gray-800"
-              )}
-              onClick={() => setActiveTab("org-chart")}
-              data-testid="tab-org-chart"
-            >
-              Vessel Org Chart
-            </button>
-          </div>
 
           <div className="flex items-center gap-2">
             {!isEditMode ? (
@@ -643,7 +637,7 @@ export default function RanksAdmin() {
             ) : (
               <>
                 <Button variant="outline" size="sm" onClick={exitEditMode} data-testid="button-cancel">
-                  {hasSavedInSession[activeTab] ? "Exit" : "Cancel"}
+                  {hasSavedInSession['ranks'] ? "Exit" : "Cancel"}
                 </Button>
                 <Button
                   size="sm"
@@ -655,55 +649,94 @@ export default function RanksAdmin() {
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   Save
                 </Button>
-                {isEditMode && activeTab === "available-ranks" && (
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700 gap-1" onClick={addNewRank} data-testid="button-add-rank">
-                    <Plus className="h-4 w-4" /> New
-                  </Button>
-                )}
-                {isEditMode && activeTab === "org-chart" && (
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700 gap-1" onClick={addNewOrgChartEntry} data-testid="button-add-org-chart">
-                    <Plus className="h-4 w-4" /> New
-                  </Button>
-                )}
+                <Button size="sm" className="bg-green-600 hover:bg-green-700 gap-1" onClick={addNewRank} data-testid="button-add-rank">
+                  <Plus className="h-4 w-4" /> New
+                </Button>
               </>
             )}
           </div>
         </div>
       </div>
 
-      {/* Search/Filter bar - Fixed (Available Ranks tab only) */}
-      {activeTab === "available-ranks" && (
-        <div className="flex-shrink-0 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search ranks..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-                data-testid="input-search-ranks"
-              />
-            </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map(c => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      <div className="flex-shrink-0 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search ranks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+              data-testid="input-search-ranks"
+            />
+          </div>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {categories.map(c => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="ml-auto">
+            <button
+              onClick={() => setIsOrgChartModalOpen(true)}
+              className="flex items-center gap-2 px-5 py-2 rounded-full border border-blue-400 text-blue-600 hover:bg-blue-50 transition-colors text-sm font-medium"
+              data-testid="button-open-org-chart"
+            >
+              <Network className="h-4 w-4" />
+              Vessel Org Chart
+            </button>
           </div>
         </div>
-      )}
-
-      {/* Main Content - Scrollable */}
-      <div className="flex-1 overflow-y-auto">
-        {activeTab === "available-ranks" ? renderRanksTab() : renderOrgChartTab()}
       </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {renderRanksTab()}
+      </div>
+
+      <Dialog open={isOrgChartModalOpen} onOpenChange={(open) => {
+        if (!open) closeOrgChartModal();
+      }}>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col p-0" data-testid="modal-org-chart">
+          <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b">
+            <div className="flex items-center justify-between pr-8">
+              <DialogTitle className="text-xl font-semibold" data-testid="text-org-chart-title">Vessel Org Chart</DialogTitle>
+              <DialogDescription className="sr-only">Manage the vessel organizational chart hierarchy</DialogDescription>
+              <div className="flex items-center gap-2">
+                {!isOrgChartEditMode ? (
+                  <Button variant="outline" size="sm" onClick={() => setIsOrgChartEditMode(true)} data-testid="button-oc-edit-mode">Edit</Button>
+                ) : (
+                  <>
+                    <Button variant="outline" size="sm" onClick={exitOrgChartEditMode} data-testid="button-oc-cancel">
+                      {hasSavedInSession['orgChart'] ? "Exit" : "Cancel"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="gap-2"
+                      onClick={handleOrgChartSave}
+                      disabled={isSaving}
+                      data-testid="button-oc-save"
+                    >
+                      {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      Save
+                    </Button>
+                    <Button size="sm" className="bg-green-600 hover:bg-green-700 gap-1" onClick={addNewOrgChartEntry} data-testid="button-add-org-chart">
+                      <Plus className="h-4 w-4" /> New
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto">
+            {renderOrgChartContent()}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
