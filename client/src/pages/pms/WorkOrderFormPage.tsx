@@ -2719,33 +2719,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       if (isNaN(currentRHNum) || currentRHNum < 0) hardErrors.push('Current Reading must be a positive number (≥ 0).');
     }
 
-    if (hasAnyPartBData) {
-      const b1Warnings: string[] = [];
-      if (executionData.riskAssessment === 'No') b1Warnings.push('Risk Assessment');
-      if (executionData.safetyChecklists === 'No') b1Warnings.push('Safety Checklists');
-      if (executionData.operationalForms === 'No') b1Warnings.push('Operational Forms');
-      if (b1Warnings.length > 0) {
-        hardErrors.push(
-          `${b1Warnings.join(', ')} ${b1Warnings.length === 1 ? 'is' : 'are'} marked as "No". Please complete the required assessments or select "NA" if not applicable.`
-        );
-      }
-
-      // B1 document-required checks (mirrors handleSave pipeline).
-      // If any B1 item is marked "Yes", a supporting document must be uploaded.
-      // In unplanned-create, documents must be attached after the WO is created by reopening it;
-      // select "NA" if the assessment was not applicable at the time of creation.
-      const b1DocChecks = [
-        { field: executionData.riskAssessment, type: 'riskAssessment', label: 'Risk Assessment' },
-        { field: executionData.safetyChecklists, type: 'safetyChecklist', label: 'Safety Checklists' },
-        { field: executionData.operationalForms, type: 'operationalForm', label: 'Operational Forms' },
-      ];
-      for (const check of b1DocChecks) {
-        if (check.field === 'Yes' && getDocsByType(check.type).length === 0) {
-          hardErrors.push(`${check.label} is marked as "Yes" but no supporting document has been uploaded. Please upload the document or save as a draft first and attach it after the work order is created.`);
-        }
-      }
-    }
-
     // RH validation state checks (mirrors handleSave pipeline).
     // Unplanned WOs use maintenanceBasis='Calendar' so these are no-ops in practice,
     // but are included for full parity with the execution save path.
@@ -2881,6 +2854,42 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (!workCarriedOutTrimmed) missingFields.push('Work Carried Out');
 
     const isReadyForSubmission = missingFields.length === 0;
+
+    // B1 assessment and document-required checks are submission-only:
+    // draft saves may have incomplete B1 selection, so these errors are only enforced
+    // when all required Part B fields are present (full submission path).
+    if (isReadyForSubmission) {
+      const submissionErrors: string[] = [];
+
+      const b1Warnings: string[] = [];
+      if (executionData.riskAssessment === 'No') b1Warnings.push('Risk Assessment');
+      if (executionData.safetyChecklists === 'No') b1Warnings.push('Safety Checklists');
+      if (executionData.operationalForms === 'No') b1Warnings.push('Operational Forms');
+      if (b1Warnings.length > 0) {
+        submissionErrors.push(
+          `${b1Warnings.join(', ')} ${b1Warnings.length === 1 ? 'is' : 'are'} marked as "No". Please complete the required assessments or select "NA" if not applicable.`
+        );
+      }
+
+      // B1 document-required checks: if any B1 item is marked "Yes" without a document uploaded,
+      // the user should save a draft first, upload docs after WO creation, then re-submit.
+      const b1DocChecks = [
+        { field: executionData.riskAssessment, type: 'riskAssessment', label: 'Risk Assessment' },
+        { field: executionData.safetyChecklists, type: 'safetyChecklist', label: 'Safety Checklists' },
+        { field: executionData.operationalForms, type: 'operationalForm', label: 'Operational Forms' },
+      ];
+      for (const check of b1DocChecks) {
+        if (check.field === 'Yes' && getDocsByType(check.type).length === 0) {
+          submissionErrors.push(`${check.label} is marked as "Yes" but no supporting document has been uploaded. Save as a draft first and attach the document after the work order is created.`);
+        }
+      }
+
+      if (submissionErrors.length > 0) {
+        toast({ title: 'Validation Error', description: submissionErrors[0], variant: 'destructive' });
+        return;
+      }
+    }
+
     const woStatus = isReadyForSubmission ? 'Pending Approval' : 'Draft';
 
     const woPayload = {
