@@ -1,0 +1,124 @@
+Please update the Unplanned Work Order Form only in PMS. This is a form structure and workflow adjustment specific to the unplanned work order creation page. Do not apply these changes to planned work orders or any other work order type. The current unplanned form already contains Part A and Part B, with A1 Job Information, A2 Required Spare Parts, A3 Safety Requirements, A4 Work History, and Part B sections including B4 Spare Parts Consumed.
+
+I want the following changes made strictly for the Unplanned Work Order form:
+
+1. Remove these 5 fields from A1
+In A1. Job Information, remove the following five fields completely from the unplanned form:
+
+Job Priority
+
+Class Related
+
+Department
+
+Is Active
+
+Job Category
+
+These fields should not be shown in the Unplanned Work Order form UI, should not take layout space, and should not be required for validation on this form. If these values are still needed internally by the system, handle them through default backend/system values without showing them to the user.
+
+2. Keep the rest of A1
+Keep the other relevant A1 fields for unplanned work orders, such as:
+
+Job Title
+
+Component Name
+
+Component Code
+
+Task Type
+
+Assigned To (Rank)
+
+Approver (Rank)
+
+Criticality
+
+Brief Work Description
+
+If Task Type is always Unplanned Maintenance on this page, it may remain fixed as it is currently shown, but do not redesign the section.
+
+3. Remove A2 completely
+Remove A2. Required Spare Parts entirely from the Unplanned Work Order form. The current unplanned form shows A2 as a spare requirement section with an Add spares button and a parts table, but this section should no longer appear for unplanned work orders.
+
+Do not leave an empty block, hidden heading gap, or blank container behind. The form should reflow cleanly after A1.
+
+4. Make A3 editable
+Keep A3. Safety Requirements in the unplanned form, but change it from display-only text into an editable input section. The current A3 shows static text like PPE and permit requirements not specified; this must now become user-editable.
+
+In A3, allow the user to enter:
+
+PPE requirements
+
+Permit requirements
+
+These should be editable fields in the unplanned form so the user can define safety requirements during creation. Keep the overall styling, section layout, colors, typography, and PMS UI design unchanged.
+
+5. Use B4 for spares consumed
+Keep B4. Spare Parts Consumed in Part B as the spare-related section for unplanned work orders. Since A2 is being removed, B4 should be the only spare-related section used in the unplanned work order flow for actual spares consumed during completion.
+
+Do not create a new spare section elsewhere. Reuse the existing B4 section and keep its current UI style unchanged.
+
+6. Scope restriction
+These changes must apply only to:
+
+Unplanned Work Order creation form
+
+Unplanned Work Order edit/view flow wherever this same form is used
+
+Do not apply these A1, A2, A3, or B4 changes to:
+
+Planned work orders
+
+Regular PMS work orders
+
+Any other work order form type
+
+7. Validation and save behavior
+Please ensure:
+
+Removed A1 fields are not validated on the unplanned form.
+
+A2 data is no longer required or shown for unplanned work orders.
+
+A3 editable values are saved correctly.
+
+B4 continues to function correctly for spare parts consumed.
+
+Existing save/submit workflow for unplanned work orders continues to work properly after these changes.
+
+8. UI restriction
+Do not change:
+
+Color scheme
+
+Font styling
+
+Section styling
+
+Card layout
+
+Spacing style
+
+Left-side A / B step navigation
+
+Overall PMS design language
+
+This should feel like a form simplification only, not a redesign.
+
+Acceptance criteria
+In Unplanned Work Order A1, these 5 fields are removed: Job Priority, Class Related, Department, Is Active, Job Category.
+
+A2 Required Spare Parts is fully removed from the unplanned form.
+
+A3 Safety Requirements remains visible but is now editable for PPE and permit requirements.
+
+B4 Spare Parts Consumed remains the only spare-related section in the unplanned workflow.
+
+No blank sections or layout gaps remain after removing A2 and the 5 A1 fields.
+
+No validation errors occur for removed fields in unplanned work orders.
+
+Planned and other work order forms remain unchanged.
+
+Existing UI appearance remains unchanged
