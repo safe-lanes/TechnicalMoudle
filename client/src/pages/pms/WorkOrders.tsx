@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar } from "lucide-react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import WorkOrderPlanner from "./WorkOrderPlanner";
 import { useLocation } from "wouter";
 import { useVessel } from "@/contexts/VesselContext";
@@ -76,6 +76,79 @@ const generateTemplateCode = (componentCode: string, taskType: string, basis: st
 
 // Sample data moved to seed data in storage - now fetched from API
 
+// ─── Work Orders Table Enhancements ───────────────────────────────────────────
+type WOSortField =
+  | "component" | "workOrderNo" | "jobTitle" | "assignedTo" | "dueDate"
+  | "status" | "dateCompleted" | "plannedDate" | "postponeUntil"
+  | "postponementReason" | "daysLate" | "approvalTier";
+type WOSortDir = "asc" | "desc";
+
+const DEFAULT_WO_COL_WIDTHS: Record<string, number> = {
+  component: 160,
+  workOrderNo: 150,
+  woTemplateCode: 150,
+  jobTitle: 220,
+  assignedTo: 140,
+  dueDate: 160,
+  plannedDate: 130,
+  postponeUntil: 130,
+  postponementReason: 200,
+  daysLate: 110,
+  approvalTier: 130,
+  status: 170,
+  completedApprovalTier: 130,
+  dateCompleted: 140,
+  actions: 110,
+};
+
+function compareWorkOrders(a: any, b: any, field: WOSortField, dir: WOSortDir): number {
+  let cmp = 0;
+  switch (field) {
+    case "component": cmp = (a.component || "").localeCompare(b.component || ""); break;
+    case "workOrderNo":
+      cmp = (a.workOrderNo || a.templateCode || "").localeCompare(b.workOrderNo || b.templateCode || "");
+      break;
+    case "jobTitle": cmp = (a.jobTitle || "").localeCompare(b.jobTitle || ""); break;
+    case "assignedTo": cmp = (a.assignedTo || "").localeCompare(b.assignedTo || ""); break;
+    case "dueDate": {
+      const aVal = a.submittedDate || a.dueDate || "";
+      const bVal = b.submittedDate || b.dueDate || "";
+      cmp = aVal.localeCompare(bVal);
+      break;
+    }
+    case "status": {
+      const STATUS_ORDER: Record<string, number> = {
+        "Overdue": 0, "Due": 1, "Due (Grace P)": 2, "Active": 3,
+        "Pending Approval": 4, "Postponed": 5, "Completed": 6,
+      };
+      const aS = a.computedStatus || a.status || "";
+      const bS = b.computedStatus || b.status || "";
+      cmp = (STATUS_ORDER[aS] ?? 99) - (STATUS_ORDER[bS] ?? 99);
+      break;
+    }
+    case "dateCompleted":
+      cmp = (a.dateCompleted || "9999").localeCompare(b.dateCompleted || "9999");
+      break;
+    case "plannedDate":
+      cmp = ((a as any).plannedDate || "9999").localeCompare((b as any).plannedDate || "9999");
+      break;
+    case "postponeUntil":
+      cmp = (a.postponementEndDate || "9999").localeCompare(b.postponementEndDate || "9999");
+      break;
+    case "postponementReason":
+      cmp = (a.postponementReason || "").localeCompare(b.postponementReason || "");
+      break;
+    case "daysLate":
+      cmp = ((a as any).daysLate || 0) - ((b as any).daysLate || 0);
+      break;
+    case "approvalTier":
+      cmp = ((a as any).approvalTier || "").localeCompare((b as any).approvalTier || "");
+      break;
+  }
+  return dir === "desc" ? -cmp : cmp;
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
 const WorkOrders: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue | null>(null);
@@ -103,6 +176,12 @@ const WorkOrders: React.FC = () => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Table enhancements: sorting & column resizing
+  const [woSortField, setWoSortField] = useState<WOSortField | null>(null);
+  const [woSortDir, setWoSortDir] = useState<WOSortDir>("asc");
+  const [colWidths, setColWidths] = useState<Record<string, number>>(DEFAULT_WO_COL_WIDTHS);
+  const colWidthsRef = useRef<Record<string, number>>(DEFAULT_WO_COL_WIDTHS);
   
   // Modify mode integration  
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
@@ -408,14 +487,68 @@ const WorkOrders: React.FC = () => {
     return true;
   });
 
+  // ─── Sort helpers ──────────────────────────────────────────────────────────
+  const handleWoSort = (field: WOSortField) => {
+    if (woSortField === field) {
+      setWoSortDir(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setWoSortField(field);
+      setWoSortDir("asc");
+    }
+  };
+
+  const getWoSortIcon = (field: WOSortField) => {
+    if (woSortField !== field) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40 shrink-0" />;
+    return woSortDir === "asc"
+      ? <ArrowUp className="h-3 w-3 ml-1 opacity-90 shrink-0" />
+      : <ArrowDown className="h-3 w-3 ml-1 opacity-90 shrink-0" />;
+  };
+
+  // ─── Column resize handler ──────────────────────────────────────────────────
+  const handleResizeMouseDown = useCallback((colId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = colWidthsRef.current[colId] ?? DEFAULT_WO_COL_WIDTHS[colId] ?? 120;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientX - startX;
+      const newWidth = Math.max(60, startWidth + delta);
+      setColWidths(prev => {
+        const next = { ...prev, [colId]: newWidth };
+        colWidthsRef.current = next;
+        return next;
+      });
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, []);
+
+  // ─── Sorted work orders (applied after filter, before pagination) ───────────
+  const sortedWorkOrders = woSortField
+    ? [...filteredWorkOrders].sort((a, b) => compareWorkOrders(a, b, woSortField, woSortDir))
+    : filteredWorkOrders;
+
   // Pagination calculations
   const totalItems = filteredWorkOrders.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   
-  // Reset to page 1 when filters change
+  // Reset to page 1 when filters or sort change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchTerm, periodFilter, selectedRank, selectedCriticality, selectedPostponementReason, vesselId]);
+  }, [activeTab, searchTerm, periodFilter, selectedRank, selectedCriticality, selectedPostponementReason, vesselId, woSortField, woSortDir]);
+
+  // Reset sort when switching tabs
+  useEffect(() => {
+    setWoSortField(null);
+    setWoSortDir("asc");
+  }, [activeTab]);
   
   // Clamp current page when total pages shrinks (e.g., after deletion or filter change)
   useEffect(() => {
@@ -433,12 +566,12 @@ const WorkOrders: React.FC = () => {
     return uniqueSet.sort((a, b) => a.localeCompare(b));
   }, [safeWorkOrdersList]);
 
-  // Get paginated work orders
+  // Get paginated work orders (from sorted list)
   const paginatedWorkOrders = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return filteredWorkOrders.slice(startIndex, endIndex);
-  }, [filteredWorkOrders, currentPage, itemsPerPage]);
+    return sortedWorkOrders.slice(startIndex, endIndex);
+  }, [sortedWorkOrders, currentPage, itemsPerPage]);
   
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -1001,43 +1134,182 @@ const WorkOrders: React.FC = () => {
 
       {/* Work Orders Table */}
       <div className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
-        <table className="w-full text-sm">
-          <thead className="bg-[#52baf3] text-white sticky top-0">
+        <table className="w-full text-sm" style={{ tableLayout: "fixed", minWidth: "1000px" }}>
+          <thead className="bg-[#52baf3] text-white sticky top-0 z-10">
             <tr>
-              <th className="text-left py-3 px-4 font-medium" data-testid="C16"><Marker id="C16" />Component</th>
-              <th className="text-left py-3 px-4 font-medium" data-testid="C17"><Marker id="C17" />Work Order No</th>
-              {activeTab === "Pending Approval" && (
-                <th className="text-left py-3 px-4 font-medium">WO Template Code</th>
-              )}
-              <th className="text-left py-3 px-4 font-medium" data-testid="C18"><Marker id="C18" />Job Title</th>
-              <th className="text-left py-3 px-4 font-medium" data-testid="C19"><Marker id="C19" />Assigned to</th>
-              <th className="text-left py-3 px-4 font-medium" data-testid="C20">
-                <Marker id="C20" />
-                {activeTab === "Pending Approval" || activeTab === "Completed" ? "Submitted Date" : "Due Date"}
+              {/* Component */}
+              <th
+                className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                style={{ width: colWidths.component }}
+                onClick={() => handleWoSort("component")}
+                data-testid="C16"
+              >
+                <Marker id="C16" />
+                <div className="flex items-center">Component{getWoSortIcon("component")}</div>
+                <div className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-white/25 z-20" onMouseDown={(e) => { e.stopPropagation(); handleResizeMouseDown("component", e); }} />
               </th>
+              {/* Work Order No */}
+              <th
+                className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                style={{ width: colWidths.workOrderNo }}
+                onClick={() => handleWoSort("workOrderNo")}
+                data-testid="C17"
+              >
+                <Marker id="C17" />
+                <div className="flex items-center">Work Order No{getWoSortIcon("workOrderNo")}</div>
+                <div className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-white/25 z-20" onMouseDown={(e) => { e.stopPropagation(); handleResizeMouseDown("workOrderNo", e); }} />
+              </th>
+              {/* WO Template Code — Pending Approval only */}
+              {activeTab === "Pending Approval" && (
+                <th
+                  className="text-left py-3 px-4 font-medium relative select-none"
+                  style={{ width: colWidths.woTemplateCode }}
+                >
+                  <div className="flex items-center">WO Template Code</div>
+                  <div className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-white/25 z-20" onMouseDown={(e) => { e.stopPropagation(); handleResizeMouseDown("woTemplateCode", e); }} />
+                </th>
+              )}
+              {/* Job Title */}
+              <th
+                className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                style={{ width: colWidths.jobTitle }}
+                onClick={() => handleWoSort("jobTitle")}
+                data-testid="C18"
+              >
+                <Marker id="C18" />
+                <div className="flex items-center">Job Title{getWoSortIcon("jobTitle")}</div>
+                <div className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-white/25 z-20" onMouseDown={(e) => { e.stopPropagation(); handleResizeMouseDown("jobTitle", e); }} />
+              </th>
+              {/* Assigned To */}
+              <th
+                className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                style={{ width: colWidths.assignedTo }}
+                onClick={() => handleWoSort("assignedTo")}
+                data-testid="C19"
+              >
+                <Marker id="C19" />
+                <div className="flex items-center">Assigned to{getWoSortIcon("assignedTo")}</div>
+                <div className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-white/25 z-20" onMouseDown={(e) => { e.stopPropagation(); handleResizeMouseDown("assignedTo", e); }} />
+              </th>
+              {/* Due Date / Submitted Date */}
+              <th
+                className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                style={{ width: colWidths.dueDate }}
+                onClick={() => handleWoSort("dueDate")}
+                data-testid="C20"
+              >
+                <Marker id="C20" />
+                <div className="flex items-center">
+                  {activeTab === "Pending Approval" || activeTab === "Completed" ? "Submitted Date" : "Due Date"}
+                  {getWoSortIcon("dueDate")}
+                </div>
+                <div className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-white/25 z-20" onMouseDown={(e) => { e.stopPropagation(); handleResizeMouseDown("dueDate", e); }} />
+              </th>
+              {/* Planned Date — Planned tab only */}
               {activeTab === "Planned" && (
-                <th className="text-left py-3 px-4 font-medium" data-testid="th-planned-date">Planned Date</th>
+                <th
+                  className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                  style={{ width: colWidths.plannedDate }}
+                  onClick={() => handleWoSort("plannedDate")}
+                  data-testid="th-planned-date"
+                >
+                  <div className="flex items-center">Planned Date{getWoSortIcon("plannedDate")}</div>
+                  <div className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-white/25 z-20" onMouseDown={(e) => { e.stopPropagation(); handleResizeMouseDown("plannedDate", e); }} />
+                </th>
               )}
+              {/* Postpone Until — Postponed tab only */}
               {activeTab === "Postponed" && (
-                <th className="text-left py-3 px-4 font-medium" data-testid="th-postpone-until">Postpone Until</th>
+                <th
+                  className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                  style={{ width: colWidths.postponeUntil }}
+                  onClick={() => handleWoSort("postponeUntil")}
+                  data-testid="th-postpone-until"
+                >
+                  <div className="flex items-center">Postpone Until{getWoSortIcon("postponeUntil")}</div>
+                  <div className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-white/25 z-20" onMouseDown={(e) => { e.stopPropagation(); handleResizeMouseDown("postponeUntil", e); }} />
+                </th>
               )}
+              {/* Postponement Reason — Postponed tab only */}
               {activeTab === "Postponed" && (
-                <th className="text-left py-3 px-4 font-medium" data-testid="th-postponement-reason">Postponement Reason</th>
+                <th
+                  className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                  style={{ width: colWidths.postponementReason }}
+                  onClick={() => handleWoSort("postponementReason")}
+                  data-testid="th-postponement-reason"
+                >
+                  <div className="flex items-center">Postponement Reason{getWoSortIcon("postponementReason")}</div>
+                  <div className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-white/25 z-20" onMouseDown={(e) => { e.stopPropagation(); handleResizeMouseDown("postponementReason", e); }} />
+                </th>
               )}
+              {/* Days Late — Pending Approval tab only */}
               {activeTab === "Pending Approval" && (
-                <th className="text-left py-3 px-4 font-medium" data-testid="th-days-late">Days Late</th>
+                <th
+                  className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                  style={{ width: colWidths.daysLate }}
+                  onClick={() => handleWoSort("daysLate")}
+                  data-testid="th-days-late"
+                >
+                  <div className="flex items-center">Days Late{getWoSortIcon("daysLate")}</div>
+                  <div className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-white/25 z-20" onMouseDown={(e) => { e.stopPropagation(); handleResizeMouseDown("daysLate", e); }} />
+                </th>
               )}
+              {/* Approval Tier — Pending Approval tab only */}
               {activeTab === "Pending Approval" && (
-                <th className="text-left py-3 px-4 font-medium" data-testid="th-approval-tier">Approval Tier</th>
+                <th
+                  className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                  style={{ width: colWidths.approvalTier }}
+                  onClick={() => handleWoSort("approvalTier")}
+                  data-testid="th-approval-tier"
+                >
+                  <div className="flex items-center">Approval Tier{getWoSortIcon("approvalTier")}</div>
+                  <div className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-white/25 z-20" onMouseDown={(e) => { e.stopPropagation(); handleResizeMouseDown("approvalTier", e); }} />
+                </th>
               )}
-              <th className="text-left py-3 px-4 font-medium" data-testid="C21"><Marker id="C21" />Status</th>
+              {/* Status */}
+              <th
+                className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                style={{ width: colWidths.status }}
+                onClick={() => handleWoSort("status")}
+                data-testid="C21"
+              >
+                <Marker id="C21" />
+                <div className="flex items-center">Status{getWoSortIcon("status")}</div>
+                <div className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-white/25 z-20" onMouseDown={(e) => { e.stopPropagation(); handleResizeMouseDown("status", e); }} />
+              </th>
+              {/* Approval Tier — Completed tab only */}
               {activeTab === "Completed" && (
-                <th className="text-left py-3 px-4 font-medium" data-testid="th-completed-approval-tier">Approval Tier</th>
+                <th
+                  className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                  style={{ width: colWidths.completedApprovalTier }}
+                  onClick={() => handleWoSort("approvalTier")}
+                  data-testid="th-completed-approval-tier"
+                >
+                  <div className="flex items-center">Approval Tier{getWoSortIcon("approvalTier")}</div>
+                  <div className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-white/25 z-20" onMouseDown={(e) => { e.stopPropagation(); handleResizeMouseDown("completedApprovalTier", e); }} />
+                </th>
               )}
+              {/* Date Completed — Completed tab only */}
               {activeTab === "Completed" && (
-                <th className="text-left py-3 px-4 font-medium" data-testid="C22"><Marker id="C22" />Date Completed</th>
+                <th
+                  className="text-left py-3 px-4 font-medium relative select-none cursor-pointer hover:bg-[#3faae0]"
+                  style={{ width: colWidths.dateCompleted }}
+                  onClick={() => handleWoSort("dateCompleted")}
+                  data-testid="C22"
+                >
+                  <Marker id="C22" />
+                  <div className="flex items-center">Date Completed{getWoSortIcon("dateCompleted")}</div>
+                  <div className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-white/25 z-20" onMouseDown={(e) => { e.stopPropagation(); handleResizeMouseDown("dateCompleted", e); }} />
+                </th>
               )}
-              <th className="text-center py-3 px-4 font-medium" data-testid="C23"><Marker id="C23" />Actions</th>
+              {/* Actions */}
+              <th
+                className="text-center py-3 px-4 font-medium relative select-none"
+                style={{ width: colWidths.actions }}
+                data-testid="C23"
+              >
+                <Marker id="C23" />Actions
+                <div className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-white/25 z-20" onMouseDown={(e) => { e.stopPropagation(); handleResizeMouseDown("actions", e); }} />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -1052,38 +1324,46 @@ const WorkOrders: React.FC = () => {
                 onClick={() => handleWorkOrderClick(workOrder)}
                 data-testid={`row-work-order-${workOrder.id}`}
               >
-                <td className={`py-3 px-4 ${textColorClass}`} data-testid={index === 0 ? "C24" : undefined}>
+                {/* Component */}
+                <td className={`py-3 px-4 ${textColorClass} overflow-hidden`} data-testid={index === 0 ? "C24" : undefined}>
                   {index === 0 && <Marker id="C24" />}
-                  {workOrder.component}
-                  {isRejectedWO && activeTab === "Due" && (
-                    <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded">Previously Rejected</span>
-                  )}
+                  <div className="flex items-center gap-1 min-w-0">
+                    <span className="truncate">{workOrder.component}</span>
+                    {isRejectedWO && activeTab === "Due" && (
+                      <span className="ml-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded shrink-0">Previously Rejected</span>
+                    )}
+                  </div>
                 </td>
-                <td className={`py-3 px-4 ${isRejectedWO ? 'text-red-600 hover:text-red-800' : 'text-blue-600 hover:text-blue-800'}`} data-testid={index === 0 ? "C25" : undefined}>
+                {/* Work Order No */}
+                <td className={`py-3 px-4 whitespace-nowrap overflow-hidden ${isRejectedWO ? 'text-red-600 hover:text-red-800' : 'text-blue-600 hover:text-blue-800'}`} style={{ textOverflow: 'ellipsis' }} data-testid={index === 0 ? "C25" : undefined}>
                   {index === 0 && <Marker id="C25" />}
                   {(activeTab === "Pending Approval" || activeTab === "Completed") && workOrder.executionId 
                     ? workOrder.executionId 
                     : workOrder.workOrderNo || workOrder.templateCode}
                 </td>
+                {/* WO Template Code */}
                 {activeTab === "Pending Approval" && (
-                  <td className={`py-3 px-4 ${textColorClass}`}>{workOrder.templateCode}</td>
+                  <td className={`py-3 px-4 whitespace-nowrap overflow-hidden ${textColorClass}`} style={{ textOverflow: 'ellipsis' }}>{workOrder.templateCode}</td>
                 )}
-                <td className={`py-3 px-4 ${textColorClass}`} data-testid={index === 0 ? "C26" : undefined}>
+                {/* Job Title */}
+                <td className={`py-3 px-4 ${textColorClass} overflow-hidden`} data-testid={index === 0 ? "C26" : undefined}>
                   {index === 0 && <Marker id="C26" />}
-                  <div className="flex items-center gap-1.5">
-                    <span>{workOrder.jobTitle}</span>
+                  <div className="flex items-center gap-1 min-w-0">
+                    <span className="truncate">{workOrder.jobTitle}</span>
                     {workOrder.maintenanceBasis === "Running Hours" && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap" data-testid={`badge-rh-${workOrder.id}`}>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap shrink-0" data-testid={`badge-rh-${workOrder.id}`}>
                         RH
                       </span>
                     )}
                   </div>
                 </td>
-                <td className={`py-3 px-4 ${textColorClass}`} data-testid={index === 0 ? "C27" : undefined}>
+                {/* Assigned To */}
+                <td className={`py-3 px-4 whitespace-nowrap overflow-hidden ${textColorClass}`} style={{ textOverflow: 'ellipsis' }} data-testid={index === 0 ? "C27" : undefined}>
                   {index === 0 && <Marker id="C27" />}
                   {workOrder.assignedTo}
                 </td>
-                <td className="py-3 px-4" data-testid={index === 0 ? "C28" : undefined}>
+                {/* Due Date / Submitted Date — overflow:visible to preserve tooltips */}
+                <td className="py-3 px-4 whitespace-nowrap overflow-visible" data-testid={index === 0 ? "C28" : undefined}>
                   {index === 0 && <Marker id="C28" />}
                   <div className="flex items-center gap-2">
                     {(activeTab === "Pending Approval" || activeTab === "Completed")
@@ -1161,27 +1441,31 @@ const WorkOrders: React.FC = () => {
                     }
                   </div>
                 </td>
+                {/* Planned Date */}
                 {activeTab === "Planned" && (
-                  <td className="py-3 px-4 text-gray-900" data-testid={`cell-planned-date-${workOrder.id}`}>
+                  <td className="py-3 px-4 text-gray-900 whitespace-nowrap overflow-hidden" style={{ textOverflow: 'ellipsis' }} data-testid={`cell-planned-date-${workOrder.id}`}>
                     {(workOrder as any).plannedDate
                       ? formatProfessionalDate((workOrder as any).plannedDate)
                       : '—'}
                   </td>
                 )}
+                {/* Postpone Until */}
                 {activeTab === "Postponed" && (
-                  <td className="py-3 px-4 text-gray-900" data-testid={`cell-postpone-until-${workOrder.id}`}>
+                  <td className="py-3 px-4 text-gray-900 whitespace-nowrap overflow-hidden" style={{ textOverflow: 'ellipsis' }} data-testid={`cell-postpone-until-${workOrder.id}`}>
                     {workOrder.postponementEndDate
                       ? formatProfessionalDate(workOrder.postponementEndDate)
                       : '—'}
                   </td>
                 )}
+                {/* Postponement Reason */}
                 {activeTab === "Postponed" && (
-                  <td className="py-3 px-4 text-gray-700" data-testid={`cell-postponement-reason-${workOrder.id}`}>
+                  <td className="py-3 px-4 text-gray-700 whitespace-nowrap overflow-hidden" style={{ textOverflow: 'ellipsis' }} data-testid={`cell-postponement-reason-${workOrder.id}`}>
                     {workOrder.postponementReason || '—'}
                   </td>
                 )}
+                {/* Days Late */}
                 {activeTab === "Pending Approval" && (
-                  <td className="py-3 px-4" data-testid={`cell-days-late-${workOrder.id}`}>
+                  <td className="py-3 px-4 whitespace-nowrap" data-testid={`cell-days-late-${workOrder.id}`}>
                     {(() => {
                       const daysLate = (workOrder as any).daysLate;
                       if (daysLate == null || daysLate === 0) return <span className="text-green-600 text-xs font-medium">On Time</span>;
@@ -1191,8 +1475,9 @@ const WorkOrders: React.FC = () => {
                     })()}
                   </td>
                 )}
+                {/* Approval Tier (Pending Approval) */}
                 {activeTab === "Pending Approval" && (
-                  <td className="py-3 px-4" data-testid={`cell-approval-tier-${workOrder.id}`}>
+                  <td className="py-3 px-4 whitespace-nowrap" data-testid={`cell-approval-tier-${workOrder.id}`}>
                     {(() => {
                       const tier = (workOrder as any).approvalTier;
                       if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
@@ -1259,8 +1544,9 @@ const WorkOrders: React.FC = () => {
                     </div>
                   )}
                 </td>
+                {/* Approval Tier (Completed) */}
                 {activeTab === "Completed" && (
-                  <td className="py-3 px-4" data-testid={`cell-completed-approval-tier-${workOrder.id}`}>
+                  <td className="py-3 px-4 whitespace-nowrap" data-testid={`cell-completed-approval-tier-${workOrder.id}`}>
                     {(() => {
                       const tier = (workOrder as any).approvalTier;
                       if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
@@ -1270,8 +1556,9 @@ const WorkOrders: React.FC = () => {
                     })()}
                   </td>
                 )}
+                {/* Date Completed */}
                 {activeTab === "Completed" && (
-                  <td className="py-3 px-4 text-gray-900" data-testid={index === 0 ? "C30" : undefined}>
+                  <td className="py-3 px-4 text-gray-900 whitespace-nowrap overflow-hidden" style={{ textOverflow: 'ellipsis' }} data-testid={index === 0 ? "C30" : undefined}>
                     {index === 0 && <Marker id="C30" />}
                     {formatProfessionalDate(workOrder.dateCompleted)}
                   </td>
