@@ -926,17 +926,13 @@ export default function ShipsSurveysAdmin() {
       });
 
       if (vesselsToInit.length > 0) {
-        setInitializedVesselIds(prev => {
-          const newSet = new Set(Array.from(prev));
-          vesselsToInit.forEach(v => newSet.add(v.vesselId));
-          return newSet;
-        });
         vesselsToInit.forEach(async (vessel) => {
           try {
             await apiRequest('POST', '/technical/api/admin/vessel-survey-applicability/initialize', {
               vesselId: vessel.vesselId,
               vesselName: vessel.vesselName,
             });
+            setInitializedVesselIds(prev => new Set(Array.from(prev).concat(vessel.vesselId)));
             queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-survey-applicability', selectedVesselIds] });
           } catch (err) {
             console.error('Failed to initialize vessel survey applicability:', err);

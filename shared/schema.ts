@@ -2934,6 +2934,7 @@ export const vesselSurveyApplicability = pgTable("vessel_survey_applicability", 
   vesselName: text("vessel_name").notNull(), // Vessel name for display
   masterId: text("master_id").notNull(), // References ship_surveys_master.master_id
   isApplicable: boolean("is_applicable").notNull().default(true), // Whether this survey is applicable to this vessel
+  isDeleted: boolean("is_deleted").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({

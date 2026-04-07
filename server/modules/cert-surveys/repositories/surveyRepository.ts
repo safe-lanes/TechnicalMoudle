@@ -5,7 +5,7 @@ import {
   shipSurveysMaster,
   vesselSurveyData,
 } from '@shared/schema';
-import { eq, and, asc, inArray } from 'drizzle-orm';
+import { eq, and, asc, inArray, or, sql } from 'drizzle-orm';
 
 // ── Helpers ──
 
@@ -21,7 +21,10 @@ export async function getApplicableSurveys() {
   const db = await getDb();
   if (!db) return null;
   return db.select().from(vesselSurveyApplicability)
-    .where(eq(vesselSurveyApplicability.isApplicable, true));
+    .where(and(
+      eq(vesselSurveyApplicability.isApplicable, true),
+      or(eq(vesselSurveyApplicability.isDeleted, false), sql`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    ));
 }
 
 export async function getMasterSurveysByIds(masterIds: string[]) {

@@ -89,7 +89,10 @@ export async function getApplicabilityByVesselIds(vesselIdList: string[]) {
   if (!db) return null;
   return db.select()
     .from(vesselSurveyApplicability)
-    .where(inArray(vesselSurveyApplicability.vesselId, vesselIdList));
+    .where(and(
+      inArray(vesselSurveyApplicability.vesselId, vesselIdList),
+      or(eq(vesselSurveyApplicability.isDeleted, false), sql`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    ));
 }
 
 export async function getApplicabilityByVesselId(vesselId: string) {
@@ -97,7 +100,10 @@ export async function getApplicabilityByVesselId(vesselId: string) {
   if (!db) return null;
   return db.select()
     .from(vesselSurveyApplicability)
-    .where(eq(vesselSurveyApplicability.vesselId, vesselId));
+    .where(and(
+      eq(vesselSurveyApplicability.vesselId, vesselId),
+      or(eq(vesselSurveyApplicability.isDeleted, false), sql`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    ));
 }
 
 export async function insertApplicabilityBulk(data: Array<{
@@ -138,7 +144,10 @@ export async function getAllApplicability() {
   return db.select({
     vesselId: vesselSurveyApplicability.vesselId,
     masterId: vesselSurveyApplicability.masterId,
-  }).from(vesselSurveyApplicability);
+  }).from(vesselSurveyApplicability)
+    .where(
+      or(eq(vesselSurveyApplicability.isDeleted, false), sql`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    );
 }
 
 export async function getAllVessels() {
@@ -192,16 +201,23 @@ export async function getAllApplicabilityRecords() {
   return db.select({
     vesselId: vesselSurveyApplicability.vesselId,
     masterId: vesselSurveyApplicability.masterId,
-  }).from(vesselSurveyApplicability);
+  }).from(vesselSurveyApplicability)
+    .where(
+      or(eq(vesselSurveyApplicability.isDeleted, false), sql`${vesselSurveyApplicability.isDeleted} IS NULL`)
+    );
 }
 
-export async function deleteApplicabilityByMasterIds(masterIds: string[]) {
+export async function softDeleteApplicabilityByMasterIds(masterIds: string[]) {
   const db = await getDb();
   if (!db) return null;
   if (masterIds.length === 0) return [];
-  return db.delete(vesselSurveyApplicability)
+  return db.update(vesselSurveyApplicability)
+    .set({ isDeleted: true, updatedAt: new Date() })
     .where(
-      inArray(vesselSurveyApplicability.masterId, masterIds)
+      and(
+        inArray(vesselSurveyApplicability.masterId, masterIds),
+        or(eq(vesselSurveyApplicability.isDeleted, false), sql`${vesselSurveyApplicability.isDeleted} IS NULL`)
+      )
     )
     .returning({ masterId: vesselSurveyApplicability.masterId });
 }

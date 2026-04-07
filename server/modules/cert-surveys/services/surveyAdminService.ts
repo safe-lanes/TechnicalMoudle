@@ -220,8 +220,8 @@ export async function saveMasterSurveys(body: any) {
   }
 
   if (staleApplicabilityMasterIds.length > 0) {
-    await surveyAdminRepo.deleteApplicabilityByMasterIds(staleApplicabilityMasterIds);
-    console.log(`Deleted ${staleApplicabilityMasterIds.length} stale non-company applicability master IDs: ${staleApplicabilityMasterIds.join(', ')}`);
+    await surveyAdminRepo.softDeleteApplicabilityByMasterIds(staleApplicabilityMasterIds);
+    console.log(`Soft-deleted ${staleApplicabilityMasterIds.length} stale non-company applicability master IDs: ${staleApplicabilityMasterIds.join(', ')}`);
   }
 
   console.log(`Ship surveys master saved: ${insertedCount} inserted, ${updatedCount} updated`);
