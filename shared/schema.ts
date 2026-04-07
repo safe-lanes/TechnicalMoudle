@@ -3377,7 +3377,7 @@ export const admVesselOrgChart = pgTable("adm_vessel_org_chart", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   ocUuid: text("oc_uuid").unique().default(sql`gen_random_uuid()::text`),
   rank: text("rank"),
-  rankId: text("rank_id").notNull().references(() => admAvailableRanks.rankId),
+  rankId: text("rank_id").notNull().unique().references(() => admAvailableRanks.rankId),
   parentRankId: text("parent_rank_id").references(() => admAvailableRanks.rankId),
   sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),

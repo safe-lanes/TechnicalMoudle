@@ -2643,6 +2643,12 @@ const migrations: Migration[] = [
           RETURN;
         END IF;
 
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'adm_vessel_org_chart_rank_id_unique'
+        ) THEN
+          ALTER TABLE adm_vessel_org_chart ADD CONSTRAINT adm_vessel_org_chart_rank_id_unique UNIQUE (rank_id);
+        END IF;
+
         INSERT INTO adm_available_ranks (name, category, rank_id, label, applicable_to_company, is_system_rank, sort_order, is_deleted, is_sync, created_at, updated_at)
         VALUES
           ('Master', 'Senior Officers', 'R001', 'Master', true, true, 1, false, false, NOW(), NOW()),
@@ -2673,82 +2679,44 @@ const migrations: Migration[] = [
         ON CONFLICT (rank_id) DO NOTHING;
 
         INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT 'Master', 'R001', NULL, 0, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R001');
+        VALUES
+          ('Master', 'R001', NULL, 0, false, false, NOW(), NOW())
+        ON CONFLICT (rank_id) DO NOTHING;
 
         INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT 'Chief Officer', 'R002', 'R001', 0, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R002');
+        VALUES
+          ('Chief Officer', 'R002', 'R001', 0, false, false, NOW(), NOW()),
+          ('Chief Engineer', 'R005', 'R001', 1, false, false, NOW(), NOW()),
+          ('Chief Cook', 'R022', 'R001', 2, false, false, NOW(), NOW()),
+          ('Tester', 'R024', 'R001', 3, false, false, NOW(), NOW())
+        ON CONFLICT (rank_id) DO NOTHING;
 
         INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT 'Chief Engineer', 'R005', 'R001', 1, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R005');
+        VALUES
+          ('2nd Officer', 'R003', 'R002', 0, false, false, NOW(), NOW()),
+          ('3rd Officer', 'R004', 'R002', 1, false, false, NOW(), NOW()),
+          ('Bosun', 'R014', 'R002', 2, false, false, NOW(), NOW()),
+          ('Pumpman', 'R017', 'R002', 3, false, false, NOW(), NOW()),
+          ('AB', 'R015', 'R002', 4, false, false, NOW(), NOW()),
+          ('OS', 'R016', 'R002', 5, false, false, NOW(), NOW()),
+          ('2nd Engineer', 'R006', 'R005', 0, false, false, NOW(), NOW()),
+          ('3rd Engineer', 'R007', 'R005', 1, false, false, NOW(), NOW()),
+          ('4th Engineer', 'R008', 'R005', 2, false, false, NOW(), NOW()),
+          ('Electrical Officer', 'R010', 'R005', 3, false, false, NOW(), NOW()),
+          ('Messman', 'R023', 'R022', 0, false, false, NOW(), NOW())
+        ON CONFLICT (rank_id) DO NOTHING;
 
         INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT 'Chief Cook', 'R022', 'R001', 2, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R022');
+        VALUES
+          ('Fitter', 'R018', 'R006', 0, false, false, NOW(), NOW()),
+          ('Oiler', 'R021', 'R006', 1, false, false, NOW(), NOW())
+        ON CONFLICT (rank_id) DO NOTHING;
 
-        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT 'Tester', 'R024', 'R001', 3, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R024');
-
-        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT '2nd Officer', 'R003', 'R002', 0, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R003');
-
-        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT '3rd Officer', 'R004', 'R002', 1, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R004');
-
-        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT 'Bosun', 'R014', 'R002', 2, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R014');
-
-        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT 'Pumpman', 'R017', 'R002', 3, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R017');
-
-        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT 'AB', 'R015', 'R002', 4, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R015');
-
-        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT 'OS', 'R016', 'R002', 5, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R016');
-
-        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT '2nd Engineer', 'R006', 'R005', 0, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R006');
-
-        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT '3rd Engineer', 'R007', 'R005', 1, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R007');
-
-        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT '4th Engineer', 'R008', 'R005', 2, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R008');
-
-        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT 'Electrical Officer', 'R010', 'R005', 3, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R010');
-
-        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT 'Messman', 'R023', 'R022', 0, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R023');
-
-        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT 'Fitter', 'R018', 'R006', 0, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R018');
-
-        INSERT INTO adm_vessel_org_chart (rank, rank_id, parent_rank_id, sort_order, is_deleted, is_sync, created_at, updated_at)
-        SELECT 'Oiler', 'R021', 'R006', 1, false, false, NOW(), NOW()
-        WHERE NOT EXISTS (SELECT 1 FROM adm_vessel_org_chart WHERE rank_id = 'R021');
+        CREATE INDEX IF NOT EXISTS idx_adm_available_ranks_ar_uuid ON adm_available_ranks (ar_uuid);
+        CREATE INDEX IF NOT EXISTS idx_adm_vessel_org_chart_rank_id ON adm_vessel_org_chart (rank_id);
+        CREATE INDEX IF NOT EXISTS idx_adm_vessel_org_chart_parent_rank_id ON adm_vessel_org_chart (parent_rank_id);
 
       END $$;
-
-      CREATE INDEX IF NOT EXISTS idx_adm_available_ranks_ar_uuid ON adm_available_ranks (ar_uuid);
-      CREATE INDEX IF NOT EXISTS idx_adm_vessel_org_chart_rank_id ON adm_vessel_org_chart (rank_id);
-      CREATE INDEX IF NOT EXISTS idx_adm_vessel_org_chart_parent_rank_id ON adm_vessel_org_chart (parent_rank_id);
     `
   }
 ];

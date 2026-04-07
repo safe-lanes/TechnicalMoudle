@@ -1,0 +1,1 @@
+ALTER TABLE "adm_vessel_org_chart" ADD CONSTRAINT "adm_vessel_org_chart_rank_id_unique" UNIQUE("rank_id");
