@@ -697,45 +697,43 @@ export default function ShipsSurveysAdmin() {
   };
 
   const updateCompanySequence = (surveyId: number, rawSequence: number) => {
-    setMasterData(prevData => {
-      const companySurveys = prevData.filter(s => s.applicableToCompany);
-      const totalCompanyCount = companySurveys.length + companyOnlySurveys.length;
-      const currentSurvey = companySurveys.find(s => s.id === surveyId);
-      if (!currentSurvey) return prevData;
+    const companySurveys = masterData.filter(s => s.applicableToCompany);
+    const totalCompanyCount = companySurveys.length + companyOnlySurveys.length;
+    const currentSurvey = companySurveys.find(s => s.id === surveyId);
+    if (!currentSurvey) return;
 
-      const newSequence = Math.max(1, Math.min(rawSequence, totalCompanyCount));
-      const oldSequence = currentSurvey.companySequence ?? currentSurvey.sequence;
-      if (newSequence === oldSequence) return prevData;
+    const newSequence = Math.max(1, Math.min(rawSequence, totalCompanyCount));
+    const oldSequence = currentSurvey.companySequence ?? currentSurvey.sequence;
+    if (newSequence === oldSequence) return;
 
-      const companyIds = new Set(companySurveys.map(s => s.id));
+    const companyIds = new Set(companySurveys.map(s => s.id));
 
-      return prevData.map(s => {
-        if (!companyIds.has(s.id)) return s;
+    setMasterData(prevData => prevData.map(s => {
+      if (!companyIds.has(s.id)) return s;
 
-        const surveyOldSeq = s.companySequence ?? s.sequence;
+      const surveyOldSeq = s.companySequence ?? s.sequence;
 
-        if (s.id === surveyId) {
-          return { ...s, companySequence: newSequence };
+      if (s.id === surveyId) {
+        return { ...s, companySequence: newSequence };
+      }
+
+      if (newSequence < oldSequence) {
+        if (surveyOldSeq >= newSequence && surveyOldSeq < oldSequence) {
+          return { ...s, companySequence: surveyOldSeq + 1 };
         }
-
-        if (newSequence < oldSequence) {
-          if (surveyOldSeq >= newSequence && surveyOldSeq < oldSequence) {
-            return { ...s, companySequence: surveyOldSeq + 1 };
-          }
+      }
+      else {
+        if (surveyOldSeq > oldSequence && surveyOldSeq <= newSequence) {
+          return { ...s, companySequence: surveyOldSeq - 1 };
         }
-        else {
-          if (surveyOldSeq > oldSequence && surveyOldSeq <= newSequence) {
-            return { ...s, companySequence: surveyOldSeq - 1 };
-          }
-        }
+      }
 
-        if (s.companySequence === undefined) {
-          return { ...s, companySequence: surveyOldSeq };
-        }
+      if (s.companySequence === undefined) {
+        return { ...s, companySequence: surveyOldSeq };
+      }
 
-        return s;
-      });
-    });
+      return s;
+    }));
 
     setCompanyOnlySurveys(prev => prev.map(s => {
       const surveyOldSeq = s.sequence ?? 999999;
@@ -1449,12 +1447,24 @@ export default function ShipsSurveysAdmin() {
                     requirementRef: s.requirementRef,
                     companyGroup: s.companyGroup || "",
                     sequence: s.companySequence ?? s.sequence,
-                    isCompanyOnly: false,
+                    isCompanyOnly: false as const,
                   }));
 
-                const sortedCompanyData = [...companyDataFromMaster].sort((a, b) => a.sequence - b.sequence);
+                const companyOnlyMapped = companyOnlySurveys.map((s) => ({
+                    id: s.id,
+                    masterId: s.masterId,
+                    surveyLabel: s.surveyLabel || s.surveyName,
+                    companyId: s.companyId || "",
+                    requirementRef: s.requirementRef,
+                    companyGroup: s.companyGroup || "",
+                    sequence: s.sequence,
+                    isCompanyOnly: true as const,
+                  }));
 
-                const filteredData = sortedCompanyData.filter(s => {
+                const mergedCompanyData = [...companyDataFromMaster, ...companyOnlyMapped]
+                  .sort((a, b) => a.sequence - b.sequence);
+
+                const filteredData = mergedCompanyData.filter(s => {
                   const matchesSearch = companySearchTerm === "" || 
                     s.surveyLabel.toLowerCase().includes(companySearchTerm.toLowerCase()) ||
                     s.masterId.toLowerCase().includes(companySearchTerm.toLowerCase());
@@ -1476,11 +1486,11 @@ export default function ShipsSurveysAdmin() {
                     </thead>
                     <tbody className="divide-y text-sm">
                       {filteredData.map((survey, idx) => (
-                        <tr key={survey.id} className="hover:bg-gray-50">
+                        <tr key={survey.isCompanyOnly ? `company-only-${survey.id}` : survey.id} className={`hover:bg-gray-50 ${survey.isCompanyOnly ? 'bg-green-50' : ''}`}>
                           {viewModes.company === "edit" && (
                             <td className="px-3 py-2 text-center">
                               <Input
-                                key={`seq-company-${survey.id}-${survey.sequence}`}
+                                key={`seq-company-${survey.id}-${survey.sequence}-${survey.isCompanyOnly}`}
                                 type="number"
                                 defaultValue={survey.sequence}
                                 className="h-8 text-sm w-16 text-center"
@@ -1488,7 +1498,11 @@ export default function ShipsSurveysAdmin() {
                                 onBlur={(e) => {
                                   const newSeq = parseInt(e.target.value, 10);
                                   if (!isNaN(newSeq) && newSeq > 0) {
-                                    updateCompanySequence(survey.id, newSeq);
+                                    if (survey.isCompanyOnly) {
+                                      updateCompanyOnlySequence(survey.id, newSeq);
+                                    } else {
+                                      updateCompanySequence(survey.id, newSeq);
+                                    }
                                   }
                                 }}
                                 data-testid={`input-sequence-company-${survey.id}`}
@@ -1496,96 +1510,29 @@ export default function ShipsSurveysAdmin() {
                             </td>
                           )}
                           <td className="px-3 py-2">{idx + 1}</td>
-                          <td className="px-3 py-2 font-medium text-blue-600">{survey.masterId}</td>
+                          <td className={`px-3 py-2 font-medium ${survey.isCompanyOnly ? 'text-gray-400' : 'text-blue-600'}`}>{survey.masterId || "-"}</td>
                           <td className="px-3 py-2">
                             {viewModes.company === "edit" ? (
                               <Input 
                                 defaultValue={survey.companyId}
                                 className="h-8 text-sm"
-                                onBlur={(e) => updateCompanyField(survey.id, 'companyId', e.target.value)}
+                                onBlur={(e) => {
+                                  if (survey.isCompanyOnly) {
+                                    setCompanyOnlySurveys(prev => prev.map(s => 
+                                      s.id === survey.id ? { ...s, companyId: e.target.value } : s
+                                    ));
+                                  } else {
+                                    updateCompanyField(survey.id, 'companyId', e.target.value);
+                                  }
+                                }}
                                 data-testid={`input-companyid-${survey.id}`}
                               />
                             ) : (
                               survey.companyId || "-"
                             )}
                           </td>
-                          <td className="px-3 py-2">{survey.surveyLabel}</td>
                           <td className="px-3 py-2">
-                            {viewModes.company === "edit" ? (
-                              <Input 
-                                defaultValue={survey.requirementRef}
-                                className="h-8 text-sm"
-                                onBlur={(e) => updateCompanyField(survey.id, 'requirementRef', e.target.value)}
-                                data-testid={`input-requirement-company-${survey.id}`}
-                              />
-                            ) : (
-                              survey.requirementRef
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            {viewModes.company === "edit" ? (
-                              <Select 
-                                defaultValue={survey.companyGroup}
-                                onValueChange={(value) => updateCompanyField(survey.id, 'companyGroup', value)}
-                              >
-                                <SelectTrigger className="h-8 text-sm" data-testid={`select-companygroup-${survey.id}`}>
-                                  <SelectValue placeholder="Select Group" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {companyGroupLabels.map((grp) => (
-                                    <SelectItem key={grp.key} value={grp.key}>
-                                      {getFormattedCompanyGroupLabel(grp.key)}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              survey.companyGroup ? getFormattedCompanyGroupLabel(survey.companyGroup) : "-"
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                      
-                      {companyOnlySurveys.map((survey, idx) => (
-                        <tr key={`company-only-${survey.id}`} className="hover:bg-gray-50 bg-green-50">
-                          {viewModes.company === "edit" && (
-                            <td className="px-3 py-2 text-center">
-                              <Input
-                                key={`seq-companyonly-${survey.id}-${survey.sequence}`}
-                                type="number"
-                                defaultValue={survey.sequence}
-                                className="h-8 text-sm w-16 text-center"
-                                min={1}
-                                onBlur={(e) => {
-                                  const newSeq = parseInt(e.target.value, 10);
-                                  if (!isNaN(newSeq) && newSeq > 0) {
-                                    updateCompanyOnlySequence(survey.id, newSeq);
-                                  }
-                                }}
-                                data-testid={`input-seq-companyonly-${survey.id}`}
-                              />
-                            </td>
-                          )}
-                          <td className="px-3 py-2">{filteredData.length + idx + 1}</td>
-                          <td className="px-3 py-2 font-medium text-gray-400">{survey.masterId || "-"}</td>
-                          <td className="px-3 py-2">
-                            {viewModes.company === "edit" ? (
-                              <Input 
-                                defaultValue={survey.companyId}
-                                className="h-8 text-sm"
-                                onBlur={(e) => {
-                                  setCompanyOnlySurveys(prev => prev.map(s => 
-                                    s.id === survey.id ? { ...s, companyId: e.target.value } : s
-                                  ));
-                                }}
-                                data-testid={`input-companyid-only-${survey.id}`}
-                              />
-                            ) : (
-                              survey.companyId || "-"
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            {viewModes.company === "edit" ? (
+                            {viewModes.company === "edit" && survey.isCompanyOnly ? (
                               <Input 
                                 defaultValue={survey.surveyLabel}
                                 className="h-8 text-sm"
@@ -1594,7 +1541,7 @@ export default function ShipsSurveysAdmin() {
                                     s.id === survey.id ? { ...s, surveyLabel: e.target.value } : s
                                   ));
                                 }}
-                                data-testid={`input-label-only-${survey.id}`}
+                                data-testid={`input-label-${survey.id}`}
                               />
                             ) : (
                               survey.surveyLabel
@@ -1606,11 +1553,15 @@ export default function ShipsSurveysAdmin() {
                                 defaultValue={survey.requirementRef}
                                 className="h-8 text-sm"
                                 onBlur={(e) => {
-                                  setCompanyOnlySurveys(prev => prev.map(s => 
-                                    s.id === survey.id ? { ...s, requirementRef: e.target.value } : s
-                                  ));
+                                  if (survey.isCompanyOnly) {
+                                    setCompanyOnlySurveys(prev => prev.map(s => 
+                                      s.id === survey.id ? { ...s, requirementRef: e.target.value } : s
+                                    ));
+                                  } else {
+                                    updateCompanyField(survey.id, 'requirementRef', e.target.value);
+                                  }
                                 }}
-                                data-testid={`input-requirement-only-${survey.id}`}
+                                data-testid={`input-requirement-company-${survey.id}`}
                               />
                             ) : (
                               survey.requirementRef
@@ -1621,12 +1572,16 @@ export default function ShipsSurveysAdmin() {
                               <Select 
                                 defaultValue={survey.companyGroup}
                                 onValueChange={(value) => {
-                                  setCompanyOnlySurveys(prev => prev.map(s => 
-                                    s.id === survey.id ? { ...s, companyGroup: value } : s
-                                  ));
+                                  if (survey.isCompanyOnly) {
+                                    setCompanyOnlySurveys(prev => prev.map(s => 
+                                      s.id === survey.id ? { ...s, companyGroup: value } : s
+                                    ));
+                                  } else {
+                                    updateCompanyField(survey.id, 'companyGroup', value);
+                                  }
                                 }}
                               >
-                                <SelectTrigger className="h-8 text-sm" data-testid={`select-companygroup-only-${survey.id}`}>
+                                <SelectTrigger className="h-8 text-sm" data-testid={`select-companygroup-${survey.id}`}>
                                   <SelectValue placeholder="Select Group" />
                                 </SelectTrigger>
                                 <SelectContent>
