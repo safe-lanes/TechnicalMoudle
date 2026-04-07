@@ -1073,28 +1073,32 @@ const Dashboard = () => {
     });
 
     const overdueWOs = ytdWOs.filter(wo => wo.computedStatus === 'Overdue');
-    const overdueCounts = new Map<string, number>();
+    const overdueByReason = new Map<string, EnrichedWorkOrder[]>();
     overdueWOs.forEach(wo => {
       const reason = String(wo.overdueReason ?? '').trim();
       if (reason) {
-        overdueCounts.set(reason, (overdueCounts.get(reason) || 0) + 1);
+        const arr = overdueByReason.get(reason) || [];
+        arr.push(wo);
+        overdueByReason.set(reason, arr);
       }
     });
-    const overdueTop5 = Array.from(overdueCounts.entries())
-      .map(([reason, count]) => ({ reason, count }))
+    const overdueTop5 = Array.from(overdueByReason.entries())
+      .map(([reason, wos]) => ({ reason, count: wos.length, workOrders: wos }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
     const postponedWOs = ytdWOs.filter(wo => wo.computedStatus === 'Postponed');
-    const postponeCounts = new Map<string, number>();
+    const postponeByReason = new Map<string, EnrichedWorkOrder[]>();
     postponedWOs.forEach(wo => {
       const reason = String(wo.postponementReason ?? '').trim();
       if (reason) {
-        postponeCounts.set(reason, (postponeCounts.get(reason) || 0) + 1);
+        const arr = postponeByReason.get(reason) || [];
+        arr.push(wo);
+        postponeByReason.set(reason, arr);
       }
     });
-    const postponeTop5 = Array.from(postponeCounts.entries())
-      .map(([reason, count]) => ({ reason, count }))
+    const postponeTop5 = Array.from(postponeByReason.entries())
+      .map(([reason, wos]) => ({ reason, count: wos.length, workOrders: wos }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
@@ -1672,6 +1676,13 @@ const Dashboard = () => {
                             fill={reasonsToggle === 'overdue' ? '#5B9BD5' : '#FF964f'}
                             radius={[0, 4, 4, 0]}
                             barSize={18}
+                            cursor="pointer"
+                            onClick={(data: { reason: string; count: number; workOrders: EnrichedWorkOrder[] }) => {
+                              if (data?.workOrders) {
+                                const label = reasonsToggle === 'overdue' ? 'Overdue' : 'Postponement';
+                                setWoListModal({ open: true, title: `${label} — ${data.reason}`, workOrders: data.workOrders });
+                              }
+                            }}
                           />
                         </BarChart>
                       </ResponsiveContainer>
