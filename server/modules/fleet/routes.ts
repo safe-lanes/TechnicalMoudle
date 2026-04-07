@@ -94,6 +94,7 @@ adminRouter.delete('/fleet-vessel-mappings/:id', asyncHandler(adminCtrl.deleteFl
 
 // ── Component-Vessel Mappings ──
 adminRouter.get('/component-vessel-mappings', asyncHandler(adminCtrl.getComponentVesselMappings));
+adminRouter.post('/component-vessel-mappings/auto-linkage', asyncHandler(adminCtrl.mapVesselWithAutoLinkage));
 adminRouter.post('/component-vessel-mappings', asyncHandler(adminCtrl.createComponentVesselMapping));
 adminRouter.delete('/component-vessel-mappings/:id', asyncHandler(adminCtrl.deleteComponentVesselMapping));
 

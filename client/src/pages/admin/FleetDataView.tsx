@@ -764,8 +764,10 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
     if (!selectedComponent) return [];
     
     if (componentVesselMappings && componentVesselMappings.length > 0) {
+      const parentCode = selectedComponent.fleetEquipmentCode;
       const mappings = componentVesselMappings.filter(
-        (m) => m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
+        (m) => m.fleetEquipmentCode === parentCode ||
+               m.fleetEquipmentCode?.startsWith(parentCode + ".") ||
                m.componentId === String(selectedComponent.id)
       );
       if (mappings.length > 0) {
@@ -794,8 +796,10 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   const filteredMappingsForDialog = useMemo(() => {
     if (!selectedComponent || !componentVesselMappings) return [];
     
+    const parentCode = selectedComponent.fleetEquipmentCode;
     const componentMappings = componentVesselMappings.filter(
-      (m) => m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
+      (m) => m.fleetEquipmentCode === parentCode ||
+             m.fleetEquipmentCode?.startsWith(parentCode + ".") ||
              m.componentId === String(selectedComponent.id)
     );
     
@@ -829,9 +833,10 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
     if (!selectedVesselForDetail || !selectedComponent || !componentVesselMappings) return [];
     
     const targetVesselKey = selectedVesselForDetail.vesselCode || selectedVesselForDetail.vesselId;
+    const parentCode = selectedComponent.fleetEquipmentCode;
     let mappings = componentVesselMappings.filter(
       (m) => (m.vesselCode || m.vesselId) === targetVesselKey &&
-             m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode
+             (m.fleetEquipmentCode === parentCode || m.fleetEquipmentCode?.startsWith(parentCode + "."))
     );
     
     const seen = new Set<string>();
@@ -858,9 +863,11 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   const unmappedVessels = useMemo(() => {
     if (!selectedComponent || !vessels) return [];
     
+    const parentCode = selectedComponent.fleetEquipmentCode;
     const mappedVesselCodes = new Set(
       (componentVesselMappings || [])
-        .filter(m => m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
+        .filter(m => m.fleetEquipmentCode === parentCode ||
+                     m.fleetEquipmentCode?.startsWith(parentCode + ".") ||
                      m.componentId === String(selectedComponent.id))
         .map(m => m.vesselCode)
     );
@@ -905,12 +912,10 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
     
     Promise.all(
       vesselsToMap.map(vessel => 
-        addMappingMutation.mutateAsync({
+        apiRequest("POST", "/technical/api/fleet-admin/component-vessel-mappings/auto-linkage", {
           fleetEquipmentCode: selectedComponent.fleetEquipmentCode,
           vesselCode: vessel.code || vessel.id,
           vesselName: vessel.name,
-          componentCode: selectedComponent.fleetEquipmentCode,
-          componentName: selectedComponent.fleetEquipmentName,
         })
       )
     ).then(() => {
@@ -920,7 +925,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
       queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/component-vessel-mappings"] });
       toast({
         title: "Success",
-        description: `${vesselsToMap.length} vessel(s) have been mapped`,
+        description: `${vesselsToMap.length} vessel(s) have been mapped with auto-linkage`,
       });
     }).catch(() => {
       toast({

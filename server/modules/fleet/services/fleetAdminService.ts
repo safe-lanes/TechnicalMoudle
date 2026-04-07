@@ -310,6 +310,45 @@ export async function createComponentVesselMapping(body: any) {
   return repo.createComponentVesselMapping(validatedData);
 }
 
+export async function mapVesselWithAutoLinkage(body: any) {
+  const schema = z.object({
+    fleetEquipmentCode: z.string(),
+    vesselCode: z.string(),
+    vesselName: z.string(),
+  });
+  const { fleetEquipmentCode, vesselCode, vesselName } = schema.parse(body);
+
+  const parentMapping = await repo.createComponentVesselMapping({
+    fleetEquipmentCode,
+    vesselCode,
+    vesselName,
+    componentCode: fleetEquipmentCode,
+    componentName: undefined,
+  });
+
+  const vesselComponents = await repo.getVesselComponentsByFleetEquipmentPrefix(vesselCode, fleetEquipmentCode);
+
+  let linkedCount = 0;
+  for (const vc of vesselComponents) {
+    if (vc.fleetEquipmentCode && vc.fleetEquipmentCode !== fleetEquipmentCode) {
+      await repo.createComponentVesselMapping({
+        fleetEquipmentCode: vc.fleetEquipmentCode,
+        vesselCode,
+        vesselName,
+        componentCode: vc.fleetEquipmentCode,
+        componentName: vc.name || vc.fleetEquipmentName || undefined,
+      });
+      linkedCount++;
+    }
+  }
+
+  return {
+    parentMapping,
+    linkedComponents: linkedCount,
+    totalVesselComponents: vesselComponents.length,
+  };
+}
+
 export async function deleteComponentVesselMapping(id: number) {
   await repo.deleteComponentVesselMapping(id);
   return { success: true, message: 'Component-vessel mapping deleted' };

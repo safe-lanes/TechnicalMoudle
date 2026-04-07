@@ -275,6 +275,19 @@ export async function createComponentVesselMapping(req: Request, res: Response) 
   }
 }
 
+export async function mapVesselWithAutoLinkage(req: Request, res: Response) {
+  try {
+    const result = await adminService.mapVesselWithAutoLinkage(req.body);
+    res.status(201).json(result);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('Error mapping vessel with auto-linkage:', error);
+    res.status(500).json({ error: 'Failed to map vessel with auto-linkage' });
+  }
+}
+
 export async function deleteComponentVesselMapping(req: Request, res: Response) {
   try {
     const id = parseInt(req.params.id);

@@ -1,6 +1,6 @@
 import { storage } from '../../../storage';
 import { getDb } from '../../../db';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, like, or } from 'drizzle-orm';
 import {
   fleetComponents,
   fleetJobs,
@@ -227,6 +227,25 @@ export { components, jobs, spares, spareComponentLinks, storesItems };
 // ══════════════════════════════════════════════════════════
 // Re-Sync: Fleet → Vessel field sync
 // ══════════════════════════════════════════════════════════
+
+export async function getVesselComponentsByFleetEquipmentPrefix(vesselCode: string, fleetEquipmentCode: string) {
+  const db = await getDb();
+  return db.select({
+    cuuid: components.cuuid,
+    componentCode: components.componentCode,
+    name: components.name,
+    fleetEquipmentCode: components.fleetEquipmentCode,
+    fleetEquipmentName: components.fleetEquipmentName,
+  }).from(components)
+    .where(and(
+      eq(components.vesselCode, vesselCode),
+      eq(components.dataScope, 'vessel'),
+      or(
+        eq(components.fleetEquipmentCode, fleetEquipmentCode),
+        like(components.fleetEquipmentCode, fleetEquipmentCode + '.%'),
+      ),
+    ));
+}
 
 export async function getActiveComponentMappingsForVessel(vesselCode: string) {
   const db = await getDb();
