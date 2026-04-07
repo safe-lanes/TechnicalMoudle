@@ -894,10 +894,14 @@ export default function ShipsSurveysAdmin() {
   const hasSavedMasterData = savedSurveys && Array.isArray(savedSurveys) && savedSurveys.length > 0;
 
   const companyApplicableMasterIds = useMemo(() => {
-    return masterData
+    const fromMaster = masterData
       .filter(survey => survey.applicableToCompany && !survey.masterId.startsWith('VES-'))
       .map(survey => survey.masterId);
-  }, [masterData]);
+    const fromCompanyOnly = companyOnlySurveys
+      .filter(survey => survey.masterId.startsWith('CMP-'))
+      .map(survey => survey.masterId);
+    return [...fromMaster, ...fromCompanyOnly];
+  }, [masterData, companyOnlySurveys]);
 
   useEffect(() => {
     if (!hasSavedMasterData) return;

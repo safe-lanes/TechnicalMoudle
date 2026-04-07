@@ -195,12 +195,11 @@ export async function getAllApplicabilityRecords() {
   }).from(vesselSurveyApplicability);
 }
 
-export async function deactivateApplicabilityByMasterIds(masterIds: string[]) {
+export async function deleteApplicabilityByMasterIds(masterIds: string[]) {
   const db = await getDb();
   if (!db) return null;
   if (masterIds.length === 0) return [];
-  return db.update(vesselSurveyApplicability)
-    .set({ isApplicable: false, updatedAt: new Date() })
+  return db.delete(vesselSurveyApplicability)
     .where(
       inArray(vesselSurveyApplicability.masterId, masterIds)
     )
