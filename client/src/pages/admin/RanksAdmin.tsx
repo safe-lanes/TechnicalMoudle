@@ -400,7 +400,7 @@ export default function RanksAdmin() {
     }
     if (categoryFilter !== "all" && r.category !== categoryFilter) return false;
     return true;
-  });
+  }).sort((a, b) => a.sortOrder - b.sortOrder);
 
   const categories = [...new Set(ranksData.map(r => r.category).filter(Boolean))];
   const isSaving = saveRanksMutation.isPending || saveOrgChartMutation.isPending;
