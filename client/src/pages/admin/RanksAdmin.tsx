@@ -369,6 +369,28 @@ export default function RanksAdmin() {
     setHasUnsavedChanges(true);
   };
 
+  const moveRank = (rankId: string, direction: 'up' | 'down') => {
+    setRanksData(prev => {
+      const sorted = [...prev].sort((a, b) => a.sortOrder - b.sortOrder);
+      const idx = sorted.findIndex(r => r.rankId === rankId);
+      if (direction === 'up' && idx <= 0) return prev;
+      if (direction === 'down' && idx >= sorted.length - 1) return prev;
+
+      const reordered = [...sorted];
+      const [moved] = reordered.splice(idx, 1);
+      reordered.splice(direction === 'up' ? idx - 1 : idx + 1, 0, moved);
+
+      const sortMap = new Map<string, number>();
+      reordered.forEach((r, i) => sortMap.set(r.rankId, i + 1));
+
+      return prev.map(r => {
+        const newSort = sortMap.get(r.rankId);
+        return newSort !== undefined ? { ...r, sortOrder: newSort } : r;
+      });
+    });
+    setHasUnsavedChanges(true);
+  };
+
   const filteredRanks = ranksData.filter(r => {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -394,10 +416,7 @@ export default function RanksAdmin() {
               <th className="px-4 py-3 text-left font-medium text-sm">Name</th>
               <th className="px-4 py-3 text-left font-medium text-sm">Label</th>
               <th className="px-4 py-3 text-left font-medium text-sm w-40">Category</th>
-              <th className="px-4 py-3 text-center font-medium text-sm w-28">Apply to Co.</th>
-              <th className="px-4 py-3 text-center font-medium text-sm w-28">System Rank</th>
-              <th className="px-4 py-3 text-center font-medium text-sm w-24">Sort Order</th>
-              {isEditMode && <th className="px-4 py-3 text-center font-medium text-sm w-20">Actions</th>}
+              {isEditMode && <th className="px-4 py-3 text-center font-medium text-sm w-28">Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -425,34 +444,35 @@ export default function RanksAdmin() {
                     </Select>
                   ) : rank.category}
                 </td>
-                <td className="px-4 py-3 text-center" data-testid={`text-rank-atc-${rank.rankId}`}>
-                  {isEditMode ? (
-                    <Checkbox checked={rank.applicableToCompany} onCheckedChange={(v) => updateRank(rank.rankId, 'applicableToCompany', !!v)} data-testid={`checkbox-rank-atc-${rank.rankId}`} />
-                  ) : (rank.applicableToCompany ? "Yes" : "No")}
-                </td>
-                <td className="px-4 py-3 text-center" data-testid={`text-rank-system-${rank.rankId}`}>
-                  {isEditMode ? (
-                    <Checkbox checked={rank.isSystemRank} onCheckedChange={(v) => updateRank(rank.rankId, 'isSystemRank', !!v)} data-testid={`checkbox-rank-system-${rank.rankId}`} />
-                  ) : (rank.isSystemRank ? "Yes" : "No")}
-                </td>
-                <td className="px-4 py-3 text-center" data-testid={`text-rank-sort-${rank.rankId}`}>
-                  {isEditMode ? (
-                    <Input type="number" value={rank.sortOrder} onChange={(e) => updateRank(rank.rankId, 'sortOrder', parseInt(e.target.value, 10) || 0)} className="h-8 w-20 text-center mx-auto" data-testid={`input-rank-sort-${rank.rankId}`} />
-                  ) : rank.sortOrder}
-                </td>
                 {isEditMode && (
                   <td className="px-4 py-3 text-center">
-                    {!rank.isSystemRank && (
-                      <Button variant="ghost" size="sm" onClick={() => deleteRank(rank.rankId)} className="text-red-500 hover:text-red-700" data-testid={`button-delete-rank-${rank.rankId}`}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => moveRank(rank.rankId, 'up')}
+                        className="text-blue-500 hover:text-blue-700 p-0.5"
+                        data-testid={`button-move-up-rank-${rank.rankId}`}
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => moveRank(rank.rankId, 'down')}
+                        className="text-blue-500 hover:text-blue-700 p-0.5"
+                        data-testid={`button-move-down-rank-${rank.rankId}`}
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </button>
+                      {!rank.isSystemRank && (
+                        <Button variant="ghost" size="sm" onClick={() => deleteRank(rank.rankId)} className="text-red-500 hover:text-red-700 ml-1 h-6 w-6 p-0" data-testid={`button-delete-rank-${rank.rankId}`}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 )}
               </tr>
             ))}
             {filteredRanks.length === 0 && (
-              <tr><td colSpan={isEditMode ? 9 : 8} className="px-4 py-8 text-center text-gray-500">No ranks found</td></tr>
+              <tr><td colSpan={isEditMode ? 6 : 5} className="px-4 py-8 text-center text-gray-500">No ranks found</td></tr>
             )}
           </tbody>
         </table>
