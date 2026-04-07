@@ -310,7 +310,8 @@ const WorkOrders: React.FC = () => {
   const isStoredCompleted = (wo: any) => wo.status && FINALIZED_STATUSES.has(wo.status.toLowerCase().trim());
   const getEffectiveStatus = (wo: any) => {
     if (isStoredCompleted(wo)) return 'Completed';
-    if (wo.status === 'Draft') return 'Draft';
+    // Unplanned Draft WOs are excluded from all tabs until resumed and submitted
+    if (wo.status === 'Draft' && wo.workOrderType === 'Unplanned') return 'Draft';
     return wo.computedStatus || wo.status || 'Active';
   };
 
@@ -375,7 +376,7 @@ const WorkOrders: React.FC = () => {
     
     if (activeTab === "Planned") {
       if (wo.isExecution) return false;
-      if (wo.status === 'Draft') return false;
+      if (wo.status === 'Draft' && wo.workOrderType === 'Unplanned') return false;
       if (effectiveStatus !== "Active") return false;
     } else if (activeTab === "Due") {
       const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';

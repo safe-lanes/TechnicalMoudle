@@ -2903,20 +2903,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         await apiRequest('PATCH', `/technical/api/work-orders/${newWoId}`, execPayload);
       }
 
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+
       if (isReadyForSubmission) {
         toast({ title: 'Work Order Created', description: 'Unplanned work order submitted for approval.' });
         sessionStorage.setItem('workOrdersActiveTab', 'Pending Approval');
-      } else if (hasAnyPartBData) {
+        navigate('/pms/work-orders');
+      } else {
+        // Draft: navigate to the execution form for the new WO so the user can resume editing
         toast({
           title: 'Draft Saved',
-          description: `Unplanned work order saved as draft. Complete these fields before submitting: ${missingFields.join(', ')}.`,
+          description: hasAnyPartBData
+            ? `Unplanned work order saved as draft. Complete these fields before submitting: ${missingFields.join(', ')}.`
+            : 'Unplanned work order saved as draft. Open it to complete the Work Completion Record and submit for approval.',
         });
-      } else {
-        toast({ title: 'Work Order Created', description: 'Unplanned work order saved as draft.' });
+        navigate(`/pms/work-order/${newWoId}`);
       }
-
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
-      navigate('/pms/work-orders');
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create work order. Please try again.';
       toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
