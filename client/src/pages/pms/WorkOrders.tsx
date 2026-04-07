@@ -1117,21 +1117,6 @@ const WorkOrders: React.FC = () => {
           </SelectContent>
         </Select>
 
-        {activeTab === "Postponed" && (
-          <Select value={selectedPostponementReason} onValueChange={setSelectedPostponementReason}>
-            <SelectTrigger className="w-52" data-testid="select-filter-postponement-reason">
-              <SelectValue placeholder="Postponement Reason" />
-            </SelectTrigger>
-            <SelectContent className="max-h-72">
-              <SelectItem value="all">All Reasons</SelectItem>
-              {filterPostponementReasons.map((reason) => (
-                <SelectItem key={reason} value={reason}>
-                  {reason}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
 
         <Button
           variant="outline"
