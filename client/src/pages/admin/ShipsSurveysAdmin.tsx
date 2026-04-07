@@ -699,10 +699,11 @@ export default function ShipsSurveysAdmin() {
   const updateCompanySequence = (surveyId: number, rawSequence: number) => {
     setMasterData(prevData => {
       const companySurveys = prevData.filter(s => s.applicableToCompany);
+      const totalCompanyCount = companySurveys.length + companyOnlySurveys.length;
       const currentSurvey = companySurveys.find(s => s.id === surveyId);
       if (!currentSurvey) return prevData;
 
-      const newSequence = Math.max(1, Math.min(rawSequence, companySurveys.length));
+      const newSequence = Math.max(1, Math.min(rawSequence, totalCompanyCount));
       const oldSequence = currentSurvey.companySequence ?? currentSurvey.sequence;
       if (newSequence === oldSequence) return prevData;
 
@@ -735,6 +736,71 @@ export default function ShipsSurveysAdmin() {
         return s;
       });
     });
+
+    setCompanyOnlySurveys(prev => prev.map(s => {
+      const surveyOldSeq = s.sequence ?? 999999;
+      if (newSequence < oldSequence) {
+        if (surveyOldSeq >= newSequence && surveyOldSeq < oldSequence) {
+          return { ...s, sequence: surveyOldSeq + 1 };
+        }
+      } else {
+        if (surveyOldSeq > oldSequence && surveyOldSeq <= newSequence) {
+          return { ...s, sequence: surveyOldSeq - 1 };
+        }
+      }
+      return s;
+    }));
+
+    setHasUnsavedChanges(true);
+  };
+
+  const updateCompanyOnlySequence = (surveyId: number, rawSequence: number) => {
+    const masterCompanySurveys = masterData.filter(s => s.applicableToCompany);
+    const totalCompanyCount = masterCompanySurveys.length + companyOnlySurveys.length;
+    const currentSurvey = companyOnlySurveys.find(s => s.id === surveyId);
+    if (!currentSurvey) return;
+
+    const newSequence = Math.max(1, Math.min(rawSequence, totalCompanyCount));
+    const oldSequence = currentSurvey.sequence ?? 999999;
+    if (newSequence === oldSequence) return;
+
+    const masterCompanyIds = new Set(masterCompanySurveys.map(s => s.id));
+
+    setMasterData(prevData => prevData.map(s => {
+      if (!masterCompanyIds.has(s.id)) return s;
+      const surveyOldSeq = s.companySequence ?? s.sequence;
+      if (newSequence < oldSequence) {
+        if (surveyOldSeq >= newSequence && surveyOldSeq < oldSequence) {
+          return { ...s, companySequence: surveyOldSeq + 1 };
+        }
+      } else {
+        if (surveyOldSeq > oldSequence && surveyOldSeq <= newSequence) {
+          return { ...s, companySequence: surveyOldSeq - 1 };
+        }
+      }
+      if (s.companySequence === undefined) {
+        return { ...s, companySequence: surveyOldSeq };
+      }
+      return s;
+    }));
+
+    setCompanyOnlySurveys(prev => prev.map(s => {
+      const surveyOldSeq = s.sequence ?? 999999;
+      if (s.id === surveyId) {
+        return { ...s, sequence: newSequence };
+      }
+      if (newSequence < oldSequence) {
+        if (surveyOldSeq >= newSequence && surveyOldSeq < oldSequence) {
+          return { ...s, sequence: surveyOldSeq + 1 };
+        }
+      } else {
+        if (surveyOldSeq > oldSequence && surveyOldSeq <= newSequence) {
+          return { ...s, sequence: surveyOldSeq - 1 };
+        }
+      }
+      return s;
+    }));
+
     setHasUnsavedChanges(true);
   };
 
@@ -766,9 +832,16 @@ export default function ShipsSurveysAdmin() {
     
     const newId = Math.max(...companyOnlySurveys.map(s => s.id), ...masterData.map(s => s.id), 0) + 1000;
     
+    const masterCompanyCount = masterData.filter(s => s.applicableToCompany).length;
+    const allCompanySeqs = [
+      ...masterData.filter(s => s.applicableToCompany).map(s => s.companySequence ?? s.sequence),
+      ...companyOnlySurveys.filter(s => s.sequence !== undefined && s.sequence > 0).map(s => s.sequence),
+    ];
+    const nextSeq = allCompanySeqs.length > 0 ? Math.max(...allCompanySeqs) + 1 : masterCompanyCount + companyOnlySurveys.length + 1;
+
     const newSurvey: MasterSurvey = {
       id: newId,
-      sequence: 0,
+      sequence: nextSeq,
       masterId: newMasterId,
       surveyName: newCompanySurvey.surveyLabel?.trim() || "",
       category: "",
@@ -778,7 +851,7 @@ export default function ShipsSurveysAdmin() {
       surveyLabel: newCompanySurvey.surveyLabel?.trim() || "",
       companyId: newCompanySurvey.companyId || newMasterId,
       companyGroup: newCompanySurvey.companyGroup || "",
-      companySequence: undefined,
+      companySequence: nextSeq,
     };
     
     setCompanyOnlySurveys(prev => [...prev, newSurvey]);
@@ -1476,7 +1549,22 @@ export default function ShipsSurveysAdmin() {
                       {companyOnlySurveys.map((survey, idx) => (
                         <tr key={`company-only-${survey.id}`} className="hover:bg-gray-50 bg-green-50">
                           {viewModes.company === "edit" && (
-                            <td className="px-3 py-2 text-center text-gray-400">-</td>
+                            <td className="px-3 py-2 text-center">
+                              <Input
+                                key={`seq-companyonly-${survey.id}-${survey.sequence}`}
+                                type="number"
+                                defaultValue={survey.sequence}
+                                className="h-8 text-sm w-16 text-center"
+                                min={1}
+                                onBlur={(e) => {
+                                  const newSeq = parseInt(e.target.value, 10);
+                                  if (!isNaN(newSeq) && newSeq > 0) {
+                                    updateCompanyOnlySequence(survey.id, newSeq);
+                                  }
+                                }}
+                                data-testid={`input-seq-companyonly-${survey.id}`}
+                              />
+                            </td>
                           )}
                           <td className="px-3 py-2">{filteredData.length + idx + 1}</td>
                           <td className="px-3 py-2 font-medium text-gray-400">{survey.masterId || "-"}</td>
