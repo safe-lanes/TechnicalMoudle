@@ -330,7 +330,7 @@ export async function mapVesselWithAutoLinkage(body: any) {
 
   let linkedCount = 0;
   for (const vc of vesselComponents) {
-    if (vc.componentCode) {
+    if (vc.componentCode && vc.componentCode !== fleetEquipmentCode) {
       await repo.createComponentVesselMapping({
         fleetEquipmentCode: vc.fleetEquipmentCode || fleetEquipmentCode,
         vesselCode,
