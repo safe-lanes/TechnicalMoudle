@@ -101,13 +101,18 @@ const DEFAULT_WO_COL_WIDTHS: Record<string, number> = {
   actions: 110,
 };
 
-function compareWorkOrders(a: any, b: any, field: WOSortField, dir: WOSortDir): number {
+function compareWorkOrders(a: any, b: any, field: WOSortField, dir: WOSortDir, activeTab = ""): number {
   let cmp = 0;
   switch (field) {
     case "component": cmp = (a.component || "").localeCompare(b.component || ""); break;
-    case "workOrderNo":
-      cmp = (a.workOrderNo || a.templateCode || "").localeCompare(b.workOrderNo || b.templateCode || "");
+    case "workOrderNo": {
+      const getWoNo = (wo: any) =>
+        (activeTab === "Pending Approval" || activeTab === "Completed") && wo.executionId
+          ? wo.executionId
+          : wo.workOrderNo || wo.templateCode || "";
+      cmp = getWoNo(a).localeCompare(getWoNo(b));
       break;
+    }
     case "jobTitle": cmp = (a.jobTitle || "").localeCompare(b.jobTitle || ""); break;
     case "assignedTo": cmp = (a.assignedTo || "").localeCompare(b.assignedTo || ""); break;
     case "dueDate": {
@@ -532,7 +537,7 @@ const WorkOrders: React.FC = () => {
 
   // ─── Sorted work orders (applied after filter, before pagination) ───────────
   const sortedWorkOrders = woSortField
-    ? [...filteredWorkOrders].sort((a, b) => compareWorkOrders(a, b, woSortField, woSortDir))
+    ? [...filteredWorkOrders].sort((a, b) => compareWorkOrders(a, b, woSortField, woSortDir, activeTab))
     : filteredWorkOrders;
 
   // Pagination calculations
