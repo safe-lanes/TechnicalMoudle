@@ -1,0 +1,51 @@
+I want to enhance the PMS > Work Orders (W.O) screen by adding a new tab called Postponed in the top status tab row. The current tab row contains Planned, Due, Overdue, Pending Approval, and Completed. Please place the new Postponed tab immediately next to Pending Approval so the order becomes: Planned, Due, Overdue, Pending Approval, Postponed, Completed.
+
+The purpose of this tab is to show all work orders that have been postponed. This should not be a cosmetic tab only; it must load and display only postponed work orders for the selected vessel. The page currently already has a Postponement Reason filter, so the new tab must work consistently with that concept and use the actual postponed work order records.
+
+When the user clicks the Postponed tab, the listing area should show only postponed work orders in the same table structure already used on the Work Orders page. Keep the existing columns and page behavior consistent with the current grid: Component, Work Order No, Job Title, Assigned to, Due Date, Planned Date, Status, and Actions. Do not redesign the page; extend the existing design and behavior in the same style.
+
+The new Postponed tab must support all existing filters and controls already visible on this page. That includes Vessel, Search work orders, Period, All Ranks, Criticality, and Postponement Reason. These filters should continue to work when Postponed is selected, and the result list should update correctly based on the chosen filter values.
+
+Please also show a count badge for the Postponed tab, similar to how Due and Overdue currently show counts. The count should represent the number of postponed work orders for the selected vessel and active filter context wherever applicable. Make sure the badge styling matches the existing tab count style used in the page.
+
+For business logic, define a work order as postponed only when it has been officially marked postponed in the system, not merely because it is overdue or rescheduled informally. If the system already has a dedicated postponed status, use that. If postponement is tracked through a postponement flag, postponement record, or approved postponement entry, then use that source consistently across the tab data, count, and filters. The same logic must be used everywhere so there is no mismatch between the tab count and the displayed rows.
+
+Please ensure the following behavior is handled properly:
+
+The Postponed tab should load postponed work orders only.
+
+The tab count should be correct and should refresh when vessel or filters change.
+
+Search should work inside postponed work orders.
+
+Postponement Reason filter should narrow the postponed list correctly.
+
+Pagination should work normally.
+
+Export should export the postponed results when this tab is active.
+
+Empty state should clearly show that no postponed work orders are available for the selected filter combination.
+
+Performance should remain smooth even when many postponed records exist.
+
+From a UI perspective, keep the styling fully aligned with the current PMS design. The new tab should look like the other tabs, should highlight when active, and should not disturb the layout of the Planner, Export, and Unplanned W.O buttons. Maintain responsive behavior and proper spacing so the tab row still looks clean.
+
+Please also review whether any backend API, query, or status mapping needs to be updated so this tab is driven by real data. If the current API for work orders already supports status-based filtering, extend it to support postponed records properly. If not, add the required backend handling so postponed work orders can be fetched, counted, filtered, paginated, and exported correctly.
+
+Acceptance criteria:
+
+A new Postponed tab appears next to Pending Approval.
+
+Clicking Postponed shows only postponed work orders.
+
+The Postponed tab has an accurate count badge.
+
+All existing filters work correctly with the Postponed tab.
+
+Export works for postponed results.
+
+Pagination and search work correctly.
+
+UI styling matches the current Work Orders page.
+
+No existing tab behavior is broken.
