@@ -1333,7 +1333,6 @@ const WorkOrders: React.FC = () => {
                 onClick={() => handleWorkOrderClick(workOrder)}
                 data-testid={`row-work-order-${workOrder.id}`}
               >
-                {/* Component — inner span uses truncate; whitespace-nowrap keeps row single-line */}
                 <td className={`py-3 px-4 whitespace-nowrap overflow-hidden ${textColorClass}`} data-testid={index === 0 ? "C24" : undefined}>
                   {index === 0 && <Marker id="C24" />}
                   <div className="flex items-center gap-1 min-w-0">
@@ -1350,11 +1349,9 @@ const WorkOrders: React.FC = () => {
                     ? workOrder.executionId 
                     : workOrder.workOrderNo || workOrder.templateCode}
                 </td>
-                {/* WO Template Code */}
                 {activeTab === "Pending Approval" && (
                   <td className={`py-3 px-4 whitespace-nowrap overflow-hidden ${textColorClass}`} style={{ textOverflow: 'ellipsis' }}>{workOrder.templateCode}</td>
                 )}
-                {/* Job Title — inner span uses truncate; whitespace-nowrap keeps row single-line */}
                 <td className={`py-3 px-4 whitespace-nowrap overflow-hidden ${textColorClass}`} data-testid={index === 0 ? "C26" : undefined}>
                   {index === 0 && <Marker id="C26" />}
                   <div className="flex items-center gap-1 min-w-0">
@@ -1371,7 +1368,6 @@ const WorkOrders: React.FC = () => {
                   {index === 0 && <Marker id="C27" />}
                   {workOrder.assignedTo}
                 </td>
-                {/* Due Date / Submitted Date — overflow:visible to preserve tooltips */}
                 <td className="py-3 px-4 whitespace-nowrap overflow-visible" data-testid={index === 0 ? "C28" : undefined}>
                   {index === 0 && <Marker id="C28" />}
                   <div className="flex items-center gap-2">
@@ -1450,7 +1446,6 @@ const WorkOrders: React.FC = () => {
                     }
                   </div>
                 </td>
-                {/* Planned Date */}
                 {activeTab === "Planned" && (
                   <td className="py-3 px-4 text-gray-900 whitespace-nowrap overflow-hidden" style={{ textOverflow: 'ellipsis' }} data-testid={`cell-planned-date-${workOrder.id}`}>
                     {workOrder.plannedDate
@@ -1458,7 +1453,6 @@ const WorkOrders: React.FC = () => {
                       : '—'}
                   </td>
                 )}
-                {/* Postpone Until */}
                 {activeTab === "Postponed" && (
                   <td className="py-3 px-4 text-gray-900 whitespace-nowrap overflow-hidden" style={{ textOverflow: 'ellipsis' }} data-testid={`cell-postpone-until-${workOrder.id}`}>
                     {workOrder.postponementEndDate
@@ -1466,13 +1460,11 @@ const WorkOrders: React.FC = () => {
                       : '—'}
                   </td>
                 )}
-                {/* Postponement Reason */}
                 {activeTab === "Postponed" && (
                   <td className="py-3 px-4 text-gray-700 whitespace-nowrap overflow-hidden" style={{ textOverflow: 'ellipsis' }} data-testid={`cell-postponement-reason-${workOrder.id}`}>
                     {workOrder.postponementReason || '—'}
                   </td>
                 )}
-                {/* Days Late */}
                 {activeTab === "Pending Approval" && (
                   <td className="py-3 px-4 whitespace-nowrap" data-testid={`cell-days-late-${workOrder.id}`}>
                     {(() => {
@@ -1484,7 +1476,6 @@ const WorkOrders: React.FC = () => {
                     })()}
                   </td>
                 )}
-                {/* Approval Tier (Pending Approval) */}
                 {activeTab === "Pending Approval" && (
                   <td className="py-3 px-4 whitespace-nowrap" data-testid={`cell-approval-tier-${workOrder.id}`}>
                     {(() => {
@@ -1498,20 +1489,17 @@ const WorkOrders: React.FC = () => {
                 )}
                 <td className="py-3 px-4" data-testid={index === 0 ? "C29" : undefined}>
                   {index === 0 && <Marker id="C29" />}
-                  {/* PRIORITY: Show workflow status badges (Rejected, Pending Approval) over computed status */}
-                  {/* This ensures rejected WOs display "Rejected" badge prominently */}
                   {workOrder.status === 'Rejected' ? (
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-row flex-wrap items-center gap-1">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor('rejected')}`}>
                         Rejected
                       </span>
-                      {/* Show due date status as secondary indicator */}
                       <span className={`px-2 py-0.5 rounded text-xs ${getStatusBadgeColor(workOrder.computedStatus || 'Active')}`}>
                         {workOrder.computedStatus === 'Due (Grace P)' ? 'Grace P' : (workOrder.computedStatus || 'Active')}
                       </span>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-row flex-wrap items-center gap-1">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(getEffectiveStatus(workOrder))}`}>
                         {getEffectiveStatus(workOrder) === 'Due (Grace P)' 
                           ? 'Grace P' 
@@ -1553,7 +1541,6 @@ const WorkOrders: React.FC = () => {
                     </div>
                   )}
                 </td>
-                {/* Approval Tier (Completed) */}
                 {activeTab === "Completed" && (
                   <td className="py-3 px-4 whitespace-nowrap" data-testid={`cell-completed-approval-tier-${workOrder.id}`}>
                     {(() => {
@@ -1565,7 +1552,6 @@ const WorkOrders: React.FC = () => {
                     })()}
                   </td>
                 )}
-                {/* Date Completed */}
                 {activeTab === "Completed" && (
                   <td className="py-3 px-4 text-gray-900 whitespace-nowrap overflow-hidden" style={{ textOverflow: 'ellipsis' }} data-testid={index === 0 ? "C30" : undefined}>
                     {index === 0 && <Marker id="C30" />}
