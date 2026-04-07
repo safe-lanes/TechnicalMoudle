@@ -2655,7 +2655,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       return;
     }
 
-    const woPayload = {
+    const currentRHValue = executionData.currentReading || executionData.runningHours;
+    const woPayload: Record<string, unknown> = {
       vesselId: contextVesselId,
       component: templateData.componentName,
       componentCode: templateData.componentCode,
@@ -2681,6 +2682,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       maintenanceBasis: 'Calendar',
       frequencyValue: '',
       frequencyUnit: '',
+      startDateTime: executionData.startDateTime || '',
+      completionDateTime: executionData.completionDateTime || '',
+      dateOfCompletion: executionData.dateOfCompletion || '',
+      performedBy: executionData.performedBy || '',
+      noOfPersons: executionData.noOfPersons || '',
+      totalTimeHours: executionData.totalTimeHours || '',
+      manhours: executionData.manhours || '',
+      workCarriedOut: executionData.workCarriedOut || '',
+      runningHours: currentRHValue || '',
+      riskAssessmentStatus: executionData.riskAssessment || '',
+      safetyChecklistsStatus: executionData.safetyChecklists || '',
+      operationalFormsStatus: executionData.operationalForms || '',
+      executionAssignedTo: executionData.executionAssignedTo || '',
+      consumedSpareParts: executionData.consumedSpareParts.filter(s => s.partNo || s.description),
+      requiredSpareParts: templateData.requiredSpareParts || [],
+      requiredTools: templateData.requiredTools || [],
     };
 
     setIsDraftSaving(true);
