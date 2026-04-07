@@ -724,11 +724,10 @@ export default function ShipsCertificatesAdmin() {
     const vesselIds = getSelectedVesselIds();
     const conflictingMasterIds: string[] = [];
     
-    // For each company certificate, check if all selected vessels have the same applicability
     companyCertificates.forEach(cert => {
       const applicabilityValues = vesselIds.map(vesselId => {
         const record = vesselApplicabilityData.find((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId);
-        return record ? record.isApplicable : true; // Default to true if not yet initialized
+        return record ? record.isApplicable : false;
       });
       
       // Check if all values are the same
@@ -743,7 +742,6 @@ export default function ShipsCertificatesAdmin() {
   
   const conflictCheck = hasApplicabilityConflict();
   
-  // Get applicability for a certificate (considering multi-vessel selection)
   const getCertificateApplicability = (masterId: string): boolean | 'mixed' => {
     const vesselIds = getSelectedVesselIds();
     
@@ -751,7 +749,7 @@ export default function ShipsCertificatesAdmin() {
     
     const applicabilityValues = vesselIds.map(vesselId => {
       const record = vesselApplicabilityData.find((a: any) => a.vesselId === vesselId && a.masterId === masterId);
-      return record ? record.isApplicable : true; // Default to true
+      return record ? record.isApplicable : false;
     });
     
     const allTrue = applicabilityValues.every(val => val === true);

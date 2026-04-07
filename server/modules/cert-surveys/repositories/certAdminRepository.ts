@@ -5,7 +5,7 @@ import {
   vesselCertificateApplicability,
   vessels,
 } from '@shared/schema';
-import { eq, and, inArray, or, like } from 'drizzle-orm';
+import { eq, and, inArray, or, like, notInArray, sql } from 'drizzle-orm';
 
 // ── Helpers ──
 
@@ -206,4 +206,50 @@ export async function getCompanyCertificates() {
         )
       )
     );
+}
+
+export async function getCompanyApplicableMasterIds() {
+  const db = await getDb();
+  if (!db) return null;
+  return db.select({
+    masterId: shipCertificatesMaster.masterId,
+  }).from(shipCertificatesMaster)
+    .where(
+      and(
+        eq(shipCertificatesMaster.isActive, true),
+        eq(shipCertificatesMaster.isDeleted, false),
+        or(
+          eq(shipCertificatesMaster.applicableToCompany, true),
+          like(shipCertificatesMaster.masterId, 'CMP-%'),
+          like(shipCertificatesMaster.masterId, 'VES-%')
+        )
+      )
+    );
+}
+
+export async function getAllApplicabilityRecords() {
+  const db = await getDb();
+  if (!db) return null;
+  return db.select({
+    vesselId: vesselCertificateApplicability.vesselId,
+    masterId: vesselCertificateApplicability.masterId,
+  }).from(vesselCertificateApplicability)
+    .where(
+      or(eq(vesselCertificateApplicability.isDeleted, false), sql`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    );
+}
+
+export async function softDeleteApplicabilityByMasterIds(masterIds: string[]) {
+  const db = await getDb();
+  if (!db) return null;
+  if (masterIds.length === 0) return [];
+  return db.update(vesselCertificateApplicability)
+    .set({ isDeleted: true, updatedAt: new Date() })
+    .where(
+      and(
+        inArray(vesselCertificateApplicability.masterId, masterIds),
+        or(eq(vesselCertificateApplicability.isDeleted, false), sql`${vesselCertificateApplicability.isDeleted} IS NULL`)
+      )
+    )
+    .returning({ masterId: vesselCertificateApplicability.masterId });
 }

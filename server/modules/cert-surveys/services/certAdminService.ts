@@ -113,10 +113,14 @@ export async function saveMasterCertificates(body: any) {
     }
   }
 
-  // Auto-create vessel_certificate_applicability records
+  // Auto-create vessel_certificate_applicability records for newly inserted certs
   if (newlyInsertedMasterIds.length > 0) {
     const vesselOnlyMasterIds = newlyInsertedMasterIds.filter(id => vesselSpecificSet.has(id) || id.startsWith('VES-'));
-    const nonVesselMasterIds = newlyInsertedMasterIds.filter(id => !vesselSpecificSet.has(id) && !id.startsWith('VES-'));
+    const companyApplicableNewIds = newlyInsertedMasterIds.filter(id => {
+      if (vesselSpecificSet.has(id) || id.startsWith('VES-')) return false;
+      const cert = certificates.find(c => c.masterId === id);
+      return cert?.applicableToCompany === true;
+    });
 
     if (vesselOnlyMasterIds.length > 0 && targetVessels.length === 0) {
       throw Object.assign(new Error("targetVessels is required when adding new vessel-specific certificates"), {
@@ -125,7 +129,10 @@ export async function saveMasterCertificates(body: any) {
       });
     }
 
-    const existingApplicability = await certAdminRepo.getApplicabilityByMasterIds(newlyInsertedMasterIds);
+    const idsToCheck = [...companyApplicableNewIds, ...vesselOnlyMasterIds];
+    const existingApplicability = idsToCheck.length > 0
+      ? await certAdminRepo.getApplicabilityByMasterIds(idsToCheck)
+      : [];
     if (!existingApplicability) {
       throw Object.assign(new Error("Database not available"), { statusCode: 503 });
     }
@@ -141,7 +148,7 @@ export async function saveMasterCertificates(body: any) {
       isApplicable: boolean;
     }> = [];
 
-    for (const masterId of nonVesselMasterIds) {
+    for (const masterId of companyApplicableNewIds) {
       for (const vessel of allVessels) {
         const key = `${vessel.id}-${masterId}`;
         if (!existingKeys.has(key)) {
@@ -173,11 +180,69 @@ export async function saveMasterCertificates(body: any) {
       }
     }
 
-    // Bulk insert all applicability records at once
     if (applicabilityToInsert.length > 0) {
       await certAdminRepo.insertApplicabilityBulk(applicabilityToInsert);
       console.log(`Created ${applicabilityToInsert.length} applicability records for new certificates`);
     }
+  }
+
+  // Sync: ensure ALL company-applicable master certs have applicability records for all vessels
+  // This catches certs that were updated to applicableToCompany=true after initial creation
+  const companyApplicableResult = await certAdminRepo.getCompanyApplicableMasterIds();
+  if (!companyApplicableResult) {
+    throw Object.assign(new Error("Database not available"), { statusCode: 503 });
+  }
+  const companyApplicableIds = new Set(companyApplicableResult.map(r => r.masterId));
+
+  const allApplicabilityRecords = await certAdminRepo.getAllApplicabilityRecords();
+  if (!allApplicabilityRecords) {
+    throw Object.assign(new Error("Database not available"), { statusCode: 503 });
+  }
+
+  const existingApplicabilityKeys = new Set(
+    allApplicabilityRecords.map(r => `${r.vesselId}-${r.masterId}`)
+  );
+
+  const syncInserts: Array<{
+    vesselId: string;
+    vesselName: string;
+    masterId: string;
+    isApplicable: boolean;
+  }> = [];
+
+  for (const masterId of companyApplicableIds) {
+    if (masterId.startsWith('VES-')) continue;
+    for (const vessel of allVessels) {
+      const key = `${vessel.id}-${masterId}`;
+      if (!existingApplicabilityKeys.has(key)) {
+        syncInserts.push({
+          vesselId: vessel.id,
+          vesselName: vessel.name,
+          masterId,
+          isApplicable: true,
+        });
+      }
+    }
+  }
+
+  if (syncInserts.length > 0) {
+    await certAdminRepo.insertApplicabilityBulk(syncInserts);
+    console.log(`Synced ${syncInserts.length} missing applicability records for company-applicable certificates`);
+  }
+
+  // Cleanup: remove applicability records for non-company-applicable, non-VES certificates
+  const staleApplicabilityMasterIds: string[] = [];
+  const masterIdsInApplicability = new Set(allApplicabilityRecords.map(r => r.masterId));
+  for (const masterId of masterIdsInApplicability) {
+    if (masterId.startsWith('VES-')) continue;
+    if (!companyApplicableIds.has(masterId)) {
+      staleApplicabilityMasterIds.push(masterId);
+    }
+  }
+
+  if (staleApplicabilityMasterIds.length > 0) {
+    await certAdminRepo.softDeleteApplicabilityByMasterIds(staleApplicabilityMasterIds);
+    console.log(`Soft-deleted ${staleApplicabilityMasterIds.length} stale non-company applicability master IDs: ${staleApplicabilityMasterIds.join(', ')}`);
   }
 
   console.log(`Ship certificates master saved: ${insertedCount} inserted, ${updatedCount} updated, ${deletedCount} deleted`);
