@@ -126,7 +126,7 @@ function compareWorkOrders(a: WorkOrderWithHydratedData, b: WorkOrderWithHydrate
     case "status": {
       const STATUS_ORDER: Record<string, number> = {
         "Overdue": 0, "Due": 1, "Due (Grace P)": 2, "Active": 3,
-        "Pending Approval": 4, "Postponed": 5, "Completed": 6,
+        "Pending Approval": 4, "Postponed": 5, "Draft": 6, "Completed": 7,
       };
       const aS = a.computedStatus || a.status || "";
       const bS = b.computedStatus || b.status || "";
@@ -162,7 +162,7 @@ const WorkOrders: React.FC = () => {
   const [selectedRank, setSelectedRank] = useState("");
   const [selectedCriticality, setSelectedCriticality] = useState("");
   const [selectedPostponementReason, setSelectedPostponementReason] = useState("");
-  const VALID_TABS = new Set(["Planned", "Due", "Overdue", "Pending Approval", "Postponed", "Completed"]);
+  const VALID_TABS = new Set(["Planned", "Due", "Overdue", "Postponed", "Unplanned", "Pending Approval", "Completed"]);
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = sessionStorage.getItem('workOrdersActiveTab');
     if (savedTab) {
@@ -333,11 +333,14 @@ const WorkOrders: React.FC = () => {
       const effectiveStatus = getEffectiveStatus(wo);
       return effectiveStatus === "Overdue";
     }).length },
-    { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => getEffectiveStatus(wo) === "Pending Approval").length },
     { id: "Postponed", label: "Postponed", count: safeWorkOrdersList.filter(wo => {
       if (wo.isExecution) return false;
       return getEffectiveStatus(wo) === "Postponed";
     }).length },
+    { id: "Unplanned", label: "Unplanned", count: safeWorkOrdersList.filter(wo => {
+      return wo.status === 'Draft' && wo.workOrderType === 'Unplanned';
+    }).length },
+    { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => getEffectiveStatus(wo) === "Pending Approval").length },
     { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => getEffectiveStatus(wo) === "Completed").length }
   ];
 
@@ -393,6 +396,8 @@ const WorkOrders: React.FC = () => {
     } else if (activeTab === "Postponed") {
       if (wo.isExecution) return false;
       if (effectiveStatus !== "Postponed") return false;
+    } else if (activeTab === "Unplanned") {
+      if (wo.status !== 'Draft' || wo.workOrderType !== 'Unplanned') return false;
     }
     
     if (searchTerm && !wo.jobTitle.toLowerCase().includes(searchTerm.toLowerCase()) && 
@@ -743,7 +748,7 @@ const WorkOrders: React.FC = () => {
     try {
       const now = new Date();
       const timestamp = format(now, 'yyyyMMdd_HHmm');
-      const exportList = activeTab === "Postponed" ? filteredWorkOrders : safeWorkOrdersList;
+      const exportList = (activeTab === "Postponed" || activeTab === "Unplanned") ? filteredWorkOrders : safeWorkOrdersList;
       const isPostponedExport = activeTab === "Postponed";
 
       type BaseExcelRow = {
@@ -804,7 +809,7 @@ const WorkOrders: React.FC = () => {
     setExportingType('wo-pdf');
     try {
       const isPostponedExport = activeTab === "Postponed";
-      const exportList = isPostponedExport ? filteredWorkOrders : safeWorkOrdersList;
+      const exportList = (isPostponedExport || activeTab === "Unplanned") ? filteredWorkOrders : safeWorkOrdersList;
 
       const columns = isPostponedExport
         ? [
@@ -972,7 +977,7 @@ const WorkOrders: React.FC = () => {
         {/* Status Tabs - Center aligned */}
         <div className="absolute left-1/2 -translate-x-1/2 bg-gray-100 rounded-md p-1 flex items-center gap-0.5">
           {tabs.map((tab, index) => {
-            const markerId = index === 0 ? "C4" : index === 1 ? "C5" : index === 2 ? "C6" : index === 3 ? "C7" : index === 4 ? "C33" : "C8";
+            const markerId = index === 0 ? "C4" : index === 1 ? "C5" : index === 2 ? "C6" : index === 3 ? "C33" : index === 4 ? "C98" : index === 5 ? "C7" : "C8";
             return (
               <button
                 key={tab.id}
@@ -1190,7 +1195,7 @@ const WorkOrders: React.FC = () => {
               <SortableHeader
                 field="dueDate"
                 colKey="dueDate"
-                label={activeTab === "Pending Approval" || activeTab === "Completed" ? "Submitted Date" : "Due Date"}
+                label={activeTab === "Pending Approval" || activeTab === "Completed" ? "Submitted Date" : activeTab === "Unplanned" ? "Created Date" : "Due Date"}
                 testId="C20"
                 marker={<Marker id="C20" />}
               />

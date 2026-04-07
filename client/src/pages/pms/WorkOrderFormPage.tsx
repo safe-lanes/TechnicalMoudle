@@ -2640,6 +2640,65 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   };
 
+  const [isDraftSaving, setIsDraftSaving] = useState(false);
+
+  const handleSaveDraftUnplanned = async () => {
+    if (!templateData.woTitle?.trim()) {
+      toast({ title: 'Validation Error', description: 'Job Title is required.', variant: 'destructive' });
+      return;
+    }
+    if (!templateData.componentName?.trim()) {
+      toast({ title: 'Validation Error', description: 'Please select a Component.', variant: 'destructive' });
+      return;
+    }
+
+    const woPayload = {
+      vesselId: contextVesselId,
+      component: templateData.componentName,
+      componentCode: templateData.componentCode,
+      jobTitle: templateData.woTitle,
+      workOrderType: 'Unplanned',
+      maintenanceType: templateData.taskType || 'Unplanned Maintenance',
+      assignedTo: templateData.assignedTo || '',
+      approver: templateData.approver || '',
+      jobCategory: templateData.jobCategory || '',
+      jobPriority: templateData.jobPriority || 'Medium',
+      classRelated: templateData.classRelated || 'No',
+      department: templateData.department || '',
+      criticality: templateData.criticality || '',
+      isActive: templateData.isActive === 'Yes',
+      status: 'Draft',
+      briefWorkDescription: templateData.briefWorkDescription || '',
+      safetyRequirements: {
+        ppeRequirements: (templateData.safetyRequirements?.ppeRequirements || []).filter((s: string) => s.trim() !== ''),
+        permitRequirements: (templateData.safetyRequirements?.permitRequirements || []).filter((s: string) => s.trim() !== ''),
+        otherRequirements: (templateData.safetyRequirements?.otherRequirements || []).filter((s: string) => s.trim() !== ''),
+      },
+      dataScope: 'vessel',
+      maintenanceBasis: 'Calendar',
+      frequencyValue: '',
+      frequencyUnit: '',
+    };
+
+    setIsDraftSaving(true);
+    try {
+      const createRes = await apiRequest('POST', '/technical/api/work-orders', woPayload);
+      const createdWO = await createRes.json();
+      const newWoId = createdWO?.id || createdWO?.workOrderId;
+      if (!newWoId) throw new Error('Failed to create work order — no ID returned.');
+
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+      toast({ title: 'Draft Saved', description: 'Unplanned work order saved as draft. You can resume editing from the Unplanned tab.' });
+      sessionStorage.setItem('workOrdersActiveTab', 'Unplanned');
+      navigate('/pms/work-orders');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save draft. Please try again.';
+      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+    } finally {
+      setIsDraftSaving(false);
+    }
+  };
+
   const handleSaveUnplannedCreate = async () => {
     // === Part A validation ===
     if (!templateData.woTitle?.trim()) {
@@ -3231,7 +3290,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         );
       })()}
       {/* Top Header Bar - Professional maritime header with logo and actions */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
+      <div className={`bg-white border-b border-gray-200 shadow-sm ${(isUnplannedCreate || (workOrderType === 'Unplanned' && currentWorkOrderStatus === 'Draft')) ? 'sticky top-0 z-30' : ''}`}>
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4 md:gap-6">
@@ -3305,7 +3364,26 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 )}
               </div>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center gap-3">
+              {isUnplannedCreate && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSaveDraftUnplanned}
+                  disabled={isDraftSaving}
+                  className="border-[#22c55e] text-[#22c55e] hover:bg-green-50 font-medium px-4 h-9"
+                  data-testid="button-save-draft"
+                >
+                  {isDraftSaving ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'save'
+                  )}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
