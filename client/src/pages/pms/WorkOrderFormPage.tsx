@@ -2909,7 +2909,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       isActive: templateData.isActive === 'Yes',
       status: woStatus,
       briefWorkDescription: templateData.briefWorkDescription,
-      safetyRequirements: templateData.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] },
+      safetyRequirements: {
+        ppeRequirements: (templateData.safetyRequirements?.ppeRequirements || []).filter((s: string) => s.trim() !== ''),
+        permitRequirements: (templateData.safetyRequirements?.permitRequirements || []).filter((s: string) => s.trim() !== ''),
+        otherRequirements: (templateData.safetyRequirements?.otherRequirements || []).filter((s: string) => s.trim() !== ''),
+      },
       dataScope: 'vessel',
       maintenanceBasis: 'Calendar',
       frequencyValue: '',
