@@ -307,6 +307,7 @@ export default function ShipsSurveysAdmin() {
       }
       setHasUnsavedChanges(false);
       setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
+      setMasterData([]);
       setCompanyOnlySurveys([]);
       setVesselOnlySurveys([]);
       setDeletedMasterIds([]);

@@ -367,6 +367,7 @@ export default function ShipsCertificatesAdmin() {
       setHasUnsavedChanges(false);
       setDeletedMasterIds([]);
       setHasSavedInSession(prev => ({ ...prev, [activeTab]: true }));
+      setMasterData([]);
       setCompanyOnlyCerts([]);
       setVesselOnlyCerts([]);
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-certificates-master'] });
