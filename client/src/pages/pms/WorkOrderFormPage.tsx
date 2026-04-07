@@ -2909,6 +2909,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       isActive: templateData.isActive === 'Yes',
       status: woStatus,
       briefWorkDescription: templateData.briefWorkDescription,
+      safetyRequirements: templateData.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] },
       dataScope: 'vessel',
       maintenanceBasis: 'Calendar',
       frequencyValue: '',
@@ -3616,6 +3617,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </Select>
                 </div>
 
+                {!isUnplannedCreate && (
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.22"><Marker id="WOF.A1.22" />Job Priority</Label>
                   <Select
@@ -3634,7 +3636,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </SelectContent>
                   </Select>
                 </div>
+                )}
 
+                {!isUnplannedCreate && (
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.24"><Marker id="WOF.A1.24" />Class Related</Label>
                   <Select
@@ -3651,6 +3655,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </SelectContent>
                   </Select>
                 </div>
+                )}
 
                 {/* Conditional Next Due field based on Maintenance Basis */}
                 {!isUnplannedCreate && (templateData.maintenanceBasis === 'Running Hours' ? (
@@ -3717,6 +3722,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </div>
                 )}
 
+                {!isUnplannedCreate && (
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.28"><Marker id="WOF.A1.28" />Department</Label>
                   <Input
@@ -3728,6 +3734,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     data-testid="WOF.A1.29"
                   />
                 </div>
+                )}
 
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.30"><Marker id="WOF.A1.30" />Criticality</Label>
@@ -3746,6 +3753,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </Select>
                 </div>
 
+                {!isUnplannedCreate && (
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.32"><Marker id="WOF.A1.32" />Is Active</Label>
                   <Select
@@ -3762,29 +3770,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </SelectContent>
                   </Select>
                 </div>
-
-                {isUnplannedCreate && (
-                  <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.jobCategory">Job Category</Label>
-                    <Select
-                      value={templateData.jobCategory}
-                      onValueChange={(value) => handleTemplateChange('jobCategory', value)}
-                    >
-                      <SelectTrigger className="text-sm" data-testid="select-job-category">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Safety">Safety</SelectItem>
-                        <SelectItem value="Machinery">Machinery</SelectItem>
-                        <SelectItem value="Hull">Hull</SelectItem>
-                        <SelectItem value="Electrical">Electrical</SelectItem>
-                        <SelectItem value="Navigation">Navigation</SelectItem>
-                        <SelectItem value="Cargo">Cargo</SelectItem>
-                        <SelectItem value="Accommodation">Accommodation</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                 )}
               </div>
 
@@ -3802,7 +3787,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </div>
           </SectionBlock>
 
-          {/* A2. Required Spare Parts */}
+          {/* A2. Required Spare Parts — hidden for unplanned work orders */}
+          {!isUnplannedCreate && (<>
           <div data-testid="WOF.A2.1"><Marker id="WOF.A2.1" /></div>
           <div data-testid="WOF.A2.2"><Marker id="WOF.A2.2" /></div>
           <SectionBlock
@@ -4016,6 +4002,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
             </div>
           </SectionBlock>
+          </>)}
 
           {/* A3. Safety Requirements */}
           <div data-testid="WOF.A4.1"><Marker id="WOF.A4.1" /></div>
@@ -4027,53 +4014,101 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             description="Safety requirements and permits for this work order"
           >
             <div className="space-y-3" data-testid="WOF.A4.3"><Marker id="WOF.A4.3" />
-              {/* PPE Requirements */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Personal Protective Equipment (PPE):</h3>
-                {(templateData.safetyRequirements?.ppeRequirements || []).length > 0 ? (
-                  <ul className="space-y-0.5 text-sm text-gray-700 ml-4">
-                    {templateData.safetyRequirements.ppeRequirements.map((req, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
-                        <span>{req}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-gray-500 italic ml-4">No PPE requirements specified</p>
-                )}
-              </div>
-
-              {/* Permit Requirements */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Permits Required:</h3>
-                {(templateData.safetyRequirements?.permitRequirements || []).length > 0 ? (
-                  <ul className="space-y-0.5 text-sm text-gray-700 ml-4">
-                    {templateData.safetyRequirements.permitRequirements.map((req, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
-                        <span>{req}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-gray-500 italic ml-4">No permits required</p>
-                )}
-              </div>
-
-              {/* Other Requirements */}
-              {(templateData.safetyRequirements?.otherRequirements || []).length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Other Requirements:</h3>
-                  <ul className="space-y-0.5 text-sm text-gray-700 ml-4">
-                    {templateData.safetyRequirements.otherRequirements.map((req, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
-                        <span>{req}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              {isUnplannedCreate ? (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold text-gray-700" data-testid="label-ppe-requirements">Personal Protective Equipment (PPE)</Label>
+                    <Textarea
+                      value={(templateData.safetyRequirements?.ppeRequirements || []).join('\n')}
+                      onChange={(e) => {
+                        const lines = e.target.value.split('\n');
+                        handleTemplateChange('safetyRequirements', {
+                          ...templateData.safetyRequirements,
+                          ppeRequirements: lines,
+                        });
+                      }}
+                      onBlur={() => {
+                        const cleaned = (templateData.safetyRequirements?.ppeRequirements || []).filter((s: string) => s.trim() !== '');
+                        handleTemplateChange('safetyRequirements', {
+                          ...templateData.safetyRequirements,
+                          ppeRequirements: cleaned,
+                        });
+                      }}
+                      className="text-sm min-h-[80px]"
+                      placeholder="Enter PPE requirements (one per line, e.g. Safety Goggles)"
+                      data-testid="textarea-ppe-requirements"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold text-gray-700" data-testid="label-permit-requirements">Permits Required</Label>
+                    <Textarea
+                      value={(templateData.safetyRequirements?.permitRequirements || []).join('\n')}
+                      onChange={(e) => {
+                        const lines = e.target.value.split('\n');
+                        handleTemplateChange('safetyRequirements', {
+                          ...templateData.safetyRequirements,
+                          permitRequirements: lines,
+                        });
+                      }}
+                      onBlur={() => {
+                        const cleaned = (templateData.safetyRequirements?.permitRequirements || []).filter((s: string) => s.trim() !== '');
+                        handleTemplateChange('safetyRequirements', {
+                          ...templateData.safetyRequirements,
+                          permitRequirements: cleaned,
+                        });
+                      }}
+                      className="text-sm min-h-[80px]"
+                      placeholder="Enter permit requirements (one per line, e.g. Hot Work Permit)"
+                      data-testid="textarea-permit-requirements"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Personal Protective Equipment (PPE):</h3>
+                    {(templateData.safetyRequirements?.ppeRequirements || []).length > 0 ? (
+                      <ul className="space-y-0.5 text-sm text-gray-700 ml-4">
+                        {templateData.safetyRequirements.ppeRequirements.map((req, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
+                            <span>{req}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-gray-500 italic ml-4">No PPE requirements specified</p>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Permits Required:</h3>
+                    {(templateData.safetyRequirements?.permitRequirements || []).length > 0 ? (
+                      <ul className="space-y-0.5 text-sm text-gray-700 ml-4">
+                        {templateData.safetyRequirements.permitRequirements.map((req, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
+                            <span>{req}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-gray-500 italic ml-4">No permits required</p>
+                    )}
+                  </div>
+                  {(templateData.safetyRequirements?.otherRequirements || []).length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Other Requirements:</h3>
+                      <ul className="space-y-0.5 text-sm text-gray-700 ml-4">
+                        {templateData.safetyRequirements.otherRequirements.map((req, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
+                            <span>{req}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </SectionBlock>
