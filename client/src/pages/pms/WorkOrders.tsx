@@ -227,7 +227,7 @@ const WorkOrders: React.FC = () => {
     { id: "Planned", label: "Planned", count: safeWorkOrdersList.filter(wo => {
       if (wo.isExecution) return false;
       const effectiveStatus = getEffectiveStatus(wo);
-      return effectiveStatus === "Active" || effectiveStatus === "Postponed";
+      return effectiveStatus === "Active";
     }).length },
     { id: "Due", label: "Due", count: safeWorkOrdersList.filter(wo => {
       const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
@@ -242,6 +242,10 @@ const WorkOrders: React.FC = () => {
       return effectiveStatus === "Overdue";
     }).length },
     { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => getEffectiveStatus(wo) === "Pending Approval").length },
+    { id: "Postponed", label: "Postponed", count: safeWorkOrdersList.filter(wo => {
+      if (wo.isExecution) return false;
+      return getEffectiveStatus(wo) === "Postponed";
+    }).length },
     { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => getEffectiveStatus(wo) === "Completed").length }
   ];
 
@@ -280,7 +284,7 @@ const WorkOrders: React.FC = () => {
     
     if (activeTab === "Planned") {
       if (wo.isExecution) return false;
-      if (effectiveStatus !== "Active" && effectiveStatus !== "Postponed") return false;
+      if (effectiveStatus !== "Active") return false;
     } else if (activeTab === "Due") {
       const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
       if (wo.isExecution && !isRejectedExecution) return false;
@@ -293,6 +297,9 @@ const WorkOrders: React.FC = () => {
       if (effectiveStatus !== "Completed") return false;
     } else if (activeTab === "Pending Approval") {
       if (effectiveStatus !== "Pending Approval") return false;
+    } else if (activeTab === "Postponed") {
+      if (wo.isExecution) return false;
+      if (effectiveStatus !== "Postponed") return false;
     }
     
     if (searchTerm && !wo.jobTitle.toLowerCase().includes(searchTerm.toLowerCase()) && 
@@ -556,32 +563,43 @@ const WorkOrders: React.FC = () => {
     try {
       const now = new Date();
       const timestamp = format(now, 'yyyyMMdd_HHmm');
-      const rows = safeWorkOrdersList.map((wo, idx) => ({
-        'S.No': idx + 1,
-        'Component': wo.component || '-',
-        'Work Order No': wo.workOrderNo || wo.templateCode || '-',
-        'Job Title': wo.jobTitle || '-',
-        'Assigned To': wo.assignedTo || '-',
-        'Due Date': wo.maintenanceBasis === 'Running Hours'
-          ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
-          : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-'),
-        'Status': getEffectiveStatus(wo),
-        'Criticality': wo.criticality || '-',
-        'Maintenance Basis': wo.maintenanceBasis || '-',
-        'Frequency': wo.frequencyValue ? `${wo.frequencyValue} ${wo.frequencyUnit || ''}`.trim() : '-',
-        'Postponement Reason': wo.postponementReason || '-',
-        'Postponement Remarks': wo.postponementRemarks || '-',
-      }));
+      const exportList = activeTab === "Postponed" ? filteredWorkOrders : safeWorkOrdersList;
+      const isPostponedExport = activeTab === "Postponed";
+      const rows = exportList.map((wo, idx) => {
+        const base: Record<string, any> = {
+          'S.No': idx + 1,
+          'Component': wo.component || '-',
+          'Work Order No': wo.workOrderNo || wo.templateCode || '-',
+          'Job Title': wo.jobTitle || '-',
+          'Assigned To': wo.assignedTo || '-',
+          'Due Date': wo.maintenanceBasis === 'Running Hours'
+            ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
+            : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-'),
+          'Status': getEffectiveStatus(wo),
+          'Criticality': wo.criticality || '-',
+          'Maintenance Basis': wo.maintenanceBasis || '-',
+          'Frequency': wo.frequencyValue ? `${wo.frequencyValue} ${wo.frequencyUnit || ''}`.trim() : '-',
+          'Postponement Reason': wo.postponementReason || '-',
+          'Postponement Remarks': wo.postponementRemarks || '-',
+        };
+        if (isPostponedExport) {
+          base['Postpone Until'] = (wo as any).postponementEndDate ? formatProfessionalDate((wo as any).postponementEndDate) : '-';
+          base['Authorized By'] = (wo as any).postponementAuthorizedBy || '-';
+        }
+        return base;
+      });
 
       const ws = XLSX.utils.json_to_sheet(rows);
-      ws['!cols'] = [
-        { wch: 6 }, { wch: 30 }, { wch: 35 }, { wch: 40 }, { wch: 18 },
-        { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 14 },
-        { wch: 50 }, { wch: 40 },
-      ];
+      ws['!cols'] = isPostponedExport
+        ? [{ wch: 6 }, { wch: 30 }, { wch: 35 }, { wch: 40 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 50 }, { wch: 40 }, { wch: 18 }, { wch: 25 }]
+        : [{ wch: 6 }, { wch: 30 }, { wch: 35 }, { wch: 40 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 50 }, { wch: 40 }];
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'All Work Orders');
-      XLSX.writeFile(wb, `${vesselName}_All_Work_Orders_${timestamp}.xlsx`);
+      const sheetName = isPostponedExport ? 'Postponed Work Orders' : 'All Work Orders';
+      const fileName = isPostponedExport
+        ? `${vesselName}_Postponed_Work_Orders_${timestamp}.xlsx`
+        : `${vesselName}_All_Work_Orders_${timestamp}.xlsx`;
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      XLSX.writeFile(wb, fileName);
 
       toast({ title: "Export Complete", description: `Exported ${rows.length} work orders to Excel` });
     } catch (err) {
@@ -593,50 +611,63 @@ const WorkOrders: React.FC = () => {
   const exportWorkOrdersPdf = () => {
     setExportingType('wo-pdf');
     try {
-      const columns = [
-        { header: 'S.No', field: 'sNo', width: 10 },
-        { header: 'Component', field: 'component', width: 35 },
-        { header: 'Work Order No', field: 'workOrderNo', width: 40 },
-        { header: 'Job Title', field: 'jobTitle', width: 45 },
-        { header: 'Assigned To', field: 'assignedTo', width: 22 },
-        { header: 'Due Date', field: 'dueDate', width: 20 },
-        { header: 'Status', field: 'status', width: 16 },
-        { header: 'Criticality', field: 'criticality', width: 14 },
-        { header: 'Postponement Reason', field: 'postponementReason', width: 45 },
-        { header: 'Postponement Remarks', field: 'postponementRemarks', width: 45 },
-      ];
+      const isPostponedExport = activeTab === "Postponed";
+      const exportList = isPostponedExport ? filteredWorkOrders : safeWorkOrdersList;
 
-      const data = safeWorkOrdersList.map((wo, idx) => ({
-        sNo: idx + 1,
-        component: wo.component || '-',
-        workOrderNo: wo.workOrderNo || wo.templateCode || '-',
-        jobTitle: wo.jobTitle || '-',
-        assignedTo: wo.assignedTo || '-',
-        dueDate: wo.maintenanceBasis === 'Running Hours'
-          ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
-          : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-'),
-        status: getEffectiveStatus(wo),
-        criticality: wo.criticality || '-',
-        postponementReason: wo.postponementReason || '-',
-        postponementRemarks: wo.postponementRemarks || '-',
-      }));
+      const columns = isPostponedExport
+        ? [
+            { header: 'S.No', field: 'sNo', width: 10 },
+            { header: 'Component', field: 'component', width: 35 },
+            { header: 'Work Order No', field: 'workOrderNo', width: 40 },
+            { header: 'Job Title', field: 'jobTitle', width: 45 },
+            { header: 'Assigned To', field: 'assignedTo', width: 22 },
+            { header: 'Due Date', field: 'dueDate', width: 20 },
+            { header: 'Postpone Until', field: 'postponeUntil', width: 20 },
+            { header: 'Postponement Reason', field: 'postponementReason', width: 45 },
+            { header: 'Postponement Remarks', field: 'postponementRemarks', width: 45 },
+            { header: 'Authorized By', field: 'authorizedBy', width: 25 },
+            { header: 'Status', field: 'status', width: 16 },
+          ]
+        : [
+            { header: 'S.No', field: 'sNo', width: 10 },
+            { header: 'Component', field: 'component', width: 35 },
+            { header: 'Work Order No', field: 'workOrderNo', width: 40 },
+            { header: 'Job Title', field: 'jobTitle', width: 45 },
+            { header: 'Assigned To', field: 'assignedTo', width: 22 },
+            { header: 'Due Date', field: 'dueDate', width: 20 },
+            { header: 'Status', field: 'status', width: 16 },
+            { header: 'Criticality', field: 'criticality', width: 14 },
+            { header: 'Postponement Reason', field: 'postponementReason', width: 45 },
+            { header: 'Postponement Remarks', field: 'postponementRemarks', width: 45 },
+          ];
 
-      const statusCounts = safeWorkOrdersList.reduce((acc, wo) => {
-        const s = getEffectiveStatus(wo);
-        acc[s] = (acc[s] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const data = exportList.map((wo, idx) => {
+        const base: Record<string, any> = {
+          sNo: idx + 1,
+          component: wo.component || '-',
+          workOrderNo: wo.workOrderNo || wo.templateCode || '-',
+          jobTitle: wo.jobTitle || '-',
+          assignedTo: wo.assignedTo || '-',
+          dueDate: wo.maintenanceBasis === 'Running Hours'
+            ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
+            : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-'),
+          status: getEffectiveStatus(wo),
+          criticality: wo.criticality || '-',
+          postponementReason: wo.postponementReason || '-',
+          postponementRemarks: wo.postponementRemarks || '-',
+        };
+        if (isPostponedExport) {
+          base['postponeUntil'] = (wo as any).postponementEndDate ? formatProfessionalDate((wo as any).postponementEndDate) : '-';
+          base['authorizedBy'] = (wo as any).postponementAuthorizedBy || '-';
+        }
+        return base;
+      });
 
-      const summary = [
-        { label: 'Total Work Orders', value: safeWorkOrdersList.length },
-        { label: 'Planned', value: statusCounts['Active'] || 0 },
-        { label: 'Due', value: (statusCounts['Due'] || 0) + (statusCounts['Due (Grace P)'] || 0) },
-        { label: 'Overdue', value: statusCounts['Overdue'] || 0 },
-        { label: 'Completed', value: statusCounts['Completed'] || 0 },
-      ];
+      const reportTitle = isPostponedExport ? 'Postponed Work Orders' : 'All Work Orders';
+      const reportSubtitle = isPostponedExport ? 'Work orders currently postponed' : 'Complete work order listing';
 
       pdfReportGenerator.generateReport(
-        { title: 'All Work Orders', subtitle: 'Complete work order listing', vessel: vesselName, orientation: 'landscape' },
+        { title: reportTitle, subtitle: reportSubtitle, vessel: vesselName, orientation: 'landscape' },
         columns,
         data
       );
@@ -736,14 +767,14 @@ const WorkOrders: React.FC = () => {
         </h1>
         
         {/* Status Tabs - Center aligned */}
-        <div className="absolute left-1/2 -translate-x-1/2 bg-gray-100 rounded-md p-1 flex items-center gap-1">
+        <div className="absolute left-1/2 -translate-x-1/2 bg-gray-100 rounded-md p-1 flex items-center gap-0.5">
           {tabs.map((tab, index) => {
             const markerId = index === 0 ? "C4" : index === 1 ? "C5" : index === 2 ? "C6" : index === 3 ? "C7" : "C8";
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
                   activeTab === tab.id
                     ? "bg-[#52baf3] text-white"
                     : "text-gray-700 hover:bg-gray-200"
@@ -878,7 +909,7 @@ const WorkOrders: React.FC = () => {
           </SelectContent>
         </Select>
 
-        {activeTab === "Planned" && (
+        {(activeTab === "Planned" || activeTab === "Postponed") && (
           <Select value={selectedPostponementReason} onValueChange={setSelectedPostponementReason}>
             <SelectTrigger className="w-52" data-testid="select-filter-postponement-reason">
               <SelectValue placeholder="Postponement Reason" />
@@ -959,6 +990,12 @@ const WorkOrders: React.FC = () => {
               </th>
               {activeTab === "Planned" && (
                 <th className="text-left py-3 px-4 font-medium" data-testid="th-planned-date">Planned Date</th>
+              )}
+              {activeTab === "Postponed" && (
+                <th className="text-left py-3 px-4 font-medium" data-testid="th-postpone-until">Postpone Until</th>
+              )}
+              {activeTab === "Postponed" && (
+                <th className="text-left py-3 px-4 font-medium" data-testid="th-postponement-reason">Postponement Reason</th>
               )}
               {activeTab === "Pending Approval" && (
                 <th className="text-left py-3 px-4 font-medium" data-testid="th-days-late">Days Late</th>
@@ -1102,6 +1139,18 @@ const WorkOrders: React.FC = () => {
                     {(workOrder as any).plannedDate
                       ? formatProfessionalDate((workOrder as any).plannedDate)
                       : '—'}
+                  </td>
+                )}
+                {activeTab === "Postponed" && (
+                  <td className="py-3 px-4 text-gray-900" data-testid={`cell-postpone-until-${workOrder.id}`}>
+                    {(workOrder as any).postponementEndDate
+                      ? formatProfessionalDate((workOrder as any).postponementEndDate)
+                      : '—'}
+                  </td>
+                )}
+                {activeTab === "Postponed" && (
+                  <td className="py-3 px-4 text-gray-700" data-testid={`cell-postponement-reason-${workOrder.id}`}>
+                    {workOrder.postponementReason || '—'}
                   </td>
                 )}
                 {activeTab === "Pending Approval" && (
@@ -1261,6 +1310,15 @@ const WorkOrders: React.FC = () => {
               </tr>
               );
             })}
+            {paginatedWorkOrders.length === 0 && (
+              <tr>
+                <td colSpan={20} className="py-12 text-center text-gray-500" data-testid="empty-state-row">
+                  {activeTab === "Postponed"
+                    ? "No postponed work orders found for the selected filters."
+                    : "No work orders found for the selected filters."}
+                </td>
+              </tr>
+            )}
             </tbody>
           </table>
       </div>
@@ -1420,9 +1478,15 @@ const WorkOrders: React.FC = () => {
             <div className="border rounded-lg p-4 space-y-3" data-testid="export-section-all-wo">
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-[#1E5A8E]" />
-                <span className="font-medium text-gray-900">Export All Work Orders</span>
+                <span className="font-medium text-gray-900">
+                  {activeTab === "Postponed" ? "Export Postponed Work Orders" : "Export All Work Orders"}
+                </span>
               </div>
-              <p className="text-sm text-gray-500">Complete listing of all work orders with status, due dates, and assignments</p>
+              <p className="text-sm text-gray-500">
+                {activeTab === "Postponed"
+                  ? "Postponed work orders with postponement details, end dates, and authorization"
+                  : "Complete listing of all work orders with status, due dates, and assignments"}
+              </p>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
