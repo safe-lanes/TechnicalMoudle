@@ -46,6 +46,8 @@ type WorkOrderWithHydratedData = WorkOrderWithLeadTime & {
   currentRH?: number | null;
   postponementReason?: string | null;
   postponementRemarks?: string | null;
+  postponementEndDate?: string | null;
+  postponementAuthorizedBy?: string | null;
 };
 
 // Using WorkOrder type from shared schema
@@ -80,12 +82,14 @@ const WorkOrders: React.FC = () => {
   const [selectedRank, setSelectedRank] = useState("");
   const [selectedCriticality, setSelectedCriticality] = useState("");
   const [selectedPostponementReason, setSelectedPostponementReason] = useState("");
+  const VALID_TABS = new Set(["Planned", "Due", "Overdue", "Pending Approval", "Postponed", "Completed"]);
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = sessionStorage.getItem('workOrdersActiveTab');
     if (savedTab) {
       sessionStorage.removeItem('workOrdersActiveTab');
       // Handle legacy "Active" tab name - map to "Planned"
-      return savedTab === "Active" ? "Planned" : savedTab;
+      const resolved = savedTab === "Active" ? "Planned" : savedTab;
+      return VALID_TABS.has(resolved) ? resolved : "Planned";
     }
     return "Planned";
   });
@@ -565,16 +569,25 @@ const WorkOrders: React.FC = () => {
       const timestamp = format(now, 'yyyyMMdd_HHmm');
       const exportList = activeTab === "Postponed" ? filteredWorkOrders : safeWorkOrdersList;
       const isPostponedExport = activeTab === "Postponed";
-      const rows = exportList.map((wo, idx) => {
-        const base: Record<string, any> = {
+
+      type BaseExcelRow = {
+        'S.No': number; 'Component': string; 'Work Order No': string; 'Job Title': string;
+        'Assigned To': string; 'Due Date': string; 'Status': string; 'Criticality': string;
+        'Maintenance Basis': string; 'Frequency': string; 'Postponement Reason': string; 'Postponement Remarks': string;
+      };
+      type PostponedExcelRow = BaseExcelRow & { 'Postpone Until': string; 'Authorized By': string };
+
+      const rows = exportList.map((wo, idx): BaseExcelRow | PostponedExcelRow => {
+        const dueDateStr = wo.maintenanceBasis === 'Running Hours'
+          ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
+          : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-');
+        const base: BaseExcelRow = {
           'S.No': idx + 1,
           'Component': wo.component || '-',
           'Work Order No': wo.workOrderNo || wo.templateCode || '-',
           'Job Title': wo.jobTitle || '-',
           'Assigned To': wo.assignedTo || '-',
-          'Due Date': wo.maintenanceBasis === 'Running Hours'
-            ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
-            : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-'),
+          'Due Date': dueDateStr,
           'Status': getEffectiveStatus(wo),
           'Criticality': wo.criticality || '-',
           'Maintenance Basis': wo.maintenanceBasis || '-',
@@ -583,8 +596,11 @@ const WorkOrders: React.FC = () => {
           'Postponement Remarks': wo.postponementRemarks || '-',
         };
         if (isPostponedExport) {
-          base['Postpone Until'] = (wo as any).postponementEndDate ? formatProfessionalDate((wo as any).postponementEndDate) : '-';
-          base['Authorized By'] = (wo as any).postponementAuthorizedBy || '-';
+          return {
+            ...base,
+            'Postpone Until': wo.postponementEndDate ? formatProfessionalDate(wo.postponementEndDate) : '-',
+            'Authorized By': wo.postponementAuthorizedBy || '-',
+          } satisfies PostponedExcelRow;
         }
         return base;
       });
@@ -641,24 +657,35 @@ const WorkOrders: React.FC = () => {
             { header: 'Postponement Remarks', field: 'postponementRemarks', width: 45 },
           ];
 
-      const data = exportList.map((wo, idx) => {
-        const base: Record<string, any> = {
+      type BasePdfRow = {
+        sNo: number; component: string; workOrderNo: string; jobTitle: string;
+        assignedTo: string; dueDate: string; status: string; criticality: string;
+        postponementReason: string; postponementRemarks: string;
+      };
+      type PostponedPdfRow = BasePdfRow & { postponeUntil: string; authorizedBy: string };
+
+      const data = exportList.map((wo, idx): BasePdfRow | PostponedPdfRow => {
+        const dueDateStr = wo.maintenanceBasis === 'Running Hours'
+          ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
+          : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-');
+        const base: BasePdfRow = {
           sNo: idx + 1,
           component: wo.component || '-',
           workOrderNo: wo.workOrderNo || wo.templateCode || '-',
           jobTitle: wo.jobTitle || '-',
           assignedTo: wo.assignedTo || '-',
-          dueDate: wo.maintenanceBasis === 'Running Hours'
-            ? (() => { const rh = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null); return rh != null && !isNaN(rh) ? `${rh.toLocaleString()} RH` : '-'; })()
-            : (wo.dueDate ? formatProfessionalDate(wo.dueDate) : '-'),
+          dueDate: dueDateStr,
           status: getEffectiveStatus(wo),
           criticality: wo.criticality || '-',
           postponementReason: wo.postponementReason || '-',
           postponementRemarks: wo.postponementRemarks || '-',
         };
         if (isPostponedExport) {
-          base['postponeUntil'] = (wo as any).postponementEndDate ? formatProfessionalDate((wo as any).postponementEndDate) : '-';
-          base['authorizedBy'] = (wo as any).postponementAuthorizedBy || '-';
+          return {
+            ...base,
+            postponeUntil: wo.postponementEndDate ? formatProfessionalDate(wo.postponementEndDate) : '-',
+            authorizedBy: wo.postponementAuthorizedBy || '-',
+          } satisfies PostponedPdfRow;
         }
         return base;
       });
@@ -769,7 +796,7 @@ const WorkOrders: React.FC = () => {
         {/* Status Tabs - Center aligned */}
         <div className="absolute left-1/2 -translate-x-1/2 bg-gray-100 rounded-md p-1 flex items-center gap-0.5">
           {tabs.map((tab, index) => {
-            const markerId = index === 0 ? "C4" : index === 1 ? "C5" : index === 2 ? "C6" : index === 3 ? "C7" : "C8";
+            const markerId = index === 0 ? "C4" : index === 1 ? "C5" : index === 2 ? "C6" : index === 3 ? "C7" : index === 4 ? "C33" : "C8";
             return (
               <button
                 key={tab.id}
@@ -1143,8 +1170,8 @@ const WorkOrders: React.FC = () => {
                 )}
                 {activeTab === "Postponed" && (
                   <td className="py-3 px-4 text-gray-900" data-testid={`cell-postpone-until-${workOrder.id}`}>
-                    {(workOrder as any).postponementEndDate
-                      ? formatProfessionalDate((workOrder as any).postponementEndDate)
+                    {workOrder.postponementEndDate
+                      ? formatProfessionalDate(workOrder.postponementEndDate)
                       : '—'}
                   </td>
                 )}
