@@ -526,7 +526,7 @@ const WorkOrders: React.FC = () => {
     align?: "left" | "center";
   }) => (
     <th
-      className={`text-${align} py-3 px-4 font-medium relative select-none`}
+      className={`${align === "center" ? "text-center" : "text-left"} py-3 px-4 font-medium relative select-none`}
       style={{ width: colWidths[colKey] }}
       onClick={field ? () => handleWoSort(field) : undefined}
       data-testid={testId}
@@ -1237,14 +1237,14 @@ const WorkOrders: React.FC = () => {
                   </div>
                 </td>
                 {/* Work Order No */}
-                <td className={`py-3 px-4 whitespace-nowrap overflow-hidden ${isRejectedWO ? 'text-red-600 hover:text-red-800' : 'text-blue-600 hover:text-blue-800'}`} style={{ textOverflow: 'ellipsis' }} data-testid={index === 0 ? "C25" : undefined}>
+                <td className={`py-3 px-4 whitespace-nowrap overflow-hidden text-ellipsis ${isRejectedWO ? 'text-red-600 hover:text-red-800' : 'text-blue-600 hover:text-blue-800'}`} data-testid={index === 0 ? "C25" : undefined}>
                   {index === 0 && <Marker id="C25" />}
                   {(activeTab === "Pending Approval" || activeTab === "Completed") && workOrder.executionId 
                     ? workOrder.executionId 
                     : workOrder.workOrderNo || workOrder.templateCode}
                 </td>
                 {activeTab === "Pending Approval" && (
-                  <td className={`py-3 px-4 whitespace-nowrap overflow-hidden ${textColorClass}`} style={{ textOverflow: 'ellipsis' }}>{workOrder.templateCode}</td>
+                  <td className={`py-3 px-4 whitespace-nowrap overflow-hidden text-ellipsis ${textColorClass}`}>{workOrder.templateCode}</td>
                 )}
                 <td className={`py-3 px-4 whitespace-nowrap overflow-hidden ${textColorClass}`} data-testid={index === 0 ? "C26" : undefined}>
                   {index === 0 && <Marker id="C26" />}
@@ -1258,7 +1258,7 @@ const WorkOrders: React.FC = () => {
                   </div>
                 </td>
                 {/* Assigned To */}
-                <td className={`py-3 px-4 whitespace-nowrap overflow-hidden ${textColorClass}`} style={{ textOverflow: 'ellipsis' }} data-testid={index === 0 ? "C27" : undefined}>
+                <td className={`py-3 px-4 whitespace-nowrap overflow-hidden text-ellipsis ${textColorClass}`} data-testid={index === 0 ? "C27" : undefined}>
                   {index === 0 && <Marker id="C27" />}
                   {workOrder.assignedTo}
                 </td>
@@ -1341,26 +1341,26 @@ const WorkOrders: React.FC = () => {
                   </div>
                 </td>
                 {activeTab === "Planned" && (
-                  <td className="py-3 px-4 text-gray-900 whitespace-nowrap overflow-hidden" style={{ textOverflow: 'ellipsis' }} data-testid={`cell-planned-date-${workOrder.id}`}>
+                  <td className="py-3 px-4 text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis" data-testid={`cell-planned-date-${workOrder.id}`}>
                     {workOrder.plannedDate
                       ? formatProfessionalDate(workOrder.plannedDate)
                       : '—'}
                   </td>
                 )}
                 {activeTab === "Postponed" && (
-                  <td className="py-3 px-4 text-gray-900 whitespace-nowrap overflow-hidden" style={{ textOverflow: 'ellipsis' }} data-testid={`cell-postpone-until-${workOrder.id}`}>
+                  <td className="py-3 px-4 text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis" data-testid={`cell-postpone-until-${workOrder.id}`}>
                     {workOrder.postponementEndDate
                       ? formatProfessionalDate(workOrder.postponementEndDate)
                       : '—'}
                   </td>
                 )}
                 {activeTab === "Postponed" && (
-                  <td className="py-3 px-4 text-gray-700 whitespace-nowrap overflow-hidden" style={{ textOverflow: 'ellipsis' }} data-testid={`cell-postponement-reason-${workOrder.id}`}>
+                  <td className="py-3 px-4 text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis" data-testid={`cell-postponement-reason-${workOrder.id}`}>
                     {workOrder.postponementReason || '—'}
                   </td>
                 )}
                 {activeTab === "Pending Approval" && (
-                  <td className="py-3 px-4 whitespace-nowrap" data-testid={`cell-days-late-${workOrder.id}`}>
+                  <td className="py-3 px-4 whitespace-nowrap overflow-hidden" data-testid={`cell-days-late-${workOrder.id}`}>
                     {(() => {
                       const daysLate = workOrder.daysLate;
                       if (daysLate == null || daysLate === 0) return <span className="text-green-600 text-xs font-medium">On Time</span>;
@@ -1371,7 +1371,7 @@ const WorkOrders: React.FC = () => {
                   </td>
                 )}
                 {activeTab === "Pending Approval" && (
-                  <td className="py-3 px-4 whitespace-nowrap" data-testid={`cell-approval-tier-${workOrder.id}`}>
+                  <td className="py-3 px-4 whitespace-nowrap overflow-hidden" data-testid={`cell-approval-tier-${workOrder.id}`}>
                     {(() => {
                       const tier = workOrder.approvalTier;
                       if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
@@ -1381,7 +1381,7 @@ const WorkOrders: React.FC = () => {
                     })()}
                   </td>
                 )}
-                <td className="py-3 px-4 overflow-hidden" data-testid={index === 0 ? "C29" : undefined}>
+                <td className="py-3 px-4 whitespace-nowrap overflow-hidden" data-testid={index === 0 ? "C29" : undefined}>
                   {index === 0 && <Marker id="C29" />}
                   {workOrder.status === 'Rejected' ? (
                     <div className="flex flex-col gap-1">
@@ -1436,7 +1436,7 @@ const WorkOrders: React.FC = () => {
                   )}
                 </td>
                 {activeTab === "Completed" && (
-                  <td className="py-3 px-4 whitespace-nowrap" data-testid={`cell-completed-approval-tier-${workOrder.id}`}>
+                  <td className="py-3 px-4 whitespace-nowrap overflow-hidden" data-testid={`cell-completed-approval-tier-${workOrder.id}`}>
                     {(() => {
                       const tier = workOrder.approvalTier;
                       if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
@@ -1447,7 +1447,7 @@ const WorkOrders: React.FC = () => {
                   </td>
                 )}
                 {activeTab === "Completed" && (
-                  <td className="py-3 px-4 text-gray-900 whitespace-nowrap overflow-hidden" style={{ textOverflow: 'ellipsis' }} data-testid={index === 0 ? "C30" : undefined}>
+                  <td className="py-3 px-4 text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis" data-testid={index === 0 ? "C30" : undefined}>
                     {index === 0 && <Marker id="C30" />}
                     {formatProfessionalDate(workOrder.dateCompleted)}
                   </td>
