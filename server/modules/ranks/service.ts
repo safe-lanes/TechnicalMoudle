@@ -48,6 +48,7 @@ export async function saveRanks(ranks: any[]) {
         applicableToCompany: rank.applicableToCompany ?? true,
         isSystemRank: rank.isSystemRank ?? true,
         sortOrder: rank.sortOrder ?? null,
+        viewMode: rank.viewMode || null,
         isDeleted: false,
       };
 
@@ -81,6 +82,7 @@ export async function updateRank(rankId: string, data: any) {
     applicableToCompany: data.applicableToCompany ?? existing.applicableToCompany,
     isSystemRank: data.isSystemRank ?? existing.isSystemRank,
     sortOrder: data.sortOrder ?? existing.sortOrder,
+    viewMode: data.viewMode !== undefined ? (data.viewMode || null) : existing.viewMode,
     isDeleted: false,
   });
   return { success: true, rank: result?.[0] || null };
