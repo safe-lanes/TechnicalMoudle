@@ -769,10 +769,13 @@ export async function getSparesConsumptionAnalysis(
   if (startDate && endDate) {
     const sd = new Date(startDate as string);
     const ed = new Date(endDate as string);
-    daysOfData = Math.max(1, Math.ceil((ed.getTime() - sd.getTime()) / (1000 * 60 * 60 * 24)));
+    daysOfData = Math.max(1, Math.ceil((ed.getTime() - sd.getTime()) / (1000 * 60 * 60 * 24)) + 1);
   } else if (startDate) {
     const sd = new Date(startDate as string);
-    daysOfData = Math.max(1, Math.ceil((new Date().getTime() - sd.getTime()) / (1000 * 60 * 60 * 24)));
+    daysOfData = Math.max(1, Math.ceil((new Date().getTime() - sd.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  } else if (endDate) {
+    const ed = new Date(endDate as string);
+    daysOfData = Math.max(1, Math.ceil((ed.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
   } else {
     daysOfData = eventSpanDays;
   }
