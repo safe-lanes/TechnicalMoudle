@@ -1,10 +1,11 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, Fragment, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, ArrowLeft, Menu, AlertTriangle, Save, X, Pencil, Trash2, Loader2, FileSpreadsheet, ChevronDown } from "lucide-react";
+import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange } from "@/components/filters/PeriodFilter";
 import { Marker } from "@/components/Marker";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
@@ -416,9 +417,8 @@ const JobsFormPage: React.FC = () => {
   const WORK_HISTORY_PAGE_SIZE = 5;
   const [workHistoryExpanded, setWorkHistoryExpanded] = useState(false);
   const [workHistoryPage, setWorkHistoryPage] = useState(0);
-  const [historyComponentFilter, setHistoryComponentFilter] = useState('');
-  const [historyDateFrom, setHistoryDateFrom] = useState('');
-  const [historyDateTo, setHistoryDateTo] = useState('');
+  const [historyPeriodFilter, setHistoryPeriodFilter] = useState<PeriodFilterValue | null>(null);
+  const historyDateRange = useMemo(() => periodFilterToDateRange(historyPeriodFilter), [historyPeriodFilter]);
   const [expandedHistoryIndex, setExpandedHistoryIndex] = useState<number | null>(null);
 
   const calcDaysLate = (originalDueDate: string | null | undefined, completionDate: string | null | undefined): number => {
@@ -436,10 +436,13 @@ const JobsFormPage: React.FC = () => {
     const raw = templateData.workHistory || [];
     return raw
       .filter((h: any) => {
-        const dateStr = (h.isSkipped ? (h.skippedCycleDate || h.completionDate || h.workDate) : (h.completionDate || h.workDate))?.slice(0, 10) || '';
-        if (historyComponentFilter && (h.componentCode || '') !== historyComponentFilter) return false;
-        if (historyDateFrom && dateStr < historyDateFrom) return false;
-        if (historyDateTo && dateStr > historyDateTo) return false;
+        if (historyDateRange) {
+          const dateStr = (h.isSkipped ? (h.skippedCycleDate || h.completionDate || h.workDate) : (h.completionDate || h.workDate))?.slice(0, 10) || '';
+          if (dateStr) {
+            const d = new Date(dateStr + 'T00:00:00');
+            if (d < historyDateRange.from || d > historyDateRange.to) return false;
+          }
+        }
         return true;
       })
       .map((h: any) => {
@@ -1202,17 +1205,19 @@ const JobsFormPage: React.FC = () => {
             >
               {(() => {
                 const rawHistory = templateData.workHistory || [];
-                const uniqueComponents = Array.from(new Set<string>(rawHistory.map((h: any) => h.componentCode).filter(Boolean)));
 
                 const filteredHistory = rawHistory.filter((h: any) => {
-                  const dateStr = (h.isSkipped ? (h.skippedCycleDate || h.completionDate || h.workDate) : (h.completionDate || h.workDate))?.slice(0, 10) || '';
-                  if (historyComponentFilter && (h.componentCode || '') !== historyComponentFilter) return false;
-                  if (historyDateFrom && dateStr < historyDateFrom) return false;
-                  if (historyDateTo && dateStr > historyDateTo) return false;
+                  if (historyDateRange) {
+                    const dateStr = (h.isSkipped ? (h.skippedCycleDate || h.completionDate || h.workDate) : (h.completionDate || h.workDate))?.slice(0, 10) || '';
+                    if (dateStr) {
+                      const d = new Date(dateStr + 'T00:00:00');
+                      if (d < historyDateRange.from || d > historyDateRange.to) return false;
+                    }
+                  }
                   return true;
                 });
 
-                const hasFilters = !!(historyComponentFilter || historyDateFrom || historyDateTo);
+                const hasFilters = !!historyPeriodFilter;
                 const totalCount = filteredHistory.length;
                 const displayHistory = workHistoryExpanded
                   ? filteredHistory.slice(workHistoryPage * WORK_HISTORY_PAGE_SIZE, (workHistoryPage + 1) * WORK_HISTORY_PAGE_SIZE)
@@ -1223,37 +1228,14 @@ const JobsFormPage: React.FC = () => {
                   <>
                     {/* Filter bar */}
                     <div className="flex flex-wrap gap-2 items-center mb-3 p-2 bg-gray-50 rounded border border-gray-200" data-testid="history-filter-bar">
-                      <select
-                        value={historyComponentFilter}
-                        onChange={e => { setHistoryComponentFilter(e.target.value); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
-                        data-testid="select-history-component"
-                        className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                      >
-                        <option value="">All Components</option>
-                        {uniqueComponents.map(code => (
-                          <option key={code} value={code}>{code}</option>
-                        ))}
-                      </select>
-                      <span className="text-xs text-gray-400">From</span>
-                      <input
-                        type="date"
-                        value={historyDateFrom}
-                        onChange={e => { setHistoryDateFrom(e.target.value); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
-                        data-testid="input-history-date-from"
-                        className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                      />
-                      <span className="text-xs text-gray-400">To</span>
-                      <input
-                        type="date"
-                        value={historyDateTo}
-                        onChange={e => { setHistoryDateTo(e.target.value); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
-                        data-testid="input-history-date-to"
-                        className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      <PeriodFilter
+                        value={historyPeriodFilter}
+                        onChange={(v) => { setHistoryPeriodFilter(v); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
                       />
                       {hasFilters && (
                         <button
                           type="button"
-                          onClick={() => { setHistoryComponentFilter(''); setHistoryDateFrom(''); setHistoryDateTo(''); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
+                          onClick={() => { setHistoryPeriodFilter(null); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
                           data-testid="button-clear-history-filters"
                           className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 rounded border border-gray-200 bg-white hover:bg-gray-100"
                         >
