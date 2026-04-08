@@ -1,0 +1,232 @@
+Implement the same Period filter pattern used in the Work Orders module across the following PMS areas, replacing the existing plain date-picker style filters wherever history/report filtering currently depends on dates:
+
+Spares module – History
+
+Stores module – History
+
+Reports module
+
+Running Hours (RH) – History tab
+
+Objective
+Standardize period filtering across PMS so that these modules use the same enhanced Period selector already used in Work Orders, instead of simple date pickers. The goal is UI consistency, faster filtering, and a better user experience for common month/quarter/year-based review.
+
+The new filter must follow the same interaction pattern and visual style as the Work Orders Period filter shown in the reference:
+
+Period input opens a popup/dropdown panel.
+
+Panel offers:
+
+Year + Quarter/Month
+
+Date Range
+
+User can select:
+
+year,
+
+quarter,
+
+month,
+
+or a custom date range.
+
+Do not create a new design. Reuse the same existing Work Orders period filter component, logic, styling, and behavior wherever possible.
+
+Scope
+Replace existing date-picker based period filtering with this unified Period filter in:
+
+1) Spares module – History
+Wherever spare history is filtered by date, replace the current date-picker approach with the Work Orders style Period selector.
+
+2) Stores module – History
+Wherever store item history / stock movement / transaction history is filtered by date, replace the current date-picker approach with the same Period selector.
+
+3) Reports module
+In the Reports module, replace the current Period date selection control with the same enhanced Period selector, using the same popup model as Work Orders. The live Reports page already shows a Period control in the top filter bar, so this should be upgraded to the same behavior instead of remaining a plain/basic input.
+
+4) Running Hours – History tab
+In the RH History tab, replace the current date filter UI with the same Work Orders style Period selector.
+
+Required behavior
+The new Period filter must support these two modes:
+
+A. Year + Quarter/Month mode
+User can choose:
+
+a year,
+
+optionally a quarter,
+
+optionally a month.
+
+Rules:
+
+Only one quarter or one month should be active at a time.
+
+If a month is selected, it takes precedence over quarter.
+
+If a quarter is selected, the system should infer the correct start and end dates for that quarter.
+
+If neither quarter nor month is selected but a year is selected, filter the full year.
+
+Default year selection should behave exactly as Work Orders currently behaves.
+
+B. Date Range mode
+User can manually select a custom from-date and to-date.
+
+Rules:
+
+If Date Range mode is selected, Quarter/Month selections must not apply.
+
+If Year + Quarter/Month mode is selected, custom date range must not apply.
+
+Switching between the two modes should clearly reset or isolate the other mode’s values to avoid conflicting filters.
+
+UX and UI requirements
+Use the same UI design and layout as the Work Orders Period popup:
+
+same popup width,
+
+same radio options,
+
+same year chips/buttons,
+
+same quarter buttons,
+
+same month buttons,
+
+same Apply behavior,
+
+same visual language and spacing.
+
+Do not redesign it separately for each module. It must look and behave like a shared PMS standard component.
+
+If possible, extract the existing Work Orders Period selector into a reusable shared component/hook/helper and use it in all target modules, instead of duplicating similar code in multiple places.
+
+Functional expectations per module
+Spares History
+The selected period must correctly filter spare history records, transaction history, issue/use history, or whatever date-based history data is currently shown in that screen.
+
+Stores History
+The selected period must correctly filter store transaction/movement/history records based on the relevant date field currently used by that module.
+
+Reports Module
+The selected period must apply to the report currently being viewed, using the same backend/frontend filter logic already supported by that report. Only the UI control should be standardized unless a report currently has broken period handling.
+
+RH History tab
+The selected period must filter RH history entries using the existing relevant history date field.
+
+Filter logic rules
+Implement clear and consistent period resolution logic:
+
+Year only → full year range.
+
+Year + Quarter → corresponding quarter range.
+
+Year + Month → corresponding month range.
+
+Date Range → exact selected from/to dates.
+
+Month selection overrides quarter selection.
+
+Custom date range is separate and mutually exclusive from Year/Quarter/Month mode.
+
+The resolved start date and end date should then be passed into the module’s existing filtering/query logic in a consistent format.
+
+Clear behavior
+Each module’s existing Clear button must fully reset the Period filter as well:
+
+clear selected mode,
+
+clear year,
+
+clear quarter,
+
+clear month,
+
+clear custom date range,
+
+restore the default unfiltered state.
+
+If a filter chip/tag summary is shown anywhere, the Period filter summary must also reflect the chosen selection correctly, for example:
+
+2026
+
+Q1 2026
+
+Mar 2026
+
+01 Jan 2026 – 31 Mar 2026
+
+Consistency requirements
+This is important: all four target areas must use the same period-selection behavior. No module should have:
+
+a different popup layout,
+
+different labels,
+
+different precedence logic,
+
+different reset behavior,
+
+or a different apply mechanism.
+
+This is a PMS-wide consistency improvement, not four separate implementations.
+
+Technical expectation
+Please:
+
+identify the existing Work Orders Period filter component and logic,
+
+refactor it into a reusable shared component if needed,
+
+plug that same component into Spares History, Stores History, Reports, and RH History tab,
+
+keep module-specific data filtering logic intact while standardizing only the period input experience and resolved date-range output.
+
+Edge cases to handle
+Make sure the following cases work correctly:
+
+Selecting only a year applies the entire year.
+
+Selecting a quarter applies exactly that quarter.
+
+Selecting a month applies exactly that month.
+
+Switching from Quarter/Month mode to Date Range clears quarter/month influence.
+
+Switching from Date Range back to Year/Quarter/Month clears custom dates.
+
+Clear button resets everything fully.
+
+No stale period selection remains when changing tabs inside the same module.
+
+Existing other filters continue to work together with the new Period filter.
+
+Reports do not break if a specific report does not use period filtering in the exact same way as others.
+
+RH History, Spares History, and Stores History all resolve dates consistently.
+
+Acceptance criteria
+This task is complete only when:
+
+Spares History uses the Work Orders style Period selector.
+
+Stores History uses the Work Orders style Period selector.
+
+Reports module uses the Work Orders style Period selector.
+
+RH History tab uses the Work Orders style Period selector.
+
+Plain date-picker-only period UI is removed from these places.
+
+The same Year / Quarter / Month / Date Range interaction works consistently everywhere.
+
+Clear/reset behavior works properly.
+
+Existing filtering results remain correct after replacing the UI.
+
+Important note
+Do not just visually copy the control. Reuse the same actual logic and behavior as Work Orders so that PMS has one common period-filter standard across modules.
+
