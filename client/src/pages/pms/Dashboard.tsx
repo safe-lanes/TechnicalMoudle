@@ -18,7 +18,8 @@ import {
   ArrowUp,
   ArrowDown,
   Loader2,
-  Filter
+  Filter,
+  BarChart3
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend, BarChart, Bar } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,12 @@ import { SemiCircleGauge } from "@/components/SemiCircleGauge";
 import { ComplianceAnomalyPanel } from "./ComplianceAnomalyPanel";
 import { WorkOrdersListModal } from "./WorkOrdersListModal";
 import { SparesListModal } from "./SparesListModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Spare {
   id: number;
@@ -343,6 +350,7 @@ const Dashboard = () => {
   const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
   const [activeTab, setActiveTab] = useState('overview');
   const [showFilters, setShowFilters] = useState(false);
+  const [showBenchmarking, setShowBenchmarking] = useState(false);
   const [selectedCriticality, setSelectedCriticality] = useState("");
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
   const { vesselId, setVesselId } = useVessel();
@@ -1293,6 +1301,16 @@ const Dashboard = () => {
               <Filter className="h-4 w-4" />
               Filters
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowBenchmarking(true)}
+              className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
+              data-testid="button-open-benchmarking"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Benchmarking
+            </Button>
           </div>
         </div>
 
@@ -1358,10 +1376,14 @@ const Dashboard = () => {
       {/* MAIN CONTENT */}
       <div className="flex-1 overflow-y-auto mt-4" style={{ background: '#f8fafc' }}>
 
-        {/* MANAGEMENT TAB: Fleet Benchmarking Table */}
-        {activeTab === 'management' && vessels.length > 0 && (
-          <div className="p-4">
-            <FleetView vessels={vessels} onSelectVessel={handleFleetVesselSelect} />
+        {/* OPERATION TAB: Placeholder for future role-specific dashboard */}
+        {activeTab === 'management' && (
+          <div className="p-4 flex items-center justify-center" style={{ minHeight: '400px' }}>
+            <div className="text-center">
+              <BarChart3 className="h-12 w-12 mx-auto mb-3" style={{ color: '#9E9E9E' }} />
+              <div className="text-lg font-semibold" style={{ color: '#4a4a4a' }}>Operation Dashboard</div>
+              <div className="text-sm mt-1" style={{ color: '#9E9E9E' }}>Coming soon — a personalized view based on your role.</div>
+            </div>
           </div>
         )}
 
@@ -1920,6 +1942,21 @@ const Dashboard = () => {
         vessels={vessels}
         getStockStatus={getStockStatus}
       />
+
+      <Dialog open={showBenchmarking} onOpenChange={setShowBenchmarking}>
+        <DialogContent className="max-w-[95vw] h-[calc(100vh-10vw)] max-h-[90vh] overflow-hidden flex flex-col [&>button.absolute]:top-6 [&>button.absolute]:translate-y-1">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-xl font-semibold text-[#0f4c81]" data-testid="title-benchmarking-modal">
+              Fleet Benchmarking
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            {vessels.length > 0 && (
+              <FleetView vessels={vessels} onSelectVessel={(id) => { handleFleetVesselSelect(id); setShowBenchmarking(false); }} />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
