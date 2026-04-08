@@ -1825,7 +1825,7 @@ const Dashboard = () => {
             />
 
             {/* Pending Approval Section (Head of Dept) */}
-            {isHeadOfDept && workOrderKPIs.pendingApproval > 0 && (
+            {(isSailAdmin || isClientAdmin) && workOrderKPIs.pendingApproval > 0 && (
               <div className={cardStyle} data-testid="card-pending-approval-section">
                 <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E0E0E0' }}>
                   <span style={{ fontSize: '13px', fontWeight: 500, color: '#212121' }}>
