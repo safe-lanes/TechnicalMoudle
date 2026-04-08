@@ -241,7 +241,6 @@ const FleetView = ({ vessels, onSelectVessel }: { vessels: { id: string; name: s
     { field: 'outstandingPercent', label: 'Outstanding %' },
     { field: 'compliancePercent', label: 'Compliance %' },
     { field: 'lowStockItems', label: 'Low Stock Items' },
-    { field: 'overdueCount', label: 'Overdue Count' },
   ];
 
   return (
@@ -273,7 +272,6 @@ const FleetView = ({ vessels, onSelectVessel }: { vessels: { id: string; name: s
                   </span>
                 </th>
               ))}
-              <th className="text-left py-2.5 px-3 whitespace-nowrap" style={{ background: '#1565C0', color: '#FFFFFF', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -322,20 +320,12 @@ const FleetView = ({ vessels, onSelectVessel }: { vessels: { id: string; name: s
                   <td className="py-3 px-3 text-center font-mono font-medium" data-testid={`cell-low-stock-${v.vesselId}`}>
                     <span style={{ color: v.lowStockItems > 0 ? '#F57C00' : '#9E9E9E' }}>{v.lowStockItems}</span>
                   </td>
-                  <td className="py-3 px-3 text-center font-mono font-medium" data-testid={`cell-overdue-count-${v.vesselId}`}>
-                    <span style={{ color: v.overdueCount > 0 ? '#E53935' : '#9E9E9E' }}>{v.overdueCount}</span>
-                  </td>
-                  <td className="py-3 px-3" data-testid={`cell-status-${v.vesselId}`}>
-                    <Badge className={`${status.bgColor} ${status.color} border text-xs`}>
-                      {status.label}
-                    </Badge>
-                  </td>
                 </tr>
               );
             })}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-12 text-center" style={{ color: '#9E9E9E' }}>No vessel data available</td>
+                <td colSpan={5} className="py-12 text-center" style={{ color: '#9E9E9E' }}>No vessel data available</td>
               </tr>
             )}
           </tbody>
