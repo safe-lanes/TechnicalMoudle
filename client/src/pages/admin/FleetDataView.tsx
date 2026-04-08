@@ -311,7 +311,8 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   const [dragSourceParent, setDragSourceParent] = useState<string | null | undefined>(null);
   const [dragOverCode, setDragOverCode] = useState<string | null>(null);
   const [isSavingSortOrder, setIsSavingSortOrder] = useState(false);
-  
+  const [isResyncing, setIsResyncing] = useState(false);
+
   const { toast } = useToast();
 
   // Query fleet_components table directly as the single source of truth
@@ -1156,6 +1157,181 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
     }
   };
 
+  // ── Job Vessel Mapping handlers ──
+  const handleJobMapVessels = async () => {
+    if (selectedJobVesselIds.size === 0 || !selectedComponent || !selectedJobForDetail) return;
+    const jobCode = selectedJobForDetail.jobCode;
+    const fleetEquipmentCode = selectedComponent.fleetEquipmentCode;
+    const alreadyMapped = new Set(jobMappedVessels.map(v => v.id));
+    const vesselsToMap = relatedVessels.filter(v => selectedJobVesselIds.has(v.id) && !alreadyMapped.has(v.id));
+    if (vesselsToMap.length === 0) {
+      toast({ title: "Already Mapped", description: "Selected vessels are already mapped to this job" });
+      return;
+    }
+    let mapped = 0;
+    const errors: string[] = [];
+    for (const vessel of vesselsToMap) {
+      try {
+        await apiRequest("POST", "/technical/api/fleet-admin/fleet-job-mappings", {
+          fleetEquipmentCode,
+          jobCode,
+          vesselCode: vessel.id,
+          vesselName: vessel.name,
+          mappedBy: 'admin',
+        });
+        mapped++;
+      } catch (err: any) {
+        const msg = err?.message || '';
+        if (msg.includes('unique') || msg.includes('duplicate')) {
+          errors.push(`${vessel.name}: already linked`);
+        } else {
+          errors.push(`${vessel.name}: ${msg || 'failed'}`);
+        }
+      }
+    }
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-job-mappings/by-job", activeJobCode] });
+    setSelectedJobVesselIds(new Set());
+    if (mapped > 0) {
+      toast({ title: "Success", description: `Mapped to ${mapped} vessel(s)${errors.length > 0 ? `. Errors: ${errors.join(', ')}` : ''}` });
+    } else if (errors.length > 0) {
+      toast({ title: "Error", description: errors.join(', '), variant: "destructive" });
+    }
+  };
+
+  const handleJobRemoveVessels = async () => {
+    if (selectedJobVesselIds.size === 0 || !selectedJobForDetail) return;
+    const jobCode = selectedJobForDetail.jobCode;
+    const alreadyMapped = new Set(jobMappedVessels.map(v => v.id));
+    const vesselsToRemove = Array.from(selectedJobVesselIds).filter(id => alreadyMapped.has(id));
+    if (vesselsToRemove.length === 0) {
+      toast({ title: "Not Mapped", description: "Selected vessels don't have active mappings for this job" });
+      return;
+    }
+    try {
+      for (const vesselCode of vesselsToRemove) {
+        await apiRequest("DELETE", `/technical/api/fleet-admin/fleet-job-mappings?jobCode=${encodeURIComponent(jobCode!)}&vesselCode=${encodeURIComponent(vesselCode)}`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-job-mappings/by-job", activeJobCode] });
+      setSelectedJobVesselIds(new Set());
+      toast({ title: "Success", description: `Removed ${vesselsToRemove.length} mapping(s)` });
+    } catch {
+      toast({ title: "Error", description: "Failed to remove mappings", variant: "destructive" });
+    }
+  };
+
+  // ── Spare Vessel Mapping handlers ──
+  const handleSpareMapVessels = async () => {
+    if (selectedSpareVesselIds.size === 0 || !selectedComponent || !selectedSpareForDetail) return;
+    const partCode = selectedSpareForDetail.partCode;
+    const fleetEquipmentCode = selectedComponent.fleetEquipmentCode;
+    const alreadyMapped = new Set(spareMappedVessels.map(v => v.id));
+    const vesselsToMap = relatedVessels.filter(v => selectedSpareVesselIds.has(v.id) && !alreadyMapped.has(v.id));
+    if (vesselsToMap.length === 0) {
+      toast({ title: "Already Mapped", description: "Selected vessels are already mapped to this spare" });
+      return;
+    }
+    let mapped = 0;
+    const errors: string[] = [];
+    for (const vessel of vesselsToMap) {
+      try {
+        await apiRequest("POST", "/technical/api/fleet-admin/fleet-spare-mappings", {
+          fleetEquipmentCode,
+          partCode,
+          vesselCode: vessel.id,
+          vesselName: vessel.name,
+          mappedBy: 'admin',
+        });
+        mapped++;
+      } catch (err: any) {
+        const msg = err?.message || '';
+        if (msg.includes('unique') || msg.includes('duplicate')) {
+          errors.push(`${vessel.name}: already linked`);
+        } else {
+          errors.push(`${vessel.name}: ${msg || 'failed'}`);
+        }
+      }
+    }
+    queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-spare-mappings/by-spare", activePartCode] });
+    setSelectedSpareVesselIds(new Set());
+    if (mapped > 0) {
+      toast({ title: "Success", description: `Mapped to ${mapped} vessel(s)${errors.length > 0 ? `. Errors: ${errors.join(', ')}` : ''}` });
+    } else if (errors.length > 0) {
+      toast({ title: "Error", description: errors.join(', '), variant: "destructive" });
+    }
+  };
+
+  const handleSpareRemoveVessels = async () => {
+    if (selectedSpareVesselIds.size === 0 || !selectedSpareForDetail) return;
+    const partCode = selectedSpareForDetail.partCode;
+    const alreadyMapped = new Set(spareMappedVessels.map(v => v.id));
+    const vesselsToRemove = Array.from(selectedSpareVesselIds).filter(id => alreadyMapped.has(id));
+    if (vesselsToRemove.length === 0) {
+      toast({ title: "Not Mapped", description: "Selected vessels don't have active mappings for this spare" });
+      return;
+    }
+    try {
+      for (const vesselCode of vesselsToRemove) {
+        await apiRequest("DELETE", `/technical/api/fleet-admin/fleet-spare-mappings?partCode=${encodeURIComponent(partCode!)}&vesselCode=${encodeURIComponent(vesselCode)}`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-spare-mappings/by-spare", activePartCode] });
+      setSelectedSpareVesselIds(new Set());
+      toast({ title: "Success", description: `Removed ${vesselsToRemove.length} mapping(s)` });
+    } catch {
+      toast({ title: "Error", description: "Failed to remove mappings", variant: "destructive" });
+    }
+  };
+
+  // ── Re-Sync handlers ──
+  const handleResync = async (type: 'components' | 'jobs' | 'spares', vesselCodes: string[]) => {
+    if (vesselCodes.length === 0) return;
+    setIsResyncing(true);
+    let synced = 0, skipped = 0, noChanges = 0, failed = 0;
+    try {
+      for (const vesselCode of vesselCodes) {
+        try {
+          const res = await apiRequest("POST", `/technical/api/fleet-admin/resync/${type}`, { vesselCode });
+          const data = await res.json();
+          synced += data.synced || 0;
+          skipped += data.skipped || 0;
+          noChanges += data.noChanges || 0;
+        } catch {
+          failed++;
+        }
+      }
+      const parts: string[] = [];
+      if (synced > 0) parts.push(`Synced: ${synced}`);
+      if (skipped > 0) parts.push(`Skipped: ${skipped}`);
+      if (noChanges > 0) parts.push(`No changes: ${noChanges}`);
+      if (failed > 0) parts.push(`Failed: ${failed}`);
+      toast({ title: "Re-Sync Complete", description: parts.join(', ') || 'No results' });
+    } catch {
+      toast({ title: "Error", description: "Re-sync failed", variant: "destructive" });
+    } finally {
+      setIsResyncing(false);
+    }
+  };
+
+  const handleResyncFromComponentDialog = () => {
+    const codes = selectedMappingIds.size > 0
+      ? filteredMappingsForDialog.filter(e => e.allMappingIds.some(id => selectedMappingIds.has(id))).map(e => e.vesselCode)
+      : filteredMappingsForDialog.map(e => e.vesselCode);
+    handleResync('components', codes);
+  };
+
+  const handleResyncFromJobDialog = () => {
+    const codes = selectedJobVesselIds.size > 0
+      ? Array.from(selectedJobVesselIds)
+      : jobMappedVessels.map(v => v.id);
+    handleResync('jobs', codes);
+  };
+
+  const handleResyncFromSpareDialog = () => {
+    const codes = selectedSpareVesselIds.size > 0
+      ? Array.from(selectedSpareVesselIds)
+      : spareMappedVessels.map(v => v.id);
+    handleResync('spares', codes);
+  };
+
   return (
     <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 120px)' }}>
       <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
@@ -1689,6 +1865,16 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Vessel
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-cyan-300 text-cyan-700 whitespace-nowrap"
+                  onClick={handleResyncFromComponentDialog}
+                  disabled={isResyncing || filteredMappingsForDialog.length === 0}
+                  data-testid="btn-component-resync"
+                >
+                  <RotateCcw className={`mr-2 h-4 w-4 ${isResyncing ? 'animate-spin' : ''}`} />
+                  Re-Sync
                 </Button>
               </div>
             </div>
@@ -2375,6 +2561,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                 <Button
                   variant="outline"
                   className="border-gray-300 text-gray-700 whitespace-nowrap"
+                  onClick={handleJobRemoveVessels}
                   disabled={selectedJobVesselIds.size === 0}
                   data-testid="btn-job-remove-vessel"
                 >
@@ -2383,11 +2570,22 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                 </Button>
                 <Button
                   className="bg-[#5dc86f] hover:bg-[#4db85f] text-white whitespace-nowrap"
+                  onClick={handleJobMapVessels}
                   disabled={selectedJobVesselIds.size === 0}
                   data-testid="btn-job-map-vessel"
                 >
                   <Anchor className="mr-2 h-4 w-4" />
                   Map
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-cyan-300 text-cyan-700 whitespace-nowrap"
+                  onClick={handleResyncFromJobDialog}
+                  disabled={isResyncing || jobMappedVessels.length === 0}
+                  data-testid="btn-job-resync"
+                >
+                  <RotateCcw className={`mr-2 h-4 w-4 ${isResyncing ? 'animate-spin' : ''}`} />
+                  Re-Sync
                 </Button>
               </div>
             </div>
@@ -2401,6 +2599,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                     <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3 w-12">Select</TableHead>
                     <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Vessel Code</TableHead>
                     <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Vessel Name</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -2410,9 +2609,12 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                       const q = jobVesselSearchQuery.toLowerCase();
                       return v.id.toLowerCase().includes(q) || v.name.toLowerCase().includes(q);
                     });
+                    const mappedIds = new Set(jobMappedVessels.map(v => v.id));
                     return filtered.length > 0 ? (
-                      filtered.map((vessel, index) => (
-                        <TableRow key={index} className="border-b border-gray-100">
+                      filtered.map((vessel, index) => {
+                        const isMapped = mappedIds.has(vessel.id);
+                        return (
+                        <TableRow key={index} className={`border-b border-gray-100 ${isMapped ? 'bg-green-50' : ''}`}>
                           <TableCell className="py-3 px-2">
                             <Checkbox
                               checked={selectedJobVesselIds.has(vessel.id)}
@@ -2429,11 +2631,19 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                           </TableCell>
                           <TableCell className="py-3 font-mono text-sm text-gray-700">{vessel.id}</TableCell>
                           <TableCell className="py-3 text-gray-600">{vessel.name}</TableCell>
+                          <TableCell className="py-3">
+                            {isMapped ? (
+                              <Badge className="bg-green-100 text-green-700 text-[10px]">Mapped</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-gray-400 text-[10px]">Not Mapped</Badge>
+                            )}
+                          </TableCell>
                         </TableRow>
-                      ))
+                        );
+                      })
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={3} className="py-16 text-center">
+                        <TableCell colSpan={4} className="py-16 text-center">
                           <div className="flex flex-col items-center">
                             <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
                               <Ship className="h-8 w-8 text-gray-400" />
@@ -3814,6 +4024,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                 <Button
                   variant="outline"
                   className="border-gray-300 text-gray-700 whitespace-nowrap"
+                  onClick={handleSpareRemoveVessels}
                   disabled={selectedSpareVesselIds.size === 0}
                   data-testid="btn-spare-remove-vessel"
                 >
@@ -3822,11 +4033,22 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                 </Button>
                 <Button
                   className="bg-[#5dc86f] hover:bg-[#4db85f] text-white whitespace-nowrap"
+                  onClick={handleSpareMapVessels}
                   disabled={selectedSpareVesselIds.size === 0}
                   data-testid="btn-spare-map-vessel"
                 >
                   <Anchor className="mr-2 h-4 w-4" />
                   Map
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-cyan-300 text-cyan-700 whitespace-nowrap"
+                  onClick={handleResyncFromSpareDialog}
+                  disabled={isResyncing || spareMappedVessels.length === 0}
+                  data-testid="btn-spare-resync"
+                >
+                  <RotateCcw className={`mr-2 h-4 w-4 ${isResyncing ? 'animate-spin' : ''}`} />
+                  Re-Sync
                 </Button>
               </div>
             </div>
@@ -3840,6 +4062,7 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                     <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3 w-12">Select</TableHead>
                     <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Vessel Code</TableHead>
                     <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Vessel Name</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600 uppercase tracking-wider py-3">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -3849,9 +4072,12 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                       const q = spareVesselSearchQuery.toLowerCase();
                       return v.id.toLowerCase().includes(q) || v.name.toLowerCase().includes(q);
                     });
+                    const mappedIds = new Set(spareMappedVessels.map(v => v.id));
                     return filtered.length > 0 ? (
-                      filtered.map((vessel, index) => (
-                        <TableRow key={index} className="border-b border-gray-100">
+                      filtered.map((vessel, index) => {
+                        const isMapped = mappedIds.has(vessel.id);
+                        return (
+                        <TableRow key={index} className={`border-b border-gray-100 ${isMapped ? 'bg-green-50' : ''}`}>
                           <TableCell className="py-3 px-2">
                             <Checkbox
                               checked={selectedSpareVesselIds.has(vessel.id)}
@@ -3868,11 +4094,19 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
                           </TableCell>
                           <TableCell className="py-3 font-mono text-sm text-gray-700">{vessel.id}</TableCell>
                           <TableCell className="py-3 text-gray-600">{vessel.name}</TableCell>
+                          <TableCell className="py-3">
+                            {isMapped ? (
+                              <Badge className="bg-green-100 text-green-700 text-[10px]">Mapped</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-gray-400 text-[10px]">Not Mapped</Badge>
+                            )}
+                          </TableCell>
                         </TableRow>
-                      ))
+                        );
+                      })
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={3} className="py-16 text-center">
+                        <TableCell colSpan={4} className="py-16 text-center">
                           <div className="flex flex-col items-center">
                             <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
                               <Ship className="h-8 w-8 text-gray-400" />
