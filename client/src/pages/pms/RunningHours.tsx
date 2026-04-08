@@ -221,6 +221,13 @@ const RunningHours = () => {
 
   const historyDateRange = useMemo(() => periodFilterToDateRange(historyPeriodFilter), [historyPeriodFilter]);
 
+  const formatLocalDate = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   const { data: historyResult, isLoading: isLoadingHistory } = useQuery<{
     data: any[];
     total: number;
@@ -238,8 +245,8 @@ const RunningHours = () => {
       });
       if (historySearch) params.set('search', historySearch);
       if (historyDateRange) {
-        params.set('dateFrom', historyDateRange.from.toISOString().split('T')[0]);
-        params.set('dateTo', historyDateRange.to.toISOString().split('T')[0]);
+        params.set('dateFrom', formatLocalDate(historyDateRange.from));
+        params.set('dateTo', formatLocalDate(historyDateRange.to));
       }
       if (selectedHistoryComponent) params.set('componentId', selectedHistoryComponent.cuuid);
       const response = await fetch(`/technical/api/running-hours/history?${params.toString()}`);
@@ -271,8 +278,8 @@ const RunningHours = () => {
     });
     if (historySearch) params.set('search', historySearch);
     if (historyDateRange) {
-      params.set('dateFrom', historyDateRange.from.toISOString().split('T')[0]);
-      params.set('dateTo', historyDateRange.to.toISOString().split('T')[0]);
+      params.set('dateFrom', formatLocalDate(historyDateRange.from));
+      params.set('dateTo', formatLocalDate(historyDateRange.to));
     }
     if (selectedHistoryComponent) params.set('componentId', selectedHistoryComponent.cuuid);
     window.open(`/technical/api/running-hours/history/export?${params.toString()}`, '_blank');
