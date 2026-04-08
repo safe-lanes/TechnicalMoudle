@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import * as sparesService from '../services/sparesService';
 import type { AuthenticatedRequest } from '../../../middleware/auth';
 
-const ROTATION_ITEM_ALLOWED_ROLES = ["Sail Admin", "PMS Admin", "Super Admin", "Office"];
+const ROTATION_ITEM_ALLOWED_ROLES = ["Sail Admin", "Office"];
 
 function stripRotationItemIfUnauthorized(req: Request, body: any): any {
   const user = (req as AuthenticatedRequest).user;

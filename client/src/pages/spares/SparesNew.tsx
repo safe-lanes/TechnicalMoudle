@@ -5857,6 +5857,35 @@ const Spares: React.FC = () => {
                     <span className="text-gray-500">Component Code:</span>
                     <span className="ml-2 font-medium text-gray-900">{selectedSpare.componentCode || '-'}</span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500">Rotation Item:</span>
+                    {(isSailAdmin || isClientAdmin) ? (
+                      <select
+                        className="ml-1 px-2 py-0.5 rounded text-xs font-medium border border-gray-300 bg-white cursor-pointer"
+                        value={selectedSpare.isRotationItem ? "Yes" : "No"}
+                        data-testid="info-rotation-item-select"
+                        onChange={(e) => {
+                          const newValue = e.target.value === "Yes";
+                          updateSpareMutation.mutate({ isRotationItem: newValue }, {
+                            onSuccess: () => {
+                              setSelectedSpare({ ...selectedSpare, isRotationItem: newValue });
+                            }
+                          });
+                        }}
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    ) : (
+                      <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
+                        selectedSpare.isRotationItem
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-gray-100 text-gray-600'
+                      }`} data-testid="info-rotation-item">
+                        {selectedSpare.isRotationItem ? 'Yes' : 'No'}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -5898,16 +5927,6 @@ const Spares: React.FC = () => {
                         : 'bg-gray-100 text-gray-800'
                     }`}>
                       {selectedSpare.isActive !== false ? 'Yes' : 'No'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Rotation Item:</span>
-                    <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
-                      selectedSpare.isRotationItem
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-gray-100 text-gray-600'
-                    }`} data-testid="info-rotation-item">
-                      {selectedSpare.isRotationItem ? 'Yes' : 'No'}
                     </span>
                   </div>
                 </div>
