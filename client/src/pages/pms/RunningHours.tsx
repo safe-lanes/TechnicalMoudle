@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Search, FileSpreadsheet, Calendar, Users, Settings, Pencil, AlertTriangle, Download, Clock, History, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
+import { Search, FileSpreadsheet, Users, Settings, Pencil, AlertTriangle, Download, Clock, History, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange, getPeriodLabel } from "@/components/filters/PeriodFilter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -103,8 +103,7 @@ const RunningHours = () => {
   const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
   const [historySortOrder, setHistorySortOrder] = useState<"asc" | "desc">("desc");
   const [historySearch, setHistorySearch] = useState("");
-  const [historyDateFrom, setHistoryDateFrom] = useState("");
-  const [historyDateTo, setHistoryDateTo] = useState("");
+  const [historyPeriodFilter, setHistoryPeriodFilter] = useState<PeriodFilterValue | null>(null);
   const [historyComponentFilter, setHistoryComponentFilter] = useState("");
   const [selectedHistoryComponent, setSelectedHistoryComponent] = useState<RunningHoursData | null>(null);
   const [historyComponentSearch, setHistoryComponentSearch] = useState("");
@@ -220,6 +219,8 @@ const RunningHours = () => {
     (item.componentCode || '').toLowerCase().includes(historyComponentSearch.toLowerCase())
   );
 
+  const historyDateRange = useMemo(() => periodFilterToDateRange(historyPeriodFilter), [historyPeriodFilter]);
+
   const { data: historyResult, isLoading: isLoadingHistory } = useQuery<{
     data: any[];
     total: number;
@@ -227,7 +228,7 @@ const RunningHours = () => {
     pageSize: number;
     totalPages: number;
   }>({
-    queryKey: ['/technical/api/running-hours/history', vesselId, historyPage, historyItemsPerPage, historySortOrder, historySearch, historyDateFrom, historyDateTo, selectedHistoryComponent?.cuuid],
+    queryKey: ['/technical/api/running-hours/history', vesselId, historyPage, historyItemsPerPage, historySortOrder, historySearch, historyPeriodFilter, selectedHistoryComponent?.cuuid],
     queryFn: async () => {
       const params = new URLSearchParams({
         vesselId: vesselId || '',
@@ -236,8 +237,10 @@ const RunningHours = () => {
         sortOrder: historySortOrder,
       });
       if (historySearch) params.set('search', historySearch);
-      if (historyDateFrom) params.set('dateFrom', historyDateFrom);
-      if (historyDateTo) params.set('dateTo', historyDateTo);
+      if (historyDateRange) {
+        params.set('dateFrom', historyDateRange.from.toISOString().split('T')[0]);
+        params.set('dateTo', historyDateRange.to.toISOString().split('T')[0]);
+      }
       if (selectedHistoryComponent) params.set('componentId', selectedHistoryComponent.cuuid);
       const response = await fetch(`/technical/api/running-hours/history?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch history');
@@ -248,7 +251,7 @@ const RunningHours = () => {
 
   useEffect(() => {
     setHistoryPage(1);
-  }, [historyItemsPerPage, historySearch, historyDateFrom, historyDateTo, selectedHistoryComponent, vesselId]);
+  }, [historyItemsPerPage, historySearch, historyPeriodFilter, selectedHistoryComponent, vesselId]);
 
   useEffect(() => {
     setSelectedHistoryComponent(null);
@@ -267,16 +270,17 @@ const RunningHours = () => {
       sortOrder: historySortOrder,
     });
     if (historySearch) params.set('search', historySearch);
-    if (historyDateFrom) params.set('dateFrom', historyDateFrom);
-    if (historyDateTo) params.set('dateTo', historyDateTo);
+    if (historyDateRange) {
+      params.set('dateFrom', historyDateRange.from.toISOString().split('T')[0]);
+      params.set('dateTo', historyDateRange.to.toISOString().split('T')[0]);
+    }
     if (selectedHistoryComponent) params.set('componentId', selectedHistoryComponent.cuuid);
     window.open(`/technical/api/running-hours/history/export?${params.toString()}`, '_blank');
   };
 
   const clearHistoryFilters = () => {
     setHistorySearch("");
-    setHistoryDateFrom("");
-    setHistoryDateTo("");
+    setHistoryPeriodFilter(null);
     setHistoryPage(1);
   };
 
@@ -284,8 +288,7 @@ const RunningHours = () => {
     setSelectedHistoryComponent(item);
     setHistoryPage(1);
     setHistorySearch("");
-    setHistoryDateFrom("");
-    setHistoryDateTo("");
+    setHistoryPeriodFilter(null);
     setHistorySortOrder("desc");
   };
 
@@ -293,8 +296,7 @@ const RunningHours = () => {
     setSelectedHistoryComponent(null);
     setHistoryPage(1);
     setHistorySearch("");
-    setHistoryDateFrom("");
-    setHistoryDateTo("");
+    setHistoryPeriodFilter(null);
   };
 
   const formatHistoryDate = (dateStr: string | null) => {
@@ -1092,26 +1094,11 @@ const RunningHours = () => {
               />
             </div>
 
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-gray-500" />
-              <Input
-                type="date"
-                value={historyDateFrom}
-                onChange={(e) => setHistoryDateFrom(e.target.value)}
-                className="h-9 w-[140px] text-sm"
-                placeholder="From"
-                data-testid="input-history-date-from"
-              />
-              <span className="text-gray-400 text-sm">to</span>
-              <Input
-                type="date"
-                value={historyDateTo}
-                onChange={(e) => setHistoryDateTo(e.target.value)}
-                className="h-9 w-[140px] text-sm"
-                placeholder="To"
-                data-testid="input-history-date-to"
-              />
-            </div>
+            <PeriodFilter
+              value={historyPeriodFilter}
+              onChange={setHistoryPeriodFilter}
+              className="min-w-[180px]"
+            />
 
             <Button variant="outline" size="sm" className="text-xs text-[#8798ad] border-[#e1e8ed] h-9" onClick={exportHistoryToCSV} data-testid="button-export-history">
               <Download className="h-3.5 w-3.5 mr-1" />
@@ -1210,7 +1197,7 @@ const RunningHours = () => {
             ) : !historyResult?.data?.length ? (
               <div className="p-8 text-center text-gray-500">
                 No history records found for this component.
-                {(historySearch || historyDateFrom || historyDateTo) && (
+                {(historySearch || historyPeriodFilter) && (
                   <span> <button onClick={clearHistoryFilters} className="text-blue-600 underline" data-testid="link-clear-history-filters">Clear filters</button></span>
                 )}
               </div>

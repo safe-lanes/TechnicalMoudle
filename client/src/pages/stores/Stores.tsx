@@ -24,6 +24,7 @@ import { FEATURES } from "@/config/features";
 import { useVessels } from "@/hooks/useVessels";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { format } from "date-fns";
+import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange } from "@/components/filters/PeriodFilter";
 
 // Helper function to get marker prefix based on active tab
 const getMarkerPrefix = (tab: "stores" | "lubes" | "chemicals" | "others") => {
@@ -484,8 +485,7 @@ const Stores: React.FC = () => {
   }, [historyData]);
 
   // History filters
-  const [historyDateFrom, setHistoryDateFrom] = useState("");
-  const [historyDateTo, setHistoryDateTo] = useState("");
+  const [historyPeriodFilter, setHistoryPeriodFilter] = useState<PeriodFilterValue | null>(null);
   const [historySearch, setHistorySearch] = useState("");
   const [historyEventFilter, setHistoryEventFilter] = useState("all");
   
@@ -931,8 +931,9 @@ const Stores: React.FC = () => {
     };
 
     // Parse date picker values (YYYY-MM-DD format)
-    const fromDate = historyDateFrom ? new Date(historyDateFrom + 'T00:00:00') : null;
-    const toDate = historyDateTo ? new Date(historyDateTo + 'T23:59:59') : null;
+    const historyDateRange = periodFilterToDateRange(historyPeriodFilter);
+    const fromDate = historyDateRange ? historyDateRange.from : null;
+    const toDate = historyDateRange ? historyDateRange.to : null;
 
     return historyItems.filter(item => {
       // Filter by search
@@ -957,7 +958,7 @@ const Stores: React.FC = () => {
       
       return true;
     });
-  }, [historyItems, historySearch, historyEventFilter, historyDateFrom, historyDateTo]);
+  }, [historyItems, historySearch, historyEventFilter, historyPeriodFilter]);
 
   const handleBulkUpdateChange = (itemId: number, field: 'consumed' | 'received' | 'consumedLocationA' | 'consumedLocationB' | 'receivedLocationA' | 'receivedLocationB' | 'receivedDate' | 'receivedPlace' | 'comments', value: string) => {
     if (field === 'consumed' || field === 'received' || field === 'consumedLocationA' || field === 'consumedLocationB' || field === 'receivedLocationA' || field === 'receivedLocationB') {
@@ -2090,30 +2091,13 @@ const Stores: React.FC = () => {
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Marker id={getMarkerId(activeTab, "2.11")} />
-            <Input
-              type="date"
-              value={historyDateFrom}
-              onChange={(e) => setHistoryDateFrom(e.target.value)}
-              className="text-sm"
-              placeholder="From"
-              data-testid={getMarkerId(activeTab, "2.11")}
-            />
-          </div>
-          <span className="text-gray-500">to</span>
-          <div className="relative">
-            <Marker id={getMarkerId(activeTab, "2.12")} />
-            <Input
-              type="date"
-              value={historyDateTo}
-              onChange={(e) => setHistoryDateTo(e.target.value)}
-              className="text-sm"
-              placeholder="To"
-              data-testid={getMarkerId(activeTab, "2.12")}
-            />
-          </div>
+        <div className="relative">
+          <Marker id={getMarkerId(activeTab, "2.11")} />
+          <PeriodFilter
+            value={historyPeriodFilter}
+            onChange={setHistoryPeriodFilter}
+            className="min-w-[180px]"
+          />
         </div>
         <Button
           variant="outline"
@@ -2121,8 +2105,7 @@ const Stores: React.FC = () => {
           onClick={() => {
             setHistorySearch("");
             setHistoryEventFilter("all");
-            setHistoryDateFrom("");
-            setHistoryDateTo("");
+            setHistoryPeriodFilter(null);
           }}
           data-testid="button-clear-history-filters"
         >

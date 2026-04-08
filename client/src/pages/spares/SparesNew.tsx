@@ -31,6 +31,7 @@ import { format } from "date-fns";
 import { FEATURES } from '@/config/features';
 import { SPARES_TEMPLATE_FIELDS } from '@shared/sparesTemplateFields';
 import { useVessels } from "@/hooks/useVessels";
+import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange } from "@/components/filters/PeriodFilter";
 
 interface Spare {
   id: number;
@@ -120,8 +121,7 @@ const Spares: React.FC = () => {
   // History filter state
   const [historySearch, setHistorySearch] = useState("");
   const [historyEventFilter, setHistoryEventFilter] = useState("all");
-  const [historyDateFrom, setHistoryDateFrom] = useState("");
-  const [historyDateTo, setHistoryDateTo] = useState("");
+  const [historyPeriodFilter, setHistoryPeriodFilter] = useState<PeriodFilterValue | null>(null);
   // Pagination state - History
   const [historyPage, setHistoryPage] = useState(1);
   const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
@@ -1888,8 +1888,9 @@ const Spares: React.FC = () => {
       return new Date(year, month, day);
     };
 
-    const fromDate = historyDateFrom ? new Date(historyDateFrom + 'T00:00:00') : null;
-    const toDate = historyDateTo ? new Date(historyDateTo + 'T23:59:59') : null;
+    const historyDateRange = periodFilterToDateRange(historyPeriodFilter);
+    const fromDate = historyDateRange ? historyDateRange.from : null;
+    const toDate = historyDateRange ? historyDateRange.to : null;
 
     return historyData.filter((item: SpareHistory) => {
       if (historySearch) {
@@ -1924,7 +1925,7 @@ const Spares: React.FC = () => {
       }
       return true;
     });
-  }, [historyData, historySearch, historyEventFilter, historyDateFrom, historyDateTo]);
+  }, [historyData, historySearch, historyEventFilter, historyPeriodFilter]);
 
   // History pagination calculations
   const historyTotalPages = Math.ceil(filteredHistoryData.length / historyItemsPerPage);
@@ -1935,7 +1936,7 @@ const Spares: React.FC = () => {
 
   useEffect(() => {
     setHistoryPage(1);
-  }, [vesselId, historyItemsPerPage, historySearch, historyEventFilter, historyDateFrom, historyDateTo]);
+  }, [vesselId, historyItemsPerPage, historySearch, historyEventFilter, historyPeriodFilter]);
 
   useEffect(() => {
     if (historyTotalPages > 0 && historyPage > historyTotalPages) {
@@ -1949,8 +1950,7 @@ const Spares: React.FC = () => {
     if (activeTab !== 'history') {
       setHistorySearch("");
       setHistoryEventFilter("all");
-      setHistoryDateFrom("");
-      setHistoryDateTo("");
+      setHistoryPeriodFilter(null);
       setHistoryPage(1);
     }
   }, [activeTab]);
@@ -2824,33 +2824,18 @@ const Spares: React.FC = () => {
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-2">
-          <Input
-            type="date"
-            value={historyDateFrom}
-            onChange={(e) => setHistoryDateFrom(e.target.value)}
-            className="text-sm"
-            placeholder="From"
-            data-testid="input-history-date-from"
-          />
-          <span className="text-gray-500">to</span>
-          <Input
-            type="date"
-            value={historyDateTo}
-            onChange={(e) => setHistoryDateTo(e.target.value)}
-            className="text-sm"
-            placeholder="To"
-            data-testid="input-history-date-to"
-          />
-        </div>
+        <PeriodFilter
+          value={historyPeriodFilter}
+          onChange={setHistoryPeriodFilter}
+          className="min-w-[180px]"
+        />
         <Button
           variant="outline"
           className="text-gray-600"
           onClick={() => {
             setHistorySearch("");
             setHistoryEventFilter("all");
-            setHistoryDateFrom("");
-            setHistoryDateTo("");
+            setHistoryPeriodFilter(null);
             setHistoryPage(1);
           }}
           data-testid="button-clear-history-filters"
