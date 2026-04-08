@@ -1,5 +1,17 @@
 import { Request, Response } from 'express';
 import * as sparesService from '../services/sparesService';
+import type { AuthenticatedRequest } from '../../../middleware/auth';
+
+const ROTATION_ITEM_ALLOWED_ROLES = ["Sail Admin", "PMS Admin", "Super Admin"];
+
+function stripRotationItemIfUnauthorized(req: Request, body: any): any {
+  const user = (req as AuthenticatedRequest).user;
+  if (!user || !ROTATION_ITEM_ALLOWED_ROLES.includes(user.role)) {
+    const { isRotationItem, is_rotation_item, ...rest } = body;
+    return rest;
+  }
+  return body;
+}
 
 // ── GET /spares ──
 
@@ -85,7 +97,8 @@ export async function getSpareById(req: Request, res: Response) {
 
 export async function createSpare(req: Request, res: Response) {
   try {
-    const spare = await sparesService.createSpare(req.params.vesselId, req.body);
+    const sanitizedBody = stripRotationItemIfUnauthorized(req, req.body);
+    const spare = await sparesService.createSpare(req.params.vesselId, sanitizedBody);
     res.status(201).json(spare);
   } catch (error: any) {
     res.status(500).json({ error: error.message || "Failed to create spare" });
@@ -96,10 +109,11 @@ export async function createSpare(req: Request, res: Response) {
 
 export async function updateSpare(req: Request, res: Response) {
   try {
-    console.log('[PATCH Spare] Updating spare', req.params.id, 'with data:', JSON.stringify(req.body));
+    const sanitizedBody = stripRotationItemIfUnauthorized(req, req.body);
+    console.log('[PATCH Spare] Updating spare', req.params.id, 'with data:', JSON.stringify(sanitizedBody));
     const spareId = req.params.id;
     const userId = (req as any).user?.id?.toString() || 'System';
-    const spare = await sparesService.updateSpare(spareId, req.body, userId);
+    const spare = await sparesService.updateSpare(spareId, sanitizedBody, userId);
     console.log('[PATCH Spare] Result - location:', spare.location, 'location2:', spare.location2);
     res.json(spare);
   } catch (error: any) {
