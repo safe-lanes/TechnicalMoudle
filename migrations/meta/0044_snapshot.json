@@ -1,6 +1,6 @@
 {
-  "id": "6a9dfb90-7167-4b0e-bd7b-6a61eff8b52b",
-  "prevId": "5090e4db-8b76-45b5-b039-a93eaac5237c",
+  "id": "1232393e-04b3-45ee-bfc8-16625aba5ab9",
+  "prevId": "6a9dfb90-7167-4b0e-bd7b-6a61eff8b52b",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5848,7 +5848,17 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "unique_fleet_comp_vessel_component": {
+          "name": "unique_fleet_comp_vessel_component",
+          "nullsNotDistinct": false,
+          "columns": [
+            "fleet_equipment_code",
+            "vessel_code",
+            "component_code"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

@@ -1,0 +1,1 @@
+ALTER TABLE "fleet_component_mapping" ADD CONSTRAINT "unique_fleet_comp_vessel_component" UNIQUE("fleet_equipment_code","vessel_code","component_code");
