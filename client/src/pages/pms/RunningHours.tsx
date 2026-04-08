@@ -265,6 +265,14 @@ const RunningHours = () => {
     setHistoryComponentSearch("");
   }, [vesselId]);
 
+  useEffect(() => {
+    if (activeTab !== 'history') {
+      setHistoryPeriodFilter(null);
+      setHistorySearch("");
+      setHistoryPage(1);
+    }
+  }, [activeTab]);
+
   const goToHistoryPage = (page: number) => {
     const totalPages = historyResult?.totalPages || 1;
     const p = Math.max(1, Math.min(page, totalPages));

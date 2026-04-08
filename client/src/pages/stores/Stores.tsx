@@ -242,7 +242,14 @@ const Stores: React.FC = () => {
       setIsDeleteSelectionMode(false);
       setSelectedStoreIds(new Set());
     }
+    if (viewMode !== 'history') {
+      setHistoryPeriodFilter(null);
+    }
   }, [viewMode]);
+
+  useEffect(() => {
+    setHistoryPeriodFilter(null);
+  }, [activeTab]);
 
   // Fetch stores items from API - uses default TanStack Query fetcher
   // The query key includes the full URL with query parameters
