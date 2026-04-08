@@ -1391,6 +1391,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                     <th className="text-left py-2 px-3 font-medium text-gray-600">Min</th>
                                     <th className="text-left py-2 px-3 font-medium text-gray-600">Stock</th>
                                     <th className="text-left py-2 px-3 font-medium text-gray-600">Location</th>
+                                    <th className="text-center py-2 px-3 font-medium text-gray-600">Rotation</th>
                                     {FEATURES.IHM && (
                                       <th className="text-center py-2 px-3 font-medium text-gray-600" title="IHM Status">IHM</th>
                                     )}
@@ -1414,6 +1415,15 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                       <td className="py-3 px-3 text-gray-900">{spare.min}</td>
                                       <td className="py-3 px-3 text-gray-900">{spare.stock}</td>
                                       <td className="py-3 px-3 text-gray-900">{spare.location}</td>
+                                      <td className="py-3 px-3 text-center">
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                          spare.isRotationItem
+                                            ? "bg-blue-100 text-blue-800"
+                                            : "bg-gray-100 text-gray-600"
+                                        }`}>
+                                          {spare.isRotationItem ? "Yes" : "No"}
+                                        </span>
+                                      </td>
                                       {FEATURES.IHM && (
                                         <td className="py-3 px-3 text-center">
                                           {spare.ihmPresence === "Present" ? (

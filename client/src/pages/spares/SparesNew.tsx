@@ -67,6 +67,7 @@ interface Spare {
   criticality?: string;
   fleetEquipmentCode?: string;
   evidenceType?: string;
+  isRotationItem?: boolean;
   linkedComponents?: Array<{ componentId: string; componentCode: string; componentName: string }>;
 }
 
@@ -100,6 +101,7 @@ const Spares: React.FC = () => {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [criticalityFilter, setCriticalityFilter] = useState("");
+  const [rotationItemFilter, setRotationItemFilter] = useState("");
   const [stockFilter, setStockFilter] = useState(() => {
     const savedFilter = sessionStorage.getItem('sparesStockFilter');
     if (savedFilter) {
@@ -233,7 +235,8 @@ const Spares: React.FC = () => {
     pageNumber: "",
     ihm: "No",
     remarks: "",
-    note: ""
+    note: "",
+    isRotationItem: false
   });
   
   // Comprehensive edit spare form (includes all fields from Spare Part Details)
@@ -265,7 +268,8 @@ const Spares: React.FC = () => {
     // IHM & Notes
     ihm: "No",
     remarks: "",
-    note: ""
+    note: "",
+    isRotationItem: false
   });
   
   const { toast } = useToast();
@@ -869,7 +873,8 @@ const Spares: React.FC = () => {
       // IHM & Notes
       ihm: spare.ihm || "",
       remarks: spare.remarks || "",
-      note: spare.note || ""
+      note: spare.note || "",
+      isRotationItem: spare.isRotationItem ?? false
     });
     
     // In modify mode, store original data for change tracking
@@ -1345,6 +1350,13 @@ const Spares: React.FC = () => {
     if (criticalityFilter && criticalityFilter !== 'All') {
       result = result.filter((s: any) => s.critical === criticalityFilter || s.criticality === criticalityFilter);
     }
+    if (rotationItemFilter && rotationItemFilter !== 'All') {
+      if (rotationItemFilter === 'Rotation Items') {
+        result = result.filter((s: any) => s.isRotationItem === true);
+      } else if (rotationItemFilter === 'Non-Rotation Items') {
+        result = result.filter((s: any) => !s.isRotationItem);
+      }
+    }
     if (stockFilter && stockFilter !== 'All') {
       result = result.filter((s: any) => {
         const status = getStockStatus(s.rob, s.min);
@@ -1352,7 +1364,7 @@ const Spares: React.FC = () => {
       });
     }
     return result;
-  }, [locationSpares, searchTerm, criticalityFilter, stockFilter]);
+  }, [locationSpares, searchTerm, criticalityFilter, rotationItemFilter, stockFilter]);
 
   const locationTotalPages = Math.max(1, Math.ceil(filteredLocationSpares.length / locationItemsPerPage));
   const paginatedLocationSpares = filteredLocationSpares.slice(
@@ -1586,7 +1598,8 @@ const Spares: React.FC = () => {
       pageNumber: editSpareForm.pageNumber || null,
       ihm: editSpareForm.ihm || null,
       remarks: editSpareForm.remarks || null,
-      note: editSpareForm.note || null
+      note: editSpareForm.note || null,
+      isRotationItem: editSpareForm.isRotationItem
     };
     
     updateSpareMutation.mutate(updateData);
@@ -1782,6 +1795,15 @@ const Spares: React.FC = () => {
       }
     }
 
+    // Filter by rotation item
+    if (rotationItemFilter && rotationItemFilter !== "All") {
+      if (rotationItemFilter === "Rotation Items") {
+        filtered = filtered.filter((spare: Spare) => spare.isRotationItem === true);
+      } else if (rotationItemFilter === "Non-Rotation Items") {
+        filtered = filtered.filter((spare: Spare) => !spare.isRotationItem);
+      }
+    }
+
     // Filter by stock status (using computed status)
     if (stockFilter && stockFilter !== "All") {
       filtered = filtered.filter((spare: Spare) => {
@@ -1802,7 +1824,7 @@ const Spares: React.FC = () => {
     });
 
     return filtered;
-  }, [sparesData, selectedComponentId, searchTerm, criticalityFilter, stockFilter, isVessel, isHeadOfDept]);
+  }, [sparesData, selectedComponentId, searchTerm, criticalityFilter, rotationItemFilter, stockFilter, isVessel, isHeadOfDept]);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredSpares.length / itemsPerPage);
@@ -1814,7 +1836,7 @@ const Spares: React.FC = () => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, criticalityFilter, stockFilter, selectedComponentId]);
+  }, [searchTerm, criticalityFilter, rotationItemFilter, stockFilter, selectedComponentId]);
 
   // Clamp currentPage when totalPages shrinks (e.g., after deletion)
   useEffect(() => {
@@ -1964,6 +1986,7 @@ const Spares: React.FC = () => {
   const clearFilters = () => {
     setSearchTerm("");
     setCriticalityFilter("");
+    setRotationItemFilter("");
     setStockFilter("");
     setSelectedComponentId(null);
   };
@@ -2002,6 +2025,7 @@ const Spares: React.FC = () => {
         case 'isActive': row[field.header] = spare.isActive === false ? 'No' : 'Yes'; break;
         case 'ihm': row[field.header] = spare.ihm || ''; break;
         case 'evidenceType': row[field.header] = spare.evidenceType || ''; break;
+        case 'isRotationItem': row[field.header] = spare.isRotationItem ? 'Yes' : 'No'; break;
         default: row[field.header] = ''; break;
       }
     }
@@ -2574,6 +2598,7 @@ const Spares: React.FC = () => {
       ihm: addSpareForm.ihm || undefined,
       remarks: addSpareForm.remarks || undefined,
       note: addSpareForm.note || undefined,
+      isRotationItem: addSpareForm.isRotationItem,
       vesselId
     });
   };
@@ -2879,6 +2904,19 @@ const Spares: React.FC = () => {
           </Select>
         </div>
 
+        <div className="relative" data-testid="filter-rotation-item">
+          <Select value={rotationItemFilter} onValueChange={setRotationItemFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Rotation Item" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All</SelectItem>
+              <SelectItem value="Rotation Items">Rotation Items</SelectItem>
+              <SelectItem value="Non-Rotation Items">Non-Rotation Items</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="relative" data-testid="E7">
           <Marker id="E7" />
           <Select value={stockFilter} onValueChange={setStockFilter}>
@@ -3015,7 +3053,7 @@ const Spares: React.FC = () => {
               <div className="overflow-x-auto flex-1 flex flex-col">
                 {/* Inventory Table Header */}
                 <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3] min-w-max">
-                  <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: isBulkDeleteMode ? (FEATURES.IHM ? '40px 110px 180px 220px 120px 80px 60px 60px 80px 100px 40px' : '40px 110px 180px 220px 120px 80px 60px 60px 80px 100px') : (FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 100px 40px 130px' : '110px 180px 220px 120px 80px 60px 60px 80px 100px 130px'), minWidth: 'max-content', gap: '12px' }}>
+                  <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: isBulkDeleteMode ? (FEATURES.IHM ? '40px 110px 180px 220px 120px 80px 80px 60px 60px 80px 100px 40px' : '40px 110px 180px 220px 120px 80px 80px 60px 60px 80px 100px') : (FEATURES.IHM ? '110px 180px 220px 120px 80px 80px 60px 60px 80px 100px 40px 130px' : '110px 180px 220px 120px 80px 80px 60px 60px 80px 100px 130px'), minWidth: 'max-content', gap: '12px' }}>
                   {isBulkDeleteMode && (
                     <div className="px-2 flex items-center justify-center">
                       <input
@@ -3032,6 +3070,7 @@ const Spares: React.FC = () => {
                   <div className="px-2" data-testid="E15"><Marker id="E15" />Component</div>
                   <div className="px-2" data-testid="E16"><Marker id="E16" />Part Number</div>
                   <div className="px-2" data-testid="E17"><Marker id="E17" />Criticality</div>
+                  <div className="px-2 text-center" data-testid="col-rotation-item">Rotation</div>
                   <div className="px-2 text-center" data-testid="E18"><Marker id="E18" />ROB</div>
                   <div className="px-2 text-center" data-testid="E19"><Marker id="E19" />Min</div>
                   <div className="px-2 text-center" data-testid="E20"><Marker id="E20" />Stock</div>
@@ -3059,7 +3098,7 @@ const Spares: React.FC = () => {
                     const isInactive = spare.isActive === false;
                     return (
                     <div key={spare.id} className={`px-4 py-3 border-b border-gray-100 ${isInactive ? 'opacity-50 bg-gray-50' : 'hover:bg-gray-50'} ${isBulkDeleteMode && selectedSpareIds.has(spare.id) ? 'bg-red-50' : ''}`}>
-                      <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: isBulkDeleteMode ? (FEATURES.IHM ? '40px 110px 180px 220px 120px 80px 60px 60px 80px 100px 40px' : '40px 110px 180px 220px 120px 80px 60px 60px 80px 100px') : (FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 100px 40px 130px' : '110px 180px 220px 120px 80px 60px 60px 80px 100px 130px'), minWidth: 'max-content', gap: '12px' }}>
+                      <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: isBulkDeleteMode ? (FEATURES.IHM ? '40px 110px 180px 220px 120px 80px 80px 60px 60px 80px 100px 40px' : '40px 110px 180px 220px 120px 80px 80px 60px 60px 80px 100px') : (FEATURES.IHM ? '110px 180px 220px 120px 80px 80px 60px 60px 80px 100px 40px 130px' : '110px 180px 220px 120px 80px 80px 60px 60px 80px 100px 130px'), minWidth: 'max-content', gap: '12px' }}>
                         {isBulkDeleteMode && (
                           <div className="px-2 flex items-center justify-center">
                             {!isInactive ? (
@@ -3087,6 +3126,11 @@ const Spares: React.FC = () => {
                               : 'bg-gray-100 text-gray-800'
                           }`}>
                             {spare.critical}
+                          </span>
+                        </div>
+                        <div className="px-2 text-center" data-testid={isFirstRow ? "cell-rotation-item" : undefined}>
+                          <span className={`px-2 py-1 rounded text-xs ${spare.isRotationItem ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}`}>
+                            {spare.isRotationItem ? 'Yes' : 'No'}
                           </span>
                         </div>
                         <div className="px-2 text-center" data-testid={isFirstRow ? "E29" : undefined}>{isFirstRow && <Marker id="E29" />}{spare.rob}</div>
@@ -4248,6 +4292,21 @@ const Spares: React.FC = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                <div>
+                  <Label htmlFor="add-rotation-item">Rotation Item</Label>
+                  <Select 
+                    value={addSpareForm.isRotationItem ? "Yes" : "No"} 
+                    onValueChange={(value) => setAddSpareForm({...addSpareForm, isRotationItem: value === "Yes"})}
+                  >
+                    <SelectTrigger id="add-rotation-item" data-testid="select-add-rotation-item">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 
@@ -4756,6 +4815,22 @@ const Spares: React.FC = () => {
                     onValueChange={(value) => setEditSpareForm({...editSpareForm, isActive: value === "Yes"})}
                   >
                     <SelectTrigger id="edit-is-active" data-testid="select-edit-is-active">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="edit-rotation-item">Rotation Item</Label>
+                  <Select 
+                    value={editSpareForm.isRotationItem ? "Yes" : "No"} 
+                    onValueChange={(value) => setEditSpareForm({...editSpareForm, isRotationItem: value === "Yes"})}
+                    disabled={isVessel || isHeadOfDept}
+                  >
+                    <SelectTrigger id="edit-rotation-item" data-testid="select-edit-rotation-item" className={isVessel || isHeadOfDept ? 'opacity-60 cursor-not-allowed' : ''}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -5823,6 +5898,16 @@ const Spares: React.FC = () => {
                         : 'bg-gray-100 text-gray-800'
                     }`}>
                       {selectedSpare.isActive !== false ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Rotation Item:</span>
+                    <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
+                      selectedSpare.isRotationItem
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-gray-100 text-gray-600'
+                    }`} data-testid="info-rotation-item">
+                      {selectedSpare.isRotationItem ? 'Yes' : 'No'}
                     </span>
                   </div>
                 </div>

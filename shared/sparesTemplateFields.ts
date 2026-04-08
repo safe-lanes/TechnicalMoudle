@@ -53,6 +53,7 @@ export const SPARES_TEMPLATE_FIELDS: SparesTemplateField[] = [
   { header: 'Is Active', key: 'isActive', width: 12, required: false, description: 'Yes or No - defaults to Yes' },
   { header: 'IHM (Inventory of Hazardous Materials)', key: 'ihm', width: 35, required: false, description: 'Yes or No' },
   { header: 'Evidence Type', key: 'evidenceType', width: 16, required: false, description: 'Type of evidence/remarks' },
+  { header: 'Rotation Item', key: 'isRotationItem', width: 14, required: false, description: 'Yes or No - Rotation spare flag' },
 ];
 
 /**

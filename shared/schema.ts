@@ -529,6 +529,7 @@ export const spares = pgTable("spares", {
   partCategory: text("part_category"), // Category from master data
   applicableVesselIds: text("applicable_vessel_ids").array(), // Vessels that can use this fleet spare
   scopeNotes: text("scope_notes"), // Notes about scope applicability
+  isRotationItem: boolean("is_rotation_item").notNull().default(false), // Rotation spare flag
   createdAt: timestamp("created_at").notNull().defaultNow(),
   createdBy: text("created_by"), // User who created the spare
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
