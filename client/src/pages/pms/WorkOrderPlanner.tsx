@@ -32,7 +32,6 @@ import {
 import {
   ArrowLeft,
   Search,
-  FileSpreadsheet,
   FileText,
   ChevronLeft,
   ChevronRight,
@@ -44,6 +43,7 @@ import {
   ArrowUpDown,
   X,
   CalendarCheck,
+  Download,
 } from "lucide-react";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import { format } from "date-fns";
@@ -538,9 +538,10 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
             size="sm"
             onClick={handleExportExcel}
             title={`Export all ${totalItems} filtered items to Excel`}
+            className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
             data-testid="button-planner-export-excel"
           >
-            <FileSpreadsheet className="h-4 w-4 mr-1" />
+            <Download className="h-4 w-4" />
             Excel ({totalItems})
           </Button>
           <Button
