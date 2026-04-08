@@ -510,7 +510,8 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
   );
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col">
+      <div className="flex-shrink-0 space-y-4 pb-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button
@@ -633,9 +634,10 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
           {totalItems} job{totalItems !== 1 ? "s" : ""} found
         </div>
       </div>
+      </div>
 
       {selectedKeys.size > 0 && (
-        <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-3 sticky top-0 z-20" data-testid="bulk-action-bar">
+        <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-3 mb-4 sticky top-0 z-20" data-testid="bulk-action-bar">
           <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
             {selectedKeys.size} row{selectedKeys.size !== 1 ? "s" : ""} selected
           </span>
