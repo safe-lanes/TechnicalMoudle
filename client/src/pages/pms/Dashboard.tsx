@@ -1291,30 +1291,22 @@ const Dashboard = () => {
             <div style={{ fontSize: '18px', fontWeight: 700, color: '#1a2b4a' }} data-testid="text-current-year">
               {new Date().getFullYear()}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
-              data-testid="button-toggle-dashboard-filters"
-            >
-              <Filter className="h-4 w-4" />
-              Filters
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowBenchmarking(true)}
-              className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
-              data-testid="button-open-benchmarking"
-            >
-              <BarChart3 className="h-4 w-4" />
-              Benchmarking
-            </Button>
+            {activeTab === 'overview' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+                className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
+                data-testid="button-toggle-dashboard-filters"
+              >
+                <Filter className="h-4 w-4" />
+                Filters
+              </Button>
+            )}
           </div>
         </div>
 
-        {showFilters && (
+        {activeTab === 'overview' && showFilters && (
         <div className="flex items-center gap-3 flex-wrap" data-testid="bar-fleet-vessel-context">
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 font-medium">Vessel:</span>
@@ -1369,6 +1361,19 @@ const Dashboard = () => {
           >
             Clear
           </Button>
+
+          <div className="ml-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowBenchmarking(true)}
+              className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
+              data-testid="button-open-benchmarking"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Benchmarking
+            </Button>
+          </div>
         </div>
         )}
       </div>
