@@ -51,14 +51,6 @@ const RANK_CATEGORIES = [
   "Other",
 ];
 
-const VIEW_MODES = [
-  { key: "sail_admin", label: "Sail Admin" },
-  { key: "client_admin", label: "Client Admin" },
-  { key: "tech_superintendent", label: "Technical Superintendent" },
-  { key: "head_of_dept", label: "Head of Dept" },
-  { key: "vessel", label: "Vessel" },
-] as const;
-
 export default function RanksAdmin() {
   const { toast } = useToast();
   const [isEditMode, setIsEditMode] = useState(false);
@@ -68,7 +60,6 @@ export default function RanksAdmin() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [viewMode, setViewMode] = useState<string>("sail_admin");
 
   const [ranksData, setRanksData] = useState<RankRow[]>([]);
   const [orgChartData, setOrgChartData] = useState<OrgChartRow[]>([]);
@@ -720,26 +711,6 @@ export default function RanksAdmin() {
               Vessel Org Chart
             </button>
           </div>
-        </div>
-      </div>
-
-      <div className="flex-shrink-0 mb-4">
-        <div className="flex items-center gap-2" data-testid="view-mode-buttons">
-          {VIEW_MODES.map((mode) => (
-            <button
-              key={mode.key}
-              onClick={() => setViewMode(mode.key)}
-              className={cn(
-                "px-4 py-1.5 rounded-full text-sm font-medium transition-colors",
-                viewMode === mode.key
-                  ? "bg-[#52baf3] text-white"
-                  : "border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600"
-              )}
-              data-testid={`button-view-mode-${mode.key}`}
-            >
-              {mode.label}
-            </button>
-          ))}
         </div>
       </div>
 
