@@ -10,21 +10,50 @@ interface SectionBlockProps {
   headerActions?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
-  variant?: 'card' | 'inline';
+  variant?: 'default' | 'inline';
 }
 
-export function SectionBlock({ id, number, title, description, headerMarker, descriptionMarker, headerActions, children, className = '', variant = 'card' }: SectionBlockProps) {
-  const isCard = variant === 'card';
+export function SectionBlock({ id, number, title, description, headerMarker, descriptionMarker, headerActions, children, className = '', variant = 'default' }: SectionBlockProps) {
+  if (variant === 'inline') {
+    return (
+      <section id={id} className={className}>
+        <div className="pb-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-[#1e3a5f] flex items-start gap-1.5" data-testid={headerMarker}>
+              {headerMarker && <Marker id={headerMarker} />}
+              {number && <span>{number}.</span>}
+              <span>{title}</span>
+            </h3>
+            {headerActions && (
+              <div className="flex items-center gap-2">
+                {headerActions}
+              </div>
+            )}
+          </div>
+          {description && (
+            <p className="text-xs text-gray-600 mt-1 ml-6" data-testid={descriptionMarker}>
+              {descriptionMarker && <Marker id={descriptionMarker} />}
+              {description}
+            </p>
+          )}
+          <div className="mt-2 h-0.5 bg-[#1e3a5f]"></div>
+        </div>
+        <div className="py-4">
+          {children}
+        </div>
+      </section>
+    );
+  }
 
   return (
-    <section id={id} className={isCard ? `bg-white border border-gray-200 shadow-sm rounded-lg ${className}` : className}>
-      <div className={isCard ? "px-6 pt-4 pb-3" : "pb-3"}>
+    <section id={id} className={`bg-blue-50 rounded-md border border-blue-100 p-1 ${className}`}>
+      <div className="bg-white rounded-t-sm px-6 py-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-[#1e3a5f] flex items-start gap-1.5" data-testid={headerMarker}>
+          <h2 className="text-sm font-bold text-[hsl(var(--primary))] flex items-start gap-1.5" data-testid={headerMarker}>
             {headerMarker && <Marker id={headerMarker} />}
             {number && <span>{number}.</span>}
             <span>{title}</span>
-          </h3>
+          </h2>
           {headerActions && (
             <div className="flex items-center gap-2">
               {headerActions}
@@ -37,9 +66,9 @@ export function SectionBlock({ id, number, title, description, headerMarker, des
             {description}
           </p>
         )}
-        <div className="mt-2 h-0.5 bg-[#1e3a5f]"></div>
+        <div className="mt-2 h-0.5 bg-[hsl(var(--primary))]"></div>
       </div>
-      <div className={isCard ? "px-6 py-4" : "py-4"}>
+      <div className="px-6 py-4 bg-white rounded-b-sm">
         {children}
       </div>
     </section>
