@@ -2548,11 +2548,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           ? "Work order submitted for approval" 
           : "Work order saved successfully",
       });
-      if (embedded && onClose) {
-        onClose();
-      } else {
-        navigate("/pms/work-orders");
-      }
+      navigate("/pms/work-orders");
     } catch (error: any) {
       toast({
         title: "Error",
@@ -2733,11 +2729,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         toast({ title: 'Draft Saved', description: 'Unplanned work order saved as draft. You can resume editing from the Unplanned tab.' });
       }
       sessionStorage.setItem('workOrdersActiveTab', 'Unplanned');
-      if (embedded && onClose) {
-        onClose();
-      } else {
-        navigate('/pms/work-orders');
-      }
+      navigate('/pms/work-orders');
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save draft. Please try again.';
       toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
@@ -3073,11 +3065,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       if (isReadyForSubmission) {
         toast({ title: 'Work Order Created', description: 'Unplanned work order submitted for approval.' });
         sessionStorage.setItem('workOrdersActiveTab', 'Pending Approval');
-        if (embedded && onClose) {
-          onClose();
-        } else {
-          navigate('/pms/work-orders');
-        }
+        navigate('/pms/work-orders');
       } else {
         // Draft: navigate to the execution form for the new WO so the user can resume editing
         toast({
@@ -3139,11 +3127,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         title: "Approved",
         description: "Work order has been approved and marked as completed",
       });
-      if (embedded && onClose) {
-        onClose();
-      } else {
-        navigate("/pms/work-orders");
-      }
+      navigate("/pms/work-orders");
     } catch (error: any) {
       toast({
         title: "Error",
@@ -3195,11 +3179,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         title: "Rejected",
         description: "Work order has been rejected",
       });
-      if (embedded && onClose) {
-        onClose();
-      } else {
-        navigate("/pms/work-orders");
-      }
+      navigate("/pms/work-orders");
     } catch (error: any) {
       toast({
         title: "Error",
@@ -3212,11 +3192,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleBack = () => {
-    if (embedded && onClose) {
-      onClose();
-    } else {
-      window.history.back();
-    }
+    window.history.back();
   };
 
   return (

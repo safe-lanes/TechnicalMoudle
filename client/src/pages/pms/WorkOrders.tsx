@@ -21,7 +21,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import WorkOrderModal from "./WorkOrderModal";
 import PostponeWorkOrderDialog from "@/components/PostponeWorkOrderDialog";
 import OverdueReasonDialog from "@/components/OverdueReasonDialog";
 import UnplannedWorkOrderForm from "@/components/UnplannedWorkOrderForm";
@@ -180,8 +179,6 @@ const WorkOrders: React.FC = () => {
   const [overdueReasonWorkOrder, setOverdueReasonWorkOrder] = useState<WorkOrderWithHydratedData | null>(null);
   const [unplannedWorkOrderFormOpen, setUnplannedWorkOrderFormOpen] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editWorkOrderId, setEditWorkOrderId] = useState<string | null>(null);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -647,8 +644,7 @@ const WorkOrders: React.FC = () => {
   };
 
   const handlePencilClick = (workOrder: WorkOrder) => {
-    setEditWorkOrderId(String(workOrder.id));
-    setEditModalOpen(true);
+    setLocation(`/pms/work-order/${workOrder.id}`);
   };
 
   const handleTimerClick = (workOrder: WorkOrder) => {
@@ -1725,17 +1721,6 @@ const WorkOrders: React.FC = () => {
       </Dialog>
       )}
 
-      {editModalOpen && editWorkOrderId && (
-        <WorkOrderModal
-          open={editModalOpen}
-          onClose={() => {
-            setEditModalOpen(false);
-            setEditWorkOrderId(null);
-            queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
-          }}
-          workOrderId={editWorkOrderId}
-        />
-      )}
 
       {/* Modify Mode Sticky Footer */}
       {isModifyMode && (
