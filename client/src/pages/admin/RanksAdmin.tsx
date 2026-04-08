@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { VISIBLE_UI_ROLES, UI_ROLE_LABELS } from "@shared/uiRoles";
+import type { UIRole } from "@shared/uiRoles";
 
 interface RankRow {
   id?: number;
@@ -31,6 +33,7 @@ interface RankRow {
   applicableToCompany: boolean;
   isSystemRank: boolean;
   sortOrder: number;
+  viewMode: string;
   isNew?: boolean;
 }
 
@@ -86,6 +89,7 @@ export default function RanksAdmin() {
           applicableToCompany: r.applicableToCompany ?? r.applicable_to_company ?? true,
           isSystemRank: r.isSystemRank ?? r.is_system_rank ?? true,
           sortOrder: r.sortOrder ?? r.sort_order ?? 0,
+          viewMode: r.viewMode ?? r.view_mode ?? "",
         }));
         setRanksData(mapped);
       } else {
@@ -204,6 +208,7 @@ export default function RanksAdmin() {
       applicableToCompany: true,
       isSystemRank: false,
       sortOrder: maxSort + 1,
+      viewMode: "",
       isNew: true,
     }]);
     setHasUnsavedChanges(true);
@@ -416,6 +421,7 @@ export default function RanksAdmin() {
               <th className="px-4 py-3 text-left font-medium text-sm">Name</th>
               <th className="px-4 py-3 text-left font-medium text-sm">Label</th>
               <th className="px-4 py-3 text-left font-medium text-sm w-40">Category</th>
+              <th className="px-4 py-3 text-left font-medium text-sm w-48">View Mode</th>
               {isEditMode && <th className="px-4 py-3 text-center font-medium text-sm w-28">Actions</th>}
             </tr>
           </thead>
@@ -443,6 +449,17 @@ export default function RanksAdmin() {
                       </SelectContent>
                     </Select>
                   ) : rank.category}
+                </td>
+                <td className="px-4 py-3 text-sm" data-testid={`text-rank-viewmode-${rank.rankId}`}>
+                  {isEditMode ? (
+                    <Select value={rank.viewMode || "__none__"} onValueChange={(v) => updateRank(rank.rankId, 'viewMode', v === "__none__" ? "" : v)}>
+                      <SelectTrigger className="h-8" data-testid={`select-rank-viewmode-${rank.rankId}`}><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {VISIBLE_UI_ROLES.map(role => <SelectItem key={role} value={role}>{UI_ROLE_LABELS[role]}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  ) : (rank.viewMode ? UI_ROLE_LABELS[rank.viewMode as UIRole] || rank.viewMode : "")}
                 </td>
                 {isEditMode && (
                   <td className="px-4 py-3 text-center">
@@ -472,7 +489,7 @@ export default function RanksAdmin() {
               </tr>
             ))}
             {filteredRanks.length === 0 && (
-              <tr><td colSpan={isEditMode ? 6 : 5} className="px-4 py-8 text-center text-gray-500">No ranks found</td></tr>
+              <tr><td colSpan={isEditMode ? 7 : 6} className="px-4 py-8 text-center text-gray-500">No ranks found</td></tr>
             )}
           </tbody>
         </table>

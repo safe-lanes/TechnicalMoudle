@@ -3356,6 +3356,7 @@ export const admAvailableRanks = pgTable("adm_available_ranks", {
   applicableToCompany: boolean("applicable_to_company").default(true),
   isSystemRank: boolean("is_system_rank").default(true),
   sortOrder: integer("sort_order"),
+  viewMode: text("view_mode"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdateFn(() => new Date()),
   createdByUuid: text("created_by_uuid"),

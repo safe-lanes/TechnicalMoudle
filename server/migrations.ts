@@ -2722,6 +2722,18 @@ const migrations: Migration[] = [
 
       END $$;
     `
+  },
+  {
+    id: '080_add_view_mode_column',
+    name: 'Add view_mode column to adm_available_ranks',
+    description: 'Adds view_mode text column to adm_available_ranks for storing which UI role view mode a rank belongs to.',
+    sql: `
+      DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'adm_available_ranks') THEN
+          ALTER TABLE adm_available_ranks ADD COLUMN IF NOT EXISTS view_mode TEXT;
+        END IF;
+      END $$;
+    `
   }
 ];
 
