@@ -5878,13 +5878,15 @@ const Spares: React.FC = () => {
                         <option value="Yes">Yes</option>
                       </select>
                     ) : (
-                      <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
-                        selectedSpare.isRotationItem
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-gray-100 text-gray-600'
-                      }`} data-testid="info-rotation-item">
-                        {selectedSpare.isRotationItem ? 'Yes' : 'No'}
-                      </span>
+                      <select
+                        className="ml-1 px-2 py-0.5 rounded text-xs font-medium border border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed"
+                        value={selectedSpare.isRotationItem ? "Yes" : "No"}
+                        disabled
+                        data-testid="info-rotation-item"
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
                     )}
                   </div>
                 </div>
