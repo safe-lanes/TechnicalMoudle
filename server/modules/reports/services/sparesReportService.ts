@@ -12,6 +12,12 @@ import {
   type ConditionalStyle,
 } from '../../../lib/excelReportStyles';
 
+const CONFIDENCE_THRESHOLDS = {
+  HIGH_DAYS: 90,
+  MEDIUM_DAYS: 30,
+  LOW_DAYS: 7,
+};
+
 // ═══════════════════════════════════════════════════════════════
 // CRITICAL SPARES REPORT - PREVIEW
 // ═══════════════════════════════════════════════════════════════
@@ -757,11 +763,26 @@ export async function getSparesConsumptionAnalysis(
   const dates = consumeEvents.map((h: any) => new Date(h.timestampUTC)).filter((d: Date) => !isNaN(d.getTime()));
   const earliestDate = dates.length > 0 ? new Date(Math.min(...dates.map((d: Date) => d.getTime()))) : new Date();
   const latestDate = dates.length > 0 ? new Date(Math.max(...dates.map((d: Date) => d.getTime()))) : new Date();
-  const daysOfData = Math.max(1, Math.ceil((latestDate.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24)));
+  const eventSpanDays = Math.max(1, Math.ceil((latestDate.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+  let daysOfData: number;
+  if (startDate && endDate) {
+    const sd = new Date(startDate as string);
+    const ed = new Date(endDate as string);
+    daysOfData = Math.max(1, Math.ceil((ed.getTime() - sd.getTime()) / (1000 * 60 * 60 * 24)));
+  } else if (startDate) {
+    const sd = new Date(startDate as string);
+    daysOfData = Math.max(1, Math.ceil((new Date().getTime() - sd.getTime()) / (1000 * 60 * 60 * 24)));
+  } else {
+    daysOfData = eventSpanDays;
+  }
+
+  const distinctEventDays = new Set(dates.map((d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)).size;
+  const totalConsumptionEvents = consumeEvents.length;
 
   let confidenceLevel: 'low' | 'medium' | 'high' = 'low';
-  if (daysOfData > 90) confidenceLevel = 'high';
-  else if (daysOfData >= 30) confidenceLevel = 'medium';
+  if (daysOfData > CONFIDENCE_THRESHOLDS.HIGH_DAYS) confidenceLevel = 'high';
+  else if (daysOfData >= CONFIDENCE_THRESHOLDS.MEDIUM_DAYS) confidenceLevel = 'medium';
 
   const monthlyMap: Record<string, { totalQty: number; eventCount: number; itemIds: Set<number>; byType: Record<string, number> }> = {};
   for (const h of consumeEvents) {
@@ -814,8 +835,8 @@ export async function getSparesConsumptionAnalysis(
       const minStock = item?.min || 0;
       const rawMonthlyRate = daysOfData > 0 ? (g.totalConsumed / daysOfData) * 30 : 0;
       let confidenceMultiplier = 1.0;
-      if (daysOfData < 7) confidenceMultiplier = 0.5;
-      else if (daysOfData < 30) confidenceMultiplier = 0.75;
+      if (daysOfData < CONFIDENCE_THRESHOLDS.LOW_DAYS) confidenceMultiplier = 0.5;
+      else if (daysOfData < CONFIDENCE_THRESHOLDS.MEDIUM_DAYS) confidenceMultiplier = 0.75;
       const avgMonthlyConsumption = Math.round(rawMonthlyRate * confidenceMultiplier * 100) / 100;
       return {
         itemId,
@@ -829,9 +850,9 @@ export async function getSparesConsumptionAnalysis(
         avgMonthlyConsumption,
         rawAvgMonthlyConsumption: Math.round(rawMonthlyRate * 100) / 100,
         confidenceMultiplier,
-        adjustmentNote: daysOfData < 7
+        adjustmentNote: daysOfData < CONFIDENCE_THRESHOLDS.LOW_DAYS
           ? `Adjusted estimate (\u00d7${confidenceMultiplier}) based on limited ${daysOfData}-day sample. Raw rate: ${Math.round(rawMonthlyRate * 100) / 100}/month`
-          : daysOfData < 30
+          : daysOfData < CONFIDENCE_THRESHOLDS.MEDIUM_DAYS
             ? `Adjusted estimate (\u00d7${confidenceMultiplier}) based on ${daysOfData}-day sample. Raw rate: ${Math.round(rawMonthlyRate * 100) / 100}/month`
             : null,
         currentRob,
@@ -888,8 +909,8 @@ export async function getSparesConsumptionAnalysis(
         movementSpeed = 'non-moving';
         movementNote = currentRob > 0 ? 'No consumption recorded - consider stock reduction' : '';
       } else {
-        const fastThreshold = daysOfData < 30 ? 0.5 : 2.0;
-        const slowThreshold = daysOfData < 30 ? 0.05 : 0.5;
+        const fastThreshold = daysOfData < CONFIDENCE_THRESHOLDS.MEDIUM_DAYS ? 0.5 : 2.0;
+        const slowThreshold = daysOfData < CONFIDENCE_THRESHOLDS.MEDIUM_DAYS ? 0.05 : 0.5;
         if (stockTurnoverRatio >= fastThreshold || consumptionFrequency >= 0.5) {
           movementSpeed = 'fast';
           movementNote = totalConsumed >= minStock ? 'High consumption rate' : '';
@@ -908,10 +929,10 @@ export async function getSparesConsumptionAnalysis(
       let stockoutRange: { lower: number; upper: number } | null = null;
       let stockoutConfidence: 'low' | 'medium' | 'high' = 'high';
       if (baseStockoutDays !== null && baseStockoutDays > 0) {
-        if (daysOfData < 7) {
+        if (daysOfData < CONFIDENCE_THRESHOLDS.LOW_DAYS) {
           stockoutRange = { lower: Math.floor(baseStockoutDays * 0.5), upper: Math.ceil(baseStockoutDays * 2.0) };
           stockoutConfidence = 'low';
-        } else if (daysOfData < 30) {
+        } else if (daysOfData < CONFIDENCE_THRESHOLDS.MEDIUM_DAYS) {
           stockoutRange = { lower: Math.floor(baseStockoutDays * 0.75), upper: Math.ceil(baseStockoutDays * 1.5) };
           stockoutConfidence = 'medium';
         }
@@ -947,8 +968,8 @@ export async function getSparesConsumptionAnalysis(
   const forecastData = topConsumedItems.map(item => {
     const avgDaily = daysOfData > 0 ? item.totalConsumed / daysOfData : 0;
     let forecastConfidenceMultiplier = 1.0;
-    if (daysOfData < 7) forecastConfidenceMultiplier = 0.5;
-    else if (daysOfData < 30) forecastConfidenceMultiplier = 0.75;
+    if (daysOfData < CONFIDENCE_THRESHOLDS.LOW_DAYS) forecastConfidenceMultiplier = 0.5;
+    else if (daysOfData < CONFIDENCE_THRESHOLDS.MEDIUM_DAYS) forecastConfidenceMultiplier = 0.75;
     const adjustedDaily = avgDaily * forecastConfidenceMultiplier;
     const projectedMonthly = Math.round(adjustedDaily * 30 * 100) / 100;
     const monthsRemaining = adjustedDaily > 0 ? Math.round((item.currentRob / adjustedDaily / 30) * 10) / 10 : null;
@@ -1021,13 +1042,16 @@ export async function getSparesConsumptionAnalysis(
       dateRange: { start: earliestDate.toISOString(), end: latestDate.toISOString() },
       dataQuality: {
         daysOfData,
-        isLimitedData: daysOfData < 30,
+        distinctEventDays,
+        totalConsumptionEvents,
+        eventSpanDays,
+        isLimitedData: daysOfData < CONFIDENCE_THRESHOLDS.MEDIUM_DAYS,
         confidenceLevel,
-        message: daysOfData < 30
-          ? `Analysis based on ${daysOfData} days of consumption data. More accurate trends will develop over time.`
-          : daysOfData < 90
-            ? `Analysis based on ${daysOfData} days of data. Moderate confidence in trend projections.`
-            : `Analysis based on ${daysOfData} days of data. High confidence in trend projections.`,
+        message: daysOfData < CONFIDENCE_THRESHOLDS.MEDIUM_DAYS
+          ? `Analysis covers ${daysOfData}-day period with ${totalConsumptionEvents} consumption event${totalConsumptionEvents !== 1 ? 's' : ''} across ${distinctEventDays} distinct day${distinctEventDays !== 1 ? 's' : ''}. More accurate trends will develop with more data.`
+          : daysOfData < CONFIDENCE_THRESHOLDS.HIGH_DAYS
+            ? `Analysis covers ${daysOfData}-day period with ${totalConsumptionEvents} event${totalConsumptionEvents !== 1 ? 's' : ''} across ${distinctEventDays} day${distinctEventDays !== 1 ? 's' : ''}. Moderate confidence in trend projections.`
+            : `Analysis covers ${daysOfData}-day period with ${totalConsumptionEvents} event${totalConsumptionEvents !== 1 ? 's' : ''} across ${distinctEventDays} day${distinctEventDays !== 1 ? 's' : ''}. High confidence in trend projections.`,
       },
       totalInventoryItems: allItems.filter((i: any) => !i.deleted && i.isActive !== false).length,
       dataMonths: Math.max(0.1, Math.round((daysOfData / 30) * 10) / 10),
@@ -1146,8 +1170,8 @@ export async function exportSparesConsumptionExcel(
     const item = itemsMap.get(Number(id));
     const rawMonthlyRate = Math.round((g.totalConsumed / daysOfData) * 30 * 100) / 100;
     let confidenceMultiplier = 1.0;
-    if (daysOfData < 7) confidenceMultiplier = 0.5;
-    else if (daysOfData < 30) confidenceMultiplier = 0.75;
+    if (daysOfData < CONFIDENCE_THRESHOLDS.LOW_DAYS) confidenceMultiplier = 0.5;
+    else if (daysOfData < CONFIDENCE_THRESHOLDS.MEDIUM_DAYS) confidenceMultiplier = 0.75;
     const adjustedMonthly = Math.round(rawMonthlyRate * confidenceMultiplier * 100) / 100;
     return {
       itemCode: item?.partCode || '', itemName: item?.partName || '', itemType: item?.critical || 'Spare Part',
@@ -1252,8 +1276,8 @@ export async function exportSparesConsumptionExcel(
       speed = 'Non-Moving';
       movementNote = currentRob > 0 ? 'No consumption - consider reduction' : '';
     } else {
-      const fastThreshold = daysOfData < 30 ? 0.5 : 2.0;
-      const slowThreshold = daysOfData < 30 ? 0.05 : 0.5;
+      const fastThreshold = daysOfData < CONFIDENCE_THRESHOLDS.MEDIUM_DAYS ? 0.5 : 2.0;
+      const slowThreshold = daysOfData < CONFIDENCE_THRESHOLDS.MEDIUM_DAYS ? 0.05 : 0.5;
       if (turnover >= fastThreshold || consumptionFrequency >= 0.5) {
         speed = 'Fast';
         movementNote = totalConsumed >= minStock ? 'High consumption rate' : '';
@@ -1269,8 +1293,8 @@ export async function exportSparesConsumptionExcel(
     const daysToStockoutVal = baseStockoutDays !== null ? Math.round(baseStockoutDays) : null;
     let stockoutRange = '-';
     if (baseStockoutDays !== null && baseStockoutDays > 0) {
-      if (daysOfData < 7) stockoutRange = `${Math.floor(baseStockoutDays * 0.5)}-${Math.ceil(baseStockoutDays * 2.0)}d`;
-      else if (daysOfData < 30) stockoutRange = `${Math.floor(baseStockoutDays * 0.75)}-${Math.ceil(baseStockoutDays * 1.5)}d`;
+      if (daysOfData < CONFIDENCE_THRESHOLDS.LOW_DAYS) stockoutRange = `${Math.floor(baseStockoutDays * 0.5)}-${Math.ceil(baseStockoutDays * 2.0)}d`;
+      else if (daysOfData < CONFIDENCE_THRESHOLDS.MEDIUM_DAYS) stockoutRange = `${Math.floor(baseStockoutDays * 0.75)}-${Math.ceil(baseStockoutDays * 1.5)}d`;
     }
     return {
       itemCode: item.partCode || '', itemName: item.partName || '', itemType: item.critical || 'Spare Part',
@@ -1332,8 +1356,8 @@ export async function exportSparesConsumptionExcel(
     const item = itemsMap.get(Number(id));
     const avgDaily = daysOfData > 0 ? g.totalConsumed / daysOfData : 0;
     let fcMultiplier = 1.0;
-    if (daysOfData < 7) fcMultiplier = 0.5;
-    else if (daysOfData < 30) fcMultiplier = 0.75;
+    if (daysOfData < CONFIDENCE_THRESHOLDS.LOW_DAYS) fcMultiplier = 0.5;
+    else if (daysOfData < CONFIDENCE_THRESHOLDS.MEDIUM_DAYS) fcMultiplier = 0.75;
     const adjustedDaily = avgDaily * fcMultiplier;
     const projMonthly = Math.round(adjustedDaily * 30 * 100) / 100;
     const rawMonthly = Math.round(avgDaily * 30 * 100) / 100;
@@ -1356,7 +1380,7 @@ export async function exportSparesConsumptionExcel(
       projNextMonth: projMonthly, currentRob, minStock, reorderPoint: Math.round(reorderPoint),
       monthsRemaining: monthsRem !== null ? monthsRem : '-',
       reorderNeeded: reorder ? 'Yes' : 'No', suggestedQty, reasoning,
-      confidence: daysOfData > 90 ? 'High' : daysOfData >= 30 ? 'Medium' : 'Low',
+      confidence: daysOfData > CONFIDENCE_THRESHOLDS.HIGH_DAYS ? 'High' : daysOfData >= CONFIDENCE_THRESHOLDS.MEDIUM_DAYS ? 'Medium' : 'Low',
     };
   }).sort((a, b) => (typeof b.monthsRemaining === 'number' ? b.monthsRemaining : 999) - (typeof a.monthsRemaining === 'number' ? a.monthsRemaining : 999));
 
@@ -1379,7 +1403,7 @@ export async function exportSparesConsumptionExcel(
     { key: 'confidence', header: 'Confidence', width: 14, type: 'text', align: 'center' },
   ];
   const fcLastCol = getLastColumnLetter(fcCols.length);
-  applyStandardHeader(forecastSheet, 'SPARES CONSUMPTION FORECAST & REORDER PROJECTIONS', `Data Period: ${datePeriod} | Confidence: ${daysOfData > 90 ? 'High' : daysOfData >= 30 ? 'Medium' : 'Low'}`, vesselName, forecastItems.length, fcLastCol, datePeriod);
+  applyStandardHeader(forecastSheet, 'SPARES CONSUMPTION FORECAST & REORDER PROJECTIONS', `Data Period: ${datePeriod} | Confidence: ${daysOfData > CONFIDENCE_THRESHOLDS.HIGH_DAYS ? 'High' : daysOfData >= CONFIDENCE_THRESHOLDS.MEDIUM_DAYS ? 'Medium' : 'Low'}`, vesselName, forecastItems.length, fcLastCol, datePeriod);
   applyStandardTableHeader(forecastSheet, fcCols, 7);
 
   forecastItems.forEach((item, idx) => {

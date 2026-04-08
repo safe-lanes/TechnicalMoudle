@@ -480,6 +480,9 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
                   <div>
                     <CardDescription>Data Period</CardDescription>
                     <CardTitle className="text-2xl">{summary?.dataQuality?.daysOfData ?? 0} <span className="text-sm font-normal text-gray-500">days</span></CardTitle>
+                    {summary?.dataQuality?.distinctEventDays != null && (
+                      <p className="text-xs text-gray-500 mt-1">{summary.dataQuality.distinctEventDays} active day{summary.dataQuality.distinctEventDays !== 1 ? 's' : ''}</p>
+                    )}
                   </div>
                   <CalendarIcon className="h-8 w-8 text-green-500" />
                 </CardHeader>
@@ -797,7 +800,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
                       onPageSizeChange={handlePageSizeChange}
                     />
                   )}
-                  <p className="text-xs text-gray-500 italic">Movement classification based on {summary?.dataQuality?.daysOfData || "N/A"}-day sample period</p>
+                  <p className="text-xs text-gray-500 italic">Movement classification based on {summary?.dataQuality?.daysOfData || "N/A"}-day period ({summary?.dataQuality?.distinctEventDays || 0} active days)</p>
                 </>
               ) : (
                 <p className="text-gray-500 text-center py-8">No stock efficiency data available</p>
@@ -921,7 +924,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
                       <div className="flex-1 min-w-0">
                         <CardTitle className="text-blue-800 text-sm">Confidence: {summary?.dataQuality?.confidenceLevel?.toUpperCase() || 'N/A'}</CardTitle>
                         <CardDescription className="text-blue-700 text-xs mt-1">
-                          Forecasts based on {summary?.dataQuality?.daysOfData || 0} days of data. {summary?.dataQuality?.daysOfData < 30 ? 'Collect more data for accurate predictions.' : 'Sufficient data for reliable projections.'}
+                          Forecasts based on {summary?.dataQuality?.daysOfData || 0} days of data ({summary?.dataQuality?.distinctEventDays || 0} active). {summary?.dataQuality?.isLimitedData ? 'Collect more data for accurate predictions.' : 'Sufficient data for reliable projections.'}
                         </CardDescription>
                       </div>
                     </CardHeader>
