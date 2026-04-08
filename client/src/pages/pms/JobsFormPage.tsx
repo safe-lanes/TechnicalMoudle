@@ -901,7 +901,6 @@ const JobsFormPage: React.FC = () => {
           <div className="max-w-5xl mx-auto space-y-6">
             
             {/* Part A - Job Details */}
-            <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-6 space-y-8">
             <PartHeader
               id="part-a"
               label="Part A"
@@ -919,7 +918,6 @@ const JobsFormPage: React.FC = () => {
               description="Basic details and configuration for this job"
               headerMarker="JF.A1.1"
               descriptionMarker="JF.A1.2"
-              variant="inline"
             >
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1064,7 +1062,6 @@ const JobsFormPage: React.FC = () => {
               description="Spare parts needed for this job"
               headerMarker="JF.A2.1"
               descriptionMarker="JF.A2.2"
-              variant="inline"
             >
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border border-gray-200">
@@ -1120,7 +1117,6 @@ const JobsFormPage: React.FC = () => {
               description="Safety requirements and permits for this job"
               headerMarker="JF.A4.1"
               descriptionMarker="JF.A4.2"
-              variant="inline"
             >
               <div className="space-y-4">
                 <div>
@@ -1175,7 +1171,6 @@ const JobsFormPage: React.FC = () => {
               description="Previous executions and completion history for this job"
               headerMarker="JF.A5.1"
               descriptionMarker="JF.A5.2"
-              variant="inline"
               headerActions={
                 <>
                   <Button
@@ -1481,7 +1476,6 @@ const JobsFormPage: React.FC = () => {
                 );
               })()}
             </SectionBlock>
-            </div>
 
             {/* Save for Approval Button (only in modify mode) */}
             {isModifyMode && (

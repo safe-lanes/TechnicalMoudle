@@ -3488,6 +3488,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               label="Part A"
               title="Job Details"
               description="Work details about this work order"
+              variant="inline"
             />
             <div data-testid="WOF.AA"><Marker id="WOF.AA" /></div>
             <div data-testid="WOF.A"><Marker id="WOF.A" /></div>
@@ -4616,6 +4617,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 label="Part B"
                 title="Work Completion Record"
                 description="Enter work completion details here including Risk assessment, checklists, comments etc."
+                variant="inline"
               />
 
           {/* B1. Risk Assessment, Checklists & Records */}

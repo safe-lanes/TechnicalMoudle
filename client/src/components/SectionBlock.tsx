@@ -20,7 +20,7 @@ export function SectionBlock({ id, number, title, description, headerMarker, des
     <section id={id} className={isCard ? `bg-white border border-gray-200 shadow-sm rounded-lg ${className}` : className}>
       <div className={isCard ? "px-6 pt-4 pb-3" : "pb-3"}>
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-[#16569e] flex items-start gap-1.5" data-testid={headerMarker}>
+          <h3 className="text-sm font-semibold text-[#1e3a5f] flex items-start gap-1.5" data-testid={headerMarker}>
             {headerMarker && <Marker id={headerMarker} />}
             {number && <span>{number}.</span>}
             <span>{title}</span>
@@ -37,7 +37,7 @@ export function SectionBlock({ id, number, title, description, headerMarker, des
             {description}
           </p>
         )}
-        <div className="mt-2 h-0.5 bg-[#16569e]"></div>
+        <div className="mt-2 h-0.5 bg-[#1e3a5f]"></div>
       </div>
       <div className={isCard ? "px-6 py-4" : "py-4"}>
         {children}
