@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { calculateNextDueDate, normalizeDateToDDMMMYYYY, calculateMissedCycles, formatRelativeTime, formatRHWithSeparators } from "@shared/dateUtils";
 import {
   AlertDialog,
@@ -31,7 +31,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet, BarChart3, AlertTriangle, CheckCircle2, Clock, ExternalLink, RefreshCw, ChevronDown } from "lucide-react";
-import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange } from "@/components/filters/PeriodFilter";
 import RHTimelineViewer from "@/components/pms/RHTimelineViewer";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
@@ -487,9 +486,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [isExportingHistoryPDF, setIsExportingHistoryPDF] = useState(false);
   const WORK_HISTORY_COLLAPSED_COUNT = 2;
   const WORK_HISTORY_PAGE_SIZE = 5;
-  const [historyPeriodFilter, setHistoryPeriodFilter] = useState<PeriodFilterValue | null>(null);
+  const [historyComponentFilter, setHistoryComponentFilter] = useState('');
+  const [historyDateFrom, setHistoryDateFrom] = useState('');
+  const [historyDateTo, setHistoryDateTo] = useState('');
   const [expandedHistoryIndex, setExpandedHistoryIndex] = useState<number | null>(null);
-  const historyDateRange = useMemo(() => periodFilterToDateRange(historyPeriodFilter), [historyPeriodFilter]);
 
   const calcDaysLate = (originalDueDate: string | null | undefined, completionDate: string | null | undefined): number => {
     if (!originalDueDate || !completionDate) return 0;
@@ -506,13 +506,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     const raw = templateData.workHistory || [];
     return raw
       .filter((h: any) => {
-        if (historyDateRange) {
-          const dateStr = (h.isSkipped ? (h.skippedCycleDate || h.completionDate || h.workDate) : (h.completionDate || h.workDate))?.slice(0, 10) || '';
-          if (dateStr) {
-            const d = new Date(dateStr + 'T00:00:00');
-            if (d < historyDateRange.from || d > historyDateRange.to) return false;
-          }
-        }
+        const dateStr = (h.isSkipped ? (h.skippedCycleDate || h.completionDate || h.workDate) : (h.completionDate || h.workDate))?.slice(0, 10) || '';
+        if (historyComponentFilter && (h.componentCode || '') !== historyComponentFilter) return false;
+        if (historyDateFrom && dateStr < historyDateFrom) return false;
+        if (historyDateTo && dateStr > historyDateTo) return false;
         return true;
       })
       .map((h: any) => {
@@ -4281,6 +4278,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           >
             {(() => {
               const rawHistory = templateData.workHistory || [];
+              const uniqueComponents = Array.from(new Set<string>(rawHistory.map((h: any) => h.componentCode).filter(Boolean)));
               type SpareUsedItem = { partName?: string; partCode?: string; quantity?: number | null };
               const allHistory = rawHistory.map((history: any) => {
                 if (history.isSkipped) {
@@ -4325,13 +4323,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               });
 
               const filteredHistory = allHistory.filter((h: any) => {
-                if (historyDateRange) {
-                  const dateStr = h.date?.slice(0, 10) || '';
-                  if (dateStr) {
-                    const d = new Date(dateStr + 'T00:00:00');
-                    if (d < historyDateRange.from || d > historyDateRange.to) return false;
-                  }
-                }
+                const dateStr = h.date?.slice(0, 10) || '';
+                if (historyComponentFilter && h.componentCode !== historyComponentFilter) return false;
+                if (historyDateFrom && dateStr < historyDateFrom) return false;
+                if (historyDateTo && dateStr > historyDateTo) return false;
                 return true;
               });
 
@@ -4341,21 +4336,44 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 : filteredHistory.slice(0, WORK_HISTORY_COLLAPSED_COUNT);
               const totalPages = Math.ceil(totalCount / WORK_HISTORY_PAGE_SIZE);
 
-              const hasFilters = !!historyPeriodFilter;
+              const hasFilters = !!(historyComponentFilter || historyDateFrom || historyDateTo);
               const fmtDate = (d: string | null | undefined) => d ? d.slice(0, 10) : '—';
 
               return (
                 <>
                   {/* Filter bar */}
                   <div className="flex flex-wrap gap-2 items-center mb-3 p-2 bg-gray-50 rounded border border-gray-200" data-testid="history-filter-bar">
-                    <PeriodFilter
-                      value={historyPeriodFilter}
-                      onChange={(v) => { setHistoryPeriodFilter(v); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
+                    <select
+                      value={historyComponentFilter}
+                      onChange={e => { setHistoryComponentFilter(e.target.value); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
+                      data-testid="select-history-component"
+                      className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    >
+                      <option value="">All Components</option>
+                      {uniqueComponents.map(code => (
+                        <option key={code} value={code}>{code}</option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-gray-400">From</span>
+                    <input
+                      type="date"
+                      value={historyDateFrom}
+                      onChange={e => { setHistoryDateFrom(e.target.value); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
+                      data-testid="input-history-date-from"
+                      className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    />
+                    <span className="text-xs text-gray-400">To</span>
+                    <input
+                      type="date"
+                      value={historyDateTo}
+                      onChange={e => { setHistoryDateTo(e.target.value); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
+                      data-testid="input-history-date-to"
+                      className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
                     />
                     {hasFilters && (
                       <button
                         type="button"
-                        onClick={() => { setHistoryPeriodFilter(null); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
+                        onClick={() => { setHistoryComponentFilter(''); setHistoryDateFrom(''); setHistoryDateTo(''); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
                         data-testid="button-clear-history-filters"
                         className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 rounded border border-gray-200 bg-white hover:bg-gray-100"
                       >
