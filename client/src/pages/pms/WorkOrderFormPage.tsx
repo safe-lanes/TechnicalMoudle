@@ -3481,6 +3481,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           <div className="max-w-5xl mx-auto space-y-6">
 
             {/* Part A - Job Details */}
+            <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-6 space-y-8">
             <div data-testid="WOF3"><Marker id="WOF3" /></div>
             <PartHeader
               id="part-a"
@@ -3542,6 +3543,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               number="A1"
               title="Job Information" 
               description="Basic details and configuration for this work order"
+              variant="inline"
             >
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -3922,6 +3924,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             number="A2"
             title="Required Spare Parts"
             description="Spare parts needed for this work order"
+            variant="inline"
           >
             <div className="space-y-3">
               {!isPartAReadOnly && (<div className="flex justify-end">
@@ -4138,6 +4141,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             number={isUnplannedCreate ? "A2" : "A3"}
             title="Safety Requirements"
             description="Safety requirements and permits for this work order"
+            variant="inline"
           >
             <div className="space-y-3" data-testid="WOF.A4.3"><Marker id="WOF.A4.3" />
               {isUnplannedCreate ? (
@@ -4247,6 +4251,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             number={isUnplannedCreate ? "A3" : "A4"}
             title="Work History"
             description="Previous executions and completion history for this work order"
+            variant="inline"
             headerActions={
               <>
                 <Button
@@ -4599,10 +4604,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               );
             })()}
           </SectionBlock>
+          </div>
 
           {/* Part B - Work Completion Record (hidden for template mode) */}
           {resolvedMode !== 'template' && (
             <>
+            <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-6 space-y-8">
               <div data-testid="WOF.B"><Marker id="WOF.B" /></div>
               <PartHeader
                 id="part-b"
@@ -4618,6 +4625,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             id="completion"
             number="B1"
             title="Risk Assessment, Checklists & Records"
+            variant="inline"
           >
             <div className="space-y-4">
               {/* B1.1 Risk Assessment */}
@@ -4845,6 +4853,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             id="work-details"
             number="B2"
             title="Details of Work Carried Out"
+            variant="inline"
           >
             <div className="space-y-6">
               {/* B2.1 Work Duration */}
@@ -5195,6 +5204,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             id="running-hours"
             number="B3"
             title="Running Hours"
+            variant="inline"
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
@@ -5416,6 +5426,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             id="spare-parts-consumed"
             number="B4"
             title="Spare Parts Consumed"
+            variant="inline"
           >
             <div className="space-y-3">
               <div className="flex justify-end">
@@ -5827,6 +5838,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
             </div>
           </SectionBlock>
+          </div>
 
           {/* Approval Section - Only visible for Pending Approval work orders, hidden in embedded mode and vessel view */}
           {!embedded && currentWorkOrderStatus === 'Pending Approval' && !isVessel && (() => {

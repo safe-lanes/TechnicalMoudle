@@ -256,6 +256,7 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
           <div className="flex-1 overflow-auto p-6">
             {/* Part A - Job Details (A1 Only) */}
             <div className="space-y-6">
+              <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-6 space-y-8">
               <PartHeader
                 id="part-a"
                 label="Part A"
@@ -269,6 +270,7 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
                 number="A1"
                 title="Job Information" 
                 description="Basic details and configuration for this work order"
+                variant="inline"
               >
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -477,6 +479,7 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
                   </div>
                 </div>
               </SectionBlock>
+              </div>
 
               {/* Submit Button */}
               <div className="flex justify-end mt-6 pb-6">
