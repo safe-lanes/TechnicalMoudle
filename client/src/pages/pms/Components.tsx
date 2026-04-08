@@ -1439,6 +1439,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
             <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.6"><Marker id="B7.E.6" /> Min</th>
             <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.7"><Marker id="B7.E.7" /> Stock</th>
             <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.8"><Marker id="B7.E.8" /> Location</th>
+            <th className="text-center py-2 px-3 font-medium text-gray-600">Rotation</th>
             {FEATURES.IHM && (
               <th className="text-center py-2 px-3 font-medium text-gray-600" data-testid="B7.E.9" title="IHM Status"><Marker id="B7.E.9" /> IHM</th>
             )}
@@ -1448,7 +1449,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
         <tbody>
           {sparesWithInventory.length === 0 ? (
             <tr>
-              <td colSpan={FEATURES.IHM ? 11 : 10} className="text-center py-8">
+              <td colSpan={FEATURES.IHM ? 12 : 11} className="text-center py-8">
                 <div className="text-gray-400 text-sm">No spare parts linked to this component</div>
                 <p className="text-xs text-gray-500 mt-2">Navigate to the Spares module to manage spare parts inventory</p>
               </td>
@@ -1531,6 +1532,15 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
                     </div>
                   </PopoverContent>
                 </Popover>
+              </td>
+              <td className="py-3 px-3 text-center">
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  spare.isRotationItem
+                    ? "bg-blue-100 text-blue-800"
+                    : "bg-gray-100 text-gray-600"
+                }`}>
+                  {spare.isRotationItem ? "Yes" : "No"}
+                </span>
               </td>
               {FEATURES.IHM && (
                 <td className="py-3 px-3 text-center" data-testid={index === 0 ? "B7.E.17" : undefined}>
@@ -1664,6 +1674,18 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
                       ) : (
                         'No'
                       )}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Rotation Item</Label>
+                    <p className="text-sm font-medium">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        selectedSpareDetails.spare.isRotationItem
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-gray-100 text-gray-600'
+                      }`} data-testid="spare-details-rotation-item">
+                        {selectedSpareDetails.spare.isRotationItem ? 'Yes' : 'No'}
+                      </span>
                     </p>
                   </div>
                 </div>
