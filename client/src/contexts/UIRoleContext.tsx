@@ -9,6 +9,7 @@ interface UIRoleContextType {
   setUIRole: (role: UIRole) => void;
   isSailAdmin: boolean;
   isClientAdmin: boolean;
+  isTechSuperintendent: boolean;
   isHeadOfDept: boolean;
   isVessel: boolean;
 }
@@ -71,6 +72,7 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
     setUIRole,
     isSailAdmin: uiRole === "Sail_Admin",
     isClientAdmin: uiRole === "Client_Admin",
+    isTechSuperintendent: uiRole === "Tech_Superintendent",
     isHeadOfDept: uiRole === "Head_of_Dept",
     isVessel: uiRole === "Vessel",
   };
@@ -85,6 +87,7 @@ const FALLBACK_CONTEXT: UIRoleContextType = {
   setUIRole: () => {},
   isSailAdmin: false,
   isClientAdmin: false,
+  isTechSuperintendent: false,
   isHeadOfDept: false,
   isVessel: false,
 };

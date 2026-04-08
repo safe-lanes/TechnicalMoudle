@@ -1,11 +1,11 @@
-export type UIRole = "Sail_Admin" | "Client_Admin" | "Head_of_Dept" | "Vessel";
+export type UIRole = "Sail_Admin" | "Client_Admin" | "Tech_Superintendent" | "Head_of_Dept" | "Vessel";
 
-export const UI_ROLES: UIRole[] = ["Sail_Admin", "Client_Admin", "Head_of_Dept", "Vessel"];
+export const UI_ROLES: UIRole[] = ["Sail_Admin", "Client_Admin", "Tech_Superintendent", "Head_of_Dept", "Vessel"];
 
-// Visible roles in the dropdown
 export const VISIBLE_UI_ROLES: UIRole[] = [
   "Sail_Admin",
   "Client_Admin",
+  "Tech_Superintendent",
   "Head_of_Dept",
   "Vessel",
 ];
@@ -13,6 +13,7 @@ export const VISIBLE_UI_ROLES: UIRole[] = [
 export const UI_ROLE_LABELS: Record<UIRole, string> = {
   Sail_Admin: "Sail Admin",
   Client_Admin: "Client Admin",
+  Tech_Superintendent: "Technical Superintendent",
   Head_of_Dept: "Head of Dept",
   Vessel: "Vessel",
 };
@@ -20,6 +21,7 @@ export const UI_ROLE_LABELS: Record<UIRole, string> = {
 export function mapLoggedRoleToUIRole(userType: string | undefined | null, profileRole: string | undefined | null): UIRole | null {
   if (userType === "Office") {
     if (profileRole === "Sail Admin") return "Sail_Admin";
+    if (profileRole === "Admin") return "Tech_Superintendent";
     return "Client_Admin";
   }
 
