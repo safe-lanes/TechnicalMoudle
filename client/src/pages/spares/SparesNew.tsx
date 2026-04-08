@@ -1536,7 +1536,8 @@ const Spares: React.FC = () => {
         pageNumber: "",
         ihm: "No",
         remarks: "",
-        note: ""
+        note: "",
+        isRotationItem: false
       });
     },
     onError: (error: any) => {

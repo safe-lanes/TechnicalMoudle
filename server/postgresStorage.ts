@@ -7831,6 +7831,7 @@ export class PostgresStorage {
       positionNumber: spares.positionNumber,
       note: spares.note,
       isActive: spares.isActive,
+      isRotationItem: spares.isRotationItem,
       locationQty: spareLocationStock.qty,
     })
     .from(spareLocationStock)
