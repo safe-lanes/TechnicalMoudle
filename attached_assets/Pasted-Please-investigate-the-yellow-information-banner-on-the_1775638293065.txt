@@ -1,0 +1,59 @@
+Please investigate the yellow information banner on the Consumption Pattern Analysis report in the Reports module (Inventory – Spares).
+
+Current behavior:
+
+The banner text reads: “Analysis based on 5 days of consumption data. More accurate trends will develop over time.”
+
+This message appears even when the selected date range and underlying consumption history are clearly not just 5 days.
+
+I need you to:
+
+Confirm whether “5 days” is hardcoded
+
+Check the client code for this report (Consumption Pattern Analysis tabs and header) and identify exactly where this banner text and the “5 days” number are coming from.
+
+Confirm if the value “5 days” is:
+
+a hardcoded literal constant,
+
+coming from a fixed config/threshold, or
+
+actually computed from the available data points in the selected date range.
+
+Explain the logic behind this message
+
+What is the intended business rule for showing this banner?
+
+On what basis was 5 days chosen as the cutoff for “low data”?
+
+Is the message supposed to adapt to different data volumes (e.g., “Analysis based on X days of consumption data” or switch off entirely after a threshold is crossed), or is it always 5 days?
+
+Validate against real data
+
+For the current vessel and date range shown in the UI, calculate the actual number of days covered by the consumption entries returned to the report.
+
+Compare that number to the “5 days” in the banner and clearly state whether the banner is accurate or misleading for this example.
+
+Propose a fix if it is hardcoded or misleading
+
+If the message is hardcoded to 5 days or does not correctly reflect the actual data window, propose and implement a better behavior, for example:
+
+Dynamically compute the actual number of distinct days with consumption data in the selected range and display that number instead of a fixed “5 days”; or
+
+Only show a generic “Limited data — trends may not be fully accurate yet” message when the data volume is below a configurable threshold (e.g., < N days or < M events), and hide the banner otherwise.
+
+Make sure the message, threshold, and logic are easy to adjust in configuration and not scattered as magic numbers in multiple files.
+
+Document the implementation
+
+Point out the exact files and functions where this logic lives (both frontend and backend, if any).
+
+Clearly document:
+
+whether the threshold is configurable,
+
+how the number of days/events is calculated, and
+
+when the banner appears or is suppressed.
+
+Before changing anything, first give me a short written justification: is this banner currently hardcoded, and why was “5 days” chosen? Then, after implementing the improved logic, confirm the new behavior with at least one concrete example (date range, number of days, banner text).
