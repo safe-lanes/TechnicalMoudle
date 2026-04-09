@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Marker } from "@/components/Marker";
 import { useVessel } from "@/contexts/VesselContext";
 import {
@@ -10,7 +9,6 @@ import {
   Store,
   Biohazard,
   Settings2,
-  Search,
   AlertTriangle,
   LifeBuoy,
   ChevronRight,
@@ -152,7 +150,6 @@ const ReportsModule = () => {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
   const [actionTrigger, setActionTrigger] = useState<ReportActionTrigger | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editCategoryOrder, setEditCategoryOrder] = useState<ReportCategory[]>([]);
@@ -162,6 +159,7 @@ const ReportsModule = () => {
   const [globalFilters, setGlobalFilters] = useState<FilterValues>({
     vessels: vesselId ? [vesselId] : [],
     component: "",
+    department: "",
     dateRange: { from: null, to: null },
     periodFilter: null,
   });
@@ -355,6 +353,7 @@ const ReportsModule = () => {
     setGlobalFilters({
       vessels: [],
       component: "",
+      department: "",
       dateRange: { from: null, to: null },
       periodFilter: null,
     });
@@ -366,22 +365,10 @@ const ReportsModule = () => {
 
   const filteredCategories = useMemo(() => {
     const baseCategories = categoryOrder;
-    const allCategories = favoritesCategory
+    return favoritesCategory
       ? [favoritesCategory, ...baseCategories]
       : baseCategories;
-
-    if (!searchQuery.trim()) return allCategories;
-    const q = searchQuery.toLowerCase();
-    return allCategories
-      .map(cat => {
-        const matchedReports = cat.reports.filter(r => r.name.toLowerCase().includes(q));
-        const categoryMatches = cat.title.toLowerCase().includes(q);
-        if (categoryMatches) return cat;
-        if (matchedReports.length > 0) return { ...cat, reports: matchedReports };
-        return null;
-      })
-      .filter(Boolean) as ReportCategory[];
-  }, [searchQuery, categoryOrder, favoritesCategory]);
+  }, [categoryOrder, favoritesCategory]);
 
   const selectedReportName = useMemo(() => {
     if (!selectedCategoryId || !selectedReportId) return null;
@@ -429,18 +416,6 @@ const ReportsModule = () => {
           onFiltersChange={handleFiltersChange}
           onReset={handleClearAll}
         />
-        <div className="flex items-center gap-3 mt-2">
-          <div className="relative w-72">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search reports..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-9"
-              data-testid="G3"
-            />
-          </div>
-        </div>
       </div>
 
       <div className="flex flex-1 gap-0 overflow-hidden rounded-lg shadow-sm">

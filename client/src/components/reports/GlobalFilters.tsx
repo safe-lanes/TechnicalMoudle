@@ -19,10 +19,20 @@ import { cn } from "@/lib/utils";
 import { useVessels } from "@/hooks/useVessels";
 import { useQuery } from "@tanstack/react-query";
 import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange, getPeriodLabel } from "@/components/filters/PeriodFilter";
+import { useDepartmentOptions } from "@/hooks/useDepartments";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Building2 } from "lucide-react";
 
 export interface FilterValues {
   vessels: string[];
   component: string;
+  department: string;
   dateRange: {
     from: Date | null;
     to: Date | null;
@@ -58,6 +68,7 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
   className,
 }) => {
   const { data: vessels = [] } = useVessels();
+  const { options: departmentOptions } = useDepartmentOptions();
   const [vesselPopoverOpen, setVesselPopoverOpen] = useState(false);
   const [vesselSearch, setVesselSearch] = useState("");
 
@@ -221,6 +232,7 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
     let count = 0;
     if (filters.periodFilter) count++;
     if (filters.component) count++;
+    if (filters.department) count++;
     return count;
   };
 
@@ -387,6 +399,24 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
         className="min-w-[180px]"
       />
 
+      <Select
+        value={filters.department || "all"}
+        onValueChange={(val) => onFiltersChange({ ...filters, department: val === "all" ? "" : val })}
+      >
+        <SelectTrigger className="w-[180px] h-9 text-sm" data-testid="select-department">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+            <SelectValue placeholder="All Departments" />
+          </div>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Departments</SelectItem>
+          {departmentOptions.map((dept) => (
+            <SelectItem key={dept.value} value={dept.value}>{dept.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
       {getActiveFiltersCount() > 0 && (
         <Button
           variant="ghost"
@@ -423,6 +453,19 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
                 onClick={() => handlePeriodFilterChange(null)}
                 className="ml-0.5 hover:text-foreground"
                 data-testid="button-clear-date-filter"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {filters.department && (
+            <Badge variant="secondary" className="flex items-center gap-1 text-xs py-0.5">
+              {departmentOptions.find(d => d.value === filters.department)?.label || filters.department}
+              <button
+                type="button"
+                onClick={() => onFiltersChange({ ...filters, department: "" })}
+                className="ml-0.5 hover:text-foreground"
+                data-testid="button-clear-department-filter"
               >
                 <X className="h-3 w-3" />
               </button>
