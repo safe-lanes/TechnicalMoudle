@@ -953,6 +953,7 @@ const JobsFormPage: React.FC = () => {
           <div className="max-w-5xl mx-auto space-y-6">
             
             {/* Part A - Job Details */}
+            <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-6 space-y-8">
             <PartHeader
               id="part-a"
               label="Part A"
@@ -1583,6 +1584,7 @@ const JobsFormPage: React.FC = () => {
                 );
               })()}
             </SectionBlock>
+            </div>
 
             {/* Save for Approval Button (only in modify mode) */}
             {isModifyMode && (
