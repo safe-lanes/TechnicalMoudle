@@ -247,13 +247,17 @@ export async function getVesselComponentsByFleetEquipmentPrefix(vesselCode: stri
     ));
 }
 
-export async function getActiveComponentMappingsForVessel(vesselCode: string) {
+export async function getActiveComponentMappingsForVessel(vesselCode: string, fleetEquipmentCode?: string) {
   const db = await getDb();
+  const conditions = [
+    eq(fleetComponentMapping.vesselCode, vesselCode),
+    eq(fleetComponentMapping.isActive, true),
+  ];
+  if (fleetEquipmentCode) {
+    conditions.push(eq(fleetComponentMapping.fleetEquipmentCode, fleetEquipmentCode));
+  }
   return db.select().from(fleetComponentMapping)
-    .where(and(
-      eq(fleetComponentMapping.vesselCode, vesselCode),
-      eq(fleetComponentMapping.isActive, true),
-    ));
+    .where(and(...conditions));
 }
 
 export async function getActiveFleetComponentByCode(code: string) {
@@ -281,13 +285,17 @@ export async function updateComponentResyncFields(cuuid: string, fields: Record<
     .where(eq(components.cuuid, cuuid));
 }
 
-export async function getActiveJobMappingsForVessel(vesselCode: string) {
+export async function getActiveJobMappingsForVessel(vesselCode: string, fleetEquipmentCode?: string) {
   const db = await getDb();
+  const conditions = [
+    eq(fleetJobVesselMapping.vesselCode, vesselCode),
+    eq(fleetJobVesselMapping.isActive, true),
+  ];
+  if (fleetEquipmentCode) {
+    conditions.push(eq(fleetJobVesselMapping.fleetEquipmentCode, fleetEquipmentCode));
+  }
   return db.select().from(fleetJobVesselMapping)
-    .where(and(
-      eq(fleetJobVesselMapping.vesselCode, vesselCode),
-      eq(fleetJobVesselMapping.isActive, true),
-    ));
+    .where(and(...conditions));
 }
 
 export async function getFleetJobByCode(jobCode: string) {
@@ -315,13 +323,17 @@ export async function updateJobResyncFields(juuid: string, fields: Record<string
     .where(eq(jobs.juuid, juuid));
 }
 
-export async function getActiveSpareMappingsForVessel(vesselCode: string) {
+export async function getActiveSpareMappingsForVessel(vesselCode: string, fleetEquipmentCode?: string) {
   const db = await getDb();
+  const conditions = [
+    eq(fleetSpareVesselMapping.vesselCode, vesselCode),
+    eq(fleetSpareVesselMapping.isActive, true),
+  ];
+  if (fleetEquipmentCode) {
+    conditions.push(eq(fleetSpareVesselMapping.fleetEquipmentCode, fleetEquipmentCode));
+  }
   return db.select().from(fleetSpareVesselMapping)
-    .where(and(
-      eq(fleetSpareVesselMapping.vesselCode, vesselCode),
-      eq(fleetSpareVesselMapping.isActive, true),
-    ));
+    .where(and(...conditions));
 }
 
 export async function getFleetSpareByPartCode(partCode: string) {

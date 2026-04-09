@@ -608,11 +608,11 @@ export async function copyVessel(req: Request, res: Response) {
 
 export async function resyncComponents(req: Request, res: Response) {
   try {
-    const { vesselCode } = req.body;
+    const { vesselCode, fleetEquipmentCode } = req.body;
     if (!vesselCode) {
       return res.status(400).json({ error: 'Missing required parameter: vesselCode' });
     }
-    const result = await adminService.resyncComponents(vesselCode);
+    const result = await adminService.resyncComponents(vesselCode, fleetEquipmentCode);
     res.json(result);
   } catch (error) {
     console.error('Error re-syncing components:', error);
@@ -622,11 +622,11 @@ export async function resyncComponents(req: Request, res: Response) {
 
 export async function resyncJobs(req: Request, res: Response) {
   try {
-    const { vesselCode } = req.body;
+    const { vesselCode, fleetEquipmentCode } = req.body;
     if (!vesselCode) {
       return res.status(400).json({ error: 'Missing required parameter: vesselCode' });
     }
-    const result = await adminService.resyncJobs(vesselCode);
+    const result = await adminService.resyncJobs(vesselCode, fleetEquipmentCode);
     res.json(result);
   } catch (error) {
     console.error('Error re-syncing jobs:', error);
@@ -636,11 +636,11 @@ export async function resyncJobs(req: Request, res: Response) {
 
 export async function resyncSpares(req: Request, res: Response) {
   try {
-    const { vesselCode } = req.body;
+    const { vesselCode, fleetEquipmentCode } = req.body;
     if (!vesselCode) {
       return res.status(400).json({ error: 'Missing required parameter: vesselCode' });
     }
-    const result = await adminService.resyncSpares(vesselCode);
+    const result = await adminService.resyncSpares(vesselCode, fleetEquipmentCode);
     res.json(result);
   } catch (error) {
     console.error('Error re-syncing spares:', error);

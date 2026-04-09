@@ -1038,39 +1038,62 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
     }
   };
 
-  const handleMapComponents = () => {
+  const handleMapComponents = async () => {
     if (selectedComponentsToMap.size === 0 || !selectedVesselForDetail) return;
-    
-    const componentsToMap = unmappedComponentsForVessel.filter(c => 
+
+    const componentsToMap = unmappedComponentsForVessel.filter(c =>
       selectedComponentsToMap.has(c.fleetEquipmentCode)
     );
-    
-    Promise.all(
-      componentsToMap.map(component => 
-        addMappingMutation.mutateAsync({
-          fleetEquipmentCode: component.fleetEquipmentCode,
-          vesselCode: selectedVesselForDetail.vesselCode,
-          vesselName: selectedVesselForDetail.vesselName,
-          componentCode: component.fleetEquipmentCode,
-          componentName: component.fleetEquipmentName,
-        })
-      )
-    ).then(() => {
+    if (componentsToMap.length === 0) return;
+
+    const vesselCode = selectedVesselForDetail.vesselCode;
+    let mapped = 0;
+    const errors: string[] = [];
+
+    try {
+      // Fetch vessel components to find matching cuuids
+      const compRes = await fetch(`/technical/api/components?vesselId=${encodeURIComponent(vesselCode)}`, { credentials: "include" });
+      if (!compRes.ok) throw new Error("Failed to fetch vessel components");
+      const vesselComponents: any[] = await compRes.json();
+
+      for (const component of componentsToMap) {
+        const matchingComp = vesselComponents.find(
+          (vc: any) => vc.fleetEquipmentCode === component.fleetEquipmentCode
+        );
+        if (!matchingComp) {
+          errors.push(`${component.fleetEquipmentName || component.fleetEquipmentCode}: Component not available in vessel`);
+          continue;
+        }
+        try {
+          await apiRequest("POST", "/technical/api/fleet-admin/fleet-component-mappings", {
+            fleetEquipmentCode: component.fleetEquipmentCode,
+            vesselCode,
+            componentCode: matchingComp.componentCode || component.fleetEquipmentCode,
+            componentName: matchingComp.name || component.fleetEquipmentName,
+            componentId: matchingComp.cuuid,
+            mappedBy: 'admin',
+            isActive: true,
+          });
+          mapped++;
+        } catch {
+          errors.push(`${component.fleetEquipmentName || component.fleetEquipmentCode}: Failed to create mapping`);
+        }
+      }
+
       setSelectedComponentsToMap(new Set());
       setComponentMappingSearchQuery("");
       setIsComponentMappingDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/component-vessel-mappings"] });
-      toast({
-        title: "Success",
-        description: `${componentsToMap.length} component(s) have been mapped`,
-      });
-    }).catch(() => {
-      toast({
-        title: "Error",
-        description: "Failed to map components. Please try again.",
-        variant: "destructive",
-      });
-    });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/fleet-component-mappings"] });
+
+      if (errors.length > 0) {
+        toast({ title: "Partial Success", description: `Mapped: ${mapped}, Skipped: ${errors.length}. ${errors[0]}` });
+      } else {
+        toast({ title: "Success", description: `${mapped} component(s) have been mapped` });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to map components. Please try again.", variant: "destructive" });
+    }
   };
 
   const handleMappingCheckboxChange = (mappingIds: number[], checked: boolean) => {
@@ -1304,14 +1327,16 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
   };
 
   // ── Re-Sync handlers ──
-  const handleResync = async (type: 'components' | 'jobs' | 'spares', vesselCodes: string[]) => {
+  const handleResync = async (type: 'components' | 'jobs' | 'spares', vesselCodes: string[], fleetEquipmentCode?: string) => {
     if (vesselCodes.length === 0) return;
     setIsResyncing(true);
     let synced = 0, skipped = 0, noChanges = 0, failed = 0;
     try {
       for (const vesselCode of vesselCodes) {
         try {
-          const res = await apiRequest("POST", `/technical/api/fleet-admin/resync/${type}`, { vesselCode });
+          const body: Record<string, string> = { vesselCode };
+          if (fleetEquipmentCode) body.fleetEquipmentCode = fleetEquipmentCode;
+          const res = await apiRequest("POST", `/technical/api/fleet-admin/resync/${type}`, body);
           const data = await res.json();
           synced += data.synced || 0;
           skipped += data.skipped || 0;
@@ -1337,21 +1362,21 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
     const codes = selectedMappingIds.size > 0
       ? filteredMappingsForDialog.filter(e => e.allMappingIds.some(id => selectedMappingIds.has(id))).map(e => e.vesselCode)
       : filteredMappingsForDialog.map(e => e.vesselCode);
-    handleResync('components', codes);
+    handleResync('components', codes, selectedComponent?.fleetEquipmentCode);
   };
 
   const handleResyncFromJobDialog = () => {
     const codes = selectedJobVesselIds.size > 0
       ? Array.from(selectedJobVesselIds)
       : jobMappedVessels.map(v => v.id);
-    handleResync('jobs', codes);
+    handleResync('jobs', codes, selectedComponent?.fleetEquipmentCode);
   };
 
   const handleResyncFromSpareDialog = () => {
     const codes = selectedSpareVesselIds.size > 0
       ? Array.from(selectedSpareVesselIds)
       : spareMappedVessels.map(v => v.id);
-    handleResync('spares', codes);
+    handleResync('spares', codes, selectedComponent?.fleetEquipmentCode);
   };
 
   return (

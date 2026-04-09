@@ -7165,12 +7165,13 @@ export class PostgresStorage {
     return rows;
   }
 
-  async createComponentVesselMapping(data: { 
-    fleetEquipmentCode: string; 
-    vesselCode: string; 
-    vesselName: string; 
-    componentCode?: string; 
+  async createComponentVesselMapping(data: {
+    fleetEquipmentCode: string;
+    vesselCode: string;
+    vesselName: string;
+    componentCode?: string;
     componentName?: string;
+    componentId?: string;
   }): Promise<any> {
     const db = await getDb();
     const componentCode = data.componentCode || data.fleetEquipmentCode;
@@ -7180,6 +7181,7 @@ export class PostgresStorage {
       vesselCode: data.vesselCode,
       componentCode: componentCode,
       componentName: data.componentName,
+      componentId: data.componentId ?? null,
       mappedBy: 'admin',
     }).onConflictDoNothing({
       target: [fleetComponentMapping.fleetEquipmentCode, fleetComponentMapping.vesselCode, fleetComponentMapping.componentCode],

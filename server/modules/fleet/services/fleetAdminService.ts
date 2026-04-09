@@ -299,6 +299,7 @@ const createComponentVesselMappingSchema = z.object({
   vesselName: z.string(),
   componentCode: z.string().optional(),
   componentName: z.string().optional(),
+  componentId: z.string().optional(),
 });
 
 export async function getComponentVesselMappings() {
@@ -318,27 +319,44 @@ export async function mapVesselWithAutoLinkage(body: any) {
   });
   const { fleetEquipmentCode, vesselCode, vesselName } = schema.parse(body);
 
-  const parentMapping = await repo.createComponentVesselMapping({
-    fleetEquipmentCode,
-    vesselCode,
-    vesselName,
-    componentCode: fleetEquipmentCode,
-    componentName: undefined,
-  });
-
   const vesselComponents = await repo.getVesselComponentsByFleetEquipmentPrefix(vesselCode, fleetEquipmentCode);
+
+  // Find the parent vessel component (exact match on fleetEquipmentCode)
+  const parentVesselComp = vesselComponents.find(vc => vc.fleetEquipmentCode === fleetEquipmentCode);
+  let parentMapping: any = null;
+  try {
+    parentMapping = await repo.createFleetComponentMappingRecord({
+      fleetEquipmentCode,
+      vesselCode,
+      componentCode: parentVesselComp?.componentCode || fleetEquipmentCode,
+      componentName: parentVesselComp?.name || undefined,
+      componentId: parentVesselComp?.cuuid || undefined,
+      mappedBy: 'admin',
+      isActive: true,
+    });
+  } catch (err: any) {
+    // Ignore duplicate key — mapping already exists
+    if (!err.message?.includes('unique') && !err.message?.includes('duplicate')) throw err;
+  }
 
   let linkedCount = 0;
   for (const vc of vesselComponents) {
     if (vc.componentCode && vc.componentCode !== fleetEquipmentCode) {
-      await repo.createComponentVesselMapping({
-        fleetEquipmentCode: vc.fleetEquipmentCode || fleetEquipmentCode,
-        vesselCode,
-        vesselName,
-        componentCode: vc.componentCode,
-        componentName: vc.name || vc.fleetEquipmentName || undefined,
-      });
-      linkedCount++;
+      try {
+        await repo.createFleetComponentMappingRecord({
+          fleetEquipmentCode: vc.fleetEquipmentCode || fleetEquipmentCode,
+          vesselCode,
+          componentCode: vc.componentCode,
+          componentName: vc.name || vc.fleetEquipmentName || undefined,
+          componentId: vc.cuuid || undefined,
+          mappedBy: 'admin',
+          isActive: true,
+        });
+        linkedCount++;
+      } catch (err: any) {
+        // Ignore duplicate key — mapping already exists
+        if (!err.message?.includes('unique') && !err.message?.includes('duplicate')) throw err;
+      }
     }
   }
 
@@ -1089,8 +1107,8 @@ const COMPONENT_FIELD_MAP: Array<{ fleetKey: string; vesselKey: string; label: s
   { fleetKey: 'notes',              vesselKey: 'notes',              label: 'notes' },
 ];
 
-export async function resyncComponents(vesselCode: string): Promise<ResyncResult> {
-  const mappings = await repo.getActiveComponentMappingsForVessel(vesselCode);
+export async function resyncComponents(vesselCode: string, fleetEquipmentCode?: string): Promise<ResyncResult> {
+  const mappings = await repo.getActiveComponentMappingsForVessel(vesselCode, fleetEquipmentCode);
   const result: ResyncResult = { synced: 0, skipped: 0, failed: 0, noChanges: 0, details: [] };
 
   for (const m of mappings) {
@@ -1158,8 +1176,8 @@ const JOB_FIELD_MAP: Array<{ fleetKey: string; vesselKey: string; label: string 
   { fleetKey: 'department',       vesselKey: 'department',       label: 'department' },
 ];
 
-export async function resyncJobs(vesselCode: string): Promise<ResyncResult> {
-  const mappings = await repo.getActiveJobMappingsForVessel(vesselCode);
+export async function resyncJobs(vesselCode: string, fleetEquipmentCode?: string): Promise<ResyncResult> {
+  const mappings = await repo.getActiveJobMappingsForVessel(vesselCode, fleetEquipmentCode);
   const result: ResyncResult = { synced: 0, skipped: 0, failed: 0, noChanges: 0, details: [] };
 
   for (const m of mappings) {
@@ -1226,8 +1244,8 @@ const SPARE_FIELD_MAP: Array<{ fleetKey: string; vesselKey: string; label: strin
   { fleetKey: 'evidenceType',       vesselKey: 'evidenceType',   label: 'evidence_type' },
 ];
 
-export async function resyncSpares(vesselCode: string): Promise<ResyncResult> {
-  const mappings = await repo.getActiveSpareMappingsForVessel(vesselCode);
+export async function resyncSpares(vesselCode: string, fleetEquipmentCode?: string): Promise<ResyncResult> {
+  const mappings = await repo.getActiveSpareMappingsForVessel(vesselCode, fleetEquipmentCode);
   const result: ResyncResult = { synced: 0, skipped: 0, failed: 0, noChanges: 0, details: [] };
 
   for (const m of mappings) {
