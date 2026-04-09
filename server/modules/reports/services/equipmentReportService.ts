@@ -906,6 +906,8 @@ export async function getLsaFfaMaintenanceSchedule(
   statusFilter: string | undefined,
   equipmentType: string | undefined,
   format: string,
+  startDate?: string,
+  endDate?: string,
 ) {
   const allVessels = await repo.getVessels();
   let allComponents: any[] = [];
@@ -1044,6 +1046,23 @@ export async function getLsaFfaMaintenanceSchedule(
     });
   }
 
+  if (startDate || endDate) {
+    const startD = startDate ? new Date(startDate) : null;
+    const endD = endDate ? new Date(endDate) : null;
+    if (endD) endD.setHours(23, 59, 59, 999);
+    const dateFiltered = scheduleItems.filter(item => {
+      const rawDate = item.nextDueDate;
+      if (!rawDate || rawDate === '-') return false;
+      const d = new Date(rawDate);
+      if (isNaN(d.getTime())) return false;
+      if (startD && d < startD) return false;
+      if (endD && d > endD) return false;
+      return true;
+    });
+    scheduleItems.length = 0;
+    scheduleItems.push(...dateFiltered);
+  }
+
   if (statusFilter && statusFilter !== 'all') {
     const statusMap: Record<string, string> = {
       'on-schedule': 'On Schedule',
@@ -1146,6 +1165,8 @@ export async function getCriticalEquipmentSchedule(
   statusFilter: string | undefined,
   category: string | undefined,
   format: string,
+  startDate?: string,
+  endDate?: string,
 ) {
   const allVessels = await repo.getVessels();
   let allComponents: any[] = [];
@@ -1278,6 +1299,23 @@ export async function getCriticalEquipmentSchedule(
       estimatedManHours: '-',
       runningHours: comp.currentCumulativeRH || '-'
     });
+  }
+
+  if (startDate || endDate) {
+    const startD = startDate ? new Date(startDate) : null;
+    const endD = endDate ? new Date(endDate) : null;
+    if (endD) endD.setHours(23, 59, 59, 999);
+    const dateFiltered = scheduleItems.filter(item => {
+      const rawDate = item.nextDueDate;
+      if (!rawDate || rawDate === '-') return false;
+      const d = new Date(rawDate);
+      if (isNaN(d.getTime())) return false;
+      if (startD && d < startD) return false;
+      if (endD && d > endD) return false;
+      return true;
+    });
+    scheduleItems.length = 0;
+    scheduleItems.push(...dateFiltered);
   }
 
   if (statusFilter && statusFilter !== 'all') {

@@ -507,7 +507,11 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
       }
 
       case 'stores-consumption-analysis': {
-        const apiRes = await fetch(`/technical/api/reports/stores-consumption-analysis/${effectiveVesselId}`, { credentials: 'include' });
+        const storesConsParams = new URLSearchParams();
+        if (categoryFilters.dateRange?.from) storesConsParams.set('startDate', categoryFilters.dateRange.from.toISOString());
+        if (categoryFilters.dateRange?.to) storesConsParams.set('endDate', categoryFilters.dateRange.to.toISOString());
+        const storesConsQs = storesConsParams.toString() ? `?${storesConsParams}` : '';
+        const apiRes = await fetch(`/technical/api/reports/stores-consumption-analysis/${effectiveVesselId}${storesConsQs}`, { credentials: 'include' });
         if (!apiRes.ok) throw new Error('Failed to fetch consumption analysis data');
         const freshData = await apiRes.json();
 

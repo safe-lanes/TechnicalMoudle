@@ -359,13 +359,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
     switch (reportId) {
       case 'due-jobs-7': {
-        // CRITICAL: Include OVERDUE jobs (dueDate < now) AND jobs due within 7 days
-        // Previous bug: `dueDate >= now` was excluding all overdue jobs!
         const dueJobs = vesselWorkOrders.filter((wo: any) => {
           if (!wo.dueDate) return false;
           if (wo.status === 'Completed' || wo.status === 'Postponed') return false;
+          if (isDateRangeSet && !isDateInRange(wo.dueDate, dateFrom, dateTo)) return false;
           const dueDate = new Date(wo.dueDate);
-          // Include: overdue (dueDate < now) OR due within 7 days (dueDate <= sevenDaysFromNow)
           return dueDate <= sevenDaysFromNow;
         });
 
@@ -439,17 +437,15 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'overdue-jobs': {
-        // Grace period: 7 days for calendar, 168 hours for RH
         const GRACE_PERIOD_DAYS = 7;
         const GRACE_PERIOD_RH = 168;
         const gracePeriodDate = new Date(now);
         gracePeriodDate.setDate(gracePeriodDate.getDate() - GRACE_PERIOD_DAYS);
         
-        // Filter: Past grace period (dueDate < today - 7 days) or RH overdue > 168
         const overdueJobs = vesselWorkOrders.filter((wo: any) => {
           if (wo.status === 'Completed' || wo.status === 'Postponed') return false;
+          if (isDateRangeSet && !isDateInRange(wo.dueDate, dateFrom, dateTo)) return false;
           
-          // Calendar-based overdue (past grace period)
           if (wo.dueDate) {
             const dueDate = new Date(wo.dueDate);
             if (dueDate < gracePeriodDate) return true;
@@ -982,7 +978,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'postponement-log': {
-        const postponedWOs = vesselWorkOrders.filter((wo: any) => wo.status === 'Postponed');
+        const postponedWOs = vesselWorkOrders.filter((wo: any) => {
+          if (wo.status !== 'Postponed') return false;
+          if (isDateRangeSet && !isDateInRange(wo.dueDate, dateFrom, dateTo)) return false;
+          return true;
+        });
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
@@ -1047,7 +1047,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       case 'priority-performance': {
         const priorityGroups: Record<string, { total: number; completed: number; overdue: number }> = {};
         
-        vesselWorkOrders.forEach((wo: any) => {
+        const ppFilteredWOs = isDateRangeSet
+          ? vesselWorkOrders.filter((wo: any) => isDateInRange(wo.dueDate, dateFrom, dateTo))
+          : vesselWorkOrders;
+        ppFilteredWOs.forEach((wo: any) => {
           const priority = wo.jobPriority || 'Normal';
           if (!priorityGroups[priority]) {
             priorityGroups[priority] = { total: 0, completed: 0, overdue: 0 };
@@ -1095,7 +1098,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         ];
 
         const data = vesselWorkOrders
-          .filter((wo: any) => wo.status === 'Completed')
+          .filter((wo: any) => wo.status === 'Completed' && (!isDateRangeSet || isDateInRange(wo.dateCompleted || wo.completedDate, dateFrom, dateTo)))
           .map((wo: any) => {
             const planned = wo.plannedHours || wo.estimatedHours || 0;
             const actual = wo.actualHours || wo.hoursSpent || planned;
@@ -1119,7 +1122,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'workload-distribution': {
-        // Enhanced workload distribution with more metrics
         const rankStats: Record<string, { 
           count: number; 
           completed: number; 
@@ -1133,7 +1135,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           department: string;
         }> = {};
         
-        vesselWorkOrders.forEach((wo: any) => {
+        const wdFilteredWOs = isDateRangeSet
+          ? vesselWorkOrders.filter((wo: any) => isDateInRange(wo.dueDate, dateFrom, dateTo))
+          : vesselWorkOrders;
+        wdFilteredWOs.forEach((wo: any) => {
           const assignee = wo.assignedTo || wo.assignee || wo.performedBy || wo.responsibleRank || 'Unassigned';
           const dept = wo.department || 'N/A';
           
@@ -1419,6 +1424,20 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     }
   };
 
+  const isDateInRange = (dateStr: string | null | undefined, from: Date | null | undefined, to: Date | null | undefined): boolean => {
+    if (!from && !to) return true;
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return false;
+    if (from && d < from) return false;
+    if (to) {
+      const endOfDay = new Date(to);
+      endOfDay.setHours(23, 59, 59, 999);
+      if (d > endOfDay) return false;
+    }
+    return true;
+  };
+
   const filteredWorkOrders = useMemo(() => {
     let result = workOrders;
     if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
@@ -1432,21 +1451,12 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         return compName.includes(q) || compCode.includes(q);
       });
     }
-    if (categoryFilters.dateRange?.from || categoryFilters.dateRange?.to) {
-      result = result.filter((wo: any) => {
-        if (!wo.dueDate) return false;
-        const dueDate = new Date(wo.dueDate);
-        if (categoryFilters.dateRange.from && dueDate < categoryFilters.dateRange.from) return false;
-        if (categoryFilters.dateRange.to) {
-          const endOfDay = new Date(categoryFilters.dateRange.to);
-          endOfDay.setHours(23, 59, 59, 999);
-          if (dueDate > endOfDay) return false;
-        }
-        return true;
-      });
-    }
     return result;
-  }, [workOrders, categoryFilters.dateRange, globalVessels, globalComponent, vessels.length]);
+  }, [workOrders, globalVessels, globalComponent, vessels.length]);
+
+  const dateFrom = categoryFilters.dateRange?.from;
+  const dateTo = categoryFilters.dateRange?.to;
+  const isDateRangeSet = !!(dateFrom || dateTo);
 
   const isDateRangeActive = !!(categoryFilters.dateRange?.from || categoryFilters.dateRange?.to);
 

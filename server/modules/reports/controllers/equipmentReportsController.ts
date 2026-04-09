@@ -197,12 +197,14 @@ export async function getLsaFfaMaintenanceSchedule(req: Request, res: Response) 
     const statusFilter = req.query.status as string | undefined;
     const equipmentType = req.query.equipmentType as string | undefined;
     const format = (req.query.format as string) || 'json';
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
 
     if (!vesselId) {
       return res.status(400).json({ error: "vesselId is required" });
     }
 
-    const result = await equipmentReportService.getLsaFfaMaintenanceSchedule(vesselId, statusFilter, equipmentType, format);
+    const result = await equipmentReportService.getLsaFfaMaintenanceSchedule(vesselId, statusFilter, equipmentType, format, startDate, endDate);
 
     if (result.type === 'excel') {
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -231,12 +233,14 @@ export async function getCriticalEquipmentSchedule(req: Request, res: Response) 
     const statusFilter = req.query.status as string | undefined;
     const category = req.query.category as string | undefined;
     const format = (req.query.format as string) || 'json';
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
 
     if (!vesselId) {
       return res.status(400).json({ error: "vesselId is required" });
     }
 
-    const result = await equipmentReportService.getCriticalEquipmentSchedule(vesselId, statusFilter, category, format);
+    const result = await equipmentReportService.getCriticalEquipmentSchedule(vesselId, statusFilter, category, format, startDate, endDate);
 
     if (result.type === 'excel') {
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

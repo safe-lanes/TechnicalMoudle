@@ -163,11 +163,13 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
   });
 
   const { data: scheduleData, isLoading: scheduleLoading } = useQuery<any>({
-    queryKey: ['/technical/api/reports/critical-equipment-schedule', effectiveVesselId, statusFilter],
+    queryKey: ['/technical/api/reports/critical-equipment-schedule', effectiveVesselId, statusFilter, categoryFilters.dateRange?.from?.getTime(), categoryFilters.dateRange?.to?.getTime()],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.set('vesselId', effectiveVesselId || 'all');
       if (statusFilter !== 'all') params.set('status', statusFilter);
+      if (categoryFilters.dateRange?.from) params.set('startDate', categoryFilters.dateRange.from.toISOString());
+      if (categoryFilters.dateRange?.to) params.set('endDate', categoryFilters.dateRange.to.toISOString());
       const res = await fetch(`/technical/api/reports/critical-equipment-schedule?${params}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
@@ -208,8 +210,22 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
         return name.includes(q) || code.includes(q);
       });
     }
+    if (categoryFilters.dateRange?.from || categoryFilters.dateRange?.to) {
+      result = result.filter((item: any) => {
+        if (!item.nextDueDate || item.nextDueDate === '-') return false;
+        const d = new Date(item.nextDueDate);
+        if (isNaN(d.getTime())) return false;
+        if (categoryFilters.dateRange.from && d < categoryFilters.dateRange.from) return false;
+        if (categoryFilters.dateRange.to) {
+          const end = new Date(categoryFilters.dateRange.to);
+          end.setHours(23, 59, 59, 999);
+          if (d > end) return false;
+        }
+        return true;
+      });
+    }
     return { ...scheduleData, scheduleItems: result, summary: { ...scheduleData.summary, total: result.length, onSchedule: result.filter((i: any) => i.status === 'On Schedule' || i.status === 'on-schedule').length, dueSoon: result.filter((i: any) => i.status === 'Due Soon' || i.status === 'due-soon').length, overdue: result.filter((i: any) => i.status === 'Overdue' || i.status === 'overdue').length } };
-  }, [scheduleData, globalVessels, globalComponent, vessels.length]);
+  }, [scheduleData, globalVessels, globalComponent, vessels.length, categoryFilters.dateRange]);
 
   const reports: CriticalEquipmentReport[] = [
     {
@@ -422,6 +438,8 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
     params.set('format', 'excel');
     if (globalVessels.length > 0) params.set('vesselIds', globalVessels.join(','));
     if (globalComponent) params.set('componentSearch', globalComponent);
+    if (categoryFilters.dateRange?.from) params.set('startDate', categoryFilters.dateRange.from.toISOString());
+    if (categoryFilters.dateRange?.to) params.set('endDate', categoryFilters.dateRange.to.toISOString());
 
     if (reportId === 'critical-components-list') {
       if (classItemFilter !== 'all') params.set('classItem', classItemFilter);

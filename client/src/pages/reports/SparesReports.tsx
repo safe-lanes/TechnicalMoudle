@@ -387,7 +387,11 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
       }
 
       case 'spares-consumption-analysis': {
-        const apiRes = await fetch(`/technical/api/reports/consumption-analysis/${effectiveVesselId}`, { credentials: 'include' });
+        const consumptionParams = new URLSearchParams();
+        if (categoryFilters.dateRange?.from) consumptionParams.set('startDate', categoryFilters.dateRange.from.toISOString());
+        if (categoryFilters.dateRange?.to) consumptionParams.set('endDate', categoryFilters.dateRange.to.toISOString());
+        const consumptionQs = consumptionParams.toString() ? `?${consumptionParams}` : '';
+        const apiRes = await fetch(`/technical/api/reports/consumption-analysis/${effectiveVesselId}${consumptionQs}`, { credentials: 'include' });
         if (!apiRes.ok) throw new Error('Failed to fetch consumption analysis data');
         const apiData = await apiRes.json();
 

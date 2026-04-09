@@ -164,12 +164,14 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
   });
 
   const { data: scheduleData, isLoading: isScheduleLoading } = useQuery<any>({
-    queryKey: ['/technical/api/reports/lsa-ffa-maintenance-schedule', effectiveVesselId, equipmentTypeFilter, statusFilter],
+    queryKey: ['/technical/api/reports/lsa-ffa-maintenance-schedule', effectiveVesselId, equipmentTypeFilter, statusFilter, categoryFilters.dateRange?.from?.getTime(), categoryFilters.dateRange?.to?.getTime()],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.set('vesselId', effectiveVesselId || 'all');
       if (equipmentTypeFilter !== 'all') params.set('equipmentType', equipmentTypeFilter);
       if (statusFilter !== 'all') params.set('status', statusFilter);
+      if (categoryFilters.dateRange?.from) params.set('startDate', categoryFilters.dateRange.from.toISOString());
+      if (categoryFilters.dateRange?.to) params.set('endDate', categoryFilters.dateRange.to.toISOString());
       const res = await fetch(`/technical/api/reports/lsa-ffa-maintenance-schedule?${params}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
@@ -207,8 +209,22 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
         return name.includes(q) || code.includes(q);
       });
     }
+    if (categoryFilters.dateRange?.from || categoryFilters.dateRange?.to) {
+      result = result.filter((item: any) => {
+        if (!item.nextDueDate || item.nextDueDate === '-') return false;
+        const d = new Date(item.nextDueDate);
+        if (isNaN(d.getTime())) return false;
+        if (categoryFilters.dateRange.from && d < categoryFilters.dateRange.from) return false;
+        if (categoryFilters.dateRange.to) {
+          const end = new Date(categoryFilters.dateRange.to);
+          end.setHours(23, 59, 59, 999);
+          if (d > end) return false;
+        }
+        return true;
+      });
+    }
     return { ...scheduleData, scheduleItems: result, summary: { ...scheduleData.summary, total: result.length, onSchedule: result.filter((i: any) => i.status === 'On Schedule' || i.status === 'on-schedule').length, dueSoon: result.filter((i: any) => i.status === 'Due Soon' || i.status === 'due-soon').length, overdue: result.filter((i: any) => i.status === 'Overdue' || i.status === 'overdue').length } };
-  }, [scheduleData, globalVessels, globalComponent, vessels.length]);
+  }, [scheduleData, globalVessels, globalComponent, vessels.length, categoryFilters.dateRange]);
 
   const reports: LsaFfaReport[] = [
     {
@@ -424,6 +440,8 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
     if (globalVessels.length > 0) params.set('vesselIds', globalVessels.join(','));
     if (globalComponent) params.set('componentSearch', globalComponent);
     if (equipmentTypeFilter !== 'all') params.set('equipmentType', equipmentTypeFilter);
+    if (categoryFilters.dateRange?.from) params.set('startDate', categoryFilters.dateRange.from.toISOString());
+    if (categoryFilters.dateRange?.to) params.set('endDate', categoryFilters.dateRange.to.toISOString());
 
     let endpoint = '';
     if (reportId === 'lsa-ffa-master-list') {
