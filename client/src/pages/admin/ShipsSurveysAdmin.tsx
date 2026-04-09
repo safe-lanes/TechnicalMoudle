@@ -566,15 +566,27 @@ export default function ShipsSurveysAdmin() {
   };
 
   const recomputeMasterIds = (surveys: MasterSurvey[]): MasterSurvey[] => {
-    return surveys.map((s, idx) => ({
-      ...s,
-      sequence: idx + 1,
-      masterId: s.isNew || (s.masterId ?? '').startsWith('NEW-')
-        ? (s.category && s.group
-            ? `${s.category}${s.group}-${String(idx + 1).padStart(3, '0')}`
-            : `NEW-${String(idx + 1).padStart(3, '0')}`)
-        : s.masterId
-    }));
+    const existingIds = new Set(
+      surveys.filter(s => !s.isNew && !(s.masterId ?? '').startsWith('NEW-')).map(s => s.masterId)
+    );
+    const usedIds = new Set(existingIds);
+
+    return surveys.map((s, idx) => {
+      if (s.isNew || (s.masterId ?? '').startsWith('NEW-')) {
+        if (s.category && s.group) {
+          let suffix = idx + 1;
+          let candidate = `${s.category}${s.group}-${String(suffix).padStart(3, '0')}`;
+          while (usedIds.has(candidate)) {
+            suffix++;
+            candidate = `${s.category}${s.group}-${String(suffix).padStart(3, '0')}`;
+          }
+          usedIds.add(candidate);
+          return { ...s, sequence: idx + 1, masterId: candidate };
+        }
+        return { ...s, sequence: idx + 1, masterId: `NEW-${String(idx + 1).padStart(3, '0')}` };
+      }
+      return { ...s, sequence: idx + 1 };
+    });
   };
 
   const deleteRow = (id: number) => {
@@ -601,9 +613,20 @@ export default function ShipsSurveysAdmin() {
             if (s.isNew || (s.masterId ?? '').startsWith('NEW-')) {
               const cat = field === "category" ? value : s.category;
               const grp = field === "group" ? value : s.group;
-              updated.masterId = cat && grp
-                ? `${cat}${grp}-${String(s.sequence).padStart(3, '0')}`
-                : `NEW-${String(s.sequence).padStart(3, '0')}`;
+              if (cat && grp) {
+                const existingIds = new Set(
+                  prev.filter(r => r.id !== id && !r.isNew && !(r.masterId ?? '').startsWith('NEW-')).map(r => r.masterId)
+                );
+                let suffix = s.sequence;
+                let candidate = `${cat}${grp}-${String(suffix).padStart(3, '0')}`;
+                while (existingIds.has(candidate)) {
+                  suffix++;
+                  candidate = `${cat}${grp}-${String(suffix).padStart(3, '0')}`;
+                }
+                updated.masterId = candidate;
+              } else {
+                updated.masterId = `NEW-${String(s.sequence).padStart(3, '0')}`;
+              }
             }
           }
           return updated;
