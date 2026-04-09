@@ -160,13 +160,12 @@ export default function RanksAdmin() {
   });
 
   const toggleViewMode = () => setIsEditMode(true);
-  const exitEditMode = () => {
-    setIsEditMode(false);
+  const exitEditMode = async () => {
     setHasUnsavedChanges(false);
     setHasSavedInSession({});
     setDeletedRankIds([]);
-    setRanksData([]);
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/available-ranks'] });
+    await queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/available-ranks'] });
+    setIsEditMode(false);
   };
 
   const handleSave = () => {
@@ -180,12 +179,11 @@ export default function RanksAdmin() {
     saveOrgChartMutation.mutate({ entries: validEntries, deletedIds: deletedOrgChartIds });
   };
 
-  const exitOrgChartEditMode = () => {
-    setIsOrgChartEditMode(false);
+  const exitOrgChartEditMode = async () => {
     setHasUnsavedChanges(false);
     setDeletedOrgChartIds([]);
-    setOrgChartData([]);
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-org-chart'] });
+    await queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-org-chart'] });
+    setIsOrgChartEditMode(false);
   };
 
   const closeOrgChartModal = () => {
