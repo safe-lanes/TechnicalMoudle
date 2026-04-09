@@ -37,7 +37,17 @@ const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelM
       {labelMarker && <Marker id={labelMarker} />}
       {label}
     </Label>
-    <Input disabled value={value || '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default" data-testid={valueMarker} />
+    {type === "textarea" ? (
+      <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] whitespace-pre-wrap" data-testid={valueMarker}>
+        {valueMarker && <Marker id={valueMarker} />}
+        {value || '-'}
+      </div>
+    ) : (
+      <div className="relative" data-testid={valueMarker}>
+        {valueMarker && <Marker id={valueMarker} />}
+        <Input disabled value={value || '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default" />
+      </div>
+    )}
   </div>
 );
 
@@ -1101,8 +1111,8 @@ const JobsFormPage: React.FC = () => {
                     valueMarker="JF.A1.32"
                   />
                   {templateData.maintenanceBasis === 'Running Hours' && (() => {
-                    const ctx = jobContext as any;
-                    const lastRH = ctx?.templateData?.lastCompletedRH ?? ctx?.templateData?.lastDoneRH;
+                    const td = (jobContext as Record<string, Record<string, unknown>> | undefined)?.templateData;
+                    const lastRH = (td?.lastCompletedRH ?? td?.lastDoneRH) as number | undefined;
                     return lastRH != null ? (
                       <div className="space-y-2">
                         <Label className="text-sm text-[#8798ad]">Last Completed At</Label>
@@ -1114,8 +1124,8 @@ const JobsFormPage: React.FC = () => {
                     ) : null;
                   })()}
                   {(() => {
-                    const ctx = jobContext as any;
-                    const lastDate = ctx?.templateData?.lastCompletedDate ?? ctx?.templateData?.lastDoneDate;
+                    const td = (jobContext as Record<string, Record<string, unknown>> | undefined)?.templateData;
+                    const lastDate = (td?.lastCompletedDate ?? td?.lastDoneDate) as string | undefined;
                     if (!lastDate) return null;
                     const relative = formatRelativeTime(lastDate);
                     return (
