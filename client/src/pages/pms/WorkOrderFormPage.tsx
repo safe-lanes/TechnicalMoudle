@@ -488,7 +488,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [isExportingHistoryPDF, setIsExportingHistoryPDF] = useState(false);
   const WORK_HISTORY_COLLAPSED_COUNT = 2;
   const WORK_HISTORY_PAGE_SIZE = 5;
-  const [historyComponentFilter, setHistoryComponentFilter] = useState('');
+  const [historyComponentFilter] = useState('');
   const [historyDateFrom, setHistoryDateFrom] = useState('');
   const [historyDateTo, setHistoryDateTo] = useState('');
   const [historyPeriod, setHistoryPeriod] = useState<PeriodValue | null>(null);
@@ -4330,7 +4330,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           >
             {(() => {
               const rawHistory = templateData.workHistory || [];
-              const uniqueComponents = Array.from(new Set<string>(rawHistory.map((h: any) => h.componentCode).filter(Boolean)));
               type SpareUsedItem = { partName?: string; partCode?: string; quantity?: number | null };
               const allHistory = rawHistory.map((history: any) => {
                 if (history.isSkipped) {
