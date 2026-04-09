@@ -564,11 +564,6 @@ const ReportsModule = () => {
               );
             })}
 
-            {!isEditMode && filteredCategories.length === 0 && (
-              <div className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                No reports match your search.
-              </div>
-            )}
           </div>
         </div>
 
