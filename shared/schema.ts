@@ -29,7 +29,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
-export type UserRole = "Ship" | "Office" | "PMS Admin" | "Sail Admin" | "Super Admin" | "Vessel Admin" | "Vessel User";
+export type UserRole = "Ship" | "Office" | "PMS Admin" | "Sail Admin" | "Super Admin" | "Vessel Admin" | "Vessel User" | "External 10";
 
 export type PublicUser = Omit<User, "password" | "role"> & {
   role: UserRole;
