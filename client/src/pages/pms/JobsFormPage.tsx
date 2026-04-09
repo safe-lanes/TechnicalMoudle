@@ -1107,21 +1107,6 @@ const JobsFormPage: React.FC = () => {
                   ) : (
                     <ReadOnlyField label="Next Due Date" value={formatDate(templateData.nextDueDate)} labelMarker="JF.A1.25" valueMarker="JF.A1.26" />
                   )}
-                  <ReadOnlyField label="Department" value={templateData.department} labelMarker="JF.A1.27" valueMarker="JF.A1.28" />
-                  <ReadOnlyField label="Criticality" value={templateData.criticality} labelMarker="JF.A1.29" valueMarker="JF.A1.30" />
-                  <EditableField 
-                    label="Is Active" 
-                    field="isActive"
-                    value={templateData.isActive} 
-                    originalValue={originalData.isActive}
-                    onChange={handleFieldChange}
-                    isModifyMode={isModifyMode}
-                    isEditMode={isEditMode}
-                    type="select"
-                    options={['Yes', 'No']}
-                    labelMarker="JF.A1.31"
-                    valueMarker="JF.A1.32"
-                  />
                   {templateData.maintenanceBasis === 'Running Hours' && (() => {
                     const td = (jobContext as Record<string, Record<string, unknown>> | undefined)?.templateData;
                     const lastRH = (td?.lastCompletedRH ?? td?.lastDoneRH) as number | undefined;
@@ -1132,7 +1117,7 @@ const JobsFormPage: React.FC = () => {
                           Last Completed At
                         </Label>
                         <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-rh">
-                          {lastRH != null ? <>{formatRHWithSeparators(lastRH)} Hours</> : <span className="italic text-gray-400">RH not recorded</span>}
+                          {lastRH != null ? <>{formatRHWithSeparators(lastRH)} Hours</> : <span className="italic text-gray-400">First maintenance cycle</span>}
                         </div>
                       </div>
                     );
@@ -1156,6 +1141,21 @@ const JobsFormPage: React.FC = () => {
                       </div>
                     );
                   })()}
+                  <ReadOnlyField label="Department" value={templateData.department} labelMarker="JF.A1.27" valueMarker="JF.A1.28" />
+                  <ReadOnlyField label="Criticality" value={templateData.criticality} labelMarker="JF.A1.29" valueMarker="JF.A1.30" />
+                  <EditableField 
+                    label="Is Active" 
+                    field="isActive"
+                    value={templateData.isActive} 
+                    originalValue={originalData.isActive}
+                    onChange={handleFieldChange}
+                    isModifyMode={isModifyMode}
+                    isEditMode={isEditMode}
+                    type="select"
+                    options={['Yes', 'No']}
+                    labelMarker="JF.A1.31"
+                    valueMarker="JF.A1.32"
+                  />
                 </div>
 
                 <EditableField 
