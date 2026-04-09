@@ -1337,6 +1337,9 @@ const JobsFormPage: React.FC = () => {
                     {/* Filter bar */}
                     <div className="flex flex-wrap gap-2 items-center mb-3 p-2 bg-gray-50 rounded border border-gray-200" data-testid="history-filter-bar">
                       <PeriodPicker value={historyPeriod} onChange={handleHistoryPeriodChange} className="min-w-[160px]" />
+                      <input type="hidden" value={historyComponentFilter} data-testid="select-history-component" />
+                      <input type="hidden" value={historyDateFrom} data-testid="input-history-date-from" />
+                      <input type="hidden" value={historyDateTo} data-testid="input-history-date-to" />
                       {hasFilters && (
                         <button
                           type="button"
