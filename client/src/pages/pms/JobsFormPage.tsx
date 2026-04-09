@@ -4,7 +4,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, ArrowLeft, Menu, AlertTriangle, Save, X, Pencil, Trash2, Loader2, FileSpreadsheet, ChevronDown } from "lucide-react";
+import { FileText, ArrowLeft, Menu, AlertTriangle, Save, X, Pencil, Trash2, Loader2, FileSpreadsheet, ChevronDown, Clock } from "lucide-react";
+import { normalizeDateToDDMMMYYYY, formatRelativeTime, formatRHWithSeparators } from "@shared/dateUtils";
+import { PeriodPicker } from "@/components/filters/PeriodPicker";
+import type { PeriodValue } from "@/components/filters/PeriodPicker";
 import { Marker } from "@/components/Marker";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
@@ -29,15 +32,12 @@ import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
 
 const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string; type?: "text" | "textarea" }> = ({ label, value, labelMarker, valueMarker, type = "text" }) => (
-  <div className="space-y-1">
+  <div className="space-y-2">
     <Label className="text-sm text-[#8798ad]" data-testid={labelMarker}>
       {labelMarker && <Marker id={labelMarker} />}
       {label}
     </Label>
-    <div className={`text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] ${type === "textarea" ? "whitespace-pre-wrap" : "flex items-center"}`} data-testid={valueMarker}>
-      {valueMarker && <Marker id={valueMarker} />}
-      {value || '-'}
-    </div>
+    <Input disabled value={value || '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default" data-testid={valueMarker} />
   </div>
 );
 
@@ -76,7 +76,7 @@ const EditableField: React.FC<EditableFieldProps> = ({
   }
   
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       <Label className={`text-sm ${isChanged && isModifyMode ? 'text-red-600 font-semibold' : 'text-[#8798ad]'}`} data-testid={labelMarker}>
         {labelMarker && <Marker id={labelMarker} />}
         {label} {isChanged && isModifyMode && '(Modified)'}
@@ -416,10 +416,52 @@ const JobsFormPage: React.FC = () => {
   const WORK_HISTORY_PAGE_SIZE = 5;
   const [workHistoryExpanded, setWorkHistoryExpanded] = useState(false);
   const [workHistoryPage, setWorkHistoryPage] = useState(0);
-  const [historyComponentFilter, setHistoryComponentFilter] = useState('');
+  const [historyComponentFilter] = useState('');
   const [historyDateFrom, setHistoryDateFrom] = useState('');
   const [historyDateTo, setHistoryDateTo] = useState('');
+  const [historyPeriod, setHistoryPeriod] = useState<PeriodValue | null>(null);
   const [expandedHistoryIndex, setExpandedHistoryIndex] = useState<number | null>(null);
+
+  const handleHistoryPeriodChange = (val: PeriodValue | null) => {
+    setHistoryPeriod(val);
+    setWorkHistoryPage(0);
+    setExpandedHistoryIndex(null);
+    if (!val) {
+      setHistoryDateFrom('');
+      setHistoryDateTo('');
+      return;
+    }
+    if (val.mode === 'yearQuarterMonth') {
+      const year = val.year || new Date().getFullYear();
+      let startMonth = 0;
+      let endMonth = 11;
+      if (val.month !== undefined) {
+        startMonth = val.month;
+        endMonth = val.month;
+      } else if (val.quarter !== undefined) {
+        startMonth = (val.quarter - 1) * 3;
+        endMonth = startMonth + 2;
+      }
+      const from = `${year}-${String(startMonth + 1).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, endMonth + 1, 0).getDate();
+      const to = `${year}-${String(endMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+      setHistoryDateFrom(from);
+      setHistoryDateTo(to);
+    } else if (val.mode === 'dateRange') {
+      if (val.dateFrom) {
+        const d = val.dateFrom;
+        setHistoryDateFrom(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+      } else {
+        setHistoryDateFrom('');
+      }
+      if (val.dateTo) {
+        const d = val.dateTo;
+        setHistoryDateTo(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+      } else {
+        setHistoryDateTo('');
+      }
+    }
+  };
 
   const calcDaysLate = (originalDueDate: string | null | undefined, completionDate: string | null | undefined): number => {
     if (!originalDueDate || !completionDate) return 0;
@@ -918,6 +960,7 @@ const JobsFormPage: React.FC = () => {
               description="Basic details and configuration for this job"
               headerMarker="JF.A1.1"
               descriptionMarker="JF.A1.2"
+              variant="inline"
             >
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -936,17 +979,37 @@ const JobsFormPage: React.FC = () => {
                   <ReadOnlyField label="Component Code" value={templateData.componentCode} labelMarker="JF.A1.7" valueMarker="JF.A1.8" />
                   <ReadOnlyField label="Job Code" value={templateData.woTemplateCode} labelMarker="JF.A1.9" valueMarker="JF.A1.10" />
                   <ReadOnlyField label="Maintenance Basis" value={templateData.maintenanceBasis} labelMarker="JF.A1.11" valueMarker="JF.A1.12" />
-                  <EditableField 
-                    label="Frequency" 
-                    field="frequencyValue"
-                    value={templateData.frequencyValue} 
-                    originalValue={originalData.frequencyValue}
-                    onChange={handleFieldChange}
-                    isModifyMode={isModifyMode}
-                    isEditMode={isEditMode}
-                    labelMarker="JF.A1.13"
-                    valueMarker="JF.A1.14"
-                  />
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]" data-testid="JF.A1.13"><Marker id="JF.A1.13" />Frequency</Label>
+                    <div className="flex gap-2">
+                      {(isModifyMode || isEditMode) ? (
+                        <Input
+                          value={templateData.frequencyValue || ''}
+                          onChange={(e) => handleFieldChange('frequencyValue', e.target.value)}
+                          className="text-sm flex-1"
+                          data-testid="JF.A1.14"
+                        />
+                      ) : (
+                        <Input disabled value={templateData.frequencyValue || '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default flex-1" data-testid="JF.A1.14" />
+                      )}
+                      {templateData.maintenanceBasis === 'Running Hours' ? (
+                        <Input disabled value="Hours" className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default w-24" />
+                      ) : (isModifyMode || isEditMode) ? (
+                        <Select value={templateData.frequencyUnit || 'Months'} onValueChange={(val) => handleFieldChange('frequencyUnit', val)}>
+                          <SelectTrigger className="text-sm w-28">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {['Days', 'Weeks', 'Months', 'Years'].map(u => (
+                              <SelectItem key={u} value={u}>{u}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input disabled value={templateData.frequencyUnit || 'Months'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default w-24" />
+                      )}
+                    </div>
+                  </div>
                   <EditableField 
                     label="Task Type" 
                     field="taskType"
@@ -1037,6 +1100,34 @@ const JobsFormPage: React.FC = () => {
                     labelMarker="JF.A1.31"
                     valueMarker="JF.A1.32"
                   />
+                  {templateData.maintenanceBasis === 'Running Hours' && (() => {
+                    const ctx = jobContext as any;
+                    const lastRH = ctx?.templateData?.lastCompletedRH ?? ctx?.templateData?.lastDoneRH;
+                    return lastRH != null ? (
+                      <div className="space-y-2">
+                        <Label className="text-sm text-[#8798ad]">Last Completed At</Label>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-gray-400 shrink-0" />
+                          <Input disabled value={`${formatRHWithSeparators(lastRH)} RH`} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default" data-testid="text-last-completed-rh" />
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
+                  {(() => {
+                    const ctx = jobContext as any;
+                    const lastDate = ctx?.templateData?.lastCompletedDate ?? ctx?.templateData?.lastDoneDate;
+                    if (!lastDate) return null;
+                    const relative = formatRelativeTime(lastDate);
+                    return (
+                      <div className="space-y-2">
+                        <Label className="text-sm text-[#8798ad]">Last Completed On</Label>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-gray-400 shrink-0" />
+                          <Input disabled value={`${normalizeDateToDDMMMYYYY(lastDate)}${relative ? ` (${relative})` : ''}`} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default" data-testid="text-last-completed-date" />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <EditableField 
@@ -1062,6 +1153,7 @@ const JobsFormPage: React.FC = () => {
               description="Spare parts needed for this job"
               headerMarker="JF.A2.1"
               descriptionMarker="JF.A2.2"
+              variant="inline"
             >
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border border-gray-200">
@@ -1117,45 +1209,55 @@ const JobsFormPage: React.FC = () => {
               description="Safety requirements and permits for this job"
               headerMarker="JF.A4.1"
               descriptionMarker="JF.A4.2"
+              variant="inline"
             >
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div>
-                  <Label className="text-sm font-medium text-gray-700" data-testid="JF.A4.3"><Marker id="JF.A4.3" />Personal Protective Equipment (PPE):</Label>
+                  <h3 className="text-sm font-semibold text-gray-700" data-testid="JF.A4.3"><Marker id="JF.A4.3" />Personal Protective Equipment (PPE):</h3>
                   {(templateData.safetyRequirements?.ppeRequirements || []).length > 0 ? (
-                    <ul className="list-disc list-inside mt-1 text-sm text-gray-600" data-testid="JF.A4.4">
+                    <div className="mt-1 space-y-0.5" data-testid="JF.A4.4">
                       <Marker id="JF.A4.4" />
                       {templateData.safetyRequirements.ppeRequirements.map((item, index) => (
-                        <li key={index}>{item}</li>
+                        <div key={index} className="flex items-start gap-2 text-sm text-gray-600">
+                          <span className="text-gray-400 mt-0.5 shrink-0">&bull;</span>
+                          <span>{item}</span>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   ) : (
                     <p className="text-sm text-gray-500 italic mt-1" data-testid="JF.A4.4"><Marker id="JF.A4.4" />No PPE requirements specified</p>
                   )}
                 </div>
                 
                 <div>
-                  <Label className="text-sm font-medium text-gray-700" data-testid="JF.A4.5"><Marker id="JF.A4.5" />Permits Required:</Label>
+                  <h3 className="text-sm font-semibold text-gray-700" data-testid="JF.A4.5"><Marker id="JF.A4.5" />Permits Required:</h3>
                   {(templateData.safetyRequirements?.permitRequirements || []).length > 0 ? (
-                    <ul className="list-disc list-inside mt-1 text-sm text-gray-600" data-testid="JF.A4.6">
+                    <div className="mt-1 space-y-0.5" data-testid="JF.A4.6">
                       <Marker id="JF.A4.6" />
                       {templateData.safetyRequirements.permitRequirements.map((item, index) => (
-                        <li key={index}>{item}</li>
+                        <div key={index} className="flex items-start gap-2 text-sm text-gray-600">
+                          <span className="text-gray-400 mt-0.5 shrink-0">&bull;</span>
+                          <span>{item}</span>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   ) : (
                     <p className="text-sm text-gray-500 italic mt-1" data-testid="JF.A4.6"><Marker id="JF.A4.6" />No permits required</p>
                   )}
                 </div>
                 
                 <div>
-                  <Label className="text-sm font-medium text-gray-700" data-testid="JF.A4.7"><Marker id="JF.A4.7" />Other Safety Requirements:</Label>
+                  <h3 className="text-sm font-semibold text-gray-700" data-testid="JF.A4.7"><Marker id="JF.A4.7" />Other Safety Requirements:</h3>
                   {(templateData.safetyRequirements?.otherRequirements || []).length > 0 ? (
-                    <ul className="list-disc list-inside mt-1 text-sm text-gray-600" data-testid="JF.A4.8">
+                    <div className="mt-1 space-y-0.5" data-testid="JF.A4.8">
                       <Marker id="JF.A4.8" />
                       {templateData.safetyRequirements.otherRequirements.map((item, index) => (
-                        <li key={index}>{item}</li>
+                        <div key={index} className="flex items-start gap-2 text-sm text-gray-600">
+                          <span className="text-gray-400 mt-0.5 shrink-0">&bull;</span>
+                          <span>{item}</span>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   ) : (
                     <p className="text-sm text-gray-500 italic mt-1" data-testid="JF.A4.8"><Marker id="JF.A4.8" />No other safety requirements specified</p>
                   )}
@@ -1171,6 +1273,7 @@ const JobsFormPage: React.FC = () => {
               description="Previous executions and completion history for this job"
               headerMarker="JF.A5.1"
               descriptionMarker="JF.A5.2"
+              variant="inline"
               headerActions={
                 <>
                   <Button
@@ -1202,7 +1305,6 @@ const JobsFormPage: React.FC = () => {
             >
               {(() => {
                 const rawHistory = templateData.workHistory || [];
-                const uniqueComponents = Array.from(new Set<string>(rawHistory.map((h: any) => h.componentCode).filter(Boolean)));
 
                 const filteredHistory = rawHistory.filter((h: any) => {
                   const dateStr = (h.isSkipped ? (h.skippedCycleDate || h.completionDate || h.workDate) : (h.completionDate || h.workDate))?.slice(0, 10) || '';
@@ -1212,7 +1314,7 @@ const JobsFormPage: React.FC = () => {
                   return true;
                 });
 
-                const hasFilters = !!(historyComponentFilter || historyDateFrom || historyDateTo);
+                const hasFilters = !!historyPeriod;
                 const totalCount = filteredHistory.length;
                 const displayHistory = workHistoryExpanded
                   ? filteredHistory.slice(workHistoryPage * WORK_HISTORY_PAGE_SIZE, (workHistoryPage + 1) * WORK_HISTORY_PAGE_SIZE)
@@ -1223,37 +1325,11 @@ const JobsFormPage: React.FC = () => {
                   <>
                     {/* Filter bar */}
                     <div className="flex flex-wrap gap-2 items-center mb-3 p-2 bg-gray-50 rounded border border-gray-200" data-testid="history-filter-bar">
-                      <select
-                        value={historyComponentFilter}
-                        onChange={e => { setHistoryComponentFilter(e.target.value); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
-                        data-testid="select-history-component"
-                        className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                      >
-                        <option value="">All Components</option>
-                        {uniqueComponents.map(code => (
-                          <option key={code} value={code}>{code}</option>
-                        ))}
-                      </select>
-                      <span className="text-xs text-gray-400">From</span>
-                      <input
-                        type="date"
-                        value={historyDateFrom}
-                        onChange={e => { setHistoryDateFrom(e.target.value); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
-                        data-testid="input-history-date-from"
-                        className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                      />
-                      <span className="text-xs text-gray-400">To</span>
-                      <input
-                        type="date"
-                        value={historyDateTo}
-                        onChange={e => { setHistoryDateTo(e.target.value); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
-                        data-testid="input-history-date-to"
-                        className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                      />
+                      <PeriodPicker value={historyPeriod} onChange={handleHistoryPeriodChange} className="min-w-[160px]" />
                       {hasFilters && (
                         <button
                           type="button"
-                          onClick={() => { setHistoryComponentFilter(''); setHistoryDateFrom(''); setHistoryDateTo(''); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
+                          onClick={() => handleHistoryPeriodChange(null)}
                           data-testid="button-clear-history-filters"
                           className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 rounded border border-gray-200 bg-white hover:bg-gray-100"
                         >
