@@ -243,7 +243,9 @@ export default function BulkDataImport() {
     { id: 'master-list' as FleetTemplateType, number: 5, name: 'Master List' },
   ];
 
-  const currentTemplates = isFleetMode ? fleetTemplates : vesselTemplates;
+  const currentTemplates = isFleetMode
+    ? (isExternal ? fleetTemplates.filter(t => t.id === 'maker-list') : fleetTemplates)
+    : vesselTemplates;
   
   // Get current page markers based on selected template
   const currentMarkers = PAGE_MARKERS_BY_TEMPLATE[selectedVesselTemplate];
@@ -367,7 +369,7 @@ export default function BulkDataImport() {
           {viewMode === 'history' ? (
             <BulkImportHistory vesselId={selectedVessel} />
           ) : isFleetMode ? (
-            selectedFleetTemplate === 'maker-list' ? (
+            (isExternal || selectedFleetTemplate === 'maker-list') ? (
               <MakerListUpload />
             ) : selectedFleetTemplate === 'fleet-component' ? (
               <FleetComponentUpload />
