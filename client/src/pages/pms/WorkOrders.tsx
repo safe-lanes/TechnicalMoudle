@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Filter } from "lucide-react";
 import WorkOrderPlanner from "./WorkOrderPlanner";
 import { useLocation } from "wouter";
 import { useVessel } from "@/contexts/VesselContext";
@@ -15,6 +15,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PeriodFilter, PeriodFilterValue } from "@/components/filters/PeriodFilter";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +52,7 @@ type WorkOrderWithHydratedData = WorkOrderWithLeadTime & {
   postponementEndDate?: string | null;
   postponementAuthorizedBy?: string | null;
   plannedDate?: string | null;
+  componentCritical?: boolean;
 };
 
 // Using WorkOrder type from shared schema
@@ -161,6 +165,9 @@ const WorkOrders: React.FC = () => {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue | null>(null);
   const [selectedRank, setSelectedRank] = useState("");
   const [selectedCriticality, setSelectedCriticality] = useState("");
+  const [compCriticalChecked, setCompCriticalChecked] = useState(false);
+  const [compNonCriticalChecked, setCompNonCriticalChecked] = useState(false);
+  const [criticalityPopoverOpen, setCriticalityPopoverOpen] = useState(false);
   const [selectedPostponementReason, setSelectedPostponementReason] = useState("");
   const VALID_TABS = new Set(["Planned", "Due", "Overdue", "Postponed", "Unplanned", "Pending Approval", "Completed"]);
   const [activeTab, setActiveTab] = useState(() => {
@@ -476,19 +483,27 @@ const WorkOrders: React.FC = () => {
       }
     }
     
-    // Criticality filter: match against criticality field
+    // WO Criticality filter: match against work order criticality field
     if (selectedCriticality && selectedCriticality !== "all") {
       const woCriticality = wo.criticality?.toLowerCase();
       if (selectedCriticality === "critical") {
-        // "critical" matches "Yes" criticality
         if (woCriticality !== "yes") {
           return false;
         }
       } else if (selectedCriticality === "non-critical") {
-        // "non-critical" matches "No" criticality or empty/null
         if (woCriticality === "yes") {
           return false;
         }
+      }
+    }
+
+    // Component Criticality filter: match against component critical boolean
+    if (compCriticalChecked || compNonCriticalChecked) {
+      const isCompCritical = wo.componentCritical === true;
+      if (compCriticalChecked && !compNonCriticalChecked) {
+        if (!isCompCritical) return false;
+      } else if (!compCriticalChecked && compNonCriticalChecked) {
+        if (isCompCritical) return false;
       }
     }
 
@@ -590,7 +605,7 @@ const WorkOrders: React.FC = () => {
   // Reset to page 1 when filters or sort change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchTerm, periodFilter, selectedRank, selectedCriticality, selectedPostponementReason, vesselId, woSortField, woSortDir]);
+  }, [activeTab, searchTerm, periodFilter, selectedRank, selectedCriticality, compCriticalChecked, compNonCriticalChecked, selectedPostponementReason, vesselId, woSortField, woSortDir]);
 
   // Reset sort when switching tabs
   useEffect(() => {
@@ -1104,17 +1119,83 @@ const WorkOrders: React.FC = () => {
           </SelectContent>
         </Select>
 
-        <Select value={selectedCriticality} onValueChange={setSelectedCriticality}>
-          <SelectTrigger className="w-32" data-testid="C14">
-            <Marker id="C14" />
-            <SelectValue placeholder="Criticality" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="critical">Critical</SelectItem>
-            <SelectItem value="non-critical">Non-Critical</SelectItem>
-          </SelectContent>
-        </Select>
+        <Popover open={criticalityPopoverOpen} onOpenChange={setCriticalityPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={`w-44 justify-between text-sm font-normal ${(selectedCriticality && selectedCriticality !== "all") || compCriticalChecked || compNonCriticalChecked ? 'border-[hsl(var(--primary))] text-[hsl(var(--primary))]' : 'text-gray-600'}`}
+              data-testid="C14"
+            >
+              <Marker id="C14" />
+              <Filter className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+              <span className="truncate">
+                {(() => {
+                  const parts: string[] = [];
+                  if (selectedCriticality === "critical") parts.push("WO: Critical");
+                  else if (selectedCriticality === "non-critical") parts.push("WO: Non-Critical");
+                  if (compCriticalChecked && !compNonCriticalChecked) parts.push("Comp: Critical");
+                  else if (!compCriticalChecked && compNonCriticalChecked) parts.push("Comp: Non-Crit");
+                  else if (compCriticalChecked && compNonCriticalChecked) parts.push("Comp: All");
+                  return parts.length > 0 ? parts.join(" + ") : "Criticality";
+                })()}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5 ml-1 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-0" align="start">
+            <div className="p-3 border-b border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Work Order Criticality</p>
+              <div className="space-y-1">
+                {[
+                  { value: "all", label: "All" },
+                  { value: "critical", label: "Critical" },
+                  { value: "non-critical", label: "Non-Critical" },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${selectedCriticality === opt.value || (!selectedCriticality && opt.value === "all") ? 'bg-[hsl(var(--primary))] text-white font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
+                    onClick={() => setSelectedCriticality(opt.value)}
+                    data-testid={`criticality-wo-${opt.value}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="p-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Component Criticality</p>
+              <TooltipProvider delayDuration={300}>
+                <div className="space-y-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <label className="flex items-center gap-2 cursor-pointer px-2 py-1 rounded hover:bg-gray-100 transition-colors" data-testid="criticality-comp-critical">
+                        <Checkbox
+                          checked={compCriticalChecked}
+                          onCheckedChange={(checked) => setCompCriticalChecked(checked === true)}
+                        />
+                        <span className="text-sm text-gray-700">Critical</span>
+                      </label>
+                    </TooltipTrigger>
+                    <TooltipContent side="right"><p>Critical Components Work Orders</p></TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <label className="flex items-center gap-2 cursor-pointer px-2 py-1 rounded hover:bg-gray-100 transition-colors" data-testid="criticality-comp-non-critical">
+                        <Checkbox
+                          checked={compNonCriticalChecked}
+                          onCheckedChange={(checked) => setCompNonCriticalChecked(checked === true)}
+                        />
+                        <span className="text-sm text-gray-700">Non-Critical</span>
+                      </label>
+                    </TooltipTrigger>
+                    <TooltipContent side="right"><p>Non-Critical Components Work Orders</p></TooltipContent>
+                  </Tooltip>
+                </div>
+              </TooltipProvider>
+            </div>
+          </PopoverContent>
+        </Popover>
 
 
         <Button
@@ -1125,6 +1206,8 @@ const WorkOrders: React.FC = () => {
             setPeriodFilter(null);
             setSelectedRank("");
             setSelectedCriticality("");
+            setCompCriticalChecked(false);
+            setCompNonCriticalChecked(false);
             setSelectedPostponementReason("");
           }}
           data-testid="button-clear-filters"

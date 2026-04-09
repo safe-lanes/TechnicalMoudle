@@ -295,6 +295,7 @@ export async function listWorkOrders(vesselId?: string) {
       missedCycles: liveMissedCycles,
       leadTimeValue: job?.leadTimeValue ?? null,
       leadTimeUnit: job?.leadTimeUnit ?? null,
+      componentCritical: component?.critical === true,
       dueRH: dueRH ?? null,
       currentRH: currentRH ?? null,
       plannedDate
