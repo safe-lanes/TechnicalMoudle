@@ -357,7 +357,6 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
     try {
       const columns = isSpares ? [
         { header: 'S.No', field: 'sno', width: 12 },
-        { header: 'Priority', field: 'priority', width: 20 },
         { header: 'Part Code', field: 'itemCode', width: 28 },
         { header: 'Part Name', field: 'itemName', width: 45 },
         { header: 'Component', field: 'category', width: 40 },
@@ -366,7 +365,6 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
         { header: 'Shortage', field: 'deficit', width: 18 },
       ] : [
         { header: 'S.No', field: 'sno', width: 12 },
-        { header: 'Priority', field: 'priority', width: 20 },
         { header: 'Item Code', field: 'itemCode', width: 22 },
         { header: 'Item Name', field: 'itemName', width: 40 },
         { header: 'Type', field: 'itemType', width: 20 },
@@ -770,7 +768,6 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                   <table className="w-full" data-testid="table-all-items">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left py-3 px-3"><SortButton field="priority" label="Priority" /></th>
                         <th className="text-left py-3 px-3"><SortButton field="itemCode" label={isSpares ? "Part Code" : "Item Code"} /></th>
                         <th className="text-left py-3 px-3"><SortButton field="itemName" label={isSpares ? "Part Name" : "Item Name"} /></th>
                         {!isSpares && <th className="text-left py-3 px-3"><SortButton field="itemType" label="Type" /></th>}
@@ -790,7 +787,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                     <tbody className="divide-y divide-gray-200">
                       {sortedItems.length === 0 ? (
                         <tr>
-                          <td colSpan={isSpares ? 8 : 15} className="text-center py-12">
+                          <td colSpan={isSpares ? 7 : 14} className="text-center py-12">
                             <Package className="h-10 w-10 text-gray-400 mx-auto mb-3" />
                             <p className="text-gray-500 font-medium">No low stock items found</p>
                             <p className="text-sm text-gray-400 mt-1">Try adjusting your filters</p>
@@ -806,7 +803,6 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                             }`}
                             data-testid={`row-item-${item.id}`}
                           >
-                            <td className="py-3 px-3">{getPriorityBadge(item.priority)}</td>
                             <td className="py-3 px-3 font-mono text-gray-700">{item.itemCode || '-'}</td>
                             <td className="py-3 px-3">
                               <div className="font-medium text-gray-900">{item.itemName || '-'}</div>

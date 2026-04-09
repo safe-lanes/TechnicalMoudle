@@ -153,7 +153,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
       description: "Comprehensive tracking of all system alerts, notifications, and critical warnings",
       purpose: "Monitor system health & alert response (Admin)",
       frequency: "Daily",
-      fields: ["Alert Type", "Priority", "Module", "Status", "Time"],
+      fields: ["Alert Type", "Module", "Status", "Time"],
       outputs: ["PDF", "Excel"],
       icon: Bell,
       priority: "high",
@@ -218,7 +218,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
       description: "All overdue work orders, defects, and certificates",
       purpose: "Prioritization & escalation (Management)",
       frequency: "Daily",
-      fields: ["Type", "ID", "Description", "Days Overdue", "Priority"],
+      fields: ["Type", "ID", "Description", "Days Overdue"],
       outputs: ["PDF", "Dashboard"],
       icon: AlertTriangle,
       priority: "high",
@@ -251,7 +251,6 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
         const columns = [
           { header: 'Alert Type', field: 'type', width: 35 },
           { header: 'Description', field: 'description', width: 60 },
-          { header: 'Priority', field: 'priority', width: 25 },
           { header: 'Status', field: 'status', width: 25 }
         ];
 
@@ -358,8 +357,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
           { header: 'Type', field: 'type', width: 35 },
           { header: 'ID', field: 'id', width: 40 },
           { header: 'Description', field: 'description', width: 50 },
-          { header: 'Days Overdue', field: 'daysOverdue', width: 30 },
-          { header: 'Priority', field: 'priority', width: 25 }
+          { header: 'Days Overdue', field: 'daysOverdue', width: 30 }
         ];
 
         const overdueItems: any[] = [];

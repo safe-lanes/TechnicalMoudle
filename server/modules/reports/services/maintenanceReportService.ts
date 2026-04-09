@@ -253,7 +253,6 @@ export async function exportDueJobs7Days(vesselId: string): Promise<{ buffer: Bu
 
   const columns: ColumnDef[] = [
     { key: 'sno', header: 'S.No', width: 6, type: 'number', align: 'center' },
-    { key: 'priority', header: 'Priority', width: 12, type: 'text', align: 'center' },
     { key: 'statusIndicator', header: 'Status', width: 12, type: 'text', align: 'center' },
     { key: 'workOrderNo', header: 'WO Number', width: 22, type: 'text' },
     { key: 'jobTitle', header: 'Title', width: 35, type: 'text' },
@@ -678,7 +677,6 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
     { header: 'Job Title', key: 'jobTitle', width: 30 },
     { header: 'Job Type', key: 'jobType', width: 14 },
     { header: 'Dept', key: 'department', width: 12 },
-    { header: 'Priority', key: 'priority', width: 12 },
     { header: 'Assigned To', key: 'assignedTo', width: 18 },
     { header: 'Start Date', key: 'startDate', width: 16 },
     { header: 'Completion Date', key: 'completionDate', width: 16 },

@@ -146,7 +146,6 @@ export async function exportStoresInventoryStatusExcel(
       { key: 'rob', header: 'Current ROB', width: 14, type: 'number', align: 'right' },
       { key: 'avgMonthly', header: 'Avg Monthly', width: 16, type: 'number', align: 'right' },
       { key: 'daysToStockout', header: 'Days to Stockout', width: 18, type: 'number', align: 'right' },
-      { key: 'priority', header: 'Priority', width: 14, align: 'center' },
       { key: 'suggestedQty', header: 'Suggested Qty', width: 16, type: 'number', align: 'right' },
     ];
 
@@ -1389,7 +1388,7 @@ export async function exportStoresLowStockAlertExcel(vesselId: string): Promise<
   const sheet = workbook.addWorksheet('Low Stock Alert');
 
   const headerRow = sheet.addRow([
-    'S.No', 'Priority', 'Item Code', 'Item Name', 'Type', 'Category',
+    'S.No', 'Item Code', 'Item Name', 'Type', 'Category',
     'ROB', 'Min Stock', 'Deficit', 'UOM',
     'Avg Monthly', 'Days to Stockout', 'Est. Cost'
   ]);
@@ -1398,7 +1397,7 @@ export async function exportStoresLowStockAlertExcel(vesselId: string): Promise<
   headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
 
   sheet.columns = [
-    { width: 6 }, { width: 10 }, { width: 14 }, { width: 30 }, { width: 12 }, { width: 16 },
+    { width: 6 }, { width: 14 }, { width: 30 }, { width: 12 }, { width: 16 },
     { width: 8 }, { width: 10 }, { width: 8 }, { width: 8 },
     { width: 16 }, { width: 18 }, { width: 14 }
   ];
@@ -1411,7 +1410,7 @@ export async function exportStoresLowStockAlertExcel(vesselId: string): Promise<
 
   lowStockItems.forEach((item: any, idx: number) => {
     const row = sheet.addRow([
-      idx + 1, item.priority, item.itemCode, item.itemName, item.itemType, item.category,
+      idx + 1, item.itemCode, item.itemName, item.itemType, item.category,
       item.rob, item.minStock, item.deficit, item.uom || '-',
       item.avgMonthlyConsumption, item.daysUntilStockout ?? 'N/A', item.estimatedCost !== null ? `$${item.estimatedCost}` : 'N/A'
     ]);

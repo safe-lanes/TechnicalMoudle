@@ -164,7 +164,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
       description: "Certificates expiring within the next 90 days",
       purpose: "Urgent renewal planning (Captain/Office)",
       frequency: "Weekly",
-      fields: ["Certificate", "Expiry Date", "Days Remaining", "Priority", "Action"],
+      fields: ["Certificate", "Expiry Date", "Days Remaining", "Action"],
       outputs: ["PDF", "Dashboard"],
       icon: AlertTriangle,
       priority: "high",
@@ -305,8 +305,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
         const columns = [
           { header: 'Certificate', field: 'name', width: 60 },
           { header: 'Expiry Date', field: 'expiryDate', width: 35 },
-          { header: 'Days Remaining', field: 'daysRemaining', width: 35 },
-          { header: 'Priority', field: 'priority', width: 30 }
+          { header: 'Days Remaining', field: 'daysRemaining', width: 35 }
         ];
 
         const data = expiringCerts.map((c: any) => {

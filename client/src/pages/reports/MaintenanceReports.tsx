@@ -192,7 +192,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       description: "Upcoming work orders due in the next 7 days",
       purpose: "Plan upcoming work (Chief Eng/Chief Off)",
       frequency: "Daily/Weekly",
-      fields: ["WO No/Title", "Component", "Dept", "Priority", "Due Date/Hour", "Required Spares/Tools/Permits", "Risk Notes"],
+      fields: ["WO No/Title", "Component", "Dept", "Due Date/Hour", "Required Spares/Tools/Permits", "Risk Notes"],
       filters: ["Vessel", "Dept", "Priority", "Window (7/14/30)", "Component/System"],
       outputs: ["PDF", "Excel", "Dashboard"],
       icon: Clock,
@@ -290,7 +290,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       description: "Performance analysis by work order priority levels",
       purpose: "Ensure critical jobs get attention (Office)",
       frequency: "Monthly",
-      fields: ["Priority", "On-time %", "Avg Days Late", "Trend"],
+      fields: ["On-time %", "Avg Days Late", "Trend"],
       filters: ["Vessel", "Dept", "Date Range"],
       outputs: ["PDF", "Dashboard"],
       icon: TrendingUp,
@@ -369,7 +369,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
-          { header: 'Priority', field: 'priority', width: 22 },
           { header: 'Status', field: 'statusIndicator', width: 22 },
           { header: 'WO Number', field: 'workOrderNo', width: 45 },
           { header: 'Title', field: 'jobTitle', width: 70 },
@@ -497,7 +496,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { header: 'Job Title', field: 'jobTitle', width: 30 },
           { header: 'Job Type', field: 'jobType', width: 14 },
           { header: 'Dept', field: 'department', width: 12 },
-          { header: 'Priority', field: 'priority', width: 12 },
           { header: 'Assigned To', field: 'assignedTo', width: 18 },
           { header: 'Start Date', field: 'startDate', width: 16 },
           { header: 'Completion Date', field: 'completionDate', width: 16 },
@@ -872,7 +870,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
-          { header: 'Priority', field: 'priority', width: 40 },
           { header: 'Total WOs', field: 'total', width: 30 },
           { header: 'Completed', field: 'completed', width: 30 },
           { header: 'On-Time %', field: 'onTimePercent', width: 30 },

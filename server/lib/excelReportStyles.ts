@@ -84,7 +84,6 @@ export const STANDARD_WORK_ORDER_COLUMNS: ColumnDef[] = [
   { key: 'componentCode', header: 'Comp Code', width: 14, type: 'text' },
   { key: 'componentName', header: 'Component Name', width: 28, type: 'text' },
   { key: 'department', header: 'Dept', width: 10, type: 'text', align: 'center' },
-  { key: 'priority', header: 'Priority', width: 10, type: 'text', align: 'center' },
   { key: 'status', header: 'Status', width: 12, type: 'text', align: 'center' },
   { key: 'dueDate', header: 'Due Date', width: 12, type: 'date', align: 'center' },
   { key: 'lastDoneDate', header: 'Last Done', width: 12, type: 'date', align: 'center' },

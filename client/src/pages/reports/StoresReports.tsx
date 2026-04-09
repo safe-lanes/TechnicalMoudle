@@ -464,7 +464,6 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
-          { header: 'Priority', field: 'priority', width: 18 },
           { header: 'Item Code', field: 'itemCode', width: 22 },
           { header: 'Item Name', field: 'itemName', width: 40 },
           { header: 'Type', field: 'itemType', width: 20 },

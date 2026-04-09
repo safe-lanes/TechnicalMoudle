@@ -257,7 +257,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
       description: "Comprehensive tracking of all PMS change requests including workflow status and approval progress",
       purpose: "Monitor change request pipeline & track approvals (Office/Superintendent)",
       frequency: "Weekly",
-      fields: ["Request ID", "Title", "Type", "Status", "Priority", "Date"],
+      fields: ["Request ID", "Title", "Type", "Status", "Date"],
       outputs: ["PDF", "Excel"],
       icon: GitPullRequest,
       priority: "high",

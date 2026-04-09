@@ -468,7 +468,6 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
           { header: 'Current ROB', field: 'rob', width: 22 },
           { header: 'Avg Monthly', field: 'avgMonthly', width: 25 },
           { header: 'Days to Stockout', field: 'daysUntilStockout', width: 28 },
-          { header: 'Priority', field: 'priority', width: 20 },
           { header: 'Suggested Qty', field: 'suggestedQty', width: 25 },
         ];
         exportData = reorderItems.map((item, idx) => ({
@@ -890,14 +889,13 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
                       <th className="text-right py-3 px-3"><SortButton field="rob" label="Current ROB" /></th>
                       <th className="text-right py-3 px-3"><SortButton field="consumption" label="Avg Monthly" /></th>
                       <th className="text-right py-3 px-3"><SortButton field="daysUntilStockout" label="Days to Stockout" /></th>
-                      <th className="text-left py-3 px-3"><SortButton field="priority" label="Priority" /></th>
                       <th className="text-right py-3 px-3 font-semibold text-sm text-gray-700">Suggested Qty</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {reorderItems.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="text-center py-12">
+                        <td colSpan={8} className="text-center py-12">
                           <Package className="h-10 w-10 text-gray-400 mx-auto mb-3" />
                           <p className="text-gray-500 font-medium">No reorder requirements</p>
                           <p className="text-sm text-gray-400 mt-1">All items have sufficient stock levels</p>
@@ -924,7 +922,6 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
                           <td className="py-3 px-3 text-right font-semibold text-sm text-gray-900">{item.rob}</td>
                           <td className="py-3 px-3 text-right text-sm text-gray-700">{item.monthlyConsumption.toFixed(2)}</td>
                           <td className="py-3 px-3 text-right text-sm text-gray-700">{formatDaysUntilStockout(item.daysUntilStockout)}</td>
-                          <td className="py-3 px-3">{getPriorityBadge(item.priority)}</td>
                           <td className="py-3 px-3 text-right text-sm font-semibold text-gray-900">{item.suggestedQty.toFixed(1)}</td>
                         </tr>
                         );

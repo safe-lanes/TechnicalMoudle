@@ -317,7 +317,6 @@ export async function exportCrewWorkloadDistributionExcel(
       { key: 'timeTakenHours', header: 'Time (hrs)', width: 10, type: 'number', align: 'right' },
       { key: 'manhours', header: 'Manhours', width: 10, type: 'number', align: 'right' },
       { key: 'status', header: 'Status', width: 12, type: 'text', align: 'center' },
-      { key: 'jobPriority', header: 'Priority', width: 10, type: 'text', align: 'center' },
       { key: 'dueDate', header: 'Due Date', width: 12, type: 'date', align: 'center' },
       { key: 'completionDate', header: 'Completion Date', width: 12, type: 'date', align: 'center' },
       { key: 'critical', header: 'Critical', width: 8, type: 'text', align: 'center' },
