@@ -24,6 +24,7 @@ export function mapLoggedRoleToUIRole(userType: string | undefined | null, profi
   if (userType === "Office") {
     if (profileRole === "Sail Admin") return "Sail_Admin";
     if (profileRole === "Admin") return "Tech_Superintendent";
+    if (profileRole === "External 10") return "External";
     return "Client_Admin";
   }
 
