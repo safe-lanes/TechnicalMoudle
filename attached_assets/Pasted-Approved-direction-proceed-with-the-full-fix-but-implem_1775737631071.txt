@@ -1,0 +1,169 @@
+Approved direction — proceed with the full fix, but implement it completely and verify it properly across all WO table columns and tabs.
+
+I reviewed your diagnosis and I agree with the root cause:
+
+the current resize logic captures an absolute fixedLeft at mousedown
+
+the table also recalculates effectiveColWidths
+
+leftover container width is being added to the jobTitle column
+
+when a column after jobTitle is resized, jobTitle width changes during the drag
+
+that shifts the physical position of all subsequent columns
+
+therefore the original fixedLeft becomes stale
+
+as a result, the resize becomes jittery / sliding / inconsistent for columns after jobTitle
+This explains why the behavior is okay only for the first few columns and not for all columns.
+Now implement the fix fully
+
+Please update the Work Orders table resize logic in client/src/pages/pms/WorkOrders.tsx so that all columns resize correctly, not just the first three.
+Required technical change
+
+Replace the current absolute-position-based resize logic with a delta-based resize model.
+Current faulty approach
+
+Do not continue using this pattern:
+ts
+const fixedLeft = th.getBoundingClientRect().left;
+const newWidth = mouseX - fixedLeft;
+
+This fails whenever the layout reflows during drag.
+Required new approach
+
+On mousedown, capture:
+ts
+const startX = e.clientX;
+const startWidth = colWidthsRef.current[colId];
+
+On mousemove, compute:
+ts
+const delta = moveEvent.clientX - startX;
+const newWidth = Math.max(MIN_COL_WIDTH, startWidth + delta);
+
+This must be the actual resize model used for all resizable columns.
+Important implementation requirements
+1. Apply this uniformly to all columns
+
+Do not patch only some columns.
+Every resizable column in the Work Orders table must use the same delta-based logic:
+
+Component
+
+Work Order No
+
+Job Title
+
+Assigned To
+
+Due Date
+
+Planned Date
+
+Status
+
+Actions
+
+and any other visible WO table columns across tabs
+If any columns are intentionally non-resizable, clearly keep them excluded and document that explicitly.
+2. Keep header and body widths aligned
+
+Ensure the width actually applied after drag is reflected consistently on:
+
+<th>
+
+corresponding <td>
+For each column, verify consistent use of:
+tsx
+width: `${colWidth}px`
+minWidth: `${colWidth}px`
+maxWidth: `${colWidth}px`
+boxSizing: "border-box"
+
+Or an equivalent stable implementation.
+3. Preserve the full-width table behavior
+
+Do not break the other fix that made the table fill the available container width.
+The table must still behave like:
+ts
+effectiveTableWidth = Math.max(containerWidth, sumOfVisibleColumnWidths)
+
+So:
+
+when columns are narrower than the container, the table fills the full width
+
+when columns exceed the container width, horizontal scrolling is allowed
+4. Ensure the flex / filler behavior does not break resizing
+
+Since jobTitle is currently absorbing leftover space, make sure this no longer interferes with drag calculations.
+You may keep jobTitle as the filler/flex column only if the resize interaction remains stable for all subsequent columns.
+If that filler implementation still causes layout shifts during drag, refactor it so that:
+
+the drag calculation remains stable
+
+visual left edge stays fixed
+
+only the right edge moves
+5. No stale geometry during dragging
+
+During resize, the calculation must not depend on DOM left positions that can change mid-drag.
+The width must depend only on:
+
+starting mouse X
+
+starting width
+
+current mouse X
+Not on recalculated left-edge geometry.
+Verification requirements
+
+Do not mark this complete until you manually verify resize behavior across all visible columns and across all WO tabs:
+
+Planned
+
+Due
+
+Overdue
+
+Postponed
+
+Unplanned
+
+Pending Approval
+
+Completed
+For each tab, confirm:
+
+first column resizes correctly
+
+middle columns resize correctly
+
+last visible column resizes correctly
+
+columns after jobTitle no longer jitter or slide
+
+header/body stay aligned
+
+table still fills available width when not overflowing
+
+horizontal scroll appears only when needed
+Acceptance criteria
+
+Only mark this fixed if all of the following are true:
+
+every resizable column uses the same resize logic
+
+the left edge remains visually stable during drag
+
+only the right edge moves
+
+no jittering
+
+no stale-position sliding
+
+no special failure for columns after jobTitle
+
+full-width table behavior remains intact
+
+all WO tabs behave consistently
