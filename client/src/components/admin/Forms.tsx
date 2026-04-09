@@ -15,7 +15,7 @@ interface FormItem {
 }
 
 export default function Forms() {
-  const { isSailAdmin } = useUIRole();
+  const { isSailAdmin, isExternal } = useUIRole();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedForm, setSelectedForm] = useState<FormItem | null>(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
@@ -57,7 +57,7 @@ export default function Forms() {
   };
 
   // Show "Features Coming Soon" for non-Sail Admin users
-  if (!isSailAdmin) {
+  if (!isSailAdmin && !isExternal) {
     return (
       <Card className="p-0 overflow-hidden">
         <div className="flex items-center justify-center py-24">

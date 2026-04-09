@@ -155,7 +155,7 @@ export default function UniformBulkUpload({
   onRefreshData,
   markers
 }: UniformBulkUploadProps) {
-  const { isSailAdmin } = useUIRole();
+  const { isSailAdmin, isExternal } = useUIRole();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<'add' | 'update' | 'upsert'>('upsert');
   const [selectedStoreType, setSelectedStoreType] = useState<string>('');
@@ -711,7 +711,7 @@ export default function UniformBulkUpload({
             <h1 className="text-2xl font-bold text-gray-900" data-testid={markers?.header || "bulk-upload-header"}>
               {title}
             </h1>
-            {isSailAdmin && (
+            {(isSailAdmin || isExternal) && (
               <p className="text-gray-600" data-testid={markers?.description || "bulk-upload-description"}>
                 {description}
               </p>
@@ -725,11 +725,11 @@ export default function UniformBulkUpload({
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className={`grid w-full ${isSailAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        <TabsList className={`grid w-full ${(isSailAdmin || isExternal) ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <TabsTrigger value="upload" data-testid={markers?.tabUpload || "tab-upload"}>
             Upload
           </TabsTrigger>
-          {isSailAdmin && (
+          {(isSailAdmin || isExternal) && (
             <TabsTrigger value="mapping" data-testid={markers?.tabMapping || "tab-mapping"}>
               Field Mapping Guide
             </TabsTrigger>
@@ -1123,7 +1123,7 @@ export default function UniformBulkUpload({
           </Card>
         </TabsContent>
 
-        {isSailAdmin && (
+        {(isSailAdmin || isExternal) && (
           <TabsContent value="mapping" className="pt-4">
             <Card>
               <CardHeader>

@@ -216,12 +216,12 @@ const PAGE_MARKERS_BY_TEMPLATE: Record<VesselTemplateType, PageMarkers> = {
 };
 
 export default function BulkDataImport() {
-  const { isSailAdmin, isClientAdmin } = useUIRole();
+  const { isSailAdmin, isClientAdmin, isExternal } = useUIRole();
   const { data: vessels = [], isLoading: isLoadingVessels } = useVessels();
   // Fleet mode is only available for Sail Admin
   const [isFleetModeState, setIsFleetModeState] = useState(false);
-  const isFleetMode = isSailAdmin ? isFleetModeState : false;
-  const setIsFleetMode = isSailAdmin ? setIsFleetModeState : () => {};
+  const isFleetMode = (isSailAdmin || isExternal) ? isFleetModeState : false;
+  const setIsFleetMode = (isSailAdmin || isExternal) ? setIsFleetModeState : () => {};
   const [selectedVesselTemplate, setSelectedVesselTemplate] = useState<VesselTemplateType>('machinery');
   const [selectedFleetTemplate, setSelectedFleetTemplate] = useState<FleetTemplateType>('maker-list');
   const [selectedVessel, setSelectedVessel] = useState<string>('');
@@ -251,7 +251,7 @@ export default function BulkDataImport() {
   return (
     <div>
       {/* Filter Bar - Vessel Selector above content */}
-      {(isSailAdmin || isClientAdmin) && !isFleetMode && (
+      {(isSailAdmin || isClientAdmin || isExternal) && !isFleetMode && (
         <div className="flex items-center gap-3 flex-wrap mb-4">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
@@ -279,7 +279,7 @@ export default function BulkDataImport() {
         </div>
       )}
 
-      <div className={`flex gap-6 ${(isSailAdmin || isClientAdmin) && !isFleetMode ? 'h-[calc(100vh-188px)]' : 'h-[calc(100vh-140px)]'}`}>
+      <div className={`flex gap-6 ${(isSailAdmin || isClientAdmin || isExternal) && !isFleetMode ? 'h-[calc(100vh-188px)]' : 'h-[calc(100vh-140px)]'}`}>
       {/* Left Sidebar - Templates */}
       <div className="w-[200px] flex-shrink-0">
         <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
@@ -328,7 +328,7 @@ export default function BulkDataImport() {
         <div className="bg-white border-b px-6 py-4">
           <div className="flex items-center gap-4">
             {/* Fleet Data Import Toggle - Only visible for Sail Admin */}
-            {isSailAdmin && (
+            {(isSailAdmin || isExternal) && (
               <div className="flex items-center gap-2 px-4 py-2 border rounded-full bg-gray-50" data-testid={currentMarkers.fleetToggle}>
                 <Label htmlFor="fleet-toggle" className="text-sm font-medium text-gray-700 cursor-pointer">
                   Fleet Data Import
