@@ -674,10 +674,14 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'critical-equipment': {
-        // Fetch data from the new API endpoint
-        const response = await fetch(
-          `/technical/api/reports/critical-equipment-status?vesselId=${effectiveVesselId}`
-        );
+        let critUrl = `/technical/api/reports/critical-equipment-status?vesselId=${effectiveVesselId}`;
+        if (categoryFilters.dateRange?.from) {
+          critUrl += `&startDate=${categoryFilters.dateRange.from.toISOString().split('T')[0]}`;
+        }
+        if (categoryFilters.dateRange?.to) {
+          critUrl += `&endDate=${categoryFilters.dateRange.to.toISOString().split('T')[0]}`;
+        }
+        const response = await fetch(critUrl);
         if (!response.ok) {
           throw new Error('Failed to fetch critical equipment data');
         }
@@ -734,9 +738,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'unplanned-jobs': {
-        // Use date range from global filters or default to current month
-        const dateFrom = globalFilters?.dateRange?.from || new Date(now.getFullYear(), now.getMonth(), 1);
-        const dateTo = globalFilters?.dateRange?.to || new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const dateFrom = categoryFilters.dateRange?.from || new Date(now.getFullYear(), now.getMonth(), 1);
+        const dateTo = categoryFilters.dateRange?.to || new Date(now.getFullYear(), now.getMonth() + 1, 0);
         
         const startDate = dateFrom.toISOString().split('T')[0];
         const endDate = dateTo.toISOString().split('T')[0];
@@ -1045,7 +1048,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     let requestBody: any = { vesselId: effectiveVesselId };
     
     // Add date range for reports that support it
-    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'postponement-log') {
+    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'postponement-log' || reportId === 'critical-equipment') {
       const dateFrom = categoryFilters.dateRange?.from;
       const dateTo = categoryFilters.dateRange?.to;
       
@@ -1056,16 +1059,16 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         requestBody.dateTo = dateTo.toISOString().split('T')[0];
       }
       
-      if (reportId === 'monthly-summary' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution') {
+      if (reportId === 'monthly-summary' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'critical-equipment') {
         let startDate: Date;
         let endDate: Date;
         
-        if (globalFilters?.dateRange?.from && globalFilters?.dateRange?.to) {
-          startDate = globalFilters.dateRange.from;
-          endDate = globalFilters.dateRange.to;
-        } else if (categoryFilters.dateRange?.from && categoryFilters.dateRange?.to) {
+        if (categoryFilters.dateRange?.from && categoryFilters.dateRange?.to) {
           startDate = categoryFilters.dateRange.from;
           endDate = categoryFilters.dateRange.to;
+        } else if (globalFilters?.dateRange?.from && globalFilters?.dateRange?.to) {
+          startDate = globalFilters.dateRange.from;
+          endDate = globalFilters.dateRange.to;
         } else {
           const now = new Date();
           startDate = new Date(now.getFullYear(), now.getMonth(), 1);

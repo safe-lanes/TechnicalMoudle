@@ -22,11 +22,13 @@ export async function getTemplate(req: Request, res: Response) {
 export async function getCriticalEquipmentStatus(req: Request, res: Response) {
   try {
     const vesselId = req.query.vesselId as string;
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
     if (!vesselId) {
       return res.status(400).json({ error: "vesselId is required" });
     }
 
-    const result = await equipmentReportService.getCriticalEquipmentStatus(vesselId);
+    const result = await equipmentReportService.getCriticalEquipmentStatus(vesselId, startDate, endDate);
     res.json(result);
   } catch (error: any) {
     console.error('Error generating critical equipment report:', error);
@@ -43,13 +45,13 @@ export async function getCriticalEquipmentStatus(req: Request, res: Response) {
 
 export async function exportCriticalEquipmentStatusExcel(req: Request, res: Response) {
   try {
-    const { vesselId } = req.body;
+    const { vesselId, startDate, endDate } = req.body;
 
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
 
-    const { buffer, filename } = await equipmentReportService.exportCriticalEquipmentStatusExcel(vesselId);
+    const { buffer, filename } = await equipmentReportService.exportCriticalEquipmentStatusExcel(vesselId, startDate, endDate);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

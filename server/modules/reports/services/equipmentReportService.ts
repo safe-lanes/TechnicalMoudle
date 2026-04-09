@@ -33,17 +33,14 @@ export async function getTemplate(templateType: string) {
 // CRITICAL EQUIPMENT STATUS - PREVIEW
 // ═══════════════════════════════════════════════════════════════
 
-export async function getCriticalEquipmentStatus(vesselId: string) {
-  // Get all components for the vessel where critical=true OR classItem=true
+export async function getCriticalEquipmentStatus(vesselId: string, startDateStr?: string, endDateStr?: string) {
   const allComponents = await repo.getComponents(vesselId);
   const criticalComponents = allComponents.filter(c =>
     c.isActive !== false && (c.critical === true || c.classItem === true)
   );
 
-  // Get all work orders for the vessel
   const allWorkOrders = await repo.getWorkOrders(vesselId);
 
-  // Parse date helper
   const parseDate = (dateStr: string | null | undefined): Date | null => {
     if (!dateStr) return null;
     try {
@@ -56,33 +53,46 @@ export async function getCriticalEquipmentStatus(vesselId: string) {
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const sevenDaysFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  // Build report data by aggregating work orders per component
+  const filterStartDate = startDateStr ? new Date(startDateStr) : null;
+  if (filterStartDate) filterStartDate.setHours(0, 0, 0, 0);
+  const filterEndDate = endDateStr ? new Date(endDateStr) : null;
+  if (filterEndDate) filterEndDate.setHours(23, 59, 59, 999);
+
+  const dueSoonStart = filterStartDate || today;
+  const dueSoonEnd = filterEndDate || new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+
   const reportData = criticalComponents.map((component, index) => {
-    // Find work orders for this component
     const componentWOs = allWorkOrders.filter(wo =>
       wo.componentCode === component.componentCode ||
       wo.componentCode === component.id ||
       wo.component === component.name
     );
 
-    // Filter active work orders (not completed)
     const activeWOs = componentWOs.filter(wo =>
       wo.status !== 'Completed' && wo.isActive !== false
     );
 
-    // Count by status
-    const overdueCount = activeWOs.filter(wo => wo.status === 'Overdue').length;
-    const dueSoonCount = activeWOs.filter(wo => {
+    let relevantWOs = activeWOs;
+    if (filterStartDate || filterEndDate) {
+      relevantWOs = activeWOs.filter(wo => {
+        const dueDate = parseDate(wo.dueDate || wo.nextDueDate);
+        if (!dueDate) return true;
+        if (filterStartDate && dueDate < filterStartDate) return false;
+        if (filterEndDate && dueDate > filterEndDate) return false;
+        return true;
+      });
+    }
+
+    const overdueCount = relevantWOs.filter(wo => wo.status === 'Overdue').length;
+    const dueSoonCount = relevantWOs.filter(wo => {
       const dueDate = parseDate(wo.dueDate || wo.nextDueDate);
       if (!dueDate) return false;
-      return dueDate >= today && dueDate <= sevenDaysFromNow;
+      return dueDate >= dueSoonStart && dueDate <= dueSoonEnd;
     }).length;
-    const totalActiveWOs = activeWOs.length;
+    const totalActiveWOs = relevantWOs.length;
 
-    // Find next due date and last done date
-    const dueDates = activeWOs
+    const dueDates = relevantWOs
       .map(wo => parseDate(wo.dueDate || wo.nextDueDate))
       .filter((d): d is Date => d !== null)
       .sort((a, b) => a.getTime() - b.getTime());
@@ -95,7 +105,6 @@ export async function getCriticalEquipmentStatus(vesselId: string) {
       .sort((a, b) => b.getTime() - a.getTime());
     const lastDoneDate = completionDates.length > 0 ? completionDates[0] : null;
 
-    // Calculate days until due
     const daysUntilDue = nextDueDate
       ? Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
       : null;
@@ -159,101 +168,20 @@ export async function getCriticalEquipmentStatus(vesselId: string) {
 
 export async function exportCriticalEquipmentStatusExcel(
   vesselId: string,
+  startDateStr?: string,
+  endDateStr?: string,
 ): Promise<{ buffer: Buffer; filename: string }> {
-  // Reuse the JSON endpoint logic - fetch critical equipment data
-  const allComponents = await repo.getComponents(vesselId);
-  const criticalComponents = allComponents.filter(c =>
-    c.isActive !== false && (c.critical === true || c.classItem === true)
-  );
+  const result = await getCriticalEquipmentStatus(vesselId, startDateStr, endDateStr);
+  const reportData = result.data.map((item: any) => ({
+    ...item,
+    nextDueDate: item.nextDueDate || '-',
+    daysUntilDue: item.daysUntilDue !== null ? item.daysUntilDue : '-'
+  }));
+  const metadata = result.metadata;
 
-  const allWorkOrders = await repo.getWorkOrders(vesselId);
   const allVessels = await repo.getVessels();
   const vessel = allVessels.find(v => v.id === vesselId);
   const vesselName = vessel?.name || vesselId;
-
-  const parseDate = (dateStr: string | null | undefined): Date | null => {
-    if (!dateStr) return null;
-    try {
-      const d = new Date(dateStr);
-      return isNaN(d.getTime()) ? null : d;
-    } catch {
-      return null;
-    }
-  };
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const sevenDaysFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-  // Build report data
-  const reportData = criticalComponents.map((component, index) => {
-    const componentWOs = allWorkOrders.filter(wo =>
-      wo.componentCode === component.componentCode ||
-      wo.componentCode === component.id ||
-      wo.component === component.name
-    );
-
-    const activeWOs = componentWOs.filter(wo =>
-      wo.status !== 'Completed' && wo.isActive !== false
-    );
-
-    const overdueCount = activeWOs.filter(wo => wo.status === 'Overdue').length;
-    const dueSoonCount = activeWOs.filter(wo => {
-      const dueDate = parseDate(wo.dueDate || wo.nextDueDate);
-      if (!dueDate) return false;
-      return dueDate >= today && dueDate <= sevenDaysFromNow;
-    }).length;
-    const totalActiveWOs = activeWOs.length;
-
-    const dueDates = activeWOs
-      .map(wo => parseDate(wo.dueDate || wo.nextDueDate))
-      .filter((d): d is Date => d !== null)
-      .sort((a, b) => a.getTime() - b.getTime());
-    const nextDueDate = dueDates.length > 0 ? dueDates[0] : null;
-
-    const daysUntilDue = nextDueDate
-      ? Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-      : null;
-
-    return {
-      sNo: index + 1,
-      componentCode: component.componentCode || component.id,
-      componentName: component.name || 'Unnamed Component',
-      isCritical: component.critical ? 'Yes' : 'No',
-      isClassItem: component.classItem ? 'Yes' : 'No',
-      department: component.department || component.eqptSystemDept || '-',
-      location: component.location || '-',
-      totalWorkOrders: totalActiveWOs,
-      overdueJobs: overdueCount,
-      dueSoonJobs: dueSoonCount,
-      nextDueDate: nextDueDate ? nextDueDate.toISOString().split('T')[0] : '-',
-      daysUntilDue: daysUntilDue !== null ? daysUntilDue : '-'
-    };
-  });
-
-  // Sort by overdue count DESC, then next_due_date ASC (nulls last)
-  reportData.sort((a, b) => {
-    if (a.overdueJobs !== b.overdueJobs) {
-      return b.overdueJobs - a.overdueJobs;
-    }
-    const daysA = a.daysUntilDue === '-' ? 9999 : (a.daysUntilDue as number);
-    const daysB = b.daysUntilDue === '-' ? 9999 : (b.daysUntilDue as number);
-    return daysA - daysB;
-  });
-
-  reportData.forEach((item, idx) => { item.sNo = idx + 1; });
-
-  // Calculate summary matching specification
-  const metadata = {
-    totalCriticalEquipment: reportData.length,
-    criticalOnly: reportData.filter(r => r.isCritical === 'Yes' && r.isClassItem === 'No').length,
-    classItemOnly: reportData.filter(r => r.isClassItem === 'Yes' && r.isCritical === 'No').length,
-    bothCriticalAndClass: reportData.filter(r => r.isCritical === 'Yes' && r.isClassItem === 'Yes').length,
-    equipmentWithOverdue: reportData.filter(r => r.overdueJobs > 0).length,
-    equipmentDueSoon: reportData.filter(r => r.dueSoonJobs > 0 && r.overdueJobs === 0).length,
-    totalOverdueJobs: reportData.reduce((sum, r) => sum + r.overdueJobs, 0),
-    totalTrackedWorkOrders: reportData.reduce((sum, r) => sum + r.totalWorkOrders, 0)
-  };
 
   // Generate Excel workbook
   const workbook = new ExcelJS.Workbook();
