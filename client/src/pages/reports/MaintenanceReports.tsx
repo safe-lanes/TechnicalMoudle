@@ -1045,8 +1045,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     let requestBody: any = { vesselId: effectiveVesselId };
     
     // Add date range for reports that support it
-    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution') {
-      // Use category filters date range for completed-jobs, unplanned-jobs, and workload-distribution
+    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'postponement-log') {
       const dateFrom = categoryFilters.dateRange?.from;
       const dateTo = categoryFilters.dateRange?.to;
       
@@ -1057,7 +1056,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         requestBody.dateTo = dateTo.toISOString().split('T')[0];
       }
       
-      // Also support startDate/endDate for monthly-summary, unplanned-jobs, workload-distribution, equipment-utilization, and rh-anomaly-detection
       if (reportId === 'monthly-summary' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution') {
         let startDate: Date;
         let endDate: Date;
