@@ -1142,54 +1142,60 @@ const WorkOrders: React.FC = () => {
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-56 p-0" align="start">
-            <div className="p-3 border-b border-gray-100">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Work Order Criticality</p>
-              <div className="space-y-1">
-                {[
-                  { value: "all", label: "All" },
-                  { value: "critical", label: "Critical" },
-                  { value: "non-critical", label: "Non-Critical" },
-                ].map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${selectedCriticality === opt.value || (!selectedCriticality && opt.value === "all") ? 'bg-[hsl(var(--primary))] text-white font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
-                    onClick={() => setSelectedCriticality(opt.value)}
-                    data-testid={`criticality-wo-${opt.value}`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
             <div className="p-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Component Criticality</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Work Order Criticality</p>
               <TooltipProvider delayDuration={300}>
-                <div className="space-y-2">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <label className="flex items-center gap-2 cursor-pointer px-2 py-1 rounded hover:bg-gray-100 transition-colors" data-testid="criticality-comp-critical">
-                        <Checkbox
-                          checked={compCriticalChecked}
-                          onCheckedChange={(checked) => setCompCriticalChecked(checked === true)}
-                        />
-                        <span className="text-sm text-gray-700">Critical</span>
-                      </label>
-                    </TooltipTrigger>
-                    <TooltipContent side="right"><p>Critical Components Work Orders</p></TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <label className="flex items-center gap-2 cursor-pointer px-2 py-1 rounded hover:bg-gray-100 transition-colors" data-testid="criticality-comp-non-critical">
-                        <Checkbox
-                          checked={compNonCriticalChecked}
-                          onCheckedChange={(checked) => setCompNonCriticalChecked(checked === true)}
-                        />
-                        <span className="text-sm text-gray-700">Non-Critical</span>
-                      </label>
-                    </TooltipTrigger>
-                    <TooltipContent side="right"><p>Non-Critical Components Work Orders</p></TooltipContent>
-                  </Tooltip>
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${selectedCriticality === "all" || !selectedCriticality ? 'bg-[hsl(var(--primary))] text-white font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
+                    onClick={() => setSelectedCriticality("all")}
+                    data-testid="criticality-wo-all"
+                  >
+                    All
+                  </button>
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      className={`flex-1 text-left px-2 py-1.5 rounded text-sm transition-colors ${selectedCriticality === "critical" ? 'bg-[hsl(var(--primary))] text-white font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
+                      onClick={() => setSelectedCriticality("critical")}
+                      data-testid="criticality-wo-critical"
+                    >
+                      Critical
+                    </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <label className="flex items-center cursor-pointer p-1 rounded hover:bg-gray-100 transition-colors" data-testid="criticality-comp-critical">
+                          <Checkbox
+                            checked={compCriticalChecked}
+                            onCheckedChange={(checked) => setCompCriticalChecked(checked === true)}
+                          />
+                        </label>
+                      </TooltipTrigger>
+                      <TooltipContent side="right"><p>Critical Components Work Orders</p></TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      className={`flex-1 text-left px-2 py-1.5 rounded text-sm transition-colors ${selectedCriticality === "non-critical" ? 'bg-[hsl(var(--primary))] text-white font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
+                      onClick={() => setSelectedCriticality("non-critical")}
+                      data-testid="criticality-wo-non-critical"
+                    >
+                      Non-Critical
+                    </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <label className="flex items-center cursor-pointer p-1 rounded hover:bg-gray-100 transition-colors" data-testid="criticality-comp-non-critical">
+                          <Checkbox
+                            checked={compNonCriticalChecked}
+                            onCheckedChange={(checked) => setCompNonCriticalChecked(checked === true)}
+                          />
+                        </label>
+                      </TooltipTrigger>
+                      <TooltipContent side="right"><p>Non-Critical Components Work Orders</p></TooltipContent>
+                    </Tooltip>
+                  </div>
                 </div>
               </TooltipProvider>
             </div>
