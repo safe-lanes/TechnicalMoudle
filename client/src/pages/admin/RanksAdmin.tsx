@@ -43,6 +43,7 @@ interface OrgChartRow {
   rankId: string;
   parentRankId: string | null;
   sortOrder: number;
+  rankView: string;
   isNew?: boolean;
 }
 
@@ -107,6 +108,7 @@ export default function RanksAdmin() {
           rankId: o.rankId || o.rank_id,
           parentRankId: o.parentRankId || o.parent_rank_id || null,
           sortOrder: o.sortOrder ?? o.sort_order ?? 0,
+          rankView: o.rankView || o.rank_view || "",
         }));
         setOrgChartData(mapped);
       } else {
@@ -236,6 +238,7 @@ export default function RanksAdmin() {
       rankId: "",
       parentRankId: null,
       sortOrder: 0,
+      rankView: "",
       isNew: true,
     }]);
     setHasUnsavedChanges(true);
@@ -556,6 +559,12 @@ export default function RanksAdmin() {
             {label}
           </span>
 
+          {!isOrgChartEditMode && entry.rankView && (
+            <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded" data-testid={`text-oc-viewmode-${entry.rankId}`}>
+              {UI_ROLE_LABELS[entry.rankView as UIRole] || entry.rankView}
+            </span>
+          )}
+
           {isOrgChartEditMode && (
             <>
               <Select
@@ -579,9 +588,21 @@ export default function RanksAdmin() {
                   })()}
                 </SelectContent>
               </Select>
+              <Select
+                value={entry.rankView || "__none__"}
+                onValueChange={(v) => updateOrgChartEntry(index, 'rankView', v === "__none__" ? "" : v)}
+              >
+                <SelectTrigger className="h-8 w-[150px] ml-2 text-sm" data-testid={`select-oc-viewmode-${entry.rankId}`}>
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {VISIBLE_UI_ROLES.map(role => <SelectItem key={role} value={role}>{UI_ROLE_LABELS[role]}</SelectItem>)}
+                </SelectContent>
+              </Select>
               <button
                 onClick={() => deleteOrgChartEntry(index)}
-                className="ml-3 text-red-400 hover:text-red-600 flex-shrink-0"
+                className="ml-2 text-red-400 hover:text-red-600 flex-shrink-0"
                 data-testid={`button-delete-oc-${entry.rankId}`}
               >
                 <X className="h-4 w-4" />

@@ -143,6 +143,7 @@ export async function saveOrgChart(entries: any[]) {
         parentRankId: entry.parentRankId || null,
         sortOrder: entry.sortOrder ?? 0,
         isDeleted: false,
+        rankView: entry.rankView || null,
       };
 
       if (entry.id) {

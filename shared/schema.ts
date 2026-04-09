@@ -3389,6 +3389,7 @@ export const admVesselOrgChart = pgTable("adm_vessel_org_chart", {
   updatedByUuid: text("updated_by_uuid"),
   isDeleted: boolean("is_deleted").default(false),
   isSync: boolean("is_sync").default(false),
+  rankView: text("rank_view"),
 });
 
 export const insertAdmVesselOrgChartSchema = createInsertSchema(admVesselOrgChart).omit({

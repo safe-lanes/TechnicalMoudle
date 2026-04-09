@@ -2734,6 +2734,18 @@ const migrations: Migration[] = [
         END IF;
       END $$;
     `
+  },
+  {
+    id: '081_add_rank_view_to_org_chart',
+    name: 'Add rank_view column to adm_vessel_org_chart',
+    description: 'Adds rank_view text column to adm_vessel_org_chart for storing the view mode per org chart entry.',
+    sql: `
+      DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'adm_vessel_org_chart') THEN
+          ALTER TABLE adm_vessel_org_chart ADD COLUMN IF NOT EXISTS rank_view TEXT;
+        END IF;
+      END $$;
+    `
   }
 ];
 
