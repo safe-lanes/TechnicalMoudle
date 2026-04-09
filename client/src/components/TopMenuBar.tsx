@@ -17,6 +17,7 @@ import sailLogoPath from "@assets/SAIL logo Transparent_1753957135582.png";
 import { SyncStatusIndicator } from "./SyncStatusIndicator";
 import { RoleSwitcher } from "./RoleSwitcher";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { useUIRole } from "@/contexts/UIRoleContext";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -34,6 +35,7 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
   onSubModuleChange 
 }) => {
   const { hasAnyChildAccess, isLoading: permissionsLoading } = usePermissions();
+  const { isSailAdmin } = useUIRole();
 
   const menuItems = [
     {
@@ -63,7 +65,7 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
       icon: Shield,
     },
     // ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
-    ...(NOON_MODULE_ENABLED ? [{
+    ...(NOON_MODULE_ENABLED && isSailAdmin ? [{
       id: "noon-report",
       label: "Noon Report",
       icon: Anchor,
