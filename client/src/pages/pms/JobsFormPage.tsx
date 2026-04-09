@@ -38,9 +38,9 @@ const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelM
       {label}
     </Label>
     {type === "textarea" ? (
-      <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] whitespace-pre-wrap" data-testid={valueMarker}>
+      <div className="relative" data-testid={valueMarker}>
         {valueMarker && <Marker id={valueMarker} />}
-        {value || '-'}
+        <Textarea disabled value={value || '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default min-h-[80px]" rows={3} />
       </div>
     ) : (
       <div className="relative" data-testid={valueMarker}>
