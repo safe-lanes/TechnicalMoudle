@@ -48,6 +48,8 @@ import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useModifyMode } from "@/hooks/useModifyMode";
+import { PeriodPicker } from "@/components/filters/PeriodPicker";
+import type { PeriodValue } from "@/components/filters/PeriodPicker";
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { generateSuggestions, extractContextFromWorkOrder, type WorkOrderContext } from "@/utils/suggestionEngine";
@@ -489,6 +491,50 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [historyComponentFilter, setHistoryComponentFilter] = useState('');
   const [historyDateFrom, setHistoryDateFrom] = useState('');
   const [historyDateTo, setHistoryDateTo] = useState('');
+  const [historyPeriod, setHistoryPeriod] = useState<PeriodValue | null>(null);
+
+  const handleHistoryPeriodChange = (val: PeriodValue | null) => {
+    setHistoryPeriod(val);
+    setWorkHistoryPage(0);
+    setExpandedHistoryIndex(null);
+    if (!val) {
+      setHistoryDateFrom('');
+      setHistoryDateTo('');
+      return;
+    }
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    if (val.mode === 'yearQuarterMonth' && val.year) {
+      if (val.month !== undefined) {
+        const y = val.year;
+        const m = val.month;
+        const lastDay = new Date(y, m + 1, 0).getDate();
+        setHistoryDateFrom(`${y}-${pad(m + 1)}-01`);
+        setHistoryDateTo(`${y}-${pad(m + 1)}-${pad(lastDay)}`);
+      } else if (val.quarter !== undefined) {
+        const startMonth = (val.quarter - 1) * 3;
+        const endMonth = startMonth + 2;
+        const lastDay = new Date(val.year, endMonth + 1, 0).getDate();
+        setHistoryDateFrom(`${val.year}-${pad(startMonth + 1)}-01`);
+        setHistoryDateTo(`${val.year}-${pad(endMonth + 1)}-${pad(lastDay)}`);
+      } else {
+        setHistoryDateFrom(`${val.year}-01-01`);
+        setHistoryDateTo(`${val.year}-12-31`);
+      }
+    } else if (val.mode === 'dateRange') {
+      if (val.dateFrom) {
+        const d = val.dateFrom;
+        setHistoryDateFrom(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+      } else {
+        setHistoryDateFrom('');
+      }
+      if (val.dateTo) {
+        const d = val.dateTo;
+        setHistoryDateTo(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+      } else {
+        setHistoryDateTo('');
+      }
+    }
+  };
   const [expandedHistoryIndex, setExpandedHistoryIndex] = useState<number | null>(null);
 
   const calcDaysLate = (originalDueDate: string | null | undefined, completionDate: string | null | undefined): number => {
@@ -4342,44 +4388,21 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 : filteredHistory.slice(0, WORK_HISTORY_COLLAPSED_COUNT);
               const totalPages = Math.ceil(totalCount / WORK_HISTORY_PAGE_SIZE);
 
-              const hasFilters = !!(historyComponentFilter || historyDateFrom || historyDateTo);
+              const hasFilters = !!historyPeriod;
               const fmtDate = (d: string | null | undefined) => d ? d.slice(0, 10) : '—';
 
               return (
                 <>
                   {/* Filter bar */}
                   <div className="flex flex-wrap gap-2 items-center mb-3 p-2 bg-gray-50 rounded border border-gray-200" data-testid="history-filter-bar">
-                    <select
-                      value={historyComponentFilter}
-                      onChange={e => { setHistoryComponentFilter(e.target.value); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
-                      data-testid="select-history-component"
-                      className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                    >
-                      <option value="">All Components</option>
-                      {uniqueComponents.map(code => (
-                        <option key={code} value={code}>{code}</option>
-                      ))}
-                    </select>
-                    <span className="text-xs text-gray-400">From</span>
-                    <input
-                      type="date"
-                      value={historyDateFrom}
-                      onChange={e => { setHistoryDateFrom(e.target.value); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
-                      data-testid="input-history-date-from"
-                      className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                    />
-                    <span className="text-xs text-gray-400">To</span>
-                    <input
-                      type="date"
-                      value={historyDateTo}
-                      onChange={e => { setHistoryDateTo(e.target.value); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
-                      data-testid="input-history-date-to"
-                      className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    <PeriodPicker
+                      value={historyPeriod}
+                      onChange={handleHistoryPeriodChange}
                     />
                     {hasFilters && (
                       <button
                         type="button"
-                        onClick={() => { setHistoryComponentFilter(''); setHistoryDateFrom(''); setHistoryDateTo(''); setWorkHistoryPage(0); setExpandedHistoryIndex(null); }}
+                        onClick={() => { handleHistoryPeriodChange(null); }}
                         data-testid="button-clear-history-filters"
                         className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 rounded border border-gray-200 bg-white hover:bg-gray-100"
                       >
