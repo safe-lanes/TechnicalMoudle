@@ -1,0 +1,65 @@
+Task: Remove the “Priority” column from all reports in the PMS Reports module
+
+Issue
+The Priority column is currently appearing in report tables, but I do not want this column shown in the reports anymore. This is causing unnecessary clutter and inconsistency in report structure. Priority should be removed from all report table views wherever it is currently displayed.
+
+Objective
+Remove the Priority column from all reports in the PMS Reports module.
+
+Required fix
+Please do the following only:
+
+Identify every report table in the PMS Reports module where a Priority column is currently rendered.
+
+Remove the Priority column from the table UI in all those reports.
+
+Remove it from the displayed column order so the remaining columns shift correctly.
+
+If PDF and Excel exports currently include Priority, remove it from those exports as well so exports match the UI.
+
+If any report-specific column configuration, header definition, or export mapping contains Priority, update it consistently.
+
+Ensure that removing the column does not break table rendering, sorting, export generation, or data mapping for the remaining columns.
+
+Important implementation notes
+Remove only the visible/reported Priority column, not unrelated priority settings in other modules such as alerts, notifications, workflows, or admin configuration.
+
+Do not delete priority from the database or underlying source objects unless absolutely required for report rendering. This is a presentation-level/report output change, not a master-data deletion.
+
+If some reports internally still use priority for logic, that is fine — just do not display it in report outputs.
+
+Scope
+This applies only to the PMS Reports module reports, including on-screen tables and matching exports.
+
+Expected behavior
+After the fix:
+
+no report table should display a Priority column,
+
+PDF and Excel exports should also exclude Priority where those reports previously included it,
+
+report layouts should remain stable and aligned after column removal.
+
+Output required after fix
+Please provide:
+
+list of reports where Priority was removed
+
+files changed
+
+confirmation that UI, PDF, and Excel outputs are now aligned without the Priority column
+
+Strict instruction
+Do not change anything else.
+
+no redesign
+
+no new filters
+
+no other column changes
+
+no changes to admin alert priority settings
+
+no business logic changes except what is necessary to remove Priority from report outputs
+
+Only remove the Priority column from all PMS reports.
