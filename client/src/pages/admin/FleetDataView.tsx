@@ -1172,9 +1172,20 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
     const errors: string[] = [];
     for (const vessel of vesselsToMap) {
       try {
+        const jobsRes = await fetch(`/technical/api/jobs?vesselId=${encodeURIComponent(vessel.id)}`, { credentials: "include" });
+        if (!jobsRes.ok) throw new Error("Failed to fetch vessel jobs");
+        const vesselJobs: any[] = await jobsRes.json();
+        const matchingJob = vesselJobs.find(
+          (vj: any) => vj.fleetEquipmentCode === fleetEquipmentCode && vj.jobNo === jobCode
+        );
+        if (!matchingJob) {
+          errors.push(`${vessel.name}: Job not available in vessel`);
+          continue;
+        }
         await apiRequest("POST", "/technical/api/fleet-admin/fleet-job-mappings", {
           fleetEquipmentCode,
           jobCode,
+          jobId: matchingJob.juuid,
           vesselCode: vessel.id,
           vesselName: vessel.name,
           mappedBy: 'admin',
@@ -1234,9 +1245,20 @@ export default function FleetDataView({ onBack }: { onBack?: () => void }) {
     const errors: string[] = [];
     for (const vessel of vesselsToMap) {
       try {
+        const sparesRes = await fetch(`/technical/api/spares/${encodeURIComponent(vessel.id)}`, { credentials: "include" });
+        if (!sparesRes.ok) throw new Error("Failed to fetch vessel spares");
+        const vesselSpares: any[] = await sparesRes.json();
+        const matchingSpare = vesselSpares.find(
+          (vs: any) => vs.fleetEquipmentCode === fleetEquipmentCode && vs.partCode === partCode
+        );
+        if (!matchingSpare) {
+          errors.push(`${vessel.name}: Spare not available in vessel`);
+          continue;
+        }
         await apiRequest("POST", "/technical/api/fleet-admin/fleet-spare-mappings", {
           fleetEquipmentCode,
           partCode,
+          spareId: String(matchingSpare.suuid),
           vesselCode: vessel.id,
           vesselName: vessel.name,
           mappedBy: 'admin',

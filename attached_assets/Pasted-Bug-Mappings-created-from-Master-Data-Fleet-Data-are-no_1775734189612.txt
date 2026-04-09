@@ -1,0 +1,32 @@
+Bug: Mappings created from Master Data → Fleet Data are not visible in Fleet Vessel Mapping screen because jobId and spareId are being saved as NULL.
+
+Root cause: FleetDataView.tsx does not look up the matching vessel job/spare before POST. It sends only vesselCode + jobCode/partCode without the vessel-side UUID.
+
+Fix in client/src/pages/admin/FleetDataView.tsx:
+
+FIX 1: Job Mapping (handleJobMapVessels)
+Before POST to /fleet-admin/fleet-job-mappings, for each selected vessel:
+1. Fetch that vessel's jobs: GET /technical/api/jobs?vesselId=<vesselVuuid>
+2. Find matching vessel job by: vesselJob.fleetEquipmentCode === selectedComponent.fleetEquipmentCode AND vesselJob.jobNo === selectedJobForDetail.jobCode
+3. If matching vessel job found, include jobId: vesselJob.juuid in the POST payload
+4. If not found, skip that vessel and show toast: "Job not available in vessel <vessel name>"
+
+Pattern to follow: FleetVesselMapping.tsx does this correctly at handleCreateJobAutoMappings — reference that implementation.
+
+FIX 2: Spare Mapping (handleSpareMapVessels)
+Same fix pattern:
+1. Fetch vessel spares: GET /technical/api/spares?vesselId=<vesselVuuid>
+2. Find matching spare by: vesselSpare.fleetEquipmentCode === selectedComponent.fleetEquipmentCode AND vesselSpare.partCode === selectedSpareForDetail.partCode
+3. Include spareId: String(vesselSpare.suuid) in POST payload
+4. If not found, show toast: "Spare not available in vessel <vessel name>"
+
+Pattern: Reference handleCreateSpareAutoMappings in FleetVesselMapping.tsx.
+
+Test after fixing:
+1. Master Data → Fleet Data → Manage Jobs → select job → Vessel Mapping → Map to a vessel
+2. Check DB: SELECT job_id FROM fleet_job_vessel_mapping ORDER BY created_at DESC LIMIT 1; — should NOT be NULL
+3. Navigate to Fleet Vessel Mapping (PMS) → select same vessel → verify the mapping appears correctly (not blank)
+4. Same test for Spare Mapping
+5. Try mapping to a vessel that doesn't have the matching job/spare → should show error toast
+
+Commit with message: "fix(fleet-data): look up vessel job/spare UUID before creating mapping"
