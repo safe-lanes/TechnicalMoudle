@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 export default function PMSAdmin() {
   const { isSailAdmin, isClientAdmin, isExternal } = useUIRole();
   const showBulkDataImp = isSailAdmin || isClientAdmin || isExternal;
-  const showMasterData = isSailAdmin || isExternal;
+  const showMasterData = isSailAdmin;
   const [activeTab, setActiveTab] = useState(showBulkDataImp ? "bulk-data-imp" : "alerts");
   const [isSubViewActive, setIsSubViewActive] = useState(false);
 
@@ -21,15 +21,19 @@ export default function PMSAdmin() {
 
   // Reset to appropriate tab when switching roles (since hidden tabs shouldn't be active)
   useEffect(() => {
-    // Users without bulk-data-imp access who are on that tab should be redirected
+    if (isExternal) {
+      if (activeTab !== "bulk-data-imp") {
+        setActiveTab("bulk-data-imp");
+      }
+      return;
+    }
     if (!showBulkDataImp && activeTab === "bulk-data-imp") {
       setActiveTab("alerts");
     }
-    // Non-Sail Admin users can't access admin-4
     if (!showMasterData && activeTab === "admin-4") {
       setActiveTab(showBulkDataImp ? "bulk-data-imp" : "alerts");
     }
-  }, [showBulkDataImp, showMasterData, activeTab]);
+  }, [showBulkDataImp, showMasterData, isExternal, activeTab]);
 
   const getPageTitle = () => {
     switch (activeTab) {
@@ -71,28 +75,32 @@ export default function PMSAdmin() {
                   Bulk Data Imp
                 </TabsTrigger>
               )}
-              <TabsTrigger 
-                value="alerts" 
-                className={cn(
-                  "px-4",
-                  activeTab === "alerts" && "bg-[#52baf3] text-white data-[state=active]:bg-[#52baf3] data-[state=active]:text-white"
-                )}
-                data-testid="I4.QL.3.3"
-              >
-                <Marker id="I4.QL.3.3" />
-                Alerts
-              </TabsTrigger>
-              <TabsTrigger 
-                value="forms" 
-                className={cn(
-                  "px-4",
-                  activeTab === "forms" && "bg-[#52baf3] text-white data-[state=active]:bg-[#52baf3] data-[state=active]:text-white"
-                )}
-                data-testid="I4.QL.3.4"
-              >
-                <Marker id="I4.QL.3.4" />
-                Forms
-              </TabsTrigger>
+              {!isExternal && (
+                <TabsTrigger 
+                  value="alerts" 
+                  className={cn(
+                    "px-4",
+                    activeTab === "alerts" && "bg-[#52baf3] text-white data-[state=active]:bg-[#52baf3] data-[state=active]:text-white"
+                  )}
+                  data-testid="I4.QL.3.3"
+                >
+                  <Marker id="I4.QL.3.3" />
+                  Alerts
+                </TabsTrigger>
+              )}
+              {!isExternal && (
+                <TabsTrigger 
+                  value="forms" 
+                  className={cn(
+                    "px-4",
+                    activeTab === "forms" && "bg-[#52baf3] text-white data-[state=active]:bg-[#52baf3] data-[state=active]:text-white"
+                  )}
+                  data-testid="I4.QL.3.4"
+                >
+                  <Marker id="I4.QL.3.4" />
+                  Forms
+                </TabsTrigger>
+              )}
               {showMasterData && (
                 <TabsTrigger 
                   value="admin-4" 
@@ -114,17 +122,23 @@ export default function PMSAdmin() {
           <BulkDataImport />
         </TabsContent>
 
-        <TabsContent value="alerts" className="mt-6">
-          <Alerts />
-        </TabsContent>
+        {!isExternal && (
+          <TabsContent value="alerts" className="mt-6">
+            <Alerts />
+          </TabsContent>
+        )}
 
-        <TabsContent value="forms" className="mt-6">
-          <Forms />
-        </TabsContent>
+        {!isExternal && (
+          <TabsContent value="forms" className="mt-6">
+            <Forms />
+          </TabsContent>
+        )}
 
-        <TabsContent value="admin-4" className={hideHeader ? "mt-0" : "mt-6"}>
-          <Admin4Dashboard onSubViewChange={handleSubViewChange} />
-        </TabsContent>
+        {showMasterData && (
+          <TabsContent value="admin-4" className={hideHeader ? "mt-0" : "mt-6"}>
+            <Admin4Dashboard onSubViewChange={handleSubViewChange} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
