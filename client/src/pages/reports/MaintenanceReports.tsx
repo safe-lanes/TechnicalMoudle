@@ -359,79 +359,49 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
     switch (reportId) {
       case 'due-jobs-7': {
-        const dueJobs = vesselWorkOrders.filter((wo: any) => {
-          if (!wo.dueDate) return false;
-          if (wo.status === 'Completed' || wo.status === 'Postponed') return false;
-          if (isDateRangeSet && !isDateInRange(wo.dueDate, dateFrom, dateTo)) return false;
-          const dueDate = new Date(wo.dueDate);
-          return dueDate <= sevenDaysFromNow;
-        });
+        const dueJobsResponse = await fetch(
+          `/technical/api/reports/due-jobs-7-days/preview?vesselId=${effectiveVesselId}`
+        );
+        if (!dueJobsResponse.ok) {
+          throw new Error('Failed to fetch due jobs data');
+        }
+        const { data: dueJobsRaw, vesselName: dueVessel, summary: dueJobsSummary } = await dueJobsResponse.json();
 
-        // Calculate status indicator for each job
-        const calculateStatus = (dueDate: Date): string => {
-          const days = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-          if (days < 0) return 'OVERDUE';
-          if (days <= 2) return 'URGENT';
-          if (days <= 7) return 'DUE';
-          return 'ACTIVE';
-        };
-
-        const calculateDaysRemaining = (dueDate: Date): number => {
-          return Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-        };
-
-        // Enhanced columns to match Excel report
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
           { header: 'Priority', field: 'priority', width: 22 },
           { header: 'Status', field: 'statusIndicator', width: 22 },
-          { header: 'WO Number', field: 'workOrderNumber', width: 45 },
-          { header: 'Title', field: 'title', width: 70 },
-          { header: 'Component', field: 'component', width: 50 },
+          { header: 'WO Number', field: 'workOrderNo', width: 45 },
+          { header: 'Title', field: 'jobTitle', width: 70 },
+          { header: 'Component', field: 'componentName', width: 50 },
           { header: 'Due Date', field: 'formattedDueDate', width: 26 },
           { header: 'Days Left', field: 'daysRemaining', width: 20 },
           { header: 'Assigned To', field: 'assignedTo', width: 35 }
         ];
 
-        // Sort by days remaining (most urgent first)
-        const sortedJobs = [...dueJobs].sort((a: any, b: any) => {
-          const daysA = calculateDaysRemaining(new Date(a.dueDate));
-          const daysB = calculateDaysRemaining(new Date(b.dueDate));
-          return daysA - daysB;
-        });
-
-        const data = sortedJobs.map((wo: any, index: number) => {
-          const dueDate = new Date(wo.dueDate);
-          const days = calculateDaysRemaining(dueDate);
-          return {
-            sno: index + 1,
-            workOrderNumber: wo.workOrderNumber || wo.workOrderNo || wo.id,
-            title: wo.title || wo.jobTitle || '-',
-            component: wo.component || wo.componentName || '-',
-            priority: wo.jobPriority || 'Normal',
-            formattedDueDate: formatDate(wo.dueDate),
-            statusIndicator: calculateStatus(dueDate),
-            daysRemaining: days,
-            assignedTo: wo.assignedTo || wo.assignee || wo.responsibleRank || '-'
-          };
-        });
-
-        // Calculate summary counts
-        const overdueCount = data.filter((d: any) => d.statusIndicator === 'OVERDUE').length;
-        const urgentCount = data.filter((d: any) => d.statusIndicator === 'URGENT').length;
-        const criticalPriorityCount = data.filter((d: any) => d.priority === 'Critical').length;
+        const data = dueJobsRaw.map((job: any, index: number) => ({
+          sno: index + 1,
+          workOrderNo: job.workOrderNo,
+          jobTitle: job.jobTitle,
+          componentName: job.componentName,
+          priority: job.priority,
+          formattedDueDate: formatDate(job.dueDate),
+          statusIndicator: job.statusIndicator,
+          daysRemaining: job.daysRemaining,
+          assignedTo: job.assignedTo
+        }));
 
         const summary = [
-          { label: 'Total Due', value: data.length },
-          { label: 'Overdue', value: overdueCount },
-          { label: 'Urgent (≤2d)', value: urgentCount },
-          { label: 'Critical Priority', value: criticalPriorityCount }
+          { label: 'Total Due', value: dueJobsSummary.totalDue },
+          { label: 'Overdue', value: dueJobsSummary.overdue },
+          { label: 'Urgent (≤2d)', value: dueJobsSummary.urgent },
+          { label: 'Critical Priority', value: dueJobsSummary.criticalPriority }
         ];
 
-        if (mode === 'preview') return { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: dueVessel || vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
-          { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
+          { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: dueVessel || vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
           data
         );
@@ -439,127 +409,65 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'overdue-jobs': {
-        const GRACE_PERIOD_DAYS = 7;
-        const GRACE_PERIOD_RH = 168;
-        const gracePeriodDate = new Date(now);
-        gracePeriodDate.setDate(gracePeriodDate.getDate() - GRACE_PERIOD_DAYS);
-        
-        const overdueJobs = vesselWorkOrders.filter((wo: any) => {
-          if (wo.status === 'Completed' || wo.status === 'Postponed') return false;
-          if (isDateRangeSet && !isDateInRange(wo.dueDate, dateFrom, dateTo)) return false;
-          
-          if (wo.dueDate) {
-            const dueDate = new Date(wo.dueDate);
-            if (dueDate < gracePeriodDate) return true;
-          }
-          
-          // RH-based overdue (past grace period of 168 RH)
-          if (wo.nextDueReading && wo.currentCumulativeRH) {
-            const rhOverdue = wo.currentCumulativeRH - wo.nextDueReading;
-            if (rhOverdue > GRACE_PERIOD_RH) return true;
-          }
-          
-          return false;
-        });
+        const overdueResponse = await fetch(
+          `/technical/api/reports/overdue-jobs/preview?vesselId=${effectiveVesselId}`
+        );
+        if (!overdueResponse.ok) {
+          throw new Error('Failed to fetch overdue jobs data');
+        }
+        const { data: overdueRaw, vesselName: overdueVessel, summary: overdueSummary } = await overdueResponse.json();
 
-        // Calculate overdue type
-        const getOverdueType = (daysPastDue: number, hoursPastDue: number): string => {
-          const calendarOverdue = daysPastDue > GRACE_PERIOD_DAYS;
-          const rhOverdue = hoursPastDue > GRACE_PERIOD_RH;
-          if (calendarOverdue && rhOverdue) return 'Both';
-          if (rhOverdue) return 'RH';
-          return 'Calendar';
-        };
-
-        // 15 columns - REMOVED Severity and Priority (not real database fields)
         const columns = [
           { header: 'S.No', field: 'sNo', width: 8 },
-          { header: 'Work Order No', field: 'workOrderNumber', width: 30 },
+          { header: 'Work Order No', field: 'workOrderNo', width: 30 },
           { header: 'Job Title', field: 'jobTitle', width: 40 },
           { header: 'Comp Code', field: 'componentCode', width: 18 },
           { header: 'Component Name', field: 'componentName', width: 32 },
           { header: 'Dept', field: 'department', width: 14 },
           { header: 'Due Date', field: 'formattedDueDate', width: 18 },
-          { header: 'Days Overdue', field: 'daysOverdue', width: 16 },
-          { header: 'Next Due RH', field: 'nextDueRH', width: 16 },
-          { header: 'Current RH', field: 'currentRH', width: 16 },
-          { header: 'RH Overdue', field: 'rhOverdue', width: 14 },
+          { header: 'Days Overdue', field: 'daysPastDue', width: 16 },
+          { header: 'Next Due RH', field: 'nextDueReading', width: 16 },
+          { header: 'Current RH', field: 'currentReading', width: 16 },
+          { header: 'RH Overdue', field: 'hoursPastDue', width: 14 },
           { header: 'Type', field: 'overdueType', width: 14 },
           { header: 'Assigned To', field: 'assignedTo', width: 20 },
           { header: 'Last Done', field: 'lastDoneDate', width: 18 },
-          { header: 'Critical', field: 'criticalEquip', width: 12 }
+          { header: 'Critical', field: 'critical', width: 12 }
         ];
 
-        const data = overdueJobs.map((wo: any, index: number) => {
-          const dueDate = wo.dueDate ? new Date(wo.dueDate) : null;
-          const daysPastDue = dueDate ? Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
-          const hoursPastDue = (wo.nextDueReading && wo.currentCumulativeRH) 
-            ? Math.max(0, wo.currentCumulativeRH - wo.nextDueReading) 
-            : 0;
-          const isCriticalEquip = wo.criticality === 'Yes' || wo.criticality === 'Critical' || wo.critical === true;
+        const data = overdueRaw.map((job: any, index: number) => ({
+          sNo: index + 1,
+          workOrderNo: job.workOrderNo,
+          jobTitle: job.jobTitle,
+          componentCode: job.componentCode,
+          componentName: job.componentName,
+          department: job.department,
+          formattedDueDate: formatDate(job.dueDate),
+          daysPastDue: job.daysPastDue > 0 ? job.daysPastDue : '-',
+          nextDueReading: job.nextDueReading,
+          currentReading: job.currentReading,
+          hoursPastDue: job.hoursPastDue > 0 ? job.hoursPastDue : '-',
+          overdueType: job.overdueType,
+          assignedTo: job.assignedTo,
+          lastDoneDate: job.lastDoneDate,
+          critical: job.critical
+        }));
 
-          return {
-            sNo: index + 1,
-            workOrderNumber: wo.workOrderNumber || wo.workOrderNo || wo.id,
-            jobTitle: wo.title || wo.jobTitle || '-',
-            componentCode: wo.componentCode || wo.componentNumber || '-',
-            componentName: wo.component || wo.componentName || '-',
-            department: wo.department || wo.assignedDepartment || '-',
-            formattedDueDate: formatDate(wo.dueDate || wo.dueDateSnapshot),
-            daysOverdue: daysPastDue > 0 ? daysPastDue : '-',
-            daysPastDue: daysPastDue,
-            nextDueRH: wo.nextDueReading ? wo.nextDueReading.toLocaleString() : '-',
-            currentRH: wo.currentCumulativeRH ? wo.currentCumulativeRH.toLocaleString() : '-',
-            rhOverdue: hoursPastDue > 0 ? hoursPastDue : '-',
-            overdueType: getOverdueType(daysPastDue, hoursPastDue),
-            assignedTo: wo.assignedTo || wo.assignee || wo.responsibleRank || '-',
-            lastDoneDate: formatDate(wo.lastDoneDate || wo.lastDoneDateSnapshot) || 'N/A',
-            criticalEquip: isCriticalEquip ? 'YES' : 'NO',
-            critical: isCriticalEquip ? 'YES' : 'NO'
-          };
-        });
-
-        // Sort by Critical Equipment first, then by days overdue (descending), then component name
-        data.sort((a, b) => {
-          if (a.criticalEquip !== b.criticalEquip) {
-            return a.criticalEquip === 'YES' ? -1 : 1;
-          }
-          const daysA = typeof a.daysOverdue === 'number' ? a.daysOverdue : 0;
-          const daysB = typeof b.daysOverdue === 'number' ? b.daysOverdue : 0;
-          if (daysA !== daysB) return daysB - daysA;
-          return (a.componentName || '').localeCompare(b.componentName || '');
-        });
-
-        // Re-number after sorting
-        data.forEach((item, idx) => { item.sNo = idx + 1; });
-
-        // Calculate summary statistics - ONLY real database-backed metrics
-        const criticalEquipCount = data.filter(d => d.criticalEquip === 'YES').length;
-        const daysOverdueArr = data.filter(d => typeof d.daysOverdue === 'number').map(d => d.daysOverdue as number);
-        const avgDaysOverdue = daysOverdueArr.length > 0 
-          ? Math.round(daysOverdueArr.reduce((a, b) => a + b, 0) / daysOverdueArr.length) 
-          : 0;
-        const maxDaysOverdue = daysOverdueArr.length > 0 ? Math.max(...daysOverdueArr) : 0;
-        const calendarOverdueCount = data.filter(d => d.overdueType === 'Calendar' || d.overdueType === 'Both').length;
-        const rhOverdueCount = data.filter(d => d.overdueType === 'RH' || d.overdueType === 'Both').length;
-
-        // REMOVED fake severity counts - only show real database metrics
         const summary = [
-          { label: 'Total Overdue', value: data.length },
-          { label: 'Critical Equip', value: criticalEquipCount, color: 'highlight' },
-          { label: 'Avg Days Overdue', value: avgDaysOverdue },
-          { label: 'Max Days Overdue', value: `${maxDaysOverdue}d` },
-          { label: 'Calendar/RH', value: `${calendarOverdueCount}/${rhOverdueCount}` }
+          { label: 'Total Overdue', value: overdueSummary.totalOverdue },
+          { label: 'Critical Equip', value: overdueSummary.criticalEquipment, color: 'highlight' },
+          { label: 'Avg Days Overdue', value: overdueSummary.avgDaysOverdue },
+          { label: 'Max Days Overdue', value: `${overdueSummary.maxDaysOverdue}d` },
+          { label: 'Calendar/RH', value: `${overdueSummary.calendarOverdue}/${overdueSummary.rhOverdue}` }
         ];
 
-        if (mode === 'preview') return { title: 'OVERDUE JOBS REPORT', subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'OVERDUE JOBS REPORT', subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', vessel: overdueVessel || vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
 
-        // Use specialized overdue report generator
         pdfReportGenerator.generateOverdueJobsReport(
           { 
             title: 'OVERDUE JOBS REPORT', 
             subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', 
-            vessel: vesselName,
+            vessel: overdueVessel || vesselName,
             dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
           columns,
@@ -569,117 +477,18 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'completed-jobs': {
-        // Helper to format date as DD-MMM-YYYY
-        const formatDateDDMMMYYYY = (dateStr: string | null | undefined): string => {
-          if (!dateStr) return '—';
-          try {
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return '—';
-            const day = d.getDate().toString().padStart(2, '0');
-            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            const month = months[d.getMonth()];
-            const year = d.getFullYear();
-            return `${day}-${month}-${year}`;
-          } catch {
-            return '—';
-          }
-        };
-
-        // Helper to format time as HH:MM
-        const formatTimeHHMM = (dateStr: string | null | undefined): string => {
-          if (!dateStr) return '—';
-          try {
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return '—';
-            const hours = d.getHours().toString().padStart(2, '0');
-            const minutes = d.getMinutes().toString().padStart(2, '0');
-            return `${hours}:${minutes}`;
-          } catch {
-            return '—';
-          }
-        };
-
-        // Helper to calculate duration in hours
-        const calculateDuration = (startStr: string | null | undefined, endStr: string | null | undefined): number => {
-          if (!startStr || !endStr) return 0;
-          try {
-            const start = new Date(startStr);
-            const end = new Date(endStr);
-            if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
-            return Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
-          } catch {
-            return 0;
-          }
-        };
-
-        // Get date range from filters
-        const dateFrom = categoryFilters.dateRange?.from;
-        const dateTo = categoryFilters.dateRange?.to;
-
-        // Filter completed jobs by date_completed field
-        let completedJobs = vesselWorkOrders.filter((wo: any) => wo.status === 'Completed');
-        
-        if (dateFrom || dateTo) {
-          completedJobs = completedJobs.filter((wo: any) => {
-            const completedDate = wo.dateCompleted || wo.completionDateTime;
-            if (!completedDate) return true;
-            const date = new Date(completedDate);
-            if (isNaN(date.getTime())) return true;
-            if (dateFrom && date < dateFrom) return false;
-            if (dateTo) {
-              const endOfDay = new Date(dateTo);
-              endOfDay.setHours(23, 59, 59, 999);
-              if (date > endOfDay) return false;
-            }
-            return true;
-          });
+        let completedUrl = `/technical/api/reports/completed-jobs/preview?vesselId=${effectiveVesselId}`;
+        if (categoryFilters.dateRange?.from) {
+          completedUrl += `&dateFrom=${categoryFilters.dateRange.from.toISOString().split('T')[0]}`;
         }
-
-        // Sort by date_completed DESC, then work_order_no ASC
-        completedJobs.sort((a: any, b: any) => {
-          const dateA = new Date(a.dateCompleted || a.completionDateTime || 0).getTime();
-          const dateB = new Date(b.dateCompleted || b.completionDateTime || 0).getTime();
-          if (dateB !== dateA) return dateB - dateA;
-          const woA = a.workOrderNo || a.id || '';
-          const woB = b.workOrderNo || b.id || '';
-          return woA.localeCompare(woB);
-        });
-
-        // Transform data with all 25 fields
-        let totalManHours = 0;
-        const data = completedJobs.map((wo: any, index: number) => {
-          const duration = parseFloat(wo.totalTimeHours) || calculateDuration(wo.startDateTime, wo.completionDateTime);
-          const persons = parseInt(wo.noOfPersons) || 1;
-          const manHours = parseFloat(wo.manhours) || (duration * persons);
-          totalManHours += manHours;
-
-          return {
-            sNo: index + 1,
-            workOrderNo: wo.workOrderNo || wo.id || '—',
-            componentName: wo.component || wo.componentName || '—',
-            componentCode: wo.componentCode || '—',
-            jobTitle: wo.jobTitle || wo.title || '—',
-            jobType: wo.taskType || wo.maintenanceType || '—',
-            maintenanceBasis: wo.maintenanceBasis || '—',
-            department: wo.department || '—',
-            priority: wo.jobPriority || wo.priority || '—',
-            criticality: wo.criticality || 'No',
-            classRelated: wo.classRelated || 'No',
-            assignedTo: wo.performedBy || wo.assignedTo || '—',
-            approver: wo.approver || '—',
-            submittedDate: formatDateDDMMMYYYY(wo.submittedDate || wo.createdAt),
-            startDate: formatDateDDMMMYYYY(wo.startDateTime),
-            startTime: formatTimeHHMM(wo.startDateTime),
-            completionDate: formatDateDDMMMYYYY(wo.dateCompleted || wo.completionDateTime),
-            completionTime: formatTimeHHMM(wo.completionDateTime),
-            workDuration: duration > 0 ? duration.toFixed(1) : '—',
-            noOfPersons: wo.noOfPersons || '1',
-            manHours: manHours > 0 ? manHours.toFixed(1) : '—',
-            riskAssessment: wo.riskAssessmentStatus || 'N/A',
-            safetyChecklists: wo.safetyChecklistsStatus || 'N/A',
-            operationalForms: wo.operationalFormsStatus || 'N/A'
-          };
-        });
+        if (categoryFilters.dateRange?.to) {
+          completedUrl += `&dateTo=${categoryFilters.dateRange.to.toISOString().split('T')[0]}`;
+        }
+        const completedResponse = await fetch(completedUrl);
+        if (!completedResponse.ok) {
+          throw new Error('Failed to fetch completed jobs data');
+        }
+        const { data: completedRaw, vesselName: completedVessel, summary: completedSummaryData } = await completedResponse.json();
 
         const completedColumns = [
           { header: 'S.No', field: 'sNo', width: 8 },
@@ -695,19 +504,21 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { header: 'Man Hours', field: 'manHours', width: 12 }
         ];
 
+        const data = completedRaw;
+
         if (mode === 'preview') {
           const completedSummary = [
-            { label: 'Total Jobs', value: data.length },
-            { label: 'Total Man-Hours', value: totalManHours.toFixed(1) }
+            { label: 'Total Jobs', value: completedSummaryData.totalJobs },
+            { label: 'Total Man-Hours', value: completedSummaryData.totalManHours }
           ];
-          return { title: 'COMPLETED JOBS REGISTER', subtitle: `Vessel: ${vesselName}`, vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns: completedColumns, data, summary: completedSummary } as ReportPreviewData;
+          return { title: 'COMPLETED JOBS REGISTER', subtitle: `Vessel: ${completedVessel || vesselName}`, vessel: completedVessel || vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns: completedColumns, data, summary: completedSummary } as ReportPreviewData;
         }
 
         pdfReportGenerator.generateReport(
           { 
             title: 'COMPLETED JOBS REGISTER', 
-            subtitle: `${data.length} completed jobs | ${totalManHours.toFixed(1)} total man-hours`,
-            vessel: vesselName,
+            subtitle: `${completedSummaryData.totalJobs} completed jobs | ${completedSummaryData.totalManHours} total man-hours`,
+            vessel: completedVessel || vesselName,
             orientation: 'landscape',
             dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
@@ -980,63 +791,56 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'postponement-log': {
-        const postponedWOs = vesselWorkOrders.filter((wo: any) => {
-          if (wo.status !== 'Postponed') return false;
-          if (isDateRangeSet && !isDateInRange(wo.dueDate, dateFrom, dateTo)) return false;
-          return true;
-        });
+        let postponeUrl = `/technical/api/reports/postponement-log/preview?vesselId=${effectiveVesselId}`;
+        if (categoryFilters.dateRange?.from) {
+          postponeUrl += `&dateFrom=${categoryFilters.dateRange.from.toISOString().split('T')[0]}`;
+        }
+        if (categoryFilters.dateRange?.to) {
+          postponeUrl += `&dateTo=${categoryFilters.dateRange.to.toISOString().split('T')[0]}`;
+        }
+        const postponeResponse = await fetch(postponeUrl);
+        if (!postponeResponse.ok) {
+          throw new Error('Failed to fetch postponement log data');
+        }
+        const { data: postponeRaw, vesselName: postponeVessel, summary: postponeSummary } = await postponeResponse.json();
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
-          { header: 'WO Number', field: 'workOrderNumber', width: 35 },
-          { header: 'Job Title', field: 'title', width: 55 },
+          { header: 'WO Number', field: 'workOrderNo', width: 35 },
+          { header: 'Job Title', field: 'jobTitle', width: 55 },
           { header: 'Component', field: 'componentName', width: 45 },
           { header: 'Dept', field: 'department', width: 20 },
-          { header: 'Original Due', field: 'originalDue', width: 25 },
-          { header: 'New Due', field: 'newDue', width: 25 },
-          { header: 'Days Extended', field: 'daysExtended', width: 22 },
-          { header: 'Reason', field: 'reason', width: 50 },
+          { header: 'Original Due', field: 'originalDueDate', width: 25 },
+          { header: 'New Due', field: 'newDueDate', width: 25 },
+          { header: 'Days Extended', field: 'durationDays', width: 22 },
+          { header: 'Reason', field: 'postponementReason', width: 50 },
           { header: 'Status', field: 'status', width: 22 }
         ];
 
-        const data = postponedWOs.map((wo: any, idx: number) => {
-          let daysExtended = '-';
-          const origDateStr = wo.originalDueDate || wo.dueDate;
-          const newDateStr = wo.newDueDate || wo.postponedToDate;
-          if (origDateStr && newDateStr) {
-            const origDate = new Date(origDateStr);
-            const newDate = new Date(newDateStr);
-            if (!isNaN(origDate.getTime()) && !isNaN(newDate.getTime())) {
-              const days = Math.ceil((newDate.getTime() - origDate.getTime()) / (1000 * 60 * 60 * 24));
-              daysExtended = days > 0 ? String(days) : '-';
-            }
-          }
-          
-          return {
-            sno: idx + 1,
-            workOrderNumber: wo.workOrderNo || wo.workOrderNumber || wo.id,
-            title: wo.title || wo.jobTitle || '-',
-            componentName: wo.component || wo.componentName || '-',
-            department: wo.department || wo.assignedDepartment || '-',
-            originalDue: formatDate(wo.originalDueDate || wo.dueDate),
-            newDue: formatDate(wo.newDueDate || wo.postponedToDate || wo.dueDate),
-            daysExtended: daysExtended,
-            reason: wo.postponementReason || wo.remarks || '-',
-            status: 'Postponed'
-          };
-        });
+        const data = postponeRaw.map((job: any, idx: number) => ({
+          sno: idx + 1,
+          workOrderNo: job.workOrderNo,
+          jobTitle: job.jobTitle,
+          componentName: job.componentName,
+          department: job.department,
+          originalDueDate: job.originalDueDate,
+          newDueDate: job.newDueDate,
+          durationDays: job.durationDays > 0 ? job.durationDays : '-',
+          postponementReason: job.postponementReason,
+          status: job.status
+        }));
 
         const summary = [
-          { label: 'Total Postponed Jobs', value: data.length }
+          { label: 'Total Postponed Jobs', value: postponeSummary.totalPostponed }
         ];
 
-        if (mode === 'preview') return { title: 'Job Postponement Log Report', subtitle: 'Audit trail of all postponed jobs with approvals and justifications', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'Job Postponement Log Report', subtitle: 'Audit trail of all postponed jobs with approvals and justifications', vessel: postponeVessel || vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
           { 
             title: 'Job Postponement Log Report', 
             subtitle: 'Audit trail of all postponed jobs with approvals and justifications', 
-            vessel: vesselName,
+            vessel: postponeVessel || vesselName,
             orientation: 'landscape',
             dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
@@ -1128,120 +932,71 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'workload-distribution': {
-        const rankStats: Record<string, { 
-          count: number; 
-          completed: number; 
-          pending: number;
-          overdue: number;
-          critical: number;
-          highPriority: number;
-          manhours: number;
-          timeTaken: number;
-          jobsWithTime: number;
-          department: string;
-        }> = {};
-        
-        const wdFilteredWOs = isDateRangeSet
-          ? vesselWorkOrders.filter((wo: any) => isDateInRange(wo.dueDate, dateFrom, dateTo))
-          : vesselWorkOrders;
-        wdFilteredWOs.forEach((wo: any) => {
-          const assignee = wo.assignedTo || wo.assignee || wo.performedBy || wo.responsibleRank || 'Unassigned';
-          const dept = wo.department || 'N/A';
-          
-          if (!rankStats[assignee]) {
-            rankStats[assignee] = { 
-              count: 0, 
-              completed: 0, 
-              pending: 0,
-              overdue: 0,
-              critical: 0,
-              highPriority: 0,
-              manhours: 0,
-              timeTaken: 0,
-              jobsWithTime: 0,
-              department: dept
-            };
-          }
-          
-          const stats = rankStats[assignee];
-          stats.count++;
-          
-          if (wo.status === 'Completed') {
-            stats.completed++;
-          } else if (wo.status === 'Overdue' || (wo.dueDate && new Date(wo.dueDate) < now && wo.status !== 'Completed')) {
-            stats.overdue++;
-          } else {
-            stats.pending++;
-          }
-          
-          if (wo.criticality === 'Yes' || wo.criticality === 'Critical' || wo.critical === true) {
-            stats.critical++;
-          }
-          
-          if (wo.jobPriority === 'High') {
-            stats.highPriority++;
-          }
-          
-          if (wo.manhours) {
-            stats.manhours += Number(wo.manhours) || 0;
-          }
-          
-          if (wo.totalTimeHours) {
-            stats.timeTaken += Number(wo.totalTimeHours) || 0;
-            stats.jobsWithTime++;
-          }
-        });
-
-        // Calculate total manhours for workload percentage
-        const totalManhours = Object.values(rankStats).reduce((sum, s) => sum + s.manhours, 0);
+        let wdStartDate: string;
+        let wdEndDate: string;
+        if (globalFilters?.dateRange?.from && globalFilters?.dateRange?.to) {
+          wdStartDate = globalFilters.dateRange.from.toISOString().split('T')[0];
+          wdEndDate = globalFilters.dateRange.to.toISOString().split('T')[0];
+        } else if (categoryFilters.dateRange?.from && categoryFilters.dateRange?.to) {
+          wdStartDate = categoryFilters.dateRange.from.toISOString().split('T')[0];
+          wdEndDate = categoryFilters.dateRange.to.toISOString().split('T')[0];
+        } else {
+          const wdNow = new Date();
+          wdStartDate = new Date(wdNow.getFullYear(), wdNow.getMonth(), 1).toISOString().split('T')[0];
+          wdEndDate = new Date(wdNow.getFullYear(), wdNow.getMonth() + 1, 0).toISOString().split('T')[0];
+        }
+        const wdResponse = await fetch(
+          `/technical/api/reports/crew-workload-distribution?vesselId=${effectiveVesselId}&startDate=${wdStartDate}&endDate=${wdEndDate}&viewType=summary`
+        );
+        if (!wdResponse.ok) {
+          throw new Error('Failed to fetch crew workload data');
+        }
+        const wdResult = await wdResponse.json();
+        const wdData = wdResult.data || [];
+        const wdMeta = wdResult.metadata || {};
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
           { header: 'Rank', field: 'rank', width: 45 },
           { header: 'Dept', field: 'department', width: 25 },
-          { header: 'Total', field: 'total', width: 22 },
-          { header: 'Done', field: 'completed', width: 22 },
-          { header: 'Pending', field: 'pending', width: 22 },
-          { header: 'Overdue', field: 'overdue', width: 22 },
-          { header: 'Manhours', field: 'manhours', width: 28 },
-          { header: 'Avg Time', field: 'avgTime', width: 25 },
-          { header: 'Rate %', field: 'completionPercent', width: 25 },
+          { header: 'Total', field: 'totalJobs', width: 22 },
+          { header: 'Done', field: 'completedJobs', width: 22 },
+          { header: 'Pending', field: 'pendingJobs', width: 22 },
+          { header: 'Overdue', field: 'overdueJobs', width: 22 },
+          { header: 'Manhours', field: 'totalManhours', width: 28 },
+          { header: 'Avg Time', field: 'avgTimePerJob', width: 25 },
+          { header: 'Rate %', field: 'completionRate', width: 25 },
           { header: 'Load %', field: 'workloadPercent', width: 25 }
         ];
 
-        const data = Object.entries(rankStats)
-          .map(([rank, stats]) => ({
-            rank,
-            department: stats.department,
-            total: stats.count,
-            completed: stats.completed,
-            pending: stats.pending,
-            overdue: stats.overdue,
-            manhours: stats.manhours.toFixed(1),
-            avgTime: stats.jobsWithTime > 0 ? (stats.timeTaken / stats.jobsWithTime).toFixed(1) : '-',
-            completionPercent: stats.count > 0 ? `${Math.round((stats.completed / stats.count) * 100)}%` : '0%',
-            workloadPercent: totalManhours > 0 ? `${Math.round((stats.manhours / totalManhours) * 100)}%` : '0%'
-          }))
-          .sort((a, b) => parseFloat(b.manhours) - parseFloat(a.manhours))
-          .map((item, index) => ({ sno: index + 1, ...item })); // Sort by manhours desc
+        const data = wdData.map((row: any, index: number) => ({
+          sno: index + 1,
+          rank: row.rank || row.assignedTo || 'Unassigned',
+          department: row.department || 'N/A',
+          totalJobs: row.totalJobs ?? row.total ?? 0,
+          completedJobs: row.completedJobs ?? row.completed ?? 0,
+          pendingJobs: row.pendingJobs ?? row.pending ?? 0,
+          overdueJobs: row.overdueJobs ?? row.overdue ?? 0,
+          totalManhours: row.totalManhours != null ? Number(row.totalManhours).toFixed(1) : '0.0',
+          avgTimePerJob: row.avgTimePerJob != null ? Number(row.avgTimePerJob).toFixed(1) : '-',
+          completionRate: row.completionRate != null ? `${row.completionRate}%` : '0%',
+          workloadPercent: row.workloadPercent != null ? `${row.workloadPercent}%` : '0%'
+        }));
 
-        // Calculate summary stats
-        const totalJobs = Object.values(rankStats).reduce((sum, s) => sum + s.count, 0);
-        const totalCompleted = Object.values(rankStats).reduce((sum, s) => sum + s.completed, 0);
-        const totalOverdue = Object.values(rankStats).reduce((sum, s) => sum + s.overdue, 0);
-        
         const summary = [
-          { label: 'Total Crew Members', value: Object.keys(rankStats).length },
-          { label: 'Total Jobs', value: totalJobs },
-          { label: 'Total Completed', value: totalCompleted },
-          { label: 'Total Overdue', value: totalOverdue },
-          { label: 'Total Manhours', value: totalManhours.toFixed(1) }
+          { label: 'Total Crew Members', value: wdMeta.totalCrewMembers || data.length },
+          { label: 'Total Jobs', value: wdMeta.totalJobs || 0 },
+          { label: 'Total Completed', value: wdMeta.totalCompleted || 0 },
+          { label: 'Total Overdue', value: wdMeta.totalOverdue || 0 },
+          { label: 'Total Manhours', value: wdMeta.totalManhours != null ? Number(wdMeta.totalManhours).toFixed(1) : '0.0' }
         ];
 
-        if (mode === 'preview') return { title: 'Crew Workload Distribution', subtitle: 'Task distribution across crew ranks and assignments', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
+        const wdVessel = wdMeta.vesselName || vesselName;
+
+        if (mode === 'preview') return { title: 'Crew Workload Distribution', subtitle: 'Task distribution across crew ranks and assignments', vessel: wdVessel, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
-          { title: 'Crew Workload Distribution', subtitle: 'Task distribution across crew ranks and assignments', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
+          { title: 'Crew Workload Distribution', subtitle: 'Task distribution across crew ranks and assignments', vessel: wdVessel, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
           columns,
           data
         );

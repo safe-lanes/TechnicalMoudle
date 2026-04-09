@@ -56,6 +56,10 @@ router.get('/reports/lsa-ffa-maintenance-schedule', asyncHandler(equipCtrl.getLs
 router.get('/reports/critical-equipment-schedule', asyncHandler(equipCtrl.getCriticalEquipmentSchedule));
 
 // ── Maintenance Reports ──
+router.get('/reports/due-jobs-7-days/preview', asyncHandler(maintCtrl.getDueJobs7DaysPreview));
+router.get('/reports/overdue-jobs/preview', asyncHandler(maintCtrl.getOverdueJobsPreview));
+router.get('/reports/completed-jobs/preview', asyncHandler(maintCtrl.getCompletedJobsPreview));
+router.get('/reports/postponement-log/preview', asyncHandler(maintCtrl.getPostponementLogPreview));
 router.post('/reports/due-jobs-7-days', asyncHandler(maintCtrl.exportDueJobs7Days));
 router.post('/reports/overdue-jobs', asyncHandler(maintCtrl.exportOverdueJobs));
 router.post('/reports/completed-jobs', asyncHandler(maintCtrl.exportCompletedJobs));

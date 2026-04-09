@@ -2,6 +2,83 @@ import type { Request, Response } from 'express';
 import * as maintenanceReportService from '../services/maintenanceReportService';
 
 // ═══════════════════════════════════════════════════════════════
+// DUE JOBS (7 DAYS) - GET PREVIEW
+// ═══════════════════════════════════════════════════════════════
+
+export async function getDueJobs7DaysPreview(req: Request, res: Response) {
+  try {
+    const vesselId = req.query.vesselId as string;
+    if (!vesselId) {
+      return res.status(400).json({ error: "Please select a vessel" });
+    }
+    const result = await maintenanceReportService.getDueJobs7DaysData(vesselId);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error fetching Due Jobs 7 Days preview:", error);
+    res.status(500).json({ error: "Failed to fetch report data: " + error.message });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// OVERDUE JOBS - GET PREVIEW
+// ═══════════════════════════════════════════════════════════════
+
+export async function getOverdueJobsPreview(req: Request, res: Response) {
+  try {
+    const vesselId = req.query.vesselId as string;
+    if (!vesselId) {
+      return res.status(400).json({ error: "Please select a vessel" });
+    }
+    const result = await maintenanceReportService.getOverdueJobsData(vesselId);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error fetching Overdue Jobs preview:", error);
+    res.status(500).json({ error: "Failed to fetch report data: " + error.message });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COMPLETED JOBS - GET PREVIEW
+// ═══════════════════════════════════════════════════════════════
+
+export async function getCompletedJobsPreview(req: Request, res: Response) {
+  try {
+    const vesselId = req.query.vesselId as string;
+    const dateFrom = req.query.dateFrom as string | undefined;
+    const dateTo = req.query.dateTo as string | undefined;
+    if (!vesselId) {
+      return res.status(400).json({ error: "Please select a vessel" });
+    }
+    const result = await maintenanceReportService.getCompletedJobsData(vesselId, dateFrom, dateTo);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error fetching Completed Jobs preview:", error);
+    res.status(500).json({ error: "Failed to fetch report data: " + error.message });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// POSTPONEMENT LOG - GET PREVIEW
+// ═══════════════════════════════════════════════════════════════
+
+export async function getPostponementLogPreview(req: Request, res: Response) {
+  try {
+    const vesselId = req.query.vesselId as string;
+    const dateFrom = req.query.dateFrom as string | undefined;
+    const dateTo = req.query.dateTo as string | undefined;
+    const status = req.query.status as string | undefined;
+    if (!vesselId) {
+      return res.status(400).json({ error: "Please select a vessel" });
+    }
+    const result = await maintenanceReportService.getPostponementLogData(vesselId, dateFrom, dateTo, status);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error fetching Postponement Log preview:", error);
+    res.status(500).json({ error: "Failed to fetch report data: " + error.message });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // DUE JOBS (7 DAYS) - EXCEL EXPORT
 // ═══════════════════════════════════════════════════════════════
 

@@ -65,10 +65,10 @@ function formatDateForExcel(dateVal: string | Date | null | undefined): string {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// DUE JOBS (7 DAYS) - EXCEL EXPORT
+// DUE JOBS (7 DAYS) - SHARED DATA FUNCTION
 // ═══════════════════════════════════════════════════════════════
 
-export async function exportDueJobs7Days(vesselId: string): Promise<{ buffer: Buffer; filename: string }> {
+export async function getDueJobs7DaysData(vesselId: string) {
   const workOrders = await repo.getWorkOrders(vesselId);
   const jobs = await repo.getJobs(vesselId);
   const components = await repo.getComponents(vesselId);
@@ -218,6 +218,31 @@ export async function exportDueJobs7Days(vesselId: string): Promise<{ buffer: Bu
     return (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
   });
 
+  const overdueCount = dueJobs.filter(d => d.statusIndicator === 'OVERDUE').length;
+  const urgentCount = dueJobs.filter(d => d.statusIndicator === 'URGENT').length;
+  const criticalPriorityCount = dueJobs.filter(d => d.priority === 'Critical').length;
+
+  return {
+    success: true,
+    data: dueJobs,
+    vesselName,
+    totalRecords: dueJobs.length,
+    summary: {
+      totalDue: dueJobs.length,
+      overdue: overdueCount,
+      urgent: urgentCount,
+      criticalPriority: criticalPriorityCount
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DUE JOBS (7 DAYS) - EXCEL EXPORT
+// ═══════════════════════════════════════════════════════════════
+
+export async function exportDueJobs7Days(vesselId: string): Promise<{ buffer: Buffer; filename: string }> {
+  const { data: dueJobs, vesselName } = await getDueJobs7DaysData(vesselId);
+
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'PMS System';
   workbook.created = new Date();
@@ -280,10 +305,10 @@ export async function exportDueJobs7Days(vesselId: string): Promise<{ buffer: Bu
 }
 
 // ═══════════════════════════════════════════════════════════════
-// OVERDUE JOBS - EXCEL EXPORT
+// OVERDUE JOBS - SHARED DATA FUNCTION
 // ═══════════════════════════════════════════════════════════════
 
-export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buffer; filename: string }> {
+export async function getOverdueJobsData(vesselId: string) {
   const workOrders = await repo.getWorkOrders(vesselId);
   const jobs = await repo.getJobs(vesselId);
   const components = await repo.getComponents(vesselId);
@@ -405,6 +430,36 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
     return (a.componentName || '').localeCompare(b.componentName || '');
   });
 
+  const criticalEquipCount = overdueJobs.filter(d => d.critical === 'YES').length;
+  const daysOverdueArr = overdueJobs.map(d => d.daysPastDue).filter((d: number) => d > 0);
+  const avgDaysOverdue = daysOverdueArr.length > 0 ? Math.round(daysOverdueArr.reduce((a: number, b: number) => a + b, 0) / daysOverdueArr.length) : 0;
+  const maxDaysOverdue = daysOverdueArr.length > 0 ? Math.max(...daysOverdueArr) : 0;
+  const calendarOverdueCount = overdueJobs.filter(d => d.overdueType === 'Calendar' || d.overdueType === 'Both').length;
+  const rhOverdueCount = overdueJobs.filter(d => d.overdueType === 'RH' || d.overdueType === 'Both').length;
+
+  return {
+    success: true,
+    data: overdueJobs,
+    vesselName,
+    totalRecords: overdueJobs.length,
+    summary: {
+      totalOverdue: overdueJobs.length,
+      criticalEquipment: criticalEquipCount,
+      avgDaysOverdue,
+      maxDaysOverdue,
+      calendarOverdue: calendarOverdueCount,
+      rhOverdue: rhOverdueCount
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// OVERDUE JOBS - EXCEL EXPORT
+// ═══════════════════════════════════════════════════════════════
+
+export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buffer; filename: string }> {
+  const { data: overdueJobs, vesselName } = await getOverdueJobsData(vesselId);
+
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'PMS System';
   workbook.created = new Date();
@@ -479,10 +534,10 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
 }
 
 // ═══════════════════════════════════════════════════════════════
-// COMPLETED JOBS REGISTER - EXCEL EXPORT
+// COMPLETED JOBS REGISTER - SHARED DATA FUNCTION
 // ═══════════════════════════════════════════════════════════════
 
-export async function exportCompletedJobs(vesselId: string, dateFrom?: string, dateTo?: string): Promise<{ buffer: Buffer; filename: string }> {
+export async function getCompletedJobsData(vesselId: string, dateFrom?: string, dateTo?: string) {
   const formatDateDDMMMYYYY = (dateStr: string | Date | null | undefined): string => {
     if (!dateStr) return '\u2014';
     try {
@@ -493,17 +548,6 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
       const month = months[d.getMonth()];
       const year = d.getFullYear();
       return `${day}-${month}-${year}`;
-    } catch { return '\u2014'; }
-  };
-
-  const formatTimeHHMM = (dateStr: string | null | undefined): string => {
-    if (!dateStr) return '\u2014';
-    try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return '\u2014';
-      const hours = d.getHours().toString().padStart(2, '0');
-      const minutes = d.getMinutes().toString().padStart(2, '0');
-      return `${hours}:${minutes}`;
     } catch { return '\u2014'; }
   };
 
@@ -560,7 +604,6 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
   const completedJobs = filteredJobs.map((wo, index) => {
     const job = jobsMap.get(wo.jobId || '');
     const comp = componentsByCodeMap.get(wo.componentCode || '');
-    const isCritical = (comp as any)?.criticalEquipment === true || (comp as any)?.criticalEquipment === 'Yes';
 
     const duration = parseFloat(wo.totalTimeHours || '0') || calculateDuration(wo.startDateTime, (wo as any).completionDateTime);
     const persons = parseInt(wo.noOfPersons || '1') || 1;
@@ -571,16 +614,54 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
       sNo: index + 1,
       workOrderNo: wo.workOrderNo || wo.id || '\u2014',
       componentName: wo.component || comp?.name || '\u2014',
+      componentCode: wo.componentCode || '\u2014',
       jobTitle: wo.jobTitle || '\u2014',
       jobType: wo.taskType || wo.maintenanceType || '\u2014',
+      maintenanceBasis: wo.maintenanceBasis || '\u2014',
       department: wo.department || 'Unassigned',
       priority: wo.jobPriority || 'Normal',
+      criticality: wo.criticality || 'No',
+      classRelated: wo.classRelated || 'No',
       assignedTo: wo.performedBy || wo.assignedTo || '\u2014',
+      approver: (wo as any).approver || '\u2014',
       startDate: formatDateDDMMMYYYY(wo.startDateTime),
       completionDate: formatDateDDMMMYYYY(wo.dateCompleted || (wo as any).completionDateTime),
       manHours: manHours > 0 ? manHours.toFixed(1) : '\u2014',
     };
   });
+
+  return {
+    success: true,
+    data: completedJobs,
+    vesselName,
+    totalRecords: completedJobs.length,
+    summary: {
+      totalJobs: completedJobs.length,
+      totalManHours: totalManHours.toFixed(1)
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COMPLETED JOBS REGISTER - EXCEL EXPORT
+// ═══════════════════════════════════════════════════════════════
+
+export async function exportCompletedJobs(vesselId: string, dateFrom?: string, dateTo?: string): Promise<{ buffer: Buffer; filename: string }> {
+  const formatDateDDMMMYYYY = (dateStr: string | Date | null | undefined): string => {
+    if (!dateStr) return '\u2014';
+    try {
+      const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+      if (isNaN(d.getTime())) return '\u2014';
+      const day = d.getDate().toString().padStart(2, '0');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = months[d.getMonth()];
+      const year = d.getFullYear();
+      return `${day}-${month}-${year}`;
+    } catch { return '\u2014'; }
+  };
+
+  const { data: completedJobs, vesselName, summary } = await getCompletedJobsData(vesselId, dateFrom, dateTo);
+  const totalManHours = parseFloat(summary.totalManHours);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'PMS System';
@@ -820,15 +901,15 @@ export async function exportUnplannedJobs(vesselId: string, dateFrom?: string, d
 }
 
 // ═══════════════════════════════════════════════════════════════
-// POSTPONEMENT LOG - EXCEL EXPORT
+// POSTPONEMENT LOG - SHARED DATA FUNCTION
 // ═══════════════════════════════════════════════════════════════
 
-export async function exportPostponementLog(
+export async function getPostponementLogData(
   vesselId: string,
   dateFrom?: string,
   dateTo?: string,
   status?: string
-): Promise<{ buffer: Buffer; filename: string }> {
+) {
   const formatDateDisplay = (dateVal: string | Date | null | undefined): string => {
     if (!dateVal) return '-';
     try {
@@ -922,6 +1003,29 @@ export async function exportPostponementLog(
     if (a.workOrderNo !== b.workOrderNo) return a.workOrderNo.localeCompare(b.workOrderNo);
     return b.postponementNumber - a.postponementNumber;
   });
+
+  return {
+    success: true,
+    data: postponedJobs,
+    vesselName,
+    totalRecords: postponedJobs.length,
+    summary: {
+      totalPostponed: postponedJobs.length
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// POSTPONEMENT LOG - EXCEL EXPORT
+// ═══════════════════════════════════════════════════════════════
+
+export async function exportPostponementLog(
+  vesselId: string,
+  dateFrom?: string,
+  dateTo?: string,
+  status?: string
+): Promise<{ buffer: Buffer; filename: string }> {
+  const { data: postponedJobs, vesselName } = await getPostponementLogData(vesselId, dateFrom, dateTo, status);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'PMS System';
