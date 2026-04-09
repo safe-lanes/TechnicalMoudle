@@ -168,12 +168,8 @@ export async function exportStoresInventoryStatusExcel(
 
     rowsData = reorderItems.map((item: any, idx: number) => {
       const daysStr = !isFinite(item.daysUntilStockout) || item.daysUntilStockout > 365 ? '>365' : Math.round(item.daysUntilStockout);
-      return [idx + 1, item.itemCode || '-', item.itemName || '-', categoryDisplayMap[item.itemType] || item.itemType || '-', item.rob, parseFloat(item.monthlyConsumption.toFixed(2)), daysStr, item.priority, parseFloat(item.suggestedQty.toFixed(1))];
+      return [idx + 1, item.itemCode || '-', item.itemName || '-', categoryDisplayMap[item.itemType] || item.itemType || '-', item.rob, parseFloat(item.monthlyConsumption.toFixed(2)), daysStr, parseFloat(item.suggestedQty.toFixed(1))];
     });
-
-    statusColIndex = 8;
-    statusBgColors = { 'Critical': 'FFFFF1F0', 'High': 'FFFFFBE6', 'Medium': 'FFFFFFFF', 'Low': 'FFFFFFFF' };
-    statusFontColors = { 'Critical': 'FFF5222D', 'High': 'FFFAAD14', 'Medium': 'FF5A6C7D', 'Low': 'FF5A6C7D' };
 
     subtitle = `Reorder Items: ${reorderItems.length}`;
   } else {
