@@ -31,7 +31,10 @@ export async function getMasterSurveyByMasterId(masterId: string) {
   const db = await getDb();
   if (!db) return null;
   return db.select().from(shipSurveysMaster)
-    .where(eq(shipSurveysMaster.masterId, masterId))
+    .where(and(
+      eq(shipSurveysMaster.masterId, masterId),
+      eq(shipSurveysMaster.isDeleted, false)
+    ))
     .limit(1);
 }
 
@@ -46,7 +49,26 @@ export async function updateMasterSurvey(masterId: string, data: any) {
 export async function insertMasterSurvey(data: any) {
   const db = await getDb();
   if (!db) return null;
-  return db.insert(shipSurveysMaster).values(data);
+  return db.insert(shipSurveysMaster)
+    .values(data)
+    .onConflictDoUpdate({
+      target: shipSurveysMaster.masterId,
+      set: {
+        sequence: data.sequence,
+        surveyName: data.surveyName,
+        category: data.category,
+        group: data.group,
+        requirementRef: data.requirementRef,
+        applicableToCompany: data.applicableToCompany,
+        surveyLabel: data.surveyLabel,
+        isActive: data.isActive !== false,
+        isDeleted: false,
+        companyId: data.companyId,
+        companyGroup: data.companyGroup,
+        companySequence: data.companySequence,
+        updatedAt: new Date(),
+      },
+    });
 }
 
 export async function deleteMasterSurvey(masterId: string) {

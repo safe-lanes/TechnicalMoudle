@@ -58,7 +58,6 @@ export async function saveMasterSurveys(body: any) {
     }
 
     if (existing.length > 0) {
-      const wasDeleted = existing[0].isDeleted === true;
       await surveyAdminRepo.updateMasterSurvey(survey.masterId, {
         sequence: survey.sequence,
         surveyName: survey.surveyName,
@@ -68,17 +67,11 @@ export async function saveMasterSurveys(body: any) {
         applicableToCompany: survey.applicableToCompany || false,
         surveyLabel: survey.surveyLabel || null,
         isActive: survey.isActive !== false,
-        isDeleted: false,
         companyId: survey.companyId || null,
         companyGroup: survey.companyGroup || null,
         companySequence: survey.companySequence || null,
       });
-      if (wasDeleted) {
-        insertedCount++;
-        newlyInsertedMasterIds.push(survey.masterId);
-      } else {
-        updatedCount++;
-      }
+      updatedCount++;
     } else {
       await surveyAdminRepo.insertMasterSurvey({
         sequence: survey.sequence,
