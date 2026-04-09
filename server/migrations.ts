@@ -1821,7 +1821,7 @@ const migrations: Migration[] = [
         (9,  gen_random_uuid(), 'External 2',        'Office', 9,  true, 9,  NOW(), NOW(), false, false),
         (10, gen_random_uuid(), 'External 3',        'Office', 10, true, 10, NOW(), NOW(), false, false),
         (11, gen_random_uuid(), 'External 4',        'Office', 11, true, 11, NOW(), NOW(), false, false),
-        (12, gen_random_uuid(), 'External 5',        'Office', 12, true, 12, NOW(), NOW(), false, false),
+        (12, gen_random_uuid(), 'External 10',        'Office', 12, true, 12, NOW(), NOW(), false, false),
         (13, gen_random_uuid(), 'Vessel User 2',     'Ship',   13, true, 13, NOW(), NOW(), false, false),
         (14, gen_random_uuid(), 'Vessel User 3',     'Ship',   14, true, 14, NOW(), NOW(), false, false),
         (15, gen_random_uuid(), 'Vessel User 4',     'Ship',   15, true, 15, NOW(), NOW(), false, false)
