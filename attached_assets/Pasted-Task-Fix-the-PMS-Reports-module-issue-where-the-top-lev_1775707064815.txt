@@ -1,0 +1,95 @@
+Task: Fix the PMS Reports module issue where the top-level Period filter is passive and does not actually affect all reports.
+
+Problem statement
+In the Reports module, the global Period filter is visible at the top, but it is not consistently applied across all report queries/components. Because of this, some reports such as:
+
+Unplanned/Breakdown Jobs
+
+Critical Equipment Status
+
+show zero data or incorrect data even when a valid Period is selected.
+
+Objective
+Make the global Period filter active and functional across all reports that are supposed to be date-sensitive, so that when a user selects a date range, the selected period is correctly passed to the underlying data fetch / query / filter logic and the report results update accordingly.
+
+Required fix
+Please do the following only:
+
+Identify where the top-level Period filter state is stored in the Reports module.
+
+Trace how each report receives filter values from the parent Reports page/component.
+
+Ensure that the selected Period range is propagated to all relevant reports, especially:
+
+Unplanned/Breakdown Jobs
+
+Critical Equipment Status
+
+Check whether these reports are:
+
+ignoring the global period state,
+
+using hardcoded/default dates,
+
+expecting a different date field name,
+
+filtering on the wrong date column,
+
+or failing because the parent filter object is not passed correctly.
+
+Fix the data filtering so that:
+
+reports refresh when Period changes,
+
+the selected date range is used in the report query/filter,
+
+empty results appear only when there is genuinely no data in that period.
+
+Verify that the same Period handling pattern is applied consistently to all other date-dependent reports in the Reports module.
+
+Keep the fix minimal, clean, and aligned with the existing architecture.
+
+Important implementation notes
+Check both frontend and backend/report service logic if applicable.
+
+If the Period filter uses a shared state, context, prop drilling, or query params, ensure the selected values are consumed correctly by every report component.
+
+If a report is based on a derived dataset, ensure the Period filter is applied before aggregation/summary generation.
+
+If different reports use different date fields, map them correctly. For example:
+
+breakdown reports may need filtering by breakdown date / WO created date / completion date depending on report logic,
+
+critical equipment reports may need filtering by next due date / last maintenance date / status date depending on intended behavior.
+
+Do not change report design, UI layout, labels, styling, columns, sorting, pagination, exports, or any unrelated logic.
+
+Do not add new filters.
+
+Do not refactor unrelated files.
+
+Do not change any business rules except what is necessary to make the existing Period filter work properly.
+
+Expected outcome
+After the fix:
+
+selecting a Period at the top of the Reports page should affect all applicable reports,
+
+Unplanned/Breakdown Jobs should return data correctly for the selected range,
+
+Critical Equipment Status should respond correctly to the selected range where applicable,
+
+there should be no passive or disconnected Period filter behavior.
+
+Strict instruction
+Do not change anything else except this Period filter issue.
+No UI redesign, no cleanup, no extra enhancements, no unrelated bug fixes.
+
+Deliverables
+Fix the code.
+
+Mention exactly which files were changed.
+
+Briefly explain the root cause.
+
+Briefly explain how the Period filter flow works after the fix.
