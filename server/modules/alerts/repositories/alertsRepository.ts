@@ -47,6 +47,38 @@ export async function createAlertDelivery(data: any) {
   return storage.createAlertDelivery(data);
 }
 
+// ── Alert Acknowledgements ──
+
+export async function getAlertAcknowledgements(eventUuid: string) {
+  return storage.getAlertAcknowledgements(eventUuid);
+}
+
+export async function createAlertAcknowledgement(data: any) {
+  return storage.createAlertAcknowledgement(data);
+}
+
+// ── Alert Engine Queries ──
+
+export async function getExistingAlertDedupeKeys() {
+  return storage.getExistingAlertDedupeKeys();
+}
+
+export async function getOverdueWorkOrders() {
+  return storage.getOverdueWorkOrders();
+}
+
+export async function getWorkOrdersWithMissedCycles() {
+  return storage.getWorkOrdersWithMissedCycles();
+}
+
+export async function getAllVesselSpares() {
+  return storage.getAllVesselSpares();
+}
+
+export async function getUnacknowledgedAlertEventsForRole(userRole: string, vesselId?: string | null) {
+  return storage.getUnacknowledgedAlertEventsForRole(userRole, vesselId);
+}
+
 // ── Alert Config ──
 
 export async function getAlertConfig(vesselId: string) {

@@ -16,10 +16,17 @@ router.post('/alerts/policies/batch-update', asyncHandler(alertsCtrl.batchUpdate
 
 // ── Events ──
 router.get('/alerts/events', asyncHandler(alertsCtrl.getEvents));
+router.get('/alerts/events/for-current-user', asyncHandler(alertsCtrl.getEventsForCurrentUser));
 router.get('/alerts/events/:id', asyncHandler(alertsCtrl.getEvent));
+router.get('/alerts/events/:id/acknowledgements', asyncHandler(alertsCtrl.getAcknowledgements));
 router.post('/alerts/events/:id/acknowledge', asyncHandler(alertsCtrl.acknowledgeEvent));
 
-// ── Test & Config ──
+// ── Engine & Test ──
+router.post('/alerts/scan', asyncHandler(async (req, res) => {
+  const { pmsAlertEngine } = await import('./services/pmsAlertEngine');
+  const results = await pmsAlertEngine.runScan();
+  res.json({ success: true, ...results });
+}));
 router.post('/alerts/test', asyncHandler(alertsCtrl.sendTestAlert));
 router.get('/alerts/config/:vesselId', asyncHandler(alertsCtrl.getConfig));
 router.post('/alerts/config', asyncHandler(alertsCtrl.updateConfig));

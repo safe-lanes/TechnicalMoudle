@@ -96,6 +96,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   workOrderStatusRecalculator.start(1 * 60 * 1000); // Run every 1 minute
   console.log('[StatusRecalculator] Scheduler started - will recalculate work order statuses based on current settings');
 
+  // Start PMS Alert Engine - evaluates alert policies and creates alert events
+  const { pmsAlertEngine } = await import("./modules/alerts/services/pmsAlertEngine");
+  pmsAlertEngine.start(5 * 60 * 1000); // Run every 5 minutes
+  console.log('[PmsAlertEngine] Alert scanner started - will evaluate overdue jobs, low spares, skipped cycles');
+
   // Dev-only seed endpoint for recurring defects testing
   if (process.env.NODE_ENV === 'development') {
     // Seed recurring defects test data

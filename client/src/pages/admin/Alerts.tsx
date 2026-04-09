@@ -17,6 +17,7 @@ import { useUIRole } from '@/contexts/UIRoleContext';
 
 interface AlertPolicy {
   id: number;
+  apuuid?: string;
   alertType: string;
   enabled: boolean;
   priority: string;
@@ -37,7 +38,25 @@ interface AlertConfig {
   escalationRecipients: string;
 }
 
-const alertTypeInfo = {
+const alertTypeInfo: Record<string, { label: string; description: string; icon: any; color: string }> = {
+  critical_job_overdue: {
+    label: 'Critical Job Overdue',
+    description: 'Alerts when critical/high priority jobs become overdue',
+    icon: Clock,
+    color: 'text-red-600'
+  },
+  low_critical_spares: {
+    label: 'Low Critical Spares',
+    description: 'Alerts when critical spare stock falls below minimum',
+    icon: Package,
+    color: 'text-orange-600'
+  },
+  critical_job_cycle_skipped: {
+    label: 'Cycle Skipped',
+    description: 'Alerts for critical jobs with skipped maintenance cycles (co-ack required)',
+    icon: AlertCircle,
+    color: 'text-red-600'
+  },
   maintenance_due: {
     label: 'Maintenance Due',
     description: 'Alerts for upcoming maintenance tasks',
@@ -68,6 +87,12 @@ const alertTypeInfo = {
     icon: HardDrive,
     color: 'text-gray-600'
   }
+};
+
+const priorityBadgeColors: Record<string, string> = {
+  high: 'bg-red-100 text-red-700 border-red-200',
+  medium: 'bg-orange-100 text-orange-700 border-orange-200',
+  low: 'bg-gray-100 text-gray-600 border-gray-200',
 };
 
 export default function Alerts() {
@@ -248,6 +273,7 @@ export default function Alerts() {
                       <tr className="border-b">
                         <th className="text-left py-3 px-4">Alert Type</th>
                         <th className="text-left py-3 px-4">Description</th>
+                        <th className="text-center py-3 px-4">Enabled</th>
                         <th className="text-center py-3 px-4">Email</th>
                         <th className="text-center py-3 px-4">In-App</th>
                         <th className="text-center py-3 px-4">Priority</th>
@@ -274,6 +300,12 @@ export default function Alerts() {
                             </td>
                             <td className="py-3 px-4 text-center">
                               <Switch
+                                checked={policy.enabled}
+                                onCheckedChange={(checked) => handlePolicyToggle(policy.id, 'enabled', checked)}
+                              />
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <Switch
                                 checked={policy.emailEnabled}
                                 onCheckedChange={(checked) => handlePolicyToggle(policy.id, 'emailEnabled', checked)}
                                 disabled={!policy.enabled}
@@ -287,20 +319,25 @@ export default function Alerts() {
                               />
                             </td>
                             <td className="py-3 px-4">
-                              <Select
-                                value={policy.priority || 'medium'}
-                                onValueChange={(value) => handlePriorityChange(policy.id, value)}
-                                disabled={!policy.enabled}
-                              >
-                                <SelectTrigger className="w-32">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="low">Low</SelectItem>
-                                  <SelectItem value="medium">Medium</SelectItem>
-                                  <SelectItem value="high">High</SelectItem>
-                                </SelectContent>
-                              </Select>
+                              <div className="flex items-center gap-2">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${priorityBadgeColors[policy.priority] || priorityBadgeColors.medium}`}>
+                                  {(policy.priority || 'medium').charAt(0).toUpperCase() + (policy.priority || 'medium').slice(1)}
+                                </span>
+                                <Select
+                                  value={policy.priority || 'medium'}
+                                  onValueChange={(value) => handlePriorityChange(policy.id, value)}
+                                  disabled={!policy.enabled}
+                                >
+                                  <SelectTrigger className="w-24 h-7 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="low">Low</SelectItem>
+                                    <SelectItem value="medium">Medium</SelectItem>
+                                    <SelectItem value="high">High</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             </td>
                           </tr>
                         );

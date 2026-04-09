@@ -57,9 +57,30 @@ export async function getEvent(req: Request, res: Response) {
 
 export async function acknowledgeEvent(req: Request, res: Response) {
   const id = req.params.id;
-  const userId = req.body.userId || 'user1';
-  const event = await alertsService.acknowledgeEvent(id, userId);
+  const user = (req as any).user;
+  const userId = req.body.userId || user?.userUuid || 'user1';
+  const userRole = req.body.userRole || user?.role || 'Office';
+  const comments = req.body.comments;
+  const event = await alertsService.acknowledgeEvent(id, userId, userRole, comments);
   res.json(event);
+}
+
+// ── GET /alerts/events/:id/acknowledgements ──
+
+export async function getAcknowledgements(req: Request, res: Response) {
+  const id = req.params.id;
+  const acks = await alertsService.getAcknowledgements(id);
+  res.json(acks);
+}
+
+// ── GET /alerts/events/for-current-user ──
+
+export async function getEventsForCurrentUser(req: Request, res: Response) {
+  const user = (req as any).user;
+  const userRole = (req.query.role as string) || user?.role || 'Office';
+  const vesselId = (req.query.vesselId as string) || user?.vesselId || null;
+  const events = await alertsService.getEventsForCurrentUser(userRole, vesselId);
+  res.json(events);
 }
 
 // ── POST /alerts/test ──

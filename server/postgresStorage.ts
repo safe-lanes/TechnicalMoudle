@@ -37,6 +37,7 @@ import {
   alertEvents,
   alertDeliveries,
   alertConfig,
+  alertAcknowledgements,
   formDefinitions,
   formVersions,
   formVersionUsage,
@@ -117,6 +118,8 @@ import {
   type InsertAlertDelivery,
   type AlertConfig,
   type InsertAlertConfig,
+  type AlertAcknowledgement,
+  type InsertAlertAcknowledgement,
   type FormDefinition,
   type InsertFormDefinition,
   type FormVersion,
@@ -4557,6 +4560,109 @@ export class PostgresStorage {
       const result = await db.insert(alertConfig).values(config).returning();
       return result[0];
     }
+  }
+
+  // ============= MODULE 10: ALERT ACKNOWLEDGEMENTS =============
+
+  async getAlertAcknowledgements(eventUuid: string): Promise<AlertAcknowledgement[]> {
+    const db = await getDb();
+    return await db.select().from(alertAcknowledgements)
+      .where(eq(alertAcknowledgements.eventUuid, eventUuid))
+      .orderBy(desc(alertAcknowledgements.createdAt));
+  }
+
+  async createAlertAcknowledgement(ack: InsertAlertAcknowledgement): Promise<AlertAcknowledgement> {
+    const db = await getDb();
+    const result = await db.insert(alertAcknowledgements).values({
+      ...ack,
+      aauuid: randomUUID(),
+    }).returning();
+    return result[0];
+  }
+
+  // ============= MODULE 10: ALERT ENGINE QUERIES =============
+
+  async getExistingAlertDedupeKeys(): Promise<Set<string>> {
+    const db = await getDb();
+    const rows = await db.select({ dedupeKey: alertEvents.dedupeKey })
+      .from(alertEvents);
+    return new Set(rows.map(r => r.dedupeKey));
+  }
+
+  async getOverdueWorkOrders(): Promise<any[]> {
+    const db = await getDb();
+    return await db.select().from(workOrders)
+      .where(and(
+        eq(workOrders.status, 'Overdue'),
+        eq(workOrders.dataScope, 'vessel')
+      ));
+  }
+
+  async getWorkOrdersWithMissedCycles(): Promise<any[]> {
+    const db = await getDb();
+    return await db.select().from(workOrders)
+      .where(and(
+        sql`${workOrders.missedCycles} > 0`,
+        eq(workOrders.dataScope, 'vessel')
+      ));
+  }
+
+  async getAllVesselSpares(): Promise<any[]> {
+    const db = await getDb();
+    return await db.select().from(spares)
+      .where(and(
+        eq(spares.dataScope, 'vessel'),
+        eq(spares.deleted, false)
+      ));
+  }
+
+  async getUnacknowledgedAlertEventsForRole(userRole: string, vesselId?: string | null): Promise<AlertEvent[]> {
+    const db = await getDb();
+    const conditions: any[] = [
+      sql`${alertEvents.ackBy} IS NULL`,
+    ];
+
+    if (vesselId) {
+      conditions.push(eq(alertEvents.vesselId, vesselId));
+    }
+
+    // Get all enabled policies
+    const policies = await db.select().from(alertPolicies)
+      .where(eq(alertPolicies.enabled, true));
+
+    // Filter policies where user's role is in the recipients list
+    const adminRoles = ['PMS Admin', 'Sail Admin', 'Super Admin'];
+    const isAdmin = adminRoles.includes(userRole);
+
+    const allowedPolicyUuids: string[] = [];
+    for (const policy of policies) {
+      if (isAdmin) {
+        // Admin roles see all alerts
+        allowedPolicyUuids.push(policy.apuuid);
+        continue;
+      }
+      try {
+        const recipients = JSON.parse(policy.recipients || '{}');
+        const roles: string[] = recipients.roles || [];
+        if (roles.includes(userRole)) {
+          allowedPolicyUuids.push(policy.apuuid);
+        }
+      } catch {
+        // Invalid JSON — skip this policy
+      }
+    }
+
+    if (allowedPolicyUuids.length === 0) {
+      return [];
+    }
+
+    conditions.push(
+      sql`${alertEvents.policyUuid} IN (${sql.join(allowedPolicyUuids.map(u => sql`${u}`), sql`, `)})`
+    );
+
+    return await db.select().from(alertEvents)
+      .where(and(...conditions))
+      .orderBy(desc(alertEvents.createdAt));
   }
 
   // ============= MODULE 11: FORM DEFINITIONS =============

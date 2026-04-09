@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import sailLogoPath from "@assets/SAIL logo Transparent_1753957135582.png";
 import { SyncStatusIndicator } from "./SyncStatusIndicator";
 import { RoleSwitcher } from "./RoleSwitcher";
+import { NotificationBell } from "./NotificationBell";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import {
@@ -146,7 +147,11 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
         })}
         
         <div className="flex-1" />
-        
+
+        <div className="flex items-center px-2">
+          <NotificationBell />
+        </div>
+
         <div className="flex items-center px-4">
           <RoleSwitcher />
         </div>

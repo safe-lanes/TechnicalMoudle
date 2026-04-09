@@ -57,8 +57,69 @@ export async function getEvent(id: string) {
   return { ...event, deliveries };
 }
 
-export async function acknowledgeEvent(id: string, userId: string) {
+export async function acknowledgeEvent(id: string, userId: string, userRole?: string, comments?: string) {
+  const event = await alertsRepo.getAlertEvent(id);
+  if (!event) {
+    throw new NotFoundError('Alert event not found');
+  }
+
+  // Check if this is a co-ack alert (UC3 skipped cycles)
+  const payload = JSON.parse(event.payload || '{}');
+  const requiresCoAck = payload.requiresCoAck === true;
+
+  if (requiresCoAck) {
+    // Co-ack: add acknowledgement record (mandatory comments)
+    if (!comments || comments.trim().length === 0) {
+      throw new Error('Comments are mandatory for co-acknowledgement of skipped cycle alerts');
+    }
+    if (!userRole) {
+      throw new Error('User role is required for co-acknowledgement');
+    }
+
+    await alertsRepo.createAlertAcknowledgement({
+      eventUuid: id,
+      userId,
+      userRole,
+      comments: comments.trim(),
+    });
+
+    // Check if all required roles have acknowledged
+    const acks = await alertsRepo.getAlertAcknowledgements(id);
+    const coAckRoles: string[] = payload.coAckRoles || ['Chief Engineer', 'Technical Superintendent'];
+    const ackedRoles = new Set(acks.map((a: any) => a.userRole));
+
+    // Admin roles count as Technical Superintendent
+    const adminRoles = ['PMS Admin', 'Sail Admin', 'Super Admin'];
+    for (const ack of acks) {
+      if (adminRoles.includes(ack.userRole)) {
+        ackedRoles.add('Technical Superintendent');
+      }
+    }
+    // Ship role can count as Chief Engineer for co-ack purposes
+    if (ackedRoles.has('Ship') || ackedRoles.has('Vessel Admin')) {
+      ackedRoles.add('Chief Engineer');
+    }
+
+    const allAcked = coAckRoles.every(role => ackedRoles.has(role));
+    if (allAcked) {
+      // Fully acknowledged — mark event as acknowledged
+      return alertsRepo.acknowledgeAlertEvent(id, userId);
+    }
+
+    // Partial ack — return the event with ack status
+    return { ...event, partialAck: true, acknowledgements: acks };
+  }
+
+  // Simple ack (UC1, UC2)
   return alertsRepo.acknowledgeAlertEvent(id, userId);
+}
+
+export async function getAcknowledgements(eventId: string) {
+  return alertsRepo.getAlertAcknowledgements(eventId);
+}
+
+export async function getEventsForCurrentUser(userRole: string, vesselId?: string | null) {
+  return alertsRepo.getUnacknowledgedAlertEventsForRole(userRole, vesselId);
 }
 
 // ── Test Alert ──

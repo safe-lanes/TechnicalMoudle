@@ -890,6 +890,26 @@ export const insertAlertConfigSchema = createInsertSchema(alertConfig).omit({
 export type InsertAlertConfig = z.infer<typeof insertAlertConfigSchema>;
 export type AlertConfig = typeof alertConfig.$inferSelect;
 
+// Alert Acknowledgements Table (co-acknowledgement for UC3 skipped cycles)
+export const alertAcknowledgements = pgTable("alert_acknowledgements", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  aauuid: text("aauuid").notNull().unique(),
+  eventUuid: text("event_uuid").notNull().references(() => alertEvents.aeuuid),
+  userId: text("user_id").notNull(),
+  userRole: text("user_role").notNull(),
+  comments: text("comments").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertAlertAcknowledgementSchema = createInsertSchema(alertAcknowledgements).omit({
+  id: true,
+  aauuid: true,
+  createdAt: true,
+});
+
+export type InsertAlertAcknowledgement = z.infer<typeof insertAlertAcknowledgementSchema>;
+export type AlertAcknowledgement = typeof alertAcknowledgements.$inferSelect;
+
 // Jobs Table - Templates/Blueprints for maintenance jobs linked to components
 // NOTE: componentId/componentCode/componentName are DEPRECATED - use jobComponentLinks table for many-to-many relationships
 export const jobs = pgTable("jobs", {
