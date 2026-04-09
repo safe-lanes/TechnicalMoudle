@@ -251,8 +251,20 @@ export default function ShipsSurveysAdmin() {
           return s;
         });
         setMasterData(normalized);
+        if (viewModes.master === "edit") {
+          const draft = normalized.map(s => ({ ...s }));
+          draft.sort((a, b) => a.sequence - b.sequence);
+          setDraftMasterData(draft);
+          setMasterSnapshot(normalized.map(s => ({ ...s })));
+        }
       } else {
         setMasterData(masterOnly);
+        if (viewModes.master === "edit") {
+          const draft = masterOnly.map(s => ({ ...s }));
+          draft.sort((a, b) => a.sequence - b.sequence);
+          setDraftMasterData(draft);
+          setMasterSnapshot(masterOnly.map(s => ({ ...s })));
+        }
       }
       setHasUnsavedChanges(false);
     }
@@ -302,7 +314,6 @@ export default function ShipsSurveysAdmin() {
         description: `${data.inserted || 0} new surveys added, ${data.updated || 0} updated`,
       });
       if (activeTab === "master") {
-        setDraftMasterData(null);
         setMasterSnapshot(null);
         setDeletedDraftIds([]);
       }
@@ -314,7 +325,6 @@ export default function ShipsSurveysAdmin() {
       setDeletedMasterIds([]);
       setMasterValidationError("");
       setInvalidSurveyIds(new Set());
-      setViewModes(prev => ({ ...prev, [activeTab]: "view" }));
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-survey-applicability', selectedVesselIds] });
     },
