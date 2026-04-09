@@ -12,6 +12,7 @@ interface UIRoleContextType {
   isTechSuperintendent: boolean;
   isHeadOfDept: boolean;
   isVessel: boolean;
+  isExternal: boolean;
 }
 
 const UIRoleContext = createContext<UIRoleContextType | undefined>(undefined);
@@ -75,6 +76,7 @@ export function UIRoleProvider({ children }: UIRoleProviderProps) {
     isTechSuperintendent: uiRole === "Tech_Superintendent",
     isHeadOfDept: uiRole === "Head_of_Dept",
     isVessel: uiRole === "Vessel",
+    isExternal: uiRole === "External",
   };
 
   return (
@@ -90,6 +92,7 @@ const FALLBACK_CONTEXT: UIRoleContextType = {
   isTechSuperintendent: false,
   isHeadOfDept: false,
   isVessel: false,
+  isExternal: false,
 };
 
 export function useUIRole() {

@@ -1,6 +1,6 @@
-export type UIRole = "Sail_Admin" | "Client_Admin" | "Tech_Superintendent" | "Head_of_Dept" | "Vessel";
+export type UIRole = "Sail_Admin" | "Client_Admin" | "Tech_Superintendent" | "Head_of_Dept" | "Vessel" | "External";
 
-export const UI_ROLES: UIRole[] = ["Sail_Admin", "Client_Admin", "Tech_Superintendent", "Head_of_Dept", "Vessel"];
+export const UI_ROLES: UIRole[] = ["Sail_Admin", "Client_Admin", "Tech_Superintendent", "Head_of_Dept", "Vessel", "External"];
 
 export const VISIBLE_UI_ROLES: UIRole[] = [
   "Sail_Admin",
@@ -8,6 +8,7 @@ export const VISIBLE_UI_ROLES: UIRole[] = [
   "Tech_Superintendent",
   "Head_of_Dept",
   "Vessel",
+  "External",
 ];
 
 export const UI_ROLE_LABELS: Record<UIRole, string> = {
@@ -16,6 +17,7 @@ export const UI_ROLE_LABELS: Record<UIRole, string> = {
   Tech_Superintendent: "Technical Superintendent",
   Head_of_Dept: "Head of Dept",
   Vessel: "Vessel",
+  External: "External",
 };
 
 export function mapLoggedRoleToUIRole(userType: string | undefined | null, profileRole: string | undefined | null): UIRole | null {
