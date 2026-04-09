@@ -1,0 +1,247 @@
+UI Fix Required: Work Order module tables are no longer filling the available table width after the previous column-resize fix
+
+The earlier resize issue may be resolved, but a new UI glitch has been introduced.
+
+Current problem
+In the WO module tables, the table now stops before the right edge of the available container and leaves a large blank area on the right side. This is wrong.
+
+Expected layout behavior:
+
+The leftmost column must stay aligned to the left edge of the table container.
+
+The rightmost visible column must extend up to the right edge of the table container whenever total column widths are less than available space.
+
+The table should use the full available width of the table wrapper by default.
+
+If the user resizes columns so total width becomes greater than container width, then horizontal scroll is fine.
+
+In short:
+minimum table width = container width
+
+actual table width = max(container width, sum of visible column widths)
+Right now, it looks like the table width is being set only to the sum of visible column widths, which causes the whole table to shrink and leaves empty space to the right. That behavior is not acceptable.
+What I want you to fix
+
+Please fix this for all tables in the Work Order module, not just the currently visible one.
+That means any shared table logic, reusable table component, or all WO submodule tables using this column-width behavior must follow the same rule consistently.
+Root cause to investigate
+
+I suspect the previous fix did this:
+
+
+removed w-full
+
+set the table width equal to the sum of the visible column widths
+
+enabled horizontal scrolling
+That solved the “both edges moving” issue, but introduced another one:
+
+when summed column widths are less than the available wrapper width, the table no longer stretches to fill the wrapper
+
+so the last column ends too early
+
+leaving blank dead space on the right side
+This means the logic must be changed from:
+ts
+tableWidth = sumOfVisibleColumnWidths
+
+to:
+ts
+tableWidth = Math.max(containerWidth, sumOfVisibleColumnWidths)
+
+But do not blindly apply only that line — rework the layout properly so the visual behavior is correct in all WO tables.
+Required behavior
+1. Table should fill available width by default
+
+If total column widths are smaller than the table wrapper width:
+
+stretch the table to match the wrapper width
+
+keep first column visually fixed to the left edge
+
+keep last visible column visually ending at the right edge
+
+no empty unused gap on the right inside the table container
+2. Table should overflow only when necessary
+
+If total column widths become larger than the wrapper width due to user resizing:
+
+allow horizontal scroll
+
+preserve fixed-edge resizing behavior
+
+do not compress columns unexpectedly
+
+do not redistribute widths in a way that makes the resized column move from both edges
+3. Resize behavior must remain correct
+
+The previous bug must stay fixed:
+
+left edge of active resized column must remain fixed during drag
+
+only the right edge should move
+
+no proportional shrink of all columns when dragging
+4. All visible columns must participate correctly
+
+If different WO tabs show different visible columns:
+
+compute widths based only on visible columns
+
+but still ensure the rendered table occupies full available wrapper width
+
+no tab should look narrow or under-filled
+Implementation guidance
+
+Please inspect and correct the layout in client/src/pages/pms/WorkOrders.tsx and any shared table logic used by other WO tables.
+A. Measure the actual table wrapper width
+
+Add logic to measure the visible table container/wrapper width using the correct parent element.
+Use:
+
+ResizeObserver, or
+
+a ref + getBoundingClientRect().width
+The measured width should update on:
+
+initial render
+
+window resize
+
+layout/sidebar changes
+
+tab changes if visible columns differ
+Example concept:
+ts
+const visibleColumnsWidth = sumOfVisibleColumnWidths;
+const effectiveTableWidth = Math.max(containerWidth, visibleColumnsWidth);
+B. Use min-width, not only fixed width
+
+Do not force the table to always equal only the summed widths.
+The table should behave like:
+tsx
+style={{
+  width: effectiveTableWidth,
+  minWidth: effectiveTableWidth,
+}}
+
+Or equivalent logic that guarantees:
+
+fills container when narrow
+
+grows beyond container when resized wider
+If a better CSS/layout approach exists, use it, but the rendered result must match this behavior exactly.
+C. Keep column widths explicit
+
+Header and body cells must still receive matching explicit widths so resize remains stable.
+For each visible column, keep:
+tsx
+width: `${colWidth}px`
+minWidth: `${colWidth}px`
+maxWidth: `${colWidth}px`
+boxSizing: "border-box"
+
+Or an equivalent stable model.
+But if the table needs to fill remaining free space when total width is smaller than the wrapper, then handle that intentionally rather than letting the browser distort random columns.
+D. Decide how extra free space should be distributed
+
+This is important.
+When the container is wider than the total visible column widths, the extra free space must be handled predictably.
+Preferred behavior:
+
+either let the last non-action content column absorb the remaining free space
+
+or distribute remaining free space according to a controlled rule
+But do not leave blank space to the right of the last column.
+Also do not stretch tiny utility columns like:
+
+status icon columns
+
+action columns
+
+checkbox columns
+
+small badge columns
+Best approach:
+
+keep fixed-width utility columns fixed
+
+allow one suitable flexible content column to grow and absorb leftover space
+For example:
+
+Job Title, Component, or another text-heavy column can be the flexible filler column
+
+Actions should usually remain fixed
+E. Preserve left and right visual boundaries
+
+Final rendered result must satisfy:
+
+first visible column begins at the left edge of the grid area
+
+last visible column ends at the right edge of the grid area when no overflow is needed
+
+if overflow is needed, horizontal scrolling appears naturally
+F. Fix this in all WO module tables
+
+Please audit all Work Order module tables and apply the same layout rule consistently:
+
+planned
+
+due
+
+overdue
+
+postponed
+
+unplanned
+
+pending approval
+
+completed
+
+and any other WO subtable/view using the same resizable grid
+If there is a shared table component or column-width hook, fix it there instead of patching only one tab.
+What not to do
+
+Do not reintroduce width: 100% in a way that causes browser redistribution of all columns during resize
+
+Do not keep the table narrower than its wrapper
+
+Do not allow random columns to stretch unpredictably
+
+Do not fix only the current tab if the same issue exists in other WO tables
+
+Do not claim success based only on code changes; verify the rendered UI
+Acceptance criteria
+
+Mark this complete only if all of these are true:
+
+In every WO table, the table fills the available width when total column widths are smaller than the container
+
+No blank dead space remains to the right of the last visible column
+
+Left edge of first column aligns with the left boundary of the table area
+
+Right edge of last visible column aligns with the right boundary of the table area when no overflow is required
+
+Horizontal scroll appears only when total column widths exceed available width
+
+Column resize still works with one fixed edge only
+
+Header and body columns remain aligned
+
+Different WO tabs with different visible columns also render correctly
+Deliverables I want from you
+
+After fixing, tell me:
+
+the exact root cause
+
+what width logic was wrong
+
+which column is used to absorb remaining free space, or how the extra width is distributed
+
+what shared logic was updated so all WO tables behave consistently
+
+why this fix prevents both the old resize issue and the new narrow-table issue
+
