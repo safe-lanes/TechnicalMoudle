@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Filter } from "lucide-react";
+import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown } from "lucide-react";
 import WorkOrderPlanner from "./WorkOrderPlanner";
 import { useLocation } from "wouter";
 import { useVessel } from "@/contexts/VesselContext";
@@ -1123,11 +1123,10 @@ const WorkOrders: React.FC = () => {
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className={`w-44 justify-between text-sm font-normal ${(selectedCriticality && selectedCriticality !== "all") || compCriticalChecked || compNonCriticalChecked ? 'border-[hsl(var(--primary))] text-[hsl(var(--primary))]' : 'text-gray-600'}`}
+              className="w-44 justify-between text-sm font-normal text-gray-600"
               data-testid="C14"
             >
               <Marker id="C14" />
-              <Filter className="h-3.5 w-3.5 mr-1.5 shrink-0" />
               <span className="truncate">
                 {(() => {
                   const parts: string[] = [];
