@@ -1,0 +1,129 @@
+TASK: UI ALIGNMENT – JOB FORM WITH WORK ORDER FORM + ADD MISSING SECTIONS
+
+Objective:
+
+1. Align **Job Form UI** with **Work Order Form UI**  
+2. Ensure consistency in:
+   • Field names  
+   • Field alignment  
+   • Layout structure  
+3. Add missing sections in Job Form (only UI presence, no logic change)
+
+--------------------------------------------------
+
+1. Scope (STRICT)
+
+Apply ONLY:
+
+• UI alignment  
+• Field naming consistency  
+• Layout formatting  
+
+--------------------------------------------------
+
+2. Out of Scope (DO NOT CHANGE)
+
+• Functionality  
+• Business logic  
+• API behavior  
+• Data flow  
+• Existing validations  
+
+--------------------------------------------------
+
+3. A1. Job Information Section
+
+Align with Work Order Form:
+
+• Field labels → same naming format  
+• Field alignment → same grid/structure  
+• Input sizes → match exactly  
+• Spacing between fields → consistent  
+• Label positioning → same (top/left alignment)  
+
+--------------------------------------------------
+
+4. A3. Safety Requirements Section
+
+Align with Work Order Form:
+
+• Section layout → same structure  
+• Field alignment and grouping  
+• Checkbox / input styling  
+• Label formatting  
+• Spacing and padding  
+
+--------------------------------------------------
+
+5. A4. Work History Section
+
+Align with Work Order Form:
+
+• Field names → same as Work Order  
+• Date/period fields → same UI style  
+• Table/list structure → same format  
+• Spacing and alignment → consistent  
+
+--------------------------------------------------
+
+6. Field-Level Alignment (Across Sections)
+
+Ensure:
+
+• Same font size and weight  
+• Same input height and width  
+• Same border style and radius  
+• Same label-to-field spacing  
+• Same section header styling  
+
+--------------------------------------------------
+
+7. Add Missing Sections (UI Only)
+
+Identify sections present in Work Order Form but missing in Job Form.
+
+Action:
+
+• Add those sections in Job Form UI  
+• Maintain same:
+
+  - Section headers  
+  - Layout structure  
+  - Field placeholders (if needed)  
+
+Constraints:
+
+• Do NOT implement new logic  
+• Do NOT connect to backend  
+• UI placeholders only  
+
+--------------------------------------------------
+
+8. Layout & Formatting
+
+• Maintain same:
+
+  - Container width  
+  - Padding  
+  - Section spacing  
+  - Alignment with page structure  
+
+--------------------------------------------------
+
+9. Validation
+
+Verify:
+
+• Job Form visually matches Work Order Form  
+• All fields aligned consistently  
+• Missing sections added (UI only)  
+• No functional changes introduced  
+
+--------------------------------------------------
+
+Expected Result:
+
+• Job Form UI is fully aligned with Work Order Form  
+• Consistent structure across both forms  
+• Improved usability and uniform design  
+• No impact on existing functionality  
