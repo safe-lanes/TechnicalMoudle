@@ -1127,10 +1127,12 @@ const JobsFormPage: React.FC = () => {
                     const lastRH = (td?.lastCompletedRH ?? td?.lastDoneRH) as number | undefined;
                     return (
                       <div className="space-y-2">
-                        <Label className="text-sm text-[#8798ad]">Last Completed At</Label>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-gray-400 shrink-0" />
-                          <Input disabled value={lastRH != null ? `${formatRHWithSeparators(lastRH)} RH` : 'RH not recorded'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default" data-testid="text-last-completed-rh" />
+                        <Label className="text-sm text-[#8798ad] flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5" />
+                          Last Completed At
+                        </Label>
+                        <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-rh">
+                          {lastRH != null ? <>{formatRHWithSeparators(lastRH)} Hours</> : <span className="italic text-gray-400">RH not recorded</span>}
                         </div>
                       </div>
                     );
@@ -1138,15 +1140,18 @@ const JobsFormPage: React.FC = () => {
                   {(() => {
                     const td = (jobContext as Record<string, Record<string, unknown>> | undefined)?.templateData;
                     const lastDate = (td?.lastCompletedDate ?? td?.lastDoneDate) as string | undefined;
-                    const displayValue = lastDate
-                      ? `${normalizeDateToDDMMMYYYY(lastDate)}${(() => { const r = formatRelativeTime(lastDate); return r ? ` (${r})` : ''; })()}`
-                      : 'First cycle';
                     return (
                       <div className="space-y-2">
-                        <Label className="text-sm text-[#8798ad]">Last Completed On</Label>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-gray-400 shrink-0" />
-                          <Input disabled value={displayValue} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default" data-testid="text-last-completed-date" />
+                        <Label className="text-sm text-[#8798ad] flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5" />
+                          Last Completed On
+                        </Label>
+                        <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-date">
+                          {lastDate ? (
+                            <>{normalizeDateToDDMMMYYYY(lastDate)}{(() => { const r = formatRelativeTime(lastDate); return r ? ` (${r})` : ''; })()}</>
+                          ) : (
+                            <span className="italic text-gray-400">First maintenance cycle</span>
+                          )}
                         </div>
                       </div>
                     );
@@ -1236,53 +1241,53 @@ const JobsFormPage: React.FC = () => {
             >
               <div className="space-y-3">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700" data-testid="JF.A4.3"><Marker id="JF.A4.3" />Personal Protective Equipment (PPE):</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-1.5" data-testid="JF.A4.3"><Marker id="JF.A4.3" />Personal Protective Equipment (PPE):</h3>
                   {(templateData.safetyRequirements?.ppeRequirements || []).length > 0 ? (
-                    <div className="mt-1 space-y-0.5" data-testid="JF.A4.4">
+                    <ul className="space-y-0.5 text-sm text-gray-700 ml-4" data-testid="JF.A4.4">
                       <Marker id="JF.A4.4" />
                       {templateData.safetyRequirements.ppeRequirements.map((item, index) => (
-                        <div key={index} className="flex items-start gap-2 text-sm text-gray-600">
-                          <span className="text-gray-400 mt-0.5 shrink-0">&bull;</span>
+                        <li key={index} className="flex items-start gap-2">
+                          <span className="text-[hsl(var(--primary))] mt-1.5">&bull;</span>
                           <span>{item}</span>
-                        </div>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   ) : (
-                    <p className="text-sm text-gray-500 italic mt-1" data-testid="JF.A4.4"><Marker id="JF.A4.4" />No PPE requirements specified</p>
+                    <p className="text-sm text-gray-500 italic ml-4" data-testid="JF.A4.4"><Marker id="JF.A4.4" />No PPE requirements specified</p>
                   )}
                 </div>
                 
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700" data-testid="JF.A4.5"><Marker id="JF.A4.5" />Permits Required:</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-1.5" data-testid="JF.A4.5"><Marker id="JF.A4.5" />Permits Required:</h3>
                   {(templateData.safetyRequirements?.permitRequirements || []).length > 0 ? (
-                    <div className="mt-1 space-y-0.5" data-testid="JF.A4.6">
+                    <ul className="space-y-0.5 text-sm text-gray-700 ml-4" data-testid="JF.A4.6">
                       <Marker id="JF.A4.6" />
                       {templateData.safetyRequirements.permitRequirements.map((item, index) => (
-                        <div key={index} className="flex items-start gap-2 text-sm text-gray-600">
-                          <span className="text-gray-400 mt-0.5 shrink-0">&bull;</span>
+                        <li key={index} className="flex items-start gap-2">
+                          <span className="text-[hsl(var(--primary))] mt-1.5">&bull;</span>
                           <span>{item}</span>
-                        </div>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   ) : (
-                    <p className="text-sm text-gray-500 italic mt-1" data-testid="JF.A4.6"><Marker id="JF.A4.6" />No permits required</p>
+                    <p className="text-sm text-gray-500 italic ml-4" data-testid="JF.A4.6"><Marker id="JF.A4.6" />No permits required</p>
                   )}
                 </div>
                 
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700" data-testid="JF.A4.7"><Marker id="JF.A4.7" />Other Safety Requirements:</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-1.5" data-testid="JF.A4.7"><Marker id="JF.A4.7" />Other Safety Requirements:</h3>
                   {(templateData.safetyRequirements?.otherRequirements || []).length > 0 ? (
-                    <div className="mt-1 space-y-0.5" data-testid="JF.A4.8">
+                    <ul className="space-y-0.5 text-sm text-gray-700 ml-4" data-testid="JF.A4.8">
                       <Marker id="JF.A4.8" />
                       {templateData.safetyRequirements.otherRequirements.map((item, index) => (
-                        <div key={index} className="flex items-start gap-2 text-sm text-gray-600">
-                          <span className="text-gray-400 mt-0.5 shrink-0">&bull;</span>
+                        <li key={index} className="flex items-start gap-2">
+                          <span className="text-[hsl(var(--primary))] mt-1.5">&bull;</span>
                           <span>{item}</span>
-                        </div>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   ) : (
-                    <p className="text-sm text-gray-500 italic mt-1" data-testid="JF.A4.8"><Marker id="JF.A4.8" />No other safety requirements specified</p>
+                    <p className="text-sm text-gray-500 italic ml-4" data-testid="JF.A4.8"><Marker id="JF.A4.8" />No other safety requirements specified</p>
                   )}
                 </div>
               </div>
