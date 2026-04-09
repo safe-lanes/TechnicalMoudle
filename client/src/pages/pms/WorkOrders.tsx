@@ -17,7 +17,6 @@ import {
 import { PeriodFilter, PeriodFilterValue } from "@/components/filters/PeriodFilter";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -164,9 +163,7 @@ const WorkOrders: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue | null>(null);
   const [selectedRank, setSelectedRank] = useState("");
-  const [selectedCriticality, setSelectedCriticality] = useState("");
-  const [compCriticalChecked, setCompCriticalChecked] = useState(false);
-  const [compNonCriticalChecked, setCompNonCriticalChecked] = useState(false);
+  const [criticalitySelections, setCriticalitySelections] = useState<Set<string>>(new Set());
   const [criticalityPopoverOpen, setCriticalityPopoverOpen] = useState(false);
   const [selectedPostponementReason, setSelectedPostponementReason] = useState("");
   const VALID_TABS = new Set(["Planned", "Due", "Overdue", "Postponed", "Unplanned", "Pending Approval", "Completed"]);
@@ -483,28 +480,14 @@ const WorkOrders: React.FC = () => {
       }
     }
     
-    // WO Criticality filter: match against work order criticality field
-    if (selectedCriticality && selectedCriticality !== "all") {
+    if (criticalitySelections.size > 0) {
       const woCriticality = wo.criticality?.toLowerCase();
-      if (selectedCriticality === "critical") {
-        if (woCriticality !== "yes") {
-          return false;
-        }
-      } else if (selectedCriticality === "non-critical") {
-        if (woCriticality === "yes") {
-          return false;
-        }
-      }
-    }
-
-    // Component Criticality filter: match against component critical boolean
-    if (compCriticalChecked || compNonCriticalChecked) {
       const isCompCritical = wo.componentCritical === true;
-      if (compCriticalChecked && !compNonCriticalChecked) {
-        if (!isCompCritical) return false;
-      } else if (!compCriticalChecked && compNonCriticalChecked) {
-        if (isCompCritical) return false;
-      }
+      let matchesAny = false;
+      if (criticalitySelections.has("critical") && woCriticality === "yes") matchesAny = true;
+      if (criticalitySelections.has("non-critical") && woCriticality !== "yes") matchesAny = true;
+      if (criticalitySelections.has("critical-component") && isCompCritical) matchesAny = true;
+      if (!matchesAny) return false;
     }
 
     // Postponement reason filter: only applies to Postponed work orders
@@ -605,7 +588,7 @@ const WorkOrders: React.FC = () => {
   // Reset to page 1 when filters or sort change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchTerm, periodFilter, selectedRank, selectedCriticality, compCriticalChecked, compNonCriticalChecked, selectedPostponementReason, vesselId, woSortField, woSortDir]);
+  }, [activeTab, searchTerm, periodFilter, selectedRank, criticalitySelections, selectedPostponementReason, vesselId, woSortField, woSortDir]);
 
   // Reset sort when switching tabs
   useEffect(() => {
@@ -1129,75 +1112,63 @@ const WorkOrders: React.FC = () => {
               <Marker id="C14" />
               <span className="truncate">
                 {(() => {
-                  const parts: string[] = [];
-                  if (selectedCriticality === "critical") parts.push("WO: Critical");
-                  else if (selectedCriticality === "non-critical") parts.push("WO: Non-Critical");
-                  if (compCriticalChecked && !compNonCriticalChecked) parts.push("Comp: Critical");
-                  else if (!compCriticalChecked && compNonCriticalChecked) parts.push("Comp: Non-Crit");
-                  else if (compCriticalChecked && compNonCriticalChecked) parts.push("Comp: All");
-                  return parts.length > 0 ? parts.join(" + ") : "Criticality";
+                  if (criticalitySelections.size === 0 || criticalitySelections.size === 3) return "Criticality";
+                  const labels: string[] = [];
+                  if (criticalitySelections.has("critical")) labels.push("Critical");
+                  if (criticalitySelections.has("non-critical")) labels.push("Non-Critical");
+                  if (criticalitySelections.has("critical-component")) labels.push("Comp Critical");
+                  return labels.join(", ");
                 })()}
               </span>
               <ChevronDown className="h-3.5 w-3.5 ml-1 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-56 p-0" align="start">
-            <div className="p-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Work Order Criticality</p>
-              <TooltipProvider delayDuration={300}>
-                <div className="space-y-1">
-                  <button
-                    type="button"
-                    className={`w-full text-left px-2 py-1.5 rounded-sm text-sm transition-colors ${selectedCriticality === "all" || !selectedCriticality ? 'bg-accent text-accent-foreground font-medium' : 'hover:bg-accent hover:text-accent-foreground text-gray-700'}`}
-                    onClick={() => setSelectedCriticality("all")}
-                    data-testid="criticality-wo-all"
+          <PopoverContent className="w-56 p-1" align="start">
+            <div className="space-y-0.5">
+              {[
+                { value: "all", label: "All" },
+                { value: "critical", label: "Critical" },
+                { value: "non-critical", label: "Non-Critical" },
+                { value: "critical-component", label: "Critical Component WO" },
+              ].map((opt) => {
+                const INDIVIDUAL_OPTIONS = ["critical", "non-critical", "critical-component"];
+                const isAll = opt.value === "all";
+                const isChecked = isAll
+                  ? criticalitySelections.size === 3
+                  : criticalitySelections.has(opt.value);
+                const handleToggle = () => {
+                  setCriticalitySelections((prev) => {
+                    const next = new Set(prev);
+                    if (isAll) {
+                      if (prev.size === 3) {
+                        next.clear();
+                      } else {
+                        INDIVIDUAL_OPTIONS.forEach((v) => next.add(v));
+                      }
+                    } else {
+                      if (next.has(opt.value)) {
+                        next.delete(opt.value);
+                      } else {
+                        next.add(opt.value);
+                      }
+                    }
+                    return next;
+                  });
+                };
+                return (
+                  <label
+                    key={opt.value}
+                    className="flex items-center gap-2 cursor-pointer px-2 py-1.5 rounded-sm text-sm text-gray-700 hover:bg-accent hover:text-accent-foreground transition-colors"
+                    data-testid={`criticality-${opt.value}`}
                   >
-                    All
-                  </button>
-                  <div className="flex items-center justify-between">
-                    <button
-                      type="button"
-                      className={`flex-1 text-left px-2 py-1.5 rounded-sm text-sm transition-colors ${selectedCriticality === "critical" ? 'bg-accent text-accent-foreground font-medium' : 'hover:bg-accent hover:text-accent-foreground text-gray-700'}`}
-                      onClick={() => setSelectedCriticality("critical")}
-                      data-testid="criticality-wo-critical"
-                    >
-                      Critical
-                    </button>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <label className="flex items-center cursor-pointer p-1 rounded-sm hover:bg-accent transition-colors" data-testid="criticality-comp-critical">
-                          <Checkbox
-                            checked={compCriticalChecked}
-                            onCheckedChange={(checked) => setCompCriticalChecked(checked === true)}
-                          />
-                        </label>
-                      </TooltipTrigger>
-                      <TooltipContent side="right"><p>Critical Components Work Orders</p></TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <button
-                      type="button"
-                      className={`flex-1 text-left px-2 py-1.5 rounded-sm text-sm transition-colors ${selectedCriticality === "non-critical" ? 'bg-accent text-accent-foreground font-medium' : 'hover:bg-accent hover:text-accent-foreground text-gray-700'}`}
-                      onClick={() => setSelectedCriticality("non-critical")}
-                      data-testid="criticality-wo-non-critical"
-                    >
-                      Non-Critical
-                    </button>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <label className="flex items-center cursor-pointer p-1 rounded-sm hover:bg-accent transition-colors" data-testid="criticality-comp-non-critical">
-                          <Checkbox
-                            checked={compNonCriticalChecked}
-                            onCheckedChange={(checked) => setCompNonCriticalChecked(checked === true)}
-                          />
-                        </label>
-                      </TooltipTrigger>
-                      <TooltipContent side="right"><p>Non-Critical Components Work Orders</p></TooltipContent>
-                    </Tooltip>
-                  </div>
-                </div>
-              </TooltipProvider>
+                    <Checkbox
+                      checked={isChecked}
+                      onCheckedChange={handleToggle}
+                    />
+                    <span>{opt.label}</span>
+                  </label>
+                );
+              })}
             </div>
           </PopoverContent>
         </Popover>
@@ -1210,9 +1181,7 @@ const WorkOrders: React.FC = () => {
             setSearchTerm("");
             setPeriodFilter(null);
             setSelectedRank("");
-            setSelectedCriticality("");
-            setCompCriticalChecked(false);
-            setCompNonCriticalChecked(false);
+            setCriticalitySelections(new Set());
             setSelectedPostponementReason("");
           }}
           data-testid="button-clear-filters"
