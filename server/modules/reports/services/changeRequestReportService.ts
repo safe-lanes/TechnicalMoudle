@@ -209,7 +209,7 @@ export async function exportChangeRequestsExcel(
     : 'All Vessels';
 
   const ws = wb.addWorksheet('CR Status & Tracking');
-  const totalColumns = 13;
+  const totalColumns = 14;
 
   const s = reportData.summary;
   const totalReqs = s.totalRequests;
@@ -257,8 +257,8 @@ export async function exportChangeRequestsExcel(
 
   ws.addRow([]);
 
-  const colHeaders = ['ID', 'Title', 'Category', 'Status', 'Requested By', 'Vessel', 'Submitted', 'Reviewed By', 'Reviewed At', 'Cycle Time (hrs)', 'Target', 'Changes', 'Reason'];
-  const colWidths = [10, 40, 18, 16, 20, 18, 18, 20, 18, 16, 28, 12, 30];
+  const colHeaders = ['S.No', 'ID', 'Title', 'Category', 'Status', 'Requested By', 'Vessel', 'Submitted', 'Reviewed By', 'Reviewed At', 'Cycle Time (hrs)', 'Target', 'Changes', 'Reason'];
+  const colWidths = [6, 10, 40, 18, 16, 20, 18, 18, 20, 18, 16, 28, 12, 30];
   colWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
   const tableHeaderRow = ws.addRow(colHeaders);
@@ -281,6 +281,7 @@ export async function exportChangeRequestsExcel(
   };
   (reportData.requests || []).forEach((req: any, i: number) => {
     const r = ws.addRow([
+      i + 1,
       req.id,
       req.title,
       catNames[req.category] || req.category,

@@ -227,6 +227,7 @@ export async function exportDueJobs7Days(vesselId: string): Promise<{ buffer: Bu
   });
 
   const columns: ColumnDef[] = [
+    { key: 'sno', header: 'S.No', width: 6, type: 'number', align: 'center' },
     { key: 'priority', header: 'Priority', width: 12, type: 'text', align: 'center' },
     { key: 'statusIndicator', header: 'Status', width: 12, type: 'text', align: 'center' },
     { key: 'workOrderNo', header: 'WO Number', width: 22, type: 'text' },
@@ -249,6 +250,7 @@ export async function exportDueJobs7Days(vesselId: string): Promise<{ buffer: Bu
     const hasDaysRemaining = typeof daysRemainingValue === 'number' && !isNaN(daysRemainingValue);
 
     return {
+      sno: index + 1,
       priority: job.priority,
       statusIndicator: job.statusIndicator,
       workOrderNo: job.workOrderNo,
