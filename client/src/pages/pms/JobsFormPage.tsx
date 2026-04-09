@@ -1113,27 +1113,28 @@ const JobsFormPage: React.FC = () => {
                   {templateData.maintenanceBasis === 'Running Hours' && (() => {
                     const td = (jobContext as Record<string, Record<string, unknown>> | undefined)?.templateData;
                     const lastRH = (td?.lastCompletedRH ?? td?.lastDoneRH) as number | undefined;
-                    return lastRH != null ? (
+                    return (
                       <div className="space-y-2">
                         <Label className="text-sm text-[#8798ad]">Last Completed At</Label>
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-gray-400 shrink-0" />
-                          <Input disabled value={`${formatRHWithSeparators(lastRH)} RH`} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default" data-testid="text-last-completed-rh" />
+                          <Input disabled value={lastRH != null ? `${formatRHWithSeparators(lastRH)} RH` : 'RH not recorded'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default" data-testid="text-last-completed-rh" />
                         </div>
                       </div>
-                    ) : null;
+                    );
                   })()}
                   {(() => {
                     const td = (jobContext as Record<string, Record<string, unknown>> | undefined)?.templateData;
                     const lastDate = (td?.lastCompletedDate ?? td?.lastDoneDate) as string | undefined;
-                    if (!lastDate) return null;
-                    const relative = formatRelativeTime(lastDate);
+                    const displayValue = lastDate
+                      ? `${normalizeDateToDDMMMYYYY(lastDate)}${(() => { const r = formatRelativeTime(lastDate); return r ? ` (${r})` : ''; })()}`
+                      : 'First cycle';
                     return (
                       <div className="space-y-2">
                         <Label className="text-sm text-[#8798ad]">Last Completed On</Label>
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-gray-400 shrink-0" />
-                          <Input disabled value={`${normalizeDateToDDMMMYYYY(lastDate)}${relative ? ` (${relative})` : ''}`} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default" data-testid="text-last-completed-date" />
+                          <Input disabled value={displayValue} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default" data-testid="text-last-completed-date" />
                         </div>
                       </div>
                     );
