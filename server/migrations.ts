@@ -2734,6 +2734,14 @@ const migrations: Migration[] = [
         END IF;
       END $$;
     `
+  },
+  {
+    id: '081_rename_external5_to_external10',
+    name: 'Rename External 5 to External 10 in role master',
+    description: 'Updates admn_role_master row id=12 from External 5 to External 10 to align with External view mode mapping.',
+    sql: `
+      UPDATE admn_role_master SET assigned_role = 'External 10', updated_at = NOW() WHERE id = 12 AND assigned_role = 'External 5';
+    `
   }
 ];
 

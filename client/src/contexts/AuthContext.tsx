@@ -47,7 +47,7 @@ const DEFAULT_USER: PublicUser = {
   username: "munawer.modak",
   fullName: "Munawer A. Modak",
   email: "ayush.agrawal@safe-lanes.com",
-  role: "Vessel Admin",
+  role: "External 10",
   userType: "Office",
   vesselId: null,
   department: null,
