@@ -219,7 +219,6 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
 
   const getActiveFiltersCount = () => {
     let count = 0;
-    if (filters.vessels.length > 0 && filters.vessels.length < vessels.length) count++;
     if (filters.periodFilter) count++;
     if (filters.component) count++;
     return count;
@@ -403,19 +402,6 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
 
       {getActiveFiltersCount() > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {filters.vessels.length > 0 && filters.vessels.length < vessels.length && (
-            <Badge variant="secondary" className="flex items-center gap-1 text-xs py-0.5">
-              {getVesselSummary()}
-              <button
-                type="button"
-                onClick={() => onFiltersChange({ ...filters, vessels: [] })}
-                className="ml-0.5 hover:text-foreground"
-                data-testid="button-clear-vessel-filter"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          )}
           {filters.component && (
             <Badge variant="secondary" className="flex items-center gap-1 text-xs py-0.5">
               {filters.component}
