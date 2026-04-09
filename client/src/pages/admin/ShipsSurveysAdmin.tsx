@@ -93,6 +93,7 @@ interface MasterSurvey {
   companyId?: string;
   companyGroup?: string;
   companySequence?: number;
+  isNew?: boolean;
 }
 
 interface VesselSurvey {
@@ -313,6 +314,7 @@ export default function ShipsSurveysAdmin() {
       setDeletedMasterIds([]);
       setMasterValidationError("");
       setInvalidSurveyIds(new Set());
+      setViewModes(prev => ({ ...prev, [activeTab]: "view" }));
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-survey-applicability', selectedVesselIds] });
     },
@@ -556,6 +558,7 @@ export default function ShipsSurveysAdmin() {
       requirementRef: "",
       applicableToCompany: false,
       surveyLabel: "",
+      isNew: true,
     };
     
     setDraftMasterData(prev => prev ? [...prev, newSurvey] : [newSurvey]);
@@ -566,9 +569,11 @@ export default function ShipsSurveysAdmin() {
     return surveys.map((s, idx) => ({
       ...s,
       sequence: idx + 1,
-      masterId: s.category && s.group
-        ? `${s.category}${s.group}-${String(idx + 1).padStart(3, '0')}`
-        : `NEW-${String(idx + 1).padStart(3, '0')}`
+      masterId: s.isNew || (s.masterId ?? '').startsWith('NEW-')
+        ? (s.category && s.group
+            ? `${s.category}${s.group}-${String(idx + 1).padStart(3, '0')}`
+            : `NEW-${String(idx + 1).padStart(3, '0')}`)
+        : s.masterId
     }));
   };
 
@@ -593,11 +598,13 @@ export default function ShipsSurveysAdmin() {
         if (s.id === id) {
           const updated = { ...s, [field]: value };
           if (field === "category" || field === "group") {
-            const cat = field === "category" ? value : s.category;
-            const grp = field === "group" ? value : s.group;
-            updated.masterId = cat && grp
-              ? `${cat}${grp}-${String(s.sequence).padStart(3, '0')}`
-              : `NEW-${String(s.sequence).padStart(3, '0')}`;
+            if (s.isNew || (s.masterId ?? '').startsWith('NEW-')) {
+              const cat = field === "category" ? value : s.category;
+              const grp = field === "group" ? value : s.group;
+              updated.masterId = cat && grp
+                ? `${cat}${grp}-${String(s.sequence).padStart(3, '0')}`
+                : `NEW-${String(s.sequence).padStart(3, '0')}`;
+            }
           }
           return updated;
         }
