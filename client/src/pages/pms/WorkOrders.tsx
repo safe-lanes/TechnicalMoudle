@@ -193,6 +193,8 @@ const WorkOrders: React.FC = () => {
   const [woSortDir, setWoSortDir] = useState<WOSortDir>("asc");
   const [colWidths, setColWidths] = useState<Record<string, number>>(DEFAULT_WO_COL_WIDTHS);
   const colWidthsRef = useRef<Record<string, number>>(DEFAULT_WO_COL_WIDTHS);
+  const tableWrapperRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
   
   // Modify mode integration  
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
@@ -534,7 +536,7 @@ const WorkOrders: React.FC = () => {
   }) => (
     <th
       className={`${align === "center" ? "text-center" : "text-left"} py-3 px-4 font-medium relative select-none`}
-      style={{ width: colWidths[colKey], minWidth: colWidths[colKey], maxWidth: colWidths[colKey], boxSizing: "border-box" }}
+      style={{ width: effectiveColWidths[colKey] ?? colWidths[colKey], minWidth: effectiveColWidths[colKey] ?? colWidths[colKey], maxWidth: effectiveColWidths[colKey] ?? colWidths[colKey], boxSizing: "border-box" }}
       onClick={field ? () => handleWoSort(field) : undefined}
       data-testid={testId}
     >
@@ -590,6 +592,32 @@ const WorkOrders: React.FC = () => {
     visibleColKeys.reduce((sum, key) => sum + (colWidths[key] ?? DEFAULT_WO_COL_WIDTHS[key] ?? 120), 0),
     [visibleColKeys, colWidths]
   );
+
+  useEffect(() => {
+    const el = tableWrapperRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const effectiveTableWidth = Math.max(containerWidth, tableWidth);
+
+  const effectiveColWidths = useMemo(() => {
+    const base: Record<string, number> = {};
+    for (const key of visibleColKeys) {
+      base[key] = colWidths[key] ?? DEFAULT_WO_COL_WIDTHS[key] ?? 120;
+    }
+    const extra = effectiveTableWidth - tableWidth;
+    if (extra > 0) {
+      base['jobTitle'] = (base['jobTitle'] ?? 220) + extra;
+    }
+    return base;
+  }, [visibleColKeys, colWidths, effectiveTableWidth, tableWidth]);
 
   // ─── Sorted work orders (applied after filter, before pagination) ───────────
   const sortedWorkOrders = useMemo(
@@ -1243,11 +1271,11 @@ const WorkOrders: React.FC = () => {
       })()}
 
       {/* Work Orders Table */}
-      <div className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
-        <table className="text-sm" style={{ tableLayout: "fixed", width: Math.max(tableWidth, 1000), minWidth: 1000 }}>
+      <div ref={tableWrapperRef} className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
+        <table className="text-sm" style={{ tableLayout: "fixed", width: effectiveTableWidth, minWidth: effectiveTableWidth }}>
           <colgroup>
             {visibleColKeys.map(key => {
-              const w = colWidths[key] ?? DEFAULT_WO_COL_WIDTHS[key] ?? 120;
+              const w = effectiveColWidths[key] ?? colWidths[key] ?? DEFAULT_WO_COL_WIDTHS[key] ?? 120;
               return <col key={key} style={{ width: w, minWidth: w, maxWidth: w }} />;
             })}
           </colgroup>
