@@ -1051,16 +1051,18 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       const dateFrom = categoryFilters.dateRange?.from;
       const dateTo = categoryFilters.dateRange?.to;
       
-      if (dateFrom) {
-        requestBody.dateFrom = dateFrom.toISOString().split('T')[0];
-      }
-      if (dateTo) {
-        requestBody.dateTo = dateTo.toISOString().split('T')[0];
+      if (reportId !== 'critical-equipment') {
+        if (dateFrom) {
+          requestBody.dateFrom = dateFrom.toISOString().split('T')[0];
+        }
+        if (dateTo) {
+          requestBody.dateTo = dateTo.toISOString().split('T')[0];
+        }
       }
       
       if (reportId === 'monthly-summary' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'critical-equipment') {
-        let startDate: Date;
-        let endDate: Date;
+        let startDate: Date | null = null;
+        let endDate: Date | null = null;
         
         if (categoryFilters.dateRange?.from && categoryFilters.dateRange?.to) {
           startDate = categoryFilters.dateRange.from;
@@ -1068,13 +1070,13 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         } else if (globalFilters?.dateRange?.from && globalFilters?.dateRange?.to) {
           startDate = globalFilters.dateRange.from;
           endDate = globalFilters.dateRange.to;
-        } else {
+        } else if (reportId !== 'critical-equipment') {
           const now = new Date();
           startDate = new Date(now.getFullYear(), now.getMonth(), 1);
           endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         }
-        requestBody.startDate = startDate.toISOString().split('T')[0];
-        requestBody.endDate = endDate.toISOString().split('T')[0];
+        if (startDate) requestBody.startDate = startDate.toISOString().split('T')[0];
+        if (endDate) requestBody.endDate = endDate.toISOString().split('T')[0];
       }
       
       // Add viewType for workload-distribution (default to summary view)
