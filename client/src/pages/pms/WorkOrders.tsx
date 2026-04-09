@@ -553,11 +553,12 @@ const WorkOrders: React.FC = () => {
   const handleResizeMouseDown = useCallback((colId: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const th = (e.target as HTMLElement).closest("th");
-    const fixedLeft = th ? th.getBoundingClientRect().left : e.clientX - (colWidthsRef.current[colId] ?? DEFAULT_WO_COL_WIDTHS[colId] ?? 120);
+    const startX = e.clientX;
+    const startWidth = colWidthsRef.current[colId] ?? DEFAULT_WO_COL_WIDTHS[colId] ?? 120;
 
     const onMouseMove = (moveEvent: MouseEvent) => {
-      const newWidth = Math.max(60, moveEvent.clientX - fixedLeft);
+      const delta = moveEvent.clientX - startX;
+      const newWidth = Math.max(60, startWidth + delta);
       setColWidths(prev => {
         const next = { ...prev, [colId]: newWidth };
         colWidthsRef.current = next;
