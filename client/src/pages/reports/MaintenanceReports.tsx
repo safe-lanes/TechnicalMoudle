@@ -717,7 +717,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Class Item Only', value: metadata.classItemOnly },
           { label: 'Both Critical & Class', value: metadata.bothCriticalAndClass },
           { label: 'With Overdue Jobs', value: metadata.equipmentWithOverdue, color: 'highlight' },
-          { label: 'Due Soon (7 days)', value: metadata.equipmentDueSoon }
+          { label: (categoryFilters.dateRange?.from || categoryFilters.dateRange?.to) ? 'Due in Period' : 'Due Soon (7 days)', value: metadata.equipmentDueSoon }
         ];
 
         if (mode === 'preview') return { title: 'CRITICAL EQUIPMENT STATUS REPORT', subtitle: 'SOLAS-critical and class-critical equipment', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;

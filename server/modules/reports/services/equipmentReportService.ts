@@ -77,7 +77,7 @@ export async function getCriticalEquipmentStatus(vesselId: string, startDateStr?
     if (filterStartDate || filterEndDate) {
       relevantWOs = activeWOs.filter(wo => {
         const dueDate = parseDate(wo.dueDate || wo.nextDueDate);
-        if (!dueDate) return true;
+        if (!dueDate) return false;
         if (filterStartDate && dueDate < filterStartDate) return false;
         if (filterEndDate && dueDate > filterEndDate) return false;
         return true;
