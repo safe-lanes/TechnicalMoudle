@@ -2066,13 +2066,15 @@ const migrations: Migration[] = [
   {
     id: '066b_adm_role_menu_access_fks',
     name: 'Add FK constraints to adm_role_menu_access',
-    description: 'Alters columns to UUID type and adds foreign key constraints referencing admn_role_master(ruid) and adm_menumaster_ac(muid)',
+    description: 'Adds foreign key constraints referencing admn_role_master(ruid) and adm_menumaster_ac(muid) with orphan cleanup',
     sql: `
       DO $$
       BEGIN
-        ALTER TABLE adm_role_menu_access
-          ALTER COLUMN role_ruid TYPE uuid USING role_ruid::uuid,
-          ALTER COLUMN menu_muid TYPE uuid USING menu_muid::uuid;
+        DELETE FROM adm_role_menu_access
+        WHERE role_ruid NOT IN (SELECT ruid FROM admn_role_master);
+
+        DELETE FROM adm_role_menu_access
+        WHERE menu_muid NOT IN (SELECT muid FROM adm_menumaster_ac);
 
         IF NOT EXISTS (
           SELECT 1 FROM information_schema.table_constraints
