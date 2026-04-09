@@ -140,7 +140,7 @@ const RunningHours = () => {
   
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
-  const { isSailAdmin, isClientAdmin } = useUIRole();
+  const { isSailAdmin, isClientAdmin, isExternal } = useUIRole();
   const { data: vessels = [] } = useVessels();
   
   // Fetch children RH data when popup is open
@@ -1026,7 +1026,7 @@ const RunningHours = () => {
         {/* Filters - Single Row - Main Tab */}
         {activeTab === 'main' && (
           <div className="flex items-center gap-3 flex-wrap">
-            {(isSailAdmin || isClientAdmin) && (
+            {(isSailAdmin || isClientAdmin || isExternal) && (
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-gray-600">Vessel:</span>
                 <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
@@ -1605,7 +1605,7 @@ const RunningHours = () => {
             </div>
 
             {/* Meter Replaced Checkbox - Sail Admin only */}
-            {isSailAdmin && (
+            {(isSailAdmin || isExternal) && (
               <div className="flex items-center space-x-2">
                 <Checkbox 
                   id="meterReplaced"
@@ -1623,7 +1623,7 @@ const RunningHours = () => {
             )}
 
             {/* Meter Replacement Fields - Sail Admin only */}
-            {isSailAdmin && meterReplaced && (
+            {(isSailAdmin || isExternal) && meterReplaced && (
               <div className="grid grid-cols-2 gap-4 p-3 bg-gray-50 rounded">
                 <div>
                   <Label className="text-sm text-gray-600">Old Meter Final *</Label>

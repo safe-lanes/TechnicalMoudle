@@ -142,7 +142,7 @@ const Spares: React.FC = () => {
   const { isChangeMode } = useChangeMode();
   
   // UI Role context for role-based visibility
-  const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
+  const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin, isExternal } = useUIRole();
   const [showModifySubmitFooter, setShowModifySubmitFooter] = useState(false);
   const [originalSpareData, setOriginalSpareData] = useState<Spare | null>(null);
   const [modifiedSpareData, setModifiedSpareData] = useState<Partial<Spare>>({});
@@ -1813,7 +1813,7 @@ const Spares: React.FC = () => {
       });
     }
 
-    if (isVessel || isHeadOfDept) {
+    if ((isVessel || isHeadOfDept) && !isExternal) {
       filtered = filtered.filter((spare: Spare) => spare.isActive !== false);
     }
 
@@ -1825,7 +1825,7 @@ const Spares: React.FC = () => {
     });
 
     return filtered;
-  }, [sparesData, selectedComponentId, searchTerm, criticalityFilter, rotationItemFilter, stockFilter, isVessel, isHeadOfDept]);
+  }, [sparesData, selectedComponentId, searchTerm, criticalityFilter, rotationItemFilter, stockFilter, isVessel, isHeadOfDept, isExternal]);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredSpares.length / itemsPerPage);
@@ -2783,7 +2783,7 @@ const Spares: React.FC = () => {
             </>
           ) : (
             <>
-              {(isSailAdmin || isClientAdmin || isChangeMode) && (
+              {(isSailAdmin || isClientAdmin || isExternal || isChangeMode) && (
                 <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={() => setIsAddSpareModalOpen(true)} data-testid="E10">
                   <Marker id="E10" />
                   + Add Spare
@@ -2846,7 +2846,7 @@ const Spares: React.FC = () => {
       ) : (
       <div className="flex gap-3 items-center">
         {/* Vessel selector - visible for Sail Admin, Client Admin, or in change mode */}
-        {(isSailAdmin || isClientAdmin || isChangeMode) && (
+        {(isSailAdmin || isClientAdmin || isExternal || isChangeMode) && (
           <div className="flex items-center gap-2" data-testid="E4">
             <Marker id="E4" />
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
@@ -3166,7 +3166,7 @@ const Spares: React.FC = () => {
                             {isFirstRow && <Marker id="E34" />}
                             <Info className="h-4 w-4 text-blue-600" />
                           </Button>
-                          {(isSailAdmin || isClientAdmin || isHeadOfDept || isChangeMode) && (
+                          {(isSailAdmin || isClientAdmin || isExternal || isHeadOfDept || isChangeMode) && (
                             <Button 
                               size="sm" 
                               variant="ghost"
@@ -3187,7 +3187,7 @@ const Spares: React.FC = () => {
                           >
                             <Settings2 className="h-4 w-4 text-orange-500" />
                           </Button>
-                          {(isSailAdmin || isClientAdmin || isChangeMode) && !isInactive && (
+                          {(isSailAdmin || isClientAdmin || isExternal || isChangeMode) && !isInactive && (
                             <Button 
                               size="sm" 
                               variant="ghost"
@@ -3199,7 +3199,7 @@ const Spares: React.FC = () => {
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
                           )}
-                          {(isSailAdmin || isClientAdmin) && isInactive && (
+                          {(isSailAdmin || isClientAdmin || isExternal) && isInactive && (
                             <Button 
                               size="sm" 
                               variant="ghost"
@@ -4814,9 +4814,9 @@ const Spares: React.FC = () => {
                   <Select 
                     value={editSpareForm.isRotationItem ? "Yes" : "No"} 
                     onValueChange={(value) => setEditSpareForm({...editSpareForm, isRotationItem: value === "Yes"})}
-                    disabled={isVessel || isHeadOfDept}
+                    disabled={(isVessel || isHeadOfDept) && !isExternal}
                   >
-                    <SelectTrigger id="edit-rotation-item" data-testid="select-edit-rotation-item" className={isVessel || isHeadOfDept ? 'opacity-60 cursor-not-allowed' : ''}>
+                    <SelectTrigger id="edit-rotation-item" data-testid="select-edit-rotation-item" className={(isVessel || isHeadOfDept) && !isExternal ? 'opacity-60 cursor-not-allowed' : ''}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -5845,7 +5845,7 @@ const Spares: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-gray-500">Rotation Item:</span>
-                    {(isSailAdmin || isClientAdmin) ? (
+                    {(isSailAdmin || isClientAdmin || isExternal) ? (
                       <select
                         className="ml-1 px-2 py-0.5 rounded text-xs font-medium border border-gray-300 bg-white cursor-pointer"
                         value={selectedSpare.isRotationItem ? "Yes" : "No"}

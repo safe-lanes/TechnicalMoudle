@@ -67,7 +67,7 @@ interface ComponentNode {
 const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedComponent: ComponentNode | null; isModifyMode?: boolean; onDataChange?: (data: any) => void; previewChanges?: any[]; isPreviewMode?: boolean }> = ({ isExpanded, selectedComponent, isModifyMode = false, onDataChange, previewChanges = [], isPreviewMode = false }) => {
   const { isChangeRequestMode } = useChangeRequest();
   const { isChangeMode: contextChangeMode, collectDiff } = useChangeMode();
-  const { isSailAdmin } = useUIRole();
+  const { isSailAdmin, isExternal } = useUIRole();
   // isModifyMode prop controls inline editing behavior
   // contextChangeMode (from useChangeMode) is the secure way to enable non-admin visibility
   // For visibility gates, use contextChangeMode; for edit behavior, use isModifyMode
@@ -250,7 +250,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     <div className="space-y-4">
       {/* Auto-flowing grid for component fields - visible fields fill gaps automatically */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {(isSailAdmin || isChangeModeForVisibility || isChangeRequestMode) && (
+        {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.1"><Marker id="B7.A.1" /> Fleet Equipment Code</label>
           {isChangeMode ? (
@@ -270,7 +270,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         )}
-        {(isSailAdmin || isChangeModeForVisibility || isChangeRequestMode) && (
+        {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.3"><Marker id="B7.A.3" /> Fleet Equipment Name</label>
           {isChangeMode ? (
@@ -290,7 +290,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         )}
-        {(isSailAdmin || isChangeModeForVisibility || isChangeRequestMode) && (
+        {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.5"><Marker id="B7.A.5" /> Parent Component Code</label>
           {isChangeMode ? (
@@ -358,7 +358,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
-        {(isSailAdmin || isChangeModeForVisibility || isChangeRequestMode) && (
+        {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.15"><Marker id="B7.A.15" /> Maker Code</label>
           {isChangeMode ? (
@@ -396,7 +396,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
-        {(isSailAdmin || isChangeModeForVisibility || isChangeRequestMode) && (
+        {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.19"><Marker id="B7.A.19" /> Model Code</label>
           {isChangeMode ? (
@@ -650,7 +650,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
-        {(isSailAdmin || isChangeModeForVisibility || isChangeRequestMode) && (
+        {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.43"><Marker id="B7.A.43" /> Vessel Code</label>
           {isChangeMode ? (
@@ -670,7 +670,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         )}
-        {(isSailAdmin || isChangeModeForVisibility || isChangeRequestMode) && (
+        {(isSailAdmin || isExternal || isChangeModeForVisibility || isChangeRequestMode) && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.45"><Marker id="B7.A.45" /> IS Parent</label>
           {isChangeMode ? (
@@ -960,7 +960,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { vesselId } = useVessel();
-  const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept } = useUIRole();
+  const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept, isExternal } = useUIRole();
   const { isChangeRequestMode } = useChangeRequest();
   const { isChangeMode } = useChangeMode();
   
@@ -980,7 +980,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
     const linkedCodes: string[] = job.linkedComponentCodes || [];
     const allJobCodes = job.componentCode ? [...linkedCodes, job.componentCode] : linkedCodes;
     if (!allJobCodes.includes(componentCode)) return false;
-    if ((isVessel || isHeadOfDept) && job.isActive === false) return false;
+    if ((isVessel || isHeadOfDept) && !isExternal && job.isActive === false) return false;
     return true;
   }).sort((a, b) => (a.isActive === false ? 1 : 0) - (b.isActive === false ? 1 : 0));
   
@@ -1050,7 +1050,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   return (
     <>
       <div className="overflow-x-auto">
-        {(isSailAdmin || isChangeMode || isChangeRequestMode) && isComponentActive !== false && (
+        {(isSailAdmin || isExternal || isChangeMode || isChangeRequestMode) && isComponentActive !== false && (
         <div className="flex justify-end mb-3">
           <Button
             onClick={handleAddWorkOrder}
@@ -1096,7 +1096,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
                   onRowClick={handleRowClick}
                   toast={toast}
                   activeComponentCode={componentCode}
-                  isAdminRole={isSailAdmin || isClientAdmin}
+                  isAdminRole={isSailAdmin || isClientAdmin || isExternal}
                 />
               ))
             )}
@@ -2268,7 +2268,7 @@ const Components: React.FC = () => {
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
-  const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept } = useUIRole();
+  const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept, isExternal } = useUIRole();
   const { canCreate: canCreatePerm, canEdit: canEditPerm, canDelete: canDeletePerm } = usePermissions();
   const canCreateComponent = canCreatePerm("pms-components");
   const canEditComponent = canEditPerm("pms-components");
@@ -2570,7 +2570,7 @@ const Components: React.FC = () => {
       
       for (const node of nodes) {
         const isInactive = (node as any).isActive === false;
-        const hideInactive = (isVessel || isHeadOfDept) && isInactive;
+        const hideInactive = (isVessel || isHeadOfDept) && !isExternal && isInactive;
         if (hideInactive) continue;
 
         // First, recursively filter children
@@ -2608,7 +2608,7 @@ const Components: React.FC = () => {
     };
     
     return filterTree(componentTreeData);
-  }, [componentTreeData, searchTerm, criticalFilter, isVessel, isHeadOfDept]);
+  }, [componentTreeData, searchTerm, criticalFilter, isVessel, isHeadOfDept, isExternal]);
 
   // Helper function to find component by ID
   const findComponentById = (id: string): ComponentNode | null => {
@@ -3482,7 +3482,7 @@ const Components: React.FC = () => {
                 Export
               </Button>
             )}
-            {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && canCreateComponent && (
+            {(isSailAdmin || isClientAdmin || isExternal) && !isChangeRequestMode && !isChangeMode && canCreateComponent && (
               <Button 
                 className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                 size="sm"
@@ -3501,7 +3501,7 @@ const Components: React.FC = () => {
         
         {/* Filters Row */}
         <div className="flex items-center gap-3 flex-wrap">
-          {(isSailAdmin || isClientAdmin || isChangeMode || isChangeRequestMode) && (
+          {(isSailAdmin || isClientAdmin || isExternal || isChangeMode || isChangeRequestMode) && (
           <div className="flex items-center gap-2" data-testid="B2">
             <Marker id="B2" />
             <span className={`text-sm font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'}`}>Vessel:</span>
@@ -3641,7 +3641,7 @@ const Components: React.FC = () => {
                   <h3 className="text-lg font-semibold text-[#15569e]" data-testid="B7.1">
                     <Marker id="B7.1" /> {selectedComponent.code} {selectedComponent.name}
                   </h3>
-                  {(isSailAdmin || isClientAdmin) && !isChangeRequestMode && !isChangeMode && (canEditComponent || canDeleteComponent) && (
+                  {(isSailAdmin || isClientAdmin || isExternal) && !isChangeRequestMode && !isChangeMode && (canEditComponent || canDeleteComponent) && (
                     <div className="flex items-center gap-2">
                       {canEditComponent && (
                       <Button

@@ -9,9 +9,9 @@ import { useUIRole } from "@/contexts/UIRoleContext";
 import { cn } from "@/lib/utils";
 
 export default function PMSAdmin() {
-  const { isSailAdmin, isClientAdmin } = useUIRole();
-  const showBulkDataImp = isSailAdmin || isClientAdmin; // Not Head of Dept or Vessel
-  const showMasterData = isSailAdmin; // Only Sail Admin
+  const { isSailAdmin, isClientAdmin, isExternal } = useUIRole();
+  const showBulkDataImp = isSailAdmin || isClientAdmin || isExternal;
+  const showMasterData = isSailAdmin || isExternal;
   const [activeTab, setActiveTab] = useState(showBulkDataImp ? "bulk-data-imp" : "alerts");
   const [isSubViewActive, setIsSubViewActive] = useState(false);
 
