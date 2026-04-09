@@ -125,39 +125,39 @@ export async function getCriticalEquipmentStatus(vesselId: string, startDateStr?
     };
   });
 
-  // Sort by overdue count DESC, then next_due_date ASC (nulls last)
-  reportData.sort((a, b) => {
-    // First by overdue count (descending)
+  const hasDateFilter = !!(filterStartDate || filterEndDate);
+  const filteredReportData = hasDateFilter
+    ? reportData.filter(r => r.totalWorkOrders > 0 || r.overdueJobs > 0 || r.dueSoonJobs > 0)
+    : reportData;
+
+  filteredReportData.sort((a, b) => {
     if (a.overdueJobs !== b.overdueJobs) {
       return b.overdueJobs - a.overdueJobs;
     }
 
-    // Then by next due date (ascending, nulls last)
     if (a.daysUntilDue === null && b.daysUntilDue === null) return 0;
     if (a.daysUntilDue === null) return 1;
     if (b.daysUntilDue === null) return -1;
     return a.daysUntilDue - b.daysUntilDue;
   });
 
-  // Re-number after sorting
-  reportData.forEach((item, idx) => { item.sNo = idx + 1; });
+  filteredReportData.forEach((item, idx) => { item.sNo = idx + 1; });
 
-  // Calculate metadata matching specification
   const metadata = {
-    totalCriticalEquipment: reportData.length,
-    criticalOnly: reportData.filter(r => r.isCritical === 'Yes' && r.isClassItem === 'No').length,
-    classItemOnly: reportData.filter(r => r.isClassItem === 'Yes' && r.isCritical === 'No').length,
-    bothCriticalAndClass: reportData.filter(r => r.isCritical === 'Yes' && r.isClassItem === 'Yes').length,
-    equipmentWithOverdue: reportData.filter(r => r.overdueJobs > 0).length,
-    equipmentDueSoon: reportData.filter(r => r.dueSoonJobs > 0 && r.overdueJobs === 0).length,
-    totalOverdueJobs: reportData.reduce((sum, r) => sum + r.overdueJobs, 0),
-    totalTrackedWorkOrders: reportData.reduce((sum, r) => sum + r.totalWorkOrders, 0),
+    totalCriticalEquipment: filteredReportData.length,
+    criticalOnly: filteredReportData.filter(r => r.isCritical === 'Yes' && r.isClassItem === 'No').length,
+    classItemOnly: filteredReportData.filter(r => r.isClassItem === 'Yes' && r.isCritical === 'No').length,
+    bothCriticalAndClass: filteredReportData.filter(r => r.isCritical === 'Yes' && r.isClassItem === 'Yes').length,
+    equipmentWithOverdue: filteredReportData.filter(r => r.overdueJobs > 0).length,
+    equipmentDueSoon: filteredReportData.filter(r => r.dueSoonJobs > 0 && r.overdueJobs === 0).length,
+    totalOverdueJobs: filteredReportData.reduce((sum, r) => sum + r.overdueJobs, 0),
+    totalTrackedWorkOrders: filteredReportData.reduce((sum, r) => sum + r.totalWorkOrders, 0),
     reportDate: new Date().toISOString()
   };
 
   return {
     success: true,
-    data: reportData,
+    data: filteredReportData,
     metadata
   };
 }

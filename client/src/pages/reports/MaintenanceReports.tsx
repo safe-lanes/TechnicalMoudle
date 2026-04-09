@@ -776,15 +776,14 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Date Range', value: `${startDate} to ${endDate}` }
         ];
 
-        if (mode === 'preview') return { title: 'UNPLANNED/BREAKDOWN JOBS REPORT', subtitle: 'Analysis of breakdown maintenance and unplanned work', vessel: vesselName, dateRange: formatReportDateRange(globalFilters?.dateRange?.from, globalFilters?.dateRange?.to), columns, data: unplannedData, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'UNPLANNED/BREAKDOWN JOBS REPORT', subtitle: 'Analysis of breakdown maintenance and unplanned work', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data: unplannedData, summary } as ReportPreviewData;
 
-        // Use specialized unplanned breakdown report generator (same styling as Report 1.5)
         pdfReportGenerator.generateUnplannedBreakdownReport(
           { 
             title: 'UNPLANNED/BREAKDOWN JOBS REPORT', 
             subtitle: 'Analysis of breakdown maintenance and unplanned work', 
             vessel: vesselName,
-            dateRange: formatReportDateRange(globalFilters?.dateRange?.from, globalFilters?.dateRange?.to)
+            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
           columns,
           unplannedData,
