@@ -382,6 +382,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         // Enhanced columns to match Excel report
         const columns = [
+          { header: 'S.No', field: 'sno', width: 12 },
           { header: 'Priority', field: 'priority', width: 22 },
           { header: 'Status', field: 'statusIndicator', width: 22 },
           { header: 'WO Number', field: 'workOrderNumber', width: 45 },
@@ -399,10 +400,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           return daysA - daysB;
         });
 
-        const data = sortedJobs.map((wo: any) => {
+        const data = sortedJobs.map((wo: any, index: number) => {
           const dueDate = new Date(wo.dueDate);
           const days = calculateDaysRemaining(dueDate);
           return {
+            sno: index + 1,
             workOrderNumber: wo.workOrderNumber || wo.workOrderNo || wo.id,
             title: wo.title || wo.jobTitle || '-',
             component: wo.component || wo.componentName || '-',
@@ -1063,6 +1065,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         });
 
         const columns = [
+          { header: 'S.No', field: 'sno', width: 12 },
           { header: 'Priority', field: 'priority', width: 40 },
           { header: 'Total WOs', field: 'total', width: 30 },
           { header: 'Completed', field: 'completed', width: 30 },
@@ -1070,7 +1073,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { header: 'Overdue', field: 'overdue', width: 30 }
         ];
 
-        const data = Object.entries(priorityGroups).map(([priority, stats]) => ({
+        const data = Object.entries(priorityGroups).map(([priority, stats], index) => ({
+          sno: index + 1,
           priority,
           total: stats.total,
           completed: stats.completed,
@@ -1090,6 +1094,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
       case 'manhours-analysis': {
         const columns = [
+          { header: 'S.No', field: 'sno', width: 12 },
           { header: 'WO Number', field: 'workOrderNumber', width: 40 },
           { header: 'Title', field: 'title', width: 60 },
           { header: 'Planned Hrs', field: 'plannedHours', width: 30 },
@@ -1099,10 +1104,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         const data = vesselWorkOrders
           .filter((wo: any) => wo.status === 'Completed' && (!isDateRangeSet || isDateInRange(wo.dateCompleted || wo.completedDate, dateFrom, dateTo)))
-          .map((wo: any) => {
+          .map((wo: any, index: number) => {
             const planned = wo.plannedHours || wo.estimatedHours || 0;
             const actual = wo.actualHours || wo.hoursSpent || planned;
             return {
+              sno: index + 1,
               workOrderNumber: wo.workOrderNumber || wo.id,
               title: wo.title || wo.jobTitle || '-',
               plannedHours: planned,
@@ -1190,6 +1196,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         const totalManhours = Object.values(rankStats).reduce((sum, s) => sum + s.manhours, 0);
 
         const columns = [
+          { header: 'S.No', field: 'sno', width: 12 },
           { header: 'Rank', field: 'rank', width: 45 },
           { header: 'Dept', field: 'department', width: 25 },
           { header: 'Total', field: 'total', width: 22 },
@@ -1215,7 +1222,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             completionPercent: stats.count > 0 ? `${Math.round((stats.completed / stats.count) * 100)}%` : '0%',
             workloadPercent: totalManhours > 0 ? `${Math.round((stats.manhours / totalManhours) * 100)}%` : '0%'
           }))
-          .sort((a, b) => parseFloat(b.manhours) - parseFloat(a.manhours)); // Sort by manhours desc
+          .sort((a, b) => parseFloat(b.manhours) - parseFloat(a.manhours))
+          .map((item, index) => ({ sno: index + 1, ...item })); // Sort by manhours desc
 
         // Calculate summary stats
         const totalJobs = Object.values(rankStats).reduce((sum, s) => sum + s.count, 0);

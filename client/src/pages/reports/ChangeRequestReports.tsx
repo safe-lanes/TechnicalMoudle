@@ -298,6 +298,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
     switch (reportId) {
       case 'change-requests-status': {
         const columns = [
+          { header: 'S.No', field: 'sno', width: 10 },
           { header: 'ID', field: 'id', width: 10 },
           { header: 'Title', field: 'title', width: 40 },
           { header: 'Category', field: 'category', width: 18 },
@@ -313,7 +314,8 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
           { header: 'Reason', field: 'reason', width: 30 }
         ];
 
-        const tableData = requests.map(req => ({
+        const tableData = requests.map((req, index) => ({
+          sno: index + 1,
           id: String(req.id),
           title: req.title.length > 50 ? req.title.substring(0, 47) + '...' : req.title,
           category: CATEGORY_LABELS[req.category] || req.category,
@@ -345,7 +347,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
           { label: 'Stores', value: summary.byCategory.stores }
         ];
 
-        const finalData = tableData.length > 0 ? tableData : [{ id: '-', title: 'No change requests found', category: '-', status: '-', requestedBy: '-', vessel: '-', submittedAt: '-', reviewedBy: '-', reviewedAt: '-', cycleTime: '-', target: '-', changesCount: '-', reason: '-' }];
+        const finalData = tableData.length > 0 ? tableData : [{ sno: '-', id: '-', title: 'No change requests found', category: '-', status: '-', requestedBy: '-', vessel: '-', submittedAt: '-', reviewedBy: '-', reviewedAt: '-', cycleTime: '-', target: '-', changesCount: '-', reason: '-' }];
 
         if (mode === 'preview') {
           return {

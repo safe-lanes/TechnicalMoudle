@@ -304,6 +304,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
     switch (reportId) {
       case 'stores-inventory-status': {
         const columns = [
+          { header: 'S.No', field: 'sno', width: 12 },
           { header: 'Item Code', field: 'itemCode', width: 30 },
           { header: 'Item Name', field: 'itemName', width: 55 },
           { header: 'Category', field: 'category', width: 30 },
@@ -314,10 +315,11 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
           { header: 'Status', field: 'status', width: 25 }
         ];
 
-        const data = filteredStoresItems.map((s: any) => {
+        const data = filteredStoresItems.map((s: any, index: number) => {
           const rob = parseFloat(String(s.rob)) || 0;
           const min = parseFloat(String(s.min)) || 0;
           return {
+            sno: index + 1,
             itemCode: s.itemCode || '-',
             itemName: s.itemName || '-',
             category: s.category || s.itemType || '-',
@@ -349,6 +351,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         const lubesItems = filteredStoresItems.filter((s: any) => s.itemType === 'lubes');
 
         const columns = [
+          { header: 'S.No', field: 'sno', width: 12 },
           { header: 'Item Code', field: 'itemCode', width: 30 },
           { header: 'Item Name', field: 'itemName', width: 60 },
           { header: 'ROB', field: 'rob', width: 25 },
@@ -357,10 +360,11 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
           { header: 'Status', field: 'status', width: 30 }
         ];
 
-        const data = lubesItems.map((s: any) => {
+        const data = lubesItems.map((s: any, index: number) => {
           const rob = parseFloat(String(s.rob)) || 0;
           const min = parseFloat(String(s.min)) || 0;
           return {
+            sno: index + 1,
             itemCode: s.itemCode || '-',
             itemName: s.itemName || '-',
             rob,
@@ -389,6 +393,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         const chemicalsItems = filteredStoresItems.filter((s: any) => s.itemType === 'chemicals');
 
         const columns = [
+          { header: 'S.No', field: 'sno', width: 12 },
           { header: 'Item Code', field: 'itemCode', width: 25 },
           { header: 'Item Name', field: 'itemName', width: 45 },
           { header: 'Batch #', field: 'batchNumber', width: 25 },
@@ -401,7 +406,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         ];
 
         const today = new Date();
-        const data = chemicalsItems.map((s: any) => {
+        const data = chemicalsItems.map((s: any, index: number) => {
           const rob = parseFloat(String(s.rob)) || 0;
           const min = parseFloat(String(s.min)) || 0;
           const expiryDate = s.expiryDate || '-';
@@ -412,6 +417,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
             expiryStatus = days < 0 ? 'EXPIRED' : days <= 30 ? `${days}d` : days <= 90 ? `${days}d` : 'OK';
           }
           return {
+            sno: index + 1,
             itemCode: s.itemCode || '-',
             itemName: s.itemName || '-',
             batchNumber: s.batchNumber || '-',

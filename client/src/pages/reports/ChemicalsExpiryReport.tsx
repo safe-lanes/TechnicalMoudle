@@ -344,6 +344,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
     setGeneratingPdf(true);
     try {
       const columns = [
+        { header: 'S.No', field: 'sno', width: 12 },
         { header: 'Chem Code', field: 'itemCode', width: 22 },
         { header: 'Chemical Name', field: 'itemName', width: 45 },
         { header: 'Batch #', field: 'batchNumber', width: 22 },
@@ -358,7 +359,8 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
         { header: 'SDS', field: 'sdsStatus', width: 15 },
       ];
 
-      const exportData = sortedItems.map(item => ({
+      const exportData = sortedItems.map((item, index) => ({
+        sno: index + 1,
         itemCode: item.itemCode || '-',
         itemName: item.itemName || '-',
         batchNumber: item.batchNumber || '-',
@@ -568,6 +570,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                     <table className="w-full" data-testid="table-expired">
                       <thead>
                         <tr className="bg-red-50 border-b border-red-200">
+                          <th className="text-center py-3 px-3 font-semibold text-sm text-gray-700 w-12">S.No</th>
                           <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700">Chem Code</th>
                           <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700">Chemical Name</th>
                           <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700">Expiry Date</th>
@@ -578,8 +581,9 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-red-100">
-                        {expiredItems.map(item => (
+                        {expiredItems.map((item, index) => (
                           <tr key={item.id} className="hover:bg-red-50/50" data-testid={`row-expired-${item.id}`}>
+                            <td className="py-3 px-3 text-center text-sm text-gray-500">{index + 1}</td>
                             <td className="py-3 px-3 text-sm font-mono text-gray-700">{item.itemCode || '-'}</td>
                             <td className="py-3 px-3 text-sm font-medium text-gray-900">{item.itemName || '-'}</td>
                             <td className="py-3 px-3 text-sm text-red-600 font-semibold">{formatDate(item.expiryDate)}</td>
@@ -614,6 +618,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                     <table className="w-full" data-testid="table-expiring-soon">
                       <thead>
                         <tr className="bg-orange-50 border-b border-orange-200">
+                          <th className="text-center py-3 px-3 font-semibold text-sm text-gray-700 w-12">S.No</th>
                           <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700">Chem Code</th>
                           <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700">Chemical Name</th>
                           <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700">Expiry Date</th>
@@ -625,7 +630,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-orange-100">
-                        {expiringSoonItems.map(item => {
+                        {expiringSoonItems.map((item, index) => {
                           const days = item.daysUntilExpiry ?? 0;
                           let urgencyBadge;
                           if (days <= 30) {
@@ -637,6 +642,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                           }
                           return (
                             <tr key={item.id} className="hover:bg-orange-50/50" data-testid={`row-expiring-${item.id}`}>
+                              <td className="py-3 px-3 text-center text-sm text-gray-500">{index + 1}</td>
                               <td className="py-3 px-3 text-sm font-mono text-gray-700">{item.itemCode || '-'}</td>
                               <td className="py-3 px-3 text-sm font-medium text-gray-900">{item.itemName || '-'}</td>
                               <td className="py-3 px-3 text-sm text-orange-600">{formatDate(item.expiryDate)}</td>
@@ -670,6 +676,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                   <table className="w-full" data-testid="table-full-inventory">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-center py-3 px-3 font-semibold text-sm text-gray-700 w-12">S.No</th>
                         <th className="text-left py-3 px-3"><SortButton field="itemCode" label="Chem Code" /></th>
                         <th className="text-left py-3 px-3"><SortButton field="itemName" label="Chemical Name" /></th>
                         <th className="text-left py-3 px-3"><SortButton field="batchNumber" label="Batch #" /></th>
@@ -687,7 +694,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                     <tbody className="divide-y divide-gray-200">
                       {sortedItems.length === 0 ? (
                         <tr>
-                          <td colSpan={12} className="text-center py-12">
+                          <td colSpan={13} className="text-center py-12">
                             <Beaker className="h-10 w-10 text-gray-400 mx-auto mb-3" />
                             <p className="text-gray-500 font-medium">No chemicals found</p>
                             <p className="text-sm text-gray-400 mt-1">Try adjusting your filters</p>
@@ -697,6 +704,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                         paginateItems(sortedItems).map((item, idx) => {
                           const rob = parseFloat(String(item.rob)) || 0;
                           const min = parseFloat(String(item.min)) || 0;
+                          const snoValue = (currentPage - 1) * pageSize + idx + 1;
                           return (
                             <tr
                               key={item.id}
@@ -707,6 +715,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                               }`}
                               data-testid={`row-chemical-${item.id}`}
                             >
+                              <td className="py-3 px-3 text-center text-sm text-gray-500">{snoValue}</td>
                               <td className="py-3 px-3 text-sm font-mono text-gray-700">{item.itemCode || '-'}</td>
                               <td className="py-3 px-3">
                                 <div className="font-medium text-gray-900 text-sm">{item.itemName || '-'}</div>
