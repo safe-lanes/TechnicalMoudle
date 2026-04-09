@@ -193,6 +193,7 @@ const WorkOrders: React.FC = () => {
   const [woSortDir, setWoSortDir] = useState<WOSortDir>("asc");
   const [colWidths, setColWidths] = useState<Record<string, number>>(DEFAULT_WO_COL_WIDTHS);
   const colWidthsRef = useRef<Record<string, number>>(DEFAULT_WO_COL_WIDTHS);
+  const [isResizing, setIsResizing] = useState(false);
   const tableWrapperRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   
@@ -554,7 +555,10 @@ const WorkOrders: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX;
-    const startWidth = colWidthsRef.current[colId] ?? DEFAULT_WO_COL_WIDTHS[colId] ?? 120;
+    const th = (e.target as HTMLElement).closest("th");
+    const displayedWidth = th ? th.getBoundingClientRect().width : null;
+    const startWidth = displayedWidth ?? colWidthsRef.current[colId] ?? DEFAULT_WO_COL_WIDTHS[colId] ?? 120;
+    setIsResizing(true);
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       const delta = moveEvent.clientX - startX;
@@ -569,6 +573,7 @@ const WorkOrders: React.FC = () => {
     const onMouseUp = () => {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
+      setIsResizing(false);
     };
 
     document.addEventListener("mousemove", onMouseMove);
@@ -606,19 +611,21 @@ const WorkOrders: React.FC = () => {
     return () => ro.disconnect();
   }, []);
 
-  const effectiveTableWidth = Math.max(containerWidth, tableWidth);
+  const effectiveTableWidth = isResizing ? tableWidth : Math.max(containerWidth, tableWidth);
 
   const effectiveColWidths = useMemo(() => {
     const base: Record<string, number> = {};
     for (const key of visibleColKeys) {
       base[key] = colWidths[key] ?? DEFAULT_WO_COL_WIDTHS[key] ?? 120;
     }
-    const extra = effectiveTableWidth - tableWidth;
-    if (extra > 0) {
-      base['jobTitle'] = (base['jobTitle'] ?? 220) + extra;
+    if (!isResizing) {
+      const extra = effectiveTableWidth - tableWidth;
+      if (extra > 0) {
+        base['jobTitle'] = (base['jobTitle'] ?? 220) + extra;
+      }
     }
     return base;
-  }, [visibleColKeys, colWidths, effectiveTableWidth, tableWidth]);
+  }, [visibleColKeys, colWidths, effectiveTableWidth, tableWidth, isResizing]);
 
   // ─── Sorted work orders (applied after filter, before pagination) ───────────
   const sortedWorkOrders = useMemo(
