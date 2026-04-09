@@ -989,37 +989,49 @@ const JobsFormPage: React.FC = () => {
                   <ReadOnlyField label="Component Code" value={templateData.componentCode} labelMarker="JF.A1.7" valueMarker="JF.A1.8" />
                   <ReadOnlyField label="Job Code" value={templateData.woTemplateCode} labelMarker="JF.A1.9" valueMarker="JF.A1.10" />
                   <ReadOnlyField label="Maintenance Basis" value={templateData.maintenanceBasis} labelMarker="JF.A1.11" valueMarker="JF.A1.12" />
-                  <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]" data-testid="JF.A1.13"><Marker id="JF.A1.13" />Frequency</Label>
-                    <div className="flex gap-2">
-                      {(isModifyMode || isEditMode) ? (
-                        <Input
-                          value={templateData.frequencyValue || ''}
-                          onChange={(e) => handleFieldChange('frequencyValue', e.target.value)}
-                          className="text-sm flex-1"
-                          data-testid="JF.A1.14"
-                        />
-                      ) : (
-                        <Input disabled value={templateData.frequencyValue || '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default flex-1" data-testid="JF.A1.14" />
-                      )}
-                      {templateData.maintenanceBasis === 'Running Hours' ? (
-                        <Input disabled value="Hours" className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default w-24" />
-                      ) : (isModifyMode || isEditMode) ? (
-                        <Select value={templateData.frequencyUnit || 'Months'} onValueChange={(val) => handleFieldChange('frequencyUnit', val)}>
-                          <SelectTrigger className="text-sm w-28">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {['Days', 'Weeks', 'Months', 'Years'].map(u => (
-                              <SelectItem key={u} value={u}>{u}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input disabled value={templateData.frequencyUnit || 'Months'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default w-24" />
-                      )}
-                    </div>
-                  </div>
+                  {(() => {
+                    const freqValueChanged = isModifyMode && templateData.frequencyValue !== originalData.frequencyValue;
+                    const freqUnitChanged = isModifyMode && templateData.frequencyUnit !== originalData.frequencyUnit;
+                    const isFreqModified = freqValueChanged || freqUnitChanged;
+                    return (
+                      <div className="space-y-2">
+                        <Label className={`text-sm ${isFreqModified ? 'text-red-600 font-semibold' : 'text-[#8798ad]'}`} data-testid="JF.A1.13">
+                          <Marker id="JF.A1.13" />Frequency {isFreqModified && '(Modified)'}
+                        </Label>
+                        <div className="flex gap-2">
+                          {(isModifyMode || isEditMode) ? (
+                            <Input
+                              value={templateData.frequencyValue || ''}
+                              onChange={(e) => handleFieldChange('frequencyValue', e.target.value)}
+                              className={`text-sm flex-1 ${freqValueChanged ? 'border-red-500 bg-red-50 text-red-700' : ''}`}
+                              data-testid="JF.A1.14"
+                            />
+                          ) : (
+                            <Input disabled value={templateData.frequencyValue || '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default flex-1" data-testid="JF.A1.14" />
+                          )}
+                          {templateData.maintenanceBasis === 'Running Hours' ? (
+                            <Input disabled value="Hours" className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default w-24" />
+                          ) : (isModifyMode || isEditMode) ? (
+                            <Select value={templateData.frequencyUnit || 'Months'} onValueChange={(val) => handleFieldChange('frequencyUnit', val)}>
+                              <SelectTrigger className={`text-sm w-28 ${freqUnitChanged ? 'border-red-500 bg-red-50' : ''}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {['Days', 'Weeks', 'Months', 'Years'].map(u => (
+                                  <SelectItem key={u} value={u}>{u}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input disabled value={templateData.frequencyUnit || 'Months'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default w-24" />
+                          )}
+                        </div>
+                        {isFreqModified && (
+                          <p className="text-xs text-gray-500">Original: {originalData.frequencyValue || '-'} {originalData.frequencyUnit || 'Months'}</p>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <EditableField 
                     label="Task Type" 
                     field="taskType"
