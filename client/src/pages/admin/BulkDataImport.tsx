@@ -218,7 +218,7 @@ const PAGE_MARKERS_BY_TEMPLATE: Record<VesselTemplateType, PageMarkers> = {
 export default function BulkDataImport() {
   const { isSailAdmin, isClientAdmin, isExternal } = useUIRole();
   const { data: vessels = [], isLoading: isLoadingVessels } = useVessels();
-  // Fleet mode is only available for Sail Admin
+  // Fleet mode is available for Sail Admin and External
   const [isFleetModeState, setIsFleetModeState] = useState(false);
   const isFleetMode = (isSailAdmin || isExternal) ? isFleetModeState : false;
   const setIsFleetMode = (isSailAdmin || isExternal) ? setIsFleetModeState : () => {};
@@ -327,7 +327,7 @@ export default function BulkDataImport() {
         {/* Vessel Selector Header */}
         <div className="bg-white border-b px-6 py-4">
           <div className="flex items-center gap-4">
-            {/* Fleet Data Import Toggle - Only visible for Sail Admin */}
+            {/* Fleet Data Import Toggle */}
             {(isSailAdmin || isExternal) && (
               <div className="flex items-center gap-2 px-4 py-2 border rounded-full bg-gray-50" data-testid={currentMarkers.fleetToggle}>
                 <Label htmlFor="fleet-toggle" className="text-sm font-medium text-gray-700 cursor-pointer">

@@ -56,7 +56,7 @@ export default function Forms() {
     setShowConfigModal(true);
   };
 
-  // Show "Features Coming Soon" for non-Sail Admin users
+  // Show "Features Coming Soon" for non-admin users
   if (!isSailAdmin && !isExternal) {
     return (
       <Card className="p-0 overflow-hidden">
