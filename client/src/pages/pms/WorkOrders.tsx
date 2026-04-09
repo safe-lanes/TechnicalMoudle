@@ -1116,7 +1116,7 @@ const WorkOrders: React.FC = () => {
                   const labels: string[] = [];
                   if (criticalitySelections.has("critical")) labels.push("Critical");
                   if (criticalitySelections.has("non-critical")) labels.push("Non-Critical");
-                  if (criticalitySelections.has("critical-component")) labels.push("Comp Critical");
+                  if (criticalitySelections.has("critical-component")) labels.push("Critical Component WO");
                   return labels.join(", ");
                 })()}
               </span>
@@ -1125,13 +1125,15 @@ const WorkOrders: React.FC = () => {
           </PopoverTrigger>
           <PopoverContent className="w-56 p-1" align="start">
             <div className="space-y-0.5">
-              {[
-                { value: "all", label: "All" },
-                { value: "critical", label: "Critical" },
-                { value: "non-critical", label: "Non-Critical" },
-                { value: "critical-component", label: "Critical Component WO" },
-              ].map((opt) => {
+              {(() => {
                 const INDIVIDUAL_OPTIONS = ["critical", "non-critical", "critical-component"];
+                const OPTIONS = [
+                  { value: "all", label: "All" },
+                  { value: "critical", label: "Critical" },
+                  { value: "non-critical", label: "Non-Critical" },
+                  { value: "critical-component", label: "Critical Component WO" },
+                ];
+                return OPTIONS.map((opt) => {
                 const isAll = opt.value === "all";
                 const isChecked = isAll
                   ? criticalitySelections.size === 3
@@ -1168,7 +1170,8 @@ const WorkOrders: React.FC = () => {
                     <span>{opt.label}</span>
                   </label>
                 );
-              })}
+              });
+              })()}
             </div>
           </PopoverContent>
         </Popover>
