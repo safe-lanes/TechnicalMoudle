@@ -534,7 +534,7 @@ const WorkOrders: React.FC = () => {
   }) => (
     <th
       className={`${align === "center" ? "text-center" : "text-left"} py-3 px-4 font-medium relative select-none`}
-      style={{ width: colWidths[colKey] }}
+      style={{ width: colWidths[colKey], minWidth: colWidths[colKey], maxWidth: colWidths[colKey], boxSizing: "border-box" }}
       onClick={field ? () => handleWoSort(field) : undefined}
       data-testid={testId}
     >
@@ -571,6 +571,25 @@ const WorkOrders: React.FC = () => {
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
   }, []);
+
+  // ─── Visible column keys per active tab (for colgroup + table width) ────────
+  const visibleColKeys = useMemo(() => {
+    const keys: string[] = ['component', 'workOrderNo'];
+    if (activeTab === 'Pending Approval') keys.push('woTemplateCode');
+    keys.push('jobTitle', 'assignedTo', 'dueDate');
+    if (activeTab === 'Planned') keys.push('plannedDate');
+    if (activeTab === 'Postponed') keys.push('postponeUntil', 'postponementReason');
+    if (activeTab === 'Pending Approval') keys.push('daysLate', 'approvalTier');
+    keys.push('status');
+    if (activeTab === 'Completed') keys.push('completedApprovalTier', 'dateCompleted');
+    keys.push('actions');
+    return keys;
+  }, [activeTab]);
+
+  const tableWidth = useMemo(() =>
+    visibleColKeys.reduce((sum, key) => sum + (colWidths[key] ?? DEFAULT_WO_COL_WIDTHS[key] ?? 120), 0),
+    [visibleColKeys, colWidths]
+  );
 
   // ─── Sorted work orders (applied after filter, before pagination) ───────────
   const sortedWorkOrders = useMemo(
@@ -1225,7 +1244,13 @@ const WorkOrders: React.FC = () => {
 
       {/* Work Orders Table */}
       <div className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
-        <table className="w-full text-sm" style={{ tableLayout: "fixed", minWidth: "1000px" }}>
+        <table className="text-sm" style={{ tableLayout: "fixed", width: Math.max(tableWidth, 1000), minWidth: 1000 }}>
+          <colgroup>
+            {visibleColKeys.map(key => {
+              const w = colWidths[key] ?? DEFAULT_WO_COL_WIDTHS[key] ?? 120;
+              return <col key={key} style={{ width: w, minWidth: w, maxWidth: w }} />;
+            })}
+          </colgroup>
           <thead className="bg-[#52baf3] text-white sticky top-0 z-10">
             <tr>
               <SortableHeader field="component" colKey="component" label="Component" testId="C16" marker={<Marker id="C16" />} />
