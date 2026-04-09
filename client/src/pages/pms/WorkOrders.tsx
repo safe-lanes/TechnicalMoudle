@@ -1148,7 +1148,7 @@ const WorkOrders: React.FC = () => {
                 <div className="space-y-1">
                   <button
                     type="button"
-                    className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${selectedCriticality === "all" || !selectedCriticality ? 'bg-[hsl(var(--primary))] text-white font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
+                    className={`w-full text-left px-2 py-1.5 rounded-sm text-sm transition-colors ${selectedCriticality === "all" || !selectedCriticality ? 'bg-accent text-accent-foreground font-medium' : 'hover:bg-accent hover:text-accent-foreground text-gray-700'}`}
                     onClick={() => setSelectedCriticality("all")}
                     data-testid="criticality-wo-all"
                   >
@@ -1157,7 +1157,7 @@ const WorkOrders: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <button
                       type="button"
-                      className={`flex-1 text-left px-2 py-1.5 rounded text-sm transition-colors ${selectedCriticality === "critical" ? 'bg-[hsl(var(--primary))] text-white font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
+                      className={`flex-1 text-left px-2 py-1.5 rounded-sm text-sm transition-colors ${selectedCriticality === "critical" ? 'bg-accent text-accent-foreground font-medium' : 'hover:bg-accent hover:text-accent-foreground text-gray-700'}`}
                       onClick={() => setSelectedCriticality("critical")}
                       data-testid="criticality-wo-critical"
                     >
@@ -1165,7 +1165,7 @@ const WorkOrders: React.FC = () => {
                     </button>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <label className="flex items-center cursor-pointer p-1 rounded hover:bg-gray-100 transition-colors" data-testid="criticality-comp-critical">
+                        <label className="flex items-center cursor-pointer p-1 rounded-sm hover:bg-accent transition-colors" data-testid="criticality-comp-critical">
                           <Checkbox
                             checked={compCriticalChecked}
                             onCheckedChange={(checked) => setCompCriticalChecked(checked === true)}
@@ -1178,7 +1178,7 @@ const WorkOrders: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <button
                       type="button"
-                      className={`flex-1 text-left px-2 py-1.5 rounded text-sm transition-colors ${selectedCriticality === "non-critical" ? 'bg-[hsl(var(--primary))] text-white font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
+                      className={`flex-1 text-left px-2 py-1.5 rounded-sm text-sm transition-colors ${selectedCriticality === "non-critical" ? 'bg-accent text-accent-foreground font-medium' : 'hover:bg-accent hover:text-accent-foreground text-gray-700'}`}
                       onClick={() => setSelectedCriticality("non-critical")}
                       data-testid="criticality-wo-non-critical"
                     >
@@ -1186,7 +1186,7 @@ const WorkOrders: React.FC = () => {
                     </button>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <label className="flex items-center cursor-pointer p-1 rounded hover:bg-gray-100 transition-colors" data-testid="criticality-comp-non-critical">
+                        <label className="flex items-center cursor-pointer p-1 rounded-sm hover:bg-accent transition-colors" data-testid="criticality-comp-non-critical">
                           <Checkbox
                             checked={compNonCriticalChecked}
                             onCheckedChange={(checked) => setCompNonCriticalChecked(checked === true)}
