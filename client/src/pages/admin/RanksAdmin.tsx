@@ -144,13 +144,13 @@ export default function RanksAdmin() {
       const response = await apiRequest('POST', '/technical/api/admin/vessel-org-chart', { entries: payload.entries });
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       toast({ title: "Saved successfully", description: `${data.inserted || 0} new entries added, ${data.updated || 0} updated` });
       setHasUnsavedChanges(false);
       setHasSavedInSession(prev => ({ ...prev, orgChart: true }));
       setDeletedOrgChartIds([]);
-      setOrgChartData([]);
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-org-chart'] });
+      await queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-org-chart'] });
+      setIsOrgChartEditMode(false);
     },
     onError: (error: any) => {
       toast({ title: "Save failed", description: error.message || "Failed to save org chart", variant: "destructive" });
