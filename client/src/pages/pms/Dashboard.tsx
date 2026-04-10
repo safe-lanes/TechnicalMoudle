@@ -24,6 +24,7 @@ import {
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend, BarChart, Bar } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { WorkOrder, ChangeRequest } from "@shared/schema";
 import { useVessels } from "@/hooks/useVessels";
@@ -515,6 +516,24 @@ const Dashboard = () => {
       return response.json();
     },
     enabled: !!vesselId,
+  });
+
+  const { data: complianceAnomalies } = useQuery<{
+    cycleSkipRate: { severity: string };
+    backdatingFrequency: { severity: string };
+    bulkCompletions: { severity: string; eventCount: number };
+    scheduleDrift: { severity: string };
+  }>({
+    queryKey: ['/technical/api/dashboard/compliance-anomalies', vesselId],
+    queryFn: async () => {
+      const url = isAllVessels
+        ? '/technical/api/dashboard/compliance-anomalies'
+        : `/technical/api/dashboard/compliance-anomalies?vesselId=${vesselId}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch compliance anomalies');
+      return res.json();
+    },
+    enabled: activeTab === 'management' && !!vesselId,
   });
 
   // Helper: Calculate stock status
@@ -1027,6 +1046,74 @@ const Dashboard = () => {
     : 0;
   const completionRate = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.completed / workOrderKPIs.total) * 100) : 0;
 
+  const operationDonutData = useMemo(() => {
+    const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
+    const overdue = safeWOs.filter(wo => (wo as EnrichedWorkOrder).computedStatus === 'Overdue').length;
+    const due = safeWOs.filter(wo => {
+      const s = (wo as EnrichedWorkOrder).computedStatus;
+      return s === 'Due' || s === 'Due (Grace P)';
+    }).length;
+    const completed = safeWOs.filter(wo => (wo as EnrichedWorkOrder).computedStatus === 'Completed').length;
+    return [
+      { status: 'Overdue', count: overdue, color: '#ff6961' },
+      { status: 'Due', count: due, color: '#FF964f' },
+      { status: 'Completed', count: completed, color: '#5dc86f' },
+    ].filter(d => d.count > 0);
+  }, [workOrdersData]);
+
+  const operationKPIs = useMemo(() => {
+    const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
+    const overdueWOs = safeWOs.filter(wo => (wo as EnrichedWorkOrder).computedStatus === 'Overdue');
+    const overdueCount = overdueWOs.length;
+
+    const overdueCriticalCount = overdueWOs.filter(wo =>
+      ((wo as EnrichedWorkOrder).criticality ?? '').toLowerCase() === 'yes'
+    ).length;
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart.getTime() + 86400000);
+    const plannedTodayCount = safeWOs.filter(wo => {
+      if (!wo.dueDate) return false;
+      const parsed = parseFlexibleDate(wo.dueDate);
+      if (!parsed) return false;
+      return parsed >= todayStart && parsed < todayEnd;
+    }).length;
+
+    const criticalSparesLowCount = sparesData.filter(spare => {
+      const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes';
+      if (!isCritical) return false;
+      const rob = typeof spare.rob === 'number' ? spare.rob : parseInt(String(spare.rob)) || 0;
+      const min = typeof spare.min === 'number' ? spare.min : parseInt(String(spare.min)) || 0;
+      return rob < min && min > 0;
+    }).length;
+
+    const pendingApprovalCount = safeWOs.filter(wo =>
+      (wo as EnrichedWorkOrder).computedStatus === 'Pending Approval'
+    ).length;
+
+    const anomalyCount = complianceAnomalies ? [
+      complianceAnomalies.cycleSkipRate.severity,
+      complianceAnomalies.backdatingFrequency.severity,
+      complianceAnomalies.bulkCompletions.severity,
+      complianceAnomalies.scheduleDrift.severity,
+    ].filter(s => s !== 'green').length : 0;
+
+    const openChangeRequests = changeRequestsData.filter(cr =>
+      cr.status !== 'approved' && cr.status !== 'rejected'
+    ).length;
+
+    return {
+      overdueCount,
+      overdueCriticalCount,
+      plannedTodayCount,
+      criticalSparesLowCount,
+      pendingApprovalCount,
+      anomalyCount,
+      openChangeRequests,
+    };
+  }, [workOrdersData, sparesData, changeRequestsData, complianceAnomalies]);
+
   const ytdKPIs = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const ytdWOs = (workOrdersData as EnrichedWorkOrder[]).filter(wo => {
@@ -1383,12 +1470,132 @@ const Dashboard = () => {
 
         {/* OPERATION TAB: Placeholder for future role-specific dashboard */}
         {activeTab === 'management' && (
-          <div className="p-4 flex items-center justify-center" style={{ minHeight: '400px' }}>
-            <div className="text-center">
-              <BarChart3 className="h-12 w-12 mx-auto mb-3" style={{ color: '#9E9E9E' }} />
-              <div className="text-lg font-semibold" style={{ color: '#4a4a4a' }}>Operation Dashboard</div>
-              <div className="text-sm mt-1" style={{ color: '#9E9E9E' }}>Coming soon — a personalized view based on your role.</div>
-            </div>
+          <div className="p-4 space-y-4" data-testid="section-operation-dashboard">
+            {(isWorkOrdersLoading || isSparesLoading) ? (
+              <div className="flex items-center justify-center" style={{ minHeight: '300px' }}>
+                <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                <span className="ml-3 text-gray-500">Loading operation data...</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col lg:flex-row gap-4" data-testid="section-operation-top">
+                  <div className="lg:min-w-[260px] lg:max-w-[300px]" style={{ background: '#FFFFFF', borderRadius: '8px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+                    <div className="px-4 py-3" style={{ borderBottom: '1px solid #E0E0E0' }}>
+                      <span style={{ color: '#1565C0', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>W.O Status</span>
+                    </div>
+                    <div className="px-2 py-2" style={{ height: '220px' }} data-testid="card-operation-wo-donut">
+                      {operationDonutData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={210}>
+                          <PieChart>
+                            <Pie
+                              data={operationDonutData}
+                              dataKey="count"
+                              nameKey="status"
+                              cx="50%"
+                              cy="45%"
+                              innerRadius={45}
+                              outerRadius={72}
+                              paddingAngle={2}
+                              label={({ cx, cy, midAngle, innerRadius, outerRadius, payload }: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; payload: { count: number } }) => {
+                                const RADIAN = Math.PI / 180;
+                                const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                                const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                                return (
+                                  <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
+                                    {payload.count}
+                                  </text>
+                                );
+                              }}
+                              labelLine={false}
+                            >
+                              {operationDonutData.map((entry, index) => (
+                                <Cell key={`op-cell-${index}`} fill={entry.color} stroke={entry.color} />
+                              ))}
+                            </Pie>
+                            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px', paddingTop: '4px' }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '12px' }}>No work orders to display</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3" data-testid="section-operation-kpi-cards">
+                    <Card
+                      className="cursor-pointer hover:shadow-lg transition-shadow bg-white border-0 border-l-4 border-l-red-500"
+                      data-testid="card-kpi-overdue-wo"
+                    >
+                      <CardContent className="py-3 px-4">
+                        <p className="text-sm font-medium text-gray-600">Overdue WO</p>
+                        <p className="text-2xl font-bold mt-1 text-red-600" data-testid="kpi-overdue-wo">{operationKPIs.overdueCount}</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className="cursor-pointer hover:shadow-lg transition-shadow bg-white border-0 border-l-4 border-l-red-500"
+                      data-testid="card-kpi-overdue-wo-critical"
+                    >
+                      <CardContent className="py-3 px-4">
+                        <p className="text-sm font-medium text-gray-600">Overdue WO – Critical Eqpt</p>
+                        <p className="text-2xl font-bold mt-1 text-red-600" data-testid="kpi-overdue-wo-critical">{operationKPIs.overdueCriticalCount}</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className="cursor-pointer hover:shadow-lg transition-shadow bg-white border-0 border-l-4 border-l-green-500"
+                      data-testid="card-kpi-planned-today"
+                    >
+                      <CardContent className="py-3 px-4">
+                        <p className="text-sm font-medium text-gray-600">WO – Planned for Today</p>
+                        <p className="text-2xl font-bold mt-1 text-green-600" data-testid="kpi-planned-today">{operationKPIs.plannedTodayCount}</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className="cursor-pointer hover:shadow-lg transition-shadow bg-white border-0 border-l-4 border-l-orange-500"
+                      data-testid="card-kpi-critical-spares-low"
+                    >
+                      <CardContent className="py-3 px-4">
+                        <p className="text-sm font-medium text-gray-600">Critical Spares Low</p>
+                        <p className="text-2xl font-bold mt-1 text-orange-600" data-testid="kpi-critical-spares-low">{operationKPIs.criticalSparesLowCount}</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className="cursor-pointer hover:shadow-lg transition-shadow bg-white border-0 border-l-4 border-l-orange-500"
+                      data-testid="card-kpi-pending-approvals"
+                    >
+                      <CardContent className="py-3 px-4">
+                        <p className="text-sm font-medium text-gray-600">Pending Approvals</p>
+                        <p className="text-2xl font-bold mt-1 text-orange-600" data-testid="kpi-pending-approvals">{operationKPIs.pendingApprovalCount}</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className="cursor-pointer hover:shadow-lg transition-shadow bg-white border-0 border-l-4 border-l-orange-500"
+                      data-testid="card-kpi-wo-anomalies"
+                    >
+                      <CardContent className="py-3 px-4">
+                        <p className="text-sm font-medium text-gray-600">W.O Anomalies</p>
+                        <p className="text-2xl font-bold mt-1 text-orange-600" data-testid="kpi-wo-anomalies">{operationKPIs.anomalyCount}</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className="cursor-pointer hover:shadow-lg transition-shadow bg-white border-0 border-l-4 border-l-gray-400"
+                      data-testid="card-kpi-modify-pms-requests"
+                    >
+                      <CardContent className="py-3 px-4">
+                        <p className="text-sm font-medium text-gray-600">Modify PMS Requests</p>
+                        <p className="text-2xl font-bold mt-1 text-gray-600" data-testid="kpi-modify-pms-requests">{operationKPIs.openChangeRequests}</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
