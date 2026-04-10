@@ -289,7 +289,7 @@ const Stores: React.FC = () => {
   }, [allVesselLocationsResponse]);
 
   const handleChangeStoreLocation = async (item: StoreItem, newLocName: string) => {
-    if (!vesselId || !selectedLocationName || isChangingStoreLocation) return;
+    if (!vesselId || !selectedLocationName || isChangingStoreLocation || !canEditStore) return;
     const side = getItemLocationSide(item, selectedLocationName);
     if (!side) return;
     setIsChangingStoreLocation(true);
@@ -310,7 +310,7 @@ const Stores: React.FC = () => {
   };
 
   const handleCreateNewStoreLocation = async () => {
-    if (!newLocationName.trim() || !vesselId || !creatingLocationForStoreItem) return;
+    if (!newLocationName.trim() || !vesselId || !creatingLocationForStoreItem || !canEditStore) return;
     setIsCreatingLocation(true);
     try {
       const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
@@ -2537,6 +2537,7 @@ const Stores: React.FC = () => {
                                       ))}
                                     </CommandGroup>
                                   </div>
+                                  {canEditStore && (
                                   <CommandGroup className="border-t" forceMount>
                                     <CommandItem
                                       onSelect={() => setCreatingLocationForStoreItem(item)}
@@ -2547,6 +2548,7 @@ const Stores: React.FC = () => {
                                       <span className="text-green-600 font-medium">Create New Location</span>
                                     </CommandItem>
                                   </CommandGroup>
+                                  )}
                                 </CommandList>
                               </Command>
                             </PopoverContent>
@@ -3962,8 +3964,8 @@ const Stores: React.FC = () => {
                 }}
                 variant="destructive"
                 className="flex-1"
-                disabled={!selectedItem || selectedItem.rob === 0}
-                title={selectedItem?.rob === 0 ? "No stock available to consume" : "Consume item"}
+                disabled={!canEditStore || !selectedItem || selectedItem.rob === 0}
+                title={!canEditStore ? "No permission to consume" : selectedItem?.rob === 0 ? "No stock available to consume" : "Consume item"}
               >
                 <MinusCircle className="h-4 w-4 mr-2" />
                 Consume
@@ -3977,6 +3979,7 @@ const Stores: React.FC = () => {
                 }}
                 variant="default"
                 className="flex-1"
+                disabled={!canEditStore}
               >
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Receive
@@ -4301,6 +4304,7 @@ const Stores: React.FC = () => {
                               ))}
                             </CommandGroup>
                           </div>
+                          {canEditStore && (
                           <CommandGroup className="border-t" forceMount>
                             <CommandItem
                               onSelect={async () => {
@@ -4335,6 +4339,7 @@ const Stores: React.FC = () => {
                               <span className="text-green-600 font-medium">Create New Location</span>
                             </CommandItem>
                           </CommandGroup>
+                          )}
                         </CommandList>
                       </Command>
                     </PopoverContent>
@@ -4417,6 +4422,7 @@ const Stores: React.FC = () => {
                               ))}
                             </CommandGroup>
                           </div>
+                          {canEditStore && (
                           <CommandGroup className="border-t" forceMount>
                             <CommandItem
                               onSelect={async () => {
@@ -4451,6 +4457,7 @@ const Stores: React.FC = () => {
                               <span className="text-green-600 font-medium">Create New Location</span>
                             </CommandItem>
                           </CommandGroup>
+                          )}
                         </CommandList>
                       </Command>
                     </PopoverContent>
@@ -4548,7 +4555,7 @@ const Stores: React.FC = () => {
               </Button>
               <Button 
                 onClick={handleCreateNewStoreLocation}
-                disabled={!newLocationName.trim() || isCreatingLocation}
+                disabled={!canEditStore || !newLocationName.trim() || isCreatingLocation}
                 data-testid="button-confirm-create-store-location"
               >
                 {isCreatingLocation ? 'Creating...' : 'Create Location'}
