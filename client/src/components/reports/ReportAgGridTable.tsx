@@ -62,8 +62,10 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({ columns, data, he
     if (sortModel.length > 0) {
       const col = sortModel[0];
       onSortChanged(col.colId, col.sort as 'asc' | 'desc');
+    } else if (columns.length > 0) {
+      onSortChanged(columns[0].field, 'asc');
     }
-  }, [onSortChanged]);
+  }, [onSortChanged, columns]);
 
   if (data.length === 0) {
     return (
