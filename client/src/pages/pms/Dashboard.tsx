@@ -365,7 +365,7 @@ const Dashboard = () => {
   const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
   const [activeTab, setActiveTab] = useState('overview');
   const [showFilters, setShowFilters] = useState(false);
-  type OperationCardFilter = 'overdue' | 'overdue-critical' | 'planned-today' | 'pending-approvals' | 'critical-spares' | 'anomalies' | 'modify-pms';
+  type OperationCardFilter = 'overdue' | 'overdue-critical' | 'planned-today' | 'pending-approvals' | 'critical-spares' | 'anomalies' | 'modify-pms' | 'donut-overdue' | 'donut-due' | 'donut-planned';
   const [selectedOpCard, setSelectedOpCard] = useState<OperationCardFilter>('overdue');
   const [hodScope, setHodScope] = useState<'me' | 'myTeam'>('myTeam');
   const [opViewModal, setOpViewModal] = useState<{ open: boolean; workOrder: EnrichedWorkOrder | null }>({ open: false, workOrder: null });
@@ -1087,6 +1087,15 @@ const Dashboard = () => {
     const overdueWOs = safeWOs.filter(wo => (wo as EnrichedWorkOrder).computedStatus === 'Overdue');
     const overdueCount = overdueWOs.length;
 
+    const dueWOs = safeWOs.filter(wo => {
+      const s = (wo as EnrichedWorkOrder).computedStatus;
+      return s === 'Due' || s === 'Due (Grace P)';
+    });
+    const plannedStatusWOs = safeWOs.filter(wo => {
+      const s = (wo as EnrichedWorkOrder).computedStatus;
+      return s === 'Active' || s === 'Postponed' || s === 'Completed';
+    });
+
     const overdueCriticalWOs = overdueWOs.filter(wo =>
       ((wo as EnrichedWorkOrder).criticality ?? '').toLowerCase() === 'yes'
     );
@@ -1130,6 +1139,8 @@ const Dashboard = () => {
     return {
       overdueCount,
       overdueWOs: overdueWOs as EnrichedWorkOrder[],
+      dueWOs: dueWOs as EnrichedWorkOrder[],
+      plannedStatusWOs: plannedStatusWOs as EnrichedWorkOrder[],
       overdueCriticalCount,
       overdueCriticalWOs: overdueCriticalWOs as EnrichedWorkOrder[],
       plannedTodayCount,
@@ -1145,6 +1156,7 @@ const Dashboard = () => {
   const operationTableData = useMemo(() => {
     switch (selectedOpCard) {
       case 'overdue':
+      case 'donut-overdue':
         return operationKPIs.overdueWOs;
       case 'overdue-critical':
         return operationKPIs.overdueCriticalWOs;
@@ -1152,6 +1164,10 @@ const Dashboard = () => {
         return operationKPIs.plannedTodayWOs;
       case 'pending-approvals':
         return operationKPIs.pendingApprovalWOs;
+      case 'donut-due':
+        return operationKPIs.dueWOs;
+      case 'donut-planned':
+        return operationKPIs.plannedStatusWOs;
       default:
         return [];
     }
@@ -1166,10 +1182,14 @@ const Dashboard = () => {
       case 'critical-spares': return 'Critical Spares Low';
       case 'anomalies': return 'W.O Anomalies';
       case 'modify-pms': return 'Modify PMS Requests';
+      case 'donut-overdue': return 'Overdue Work Orders';
+      case 'donut-due': return 'Due Work Orders';
+      case 'donut-planned': return 'Planned Work Orders';
       default: return 'Work Orders';
     }
   }, [selectedOpCard]);
 
+  const isDonutFilter = selectedOpCard?.startsWith('donut-');
   const isNonWOCard = selectedOpCard === 'critical-spares' || selectedOpCard === 'anomalies' || selectedOpCard === 'modify-pms';
 
   const ytdKPIs = useMemo(() => {
@@ -1580,6 +1600,20 @@ const Dashboard = () => {
                                 innerRadius={35}
                                 outerRadius={58}
                                 paddingAngle={2}
+                                cursor="pointer"
+                                onClick={(_: unknown, index: number) => {
+                                  const segment = operationDonutData[index];
+                                  if (!segment) return;
+                                  const filterMap: Record<string, OperationCardFilter> = {
+                                    'Overdue': 'donut-overdue',
+                                    'Due': 'donut-due',
+                                    'Planned': 'donut-planned',
+                                  };
+                                  const newFilter = filterMap[segment.status];
+                                  if (newFilter) {
+                                    setSelectedOpCard(prev => prev === newFilter ? 'overdue' : newFilter);
+                                  }
+                                }}
                                 label={({ cx, cy, midAngle, innerRadius, outerRadius, payload }: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; payload: { count: number } }) => {
                                   const RADIAN = Math.PI / 180;
                                   const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
@@ -1631,7 +1665,7 @@ const Dashboard = () => {
                     ]).map(card => (
                       <Card
                         key={card.key}
-                        className={`cursor-pointer transition-shadow bg-white border-0 border-l-4 ${card.borderColor} ${selectedOpCard === card.key ? 'ring-2 ring-blue-400 shadow-md' : 'hover:shadow-lg'} flex min-h-[120px]`}
+                        className={`cursor-pointer transition-shadow bg-white border-0 border-l-4 ${card.borderColor} ${!isDonutFilter && selectedOpCard === card.key ? 'ring-2 ring-blue-400 shadow-md' : 'hover:shadow-lg'} flex min-h-[120px]`}
                         onClick={() => setSelectedOpCard(card.key)}
                         data-testid={card.testId}
                       >
