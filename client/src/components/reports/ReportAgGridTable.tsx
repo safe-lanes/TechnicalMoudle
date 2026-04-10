@@ -40,8 +40,8 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({ columns, data, he
     return columns.map((col) => ({
       headerName: col.header,
       field: col.field,
-      width: col.width,
-      minWidth: col.field === 'sNo' || col.field === 'sno' ? 60 : 80,
+      minWidth: col.width || (col.field === 'sNo' || col.field === 'sno' ? 60 : 80),
+      flex: 1,
       sortable: true,
       resizable: true,
       filter: false,
@@ -66,6 +66,7 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({ columns, data, he
     sortable: true,
     resizable: true,
     filter: false,
+    flex: 1,
     suppressHeaderFilterButton: true,
     menuTabs: ['generalMenuTab', 'columnsMenuTab'],
     wrapText: false,
