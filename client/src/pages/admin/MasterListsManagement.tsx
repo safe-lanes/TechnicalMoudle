@@ -21,19 +21,49 @@ import { Marker } from "@/components/Marker";
 const masterListFormSchema = insertMasterListSchema;
 type MasterListFormData = z.infer<typeof masterListFormSchema>;
 
-const LIST_TYPES = [
-  { value: "department", label: "Department" },
-  { value: "rank", label: "Rank" },
-  { value: "intervalUnit", label: "Interval Unit" },
-  { value: "componentCategory", label: "Component Category" },
-  { value: "location", label: "Location" },
-  { value: "postponementReason", label: "Postponement Reason" },
-  { value: "overdueReason", label: "Overdue Reason" },
+const SECTIONS = [
+  {
+    value: "components",
+    label: "Components",
+    types: [
+      { value: "department", label: "Department" },
+      { value: "componentCategory", label: "Component Category" },
+      { value: "location", label: "Location" },
+    ],
+  },
+  {
+    value: "jobs",
+    label: "Jobs",
+    types: [
+      { value: "rank", label: "Rank" },
+      { value: "intervalUnit", label: "Interval Unit" },
+    ],
+  },
+  {
+    value: "spares",
+    label: "Spares / Work Orders",
+    types: [
+      { value: "postponementReason", label: "Postponement Reason" },
+      { value: "overdueReason", label: "Overdue Reason" },
+    ],
+  },
 ];
+
+const ALL_LIST_TYPES = SECTIONS.flatMap((s) => s.types);
+
+const getTypesForSection = (sectionValue: string) => {
+  const section = SECTIONS.find((s) => s.value === sectionValue);
+  return section ? section.types : [];
+};
+
+const getSectionForType = (typeValue: string) => {
+  return SECTIONS.find((s) => s.types.some((t) => t.value === typeValue))?.value || SECTIONS[0].value;
+};
 
 export default function MasterListsManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
-  const [selectedListType, setSelectedListType] = useState<string>("department");
+  const [selectedSection, setSelectedSection] = useState<string>(SECTIONS[0].value);
+  const [selectedListType, setSelectedListType] = useState<string>(SECTIONS[0].types[0].value);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MasterList | null>(null);
   const [selectedRowItem, setSelectedRowItem] = useState<MasterList | null>(null);
@@ -229,26 +259,52 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
-        <Select value={selectedListType} onValueChange={(value) => {
-          setSelectedListType(value);
-          setSelectedRowItem(null);
-        }}>
-          <SelectTrigger className="w-[200px] bg-white border-gray-300" data-testid="I4.QL.2.10">
-            <Marker id="I4.QL.2.10" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {LIST_TYPES.map((type) => (
-              <SelectItem key={type.value} value={type.value}>
-                {type.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate" data-testid="badge-total-items">
-          <Package className="h-3 w-3 mr-1" />
-          {totalItems} Total
-        </Badge>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs text-gray-500 font-medium">Select Section</span>
+          <Select value={selectedSection} onValueChange={(value) => {
+            setSelectedSection(value);
+            const firstType = getTypesForSection(value)[0];
+            setSelectedListType(firstType?.value || "");
+            setSelectedRowItem(null);
+          }}>
+            <SelectTrigger className="w-[200px] bg-white border-gray-300" data-testid="select-section">
+              <SelectValue placeholder="Select Section" />
+            </SelectTrigger>
+            <SelectContent>
+              {SECTIONS.map((section) => (
+                <SelectItem key={section.value} value={section.value}>
+                  {section.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs text-gray-500 font-medium">Select Master List Type</span>
+          <Select value={selectedListType} onValueChange={(value) => {
+            setSelectedListType(value);
+            setSelectedRowItem(null);
+          }}>
+            <SelectTrigger className="w-[220px] bg-white border-gray-300" data-testid="I4.QL.2.10">
+              <Marker id="I4.QL.2.10" />
+              <SelectValue placeholder="Select Master List Type" />
+            </SelectTrigger>
+            <SelectContent>
+              {getTypesForSection(selectedSection).map((type) => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs text-gray-500 font-medium invisible">Count</span>
+          <Badge variant="secondary" className="bg-cyan-100 text-cyan-700 no-default-hover-elevate no-default-active-elevate h-9 flex items-center" data-testid="badge-total-items">
+            <Package className="h-3 w-3 mr-1" />
+            {totalItems} Total
+          </Badge>
+        </div>
       </div>
 
       <div>
@@ -360,7 +416,7 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
           </DialogHeader>
 
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* List Type - Read only in edit mode */}
+            {/* List Type - Read only in edit mode, filtered by current section in create mode */}
             <div className="space-y-2">
               <Label htmlFor="listType">List Type</Label>
               <Select
@@ -372,7 +428,7 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {LIST_TYPES.map((type) => (
+                  {(selectedItem ? ALL_LIST_TYPES : getTypesForSection(selectedSection)).map((type) => (
                     <SelectItem key={type.value} value={type.value}>
                       {type.label}
                     </SelectItem>
