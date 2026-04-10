@@ -1,0 +1,417 @@
+Task: Upgrade all report tables in the PMS Reports sub-module to AG Grid
+Objective
+Implement AG Grid for all tables inside the Reports sub-module as a UI/UX upgrade only.
+
+This is not a logic rewrite.
+This is not a data-source rewrite.
+This is not a filter/business-rule rewrite.
+This is not a report calculation rewrite.
+
+The goal is to keep all current report functionality, data, filters, APIs, exports, and business behavior exactly the same, while replacing the current table rendering with AG Grid-based tables for a better user experience. The user has already identified ongoing problems around inconsistent headers, fixed columns, and hardcoded column visibility in the reports module, so the AG Grid upgrade is intended to improve table usability without changing what the reports actually do.
+
+Very important instruction
+Do not change any existing functionality
+You must not change any of the following:
+
+report logic
+
+API calls
+
+backend services
+
+data calculations
+
+filter logic
+
+period logic
+
+vessel logic
+
+department logic
+
+export logic
+
+PDF logic
+
+Excel logic
+
+report counts
+
+row data generation
+
+report grouping/category structure
+
+business rules
+
+permissions/access behavior
+
+existing report names
+
+This task is strictly a UI table framework upgrade from existing table rendering to AG Grid.
+
+If any report currently shows certain data, filters in a certain way, or exports in a certain way, it must continue to do exactly that after the AG Grid implementation.
+
+Scope
+Apply AG Grid to every report table in the PMS Reports sub-module.
+
+This includes all report categories and all reports that currently render tabular data, such as:
+
+Maintenance & Work Orders
+
+Running Hours & Condition
+
+Inventory - Spares
+
+Inventory - Stores/Lubes/Chemicals
+
+IHM
+
+Modify PMS / Change Requests
+
+Critical Equipment
+
+LSA/FFA Equipment
+
+If a report currently renders a data table, convert that table to AG Grid. If a report is summary-only and has no table, leave it untouched.
+
+Required AG Grid features
+1. Column show/hide
+Every report table must support AG Grid’s column visibility selector / column tool panel / column chooser so that the user can choose which columns to display.
+
+Required behavior:
+
+user can open a columns panel / popup / side panel
+
+user can check/uncheck columns
+
+hiding a column should only affect visibility, not data logic
+
+showing the column again should restore it cleanly
+
+no broken layout after hiding/showing columns
+
+This directly supports the need for report column customization instead of hardcoded visible headers.
+
+2. Column resizing
+All AG Grid report tables must support:
+
+drag-to-resize columns
+
+smooth resizing
+
+stable left/right edges
+
+no layout jitter
+
+no broken scroll behavior
+
+This is important because the user has already been working on Excel-like resize behavior in other PMS tables and wants similar usability in reports.
+
+3. Horizontal scrolling
+For wide reports:
+
+horizontal scroll must work cleanly
+
+grid must occupy available table area properly
+
+no unused blank strip on right side
+
+no compressed/narrow columns unless intentionally sized
+
+rightmost visible column should visually extend to proper boundary of the grid area when appropriate
+
+This should feel like a professional data grid, not a shrunk HTML table.
+
+4. Sorting
+Enable AG Grid sorting on applicable columns.
+
+Required behavior:
+
+sortable headers where sorting makes sense
+
+ascending / descending / default state
+
+sorting should only affect frontend row display unless current report already has server-side sorting logic
+
+do not invent new sorting rules
+
+do not change report business logic
+
+If a report already has a specific ordering rule that must stay fixed, preserve that unless safe client-side sorting is already acceptable in current behavior.
+
+5. No text wrapping in cells
+For all AG Grid report tables:
+
+disable text wrapping by default
+
+keep rows at consistent height
+
+long text should remain single-line
+
+use ellipsis/truncation if needed
+
+full text may be accessible via tooltip if already available or easy to add without changing logic
+
+The user specifically prefers Excel-like behavior where rows remain consistent and column width can be adjusted to reveal more text.
+
+6. Stable row height
+All rows should have a consistent row height by default.
+Do not allow random multi-line row growth due to wrapped content.
+
+7. Sticky/frozen usability where appropriate
+If feasible within the current report layout and without disturbing behavior:
+
+keep header row sticky
+
+support pinned first column only if it can be done consistently and safely
+
+do not over-engineer
+
+Important:
+Do not introduce a new pinned-column experience unless it can be done cleanly across the reports UI. If there is any risk of breaking layout or current UX, skip pinning and keep only sticky headers.
+
+8. Search/filter compatibility
+AG Grid must not replace the existing global report filters and report-specific filters.
+
+That means:
+
+existing vessel filter must continue working
+
+existing period filter must continue working
+
+existing department filter logic (if already implemented) must continue working
+
+existing component search / report filters must continue working exactly as before
+
+AG Grid is only the display layer for table data. It must consume the already-filtered dataset or the current report dataset exactly as it is today.
+
+9. Export compatibility
+This is extremely important.
+
+Do not change existing export behavior:
+
+existing PDF export must continue to work
+
+existing Excel export must continue to work
+
+existing export data source logic must remain untouched unless already separately being fixed under another task
+
+If AG Grid has its own export features, do not replace current export behavior automatically.
+Current report export buttons must continue working through the existing report flow.
+
+This AG Grid implementation is not an export migration task.
+
+10. Theme/UI continuity
+AG Grid must be styled to match the current PMS UI as closely as possible.
+
+Required:
+
+preserve current color theme
+
+preserve current report page layout
+
+preserve current spacing feel as much as possible
+
+preserve current visual hierarchy
+
+preserve current report title / toolbar / export button positions
+
+Do not make the reports suddenly look like a generic AG Grid demo.
+
+Make AG Grid visually blend into the existing PMS design system.
+
+Column customization behavior
+Implement column visibility control for all report tables, but with care.
+
+Required
+every report table should expose available columns
+
+user can show/hide columns
+
+visible columns update immediately
+
+no refresh needed
+
+Optional but recommended
+If easy and safe:
+
+persist visible-column preference per report per user
+
+if persistence is added, it must not break anything
+
+include a Reset to Default Columns option
+
+Important
+Do not let this become a business-logic feature.
+This is only for presentation-level column visibility.
+
+Data mapping requirement
+For each report table:
+
+map AG Grid column definitions directly to the current report headers and row fields
+
+preserve current header names unless explicitly changed in another separate task
+
+preserve current row values exactly as currently displayed
+
+preserve existing derived/calculated values exactly as they are
+
+Example:
+If a report currently shows a derived “Days Left” or a transformed “Status”, AG Grid should display that exact already-prepared value; do not rewrite how that value is computed.
+
+Reports with different structures
+Some reports may have:
+
+simple flat tables
+
+summary tables
+
+grouped sections
+
+mixed cards + table layouts
+
+Implementation rule:
+
+convert only the actual tabular data regions to AG Grid
+
+do not force AG Grid onto summary cards, KPIs, charts, static metric blocks, or non-tabular layouts
+
+If a report has a summary section above and a table below, only the table should become AG Grid.
+
+Performance expectations
+Because the Reports module may hold many rows:
+
+implement AG Grid in a performant way
+
+avoid unnecessary re-renders
+
+avoid rebuilding column definitions on every render if possible
+
+keep current pagination/virtualization behavior compatible
+
+if AG Grid pagination conflicts with existing report pagination, preserve the current report behavior first
+
+Do not introduce lag or unstable scrolling.
+
+Implementation guidance
+Please do this carefully, report by report.
+
+Step 1
+Audit all reports in the Reports sub-module and identify which ones currently render tables.
+
+Step 2
+Create a reusable AG Grid wrapper/component for report tables, but do not over-refactor unrelated files.
+
+Step 3
+Map each existing report’s:
+
+headers
+
+row fields
+
+column widths
+
+sortability
+
+visibility options
+
+Step 4
+Replace the current table rendering with AG Grid for each report table while keeping the current data source untouched.
+
+Step 5
+Style AG Grid so it visually matches the PMS report interface.
+
+Step 6
+Test every report for:
+
+correct rendering
+
+correct row count
+
+correct filters
+
+correct exports still working
+
+no data mismatch
+
+no broken layout
+
+no console errors
+
+Non-negotiable restrictions
+Do not do any of the following:
+
+do not change APIs
+
+do not change backend services
+
+do not change SQL/query logic
+
+do not change report formulas
+
+do not change report filters
+
+do not remove columns unless the user hides them
+
+do not rename reports
+
+do not redesign the reports page
+
+do not move export buttons
+
+do not change category structure
+
+do not add unrelated features
+
+do not “clean up” unrelated code
+
+do not rewrite the module architecture unless absolutely necessary
+
+Again: this is a UI table upgrade only.
+
+Expected outcome
+After implementation:
+
+all report tables in the Reports sub-module use AG Grid
+
+the tables feel more professional and usable
+
+users can choose visible columns
+
+columns can be resized
+
+rows remain single-line and stable
+
+sorting is available where appropriate
+
+current filters still work exactly the same
+
+current exports still work exactly the same
+
+no report logic changes have been introduced
+
+Deliverables
+After implementation, provide:
+
+List of all report tables converted to AG Grid
+
+List of files changed
+
+Confirmation that:
+
+no report logic was changed
+
+no API logic was changed
+
+no export logic was changed
+
+only the table UI layer was upgraded
+
+Any report that could not be converted, with exact reason
+
+Whether column visibility preferences were persisted or only session-based
+
+Final instruction
+If there is any place where AG Grid would force a logic change, stop and avoid that change.
+Preserve the existing report behavior first.
+UI upgrade only.
