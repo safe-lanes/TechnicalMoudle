@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -12,19 +11,17 @@ import {
 } from "@/components/ui/select";
 import {
   ArrowLeft,
-  ArrowUpDown,
   Search,
   Download,
   FileText,
   Loader2,
   AlertTriangle,
   AlertCircle,
-  CheckCircle,
-  HelpCircle,
   Package,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import ReportAgGridTable from "@/components/reports/ReportAgGridTable";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
@@ -165,50 +162,6 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
   const items = filteredByGlobal;
   const pagination = data?.pagination || { currentPage: 1, totalPages: 1, totalItems: 0, pageSize: 25 };
   const categoryCounts = data?.categoryCounts || { all: 0, spares: 0, stores: 0 };
-
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
-
-  const SortButton = ({ field, label }: { field: SortField; label: string }) => (
-    <button
-      className="flex items-center gap-1 font-semibold text-sm text-gray-700 hover:text-gray-900"
-      onClick={() => handleSort(field)}
-      data-testid={`button-sort-${field}`}
-    >
-      {label}
-      <ArrowUpDown className={`h-3 w-3 ${sortField === field ? 'text-blue-600' : 'text-gray-400'}`} />
-    </button>
-  );
-
-  const getIhmStatusBadge = (status: string) => {
-    switch (status) {
-      case 'present':
-        return (
-          <Badge className="bg-red-600 text-white border-red-700" data-testid="badge-ihm-present">
-            <AlertCircle className="h-3 w-3 mr-1" />Present
-          </Badge>
-        );
-      case 'not_present':
-        return (
-          <Badge className="bg-green-600 text-white border-green-700" data-testid="badge-ihm-not-present">
-            <CheckCircle className="h-3 w-3 mr-1" />Not Present
-          </Badge>
-        );
-      case 'unknown':
-      default:
-        return (
-          <Badge className="bg-amber-500 text-white border-amber-600" data-testid="badge-ihm-unknown">
-            <HelpCircle className="h-3 w-3 mr-1" />Unknown
-          </Badge>
-        );
-    }
-  };
 
   const getItemTypeDisplay = (item: IhmInventoryItem) => {
     if (item.itemType === 'spare') return 'Spare';
@@ -479,39 +432,34 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
             </div>
           ) : (
             <>
-              <div className="rounded-lg border border-gray-200 overflow-x-auto bg-white mb-4">
-                <table className="w-full" data-testid="ihm-inventory-table">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 w-16">S.No</th>
-                      <th className="text-left py-3 px-4"><SortButton field="itemCode" label="Item Code" /></th>
-                      <th className="text-left py-3 px-4"><SortButton field="itemName" label="Item Name" /></th>
-                      <th className="text-left py-3 px-4"><SortButton field="itemType" label="Item Type" /></th>
-                      <th className="text-left py-3 px-4"><SortButton field="componentOrCategory" label="Component / Category" /></th>
-                      <th className="text-left py-3 px-4"><SortButton field="ihmStatus" label="IHM Status" /></th>
-                      <th className="text-left py-3 px-4"><SortButton field="evidenceType" label="Evidence Type" /></th>
-                      <th className="text-left py-3 px-4"><SortButton field="currentROB" label="Current ROB" /></th>
-                      <th className="text-left py-3 px-4"><SortButton field="location" label="Location" /></th>
-                      <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">UOM</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {items.map((item, index) => (
-                      <tr key={item.id} className="hover:bg-gray-50" data-testid={`row-ihm-item-${item.id}`}>
-                        <td className="py-3 px-4 text-sm text-gray-500">{startItem + index}</td>
-                        <td className="py-3 px-4 text-sm font-medium text-gray-900" data-testid={`text-item-code-${item.id}`}>{item.itemCode || '-'}</td>
-                        <td className="py-3 px-4 text-sm text-gray-900" data-testid={`text-item-name-${item.id}`}>{item.itemName || '-'}</td>
-                        <td className="py-3 px-4 text-sm text-gray-700">{getItemTypeDisplay(item)}</td>
-                        <td className="py-3 px-4 text-sm text-gray-700">{item.componentOrCategory || '-'}</td>
-                        <td className="py-3 px-4">{getIhmStatusBadge(item.ihmStatus)}</td>
-                        <td className="py-3 px-4 text-sm text-gray-700">{item.evidenceType || '-'}</td>
-                        <td className="py-3 px-4 text-sm text-gray-900">{item.currentROB ?? '-'}</td>
-                        <td className="py-3 px-4 text-sm text-gray-700">{item.location || '-'}</td>
-                        <td className="py-3 px-4 text-sm text-gray-500">{item.uom || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="mb-4" data-testid="ihm-inventory-table">
+                <ReportAgGridTable
+                  columns={[
+                    { header: 'S.No', field: 'sno', width: 12 },
+                    { header: 'Item Code', field: 'itemCode', width: 25 },
+                    { header: 'Item Name', field: 'itemName', width: 45 },
+                    { header: 'Item Type', field: 'itemType', width: 20 },
+                    { header: 'Component / Category', field: 'componentOrCategory', width: 35 },
+                    { header: 'IHM Status', field: 'ihmStatus', width: 22 },
+                    { header: 'Evidence Type', field: 'evidenceType', width: 25 },
+                    { header: 'Current ROB', field: 'currentROB', width: 20 },
+                    { header: 'Location', field: 'location', width: 25 },
+                    { header: 'UOM', field: 'uom', width: 15 },
+                  ]}
+                  data={items.map((item, index) => ({
+                    sno: startItem + index,
+                    itemCode: item.itemCode || '-',
+                    itemName: item.itemName || '-',
+                    itemType: getItemTypeDisplay(item),
+                    componentOrCategory: item.componentOrCategory || '-',
+                    ihmStatus: item.ihmStatus === 'present' ? 'Present' : item.ihmStatus === 'not_present' ? 'Not Present' : 'Unknown',
+                    evidenceType: item.evidenceType || '-',
+                    currentROB: item.currentROB ?? '-',
+                    location: item.location || '-',
+                    uom: item.uom || '-',
+                  }))}
+                  height="50vh"
+                />
               </div>
 
               <div className="flex items-center justify-between flex-wrap gap-4" data-testid="pagination">

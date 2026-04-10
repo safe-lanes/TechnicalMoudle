@@ -192,6 +192,102 @@
   overflow: visible !important;
 }
 
+.report-ag-grid.ag-theme-alpine {
+  --ag-row-height: 36px;
+  --ag-header-height: 38px;
+  --ag-font-size: 12.5px;
+  --ag-cell-horizontal-padding: 10px;
+  --ag-header-cell-horizontal-padding: 10px;
+  --ag-header-background-color: #f3f4f6;
+  --ag-header-foreground-color: #6b7280;
+  --ag-odd-row-background-color: #ffffff;
+  --ag-background-color: #ffffff;
+  --ag-border-color: #e5e7eb;
+  --ag-row-border-color: #f3f4f6;
+}
+
+.report-ag-grid.ag-theme-alpine .ag-header {
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
+
+.report-ag-grid.ag-theme-alpine .ag-header-cell-text {
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.report-ag-grid.ag-theme-alpine .ag-header-cell .ag-header-icon,
+.report-ag-grid.ag-theme-alpine .ag-header-cell .ag-icon {
+  color: #9ca3af !important;
+}
+
+.report-ag-grid.ag-theme-alpine .ag-header-cell .ag-icon-asc,
+.report-ag-grid.ag-theme-alpine .ag-header-cell .ag-icon-desc {
+  color: #374151 !important;
+}
+
+.report-ag-grid.ag-theme-alpine .ag-header-cell-menu-button {
+  display: flex !important;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.report-ag-grid.ag-theme-alpine .ag-header-cell:hover .ag-header-cell-menu-button {
+  opacity: 1;
+}
+
+.report-ag-grid.ag-theme-alpine .ag-header-cell-resize {
+  width: 6px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.report-ag-grid.ag-theme-alpine .ag-header-cell:hover .ag-header-cell-resize {
+  opacity: 1;
+}
+
+.report-ag-grid.ag-theme-alpine .ag-row:hover {
+  background-color: #f9fafb;
+}
+
+.report-ag-grid.ag-theme-alpine .ag-cell {
+  display: flex;
+  align-items: center;
+  color: #1f2937;
+  line-height: 1.4;
+}
+
+.dark .report-ag-grid.ag-theme-alpine {
+  --ag-header-background-color: rgba(17, 24, 39, 0.5);
+  --ag-header-foreground-color: #9ca3af;
+  --ag-odd-row-background-color: rgba(17, 24, 39, 0.1);
+  --ag-background-color: rgba(0, 0, 0, 0.05);
+  --ag-foreground-color: #e5e7eb;
+  --ag-data-color: #d1d5db;
+  --ag-border-color: #374151;
+  --ag-row-border-color: #1f2937;
+  --ag-selected-row-background-color: rgba(59, 130, 246, 0.15);
+}
+
+.dark .report-ag-grid.ag-theme-alpine .ag-header {
+  border-bottom-color: #374151;
+}
+
+.dark .report-ag-grid.ag-theme-alpine .ag-header-cell-text {
+  color: #9ca3af;
+}
+
+.dark .report-ag-grid.ag-theme-alpine .ag-cell {
+  color: #e5e7eb;
+}
+
+.dark .report-ag-grid.ag-theme-alpine .ag-row:hover {
+  background-color: rgba(17, 24, 39, 0.3);
+}
+
 @layer components {
   .all-\[unset\] {
     all: unset;

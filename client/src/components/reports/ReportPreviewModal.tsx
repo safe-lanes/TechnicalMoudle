@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,8 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { TablePagination, usePagination } from "@/components/reports/TablePagination";
-import { X } from "lucide-react";
+import ReportAgGridTable from "@/components/reports/ReportAgGridTable";
 
 export interface ReportColumn {
   header: string;
@@ -40,16 +38,9 @@ interface ReportPreviewModalProps {
 }
 
 const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({ open, onClose, reportData }) => {
-  const { currentPage, pageSize, handlePageChange, handlePageSizeChange, resetPage, paginateItems } = usePagination(50);
-
-  useEffect(() => {
-    resetPage();
-  }, [reportData]);
-
   if (!reportData) return null;
 
   const { title, subtitle, vessel, columns, data, summary } = reportData;
-  const paginatedData = paginateItems(data);
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
@@ -90,72 +81,9 @@ const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({ open, onClose, 
           </div>
         )}
 
-        <div className="flex-1 overflow-auto p-4 pt-2">
-          {data.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <p className="text-lg font-medium mb-1">No data available</p>
-              <p className="text-sm">No records match the current filters.</p>
-            </div>
-          ) : (
-            <table className="w-full text-sm border-collapse" data-testid="report-preview-table">
-              <thead>
-                <tr className="bg-muted/50 sticky top-0 z-10">
-                  {columns.map((col, idx) => (
-                    <th
-                      key={idx}
-                      className="text-left py-2 px-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider border-b whitespace-nowrap"
-                    >
-                      {col.header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedData.map((row, rowIdx) => {
-                  const globalIdx = (currentPage - 1) * pageSize + rowIdx;
-                  return (
-                    <tr
-                      key={globalIdx}
-                      className="border-b last:border-b-0 hover:bg-muted/30"
-                      data-testid={`report-preview-row-${globalIdx}`}
-                    >
-                      {columns.map((col, colIdx) => {
-                        const value = row[col.field];
-                        let displayValue: string;
-                        if (col.field === 'sNo') {
-                          displayValue = String(globalIdx + 1);
-                        } else {
-                          displayValue = value === null || value === undefined ? '-' : String(value);
-                        }
-                        return (
-                          <td
-                            key={colIdx}
-                            className="py-2 px-3 text-foreground whitespace-nowrap"
-                          >
-                            {displayValue}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
+        <div className="flex-1 overflow-hidden p-4 pt-2">
+          <ReportAgGridTable columns={columns} data={data} height="calc(90vh - 280px)" />
         </div>
-
-        {data.length > 0 && (
-          <div className="flex-shrink-0 border-t px-4 py-2 bg-muted/20">
-            <TablePagination
-              totalItems={data.length}
-              pageSize={pageSize}
-              currentPage={currentPage}
-              onPageChange={handlePageChange}
-              onPageSizeChange={handlePageSizeChange}
-              pageSizeOptions={[25, 50, 100, 200]}
-            />
-          </div>
-        )}
 
         <div className="flex-shrink-0 border-t p-3 flex justify-end">
           <Button variant="outline" onClick={onClose} data-testid="button-close-preview">
