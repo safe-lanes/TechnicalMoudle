@@ -381,6 +381,9 @@ export async function createMasterList(req: Request, res: Response) {
     if (error.name === 'ZodError') {
       return res.status(400).json({ error: "Invalid master list data", details: error.errors });
     }
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error("Error creating master list:", error);
     res.status(500).json({ error: "Failed to create master list" });
   }
@@ -393,6 +396,9 @@ export async function updateMasterList(req: Request, res: Response) {
   } catch (error: any) {
     if (error.name === 'ZodError') {
       return res.status(400).json({ error: "Invalid master list data", details: error.errors });
+    }
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
     }
     if (error.message?.includes('not found')) {
       return res.status(404).json({ error: error.message });
@@ -412,6 +418,83 @@ export async function deleteMasterList(req: Request, res: Response) {
     }
     console.error("Error deleting master list:", error);
     res.status(500).json({ error: "Failed to delete master list" });
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// Master List Types (DB-backed registry + Section mapping)
+// ══════════════════════════════════════════════════════════
+
+export async function getMasterListTypes(req: Request, res: Response) {
+  try {
+    const section = req.query.section as string | undefined;
+    const includeInactive = req.query.includeInactive === 'true';
+    const types = await fleetService.getMasterListTypes(section, includeInactive);
+    res.json(types);
+  } catch (error) {
+    console.error("Error fetching master list types:", error);
+    res.status(500).json({ error: "Failed to fetch master list types" });
+  }
+}
+
+export async function getMasterListTypeById(req: Request, res: Response) {
+  try {
+    const type = await fleetService.getMasterListTypeById(parseInt(req.params.id));
+    res.json(type);
+  } catch (error: any) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("Error fetching master list type:", error);
+    res.status(500).json({ error: "Failed to fetch master list type" });
+  }
+}
+
+export async function createMasterListType(req: Request, res: Response) {
+  try {
+    const userUuid = (req as any).user?.userUuid ?? null;
+    const type = await fleetService.createMasterListType(req.body, userUuid);
+    res.status(201).json(type);
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      return res.status(400).json({ error: "Invalid master list type data", details: error.errors });
+    }
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("Error creating master list type:", error);
+    res.status(500).json({ error: "Failed to create master list type" });
+  }
+}
+
+export async function updateMasterListType(req: Request, res: Response) {
+  try {
+    const userUuid = (req as any).user?.userUuid ?? null;
+    const type = await fleetService.updateMasterListType(parseInt(req.params.id), req.body, userUuid);
+    res.json(type);
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      return res.status(400).json({ error: "Invalid master list type data", details: error.errors });
+    }
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("Error updating master list type:", error);
+    res.status(500).json({ error: "Failed to update master list type" });
+  }
+}
+
+export async function deleteMasterListType(req: Request, res: Response) {
+  try {
+    const userUuid = (req as any).user?.userUuid ?? null;
+    const result = await fleetService.deleteMasterListType(parseInt(req.params.id), userUuid);
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("Error deleting master list type:", error);
+    res.status(500).json({ error: "Failed to delete master list type" });
   }
 }
 
