@@ -936,12 +936,25 @@ export async function getPostponementLogData(
   });
 
   if (postponements.length === 0) {
-    const postponedWOs = workOrders.filter(wo =>
-      wo.status === 'Postponed' &&
-      (wo.postponementEndDate || wo.postponementReason)
-    );
+    const dateFromObj = dateFrom ? new Date(dateFrom) : null;
+    const dateToObj = dateTo ? new Date(dateTo) : null;
+    if (dateFromObj) dateFromObj.setHours(0, 0, 0, 0);
+    if (dateToObj) dateToObj.setHours(23, 59, 59, 999);
 
-    postponements = postponedWOs.map(wo => ({
+    const postponedWOs = workOrders.filter((wo: any) => {
+      if (!(wo.status === 'Postponed' && (wo.postponementEndDate || wo.postponementReason))) return false;
+      if (dateFromObj || dateToObj) {
+        const refDateStr = wo.submittedDate || wo.dueDate;
+        if (!refDateStr) return false;
+        const refDate = new Date(refDateStr);
+        if (isNaN(refDate.getTime())) return false;
+        if (dateFromObj && refDate < dateFromObj) return false;
+        if (dateToObj && refDate > dateToObj) return false;
+      }
+      return true;
+    });
+
+    postponements = postponedWOs.map((wo: any) => ({
       id: `temp-${wo.id}`,
       workOrderId: wo.wouuid,
       vesselId: vesselId,

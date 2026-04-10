@@ -75,9 +75,10 @@ export async function getCrewWorkloadDistribution(
 
   // Filter work orders
   let filteredWOs = workOrders.filter((wo: any) => {
-    // Date range filter using dueDate (primary) or createdAt (fallback)
+    // Date range filter: use completion date as primary, fall back to dueDate for non-completed jobs
     if (startDateObj || endDateObj) {
-      const relevantDate = parseDate(wo.dueDate) || parseDate(wo.createdAt);
+      const completionDate = parseDate(wo.dateCompleted) || parseDate((wo as any).completionDateTime);
+      const relevantDate = completionDate || parseDate(wo.dueDate);
       if (!relevantDate) return false;
       if (startDateObj && relevantDate < startDateObj) return false;
       if (endDateObj && relevantDate > endDateObj) return false;
@@ -266,8 +267,10 @@ export async function exportCrewWorkloadDistributionExcel(
 
   // Filter work orders
   let filteredWOs = workOrders.filter((wo: any) => {
+    // Date range filter: use completion date as primary, fall back to dueDate for non-completed jobs
     if (startDateObj || endDateObj) {
-      const relevantDate = parseDate(wo.dueDate) || parseDate(wo.createdAt);
+      const completionDate = parseDate(wo.dateCompleted) || parseDate((wo as any).completionDateTime);
+      const relevantDate = completionDate || parseDate(wo.dueDate);
       if (!relevantDate) return false;
       if (startDateObj && relevantDate < startDateObj) return false;
       if (endDateObj && relevantDate > endDateObj) return false;
