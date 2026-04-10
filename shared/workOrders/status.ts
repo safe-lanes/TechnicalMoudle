@@ -21,7 +21,7 @@ function parseDDMMMYYYY(dateStr: string | null | undefined): Date | null {
   
   if (isNaN(day) || month === undefined || isNaN(year)) return null;
   
-  return new Date(year, month, day);
+  return new Date(Date.UTC(year, month, day));
 }
 
 /**
@@ -148,16 +148,16 @@ function applyGraceMethod(dueDate: Date, method: CompanyStandardGraceConfig['gra
   if (method === 'FIXED_DAYS') {
     const graceEnd = new Date(dueDate);
     graceEnd.setDate(graceEnd.getDate() + (value || GRACE_PERIOD_CONSTANTS.GRACE_PERIOD_DAYS));
-    graceEnd.setHours(0, 0, 0, 0);
+    graceEnd.setUTCHours(0, 0, 0, 0);
     return graceEnd;
   } else if (method === 'MONTH_END') {
-    const endOfMonth = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, 0);
-    endOfMonth.setHours(0, 0, 0, 0);
+    const endOfMonth = new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + 1, 0));
+    endOfMonth.setUTCHours(0, 0, 0, 0);
     return endOfMonth;
   } else {
     const dayOfNextMonth = value || 5;
-    const graceEnd = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, dayOfNextMonth);
-    graceEnd.setHours(0, 0, 0, 0);
+    const graceEnd = new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + 1, dayOfNextMonth));
+    graceEnd.setUTCHours(0, 0, 0, 0);
     return graceEnd;
   }
 }
@@ -169,9 +169,9 @@ export function calculateCompanyStandardGraceEnd(dueDate: Date, config?: Company
     return applyGraceMethod(dueDate, cfg.graceMethod, cfg.graceValue);
   }
 
-  const endOfMonth = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, 0);
-  endOfMonth.setHours(0, 0, 0, 0);
-  const daysUntilEndOfMonth = endOfMonth.getDate() - dueDate.getDate();
+  const endOfMonth = new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + 1, 0));
+  endOfMonth.setUTCHours(0, 0, 0, 0);
+  const daysUntilEndOfMonth = endOfMonth.getUTCDate() - dueDate.getUTCDate();
 
   if (daysUntilEndOfMonth <= 7) {
     return applyGraceMethod(dueDate, cfg.graceMethod, cfg.graceValue);
@@ -181,7 +181,7 @@ export function calculateCompanyStandardGraceEnd(dueDate: Date, config?: Company
     const fallbackDays = cfg.fallbackGraceDays ?? GRACE_PERIOD_CONSTANTS.GRACE_PERIOD_DAYS;
     const graceEnd = new Date(dueDate);
     graceEnd.setDate(graceEnd.getDate() + fallbackDays);
-    graceEnd.setHours(0, 0, 0, 0);
+    graceEnd.setUTCHours(0, 0, 0, 0);
     return graceEnd;
   }
 }
@@ -336,10 +336,10 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
     if (!dueDateObj) return 'Active';
     
     const today = input.referenceDate ? new Date(input.referenceDate) : new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
     
     const dueDateTime = new Date(dueDateObj);
-    dueDateTime.setHours(0, 0, 0, 0);
+    dueDateTime.setUTCHours(0, 0, 0, 0);
     
     // Calculate days difference
     const diffTime = dueDateTime.getTime() - today.getTime();
@@ -354,7 +354,7 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
       } else {
         graceEndDate = new Date(dueDateTime);
         graceEndDate.setDate(graceEndDate.getDate() + (vesselGraceSettings.calendarGraceDays || GRACE_PERIOD_CONSTANTS.GRACE_PERIOD_DAYS));
-        graceEndDate.setHours(0, 0, 0, 0);
+        graceEndDate.setUTCHours(0, 0, 0, 0);
       }
     } else {
       graceEndDate = calculateCompanyStandardGraceEnd(dueDateTime, companyGraceConfig);

@@ -592,18 +592,18 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { header: 'Movement', field: 'movement', width: 30 },
           { header: 'Closing', field: 'closing', width: 20 }
         ];
-        const pdfData = categories.map(c => ({
+        const pdfData: Array<{ category: string; opening: string | number; movement: string; closing: string | number }> = categories.map(c => ({
           category: c,
           opening: summaryApiData.opening[c]?.count ?? 0,
           movement: '-',
           closing: summaryApiData.closing[c]?.count ?? 0,
         }));
         pdfData.push(
-          { category: '', opening: '' as any, movement: '', closing: '' as any },
-          { category: 'New Jobs Entered', opening: '' as any, movement: String(summaryApiData.movement.newJobsEntered.count), closing: '' as any },
-          { category: 'Completed in Month', opening: '' as any, movement: String(summaryApiData.movement.completedInMonth.count), closing: '' as any },
-          { category: 'Postponed in Month', opening: '' as any, movement: String(summaryApiData.movement.postponedInMonth.count), closing: '' as any },
-          { category: 'Newly Overdue', opening: '' as any, movement: String(summaryApiData.movement.newlyOverdue.count), closing: '' as any },
+          { category: '', opening: '', movement: '', closing: '' },
+          { category: 'New Jobs Entered', opening: '', movement: String(summaryApiData.movement.newJobsEntered.count), closing: '' },
+          { category: 'Completed in Month', opening: '', movement: String(summaryApiData.movement.completedInMonth.count), closing: '' },
+          { category: 'Postponed in Month', opening: '', movement: String(summaryApiData.movement.postponedInMonth.count), closing: '' },
+          { category: 'Newly Overdue', opening: '', movement: String(summaryApiData.movement.newlyOverdue.count), closing: '' },
         );
 
         pdfReportGenerator.generateReport(

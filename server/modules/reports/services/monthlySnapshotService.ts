@@ -126,7 +126,7 @@ function parseDateAny(dateStr: string | null | undefined): Date | null {
     const day = parseInt(ddMmmYyyy[1], 10);
     const m = months[ddMmmYyyy[2]];
     const y = parseInt(ddMmmYyyy[3], 10);
-    if (m !== undefined) return new Date(y, m, day);
+    if (m !== undefined) return new Date(Date.UTC(y, m, day));
   }
   const d = new Date(dateStr);
   return isNaN(d.getTime()) ? null : d;
@@ -157,7 +157,12 @@ async function computeSnapshotAtTimestamp(
     'Completed': { count: 0, woIds: [] },
   };
 
-  const vesselWOs = allWorkOrders.filter(wo => wo.dataScope === 'vessel');
+  const vesselWOs = allWorkOrders.filter(wo => {
+    if (wo.dataScope !== 'vessel') return false;
+    const woCreatedAt = wo.createdAt ? new Date(wo.createdAt as string | Date) : null;
+    if (woCreatedAt && woCreatedAt > snapshotDate) return false;
+    return true;
+  });
 
   for (const wo of vesselWOs) {
     const FINALIZED = new Set(['completed', 'approved', 'closed', 'cancelled']);
@@ -422,6 +427,7 @@ export async function getMonthlySummaryData(vesselId: string, year: number, mont
     count: s.count,
     generatedAt: s.generatedAt,
     timestamp: s.snapshotTimestamp,
+    workOrderIds: s.workOrderIds || [],
   }));
 
   return {

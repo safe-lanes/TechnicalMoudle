@@ -34,6 +34,7 @@ interface SnapshotMeta {
   count: number;
   generatedAt: string;
   timestamp: string;
+  workOrderIds: string[];
 }
 
 export interface MonthlySummaryData {
@@ -162,41 +163,45 @@ const MonthlySummaryPreview: React.FC<MonthlySummaryPreviewProps> = ({ data, ves
     </button>
   );
 
+  const hasIndicatorDenominator = openingTotal > 0 || movement.completedInMonth.count > 0;
+
   return (
     <div className="space-y-4" data-testid="monthly-summary-preview">
-      <div className="grid grid-cols-4 gap-3">
-        <Card className="border-blue-200 dark:border-blue-800">
-          <CardContent className="p-3 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Completion Rate</p>
-            <p className={`text-2xl font-bold ${indicators.completionRate >= 80 ? 'text-green-600' : indicators.completionRate >= 50 ? 'text-amber-600' : 'text-red-600'}`} data-testid="indicator-completion-rate">
-              {indicators.completionRate}%
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border-red-200 dark:border-red-800">
-          <CardContent className="p-3 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Overdue Change</p>
-            <div className="flex items-center justify-center gap-1" data-testid="indicator-overdue-change">
-              {indicators.overdueChange > 0 ? <TrendingUp className="h-4 w-4 text-red-500" /> : indicators.overdueChange < 0 ? <TrendingDown className="h-4 w-4 text-green-500" /> : null}
-              <p className={`text-2xl font-bold ${indicators.overdueChange > 0 ? 'text-red-600' : indicators.overdueChange < 0 ? 'text-green-600' : 'text-muted-foreground'}`}>
-                {indicators.overdueChange > 0 ? `+${indicators.overdueChange}` : indicators.overdueChange}
+      {hasIndicatorDenominator && (
+        <div className="grid grid-cols-4 gap-3" data-testid="section-indicators">
+          <Card className="border-blue-200 dark:border-blue-800">
+            <CardContent className="p-3 text-center">
+              <p className="text-xs text-muted-foreground mb-1">Completion Rate</p>
+              <p className={`text-2xl font-bold ${indicators.completionRate >= 80 ? 'text-green-600' : indicators.completionRate >= 50 ? 'text-amber-600' : 'text-red-600'}`} data-testid="indicator-completion-rate">
+                {indicators.completionRate}%
               </p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-orange-200 dark:border-orange-800">
-          <CardContent className="p-3 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Postponements</p>
-            <p className="text-2xl font-bold text-orange-600" data-testid="indicator-postponements">{indicators.postponementCount}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-purple-200 dark:border-purple-800">
-          <CardContent className="p-3 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Unplanned Jobs</p>
-            <p className="text-2xl font-bold text-purple-600" data-testid="indicator-unplanned">{indicators.unplannedCount}</p>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+          <Card className="border-red-200 dark:border-red-800">
+            <CardContent className="p-3 text-center">
+              <p className="text-xs text-muted-foreground mb-1">Overdue Change</p>
+              <div className="flex items-center justify-center gap-1" data-testid="indicator-overdue-change">
+                {indicators.overdueChange > 0 ? <TrendingUp className="h-4 w-4 text-red-500" /> : indicators.overdueChange < 0 ? <TrendingDown className="h-4 w-4 text-green-500" /> : null}
+                <p className={`text-2xl font-bold ${indicators.overdueChange > 0 ? 'text-red-600' : indicators.overdueChange < 0 ? 'text-green-600' : 'text-muted-foreground'}`}>
+                  {indicators.overdueChange > 0 ? `+${indicators.overdueChange}` : indicators.overdueChange}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-orange-200 dark:border-orange-800">
+            <CardContent className="p-3 text-center">
+              <p className="text-xs text-muted-foreground mb-1">Postponements</p>
+              <p className="text-2xl font-bold text-orange-600" data-testid="indicator-postponements">{indicators.postponementCount}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-purple-200 dark:border-purple-800">
+            <CardContent className="p-3 text-center">
+              <p className="text-xs text-muted-foreground mb-1">Unplanned Jobs</p>
+              <p className="text-2xl font-bold text-purple-600" data-testid="indicator-unplanned">{indicators.unplannedCount}</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-4">
         <Card data-testid="section-opening">
@@ -334,6 +339,7 @@ const MonthlySummaryPreview: React.FC<MonthlySummaryPreviewProps> = ({ data, ves
                     <th className="text-left py-1 px-2 font-medium text-muted-foreground">Category</th>
                     <th className="text-right py-1 px-2 font-medium text-muted-foreground">Count</th>
                     <th className="text-left py-1 px-2 font-medium text-muted-foreground">Generated At</th>
+                    <th className="text-left py-1 px-2 font-medium text-muted-foreground">Work Order IDs</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -346,6 +352,13 @@ const MonthlySummaryPreview: React.FC<MonthlySummaryPreviewProps> = ({ data, ves
                       <td className="py-1 px-2 text-right font-mono">{s.count}</td>
                       <td className="py-1 px-2 text-muted-foreground">
                         {s.generatedAt ? new Date(s.generatedAt).toLocaleString() : '-'}
+                      </td>
+                      <td className="py-1 px-2 text-muted-foreground max-w-[200px]">
+                        <div className="truncate font-mono text-[10px]" title={s.workOrderIds?.join(', ') || '-'}>
+                          {s.workOrderIds && s.workOrderIds.length > 0
+                            ? `${s.workOrderIds.slice(0, 3).join(', ')}${s.workOrderIds.length > 3 ? ` (+${s.workOrderIds.length - 3} more)` : ''}`
+                            : '-'}
+                        </div>
                       </td>
                     </tr>
                   ))}
