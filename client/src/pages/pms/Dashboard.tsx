@@ -1070,11 +1070,14 @@ const Dashboard = () => {
       const s = (wo as EnrichedWorkOrder).computedStatus;
       return s === 'Due' || s === 'Due (Grace P)';
     }).length;
-    const completed = safeWOs.filter(wo => (wo as EnrichedWorkOrder).computedStatus === 'Completed').length;
+    const planned = safeWOs.filter(wo => {
+      const s = (wo as EnrichedWorkOrder).computedStatus;
+      return s === 'Active' || s === 'Postponed' || s === 'Completed';
+    }).length;
     return [
       { status: 'Overdue', count: overdue, color: '#ff6961' },
       { status: 'Due', count: due, color: '#FF964f' },
-      { status: 'Completed', count: completed, color: '#5dc86f' },
+      { status: 'Planned', count: planned, color: '#5dc86f' },
     ].filter(d => d.count > 0);
   }, [workOrdersData]);
 
@@ -1536,7 +1539,7 @@ const Dashboard = () => {
                   <div className="flex items-center gap-3 flex-shrink-0" data-testid="card-operation-wo-donut">
                     {operationDonutData.length > 0 ? (
                       <div className="flex items-center gap-1">
-                        <div style={{ width: 120, height: 100 }}>
+                        <div style={{ width: 130, height: 120 }}>
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie
@@ -1545,8 +1548,8 @@ const Dashboard = () => {
                                 nameKey="status"
                                 cx="50%"
                                 cy="50%"
-                                innerRadius={28}
-                                outerRadius={45}
+                                innerRadius={35}
+                                outerRadius={58}
                                 paddingAngle={2}
                                 label={({ cx, cy, midAngle, innerRadius, outerRadius, payload }: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; payload: { count: number } }) => {
                                   const RADIAN = Math.PI / 180;
