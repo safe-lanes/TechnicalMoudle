@@ -3,10 +3,65 @@ import { monthlySnapshots } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import * as repo from '../repositories/reportRepository';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
+import type { CompanyStandardGraceConfig } from '@shared/workOrders/status';
 import { storage } from '../../../storage';
 
 const SNAPSHOT_CATEGORIES = ['Planned', 'Due', 'Overdue', 'Postponed', 'Unplanned', 'Pending Approval', 'Completed'] as const;
 type SnapshotCategory = typeof SNAPSHOT_CATEGORIES[number];
+
+interface CategoryBucket {
+  count: number;
+  woIds: string[];
+}
+
+interface WorkOrderRecord {
+  wouuid?: string;
+  id: string;
+  workOrderType?: string;
+  status?: string;
+  isExecution?: boolean;
+  dataScope?: string;
+  jobId?: string;
+  componentCode?: string | null;
+  component?: string;
+  maintenanceBasis?: string;
+  dueDateSnapshot?: string | null;
+  dueDate?: string | null;
+  nextDueReading?: string | number | null;
+  currentReading?: string | number | null;
+  completionDateTime?: string | null;
+  createdAt?: string | Date | null;
+  department?: string | null;
+  assignedDepartment?: string | null;
+  workOrderNo?: string | null;
+  jobTitle?: string | null;
+  [key: string]: unknown;
+}
+
+interface JobRecord {
+  juuid: string;
+  maintenanceBasis?: string;
+  nextDueRH?: string | number | null;
+  jobTitle?: string | null;
+  frequencyUnit?: string | null;
+  frequencyValue?: string | number | null;
+  [key: string]: unknown;
+}
+
+interface ComponentRecord {
+  cuuid: string;
+  componentCode: string;
+  name?: string | null;
+  currentCumulativeRH?: string | number | null;
+  [key: string]: unknown;
+}
+
+interface PostponementRecord {
+  workOrderId: string;
+  submittedDate?: string | null;
+  createdAt?: string | Date | null;
+  [key: string]: unknown;
+}
 
 function getMonthBoundaries(year: number, month: number) {
   const opening = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
@@ -17,13 +72,10 @@ function getMonthBoundaries(year: number, month: number) {
 
 function mapStatusToCategory(
   computedStatus: string,
-  wo: any
+  wo: WorkOrderRecord
 ): SnapshotCategory {
   if (wo.workOrderType === 'Unplanned') return 'Unplanned';
-
   if (wo.status === 'Postponed') return 'Postponed';
-
-  if (wo.isExecution && wo.status === 'Pending Approval') return 'Pending Approval';
   if (wo.status === 'Pending Approval') return 'Pending Approval';
 
   switch (computedStatus) {
@@ -40,22 +92,45 @@ function mapStatusToCategory(
   }
 }
 
+function parseRH(value: string | number | null | undefined): number | null {
+  if (value == null || value === '') return null;
+  const num = Number(value);
+  return isNaN(num) ? null : num;
+}
+
+function parseDateAny(dateStr: string | null | undefined): Date | null {
+  if (!dateStr) return null;
+  const ddMmmYyyy = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (ddMmmYyyy) {
+    const months: Record<string, number> = {
+      'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+      'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+    };
+    const day = parseInt(ddMmmYyyy[1], 10);
+    const m = months[ddMmmYyyy[2]];
+    const y = parseInt(ddMmmYyyy[3], 10);
+    if (m !== undefined) return new Date(y, m, day);
+  }
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 async function computeSnapshotAtTimestamp(
   vesselId: string,
   snapshotDate: Date
-) {
-  const allWorkOrders = await repo.getWorkOrders(vesselId);
-  const jobs = await repo.getJobs(vesselId);
-  const components = await repo.getComponents(vesselId);
+): Promise<Record<SnapshotCategory, CategoryBucket>> {
+  const allWorkOrders = await repo.getWorkOrders(vesselId) as unknown as WorkOrderRecord[];
+  const jobs = await repo.getJobs(vesselId) as unknown as JobRecord[];
+  const components = await repo.getComponents(vesselId) as unknown as ComponentRecord[];
 
   const jobsMap = new Map(jobs.map(j => [j.juuid, j]));
   const componentsByCodeMap = new Map(components.map(c => [c.componentCode, c]));
   const componentsMap = new Map(components.map(c => [c.cuuid, c]));
 
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
-  const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
+  const companyGraceConfig: CompanyStandardGraceConfig = buildCompanyGraceConfig(companyGraceRow);
 
-  const categoryCounts: Record<SnapshotCategory, { count: number; woIds: string[] }> = {
+  const categoryCounts: Record<SnapshotCategory, CategoryBucket> = {
     'Planned': { count: 0, woIds: [] },
     'Due': { count: 0, woIds: [] },
     'Overdue': { count: 0, woIds: [] },
@@ -65,7 +140,7 @@ async function computeSnapshotAtTimestamp(
     'Completed': { count: 0, woIds: [] },
   };
 
-  const vesselWOs = allWorkOrders.filter((wo: any) => wo.dataScope === 'vessel');
+  const vesselWOs = allWorkOrders.filter(wo => wo.dataScope === 'vessel');
 
   for (const wo of vesselWOs) {
     if (wo.isExecution && wo.status !== 'Pending Approval') continue;
@@ -75,9 +150,9 @@ async function computeSnapshotAtTimestamp(
       ? componentsByCodeMap.get(wo.componentCode)
       : (wo.component ? componentsMap.get(wo.component) : undefined);
 
-    const maintenanceBasis = wo.maintenanceBasis || (job as any)?.maintenanceBasis || 'Calendar';
+    const maintenanceBasis = wo.maintenanceBasis || job?.maintenanceBasis || 'Calendar';
     const dueDate = wo.dueDateSnapshot || wo.dueDate || null;
-    const dueRH = parseRH((job as any)?.nextDueRH) ?? parseRH(wo.nextDueReading);
+    const dueRH = parseRH(job?.nextDueRH) ?? parseRH(wo.nextDueReading);
     const currentRH = parseRH(component?.currentCumulativeRH) ?? parseRH(wo.currentReading);
 
     const computedStatus = computeWorkOrderStatus({
@@ -89,6 +164,7 @@ async function computeSnapshotAtTimestamp(
       completionDateTime: wo.completionDateTime,
       maintenanceBasis,
       companyGraceConfig,
+      referenceDate: snapshotDate,
     });
 
     const category = mapStatusToCategory(computedStatus, wo);
@@ -97,12 +173,6 @@ async function computeSnapshotAtTimestamp(
   }
 
   return categoryCounts;
-}
-
-function parseRH(value: string | number | null | undefined): number | null {
-  if (value == null || value === '') return null;
-  const num = Number(value);
-  return isNaN(num) ? null : num;
 }
 
 export async function ensureSnapshotsExist(vesselId: string, year: number, month: number) {
@@ -176,27 +246,13 @@ export async function ensureSnapshotsExist(vesselId: string, year: number, month
 }
 
 export async function computeMonthlyMovement(vesselId: string, year: number, month: number) {
-  const { opening, closing, monthKey } = getMonthBoundaries(year, month);
+  const { opening, closing } = getMonthBoundaries(year, month);
 
-  const allWorkOrders = await repo.getWorkOrders(vesselId);
-  const vesselWOs = allWorkOrders.filter((wo: any) => wo.dataScope === 'vessel');
+  const allWorkOrders = await repo.getWorkOrders(vesselId) as unknown as WorkOrderRecord[];
+  const vesselWOs = allWorkOrders.filter(wo => wo.dataScope === 'vessel');
 
-  const parseDateLocal = (dateStr: string | null | undefined): Date | null => {
-    if (!dateStr) return null;
-    const ddMmmYyyy = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
-    if (ddMmmYyyy) {
-      const months: Record<string, number> = {
-        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
-      };
-      const day = parseInt(ddMmmYyyy[1], 10);
-      const m = months[ddMmmYyyy[2]];
-      const y = parseInt(ddMmmYyyy[3], 10);
-      if (m !== undefined) return new Date(y, m, day);
-    }
-    const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? null : d;
-  };
+  const companyGraceRow = await storage.getCompanyStandardGraceSettings();
+  const companyGraceConfig: CompanyStandardGraceConfig = buildCompanyGraceConfig(companyGraceRow);
 
   const isInMonth = (d: Date | null) => {
     if (!d) return false;
@@ -216,49 +272,84 @@ export async function computeMonthlyMovement(vesselId: string, year: number, mon
 
   for (const wo of vesselWOs) {
     const createdAt = wo.createdAt ? new Date(wo.createdAt) : null;
-    const completionDate = parseDateLocal(wo.completionDateTime);
-    const dueDate = parseDateLocal(wo.dueDateSnapshot || wo.dueDate);
+    const completionDate = parseDateAny(wo.completionDateTime);
+    const woId = wo.wouuid || wo.id;
 
     if (isInMonth(createdAt)) {
       newJobsEntered++;
-      newJobsEnteredIds.push(wo.wouuid || wo.id);
+      newJobsEnteredIds.push(woId);
 
       if (wo.workOrderType === 'Unplanned') {
         unplannedRaised++;
-        unplannedRaisedIds.push(wo.wouuid || wo.id);
+        unplannedRaisedIds.push(woId);
       }
     }
 
-    if (wo.status === 'Completed' && isInMonth(completionDate)) {
+    const FINALIZED = new Set(['completed', 'approved', 'closed']);
+    const normalizedStatus = (wo.status || '').toLowerCase().trim();
+    if (FINALIZED.has(normalizedStatus) && isInMonth(completionDate)) {
       completedInMonth++;
-      completedInMonthIds.push(wo.wouuid || wo.id);
+      completedInMonthIds.push(woId);
     }
 
-    if (wo.isExecution && wo.status === 'Pending Approval' && isInMonth(createdAt)) {
-      sentToPendingApproval++;
-      sentToPendingApprovalIds.push(wo.wouuid || wo.id);
+    if (wo.isExecution && wo.status === 'Pending Approval') {
+      const execCreatedAt = wo.createdAt ? new Date(wo.createdAt) : null;
+      if (isInMonth(execCreatedAt)) {
+        sentToPendingApproval++;
+        sentToPendingApprovalIds.push(woId);
+      }
     }
 
-    if (dueDate && isInMonth(dueDate) && wo.status !== 'Completed') {
-      newlyOverdue++;
-      newlyOverdueIds.push(wo.wouuid || wo.id);
+    const dueDate = wo.dueDateSnapshot || wo.dueDate || null;
+    if (dueDate && wo.status !== 'Completed') {
+      const jobs = await repo.getJobs(vesselId) as unknown as JobRecord[];
+      const components = await repo.getComponents(vesselId) as unknown as ComponentRecord[];
+      const job = wo.jobId ? jobs.find(j => j.juuid === wo.jobId) : undefined;
+      const maintenanceBasis = wo.maintenanceBasis || job?.maintenanceBasis || 'Calendar';
+
+      if (maintenanceBasis === 'Calendar') {
+        const statusAtOpening = computeWorkOrderStatus({
+          dueDate,
+          isExecution: wo.isExecution,
+          status: wo.status,
+          completionDateTime: wo.completionDateTime,
+          maintenanceBasis,
+          companyGraceConfig,
+          referenceDate: opening,
+        });
+        const statusAtClosing = computeWorkOrderStatus({
+          dueDate,
+          isExecution: wo.isExecution,
+          status: wo.status,
+          completionDateTime: wo.completionDateTime,
+          maintenanceBasis,
+          companyGraceConfig,
+          referenceDate: closing,
+        });
+
+        if (statusAtOpening !== 'Overdue' && statusAtClosing === 'Overdue') {
+          newlyOverdue++;
+          newlyOverdueIds.push(woId);
+        }
+      }
     }
   }
 
   let postponedInMonth = 0;
   const postponedInMonthIds: string[] = [];
   try {
-    const postponements = await repo.getWorkOrderPostponements(vesselId);
+    const postponements = await repo.getWorkOrderPostponements(vesselId) as unknown as PostponementRecord[];
     if (Array.isArray(postponements)) {
       for (const p of postponements) {
-        const pDate = parseDateLocal(p.submittedDate || (p.createdAt ? new Date(p.createdAt).toISOString() : null));
+        const pDateStr = p.submittedDate || (p.createdAt ? new Date(p.createdAt).toISOString() : null);
+        const pDate = parseDateAny(pDateStr);
         if (isInMonth(pDate)) {
           postponedInMonth++;
           postponedInMonthIds.push(p.workOrderId);
         }
       }
     }
-  } catch (e) {
+  } catch {
     console.log('[MONTHLY MOVEMENT] No postponement data available');
   }
 
@@ -276,11 +367,11 @@ export async function getMonthlySummaryData(vesselId: string, year: number, mont
   const snapshots = await ensureSnapshotsExist(vesselId, year, month);
   const movement = await computeMonthlyMovement(vesselId, year, month);
 
-  const opening: Record<string, { count: number; woIds: string[] }> = {};
-  const closing: Record<string, { count: number; woIds: string[] }> = {};
+  const opening: Record<string, CategoryBucket> = {};
+  const closing: Record<string, CategoryBucket> = {};
 
   for (const snap of snapshots) {
-    const data = { count: snap.count, woIds: snap.workOrderIds || [] };
+    const data: CategoryBucket = { count: snap.count, woIds: snap.workOrderIds || [] };
     if (snap.snapshotType === 'opening') {
       opening[snap.category] = data;
     } else {
@@ -289,7 +380,6 @@ export async function getMonthlySummaryData(vesselId: string, year: number, mont
   }
 
   const openingTotal = Object.values(opening).reduce((sum, v) => sum + v.count, 0);
-  const closingTotal = Object.values(closing).reduce((sum, v) => sum + v.count, 0);
   const openingOverdue = opening['Overdue']?.count || 0;
   const closingOverdue = closing['Overdue']?.count || 0;
 
@@ -302,7 +392,7 @@ export async function getMonthlySummaryData(vesselId: string, year: number, mont
   };
 
   const allVessels = await repo.getVessels();
-  const vessel = allVessels.find((v: any) => v.id === vesselId || v.vuuid === vesselId);
+  const vessel = allVessels.find((v: { id: string; vuuid?: string; name?: string }) => v.id === vesselId || v.vuuid === vesselId);
   const vesselName = vessel?.name || vesselId;
 
   const snapshotMeta = snapshots.map(s => ({
@@ -325,13 +415,52 @@ export async function getMonthlySummaryData(vesselId: string, year: number, mont
   };
 }
 
-export async function getSnapshotDrilldown(
+interface DrilldownRow {
+  workOrderNo: string;
+  jobTitle: string;
+  componentCode: string;
+  componentName: string;
+  dueDate: string;
+  status: string;
+  maintenanceBasis: string;
+  department: string;
+}
+
+function buildDrilldownRows(
+  woIds: string[],
+  allWorkOrders: WorkOrderRecord[],
+  jobsMap: Map<string, JobRecord>,
+  componentsByCodeMap: Map<string, ComponentRecord>,
+  componentsMap: Map<string, ComponentRecord>
+): DrilldownRow[] {
+  const woIdSet = new Set(woIds);
+  return allWorkOrders
+    .filter(wo => woIdSet.has(wo.wouuid || '') || woIdSet.has(wo.id))
+    .map(wo => {
+      const job = wo.jobId ? jobsMap.get(wo.jobId) : undefined;
+      const component = wo.componentCode
+        ? componentsByCodeMap.get(wo.componentCode)
+        : (wo.component ? componentsMap.get(wo.component) : undefined);
+      return {
+        workOrderNo: wo.workOrderNo || wo.id,
+        jobTitle: wo.jobTitle || job?.jobTitle || '-',
+        componentCode: wo.componentCode || '-',
+        componentName: component?.name || wo.component || '-',
+        dueDate: wo.dueDateSnapshot || wo.dueDate || '-',
+        status: wo.status || '-',
+        maintenanceBasis: wo.maintenanceBasis || '-',
+        department: wo.department || wo.assignedDepartment || '-',
+      };
+    });
+}
+
+export async function getSnapshotDetail(
   vesselId: string,
   year: number,
   month: number,
   snapshotType: string,
   category: string
-) {
+): Promise<DrilldownRow[]> {
   const db = await getDb();
   const monthKey = `${year}-${String(month).padStart(2, '0')}`;
 
@@ -349,44 +478,25 @@ export async function getSnapshotDrilldown(
     return [];
   }
 
-  const allWorkOrders = await repo.getWorkOrders(vesselId);
-  const jobs = await repo.getJobs(vesselId);
-  const components = await repo.getComponents(vesselId);
+  const allWorkOrders = await repo.getWorkOrders(vesselId) as unknown as WorkOrderRecord[];
+  const jobs = await repo.getJobs(vesselId) as unknown as JobRecord[];
+  const components = await repo.getComponents(vesselId) as unknown as ComponentRecord[];
   const componentsByCodeMap = new Map(components.map(c => [c.componentCode, c]));
   const componentsMap = new Map(components.map(c => [c.cuuid, c]));
   const jobsMap = new Map(jobs.map(j => [j.juuid, j]));
 
-  const woIdSet = new Set(snapshot.workOrderIds);
-
-  return allWorkOrders
-    .filter((wo: any) => woIdSet.has(wo.wouuid) || woIdSet.has(wo.id))
-    .map((wo: any) => {
-      const job = wo.jobId ? jobsMap.get(wo.jobId) : undefined;
-      const component = wo.componentCode
-        ? componentsByCodeMap.get(wo.componentCode)
-        : (wo.component ? componentsMap.get(wo.component) : undefined);
-      return {
-        workOrderNo: wo.workOrderNo || wo.id,
-        jobTitle: wo.jobTitle || (job as any)?.jobTitle || '-',
-        componentCode: wo.componentCode || '-',
-        componentName: component?.name || wo.component || '-',
-        dueDate: wo.dueDateSnapshot || wo.dueDate || '-',
-        status: wo.status || '-',
-        maintenanceBasis: wo.maintenanceBasis || '-',
-        department: wo.department || '-',
-      };
-    });
+  return buildDrilldownRows(snapshot.workOrderIds, allWorkOrders, jobsMap, componentsByCodeMap, componentsMap);
 }
 
-export async function getMovementDrilldown(
+export async function getMovementDetail(
   vesselId: string,
   year: number,
   month: number,
   movementType: string
-) {
+): Promise<DrilldownRow[]> {
   const movement = await computeMonthlyMovement(vesselId, year, month);
 
-  const movementMap: Record<string, { count: number; woIds: string[] }> = {
+  const movementMap: Record<string, CategoryBucket> = {
     newJobsEntered: movement.newJobsEntered,
     completedInMonth: movement.completedInMonth,
     postponedInMonth: movement.postponedInMonth,
@@ -400,33 +510,14 @@ export async function getMovementDrilldown(
     return [];
   }
 
-  const allWorkOrders = await repo.getWorkOrders(vesselId);
-  const jobs = await repo.getJobs(vesselId);
-  const components = await repo.getComponents(vesselId);
+  const allWorkOrders = await repo.getWorkOrders(vesselId) as unknown as WorkOrderRecord[];
+  const jobs = await repo.getJobs(vesselId) as unknown as JobRecord[];
+  const components = await repo.getComponents(vesselId) as unknown as ComponentRecord[];
   const componentsByCodeMap = new Map(components.map(c => [c.componentCode, c]));
   const componentsMap = new Map(components.map(c => [c.cuuid, c]));
   const jobsMap = new Map(jobs.map(j => [j.juuid, j]));
 
-  const woIdSet = new Set(movementData.woIds);
-
-  return allWorkOrders
-    .filter((wo: any) => woIdSet.has(wo.wouuid) || woIdSet.has(wo.id))
-    .map((wo: any) => {
-      const job = wo.jobId ? jobsMap.get(wo.jobId) : undefined;
-      const component = wo.componentCode
-        ? componentsByCodeMap.get(wo.componentCode)
-        : (wo.component ? componentsMap.get(wo.component) : undefined);
-      return {
-        workOrderNo: wo.workOrderNo || wo.id,
-        jobTitle: wo.jobTitle || (job as any)?.jobTitle || '-',
-        componentCode: wo.componentCode || '-',
-        componentName: component?.name || wo.component || '-',
-        dueDate: wo.dueDateSnapshot || wo.dueDate || '-',
-        status: wo.status || '-',
-        maintenanceBasis: wo.maintenanceBasis || '-',
-        department: wo.department || '-',
-      };
-    });
+  return buildDrilldownRows(movementData.woIds, allWorkOrders, jobsMap, componentsByCodeMap, componentsMap);
 }
 
 export async function regenerateSnapshots(vesselId: string, year: number, month: number) {

@@ -222,10 +222,10 @@ export async function getMonthlySummaryPreview(req: Request, res: Response) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MONTHLY MAINTENANCE SUMMARY - SNAPSHOT DRILL-DOWN
+// MONTHLY MAINTENANCE SUMMARY - SNAPSHOT DETAIL
 // ═══════════════════════════════════════════════════════════════
 
-export async function getMonthlySummaryDrilldown(req: Request, res: Response) {
+export async function getMonthlySummarySnapshotDetail(req: Request, res: Response) {
   try {
     const vesselId = req.query.vesselId as string;
     const year = parseInt(req.query.year as string, 10);
@@ -241,15 +241,15 @@ export async function getMonthlySummaryDrilldown(req: Request, res: Response) {
     }
 
     if (type === 'movement') {
-      const data = await monthlySnapshotService.getMovementDrilldown(vesselId, year, month, category);
+      const data = await monthlySnapshotService.getMovementDetail(vesselId, year, month, category);
       return res.json(data);
     }
 
-    const data = await monthlySnapshotService.getSnapshotDrilldown(vesselId, year, month, type, category);
+    const data = await monthlySnapshotService.getSnapshotDetail(vesselId, year, month, type, category);
     res.json(data);
   } catch (error: any) {
-    console.error("Error fetching snapshot drilldown:", error);
-    res.status(500).json({ error: "Failed to fetch drilldown data: " + error.message });
+    console.error("Error fetching snapshot detail:", error);
+    res.status(500).json({ error: "Failed to fetch snapshot detail: " + error.message });
   }
 }
 

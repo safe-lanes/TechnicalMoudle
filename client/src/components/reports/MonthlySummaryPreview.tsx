@@ -104,7 +104,7 @@ const MonthlySummaryPreview: React.FC<MonthlySummaryPreviewProps> = ({ data, ves
     setDrilldownOpen(true);
 
     try {
-      const res = await fetch(`/technical/api/reports/maintenance/monthly-summary/drilldown?vesselId=${vesselId}&year=${year}&month=${month}&type=${type}&category=${encodeURIComponent(category)}`);
+      const res = await fetch(`/technical/api/reports/maintenance/monthly-summary/snapshot-detail?vesselId=${vesselId}&year=${year}&month=${month}&type=${type}&category=${encodeURIComponent(category)}`);
       if (!res.ok) throw new Error('Failed to fetch drilldown');
       const rows = await res.json();
       setDrilldownData(rows);
@@ -124,7 +124,7 @@ const MonthlySummaryPreview: React.FC<MonthlySummaryPreviewProps> = ({ data, ves
     setDrilldownOpen(true);
 
     try {
-      const res = await fetch(`/technical/api/reports/maintenance/monthly-summary/drilldown?vesselId=${vesselId}&year=${year}&month=${month}&type=movement&category=${movementType}`);
+      const res = await fetch(`/technical/api/reports/maintenance/monthly-summary/snapshot-detail?vesselId=${vesselId}&year=${year}&month=${month}&type=movement&category=${movementType}`);
       if (!res.ok) throw new Error('Failed to fetch drilldown');
       const rows = await res.json();
       setDrilldownData(rows);

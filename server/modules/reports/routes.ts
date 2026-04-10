@@ -66,7 +66,7 @@ router.post('/reports/completed-jobs', asyncHandler(maintCtrl.exportCompletedJob
 router.post('/reports/unplanned-jobs', asyncHandler(maintCtrl.exportUnplannedJobs));
 router.post('/reports/postponement-log', asyncHandler(maintCtrl.exportPostponementLog));
 router.get('/reports/maintenance/monthly-summary/preview', asyncHandler(maintCtrl.getMonthlySummaryPreview));
-router.get('/reports/maintenance/monthly-summary/drilldown', asyncHandler(maintCtrl.getMonthlySummaryDrilldown));
+router.get('/reports/maintenance/monthly-summary/snapshot-detail', asyncHandler(maintCtrl.getMonthlySummarySnapshotDetail));
 router.post('/reports/maintenance/monthly-summary/regenerate', asyncHandler(maintCtrl.regenerateMonthlySummarySnapshots));
 router.post('/reports/maintenance/monthly-summary/excel', asyncHandler(maintCtrl.exportMonthlySummary));
 

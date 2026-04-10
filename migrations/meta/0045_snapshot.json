@@ -1,6 +1,6 @@
 {
-  "id": "89ca15a2-fb87-4ff5-946e-be32c6b6e179",
-  "prevId": "f71276bd-5288-430b-8cd7-4e3e46045a32",
+  "id": "4b6dcab7-0ef1-4ada-aede-71673d5f81a5",
+  "prevId": "89ca15a2-fb87-4ff5-946e-be32c6b6e179",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -141,6 +141,12 @@
         "sort_order": {
           "name": "sort_order",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "view_mode": {
+          "name": "view_mode",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -542,6 +548,12 @@
           "primaryKey": false,
           "notNull": false,
           "default": false
+        },
+        "rank_view": {
+          "name": "rank_view",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -691,6 +703,95 @@
           "nullsNotDistinct": false,
           "columns": [
             "ruid"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.alert_acknowledgements": {
+      "name": "alert_acknowledgements",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "alert_acknowledgements_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "aauuid": {
+          "name": "aauuid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_uuid": {
+          "name": "event_uuid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_role": {
+          "name": "user_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "comments": {
+          "name": "comments",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "alert_acknowledgements_event_uuid_alert_events_aeuuid_fk": {
+          "name": "alert_acknowledgements_event_uuid_alert_events_aeuuid_fk",
+          "tableFrom": "alert_acknowledgements",
+          "tableTo": "alert_events",
+          "columnsFrom": [
+            "event_uuid"
+          ],
+          "columnsTo": [
+            "aeuuid"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "alert_acknowledgements_aauuid_unique": {
+          "name": "alert_acknowledgements_aauuid_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "aauuid"
           ]
         }
       },
@@ -9674,6 +9775,149 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.monthly_snapshots": {
+      "name": "monthly_snapshots",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "monthly_snapshots_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "vessel_id": {
+          "name": "vessel_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot_month": {
+          "name": "snapshot_month",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot_type": {
+          "name": "snapshot_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot_timestamp": {
+          "name": "snapshot_timestamp",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "work_order_ids": {
+          "name": "work_order_ids",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
+        "generated_at": {
+          "name": "generated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_monthly_snap_vessel_month": {
+          "name": "idx_monthly_snap_vessel_month",
+          "columns": [
+            {
+              "expression": "vessel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "snapshot_month",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_monthly_snap_type": {
+          "name": "idx_monthly_snap_type",
+          "columns": [
+            {
+              "expression": "snapshot_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "monthly_snapshots_vessel_id_vessels_vuuid_fk": {
+          "name": "monthly_snapshots_vessel_id_vessels_vuuid_fk",
+          "tableFrom": "monthly_snapshots",
+          "tableTo": "vessels",
+          "columnsFrom": [
+            "vessel_id"
+          ],
+          "columnsTo": [
+            "vuuid"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unique_monthly_snapshot": {
+          "name": "unique_monthly_snapshot",
+          "nullsNotDistinct": false,
+          "columns": [
+            "vessel_id",
+            "snapshot_month",
+            "snapshot_type",
+            "category"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.planner_dates": {
       "name": "planner_dates",
       "schema": "",
@@ -12081,6 +12325,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "is_rotation_item": {
+          "name": "is_rotation_item",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",

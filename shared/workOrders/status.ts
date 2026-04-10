@@ -141,6 +141,7 @@ export interface WorkOrderStatusInput {
   rhLeadTimeHours?: number;
   calendarLeadTimeDays?: number;
   companyGraceConfig?: CompanyStandardGraceConfig;
+  referenceDate?: Date;
 }
 
 function applyGraceMethod(dueDate: Date, method: CompanyStandardGraceConfig['graceMethod'], value: number | null): Date {
@@ -334,7 +335,7 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
     const dueDateObj = parseDate(dueDate);
     if (!dueDateObj) return 'Active';
     
-    const today = new Date();
+    const today = input.referenceDate ? new Date(input.referenceDate) : new Date();
     today.setHours(0, 0, 0, 0);
     
     const dueDateTime = new Date(dueDateObj);
