@@ -1,0 +1,177 @@
+Task: Update only the Overdue Jobs Report column format to the final agreed structure
+
+We are now finalizing the Overdue Jobs Report format from a maritime PMS domain perspective.
+
+I do not want any redesign, logic rewrite, filter change, export behavior change, or backend change in this task.
+This task is only to update the column headers / displayed table structure of the Overdue Jobs Report to the exact final format agreed below. The current report contains fields like Work Order No, Job Title, Comp Code, Component Name, Dept, Due Date, Days Overdue, Next Due RH, Current RH, RH Overdue, Type, Assigned To, Last Done, and Critical, and we are now replacing that visible structure with a cleaner, clearer overdue-report format.
+
+Final required column format
+Please use exactly this column order for the Overdue Jobs Report:
+
+S.No
+
+WO Code
+
+WO Title
+
+Component Code
+
+Component Name
+
+Department
+
+Job Type
+
+Last Done Date
+
+RH When Last Done
+
+Days/RH Overdue
+
+Assigned To
+
+Critical
+
+What this means
+This is the final display format I want for this report.
+Please update the report table and matching export layout for this report to show these headers in this order only.
+
+Important field meaning
+Use the following interpretation while mapping fields:
+
+WO Code = existing work order number/code
+
+WO Title = existing job title
+
+Component Code = existing component code / comp code
+
+Department = existing dept
+
+Job Type = current job type/category field used by the report logic
+
+Last Done Date = date when the job was last completed/done
+
+RH When Last Done = running hours recorded when the job was last done
+
+Days/RH Overdue = one combined display field:
+
+for calendar-based jobs, show overdue in days
+
+for RH-based jobs, show overdue in running hours
+
+Assigned To = current assigned rank/person
+
+Critical = current critical indicator
+
+Very important instruction
+Do not change anything except the format
+Do not change:
+
+report logic
+
+overdue calculation logic
+
+business rules
+
+filter behavior
+
+period behavior
+
+vessel behavior
+
+API calls
+
+backend queries
+
+export source logic
+
+sorting logic unless required only to support the same report rendering
+
+critical logic
+
+assigned-to logic
+
+job type logic
+
+This task is only to apply the final column/header format for the Overdue Jobs Report.
+
+Specific instruction on old columns
+The previous visible structure had fields such as:
+
+Due Date
+
+Days Overdue
+
+Next Due RH
+
+Current RH
+
+RH Overdue
+
+Type
+
+Last Done
+
+Replace that visible structure with the new agreed structure above.
+
+That means:
+
+Type should now appear as Job Type
+
+Last Done should now appear as Last Done Date
+
+RH-related overdue fields should no longer appear as separate columns in the old scattered format
+
+instead use the combined field Days/RH Overdue
+
+use RH When Last Done instead of showing unrelated RH columns like Next Due RH / Current RH / RH Overdue in the visible report format
+
+Clarification required from you
+Before or after implementation, I want you to explicitly confirm whether you still remember and are preserving the existing calculation logic for:
+
+how overdue is calculated for calendar-based jobs
+
+how overdue is calculated for RH-based jobs
+
+how Last Done Date is derived
+
+how RH When Last Done is derived
+
+how Critical is derived
+
+how Job Type is derived or mapped
+
+Do not guess.
+If you are not fully sure, say so clearly before making the change.
+
+Expected output from you
+After making the change, provide:
+
+exact file(s) changed
+
+confirmation that only the Overdue Jobs Report format was changed
+
+confirmation that no calculation logic was changed
+
+confirmation of how each new column is mapped from the existing fields
+
+explicit statement on whether you remembered/preserved the existing calculation logic correctly
+
+Strict instruction
+Do not change anything else.
+
+no redesign
+
+no summary changes
+
+no additional columns
+
+no report-wide AG Grid migration
+
+no logic cleanup
+
+no backend edits unless absolutely required only to map the same existing fields into the new visible format
+
+no changes to other reports
+
+Only change the Overdue Jobs Report to this final agreed column structure.
