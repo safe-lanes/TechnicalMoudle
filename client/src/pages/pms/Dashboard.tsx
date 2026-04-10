@@ -1602,7 +1602,7 @@ const Dashboard = () => {
                     ]).map(card => (
                       <Card
                         key={card.key}
-                        className={`cursor-pointer transition-shadow bg-white border-0 border-l-4 ${card.borderColor} ${selectedOpCard === card.key ? 'ring-2 ring-blue-400 shadow-md' : 'hover:shadow-lg'} flex`}
+                        className={`cursor-pointer transition-shadow bg-white border-0 border-l-4 ${card.borderColor} ${selectedOpCard === card.key ? 'ring-2 ring-blue-400 shadow-md' : 'hover:shadow-lg'} flex min-h-[120px]`}
                         onClick={() => setSelectedOpCard(card.key)}
                         data-testid={card.testId}
                       >
