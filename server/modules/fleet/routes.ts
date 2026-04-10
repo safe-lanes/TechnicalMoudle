@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { asyncHandler } from '../shared/middleware';
-import { requireOfficeOrAdmin } from '../../middleware/auth';
+import { requireOfficeOrAdmin, requireRole } from '../../middleware/auth';
 import * as fleetCtrl from './controllers/fleetController';
 import * as adminCtrl from './controllers/fleetAdminController';
+
+// Only Sail Admin can mutate master list types
+const requireSailAdmin = requireRole(["Sail Admin"]);
 
 const router = Router();
 
@@ -51,6 +54,13 @@ router.get('/fleet/master-lists/:id', asyncHandler(fleetCtrl.getMasterListById))
 router.post('/fleet/master-lists', asyncHandler(fleetCtrl.createMasterList));
 router.put('/fleet/master-lists/:id', asyncHandler(fleetCtrl.updateMasterList));
 router.delete('/fleet/master-lists/:id', asyncHandler(fleetCtrl.deleteMasterList));
+
+// ── Master List Types (Sail Admin only for mutations) ──
+router.get('/fleet/master-list-types', asyncHandler(fleetCtrl.getMasterListTypes));
+router.get('/fleet/master-list-types/:id', asyncHandler(fleetCtrl.getMasterListTypeById));
+router.post('/fleet/master-list-types', requireSailAdmin, asyncHandler(fleetCtrl.createMasterListType));
+router.put('/fleet/master-list-types/:id', requireSailAdmin, asyncHandler(fleetCtrl.updateMasterListType));
+router.delete('/fleet/master-list-types/:id', requireSailAdmin, asyncHandler(fleetCtrl.deleteMasterListType));
 
 // ── Fleet Vessel Mappings ──
 router.get('/fleet/vessel-mappings', asyncHandler(fleetCtrl.getFleetVesselMappings));

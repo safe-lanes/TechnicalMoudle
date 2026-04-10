@@ -10,6 +10,7 @@ import {
   companyStandardGraceSettings,
   makers,
   masterLists,
+  masterListTypes,
   makerList,
   fleetComponents,
   fleetJobs,
@@ -68,6 +69,8 @@ import {
   type InsertMaker,
   type MasterList,
   type InsertMasterList,
+  type MasterListType,
+  type InsertMasterListType,
   type MakerList,
   type InsertMakerList,
   type FleetComponents,
@@ -602,6 +605,78 @@ export class PostgresStorage {
   async deleteMasterList(id: number): Promise<void> {
     const db = await getDb();
     await db.delete(masterLists).where(eq(masterLists.id, id));
+  }
+
+  // ============= MODULE 2: MASTER LIST TYPES =============
+  // DB-backed registry of list types (replaces hardcoded LIST_TYPES constant).
+  // All queries filter out soft-deleted rows unless explicitly asked.
+
+  async getMasterListTypes(section?: string): Promise<MasterListType[]> {
+    const db = await getDb();
+    const conds = [eq(masterListTypes.isDeleted, false), eq(masterListTypes.isActive, true)];
+    if (section) conds.push(eq(masterListTypes.section, section));
+    return await db.select().from(masterListTypes)
+      .where(and(...conds))
+      .orderBy(asc(masterListTypes.section), asc(masterListTypes.displayOrder), asc(masterListTypes.label));
+  }
+
+  async getAllMasterListTypesIncludingInactive(section?: string): Promise<MasterListType[]> {
+    const db = await getDb();
+    const conds = [eq(masterListTypes.isDeleted, false)];
+    if (section) conds.push(eq(masterListTypes.section, section));
+    return await db.select().from(masterListTypes)
+      .where(and(...conds))
+      .orderBy(asc(masterListTypes.section), asc(masterListTypes.displayOrder), asc(masterListTypes.label));
+  }
+
+  async getMasterListTypeById(id: number): Promise<MasterListType | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(masterListTypes)
+      .where(and(eq(masterListTypes.id, id), eq(masterListTypes.isDeleted, false)));
+    return result[0];
+  }
+
+  async getMasterListTypeByKey(key: string): Promise<MasterListType | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(masterListTypes)
+      .where(and(eq(masterListTypes.listTypeKey, key), eq(masterListTypes.isDeleted, false)));
+    return result[0];
+  }
+
+  async createMasterListType(data: InsertMasterListType & { createdByUuid?: string | null }): Promise<MasterListType> {
+    const db = await getDb();
+    const result = await db.insert(masterListTypes).values(data).returning();
+    return result[0];
+  }
+
+  async updateMasterListType(
+    id: number,
+    data: Partial<InsertMasterListType> & { updatedByUuid?: string | null }
+  ): Promise<MasterListType> {
+    const db = await getDb();
+    const result = await db.update(masterListTypes)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(masterListTypes.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Master list type with id ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async softDeleteMasterListType(id: number, userUuid?: string | null): Promise<void> {
+    const db = await getDb();
+    await db.update(masterListTypes)
+      .set({ isDeleted: true, isActive: false, updatedAt: new Date(), updatedByUuid: userUuid ?? null })
+      .where(eq(masterListTypes.id, id));
+  }
+
+  async countMasterListItemsByType(listTypeKey: string): Promise<number> {
+    const db = await getDb();
+    const result = await db.select({ count: sql<number>`count(*)::int` })
+      .from(masterLists)
+      .where(eq(masterLists.listType, listTypeKey));
+    return Number(result[0]?.count || 0);
   }
 
   // ============= MODULE 2: MAKER LIST =============

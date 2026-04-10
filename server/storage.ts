@@ -92,6 +92,8 @@ import {
   masterLists,
   type MasterList,
   type InsertMasterList,
+  type MasterListType,
+  type InsertMasterListType,
   componentDocuments,
   type ComponentDocument,
   insertComponentDocumentSchema,
@@ -678,6 +680,16 @@ export interface IStorage {
   createMasterList(list: InsertMasterList): Promise<MasterList>;
   updateMasterList(id: number, data: Partial<InsertMasterList>): Promise<MasterList>;
   deleteMasterList(id: number): Promise<void>;
+
+  // Fleet Admin - Master List Types methods (DB-backed registry + Section mapping)
+  getMasterListTypes(section?: string): Promise<MasterListType[]>;
+  getAllMasterListTypesIncludingInactive(section?: string): Promise<MasterListType[]>;
+  getMasterListTypeById(id: number): Promise<MasterListType | undefined>;
+  getMasterListTypeByKey(key: string): Promise<MasterListType | undefined>;
+  createMasterListType(data: InsertMasterListType & { createdByUuid?: string | null }): Promise<MasterListType>;
+  updateMasterListType(id: number, data: Partial<InsertMasterListType> & { updatedByUuid?: string | null }): Promise<MasterListType>;
+  softDeleteMasterListType(id: number, userUuid?: string | null): Promise<void>;
+  countMasterListItemsByType(listTypeKey: string): Promise<number>;
   
   // Data Purge methods
   purgeJobsAndLinkedData(vesselId?: string): Promise<{

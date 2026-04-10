@@ -6,6 +6,7 @@ import {
   insertFleetSparesSchema,
   insertMakerListSchema,
   insertMasterListSchema,
+  insertMasterListTypeSchema,
 } from '@shared/schema';
 import * as repo from '../repositories/fleetRepository';
 
@@ -368,17 +369,185 @@ export async function getMasterListById(id: number) {
 
 export async function createMasterList(body: any) {
   const validatedData = insertMasterListSchema.parse(body);
+  // FK-style validation at the SERVICE layer (intentional — NOT a DB FK).
+  //
+  // WHY NOT A DB FK:
+  //   A real foreign key on master_lists.list_type -> master_list_types.list_type_key
+  //   would fail the migration any time an existing master_lists row referenced
+  //   an orphan type. Migration 085 seeds orphans as inactive Spares entries,
+  //   but we still want existing orphan items to remain readable via GET so
+  //   admins can reassign them without data loss.
+  //
+  //   Service-level enforcement therefore:
+  //     - BLOCKS creation of new items referencing unknown/inactive types
+  //     - BLOCKS updates that change list_type to an unknown/inactive value
+  //     - ALLOWS reads of pre-existing rows even if their list_type is inactive
+  //
+  // If we ever do a hard sync cleanup, this can be upgraded to a DB FK.
+  const type = await repo.getMasterListTypeByKey(validatedData.listType);
+  if (!type || !type.isActive) {
+    const err: any = new Error(
+      `Invalid listType "${validatedData.listType}" — must reference an active entry in master_list_types.`
+    );
+    err.statusCode = 400;
+    throw err;
+  }
   return repo.createMasterList(validatedData);
 }
 
 export async function updateMasterList(id: number, body: any) {
   const partialMasterListSchema = insertMasterListSchema.partial();
   const validatedData = partialMasterListSchema.parse(body);
+  // If listType is being changed, validate the new value exists + is active.
+  if (validatedData.listType !== undefined) {
+    const type = await repo.getMasterListTypeByKey(validatedData.listType);
+    if (!type || !type.isActive) {
+      const err: any = new Error(
+        `Invalid listType "${validatedData.listType}" — must reference an active entry in master_list_types.`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+  }
   return repo.updateMasterList(id, validatedData);
 }
 
 export async function deleteMasterList(id: number) {
   await repo.deleteMasterList(id);
+  return { success: true };
+}
+
+// ══════════════════════════════════════════════════════════
+// Master List Types (DB-backed registry + Section mapping)
+// ══════════════════════════════════════════════════════════
+// Business rules:
+//   - is_system=true rows cannot be deleted or have their key/section modified
+//   - A type with items in use (master_lists.list_type = key) cannot be
+//     deleted OR have its key renamed — the caller must reassign/delete
+//     the dependent master_list items first.
+//   - Only Sail Admin can mutate these rows (enforced at route level via
+//     requireRole middleware; this service layer assumes the auth check
+//     has already passed).
+
+export async function getMasterListTypes(section?: string, includeInactive = false) {
+  if (includeInactive) {
+    return repo.getAllMasterListTypesIncludingInactive(section);
+  }
+  return repo.getMasterListTypes(section);
+}
+
+export async function getMasterListTypeById(id: number) {
+  const type = await repo.getMasterListTypeById(id);
+  if (!type) {
+    const err: any = new Error('Master list type not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  return type;
+}
+
+export async function createMasterListType(body: any, userUuid?: string | null) {
+  const validatedData = insertMasterListTypeSchema.parse(body);
+
+  // Block key collision (active or soft-deleted with same key is a conflict
+  // because the DB column has a UNIQUE constraint on list_type_key).
+  const existing = await repo.getMasterListTypeByKey(validatedData.listTypeKey);
+  if (existing) {
+    const err: any = new Error(
+      `List type with key "${validatedData.listTypeKey}" already exists`
+    );
+    err.statusCode = 409;
+    throw err;
+  }
+
+  return repo.createMasterListType({
+    ...validatedData,
+    isSystem: false, // new types are never system types
+    createdByUuid: userUuid ?? null,
+    updatedByUuid: userUuid ?? null,
+  });
+}
+
+export async function updateMasterListType(id: number, body: any, userUuid?: string | null) {
+  const partialSchema = insertMasterListTypeSchema.partial();
+  const validatedData = partialSchema.parse(body);
+
+  const existing = await repo.getMasterListTypeById(id);
+  if (!existing) {
+    const err: any = new Error('Master list type not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  // System type protection: cannot change key or section on seeded rows
+  if (existing.isSystem) {
+    if (validatedData.listTypeKey !== undefined && validatedData.listTypeKey !== existing.listTypeKey) {
+      const err: any = new Error('System list types cannot have their key modified');
+      err.statusCode = 400;
+      throw err;
+    }
+    if (validatedData.section !== undefined && validatedData.section !== existing.section) {
+      const err: any = new Error('System list types cannot have their section modified');
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+
+  // Rename protection: if the key is being changed and items reference the
+  // old key, block the rename (caller must reassign/delete items first).
+  if (
+    validatedData.listTypeKey !== undefined &&
+    validatedData.listTypeKey !== existing.listTypeKey
+  ) {
+    const inUse = await repo.countMasterListItemsByType(existing.listTypeKey);
+    if (inUse > 0) {
+      const err: any = new Error(
+        `Cannot rename — ${inUse} item(s) use this type. Please reassign or delete those items first.`
+      );
+      err.statusCode = 409;
+      throw err;
+    }
+    // Also check the destination key doesn't already exist
+    const collision = await repo.getMasterListTypeByKey(validatedData.listTypeKey);
+    if (collision) {
+      const err: any = new Error(
+        `List type with key "${validatedData.listTypeKey}" already exists`
+      );
+      err.statusCode = 409;
+      throw err;
+    }
+  }
+
+  return repo.updateMasterListType(id, {
+    ...validatedData,
+    updatedByUuid: userUuid ?? null,
+  });
+}
+
+export async function deleteMasterListType(id: number, userUuid?: string | null) {
+  const existing = await repo.getMasterListTypeById(id);
+  if (!existing) {
+    const err: any = new Error('Master list type not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (existing.isSystem) {
+    const err: any = new Error('System list types cannot be deleted');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const inUse = await repo.countMasterListItemsByType(existing.listTypeKey);
+  if (inUse > 0) {
+    const err: any = new Error(
+      `Cannot delete — ${inUse} item(s) use this type. Please reassign or delete those items first.`
+    );
+    err.statusCode = 409;
+    throw err;
+  }
+
+  await repo.softDeleteMasterListType(id, userUuid);
   return { success: true };
 }
 
