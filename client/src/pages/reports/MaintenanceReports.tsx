@@ -418,39 +418,39 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         const columns = [
           { header: 'S.No', field: 'sNo', width: 8 },
-          { header: 'Work Order No', field: 'workOrderNo', width: 30 },
-          { header: 'Job Title', field: 'jobTitle', width: 40 },
-          { header: 'Comp Code', field: 'componentCode', width: 18 },
+          { header: 'WO Code', field: 'workOrderNo', width: 30 },
+          { header: 'WO Title', field: 'jobTitle', width: 40 },
+          { header: 'Component Code', field: 'componentCode', width: 18 },
           { header: 'Component Name', field: 'componentName', width: 32 },
-          { header: 'Dept', field: 'department', width: 14 },
-          { header: 'Due Date', field: 'formattedDueDate', width: 18 },
-          { header: 'Days Overdue', field: 'daysPastDue', width: 16 },
-          { header: 'Next Due RH', field: 'nextDueReading', width: 16 },
-          { header: 'Current RH', field: 'currentReading', width: 16 },
-          { header: 'RH Overdue', field: 'hoursPastDue', width: 14 },
-          { header: 'Type', field: 'overdueType', width: 14 },
+          { header: 'Department', field: 'department', width: 14 },
+          { header: 'Job Type', field: 'jobType', width: 16 },
+          { header: 'Last Done Date', field: 'lastDoneDate', width: 18 },
+          { header: 'RH When Last Done', field: 'rhWhenLastDone', width: 18 },
+          { header: 'Days/RH Overdue', field: 'daysRhOverdue', width: 18 },
           { header: 'Assigned To', field: 'assignedTo', width: 20 },
-          { header: 'Last Done', field: 'lastDoneDate', width: 18 },
           { header: 'Critical', field: 'critical', width: 12 }
         ];
 
-        const data = overdueRaw.map((job: any, index: number) => ({
-          sNo: index + 1,
-          workOrderNo: job.workOrderNo,
-          jobTitle: job.jobTitle,
-          componentCode: job.componentCode,
-          componentName: job.componentName,
-          department: job.department,
-          formattedDueDate: formatDate(job.dueDate),
-          daysPastDue: job.daysPastDue > 0 ? job.daysPastDue : '-',
-          nextDueReading: job.nextDueReading,
-          currentReading: job.currentReading,
-          hoursPastDue: job.hoursPastDue > 0 ? job.hoursPastDue : '-',
-          overdueType: job.overdueType,
-          assignedTo: job.assignedTo,
-          lastDoneDate: job.lastDoneDate,
-          critical: job.critical
-        }));
+        const data = overdueRaw.map((job: any, index: number) => {
+          const isRHBased = job.maintenanceBasis === 'Running Hours';
+          const daysRhOverdue = isRHBased
+            ? (job.hoursPastDue > 0 ? `${job.hoursPastDue} RH` : '-')
+            : (job.daysPastDue > 0 ? `${job.daysPastDue} days` : '-');
+          return {
+            sNo: index + 1,
+            workOrderNo: job.workOrderNo,
+            jobTitle: job.jobTitle,
+            componentCode: job.componentCode,
+            componentName: job.componentName,
+            department: job.department,
+            jobType: job.maintenanceBasis || '-',
+            lastDoneDate: job.lastDoneDate,
+            rhWhenLastDone: job.lastDoneRH || '-',
+            daysRhOverdue,
+            assignedTo: job.assignedTo,
+            critical: job.critical
+          };
+        });
 
         const summary = [
           { label: 'Total Overdue', value: overdueSummary.totalOverdue },

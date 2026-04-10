@@ -331,11 +331,11 @@ class PDFReportGenerator {
     columns: TableColumn[],
     data: any[]
   ): void {
-    // Force landscape and A3 for better column visibility (15 columns)
+    // Landscape A4 sufficient for 12 columns
     this.doc = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
-      format: 'a3' // Use A3 for 15 columns
+      format: 'a4'
     });
 
     const pageWidth = this.doc.internal.pageSize.getWidth();

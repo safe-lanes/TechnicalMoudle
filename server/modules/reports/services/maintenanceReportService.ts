@@ -399,6 +399,7 @@ export async function getOverdueJobsData(vesselId: string) {
         componentCode: wo.componentCode || '-',
         componentName: component?.name || wo.component || '-',
         department: wo.department || job?.department || '-',
+        maintenanceBasis,
         dueDate: dueDate || '-',
         daysPastDue,
         nextDueReading: job?.nextDueRH || wo.nextDueReading || '-',
@@ -407,6 +408,7 @@ export async function getOverdueJobsData(vesselId: string) {
         overdueType,
         assignedTo: wo.assignedTo || job?.assignedTo || '-',
         lastDoneDate: wo.lastDoneDateSnapshot || '-',
+        lastDoneRH: job?.lastDoneRH || '-',
         critical: isCriticalEquipment ? 'YES' : 'No'
       });
     }
@@ -469,19 +471,16 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
 
   const columns: ColumnDef[] = [
     { key: 'sno', header: 'S.No', width: 6, type: 'number', align: 'center' },
-    { key: 'workOrderNo', header: 'Work Order No', width: 22, type: 'text' },
-    { key: 'jobTitle', header: 'Job Title', width: 30, type: 'text' },
-    { key: 'componentCode', header: 'Comp Code', width: 14, type: 'text' },
+    { key: 'workOrderNo', header: 'WO Code', width: 22, type: 'text' },
+    { key: 'jobTitle', header: 'WO Title', width: 30, type: 'text' },
+    { key: 'componentCode', header: 'Component Code', width: 16, type: 'text' },
     { key: 'componentName', header: 'Component Name', width: 25, type: 'text' },
-    { key: 'department', header: 'Dept', width: 10, type: 'text', align: 'center' },
-    { key: 'dueDate', header: 'Due Date', width: 14, type: 'date', align: 'center' },
-    { key: 'daysOverdue', header: 'Days Overdue', width: 12, type: 'number', align: 'right' },
-    { key: 'nextDueRH', header: 'Next Due RH', width: 12, type: 'number', align: 'right' },
-    { key: 'currentRH', header: 'Current RH', width: 12, type: 'number', align: 'right' },
-    { key: 'rhOverdue', header: 'RH Overdue', width: 12, type: 'number', align: 'right' },
-    { key: 'overdueType', header: 'Type', width: 10, type: 'text', align: 'center' },
+    { key: 'department', header: 'Department', width: 12, type: 'text' },
+    { key: 'jobType', header: 'Job Type', width: 14, type: 'text', align: 'center' },
+    { key: 'lastDoneDate', header: 'Last Done Date', width: 14, type: 'date', align: 'center' },
+    { key: 'rhWhenLastDone', header: 'RH When Last Done', width: 16, type: 'text', align: 'right' },
+    { key: 'daysRhOverdue', header: 'Days/RH Overdue', width: 16, type: 'text', align: 'right' },
     { key: 'assignedTo', header: 'Assigned To', width: 16, type: 'text' },
-    { key: 'lastDoneDate', header: 'Last Done', width: 14, type: 'date', align: 'center' },
     { key: 'criticalEquipment', header: 'Critical', width: 10, type: 'text', align: 'center' },
   ];
   const totalColumns = columns.length;
@@ -494,7 +493,10 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
 
   const preparedData: WorkOrderRowData[] = overdueJobs.map((job, index) => {
     const isCritical = job.critical === 'YES';
-    const isCalendarBased = job.overdueType === 'Calendar';
+    const isRHBased = job.maintenanceBasis === 'Running Hours';
+    const daysRhOverdue = isRHBased
+      ? (job.hoursPastDue > 0 ? `${job.hoursPastDue} RH` : '-')
+      : (job.daysPastDue > 0 ? `${job.daysPastDue} days` : '-');
 
     return {
       sno: index + 1,
@@ -503,14 +505,11 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
       componentCode: job.componentCode,
       componentName: job.componentName,
       department: job.department,
-      dueDate: job.dueDate,
-      daysOverdue: job.daysPastDue || '-',
-      nextDueRH: isCalendarBased ? '-' : (job.nextDueReading ?? '-'),
-      currentRH: isCalendarBased ? '-' : (job.currentReading ?? '-'),
-      rhOverdue: isCalendarBased ? '-' : (job.hoursPastDue || '-'),
-      overdueType: job.overdueType || '-',
-      assignedTo: job.assignedTo,
+      jobType: job.maintenanceBasis || '-',
       lastDoneDate: job.lastDoneDate,
+      rhWhenLastDone: job.lastDoneRH || '-',
+      daysRhOverdue,
+      assignedTo: job.assignedTo,
       criticalEquipment: isCritical ? 'YES' : 'No',
       _rowStatus: 'overdue' as WorkOrderStatus,
       isCriticalEquipment: isCritical
