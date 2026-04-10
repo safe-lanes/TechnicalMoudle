@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte, lt, gt, isNull, not } from 'drizzle-orm';
 import { getDb } from './db';
 import {
   users,
@@ -8626,7 +8626,10 @@ export class PostgresStorage {
     return db
       .select()
       .from(admnRoleMaster)
-      .where(and(eq(admnRoleMaster.isActive, true), eq(admnRoleMaster.isDeleted, false)))
+      .where(and(
+        eq(admnRoleMaster.isActive, true),
+        or(eq(admnRoleMaster.isDeleted, false), isNull(admnRoleMaster.isDeleted))
+      ))
       .orderBy(asc(admnRoleMaster.sortOrder));
   }
 
@@ -8635,7 +8638,10 @@ export class PostgresStorage {
     return db
       .select()
       .from(admMenumasterAc)
-      .where(and(eq(admMenumasterAc.isActive, true), eq(admMenumasterAc.isDeleted, false)))
+      .where(and(
+        eq(admMenumasterAc.isActive, true),
+        or(eq(admMenumasterAc.isDeleted, false), isNull(admMenumasterAc.isDeleted))
+      ))
       .orderBy(asc(admMenumasterAc.sortOrder));
   }
 
