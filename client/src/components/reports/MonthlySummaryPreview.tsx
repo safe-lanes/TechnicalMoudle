@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, RefreshCw, ChevronDown, ChevronRight, TrendingUp, TrendingDown, ArrowRight, CheckCircle, AlertTriangle, Clock, XCircle, Wrench, FileWarning, ShieldCheck, type LucideIcon } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2, RefreshCw, ChevronDown, ChevronRight, TrendingUp, TrendingDown, ArrowRight, CheckCircle, AlertTriangle, Clock, XCircle, Wrench, FileWarning, ShieldCheck, AlertCircle, type LucideIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface CategoryData {
@@ -63,6 +64,8 @@ interface MonthlySummaryPreviewProps {
   vesselId: string;
   year: number;
   month: number;
+  isLoading?: boolean;
+  error?: string | null;
   onRegenerate: () => Promise<void>;
 }
 
@@ -81,7 +84,57 @@ const CATEGORY_STYLES: Record<string, { icon: LucideIcon; color: string; bg: str
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
 
-const MonthlySummaryPreview: React.FC<MonthlySummaryPreviewProps> = ({ data, vesselId, year, month, onRegenerate }) => {
+function MonthlySummaryLoadingSkeleton() {
+  return (
+    <div className="space-y-4" data-testid="monthly-summary-skeleton">
+      <div className="grid grid-cols-4 gap-3">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i}>
+            <CardContent className="p-3 text-center space-y-2">
+              <Skeleton className="h-3 w-20 mx-auto" />
+              <Skeleton className="h-8 w-12 mx-auto" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        {[...Array(3)].map((_, i) => (
+          <Card key={i}>
+            <CardHeader className="pb-2 pt-3 px-4">
+              <Skeleton className="h-5 w-32" />
+              <Skeleton className="h-3 w-24" />
+            </CardHeader>
+            <CardContent className="px-4 pb-3 space-y-2">
+              {[...Array(7)].map((_, j) => (
+                <Skeleton key={j} className="h-4 w-full" />
+              ))}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MonthlySummaryErrorPanel({ error, onRetry }: { error: string; onRetry: () => void }) {
+  return (
+    <Card className="border-red-200 dark:border-red-800" data-testid="monthly-summary-error">
+      <CardContent className="p-6 flex flex-col items-center gap-3 text-center">
+        <AlertCircle className="h-10 w-10 text-red-500" />
+        <div>
+          <p className="font-semibold text-red-700 dark:text-red-400">Snapshot Generation Failed</p>
+          <p className="text-sm text-muted-foreground mt-1">{error}</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={onRetry} data-testid="button-retry-snapshot">
+          <RefreshCw className="h-3 w-3 mr-1" />
+          Retry
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+const MonthlySummaryPreview: React.FC<MonthlySummaryPreviewProps> = ({ data, vesselId, year, month, isLoading, error, onRegenerate }) => {
   const { toast } = useToast();
   const [drilldownOpen, setDrilldownOpen] = useState(false);
   const [drilldownTitle, setDrilldownTitle] = useState('');
@@ -89,6 +142,14 @@ const MonthlySummaryPreview: React.FC<MonthlySummaryPreviewProps> = ({ data, ves
   const [drilldownLoading, setDrilldownLoading] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [verificationOpen, setVerificationOpen] = useState(false);
+
+  if (isLoading) {
+    return <MonthlySummaryLoadingSkeleton />;
+  }
+
+  if (error) {
+    return <MonthlySummaryErrorPanel error={error} onRetry={() => onRegenerate()} />;
+  }
 
   const { opening, movement, closing, indicators, snapshotMeta } = data;
   const periodLabel = `${MONTH_NAMES[month - 1]} ${year}`;

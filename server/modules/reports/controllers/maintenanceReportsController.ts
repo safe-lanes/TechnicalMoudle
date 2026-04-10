@@ -295,7 +295,10 @@ export async function exportMonthlySummary(req: Request, res: Response) {
     let year: number;
     let month: number;
 
-    if (startDate) {
+    if (req.body.year && req.body.month) {
+      year = Number(req.body.year);
+      month = Number(req.body.month);
+    } else if (startDate) {
       const d = new Date(startDate);
       year = d.getFullYear();
       month = d.getMonth() + 1;

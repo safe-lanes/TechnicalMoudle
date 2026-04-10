@@ -1017,6 +1017,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         }
         if (startDate) requestBody.startDate = toLocalDateStr(startDate);
         if (endDate) requestBody.endDate = toLocalDateStr(endDate);
+
+        if (reportId === 'monthly-summary' && startDate) {
+          requestBody.year = startDate.getFullYear();
+          requestBody.month = startDate.getMonth() + 1;
+        }
       }
       
       // Add viewType for workload-distribution (default to summary view)
