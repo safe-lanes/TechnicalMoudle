@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,6 @@ import {
   Search,
   FileText,
   Loader2,
-  ArrowUpDown,
   Package,
   Droplets,
   FlaskConical,
@@ -35,7 +34,7 @@ import {
   ChevronUp,
   Eye,
 } from "lucide-react";
-import { TablePagination, usePagination } from "@/components/reports/TablePagination";
+import ReportAgGridTable from "@/components/reports/ReportAgGridTable";
 import { useQuery } from "@tanstack/react-query";
 import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
@@ -89,47 +88,9 @@ interface LowStockAlertReportProps {
   globalComponent?: string;
 }
 
-type SortField = 'priority' | 'itemCode' | 'itemName' | 'itemType' | 'category' | 'rob' | 'minStock' | 'deficit' | 'deficitPercent' | 'uom' | 'avgMonthlyConsumption' | 'daysUntilStockout' | 'estimatedCost' | 'supplier' | 'leadTime';
-type SortDirection = 'asc' | 'desc';
-
 function formatCurrency(val: number | null | undefined): string {
   if (val == null || val === 0) return 'N/A';
   return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function getPriorityBadge(priority: string) {
-  switch (priority) {
-    case 'Critical':
-      return <Badge className="bg-red-600 text-white border-red-700">CRITICAL</Badge>;
-    case 'High':
-      return <Badge className="bg-orange-500 text-white border-orange-600">HIGH</Badge>;
-    case 'Medium':
-      return <Badge className="bg-yellow-500 text-white border-yellow-600">MEDIUM</Badge>;
-    default:
-      return <Badge>{priority}</Badge>;
-  }
-}
-
-function getTypeBadge(type: string) {
-  switch (type) {
-    case 'stores':
-      return <Badge variant="outline" className="border-purple-300 text-purple-700">Stores</Badge>;
-    case 'lubricants':
-    case 'lubes':
-      return <Badge variant="outline" className="border-blue-300 text-blue-700">Lubricants</Badge>;
-    case 'chemicals':
-      return <Badge variant="outline" className="border-green-300 text-green-700">Chemicals</Badge>;
-    default:
-      return <Badge variant="outline">{type}</Badge>;
-  }
-}
-
-function getDaysUntilStockoutDisplay(days: number | null) {
-  if (days === null) return <span className="text-gray-400">N/A</span>;
-  if (days === 0) return <span className="text-red-600 font-bold">0 days</span>;
-  if (days < 7) return <span className="text-orange-500 font-semibold">{days} days</span>;
-  if (days < 30) return <span className="text-yellow-600">{days} days</span>;
-  return <span className="text-green-600">{days} days</span>;
 }
 
 const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesselId: propVesselId, source = 'stores', embedded, globalVessels = [], globalComponent = "" }) => {
@@ -143,17 +104,11 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
-  const [sortField, setSortField] = useState<SortField>('priority');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingExcel, setGeneratingExcel] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [viewingSnapshotId, setViewingSnapshotId] = useState<number | null>(null);
 
-  const criticalPagination = usePagination(10);
-  const highPagination = usePagination(10);
-  const mediumPagination = usePagination(10);
-  const allItemsPagination = usePagination(25);
 
   const { data, isLoading, error } = useQuery<LowStockAlertResponse>({
     queryKey: [apiBase, effectiveVesselId, source],
@@ -294,63 +249,16 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
     const sorted = [...filteredItems];
     const priorityOrder: Record<string, number> = { Critical: 0, High: 1, Medium: 2 };
     sorted.sort((a, b) => {
-      let cmp = 0;
-      switch (sortField) {
-        case 'priority':
-          cmp = (priorityOrder[a.priority] ?? 3) - (priorityOrder[b.priority] ?? 3);
-          if (cmp === 0) cmp = b.deficit - a.deficit;
-          break;
-        case 'itemCode': cmp = (a.itemCode || '').localeCompare(b.itemCode || ''); break;
-        case 'itemName': cmp = (a.itemName || '').localeCompare(b.itemName || ''); break;
-        case 'itemType': cmp = (a.itemType || '').localeCompare(b.itemType || ''); break;
-        case 'category': cmp = (a.category || '').localeCompare(b.category || ''); break;
-        case 'rob': cmp = a.rob - b.rob; break;
-        case 'minStock': cmp = a.minStock - b.minStock; break;
-        case 'deficit': cmp = a.deficit - b.deficit; break;
-        case 'deficitPercent': cmp = a.deficitPercent - b.deficitPercent; break;
-        case 'uom': cmp = (a.uom || '').localeCompare(b.uom || ''); break;
-        case 'avgMonthlyConsumption': cmp = a.avgMonthlyConsumption - b.avgMonthlyConsumption; break;
-        case 'daysUntilStockout': cmp = (a.daysUntilStockout ?? 99999) - (b.daysUntilStockout ?? 99999); break;
-        case 'estimatedCost': cmp = (a.estimatedCost ?? 0) - (b.estimatedCost ?? 0); break;
-        case 'supplier': cmp = (a.supplier || '').localeCompare(b.supplier || ''); break;
-        case 'leadTime': cmp = (a.leadTime || '').localeCompare(b.leadTime || ''); break;
-        default: cmp = 0;
-      }
-      return sortDirection === 'desc' ? -cmp : cmp;
+      const cmp = (priorityOrder[a.priority] ?? 3) - (priorityOrder[b.priority] ?? 3);
+      return cmp === 0 ? b.deficit - a.deficit : cmp;
     });
     return sorted;
-  }, [filteredItems, sortField, sortDirection]);
+  }, [filteredItems]);
 
   const criticalItems = useMemo(() => filteredItems.filter(i => i.priority === 'Critical'), [filteredItems]);
   const highPriorityItems = useMemo(() => filteredItems.filter(i => i.priority === 'High'), [filteredItems]);
   const mediumPriorityItems = useMemo(() => filteredItems.filter(i => i.priority === 'Medium'), [filteredItems]);
 
-  useEffect(() => {
-    criticalPagination.resetPage();
-    highPagination.resetPage();
-    mediumPagination.resetPage();
-    allItemsPagination.resetPage();
-  }, [searchQuery, categoryFilter, priorityFilter]);
-
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
-
-  const SortButton = ({ field, label }: { field: SortField; label: string }) => (
-    <button
-      className="flex items-center gap-1 font-medium text-xs uppercase text-gray-600 hover:text-gray-900"
-      onClick={() => handleSort(field)}
-      data-testid={`button-sort-${field}`}
-    >
-      {label}
-      <ArrowUpDown className={`h-3 w-3 ${sortField === field ? 'text-blue-600' : 'text-gray-400'}`} />
-    </button>
-  );
 
   const handlePdfExport = async () => {
     setGeneratingPdf(true);
@@ -458,64 +366,55 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
     }
   };
 
-  const renderPriorityTable = (priorityItems: LowStockItem[], label: string, pagination: ReturnType<typeof usePagination>) => {
-    const paginatedItems = pagination.paginateItems(priorityItems);
-    return (
-      <>
-        <div className="rounded-lg border overflow-hidden bg-white">
-          <div className="overflow-x-auto">
-            <table className="w-full" data-testid={`table-${label.toLowerCase()}`}>
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Part Code' : 'Item Code'}</th>
-                  <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Part Name' : 'Item Name'}</th>
-                  <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Component' : 'Category'}</th>
-                  {!isSpares && <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Type</th>}
-                  <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Current Qty' : 'ROB'}</th>
-                  <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Min Qty' : 'Min'}</th>
-                  <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">{isSpares ? 'Shortage' : 'Deficit'}</th>
-                  {!isSpares && <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">UOM</th>}
-                  {!isSpares && <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Avg Monthly</th>}
-                  {!isSpares && <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Days to Stockout</th>}
-                  {!isSpares && <th className="text-right py-3 px-3 font-medium text-xs uppercase text-gray-600">Est. Cost</th>}
-                  {!isSpares && <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Supplier</th>}
-                  {!isSpares && <th className="text-left py-3 px-3 font-medium text-xs uppercase text-gray-600">Lead Time</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {paginatedItems.map(item => (
-                  <tr key={item.id} className="hover:bg-gray-50/50 text-sm" data-testid={`row-${label.toLowerCase()}-${item.id}`}>
-                    <td className="py-3 px-3 font-mono text-gray-700">{item.itemCode || '-'}</td>
-                    <td className="py-3 px-3 font-medium text-gray-900">{item.itemName || '-'}</td>
-                    <td className="py-3 px-3 text-gray-600">{item.category || '-'}</td>
-                    {!isSpares && <td className="py-3 px-3">{getTypeBadge(item.itemType)}</td>}
-                    <td className="py-3 px-3 text-right font-semibold text-gray-900">{item.rob}</td>
-                    <td className="py-3 px-3 text-right text-gray-600">{item.minStock}</td>
-                    <td className="py-3 px-3 text-right font-semibold text-red-600">{item.deficit}</td>
-                    {!isSpares && <td className="py-3 px-3 text-gray-600">{item.uom || '-'}</td>}
-                    {!isSpares && <td className="py-3 px-3 text-right text-gray-600">{item.avgMonthlyConsumption}</td>}
-                    {!isSpares && <td className="py-3 px-3 text-right">{getDaysUntilStockoutDisplay(item.daysUntilStockout)}</td>}
-                    {!isSpares && <td className="py-3 px-3 text-right text-gray-700">{formatCurrency(item.estimatedCost)}</td>}
-                    {!isSpares && <td className="py-3 px-3 text-gray-600">{item.supplier || '-'}</td>}
-                    {!isSpares && <td className="py-3 px-3 text-gray-600">{item.leadTime || '-'}</td>}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        {priorityItems.length > pagination.pageSize && (
-          <TablePagination
-            totalItems={priorityItems.length}
-            pageSize={pagination.pageSize}
-            currentPage={pagination.currentPage}
-            onPageChange={pagination.handlePageChange}
-            onPageSizeChange={pagination.handlePageSizeChange}
-          />
-        )}
-      </>
+  const getPriorityTableColumns = () => {
+    const cols = [
+      { header: isSpares ? 'Part Code' : 'Item Code', field: 'itemCode' },
+      { header: isSpares ? 'Part Name' : 'Item Name', field: 'itemName' },
+      { header: isSpares ? 'Component' : 'Category', field: 'category' },
+    ];
+    if (!isSpares) cols.push({ header: 'Type', field: 'itemType' });
+    cols.push(
+      { header: isSpares ? 'Current Qty' : 'ROB', field: 'rob' },
+      { header: isSpares ? 'Min Qty' : 'Min', field: 'minStock' },
+      { header: isSpares ? 'Shortage' : 'Deficit', field: 'deficit' },
     );
+    if (!isSpares) {
+      cols.push(
+        { header: 'UOM', field: 'uom' },
+        { header: 'Avg Monthly', field: 'avgMonthlyConsumption' },
+        { header: 'Days to Stockout', field: 'daysUntilStockout' },
+        { header: 'Est. Cost', field: 'estCost' },
+        { header: 'Supplier', field: 'supplier' },
+        { header: 'Lead Time', field: 'leadTime' },
+      );
+    }
+    return cols;
   };
+
+  const mapPriorityData = (priorityItems: LowStockItem[]) =>
+    priorityItems.map(item => ({
+      itemCode: item.itemCode || '-',
+      itemName: item.itemName || '-',
+      category: item.category || '-',
+      itemType: item.itemType || '-',
+      rob: item.rob,
+      minStock: item.minStock,
+      deficit: item.deficit,
+      uom: item.uom || '-',
+      avgMonthlyConsumption: item.avgMonthlyConsumption,
+      daysUntilStockout: item.daysUntilStockout ?? 'N/A',
+      estCost: formatCurrency(item.estimatedCost),
+      supplier: item.supplier || '-',
+      leadTime: item.leadTime || '-',
+    }));
+
+  const renderPriorityTable = (priorityItems: LowStockItem[], label: string) => (
+    <ReportAgGridTable
+      columns={getPriorityTableColumns()}
+      data={mapPriorityData(priorityItems)}
+      height={priorityItems.length > 15 ? '500px' : `${Math.max(priorityItems.length * 36 + 50, 150)}px`}
+    />
+  );
 
   if (!effectiveVesselId) {
     return (
@@ -719,7 +618,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                 <CardDescription className="text-red-600">These items are completely depleted and require immediate ordering</CardDescription>
               </CardHeader>
               <CardContent>
-                {renderPriorityTable(criticalItems, 'critical', criticalPagination)}
+                {renderPriorityTable(criticalItems, 'critical')}
               </CardContent>
             </Card>
           )}
@@ -734,7 +633,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                 <CardDescription className="text-orange-600">These items need to be ordered soon</CardDescription>
               </CardHeader>
               <CardContent>
-                {renderPriorityTable(highPriorityItems, 'high', highPagination)}
+                {renderPriorityTable(highPriorityItems, 'high')}
               </CardContent>
             </Card>
           )}
@@ -749,7 +648,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                 <CardDescription className="text-yellow-600">These items are below minimum but not critical yet</CardDescription>
               </CardHeader>
               <CardContent>
-                {renderPriorityTable(mediumPriorityItems, 'medium', mediumPagination)}
+                {renderPriorityTable(mediumPriorityItems, 'medium')}
               </CardContent>
             </Card>
           )}
@@ -763,95 +662,50 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
               <CardDescription>Complete list of items below minimum stock levels</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
-                <div className="overflow-x-auto">
-                  <table className="w-full" data-testid="table-all-items">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left py-3 px-3"><SortButton field="itemCode" label={isSpares ? "Part Code" : "Item Code"} /></th>
-                        <th className="text-left py-3 px-3"><SortButton field="itemName" label={isSpares ? "Part Name" : "Item Name"} /></th>
-                        {!isSpares && <th className="text-left py-3 px-3"><SortButton field="itemType" label="Type" /></th>}
-                        <th className="text-left py-3 px-3"><SortButton field="category" label={isSpares ? "Component" : "Category"} /></th>
-                        <th className="text-right py-3 px-3"><SortButton field="rob" label={isSpares ? "Current Qty" : "ROB"} /></th>
-                        <th className="text-right py-3 px-3"><SortButton field="minStock" label={isSpares ? "Min Qty" : "Min Stock"} /></th>
-                        <th className="text-right py-3 px-3"><SortButton field="deficit" label={isSpares ? "Shortage" : "Deficit"} /></th>
-                        <th className="text-right py-3 px-3"><SortButton field="deficitPercent" label={isSpares ? "Shortage %" : "Deficit %"} /></th>
-                        {!isSpares && <th className="text-left py-3 px-3"><SortButton field="uom" label="UOM" /></th>}
-                        {!isSpares && <th className="text-right py-3 px-3"><SortButton field="avgMonthlyConsumption" label="Avg Monthly" /></th>}
-                        {!isSpares && <th className="text-right py-3 px-3"><SortButton field="daysUntilStockout" label="Days to Stockout" /></th>}
-                        {!isSpares && <th className="text-right py-3 px-3"><SortButton field="estimatedCost" label="Est. Cost" /></th>}
-                        {!isSpares && <th className="text-left py-3 px-3"><SortButton field="supplier" label="Supplier" /></th>}
-                        {!isSpares && <th className="text-left py-3 px-3"><SortButton field="leadTime" label="Lead Time" /></th>}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {sortedItems.length === 0 ? (
-                        <tr>
-                          <td colSpan={isSpares ? 7 : 14} className="text-center py-12">
-                            <Package className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                            <p className="text-gray-500 font-medium">No low stock items found</p>
-                            <p className="text-sm text-gray-400 mt-1">Try adjusting your filters</p>
-                          </td>
-                        </tr>
-                      ) : (
-                        allItemsPagination.paginateItems(sortedItems).map(item => (
-                          <tr
-                            key={item.id}
-                            className={`hover:bg-gray-50 text-sm ${
-                              item.priority === 'Critical' ? 'bg-red-50/40' :
-                              item.priority === 'High' ? 'bg-orange-50/30' : ''
-                            }`}
-                            data-testid={`row-item-${item.id}`}
-                          >
-                            <td className="py-3 px-3 font-mono text-gray-700">{item.itemCode || '-'}</td>
-                            <td className="py-3 px-3">
-                              <div className="font-medium text-gray-900">{item.itemName || '-'}</div>
-                            </td>
-                            {!isSpares && <td className="py-3 px-3">{getTypeBadge(item.itemType)}</td>}
-                            <td className="py-3 px-3 text-gray-600">{item.category || '-'}</td>
-                            <td className="py-3 px-3 text-right">
-                              <span className={`font-semibold ${item.rob === 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                                {item.rob}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 text-right text-gray-600">{item.minStock}</td>
-                            <td className="py-3 px-3 text-right font-semibold text-red-600">{item.deficit}</td>
-                            <td className="py-3 px-3 text-right">
-                              <div className="flex items-center gap-2 justify-end">
-                                <div className="w-16 bg-gray-200 rounded-full h-2">
-                                  <div
-                                    className={`h-2 rounded-full ${
-                                      item.deficitPercent >= 80 ? 'bg-red-500' :
-                                      item.deficitPercent >= 50 ? 'bg-orange-500' : 'bg-yellow-500'
-                                    }`}
-                                    style={{ width: `${Math.min(item.deficitPercent, 100)}%` }}
-                                  />
-                                </div>
-                                <span className="text-gray-600 w-10 text-right">{item.deficitPercent}%</span>
-                              </div>
-                            </td>
-                            {!isSpares && <td className="py-3 px-3 text-gray-600">{item.uom || '-'}</td>}
-                            {!isSpares && <td className="py-3 px-3 text-right text-gray-600">{item.avgMonthlyConsumption}</td>}
-                            {!isSpares && <td className="py-3 px-3 text-right">{getDaysUntilStockoutDisplay(item.daysUntilStockout)}</td>}
-                            {!isSpares && <td className="py-3 px-3 text-right text-gray-700">{formatCurrency(item.estimatedCost)}</td>}
-                            {!isSpares && <td className="py-3 px-3 text-gray-600">{item.supplier || '-'}</td>}
-                            {!isSpares && <td className="py-3 px-3 text-gray-600">{item.leadTime || '-'}</td>}
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              {sortedItems.length > 0 && (
-                <TablePagination
-                  totalItems={sortedItems.length}
-                  pageSize={allItemsPagination.pageSize}
-                  currentPage={allItemsPagination.currentPage}
-                  onPageChange={allItemsPagination.handlePageChange}
-                  onPageSizeChange={allItemsPagination.handlePageSizeChange}
-                />
-              )}
+              <ReportAgGridTable
+                columns={(() => {
+                  const cols = [
+                    { header: isSpares ? 'Part Code' : 'Item Code', field: 'itemCode' },
+                    { header: isSpares ? 'Part Name' : 'Item Name', field: 'itemName' },
+                  ];
+                  if (!isSpares) cols.push({ header: 'Type', field: 'itemType' });
+                  cols.push({ header: isSpares ? 'Component' : 'Category', field: 'category' });
+                  cols.push(
+                    { header: isSpares ? 'Current Qty' : 'ROB', field: 'rob' },
+                    { header: isSpares ? 'Min Qty' : 'Min Stock', field: 'minStock' },
+                    { header: isSpares ? 'Shortage' : 'Deficit', field: 'deficit' },
+                    { header: isSpares ? 'Shortage %' : 'Deficit %', field: 'deficitPercent' },
+                  );
+                  if (!isSpares) {
+                    cols.push(
+                      { header: 'UOM', field: 'uom' },
+                      { header: 'Avg Monthly', field: 'avgMonthlyConsumption' },
+                      { header: 'Days to Stockout', field: 'daysUntilStockout' },
+                      { header: 'Est. Cost', field: 'estCost' },
+                      { header: 'Supplier', field: 'supplier' },
+                      { header: 'Lead Time', field: 'leadTime' },
+                    );
+                  }
+                  return cols;
+                })()}
+                data={sortedItems.map(item => ({
+                  itemCode: item.itemCode || '-',
+                  itemName: item.itemName || '-',
+                  itemType: item.itemType || '-',
+                  category: item.category || '-',
+                  rob: item.rob,
+                  minStock: item.minStock,
+                  deficit: item.deficit,
+                  deficitPercent: `${item.deficitPercent}%`,
+                  uom: item.uom || '-',
+                  avgMonthlyConsumption: item.avgMonthlyConsumption,
+                  daysUntilStockout: item.daysUntilStockout ?? 'N/A',
+                  estCost: formatCurrency(item.estimatedCost),
+                  supplier: item.supplier || '-',
+                  leadTime: item.leadTime || '-',
+                }))}
+                height="60vh"
+              />
             </CardContent>
           </Card>
 
@@ -1022,46 +876,39 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                             </div>
                             {isViewing && snapshotDetail && (
                               <div className="border-t border-gray-200 p-3 bg-gray-50">
-                                <div className="overflow-x-auto">
-                                  <table className="min-w-full text-xs" data-testid={`snapshot-table-${snapshot.id}`}>
-                                    <thead>
-                                      <tr className="bg-gray-100">
-                                        <th className="px-2 py-1 text-left font-medium text-gray-600">S.No</th>
-                                        <th className="px-2 py-1 text-left font-medium text-gray-600">Priority</th>
-                                        <th className="px-2 py-1 text-left font-medium text-gray-600">Item Code</th>
-                                        <th className="px-2 py-1 text-left font-medium text-gray-600">Item Name</th>
-                                        <th className="px-2 py-1 text-left font-medium text-gray-600">Type</th>
-                                        <th className="px-2 py-1 text-left font-medium text-gray-600">Category</th>
-                                        <th className="px-2 py-1 text-right font-medium text-gray-600">ROB</th>
-                                        <th className="px-2 py-1 text-right font-medium text-gray-600">Min Stock</th>
-                                        <th className="px-2 py-1 text-right font-medium text-gray-600">Deficit</th>
-                                        <th className="px-2 py-1 text-left font-medium text-gray-600">UOM</th>
-                                        <th className="px-2 py-1 text-right font-medium text-gray-600">Avg Monthly</th>
-                                        <th className="px-2 py-1 text-right font-medium text-gray-600">Days to Stockout</th>
-                                        <th className="px-2 py-1 text-right font-medium text-gray-600">Est. Cost</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {(snapshotDetail.itemsData as any[]).map((item: any, idx: number) => (
-                                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                          <td className="px-2 py-1">{idx + 1}</td>
-                                          <td className="px-2 py-1">{getPriorityBadge(item.priority)}</td>
-                                          <td className="px-2 py-1 font-mono">{item.itemCode}</td>
-                                          <td className="px-2 py-1">{item.itemName}</td>
-                                          <td className="px-2 py-1">{item.itemType}</td>
-                                          <td className="px-2 py-1">{item.category}</td>
-                                          <td className="px-2 py-1 text-right">{item.rob}</td>
-                                          <td className="px-2 py-1 text-right">{item.minStock}</td>
-                                          <td className="px-2 py-1 text-right">{item.deficit}</td>
-                                          <td className="px-2 py-1">{item.uom}</td>
-                                          <td className="px-2 py-1 text-right">{item.avgMonthlyConsumption}</td>
-                                          <td className="px-2 py-1 text-right">{item.daysUntilStockout ?? 'N/A'}</td>
-                                          <td className="px-2 py-1 text-right">{item.estimatedCost !== null ? `$${item.estimatedCost}` : 'N/A'}</td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
+                                <ReportAgGridTable
+                                  columns={[
+                                    { header: 'S.No', field: 'sNo' },
+                                    { header: 'Priority', field: 'priority' },
+                                    { header: 'Item Code', field: 'itemCode' },
+                                    { header: 'Item Name', field: 'itemName' },
+                                    { header: 'Type', field: 'itemType' },
+                                    { header: 'Category', field: 'category' },
+                                    { header: 'ROB', field: 'rob' },
+                                    { header: 'Min Stock', field: 'minStock' },
+                                    { header: 'Deficit', field: 'deficit' },
+                                    { header: 'UOM', field: 'uom' },
+                                    { header: 'Avg Monthly', field: 'avgMonthlyConsumption' },
+                                    { header: 'Days to Stockout', field: 'daysUntilStockout' },
+                                    { header: 'Est. Cost', field: 'estCost' },
+                                  ]}
+                                  data={(snapshotDetail.itemsData as any[]).map((item: any, idx: number) => ({
+                                    sNo: idx + 1,
+                                    priority: item.priority || '-',
+                                    itemCode: item.itemCode || '-',
+                                    itemName: item.itemName || '-',
+                                    itemType: item.itemType || '-',
+                                    category: item.category || '-',
+                                    rob: item.rob,
+                                    minStock: item.minStock,
+                                    deficit: item.deficit,
+                                    uom: item.uom || '-',
+                                    avgMonthlyConsumption: item.avgMonthlyConsumption,
+                                    daysUntilStockout: item.daysUntilStockout ?? 'N/A',
+                                    estCost: item.estimatedCost !== null ? `$${item.estimatedCost}` : 'N/A',
+                                  }))}
+                                  height={`${Math.max((snapshotDetail.itemsData as any[]).length * 36 + 50, 150)}px`}
+                                />
                               </div>
                             )}
                           </div>

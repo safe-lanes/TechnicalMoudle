@@ -1,14 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   ArrowLeft,
   Search,
@@ -18,11 +11,9 @@ import {
   AlertTriangle,
   AlertCircle,
   Package,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import ReportAgGridTable from "@/components/reports/ReportAgGridTable";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
@@ -81,33 +72,26 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
   const { vesselId: contextVesselId, vessels } = useVessel();
   const effectiveVesselId = propVesselId || contextVesselId;
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [itemTypeFilter, setItemTypeFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("itemCode");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchInput);
-      setPage(1);
     }, 300);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [itemTypeFilter]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [globalVessels, globalComponent]);
+  const handleGridSortChanged = useCallback((field: string, direction: 'asc' | 'desc') => {
+    setSortField(field as SortField);
+    setSortDirection(direction);
+  }, []);
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -116,10 +100,10 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
     if (debouncedSearch) params.set('search', debouncedSearch);
     params.set('sortBy', sortField);
     params.set('sortOrder', sortDirection);
-    params.set('page', String(page));
-    params.set('pageSize', String(pageSize));
+    params.set('page', '1');
+    params.set('pageSize', '10000');
     return params.toString();
-  }, [effectiveVesselId, itemTypeFilter, debouncedSearch, sortField, sortDirection, page, pageSize]);
+  }, [effectiveVesselId, itemTypeFilter, debouncedSearch, sortField, sortDirection]);
 
   const { data, isLoading, error, refetch } = useQuery<IhmInventoryStatusResponse>({
     queryKey: ['/technical/api/reports/ihm-inventory-status', queryParams],
@@ -160,7 +144,6 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
     };
   }, [filteredByGlobal, globalVessels.length, globalComponent, data?.summary]);
   const items = filteredByGlobal;
-  const pagination = data?.pagination || { currentPage: 1, totalPages: 1, totalItems: 0, pageSize: 25 };
   const categoryCounts = data?.categoryCounts || { all: 0, spares: 0, stores: 0 };
 
   const getItemTypeDisplay = (item: IhmInventoryItem) => {
@@ -277,8 +260,6 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
     }
   };
 
-  const startItem = (pagination.currentPage - 1) * pagination.pageSize + 1;
-  const endItem = Math.min(pagination.currentPage * pagination.pageSize, pagination.totalItems);
 
   if (!effectiveVesselId) {
     return (
@@ -431,82 +412,36 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
               <p className="text-gray-500">Try adjusting your filters or search criteria.</p>
             </div>
           ) : (
-            <>
-              <div className="mb-4" data-testid="ihm-inventory-table">
-                <ReportAgGridTable
-                  columns={[
-                    { header: 'S.No', field: 'sno', width: 12 },
-                    { header: 'Item Code', field: 'itemCode', width: 25 },
-                    { header: 'Item Name', field: 'itemName', width: 45 },
-                    { header: 'Item Type', field: 'itemType', width: 20 },
-                    { header: 'Component / Category', field: 'componentOrCategory', width: 35 },
-                    { header: 'IHM Status', field: 'ihmStatus', width: 22 },
-                    { header: 'Evidence Type', field: 'evidenceType', width: 25 },
-                    { header: 'Current ROB', field: 'currentROB', width: 20 },
-                    { header: 'Location', field: 'location', width: 25 },
-                    { header: 'UOM', field: 'uom', width: 15 },
-                  ]}
-                  data={items.map((item, index) => ({
-                    sno: startItem + index,
-                    itemCode: item.itemCode || '-',
-                    itemName: item.itemName || '-',
-                    itemType: getItemTypeDisplay(item),
-                    componentOrCategory: item.componentOrCategory || '-',
-                    ihmStatus: item.ihmStatus === 'present' ? 'Present' : item.ihmStatus === 'not_present' ? 'Not Present' : 'Unknown',
-                    evidenceType: item.evidenceType || '-',
-                    currentROB: item.currentROB ?? '-',
-                    location: item.location || '-',
-                    uom: item.uom || '-',
-                  }))}
-                  height="50vh"
-                />
-              </div>
-
-              <div className="flex items-center justify-between flex-wrap gap-4" data-testid="pagination">
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-600" data-testid="text-page-info">
-                    Showing {startItem}-{endItem} of {pagination.totalItems} items
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">Page size:</span>
-                    <Select value={String(pageSize)} onValueChange={(val) => { setPageSize(Number(val)); setPage(1); }}>
-                      <SelectTrigger className="w-[80px]" data-testid="select-page-size">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="10">10</SelectItem>
-                        <SelectItem value="25">25</SelectItem>
-                        <SelectItem value="50">50</SelectItem>
-                        <SelectItem value="100">100</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={pagination.currentPage <= 1}
-                    data-testid="button-prev-page"
-                  >
-                    <ChevronLeft className="h-4 w-4 mr-1" /> Previous
-                  </Button>
-                  <span className="text-sm text-gray-600 px-2">
-                    Page {pagination.currentPage} of {pagination.totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
-                    disabled={pagination.currentPage >= pagination.totalPages}
-                    data-testid="button-next-page"
-                  >
-                    Next <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </div>
-              </div>
-            </>
+            <div data-testid="ihm-inventory-table">
+              <ReportAgGridTable
+                columns={[
+                  { header: 'S.No', field: 'sno', width: 70 },
+                  { header: 'Item Code', field: 'itemCode', width: 120 },
+                  { header: 'Item Name', field: 'itemName', width: 200 },
+                  { header: 'Item Type', field: 'itemType', width: 100 },
+                  { header: 'Component / Category', field: 'componentOrCategory', width: 180 },
+                  { header: 'IHM Status', field: 'ihmStatus', width: 120 },
+                  { header: 'Evidence Type', field: 'evidenceType', width: 130 },
+                  { header: 'Current ROB', field: 'currentROB', width: 110 },
+                  { header: 'Location', field: 'location', width: 130 },
+                  { header: 'UOM', field: 'uom', width: 80 },
+                ]}
+                data={items.map((item, index) => ({
+                  sno: index + 1,
+                  itemCode: item.itemCode || '-',
+                  itemName: item.itemName || '-',
+                  itemType: getItemTypeDisplay(item),
+                  componentOrCategory: item.componentOrCategory || '-',
+                  ihmStatus: item.ihmStatus === 'present' ? 'Present' : item.ihmStatus === 'not_present' ? 'Not Present' : 'Unknown',
+                  evidenceType: item.evidenceType || '-',
+                  currentROB: item.currentROB ?? '-',
+                  location: item.location || '-',
+                  uom: item.uom || '-',
+                }))}
+                height="60vh"
+                onSortChanged={handleGridSortChanged}
+              />
+            </div>
           )}
         </>
       )}

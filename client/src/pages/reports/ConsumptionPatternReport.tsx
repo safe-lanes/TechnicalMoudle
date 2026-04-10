@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, Fragment } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,10 +24,10 @@ import {
 } from "recharts";
 import {
   ArrowLeft, Package, TrendingDown, Activity, Calendar,
-  AlertTriangle, FileText, Download, Loader2, ArrowUpDown,
+  AlertTriangle, FileText, Download, Loader2,
   ChevronDown, ChevronUp, Info,
 } from "lucide-react";
-import { TablePagination, usePagination } from "@/components/reports/TablePagination";
+import ReportAgGridTable from "@/components/reports/ReportAgGridTable";
 
 interface ConsumptionPatternReportProps {
   onBack: () => void;
@@ -40,8 +40,6 @@ interface ConsumptionPatternReportProps {
 }
 
 type ActiveTab = "trends" | "items" | "categories" | "efficiency" | "forecast";
-type SortField = "itemCode" | "itemName" | "itemType" | "category" | "uom" | "totalConsumed" | "eventCount" | "avgMonthlyConsumption" | "currentRob" | "minStock" | "lastConsumedDate";
-type SortDirection = "asc" | "desc";
 
 const PIE_COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16"];
 
@@ -56,12 +54,8 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
   const [category, setCategory] = useState("");
   const [appliedFilters, setAppliedFilters] = useState({ startDate: toDateStr(globalDateFrom), endDate: toDateStr(globalDateTo), itemType: "all", category: "" });
   const [activeTab, setActiveTab] = useState<ActiveTab>("trends");
-  const [sortField, setSortField] = useState<SortField>("totalConsumed");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
   const [nonMovingOpen, setNonMovingOpen] = useState(false);
   const [generatingExcel, setGeneratingExcel] = useState(false);
-  const { currentPage, pageSize, handlePageChange, handlePageSizeChange, resetPage, paginateItems } = usePagination(25);
 
   useEffect(() => {
     const sf = toDateStr(globalDateFrom);
@@ -70,10 +64,6 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
     setEndDate(ef);
     setAppliedFilters(prev => ({ ...prev, startDate: sf, endDate: ef }));
   }, [globalDateFrom, globalDateTo]);
-
-  useEffect(() => {
-    resetPage();
-  }, [activeTab, appliedFilters]);
 
   const queryUrl = useMemo(() => {
     const params = new URLSearchParams();
@@ -110,22 +100,12 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
   const stockEfficiency = data?.stockEfficiency || [];
   const forecastData = data?.forecastData || [];
   const nonMovingItems = data?.nonMovingItems || [];
-  const recentTransactions = data?.recentTransactions || [];
 
   const handleApplyFilters = () => {
     setAppliedFilters({ startDate, endDate, itemType, category });
   };
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(prev => (prev === "asc" ? "desc" : "asc"));
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
-
-  const sortedItems = useMemo(() => {
+  const filteredItems = useMemo(() => {
     let items = [...topConsumedItems];
     if (globalVessels.length > 0) {
       items = items.filter((i: any) => !i.vesselId || globalVessels.includes(i.vesselId));
@@ -138,19 +118,8 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
         ((i.category as string) || '').toLowerCase().includes(gc)
       );
     }
-    items.sort((a: any, b: any) => {
-      let aVal = a[sortField];
-      let bVal = b[sortField];
-      if (typeof aVal === "string") aVal = aVal.toLowerCase();
-      if (typeof bVal === "string") bVal = bVal.toLowerCase();
-      if (aVal == null) aVal = "";
-      if (bVal == null) bVal = "";
-      if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
     return items;
-  }, [topConsumedItems, sortField, sortDirection, globalComponent, globalVessels]);
+  }, [topConsumedItems, globalComponent, globalVessels]);
 
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
@@ -232,18 +201,194 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
     }
   };
 
-  const SortHeader = ({ field, label }: { field: SortField; label: string }) => (
-    <th
-      className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer select-none"
-      onClick={() => handleSort(field)}
-      data-testid={`sort-${field}`}
-    >
-      <span className="flex items-center gap-1">
-        {label}
-        <ArrowUpDown className="h-3 w-3" />
-      </span>
-    </th>
-  );
+  const trendsColumns = [
+    { header: "Month", field: "month" },
+    { header: "Total Qty", field: "totalQty" },
+    { header: "Events", field: "eventCount" },
+    { header: "Item Count", field: "itemCount" },
+    { header: "Stores", field: "stores" },
+    { header: "Lubricants", field: "lubricants" },
+    { header: "Chemicals", field: "chemicals" },
+    { header: "Others", field: "others" },
+  ];
+
+  const trendsData = useMemo(() => {
+    return consumptionTrends.map((t: any) => ({
+      month: t.month,
+      totalQty: Number(t.totalQty).toLocaleString(),
+      eventCount: t.eventCount,
+      itemCount: t.itemCount,
+      stores: t.stores,
+      lubricants: t.lubricants,
+      chemicals: t.chemicals,
+      others: t.others,
+    }));
+  }, [consumptionTrends]);
+
+  const itemsColumns = [
+    { header: "S.No", field: "sNo", width: 70 },
+    { header: "Item Code", field: "itemCode" },
+    { header: "Item Name", field: "itemName" },
+    { header: "Type", field: "itemType" },
+    { header: "Category", field: "category" },
+    { header: "UOM", field: "uom" },
+    { header: "Total Consumed", field: "totalConsumed" },
+    { header: "Events", field: "eventCount" },
+    { header: "Avg Monthly", field: "avgMonthlyConsumption" },
+    { header: "ROB", field: "currentRob" },
+    { header: "Min", field: "minStock" },
+    { header: "Last Consumed", field: "lastConsumedDate" },
+  ];
+
+  const itemsData = useMemo(() => {
+    return filteredItems.map((item: any, idx: number) => ({
+      sNo: idx + 1,
+      itemCode: item.itemCode,
+      itemName: item.itemName + (item.hasSingleEvent ? " (1 event)" : ""),
+      itemType: item.itemType,
+      category: item.category,
+      uom: item.uom,
+      totalConsumed: Number(item.totalConsumed).toLocaleString(),
+      eventCount: item.eventCount,
+      avgMonthlyConsumption: Number(item.avgMonthlyConsumption || 0).toFixed(1) + (item.adjustmentNote ? " *adjusted" : ""),
+      currentRob: item.currentRob,
+      minStock: item.minStock,
+      lastConsumedDate: item.lastConsumedDate ? format(new Date(item.lastConsumedDate), "dd MMM yyyy") : "-",
+    }));
+  }, [filteredItems]);
+
+  const categoryColumns = [
+    { header: "Category", field: "category" },
+    { header: "Type", field: "itemType" },
+    { header: "Total Qty", field: "totalQty" },
+    { header: "Items", field: "itemCount" },
+    { header: "% Share", field: "percentage" },
+  ];
+
+  const categoryData = useMemo(() => {
+    return categoryBreakdown.map((c: any) => ({
+      category: c.category,
+      itemType: c.itemType,
+      totalQty: Number(c.totalQty).toLocaleString(),
+      itemCount: c.itemCount,
+      percentage: Number(c.percentage).toFixed(1) + "%",
+    }));
+  }, [categoryBreakdown]);
+
+  const efficiencyColumns = [
+    { header: "S.No", field: "sNo", width: 70 },
+    { header: "Item Code", field: "itemCode" },
+    { header: "Item Name", field: "itemName" },
+    { header: "Type", field: "itemType" },
+    { header: "ROB", field: "currentRob" },
+    { header: "Min", field: "minStock" },
+    { header: "Consumed", field: "totalConsumed" },
+    { header: "Turnover", field: "turnover" },
+    { header: "Movement", field: "movement" },
+    { header: "Days to Stockout", field: "daysToStockout" },
+    { header: "Below Min", field: "belowMin" },
+  ];
+
+  const efficiencyData = useMemo(() => {
+    return stockEfficiency.map((item: any, idx: number) => {
+      let movement = item.movementSpeed || "-";
+      if (movement === "fast") movement = "Fast";
+      else if (movement === "slow") movement = "Slow";
+      else if (movement === "very-slow") movement = "Very Slow";
+      else if (movement === "non-moving") movement = "Non-Moving";
+      if (item.movementNote) movement += ` (${item.movementNote})`;
+
+      let daysToStockout = "-";
+      if (item.movementSpeed === "non-moving") {
+        daysToStockout = "\u221E";
+      } else if (item.daysUntilStockout != null) {
+        daysToStockout = String(item.daysUntilStockout);
+        if (item.stockoutRange) {
+          daysToStockout += ` (${item.stockoutRange.lower}-${item.stockoutRange.upper}d)`;
+        }
+      }
+
+      return {
+        sNo: idx + 1,
+        itemCode: item.itemCode,
+        itemName: item.itemName + (item.negativeRob ? " [Negative ROB]" : ""),
+        itemType: item.itemType,
+        currentRob: item.currentRob,
+        minStock: item.minStock,
+        totalConsumed: Number(item.totalConsumed).toLocaleString(),
+        turnover: Number(item.stockTurnoverRatio || 0).toFixed(2),
+        movement,
+        daysToStockout,
+        belowMin: item.belowMinStock ? "Yes" : "No",
+      };
+    });
+  }, [stockEfficiency]);
+
+  const nonMovingColumns = [
+    { header: "S.No", field: "sNo", width: 70 },
+    { header: "Item Code", field: "itemCode" },
+    { header: "Item Name", field: "itemName" },
+    { header: "Type", field: "itemType" },
+    { header: "ROB", field: "currentRob" },
+    { header: "Min", field: "minStock" },
+  ];
+
+  const nonMovingData = useMemo(() => {
+    return nonMovingItems.map((item: any, idx: number) => ({
+      sNo: idx + 1,
+      itemCode: item.itemCode,
+      itemName: item.itemName,
+      itemType: item.itemType,
+      currentRob: item.currentRob,
+      minStock: item.minStock,
+    }));
+  }, [nonMovingItems]);
+
+  const forecastColumns = [
+    { header: "S.No", field: "sNo", width: 70 },
+    { header: "Item Code", field: "itemCode" },
+    { header: "Item Name", field: "itemName" },
+    { header: "UOM", field: "uom" },
+    { header: "Avg Monthly", field: "avgMonthly" },
+    { header: "Projected", field: "projected" },
+    { header: "ROB", field: "currentRob" },
+    { header: "Min", field: "minStock" },
+    { header: "Reorder Pt", field: "reorderPoint" },
+    { header: "Months Left", field: "monthsLeft" },
+    { header: "Reorder?", field: "reorderNeeded" },
+    { header: "Suggested Qty", field: "suggestedQty" },
+    { header: "Confidence", field: "confidence" },
+  ];
+
+  const forecastTableData = useMemo(() => {
+    return forecastData.map((f: any, idx: number) => {
+      let avgMonthly = Number(f.avgMonthlyConsumption || 0).toFixed(1);
+      if (f.rawAvgMonthlyConsumption && f.rawAvgMonthlyConsumption !== f.avgMonthlyConsumption) {
+        avgMonthly += ` (raw: ${Number(f.rawAvgMonthlyConsumption).toFixed(1)})`;
+      }
+
+      let confidence = "-";
+      if (f.confidenceLevel === "high") confidence = "High";
+      else if (f.confidenceLevel === "medium") confidence = "Medium";
+      else if (f.confidenceLevel === "low") confidence = "Low";
+
+      return {
+        sNo: idx + 1,
+        itemCode: f.itemCode,
+        itemName: f.itemName + (f.reorderReasoning && f.reorderNeeded ? ` (${f.reorderReasoning})` : ""),
+        uom: f.uom,
+        avgMonthly,
+        projected: Number(f.projectedNextMonth || 0).toFixed(1),
+        currentRob: f.currentRob,
+        minStock: f.minStock,
+        reorderPoint: f.reorderPoint != null ? Number(f.reorderPoint).toFixed(0) : "-",
+        monthsLeft: f.monthsOfStockRemaining != null ? Number(f.monthsOfStockRemaining).toFixed(1) : "-",
+        reorderNeeded: f.reorderNeeded ? "Yes" : "No",
+        suggestedQty: f.suggestedReorderQty || "-",
+        confidence,
+      };
+    });
+  }, [forecastData]);
 
   if (!vesselId) {
     return (
@@ -422,36 +567,11 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                 <p className="text-gray-500 text-center py-8">No trend data available</p>
               )}
               {consumptionTrends.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full rounded-lg border border-gray-200 overflow-hidden bg-white" data-testid="table-trends">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Month</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Qty</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Events</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Count</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stores</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lubricants</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chemicals</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Others</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {consumptionTrends.map((t: any, i: number) => (
-                        <tr key={i} className="text-sm">
-                          <td className="px-3 py-2 font-medium">{t.month}</td>
-                          <td className="px-3 py-2">{Number(t.totalQty).toLocaleString()}</td>
-                          <td className="px-3 py-2">{t.eventCount}</td>
-                          <td className="px-3 py-2">{t.itemCount}</td>
-                          <td className="px-3 py-2">{t.stores}</td>
-                          <td className="px-3 py-2">{t.lubricants}</td>
-                          <td className="px-3 py-2">{t.chemicals}</td>
-                          <td className="px-3 py-2">{t.others}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <ReportAgGridTable
+                  columns={trendsColumns}
+                  data={trendsData}
+                  height="400px"
+                />
               )}
             </div>
           )}
@@ -474,106 +594,14 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                   </div>
                 </Card>
               )}
-              {sortedItems.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full rounded-lg border border-gray-200 overflow-hidden bg-white" data-testid="table-items">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">S.No</th>
-                        <SortHeader field="itemCode" label="Item Code" />
-                        <SortHeader field="itemName" label="Item Name" />
-                        <SortHeader field="itemType" label="Type" />
-                        <SortHeader field="category" label="Category" />
-                        <SortHeader field="uom" label="UOM" />
-                        <SortHeader field="totalConsumed" label="Total Consumed" />
-                        <SortHeader field="eventCount" label="Events" />
-                        <SortHeader field="avgMonthlyConsumption" label="Avg Monthly" />
-                        <SortHeader field="currentRob" label="ROB" />
-                        <SortHeader field="minStock" label="Min" />
-                        <SortHeader field="lastConsumedDate" label="Last Consumed" />
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {paginateItems(sortedItems).map((item: any, idx: number) => {
-                        const globalIdx = (currentPage - 1) * pageSize + idx;
-                        const itemTxns = recentTransactions.filter((t: any) => t.itemId === item.itemId);
-                        return (
-                          <Fragment key={item.itemId}>
-                            <tr
-                              className="text-sm cursor-pointer"
-                              onClick={() => setExpandedItemId(expandedItemId === item.itemId ? null : item.itemId)}
-                              data-testid={`row-item-${item.itemId}`}
-                            >
-                              <td className="px-3 py-2">{globalIdx + 1}</td>
-                              <td className="px-3 py-2 font-medium">{item.itemCode}</td>
-                              <td className="px-3 py-2">
-                                {item.itemName}
-                                {item.hasSingleEvent && <Badge variant="outline" className="ml-2 text-xs border-blue-300 text-blue-600">1 event</Badge>}
-                              </td>
-                              <td className="px-3 py-2">{item.itemType}</td>
-                              <td className="px-3 py-2">{item.category}</td>
-                              <td className="px-3 py-2">{item.uom}</td>
-                              <td className="px-3 py-2 font-medium">{Number(item.totalConsumed).toLocaleString()}</td>
-                              <td className="px-3 py-2">{item.eventCount}</td>
-                              <td className="px-3 py-2">
-                                {Number(item.avgMonthlyConsumption || 0).toFixed(1)}
-                                {item.adjustmentNote && (
-                                  <span className="block text-xs text-amber-600 mt-0.5" title={item.adjustmentNote}>*adjusted</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-2">{item.currentRob}</td>
-                              <td className="px-3 py-2">{item.minStock}</td>
-                              <td className="px-3 py-2">{item.lastConsumedDate ? format(new Date(item.lastConsumedDate), "dd MMM yyyy") : "-"}</td>
-                            </tr>
-                            {expandedItemId === item.itemId && itemTxns.length > 0 && (
-                              <tr>
-                                <td colSpan={12} className="bg-gray-50 px-6 py-3">
-                                  <p className="text-sm font-medium text-gray-700 mb-2">Recent Transactions for {item.itemName}</p>
-                                  <table className="w-full text-sm border border-gray-200 rounded" data-testid={`subtable-txn-${item.itemId}`}>
-                                    <thead className="bg-gray-100">
-                                      <tr>
-                                        <th className="px-2 py-1 text-left text-xs text-gray-500">Date</th>
-                                        <th className="px-2 py-1 text-left text-xs text-gray-500">Qty Consumed</th>
-                                        <th className="px-2 py-1 text-left text-xs text-gray-500">ROB After</th>
-                                        <th className="px-2 py-1 text-left text-xs text-gray-500">User</th>
-                                        <th className="px-2 py-1 text-left text-xs text-gray-500">Remarks</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                      {itemTxns.map((txn: any) => (
-                                        <tr key={txn.id}>
-                                          <td className="px-2 py-1">{txn.date ? format(new Date(txn.date), "dd MMM yyyy") : "-"}</td>
-                                          <td className="px-2 py-1">{txn.qtyConsumed}</td>
-                                          <td className="px-2 py-1">{txn.robAfter}</td>
-                                          <td className="px-2 py-1">{txn.userId || "-"}</td>
-                                          <td className="px-2 py-1">{txn.remarks || "-"}</td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </td>
-                              </tr>
-                            )}
-                            {expandedItemId === item.itemId && itemTxns.length === 0 && (
-                              <tr><td colSpan={12} className="bg-gray-50 px-6 py-3 text-sm text-gray-500">No recent transactions found for this item.</td></tr>
-                            )}
-                          </Fragment>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+              {filteredItems.length > 0 ? (
+                <ReportAgGridTable
+                  columns={itemsColumns}
+                  data={itemsData}
+                  height="60vh"
+                />
               ) : (
                 <p className="text-gray-500 text-center py-8">No item data available</p>
-              )}
-              {sortedItems.length > 0 && (
-                <TablePagination
-                  totalItems={sortedItems.length}
-                  pageSize={pageSize}
-                  currentPage={currentPage}
-                  onPageChange={handlePageChange}
-                  onPageSizeChange={handlePageSizeChange}
-                />
               )}
             </div>
           )}
@@ -599,30 +627,11 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                 </Card>
               )}
               {categoryBreakdown.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full rounded-lg border border-gray-200 overflow-hidden bg-white" data-testid="table-categories">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Qty</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">% Share</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {categoryBreakdown.map((c: any, i: number) => (
-                        <tr key={i} className="text-sm">
-                          <td className="px-3 py-2 font-medium">{c.category}</td>
-                          <td className="px-3 py-2">{c.itemType}</td>
-                          <td className="px-3 py-2">{Number(c.totalQty).toLocaleString()}</td>
-                          <td className="px-3 py-2">{c.itemCount}</td>
-                          <td className="px-3 py-2">{Number(c.percentage).toFixed(1)}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <ReportAgGridTable
+                  columns={categoryColumns}
+                  data={categoryData}
+                  height="400px"
+                />
               ) : (
                 <p className="text-gray-500 text-center py-8">No category data available</p>
               )}
@@ -633,76 +642,11 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
             <div className="space-y-6">
               {stockEfficiency.length > 0 ? (
                 <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full rounded-lg border border-gray-200 overflow-hidden bg-white" data-testid="table-efficiency">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">S.No</th>
-                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Code</th>
-                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
-                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">ROB</th>
-                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Min</th>
-                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Consumed</th>
-                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Turnover</th>
-                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Movement</th>
-                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Days to Stockout</th>
-                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Below Min</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {paginateItems(stockEfficiency).map((item: any, idx: number) => {
-                          const globalIdx = (currentPage - 1) * pageSize + idx;
-                          return (
-                          <tr key={item.itemId || globalIdx} className="text-sm" data-testid={`row-efficiency-${item.itemId}`}>
-                            <td className="px-3 py-2">{globalIdx + 1}</td>
-                            <td className="px-3 py-2 font-medium">{item.itemCode}</td>
-                            <td className="px-3 py-2">
-                              {item.itemName}
-                              {item.negativeRob && <Badge className="ml-2 bg-red-100 text-red-700 border-red-300 text-xs">Negative ROB</Badge>}
-                            </td>
-                            <td className="px-3 py-2">{item.itemType}</td>
-                            <td className="px-3 py-2">{item.currentRob}</td>
-                            <td className="px-3 py-2">{item.minStock}</td>
-                            <td className="px-3 py-2">{Number(item.totalConsumed).toLocaleString()}</td>
-                            <td className="px-3 py-2">{Number(item.stockTurnoverRatio || 0).toFixed(2)}</td>
-                            <td className="px-3 py-2">
-                              {item.movementSpeed === "fast" && <Badge className="bg-green-100 text-green-700 border-green-300">Fast</Badge>}
-                              {item.movementSpeed === "slow" && <Badge className="bg-yellow-100 text-yellow-700 border-yellow-300">Slow</Badge>}
-                              {item.movementSpeed === "very-slow" && <Badge className="bg-orange-100 text-orange-700 border-orange-300">Very Slow</Badge>}
-                              {item.movementSpeed === "non-moving" && <Badge className="bg-gray-100 text-gray-600 border-gray-300">Non-Moving</Badge>}
-                              {item.movementNote && <span className="block text-xs text-gray-500 mt-0.5">{item.movementNote}</span>}
-                            </td>
-                            <td className="px-3 py-2">
-                              {item.movementSpeed === "non-moving" ? "\u221E" : (
-                                item.daysUntilStockout != null ? (
-                                  <span>
-                                    {item.daysUntilStockout}
-                                    {item.stockoutRange && (
-                                      <span className="block text-xs text-gray-500">{item.stockoutRange.lower}-{item.stockoutRange.upper}d</span>
-                                    )}
-                                  </span>
-                                ) : "-"
-                              )}
-                            </td>
-                            <td className="px-3 py-2">
-                              {item.belowMinStock ? <Badge className="bg-red-100 text-red-700 border-red-300">Yes</Badge> : <Badge className="bg-green-100 text-green-700 border-green-300">No</Badge>}
-                            </td>
-                          </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  {stockEfficiency.length > 0 && (
-                    <TablePagination
-                      totalItems={stockEfficiency.length}
-                      pageSize={pageSize}
-                      currentPage={currentPage}
-                      onPageChange={handlePageChange}
-                      onPageSizeChange={handlePageSizeChange}
-                    />
-                  )}
+                  <ReportAgGridTable
+                    columns={efficiencyColumns}
+                    data={efficiencyData}
+                    height="60vh"
+                  />
                   <p className="text-xs text-gray-500 italic">Movement classification based on {summary?.dataQuality?.daysOfData || "N/A"}-day sample period</p>
                 </>
               ) : (
@@ -718,44 +662,13 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                     </Button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="overflow-x-auto mt-3">
-                      <table className="w-full rounded-lg border border-gray-200 overflow-hidden bg-white" data-testid="table-non-moving">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">S.No</th>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Code</th>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">ROB</th>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Min</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {paginateItems(nonMovingItems).map((item: any, idx: number) => {
-                            const globalIdx = (currentPage - 1) * pageSize + idx;
-                            return (
-                            <tr key={item.itemId || globalIdx} className="text-sm">
-                              <td className="px-3 py-2">{globalIdx + 1}</td>
-                              <td className="px-3 py-2 font-medium">{item.itemCode}</td>
-                              <td className="px-3 py-2">{item.itemName}</td>
-                              <td className="px-3 py-2">{item.itemType}</td>
-                              <td className="px-3 py-2">{item.currentRob}</td>
-                              <td className="px-3 py-2">{item.minStock}</td>
-                            </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                    {nonMovingItems.length > 0 && (
-                      <TablePagination
-                        totalItems={nonMovingItems.length}
-                        pageSize={pageSize}
-                        currentPage={currentPage}
-                        onPageChange={handlePageChange}
-                        onPageSizeChange={handlePageSizeChange}
+                    <div className="mt-3">
+                      <ReportAgGridTable
+                        columns={nonMovingColumns}
+                        data={nonMovingData}
+                        height="400px"
                       />
-                    )}
+                    </div>
                   </CollapsibleContent>
                 </Collapsible>
               )}
@@ -773,75 +686,11 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
                 </Card>
               )}
               {forecastData.length > 0 ? (
-                <>
-                <div className="overflow-x-auto">
-                  <table className="w-full rounded-lg border border-gray-200 overflow-hidden bg-white" data-testid="table-forecast">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">S.No</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Code</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">UOM</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Monthly</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Projected</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">ROB</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Min</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reorder Pt</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Months Left</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reorder?</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Suggested Qty</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Confidence</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {paginateItems(forecastData).map((f: any, idx: number) => {
-                        const globalIdx = (currentPage - 1) * pageSize + idx;
-                        return (
-                        <tr key={f.itemId || globalIdx} className="text-sm" data-testid={`row-forecast-${f.itemId}`}>
-                          <td className="px-3 py-2">{globalIdx + 1}</td>
-                          <td className="px-3 py-2 font-medium">{f.itemCode}</td>
-                          <td className="px-3 py-2">
-                            {f.itemName}
-                            {f.reorderReasoning && f.reorderNeeded && (
-                              <span className="block text-xs text-gray-500 mt-0.5">{f.reorderReasoning}</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2">{f.uom}</td>
-                          <td className="px-3 py-2">
-                            {Number(f.avgMonthlyConsumption || 0).toFixed(1)}
-                            {f.rawAvgMonthlyConsumption && f.rawAvgMonthlyConsumption !== f.avgMonthlyConsumption && (
-                              <span className="block text-xs text-amber-600">raw: {Number(f.rawAvgMonthlyConsumption).toFixed(1)}</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2">{Number(f.projectedNextMonth || 0).toFixed(1)}</td>
-                          <td className="px-3 py-2">{f.currentRob}</td>
-                          <td className="px-3 py-2">{f.minStock}</td>
-                          <td className="px-3 py-2">{f.reorderPoint != null ? Number(f.reorderPoint).toFixed(0) : "-"}</td>
-                          <td className="px-3 py-2">{f.monthsOfStockRemaining != null ? Number(f.monthsOfStockRemaining).toFixed(1) : "-"}</td>
-                          <td className="px-3 py-2">
-                            {f.reorderNeeded ? <Badge className="bg-red-100 text-red-700 border-red-300">Yes</Badge> : <span className="text-gray-400">No</span>}
-                          </td>
-                          <td className="px-3 py-2">{f.suggestedReorderQty || "-"}</td>
-                          <td className="px-3 py-2">
-                            {f.confidenceLevel === "high" && <Badge className="bg-green-100 text-green-700 border-green-300">High</Badge>}
-                            {f.confidenceLevel === "medium" && <Badge className="bg-yellow-100 text-yellow-700 border-yellow-300">Medium</Badge>}
-                            {f.confidenceLevel === "low" && <Badge className="bg-red-100 text-red-700 border-red-300">Low</Badge>}
-                            {!f.confidenceLevel && <span className="text-gray-400">-</span>}
-                          </td>
-                        </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <TablePagination
-                  totalItems={forecastData.length}
-                  pageSize={pageSize}
-                  currentPage={currentPage}
-                  onPageChange={handlePageChange}
-                  onPageSizeChange={handlePageSizeChange}
+                <ReportAgGridTable
+                  columns={forecastColumns}
+                  data={forecastTableData}
+                  height="60vh"
                 />
-                </>
               ) : (
                 <p className="text-gray-500 text-center py-8">No forecast data available</p>
               )}

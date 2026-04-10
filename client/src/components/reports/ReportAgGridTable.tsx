@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import type { ColDef, GridReadyEvent, GridApi } from 'ag-grid-community';
+import type { ColDef, GridReadyEvent, GridApi, SortChangedEvent } from 'ag-grid-community';
 import type { ReportColumn } from '@/components/reports/ReportPreviewModal';
 
 import 'ag-grid-community/styles/ag-grid.css';
@@ -10,16 +10,17 @@ interface ReportAgGridTableProps {
   columns: ReportColumn[];
   data: Record<string, any>[];
   height?: string;
+  onSortChanged?: (field: string, direction: 'asc' | 'desc') => void;
 }
 
-const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({ columns, data, height = '60vh' }) => {
+const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({ columns, data, height = '60vh', onSortChanged }) => {
   const gridApiRef = useRef<GridApi | null>(null);
 
   const columnDefs: ColDef[] = useMemo(() => {
     return columns.map((col) => ({
       headerName: col.header,
       field: col.field,
-      width: col.width ? col.width * 3 : undefined,
+      width: col.width,
       minWidth: col.field === 'sNo' || col.field === 'sno' ? 60 : 80,
       sortable: true,
       resizable: true,
@@ -34,9 +35,6 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({ columns, data, he
       },
       tooltipField: col.field,
       valueFormatter: (params: any) => {
-        if ((col.field === 'sNo' || col.field === 'sno') && params.node) {
-          return String((params.node.rowIndex ?? 0) + 1);
-        }
         const val = params.value;
         if (val === null || val === undefined) return '-';
         return String(val);
@@ -56,14 +54,16 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({ columns, data, he
 
   const onGridReady = useCallback((event: GridReadyEvent) => {
     gridApiRef.current = event.api;
-    event.api.sizeColumnsToFit();
   }, []);
 
-  const onGridSizeChanged = useCallback(() => {
-    if (gridApiRef.current && !gridApiRef.current.isDestroyed()) {
-      gridApiRef.current.sizeColumnsToFit();
+  const handleSortChanged = useCallback((event: SortChangedEvent) => {
+    if (!onSortChanged) return;
+    const sortModel = event.api.getColumnState().filter(c => c.sort);
+    if (sortModel.length > 0) {
+      const col = sortModel[0];
+      onSortChanged(col.colId, col.sort as 'asc' | 'desc');
     }
-  }, []);
+  }, [onSortChanged]);
 
   if (data.length === 0) {
     return (
@@ -85,7 +85,7 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({ columns, data, he
         columnDefs={columnDefs}
         defaultColDef={defaultColDef}
         onGridReady={onGridReady}
-        onGridSizeChanged={onGridSizeChanged}
+        onSortChanged={onSortChanged ? handleSortChanged : undefined}
         suppressHorizontalScroll={false}
         alwaysShowHorizontalScroll={false}
         alwaysShowVerticalScroll={false}

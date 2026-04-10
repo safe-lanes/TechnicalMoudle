@@ -1,7 +1,6 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -17,7 +16,6 @@ import {
   Download,
   FileText,
   Loader2,
-  ArrowUpDown,
   Package,
   ShieldAlert,
   ShieldCheck,
@@ -27,7 +25,7 @@ import { useQuery } from "@tanstack/react-query";
 import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
-import { TablePagination, usePagination } from "@/components/reports/TablePagination";
+import ReportAgGridTable from "@/components/reports/ReportAgGridTable";
 
 interface CriticalSpareRow {
   sNo: number;
@@ -76,9 +74,6 @@ interface CriticalSparesReportProps {
   globalComponent?: string;
 }
 
-type SortField = 'partCode' | 'partName' | 'rob' | 'shortageQty' | 'stockStatus' | 'criticalityLevel';
-type SortDirection = 'asc' | 'desc';
-
 const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, vesselId: propVesselId, embedded, globalVessels = [], globalComponent = "" }) => {
   const { vesselId: contextVesselId } = useVessel();
   const effectiveVesselId = propVesselId || contextVesselId;
@@ -87,15 +82,8 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
   const [searchQuery, setSearchQuery] = useState("");
   const [stockStatusFilter, setStockStatusFilter] = useState("all");
   const [criticalityFilter, setCriticalityFilter] = useState("all");
-  const [sortField, setSortField] = useState<SortField>('stockStatus');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingExcel, setGeneratingExcel] = useState(false);
-  const { currentPage, pageSize, handlePageChange, handlePageSizeChange, resetPage, paginateItems } = usePagination(25);
-
-  useEffect(() => {
-    resetPage();
-  }, [searchQuery, stockStatusFilter, criticalityFilter]);
 
   const queryUrl = useMemo(() => {
     const params = new URLSearchParams();
@@ -147,62 +135,24 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
       items = items.filter(i => i.criticalityLevel === criticalityFilter);
     }
 
-    items.sort((a, b) => {
-      let cmp = 0;
-      const statusPriority: Record<string, number> = { ZERO: 1, LOW: 2, OK: 3, NOT_SET: 4 };
-      const critPriority: Record<string, number> = { CRITICAL: 1, ESSENTIAL: 2, NORMAL: 3 };
-      switch (sortField) {
-        case 'stockStatus': cmp = (statusPriority[a.stockStatus] || 5) - (statusPriority[b.stockStatus] || 5); break;
-        case 'criticalityLevel': cmp = (critPriority[a.criticalityLevel] || 4) - (critPriority[b.criticalityLevel] || 4); break;
-        case 'shortageQty': cmp = a.shortageQty - b.shortageQty; break;
-        case 'rob': cmp = a.rob - b.rob; break;
-        case 'partName': cmp = a.partName.localeCompare(b.partName); break;
-        case 'partCode': cmp = a.partCode.localeCompare(b.partCode); break;
-      }
-      return sortDirection === 'desc' ? -cmp : cmp;
-    });
-
     return items;
-  }, [data?.data, searchQuery, criticalityFilter, sortField, sortDirection, globalComponent, globalVessels]);
+  }, [data?.data, searchQuery, criticalityFilter, globalComponent, globalVessels]);
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
-
-  const getStockStatusBadge = (status: string) => {
+  const getStockStatusText = (status: string) => {
     switch (status) {
-      case 'ZERO':
-        return <Badge className="bg-red-600 text-white border-red-700">Out of Stock</Badge>;
-      case 'LOW':
-        return <Badge className="bg-amber-500 text-white border-amber-600">Low Stock</Badge>;
-      case 'NOT_SET':
-        return <Badge variant="outline" className="text-gray-500">Not Set</Badge>;
-      default:
-        return <Badge className="bg-green-600 text-white border-green-700">Adequate</Badge>;
+      case 'ZERO': return 'Out of Stock';
+      case 'LOW': return 'Low Stock';
+      case 'NOT_SET': return 'Not Set';
+      default: return 'Adequate';
     }
   };
 
-  const getCriticalityBadge = (level: string) => {
+  const getCriticalityText = (level: string) => {
     switch (level) {
-      case 'CRITICAL':
-        return <Badge className="bg-red-100 text-red-800 border-red-200">Critical</Badge>;
-      case 'ESSENTIAL':
-        return <Badge className="bg-amber-100 text-amber-800 border-amber-200">Essential</Badge>;
-      default:
-        return <Badge variant="outline" className="text-gray-500">Normal</Badge>;
+      case 'CRITICAL': return 'Critical';
+      case 'ESSENTIAL': return 'Essential';
+      default: return 'Normal';
     }
-  };
-
-  const getRowBg = (row: CriticalSpareRow) => {
-    if (row.stockStatus === 'ZERO') return 'bg-red-50/50';
-    if (row.stockStatus === 'LOW' && row.criticalityLevel === 'CRITICAL') return 'bg-orange-50/50';
-    if (row.stockStatus === 'LOW') return 'bg-amber-50/30';
-    return '';
   };
 
   const handleExportPdf = async () => {
@@ -302,16 +252,39 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
     };
   }, [filteredAndSortedItems]);
 
-  const SortButton = ({ field, label }: { field: SortField; label: string }) => (
-    <button
-      className="flex items-center gap-1 font-semibold text-sm text-gray-700 hover:text-gray-900"
-      onClick={() => handleSort(field)}
-      data-testid={`button-sort-${field}`}
-    >
-      {label}
-      <ArrowUpDown className={`h-3 w-3 ${sortField === field ? 'text-blue-600' : 'text-gray-400'}`} />
-    </button>
-  );
+  const reportColumns = useMemo(() => [
+    { header: 'S.No', field: 'sNo', width: 70 },
+    { header: 'Part Code', field: 'partCode', width: 130 },
+    { header: 'Part Name', field: 'partName', width: 200 },
+    { header: 'ROB', field: 'rob', width: 80 },
+    { header: 'Min Stock', field: 'minStock', width: 100 },
+    { header: 'Stock Status', field: 'stockStatusText', width: 120 },
+    { header: 'Shortage', field: 'shortageQty', width: 100 },
+    { header: 'Criticality', field: 'criticalityText', width: 110 },
+    { header: 'Critical Equip', field: 'criticalEquip', width: 120 },
+    { header: 'Critical Components', field: 'criticalComponents', width: 180 },
+    { header: 'Related Jobs', field: 'relatedJobs', width: 180 },
+    { header: 'Dept', field: 'department', width: 100 },
+    { header: 'Remarks', field: 'remarks', width: 200 },
+  ], []);
+
+  const reportData = useMemo(() => {
+    return filteredAndSortedItems.map((item, idx) => ({
+      sNo: idx + 1,
+      partCode: item.partCode,
+      partName: item.partName,
+      rob: item.rob,
+      minStock: item.minStock ?? '-',
+      stockStatusText: getStockStatusText(item.stockStatus),
+      shortageQty: item.shortageQty,
+      criticalityText: getCriticalityText(item.criticalityLevel),
+      criticalEquip: item.linkedToCriticalEquipment ? 'YES' : 'NO',
+      criticalComponents: item.criticalComponents || '-',
+      relatedJobs: item.relatedJobs || '-',
+      department: item.department || '-',
+      remarks: item.remarks || '-',
+    }));
+  }, [filteredAndSortedItems]);
 
   if (!effectiveVesselId) {
     return (
@@ -457,107 +430,11 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
             </Select>
           </div>
 
-          <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
-            <div className="overflow-x-auto">
-              <table className="w-full" data-testid="table-critical-spares">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-center py-3 px-3 w-14 font-semibold text-sm text-gray-700">S.No</th>
-                    <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700"><SortButton field="partCode" label="Part Code" /></th>
-                    <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700"><SortButton field="partName" label="Part Name" /></th>
-                    <th className="text-right py-3 px-3 font-semibold text-sm text-gray-700"><SortButton field="rob" label="ROB" /></th>
-                    <th className="text-right py-3 px-3 font-semibold text-sm text-gray-700">Min Stock</th>
-                    <th className="text-center py-3 px-3 font-semibold text-sm text-gray-700"><SortButton field="stockStatus" label="Stock Status" /></th>
-                    <th className="text-right py-3 px-3 font-semibold text-sm text-gray-700"><SortButton field="shortageQty" label="Shortage" /></th>
-                    <th className="text-center py-3 px-3 font-semibold text-sm text-gray-700"><SortButton field="criticalityLevel" label="Criticality" /></th>
-                    <th className="text-center py-3 px-3 font-semibold text-sm text-gray-700">Critical Equip</th>
-                    <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700">Critical Components</th>
-                    <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700">Related Jobs</th>
-                    <th className="text-center py-3 px-3 font-semibold text-sm text-gray-700">Dept</th>
-                    <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700">Remarks</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredAndSortedItems.length === 0 ? (
-                    <tr>
-                      <td colSpan={13} className="text-center py-12">
-                        <Package className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                        <p className="text-gray-500 font-medium">No critical spares found</p>
-                        <p className="text-sm text-gray-400 mt-1">No spare parts match the current filter criteria</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    paginateItems(filteredAndSortedItems).map((item, idx) => {
-                      const globalIdx = (currentPage - 1) * pageSize + idx;
-                      return (
-                      <tr
-                        key={`${item.partCode}-${globalIdx}`}
-                        className={`hover:bg-gray-50 ${getRowBg(item)}`}
-                        data-testid={`row-critical-spare-${globalIdx}`}
-                      >
-                        <td className="py-3 px-3 text-center text-sm text-gray-500">{globalIdx + 1}</td>
-                        <td className="py-3 px-3 text-sm text-gray-700 font-mono">{item.partCode}</td>
-                        <td className="py-3 px-3">
-                          <div className="font-medium text-gray-900 text-sm max-w-[200px] truncate" title={item.partName}>{item.partName}</div>
-                        </td>
-                        <td className="py-3 px-3 text-right">
-                          <span className={`font-semibold text-sm ${item.rob === 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                            {item.rob}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-right text-sm text-gray-600">{item.minStock ?? '-'}</td>
-                        <td className="py-3 px-3 text-center">{getStockStatusBadge(item.stockStatus)}</td>
-                        <td className="py-3 px-3 text-right">
-                          {item.shortageQty > 0 ? (
-                            <span className="font-semibold text-sm text-red-600">{item.shortageQty}</span>
-                          ) : (
-                            <span className="text-sm text-gray-400">0</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-3 text-center">{getCriticalityBadge(item.criticalityLevel)}</td>
-                        <td className="py-3 px-3 text-center">
-                          {item.linkedToCriticalEquipment ? (
-                            <Badge className="bg-red-100 text-red-700 border-red-200">YES</Badge>
-                          ) : (
-                            <span className="text-sm text-gray-400">NO</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-3">
-                          <div className="text-sm text-gray-700 max-w-[180px] truncate" title={item.criticalComponents}>
-                            {item.criticalComponents || '-'}
-                          </div>
-                        </td>
-                        <td className="py-3 px-3">
-                          <div className="text-sm text-gray-700 max-w-[180px] truncate" title={item.relatedJobs}>
-                            {item.relatedJobs || '-'}
-                          </div>
-                        </td>
-                        <td className="py-3 px-3 text-center text-sm text-gray-600">{item.department || '-'}</td>
-                        <td className="py-3 px-3">
-                          <div className="text-sm text-gray-600 max-w-[250px]" title={item.remarks}>
-                            {item.remarks}
-                          </div>
-                        </td>
-                      </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {filteredAndSortedItems.length > 0 && (
-            <div className="mt-4">
-              <TablePagination
-                totalItems={filteredAndSortedItems.length}
-                pageSize={pageSize}
-                currentPage={currentPage}
-                onPageChange={handlePageChange}
-                onPageSizeChange={handlePageSizeChange}
-              />
-            </div>
-          )}
+          <ReportAgGridTable
+            columns={reportColumns}
+            data={reportData}
+            height="60vh"
+          />
 
           {filteredAndSortedItems.length > 0 && (
             <div className="flex items-center justify-between mt-4 flex-wrap gap-4">

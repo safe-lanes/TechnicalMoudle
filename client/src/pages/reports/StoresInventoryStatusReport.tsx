@@ -1,7 +1,6 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -17,20 +16,15 @@ import {
   Download,
   FileText,
   Loader2,
-  ArrowUpDown,
   Store,
   Droplets,
   Beaker,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Package,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
-import { TablePagination, usePagination } from "@/components/reports/TablePagination";
+import ReportAgGridTable from "@/components/reports/ReportAgGridTable";
 
 interface StoresItem {
   id: number;
@@ -87,8 +81,6 @@ interface StoresInventoryStatusReportProps {
   globalComponent?: string;
 }
 
-type SortField = 'itemCode' | 'itemName' | 'category' | 'rob' | 'min' | 'status' | 'consumption' | 'trend' | 'daysUntilStockout' | 'priority';
-type SortDirection = 'asc' | 'desc';
 type ActiveTab = 'stock-status' | 'consumption' | 'reorder';
 
 const categoryDisplayMap: Record<string, string> = {
@@ -121,14 +113,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
   const [categoryTab, setCategoryTab] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState("all");
   const [activeTab, setActiveTab] = useState<ActiveTab>('stock-status');
-  const [sortField, setSortField] = useState<SortField>('itemCode');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [generatingPdf, setGeneratingPdf] = useState(false);
-  const { currentPage, pageSize, handlePageChange, handlePageSizeChange, resetPage, paginateItems } = usePagination(25);
-
-  useEffect(() => {
-    resetPage();
-  }, [searchQuery, statusFilter, categoryTab, activeTab]);
 
   const { data: rawStoresItems = [], isLoading: loadingItems, error: errorItems } = useQuery<StoresItem[]>({
     queryKey: [`/technical/api/stores/${effectiveVesselId}`],
@@ -236,55 +221,46 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
     return items;
   }, [preTabFilteredItems, categoryTab]);
 
-  const sortedStockItems = useMemo(() => {
-    const items = [...filteredItems];
-    items.sort((a, b) => {
-      let cmp = 0;
-      const robA = parseFloat(String(a.rob)) || 0;
-      const robB = parseFloat(String(b.rob)) || 0;
-      const minA = parseFloat(String(a.min)) || 0;
-      const minB = parseFloat(String(b.min)) || 0;
-      switch (sortField) {
-        case 'itemCode': cmp = (a.itemCode || '').localeCompare(b.itemCode || ''); break;
-        case 'itemName': cmp = (a.itemName || '').localeCompare(b.itemName || ''); break;
-        case 'category': cmp = (a.itemType || '').localeCompare(b.itemType || ''); break;
-        case 'rob': cmp = robA - robB; break;
-        case 'min': cmp = minA - minB; break;
-        case 'status': cmp = getStockStatus(robA, minA).localeCompare(getStockStatus(robB, minB)); break;
-        default: cmp = (a.itemCode || '').localeCompare(b.itemCode || '');
-      }
-      return sortDirection === 'desc' ? -cmp : cmp;
+  const stockStatusData = useMemo(() => {
+    return filteredItems.map((item, idx) => {
+      const rob = parseFloat(String(item.rob)) || 0;
+      const min = parseFloat(String(item.min)) || 0;
+      const status = getStockStatus(rob, min);
+      return {
+        sno: idx + 1,
+        itemCode: item.itemCode || '-',
+        itemName: item.itemName || '-',
+        category: categoryDisplayMap[item.itemType] || item.itemType || '-',
+        rob,
+        min,
+        status,
+        locationA: item.locationA || '-',
+        locationB: item.locationB || '-',
+        uom: item.uom || '-',
+      };
     });
-    return items;
-  }, [filteredItems, sortField, sortDirection]);
+  }, [filteredItems]);
 
-  const consumptionItems = useMemo(() => {
-    const items = filteredItems.map(item => {
+  const consumptionData = useMemo(() => {
+    return filteredItems.map((item, idx) => {
       const rob = parseFloat(String(item.rob)) || 0;
       const consumption = consumptionMap[item.id]?.total30 || 0;
       const trend = getTrend(item.id);
-      return { ...item, rob, consumption, avgMonthly: consumption, trend };
+      return {
+        sno: idx + 1,
+        itemCode: item.itemCode || '-',
+        itemName: item.itemName || '-',
+        category: categoryDisplayMap[item.itemType] || item.itemType || '-',
+        rob,
+        consumption: parseFloat(consumption.toFixed(2)),
+        avgMonthly: parseFloat(consumption.toFixed(2)),
+        trend,
+      };
     });
+  }, [filteredItems, consumptionMap]);
 
-    items.sort((a, b) => {
-      let cmp = 0;
-      switch (sortField) {
-        case 'itemCode': cmp = (a.itemCode || '').localeCompare(b.itemCode || ''); break;
-        case 'itemName': cmp = (a.itemName || '').localeCompare(b.itemName || ''); break;
-        case 'category': cmp = (a.itemType || '').localeCompare(b.itemType || ''); break;
-        case 'rob': cmp = a.rob - b.rob; break;
-        case 'consumption': cmp = a.consumption - b.consumption; break;
-        case 'trend': cmp = a.trend.localeCompare(b.trend); break;
-        default: cmp = (a.itemCode || '').localeCompare(b.itemCode || '');
-      }
-      return sortDirection === 'desc' ? -cmp : cmp;
-    });
-
-    return items;
-  }, [filteredItems, consumptionMap, sortField, sortDirection]);
-
-  const reorderItems = useMemo(() => {
-    const items = filteredItems
+  const reorderData = useMemo(() => {
+    return filteredItems
       .map(item => {
         const rob = parseFloat(String(item.rob)) || 0;
         const min = parseFloat(String(item.min)) || 0;
@@ -299,36 +275,21 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
         else if (daysUntilStockout < 30) priority = 'Medium';
         else priority = 'Low';
 
-        return {
-          ...item,
-          rob,
-          min,
-          monthlyConsumption,
-          daysUntilStockout,
-          priority,
-          suggestedQty,
-        };
+        return { item, rob, min, monthlyConsumption, daysUntilStockout, priority, suggestedQty };
       })
-      .filter(item => (item.rob - item.monthlyConsumption) <= item.min);
-
-    items.sort((a, b) => {
-      let cmp = 0;
-      const priorityOrder = { Critical: 0, High: 1, Medium: 2, Low: 3 };
-      switch (sortField) {
-        case 'itemCode': cmp = (a.itemCode || '').localeCompare(b.itemCode || ''); break;
-        case 'itemName': cmp = (a.itemName || '').localeCompare(b.itemName || ''); break;
-        case 'category': cmp = (a.itemType || '').localeCompare(b.itemType || ''); break;
-        case 'rob': cmp = a.rob - b.rob; break;
-        case 'consumption': cmp = a.monthlyConsumption - b.monthlyConsumption; break;
-        case 'daysUntilStockout': cmp = a.daysUntilStockout - b.daysUntilStockout; break;
-        case 'priority': cmp = priorityOrder[a.priority] - priorityOrder[b.priority]; break;
-        default: cmp = (a.itemCode || '').localeCompare(b.itemCode || '');
-      }
-      return sortDirection === 'desc' ? -cmp : cmp;
-    });
-
-    return items;
-  }, [filteredItems, consumptionMap, sortField, sortDirection]);
+      .filter(r => (r.rob - r.monthlyConsumption) <= r.min)
+      .map((r, idx) => ({
+        sno: idx + 1,
+        itemCode: r.item.itemCode || '-',
+        itemName: r.item.itemName || '-',
+        category: categoryDisplayMap[r.item.itemType] || r.item.itemType || '-',
+        rob: r.rob,
+        avgMonthly: parseFloat(r.monthlyConsumption.toFixed(2)),
+        daysUntilStockout: formatDaysUntilStockout(r.daysUntilStockout),
+        suggestedQty: parseFloat(r.suggestedQty.toFixed(1)),
+        priority: r.priority,
+      }));
+  }, [filteredItems, consumptionMap]);
 
   const totalItems = storesItems.length;
   const lowStockCount = storesItems.filter(i => {
@@ -338,61 +299,6 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
   }).length;
   const lubricantsCount = storesItems.filter(i => i.itemType === 'lubes' || i.itemType === 'lubricants').length;
   const chemicalsCount = storesItems.filter(i => i.itemType === 'chemicals').length;
-
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
-
-  const SortButton = ({ field, label }: { field: SortField; label: string }) => (
-    <button
-      className="flex items-center gap-1 font-semibold text-sm text-gray-700 hover:text-gray-900"
-      onClick={() => handleSort(field)}
-      data-testid={`button-sort-${field}`}
-    >
-      {label}
-      <ArrowUpDown className={`h-3 w-3 ${sortField === field ? 'text-blue-600' : 'text-gray-400'}`} />
-    </button>
-  );
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'Critical':
-        return <Badge className="bg-red-600 text-white border-red-700">Critical</Badge>;
-      case 'Low':
-        return <Badge className="bg-amber-500 text-white border-amber-600">Low</Badge>;
-      default:
-        return <Badge className="bg-green-600 text-white border-green-700">OK</Badge>;
-    }
-  };
-
-  const getTrendBadge = (trend: string) => {
-    switch (trend) {
-      case 'Increasing':
-        return <Badge className="bg-red-100 text-red-800 border-red-200"><TrendingUp className="h-3 w-3 mr-1" />Increasing</Badge>;
-      case 'Decreasing':
-        return <Badge className="bg-green-100 text-green-800 border-green-200"><TrendingDown className="h-3 w-3 mr-1" />Decreasing</Badge>;
-      default:
-        return <Badge className="bg-gray-100 text-gray-700 border-gray-200"><Minus className="h-3 w-3 mr-1" />Stable</Badge>;
-    }
-  };
-
-  const getPriorityBadge = (priority: string) => {
-    switch (priority) {
-      case 'Critical':
-        return <Badge className="bg-red-600 text-white border-red-700">Critical</Badge>;
-      case 'High':
-        return <Badge className="bg-orange-500 text-white border-orange-600">High</Badge>;
-      case 'Medium':
-        return <Badge className="bg-yellow-500 text-white border-yellow-600">Medium</Badge>;
-      default:
-        return <Badge className="bg-gray-400 text-white border-gray-500">Low</Badge>;
-    }
-  };
 
   const formatDaysUntilStockout = (days: number): string => {
     if (!isFinite(days) || days > 365) return '>365';
@@ -422,18 +328,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
           { header: 'Location B', field: 'locationB', width: 20 },
           { header: 'UOM', field: 'uom', width: 15 },
         ];
-        exportData = sortedStockItems.map((item, idx) => ({
-          sno: idx + 1,
-          itemCode: item.itemCode || '-',
-          itemName: item.itemName || '-',
-          category: categoryDisplayMap[item.itemType] || item.itemType || '-',
-          rob: parseFloat(String(item.rob)) || 0,
-          min: parseFloat(String(item.min)) || 0,
-          status: getStockStatus(parseFloat(String(item.rob)) || 0, parseFloat(String(item.min)) || 0),
-          locationA: item.locationA || '-',
-          locationB: item.locationB || '-',
-          uom: item.uom || '-',
-        }));
+        exportData = stockStatusData;
       } else if (activeTab === 'consumption') {
         title = 'Stores Inventory Status - Consumption Trends';
         subtitle = 'Last 30 days consumption analysis';
@@ -447,16 +342,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
           { header: 'Avg Monthly', field: 'avgMonthly', width: 25 },
           { header: 'Trend', field: 'trend', width: 22 },
         ];
-        exportData = consumptionItems.map((item, idx) => ({
-          sno: idx + 1,
-          itemCode: item.itemCode || '-',
-          itemName: item.itemName || '-',
-          category: categoryDisplayMap[item.itemType] || item.itemType || '-',
-          rob: item.rob,
-          consumption: item.consumption.toFixed(2),
-          avgMonthly: item.avgMonthly.toFixed(2),
-          trend: item.trend,
-        }));
+        exportData = consumptionData;
       } else {
         title = 'Stores Inventory Status - Reorder Requirements';
         subtitle = 'Items requiring reorder attention';
@@ -470,17 +356,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
           { header: 'Days to Stockout', field: 'daysUntilStockout', width: 28 },
           { header: 'Suggested Qty', field: 'suggestedQty', width: 25 },
         ];
-        exportData = reorderItems.map((item, idx) => ({
-          sno: idx + 1,
-          itemCode: item.itemCode || '-',
-          itemName: item.itemName || '-',
-          category: categoryDisplayMap[item.itemType] || item.itemType || '-',
-          rob: item.rob,
-          avgMonthly: item.monthlyConsumption.toFixed(2),
-          daysUntilStockout: formatDaysUntilStockout(item.daysUntilStockout),
-          priority: item.priority,
-          suggestedQty: item.suggestedQty.toFixed(1),
-        }));
+        exportData = reorderData;
       }
 
       if (exportData.length === 0) {
@@ -735,211 +611,53 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
           </div>
 
           {activeTab === 'stock-status' && (
-            <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
-              <div className="overflow-x-auto">
-                <table className="w-full" data-testid="table-stock-status">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-center py-3 px-3 w-16">S.No</th>
-                      <th className="text-left py-3 px-3"><SortButton field="itemCode" label="Item Code" /></th>
-                      <th className="text-left py-3 px-3"><SortButton field="itemName" label="Item Name" /></th>
-                      <th className="text-left py-3 px-3"><SortButton field="category" label="Category" /></th>
-                      <th className="text-right py-3 px-3"><SortButton field="rob" label="Current ROB" /></th>
-                      <th className="text-right py-3 px-3"><SortButton field="min" label="Min Stock" /></th>
-                      <th className="text-left py-3 px-3"><SortButton field="status" label="Stock Status" /></th>
-                      <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700">Location A</th>
-                      <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700">Location B</th>
-                      <th className="text-left py-3 px-3 font-semibold text-sm text-gray-700">UOM</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {sortedStockItems.length === 0 ? (
-                      <tr>
-                        <td colSpan={10} className="text-center py-12">
-                          <Package className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                          <p className="text-gray-500 font-medium">No items found</p>
-                          <p className="text-sm text-gray-400 mt-1">Try adjusting your filters</p>
-                        </td>
-                      </tr>
-                    ) : (
-                      paginateItems(sortedStockItems).map((item, idx) => {
-                        const globalIdx = (currentPage - 1) * pageSize + idx;
-                        const rob = parseFloat(String(item.rob)) || 0;
-                        const min = parseFloat(String(item.min)) || 0;
-                        const status = getStockStatus(rob, min);
-                        return (
-                          <tr
-                            key={item.id}
-                            className={`hover:bg-gray-50 ${
-                              status === 'Critical' ? 'bg-red-50/40' :
-                              status === 'Low' ? 'bg-amber-50/30' : ''
-                            }`}
-                            data-testid={`row-stock-${item.id}`}
-                          >
-                            <td className="py-3 px-3 text-center text-sm text-gray-500">{globalIdx + 1}</td>
-                            <td className="py-3 px-3 text-sm text-gray-700 font-mono">{item.itemCode || '-'}</td>
-                            <td className="py-3 px-3">
-                              <div className="font-medium text-gray-900 text-sm">{item.itemName || '-'}</div>
-                            </td>
-                            <td className="py-3 px-3 text-sm text-gray-700">{categoryDisplayMap[item.itemType] || item.itemType || '-'}</td>
-                            <td className="py-3 px-3 text-right">
-                              <span className={`font-semibold text-sm ${rob === 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                                {rob}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 text-right text-sm text-gray-600">{min}</td>
-                            <td className="py-3 px-3">{getStatusBadge(status)}</td>
-                            <td className="py-3 px-3 text-sm text-gray-600">{item.locationA || '-'}</td>
-                            <td className="py-3 px-3 text-sm text-gray-600">{item.locationB || '-'}</td>
-                            <td className="py-3 px-3 text-sm text-gray-600">{item.uom || '-'}</td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'stock-status' && sortedStockItems.length > 0 && (
-            <TablePagination
-              totalItems={sortedStockItems.length}
-              pageSize={pageSize}
-              currentPage={currentPage}
-              onPageChange={handlePageChange}
-              onPageSizeChange={handlePageSizeChange}
+            <ReportAgGridTable
+              columns={[
+                { header: 'S.No', field: 'sno', width: 70 },
+                { header: 'Item Code', field: 'itemCode', width: 120 },
+                { header: 'Item Name', field: 'itemName', width: 200 },
+                { header: 'Category', field: 'category', width: 120 },
+                { header: 'Current ROB', field: 'rob', width: 110 },
+                { header: 'Min Stock', field: 'min', width: 100 },
+                { header: 'Stock Status', field: 'status', width: 110 },
+                { header: 'Location A', field: 'locationA', width: 110 },
+                { header: 'Location B', field: 'locationB', width: 110 },
+                { header: 'UOM', field: 'uom', width: 80 },
+              ]}
+              data={stockStatusData}
             />
           )}
 
           {activeTab === 'consumption' && (
-            <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
-              <div className="overflow-x-auto">
-                <table className="w-full" data-testid="table-consumption">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-center py-3 px-3 w-16">S.No</th>
-                      <th className="text-left py-3 px-3"><SortButton field="itemCode" label="Item Code" /></th>
-                      <th className="text-left py-3 px-3"><SortButton field="itemName" label="Item Name" /></th>
-                      <th className="text-left py-3 px-3"><SortButton field="category" label="Category" /></th>
-                      <th className="text-right py-3 px-3"><SortButton field="rob" label="Current ROB" /></th>
-                      <th className="text-right py-3 px-3"><SortButton field="consumption" label="Last 30 Days" /></th>
-                      <th className="text-right py-3 px-3 font-semibold text-sm text-gray-700">Avg Monthly Rate</th>
-                      <th className="text-left py-3 px-3"><SortButton field="trend" label="Trend" /></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {consumptionItems.length === 0 ? (
-                      <tr>
-                        <td colSpan={8} className="text-center py-12">
-                          <Package className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                          <p className="text-gray-500 font-medium">No consumption data found</p>
-                          <p className="text-sm text-gray-400 mt-1">Try adjusting your filters</p>
-                        </td>
-                      </tr>
-                    ) : (
-                      paginateItems(consumptionItems).map((item, idx) => {
-                        const globalIdx = (currentPage - 1) * pageSize + idx;
-                        return (
-                        <tr
-                          key={item.id}
-                          className="hover:bg-gray-50"
-                          data-testid={`row-consumption-${item.id}`}
-                        >
-                          <td className="py-3 px-3 text-center text-sm text-gray-500">{globalIdx + 1}</td>
-                          <td className="py-3 px-3 text-sm text-gray-700 font-mono">{item.itemCode || '-'}</td>
-                          <td className="py-3 px-3">
-                            <div className="font-medium text-gray-900 text-sm">{item.itemName || '-'}</div>
-                          </td>
-                          <td className="py-3 px-3 text-sm text-gray-700">{categoryDisplayMap[item.itemType] || item.itemType || '-'}</td>
-                          <td className="py-3 px-3 text-right font-semibold text-sm text-gray-900">{item.rob}</td>
-                          <td className="py-3 px-3 text-right text-sm text-gray-700">{item.consumption.toFixed(2)}</td>
-                          <td className="py-3 px-3 text-right text-sm text-gray-700">{item.avgMonthly.toFixed(2)}</td>
-                          <td className="py-3 px-3">{getTrendBadge(item.trend)}</td>
-                        </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'consumption' && consumptionItems.length > 0 && (
-            <TablePagination
-              totalItems={consumptionItems.length}
-              pageSize={pageSize}
-              currentPage={currentPage}
-              onPageChange={handlePageChange}
-              onPageSizeChange={handlePageSizeChange}
+            <ReportAgGridTable
+              columns={[
+                { header: 'S.No', field: 'sno', width: 70 },
+                { header: 'Item Code', field: 'itemCode', width: 120 },
+                { header: 'Item Name', field: 'itemName', width: 200 },
+                { header: 'Category', field: 'category', width: 120 },
+                { header: 'Current ROB', field: 'rob', width: 110 },
+                { header: 'Last 30 Days', field: 'consumption', width: 130 },
+                { header: 'Avg Monthly Rate', field: 'avgMonthly', width: 130 },
+                { header: 'Trend', field: 'trend', width: 110 },
+              ]}
+              data={consumptionData}
             />
           )}
 
           {activeTab === 'reorder' && (
-            <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
-              <div className="overflow-x-auto">
-                <table className="w-full" data-testid="table-reorder">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-center py-3 px-3 w-16">S.No</th>
-                      <th className="text-left py-3 px-3"><SortButton field="itemCode" label="Item Code" /></th>
-                      <th className="text-left py-3 px-3"><SortButton field="itemName" label="Item Name" /></th>
-                      <th className="text-left py-3 px-3"><SortButton field="category" label="Category" /></th>
-                      <th className="text-right py-3 px-3"><SortButton field="rob" label="Current ROB" /></th>
-                      <th className="text-right py-3 px-3"><SortButton field="consumption" label="Avg Monthly" /></th>
-                      <th className="text-right py-3 px-3"><SortButton field="daysUntilStockout" label="Days to Stockout" /></th>
-                      <th className="text-right py-3 px-3 font-semibold text-sm text-gray-700">Suggested Qty</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {reorderItems.length === 0 ? (
-                      <tr>
-                        <td colSpan={8} className="text-center py-12">
-                          <Package className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                          <p className="text-gray-500 font-medium">No reorder requirements</p>
-                          <p className="text-sm text-gray-400 mt-1">All items have sufficient stock levels</p>
-                        </td>
-                      </tr>
-                    ) : (
-                      paginateItems(reorderItems).map((item, idx) => {
-                        const globalIdx = (currentPage - 1) * pageSize + idx;
-                        return (
-                        <tr
-                          key={item.id}
-                          className={`hover:bg-gray-50 ${
-                            item.priority === 'Critical' ? 'bg-red-50/40' :
-                            item.priority === 'High' ? 'bg-orange-50/30' : ''
-                          }`}
-                          data-testid={`row-reorder-${item.id}`}
-                        >
-                          <td className="py-3 px-3 text-center text-sm text-gray-500">{globalIdx + 1}</td>
-                          <td className="py-3 px-3 text-sm text-gray-700 font-mono">{item.itemCode || '-'}</td>
-                          <td className="py-3 px-3">
-                            <div className="font-medium text-gray-900 text-sm">{item.itemName || '-'}</div>
-                          </td>
-                          <td className="py-3 px-3 text-sm text-gray-700">{categoryDisplayMap[item.itemType] || item.itemType || '-'}</td>
-                          <td className="py-3 px-3 text-right font-semibold text-sm text-gray-900">{item.rob}</td>
-                          <td className="py-3 px-3 text-right text-sm text-gray-700">{item.monthlyConsumption.toFixed(2)}</td>
-                          <td className="py-3 px-3 text-right text-sm text-gray-700">{formatDaysUntilStockout(item.daysUntilStockout)}</td>
-                          <td className="py-3 px-3 text-right text-sm font-semibold text-gray-900">{item.suggestedQty.toFixed(1)}</td>
-                        </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'reorder' && reorderItems.length > 0 && (
-            <TablePagination
-              totalItems={reorderItems.length}
-              pageSize={pageSize}
-              currentPage={currentPage}
-              onPageChange={handlePageChange}
-              onPageSizeChange={handlePageSizeChange}
+            <ReportAgGridTable
+              columns={[
+                { header: 'S.No', field: 'sno', width: 70 },
+                { header: 'Item Code', field: 'itemCode', width: 120 },
+                { header: 'Item Name', field: 'itemName', width: 200 },
+                { header: 'Category', field: 'category', width: 120 },
+                { header: 'Current ROB', field: 'rob', width: 110 },
+                { header: 'Avg Monthly', field: 'avgMonthly', width: 120 },
+                { header: 'Days to Stockout', field: 'daysUntilStockout', width: 140 },
+                { header: 'Suggested Qty', field: 'suggestedQty', width: 120 },
+                { header: 'Priority', field: 'priority', width: 100 },
+              ]}
+              data={reorderData}
             />
           )}
         </>
