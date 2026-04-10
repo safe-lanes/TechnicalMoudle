@@ -458,19 +458,6 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
               </button>
             </Badge>
           )}
-          {filters.department && (
-            <Badge variant="secondary" className="flex items-center gap-1 text-xs py-0.5">
-              {departmentOptions.find(d => d.value === filters.department)?.label || filters.department}
-              <button
-                type="button"
-                onClick={() => onFiltersChange({ ...filters, department: "" })}
-                className="ml-0.5 hover:text-foreground"
-                data-testid="button-clear-department-filter"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          )}
         </div>
       )}
     </div>
