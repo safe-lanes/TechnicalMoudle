@@ -1535,7 +1535,7 @@ const Dashboard = () => {
               </div>
             ) : (
               <>
-                <div className="flex items-center gap-3 mb-3" data-testid="section-operation-top">
+                <div className="flex items-stretch gap-3 mb-3" data-testid="section-operation-top">
                   <div className="flex items-center gap-3 flex-shrink-0" data-testid="card-operation-wo-donut">
                     {operationDonutData.length > 0 ? (
                       <div className="flex items-center gap-1">
@@ -1602,11 +1602,11 @@ const Dashboard = () => {
                     ]).map(card => (
                       <Card
                         key={card.key}
-                        className={`cursor-pointer transition-shadow bg-white border-0 border-l-4 ${card.borderColor} ${selectedOpCard === card.key ? 'ring-2 ring-blue-400 shadow-md' : 'hover:shadow-lg'}`}
+                        className={`cursor-pointer transition-shadow bg-white border-0 border-l-4 ${card.borderColor} ${selectedOpCard === card.key ? 'ring-2 ring-blue-400 shadow-md' : 'hover:shadow-lg'} flex`}
                         onClick={() => setSelectedOpCard(card.key)}
                         data-testid={card.testId}
                       >
-                        <CardContent className="py-2 px-3">
+                        <CardContent className="py-2 px-3 flex flex-col justify-center flex-1">
                           <p className="text-xs font-medium text-gray-600 leading-tight">{card.label}</p>
                           <p className={`text-xl font-bold mt-0.5 ${card.textColor}`} data-testid={card.valueTestId}>{card.value}</p>
                         </CardContent>
