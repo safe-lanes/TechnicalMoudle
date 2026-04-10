@@ -55,7 +55,6 @@ const REPORT_CATEGORIES: ReportCategory[] = [
     title: "Maintenance & Work Orders",
     icon: ClipboardList,
     reports: [
-      { id: "due-jobs-7", name: "Due Jobs (7 days)" },
       { id: "overdue-jobs", name: "Overdue Jobs" },
       { id: "completed-jobs", name: "Completed Jobs Register" },
       { id: "monthly-summary", name: "Monthly Maintenance Summary" },
