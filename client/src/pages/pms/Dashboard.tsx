@@ -11,6 +11,7 @@ import {
   CheckSquare,
   XCircle,
   Eye,
+  Pencil,
   Download,
   TrendingUp,
   TrendingDown,
@@ -102,7 +103,7 @@ interface SparesHistoryItem {
   partName: string;
 }
 
-type EnrichedWorkOrder = WorkOrder & { computedStatus?: string; criticality?: string };
+type EnrichedWorkOrder = WorkOrder & { computedStatus?: string; criticality?: string; jobPriority?: string };
 
 type SortField = 'vessel' | 'overduePercent' | 'outstandingPercent' | 'compliancePercent' | 'lowStockItems' | 'overdueCount';
 type SortDir = 'asc' | 'desc';
@@ -1535,7 +1536,7 @@ const Dashboard = () => {
                   <div className="flex items-center gap-3 flex-shrink-0" data-testid="card-operation-wo-donut">
                     {operationDonutData.length > 0 ? (
                       <div className="flex items-center gap-1">
-                        <div style={{ width: 80, height: 80 }}>
+                        <div style={{ width: 120, height: 100 }}>
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie
@@ -1544,8 +1545,8 @@ const Dashboard = () => {
                                 nameKey="status"
                                 cx="50%"
                                 cy="50%"
-                                innerRadius={22}
-                                outerRadius={36}
+                                innerRadius={28}
+                                outerRadius={45}
                                 paddingAngle={2}
                                 label={({ cx, cy, midAngle, innerRadius, outerRadius, payload }: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; payload: { count: number } }) => {
                                   const RADIAN = Math.PI / 180;
@@ -1570,7 +1571,7 @@ const Dashboard = () => {
                         <div className="flex flex-col gap-0.5">
                           <span className="text-xs font-semibold text-gray-700">Work Orders</span>
                           {[
-                            { status: 'Completed', color: '#5dc86f' },
+                            { status: 'Planned', color: '#5dc86f' },
                             { status: 'Due', color: '#FF964f' },
                             { status: 'Overdue', color: '#ff6961' },
                           ].map(item => (
@@ -1640,7 +1641,7 @@ const Dashboard = () => {
                             jobTitle: wo.jobTitle || '-',
                             dueDate: safeFormatDate(wo.dueDate),
                             status: (wo as EnrichedWorkOrder).computedStatus || wo.status || '-',
-                            criticality: (wo as any).jobPriority || '-',
+                            criticality: (wo as EnrichedWorkOrder).jobPriority || '-',
                           }));
                           pdfReportGenerator.generateReport(
                             {
@@ -1721,9 +1722,9 @@ const Dashboard = () => {
                                     </span>
                                   </TableCell>
                                   <TableCell className="py-2">
-                                    {(wo as any).jobPriority ? (
-                                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${getCritColor((wo as any).jobPriority)}`}>
-                                        {(wo as any).jobPriority}
+                                    {(wo as EnrichedWorkOrder).jobPriority ? (
+                                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${getCritColor((wo as EnrichedWorkOrder).jobPriority)}`}>
+                                        {(wo as EnrichedWorkOrder).jobPriority}
                                       </span>
                                     ) : (
                                       <span className="text-gray-400 text-xs">-</span>
@@ -1745,6 +1746,22 @@ const Dashboard = () => {
                                             </Button>
                                           </TooltipTrigger>
                                           <TooltipContent>View</TooltipContent>
+                                        </UITooltip>
+                                      </TooltipProvider>
+                                      <TooltipProvider>
+                                        <UITooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              size="icon"
+                                              variant="ghost"
+                                              className="h-6 w-6"
+                                              onClick={() => setOpViewModal({ open: true, workOrder: wo as EnrichedWorkOrder })}
+                                              data-testid={`op-edit-wo-${wo.id}`}
+                                            >
+                                              <Pencil className="h-3.5 w-3.5 text-gray-500" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Edit</TooltipContent>
                                         </UITooltip>
                                       </TooltipProvider>
                                     </div>
