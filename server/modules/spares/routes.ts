@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../shared/middleware';
 import * as sparesCtrl from './controllers/sparesController';
 import * as invCtrl from './controllers/inventoryController';
-import { requirePMSAdmin } from '../../middleware/auth';
+import { requireAuth, requirePMSAdmin } from '../../middleware/auth';
 
 const router = Router();
 
@@ -15,69 +15,69 @@ const router = Router();
 // ── Spares: No-param / specific-first routes ──
 
 // GET  /spares — get all spares (no vesselId)
-router.get('/spares', asyncHandler(sparesCtrl.getAllSpares));
+router.get('/spares', requireAuth, asyncHandler(sparesCtrl.getAllSpares));
 
 // GET  /spares/history/:vesselId — spare history (MUST be before /:vesselId)
-router.get('/spares/history/:vesselId', asyncHandler(sparesCtrl.getSpareHistoryByVessel));
+router.get('/spares/history/:vesselId', requireAuth, asyncHandler(sparesCtrl.getSpareHistoryByVessel));
 
 // POST /spares/bulk-update — location-specific bulk update (MUST be before /:vesselId)
-router.post('/spares/bulk-update', asyncHandler(sparesCtrl.bulkUpdate));
+router.post('/spares/bulk-update', requirePMSAdmin, asyncHandler(sparesCtrl.bulkUpdate));
 
 // ── Spares: suuid-only routes (no vesselId prefix) ──
 
 // POST /spares/:id/consume — legacy consume (Location A default)
-router.post('/spares/:id/consume', asyncHandler(sparesCtrl.consumeSimple));
+router.post('/spares/:id/consume', requireAuth, asyncHandler(sparesCtrl.consumeSimple));
 
 // POST /spares/:id/receive — legacy receive (Location A default)
-router.post('/spares/:id/receive', asyncHandler(sparesCtrl.receiveSimple));
+router.post('/spares/:id/receive', requireAuth, asyncHandler(sparesCtrl.receiveSimple));
 
 // POST /spares/:id/consume-from-location — location-aware consume
-router.post('/spares/:id/consume-from-location', asyncHandler(sparesCtrl.consumeFromLocation));
+router.post('/spares/:id/consume-from-location', requireAuth, asyncHandler(sparesCtrl.consumeFromLocation));
 
 // POST /spares/:id/receive-to-location — location-aware receive
-router.post('/spares/:id/receive-to-location', asyncHandler(sparesCtrl.receiveToLocation));
+router.post('/spares/:id/receive-to-location', requireAuth, asyncHandler(sparesCtrl.receiveToLocation));
 
 // ── Spares: vessel-scoped specific paths (BEFORE /:vesselId catch-all) ──
 
 // POST /spares/:vesselId/batch-consume
-router.post('/spares/:vesselId/batch-consume', asyncHandler(sparesCtrl.batchConsume));
+router.post('/spares/:vesselId/batch-consume', requireAuth, asyncHandler(sparesCtrl.batchConsume));
 
 // POST /spares/:vesselId/batch-receive
-router.post('/spares/:vesselId/batch-receive', asyncHandler(sparesCtrl.batchReceive));
+router.post('/spares/:vesselId/batch-receive', requireAuth, asyncHandler(sparesCtrl.batchReceive));
 
 // ── Spares: vessel-scoped with sub-resource ID ──
 
 // GET  /spares/:vesselId/history — legacy history route
-router.get('/spares/:vesselId/history', asyncHandler(sparesCtrl.getSpareHistoryLegacy));
+router.get('/spares/:vesselId/history', requireAuth, asyncHandler(sparesCtrl.getSpareHistoryLegacy));
 
 // GET  /spares/:vesselId/low-stock — low stock spares
-router.get('/spares/:vesselId/low-stock', asyncHandler(sparesCtrl.getLowStockSpares));
+router.get('/spares/:vesselId/low-stock', requireAuth, asyncHandler(sparesCtrl.getLowStockSpares));
 
 // POST /spares/:vesselId/:id/inactivate — soft delete (deactivate) spare
-router.post('/spares/:vesselId/:id/inactivate', asyncHandler(sparesCtrl.inactivateSpare));
+router.post('/spares/:vesselId/:id/inactivate', requirePMSAdmin, asyncHandler(sparesCtrl.inactivateSpare));
 
 // POST /spares/:vesselId/:id/adjustment — adjust spare ROB at location
-router.post('/spares/:vesselId/:id/adjustment', asyncHandler(sparesCtrl.adjustSpareAtLocation));
+router.post('/spares/:vesselId/:id/adjustment', requireAuth, asyncHandler(sparesCtrl.adjustSpareAtLocation));
 
 // POST /spares/:vesselId/:id/adjust — adjust spare quantity (+/- buttons)
-router.post('/spares/:vesselId/:id/adjust', asyncHandler(sparesCtrl.adjustSpareQuantity));
+router.post('/spares/:vesselId/:id/adjust', requireAuth, asyncHandler(sparesCtrl.adjustSpareQuantity));
 
 // ── Spares: vessel-scoped CRUD ──
 
 // GET  /spares/:vesselId/:id — get spare by ID
-router.get('/spares/:vesselId/:id', asyncHandler(sparesCtrl.getSpareById));
+router.get('/spares/:vesselId/:id', requireAuth, asyncHandler(sparesCtrl.getSpareById));
 
 // POST /spares/:vesselId — create spare
-router.post('/spares/:vesselId', asyncHandler(sparesCtrl.createSpare));
+router.post('/spares/:vesselId', requirePMSAdmin, asyncHandler(sparesCtrl.createSpare));
 
 // PATCH /spares/:vesselId/:id — update spare
-router.patch('/spares/:vesselId/:id', asyncHandler(sparesCtrl.updateSpare));
+router.patch('/spares/:vesselId/:id', requirePMSAdmin, asyncHandler(sparesCtrl.updateSpare));
 
 // DELETE /spares/:vesselId/:id — delete spare
-router.delete('/spares/:vesselId/:id', asyncHandler(sparesCtrl.deleteSpare));
+router.delete('/spares/:vesselId/:id', requirePMSAdmin, asyncHandler(sparesCtrl.deleteSpare));
 
 // GET  /spares/:vesselId — get spares for vessel (CATCH-ALL — must be last in /spares/:vesselId group)
-router.get('/spares/:vesselId', asyncHandler(sparesCtrl.getSparesByVessel));
+router.get('/spares/:vesselId', requireAuth, asyncHandler(sparesCtrl.getSparesByVessel));
 
 // ══════════════════════════════════════════════════════════
 // Inventory Routes
@@ -85,9 +85,9 @@ router.get('/spares/:vesselId', asyncHandler(sparesCtrl.getSparesByVessel));
 
 // ── Inventory: Locations ──
 
-router.get('/inventory/locations/:vesselId', asyncHandler(invCtrl.getLocations));
-router.get('/inventory/locations/:vesselId/:id', asyncHandler(invCtrl.getLocationById));
-router.post('/inventory/locations/:vesselId', asyncHandler(invCtrl.createLocation));
+router.get('/inventory/locations/:vesselId', requireAuth, asyncHandler(invCtrl.getLocations));
+router.get('/inventory/locations/:vesselId/:id', requireAuth, asyncHandler(invCtrl.getLocationById));
+router.post('/inventory/locations/:vesselId', requirePMSAdmin, asyncHandler(invCtrl.createLocation));
 
 // ── Inventory: Reconciliation ──
 
@@ -95,34 +95,34 @@ router.post('/inventory/reconcile/:vesselId', requirePMSAdmin, asyncHandler(invC
 
 // ── Inventory: Spare-Component Links (specific paths before catch-all) ──
 
-router.get('/inventory/spare-links/by-spare/:spareId', asyncHandler(invCtrl.getSpareLinksBySpare));
-router.get('/inventory/spare-links/by-component/:componentId', asyncHandler(invCtrl.getSpareLinksByComponent));
-router.get('/inventory/spare-links/:vesselId', asyncHandler(invCtrl.getSpareLinks));
-router.post('/inventory/spare-links', asyncHandler(invCtrl.createSpareLink));
-router.delete('/inventory/spare-links/:spareId/:componentId', asyncHandler(invCtrl.deleteSpareLink));
+router.get('/inventory/spare-links/by-spare/:spareId', requireAuth, asyncHandler(invCtrl.getSpareLinksBySpare));
+router.get('/inventory/spare-links/by-component/:componentId', requireAuth, asyncHandler(invCtrl.getSpareLinksByComponent));
+router.get('/inventory/spare-links/:vesselId', requireAuth, asyncHandler(invCtrl.getSpareLinks));
+router.post('/inventory/spare-links', requirePMSAdmin, asyncHandler(invCtrl.createSpareLink));
+router.delete('/inventory/spare-links/:spareId/:componentId', requirePMSAdmin, asyncHandler(invCtrl.deleteSpareLink));
 
 // ── Inventory: Stock (specific paths before catch-all) ──
 
-router.get('/inventory/stock/by-location/:locationId', asyncHandler(invCtrl.getSparesAtLocation));
-router.get('/inventory/stock/locations-with-stock/:vesselId', asyncHandler(invCtrl.getLocationsWithStock));
-router.get('/inventory/stock/full-by-location/:vesselId/:locationId', asyncHandler(invCtrl.getFullSparesAtLocation));
-router.get('/inventory/stock/:spareId', asyncHandler(invCtrl.getSpareStock));
-router.post('/inventory/stock/:spareId/:locationId', asyncHandler(invCtrl.upsertStock));
+router.get('/inventory/stock/by-location/:locationId', requireAuth, asyncHandler(invCtrl.getSparesAtLocation));
+router.get('/inventory/stock/locations-with-stock/:vesselId', requireAuth, asyncHandler(invCtrl.getLocationsWithStock));
+router.get('/inventory/stock/full-by-location/:vesselId/:locationId', requireAuth, asyncHandler(invCtrl.getFullSparesAtLocation));
+router.get('/inventory/stock/:spareId', requireAuth, asyncHandler(invCtrl.getSpareStock));
+router.post('/inventory/stock/:spareId/:locationId', requireAuth, asyncHandler(invCtrl.upsertStock));
 
 // ── Inventory: Transactions ──
 
-router.post('/inventory/transactions', asyncHandler(invCtrl.createTransaction));
-router.get('/inventory/transactions/:vesselId', asyncHandler(invCtrl.getTransactions));
+router.post('/inventory/transactions', requireAuth, asyncHandler(invCtrl.createTransaction));
+router.get('/inventory/transactions/:vesselId', requireAuth, asyncHandler(invCtrl.getTransactions));
 
 // ── Inventory: Sibling Backfill ──
 
-router.post('/inventory/backfill-sibling-links/:vesselId', asyncHandler(invCtrl.backfillSiblingLinks));
+router.post('/inventory/backfill-sibling-links/:vesselId', requirePMSAdmin, asyncHandler(invCtrl.backfillSiblingLinks));
 
 // ── Inventory: Enhanced Spare Data (specific paths before catch-all) ──
 
-router.get('/inventory/spares-with-inventory/:vesselId', asyncHandler(invCtrl.getSparesWithInventory));
-router.get('/inventory/spare-with-inventory/:spareId', asyncHandler(invCtrl.getSpareWithInventory));
-router.get('/inventory/spares-by-component/:componentId', asyncHandler(invCtrl.getSparesByComponent));
-router.get('/inventory/spares-by-component-code/:vesselId/:componentCode', asyncHandler(invCtrl.getSparesByComponentCode));
+router.get('/inventory/spares-with-inventory/:vesselId', requireAuth, asyncHandler(invCtrl.getSparesWithInventory));
+router.get('/inventory/spare-with-inventory/:spareId', requireAuth, asyncHandler(invCtrl.getSpareWithInventory));
+router.get('/inventory/spares-by-component/:componentId', requireAuth, asyncHandler(invCtrl.getSparesByComponent));
+router.get('/inventory/spares-by-component-code/:vesselId/:componentCode', requireAuth, asyncHandler(invCtrl.getSparesByComponentCode));
 
 export default router;

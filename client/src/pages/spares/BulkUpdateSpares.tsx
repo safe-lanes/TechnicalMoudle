@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Search, X, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -33,6 +34,8 @@ export default function BulkUpdateSpares() {
   const [, setLocation] = useLocation();
   const { vesselId } = useVessel();
   const { toast } = useToast();
+  const { canEdit: canEditPerm } = usePermissions();
+  const canEditSpare = canEditPerm("pms-spares");
   
   const [transactionMode, setTransactionMode] = useState<TransactionMode>("");
   const [bulkSearchQuery, setBulkSearchQuery] = useState("");
@@ -597,7 +600,7 @@ export default function BulkUpdateSpares() {
           </Button>
           <Button 
             onClick={() => setShowConfirmDialog(true)}
-            disabled={!transactionMode || !hasAnyChanges || bulkUpdateMutation.isPending}
+            disabled={!canEditSpare || !transactionMode || !hasAnyChanges || bulkUpdateMutation.isPending}
             data-testid="button-save-updates"
           >
             {bulkUpdateMutation.isPending ? "Saving..." : "Save Updates"}

@@ -3,6 +3,7 @@ import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { useLocation } from "wouter";
 import { Marker } from "@/components/Marker";
 import { Button } from "@/components/ui/button";
@@ -143,6 +144,10 @@ const Spares: React.FC = () => {
   
   // UI Role context for role-based visibility
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin, isExternal } = useUIRole();
+  const { canCreate: canCreatePerm, canEdit: canEditPerm, canDelete: canDeletePerm } = usePermissions();
+  const canCreateSpare = canCreatePerm("pms-spares");
+  const canEditSpare = canEditPerm("pms-spares");
+  const canDeleteSpare = canDeletePerm("pms-spares");
   const [showModifySubmitFooter, setShowModifySubmitFooter] = useState(false);
   const [originalSpareData, setOriginalSpareData] = useState<Spare | null>(null);
   const [modifiedSpareData, setModifiedSpareData] = useState<Partial<Spare>>({});
@@ -2783,16 +2788,18 @@ const Spares: React.FC = () => {
             </>
           ) : (
             <>
-              {(isSailAdmin || isClientAdmin || isExternal || isChangeMode) && (
+              {(isSailAdmin || isClientAdmin || isExternal || isChangeMode) && canCreateSpare && (
                 <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={() => setIsAddSpareModalOpen(true)} data-testid="E10">
                   <Marker id="E10" />
                   + Add Spare
                 </Button>
               )}
+              {canEditSpare && (
               <Button size="sm" className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" onClick={openBulkUpdateModal} data-testid="E11">
                 <Marker id="E11" />
                 Bulk Update Spares
               </Button>
+              )}
             </>
           )}
         </div>
@@ -3166,7 +3173,7 @@ const Spares: React.FC = () => {
                             {isFirstRow && <Marker id="E34" />}
                             <Info className="h-4 w-4 text-blue-600" />
                           </Button>
-                          {(isSailAdmin || isClientAdmin || isExternal || isHeadOfDept || isChangeMode) && (
+                          {(isSailAdmin || isClientAdmin || isExternal || isHeadOfDept || isChangeMode) && canEditSpare && (
                             <Button 
                               size="sm" 
                               variant="ghost"
@@ -3178,6 +3185,7 @@ const Spares: React.FC = () => {
                               <Edit2 className="h-4 w-4" />
                             </Button>
                           )}
+                          {canEditSpare && (
                           <Button 
                             size="sm" 
                             variant="ghost"
@@ -3187,7 +3195,8 @@ const Spares: React.FC = () => {
                           >
                             <Settings2 className="h-4 w-4 text-orange-500" />
                           </Button>
-                          {(isSailAdmin || isClientAdmin || isExternal || isChangeMode) && !isInactive && (
+                          )}
+                          {(isSailAdmin || isClientAdmin || isExternal || isChangeMode) && !isInactive && canDeleteSpare && (
                             <Button 
                               size="sm" 
                               variant="ghost"
@@ -3199,7 +3208,7 @@ const Spares: React.FC = () => {
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
                           )}
-                          {(isSailAdmin || isClientAdmin || isExternal) && isInactive && (
+                          {(isSailAdmin || isClientAdmin || isExternal) && isInactive && canEditSpare && (
                             <Button 
                               size="sm" 
                               variant="ghost"
