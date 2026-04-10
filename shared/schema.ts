@@ -3459,5 +3459,30 @@ export const insertAdmVesselOrgChartSchema = createInsertSchema(admVesselOrgChar
 export type InsertAdmVesselOrgChart = z.infer<typeof insertAdmVesselOrgChartSchema>;
 export type AdmVesselOrgChart = typeof admVesselOrgChart.$inferSelect;
 
+// ====== MONTHLY MAINTENANCE SNAPSHOTS ======
+export const monthlySnapshots = pgTable("monthly_snapshots", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
+  snapshotMonth: text("snapshot_month").notNull(),
+  snapshotType: text("snapshot_type").notNull(),
+  snapshotTimestamp: timestamp("snapshot_timestamp").notNull(),
+  category: text("category").notNull(),
+  count: integer("count").notNull().default(0),
+  workOrderIds: text("work_order_ids").array().notNull().default(sql`'{}'::text[]`),
+  generatedAt: timestamp("generated_at").notNull().defaultNow(),
+}, (table) => ({
+  vesselMonthIdx: index("idx_monthly_snap_vessel_month").on(table.vesselId, table.snapshotMonth),
+  typeIdx: index("idx_monthly_snap_type").on(table.snapshotType),
+  uniqueSnap: unique("unique_monthly_snapshot").on(table.vesselId, table.snapshotMonth, table.snapshotType, table.category),
+}));
+
+export const insertMonthlySnapshotSchema = createInsertSchema(monthlySnapshots).omit({
+  id: true,
+  generatedAt: true,
+});
+
+export type InsertMonthlySnapshot = z.infer<typeof insertMonthlySnapshotSchema>;
+export type MonthlySnapshot = typeof monthlySnapshots.$inferSelect;
+
 // ====== NOON REPORT MODULE SCHEMA — remove this line to disable ======
 export * from './schema-noon-report';

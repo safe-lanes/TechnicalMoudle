@@ -1169,194 +1169,16 @@ export async function exportPostponementLog(
 
 export async function exportMonthlySummary(
   vesselId: string,
-  startDate: string,
-  endDate: string
+  year: number,
+  month: number
 ): Promise<{ buffer: Buffer; filename: string }> {
-  const periodStart = new Date(startDate);
-  const periodEnd = new Date(endDate);
-  periodEnd.setHours(23, 59, 59, 999);
+  const { getMonthlySummaryData } = await import('./monthlySnapshotService');
+  const summaryData = await getMonthlySummaryData(vesselId, year, month);
   const now = new Date();
 
-  const allVessels = await repo.getVessels();
-  const vessel = allVessels.find(v => v.id === vesselId);
-  const vesselName = vessel?.name || vesselId;
+  const vesselName = summaryData.vesselName;
+  const { opening, movement, closing, indicators } = summaryData;
 
-  const workOrders = await repo.getWorkOrders(vesselId);
-  const jobs = await repo.getJobs(vesselId);
-  const components = await repo.getComponents(vesselId);
-
-  const jobsMap = new Map(jobs.map(job => [job.juuid, job]));
-  const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
-
-  const parseDateLocal = (dateStr: string | null | undefined): Date | null => {
-    if (!dateStr) return null;
-    const ddMmmYyyy = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
-    if (ddMmmYyyy) {
-      const months: Record<string, number> = {
-        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
-      };
-      const day = parseInt(ddMmmYyyy[1], 10);
-      const month = months[ddMmmYyyy[2]];
-      const year = parseInt(ddMmmYyyy[3], 10);
-      if (month !== undefined) return new Date(year, month, day);
-    }
-    const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? null : d;
-  };
-
-  const completedInPeriod = workOrders.filter((wo: any) => wo.status === 'Completed');
-  console.log(`[MONTHLY SUMMARY DEBUG] Total Completed WOs in vessel: ${completedInPeriod.length}`);
-  completedInPeriod.slice(0, 5).forEach((wo: any) => {
-    const completionDate = parseDateLocal(wo.completionDateTime);
-    const inRange = completionDate && completionDate >= periodStart && completionDate <= periodEnd;
-    console.log(`  WO: ${wo.workOrderNo || wo.id}, Status: ${wo.status}, completionDateTime: ${wo.completionDateTime}, Parsed: ${completionDate?.toISOString() || 'null'}, InRange: ${inRange}`);
-  });
-
-  const monthlyWOs = workOrders.filter((wo: any) => {
-    const dueDate = parseDateLocal(wo.dueDate);
-    const completionDate = parseDateLocal(wo.completionDateTime);
-    const isDueInMonth = dueDate && dueDate >= periodStart && dueDate <= periodEnd;
-    const isCompletedInMonth = wo.status === 'Completed' && completionDate && completionDate >= periodStart && completionDate <= periodEnd;
-    return isDueInMonth || isCompletedInMonth;
-  });
-
-  console.log(`[MONTHLY SUMMARY DEBUG] Period: ${periodStart.toISOString()} to ${periodEnd.toISOString()}`);
-  console.log(`[MONTHLY SUMMARY DEBUG] monthlyWOs: ${monthlyWOs.length}, CompletedInScope: ${monthlyWOs.filter((wo: any) => wo.status === 'Completed').length}`);
-
-  const completedWOs = monthlyWOs.filter((wo: any) => wo.status === 'Completed');
-
-  const cumulativeOverdueWOs = workOrders.filter((wo: any) => {
-    if (!wo.dueDate || wo.status === 'Completed') return false;
-    const dueDate = parseDateLocal(wo.dueDate);
-    return dueDate && dueDate < periodEnd;
-  });
-
-  const onTimeCompletions = completedWOs.filter((wo: any) => {
-    const dueDate = parseDateLocal(wo.dueDate);
-    const completionDate = parseDateLocal(wo.completionDateTime);
-    if (!dueDate || !completionDate) return true;
-    return completionDate <= dueDate;
-  });
-
-  const totalInScope = monthlyWOs.length;
-  const totalCompleted = completedWOs.length;
-  const totalOverdue = cumulativeOverdueWOs.length;
-  const completionRate = totalInScope > 0 ? Math.round((totalCompleted / totalInScope) * 100) : 0;
-  const onTimeRate = totalCompleted > 0 ? Math.round((onTimeCompletions.length / totalCompleted) * 100) : 0;
-
-  const criticalWOs = monthlyWOs.filter((wo: any) => {
-    const comp = componentsByCodeMap.get(wo.componentCode || '');
-    return (comp as any)?.classRelated === 'Yes' || (comp as any)?.classRelated === true ||
-           wo.classRelated === 'Yes' || wo.criticality === 'Yes' || wo.jobPriority === 'High';
-  });
-
-  let totalManHours = 0;
-  completedWOs.forEach((wo: any) => {
-    totalManHours += Number(wo.manhours || wo.totalTimeHours || wo.actualHours || 0);
-  });
-
-  const activeJobs = monthlyWOs.filter((wo: any) =>
-    wo.status !== 'Completed' && wo.status !== 'Postponed'
-  ).length;
-
-  const priorityStats: Record<string, { total: number; completed: number; overdue: number }> = {
-    'High': { total: 0, completed: 0, overdue: 0 },
-    'Medium': { total: 0, completed: 0, overdue: 0 },
-    'Low': { total: 0, completed: 0, overdue: 0 },
-    'Normal': { total: 0, completed: 0, overdue: 0 }
-  };
-
-  monthlyWOs.forEach((wo: any) => {
-    const priority = wo.jobPriority || 'Normal';
-    if (!priorityStats[priority]) priorityStats[priority] = { total: 0, completed: 0, overdue: 0 };
-    priorityStats[priority].total++;
-    if (wo.status === 'Completed') priorityStats[priority].completed++;
-  });
-
-  cumulativeOverdueWOs.forEach((wo: any) => {
-    const priority = wo.jobPriority || 'Normal';
-    if (!priorityStats[priority]) priorityStats[priority] = { total: 0, completed: 0, overdue: 0 };
-    priorityStats[priority].overdue++;
-  });
-
-  const deptStats: Record<string, { planned: number; completed: number; overdue: number }> = {};
-  monthlyWOs.forEach((wo: any) => {
-    const dept = wo.department || wo.assignedDepartment || 'Unassigned';
-    if (!deptStats[dept]) deptStats[dept] = { planned: 0, completed: 0, overdue: 0 };
-    deptStats[dept].planned++;
-    if (wo.status === 'Completed') deptStats[dept].completed++;
-  });
-
-  cumulativeOverdueWOs.forEach((wo: any) => {
-    const dept = wo.department || wo.assignedDepartment || 'Unassigned';
-    if (!deptStats[dept]) deptStats[dept] = { planned: 0, completed: 0, overdue: 0 };
-    deptStats[dept].overdue++;
-  });
-
-  const freqStats: Record<string, { count: number; completed: number }> = {
-    'Daily': { count: 0, completed: 0 },
-    'Weekly': { count: 0, completed: 0 },
-    'Monthly': { count: 0, completed: 0 },
-    'Quarterly': { count: 0, completed: 0 },
-    'Yearly': { count: 0, completed: 0 },
-    'Other': { count: 0, completed: 0 }
-  };
-
-  monthlyWOs.forEach((wo: any) => {
-    const job = jobsMap.get(wo.jobId || '');
-    let freqUnit = wo.frequencyUnit || job?.frequencyUnit || 'Other';
-    const freqValue = Number(wo.frequencyValue || job?.frequencyValue || 0);
-    if (freqUnit === 'Months' && freqValue === 3) freqUnit = 'Quarterly';
-    else if (freqUnit === 'Months' && freqValue === 12) freqUnit = 'Yearly';
-    else if (freqUnit === 'Months') freqUnit = 'Monthly';
-    else if (freqUnit === 'Weeks') freqUnit = 'Weekly';
-    else if (freqUnit === 'Days') freqUnit = 'Daily';
-    else if (freqUnit === 'Years') freqUnit = 'Yearly';
-    else if (freqUnit === 'Hours') freqUnit = 'Hours-Based';
-
-    if (!freqStats[freqUnit]) freqStats[freqUnit] = { count: 0, completed: 0 };
-    freqStats[freqUnit].count++;
-    if (wo.status === 'Completed') freqStats[freqUnit].completed++;
-  });
-
-  const manHoursByDept: Record<string, number> = {};
-  completedWOs.forEach((wo: any) => {
-    const dept = wo.department || wo.assignedDepartment || 'Unassigned';
-    const hours = Number(wo.manhours || wo.totalTimeHours || wo.actualHours || 0);
-    manHoursByDept[dept] = (manHoursByDept[dept] || 0) + hours;
-  });
-
-  const criticalEquipStats = {
-    solas: { total: 0, completed: 0, overdue: 0 },
-    classCritical: { total: 0, completed: 0, overdue: 0 },
-    highPriority: { total: 0, completed: 0, overdue: 0 }
-  };
-
-  monthlyWOs.forEach((wo: any) => {
-    const comp = componentsByCodeMap.get(wo.componentCode || '');
-    const isClassRelated = (comp as any)?.classRelated === 'Yes' || (comp as any)?.classRelated === true;
-    const isSolas = (comp as any)?.solasCritical === 'Yes' || (comp as any)?.solasCritical === true;
-    const isHighPriority = wo.criticality === 'Yes' || wo.jobPriority === 'High';
-    const isCompleted = wo.status === 'Completed';
-
-    if (isSolas) { criticalEquipStats.solas.total++; if (isCompleted) criticalEquipStats.solas.completed++; }
-    if (isClassRelated) { criticalEquipStats.classCritical.total++; if (isCompleted) criticalEquipStats.classCritical.completed++; }
-    if (isHighPriority) { criticalEquipStats.highPriority.total++; if (isCompleted) criticalEquipStats.highPriority.completed++; }
-  });
-
-  cumulativeOverdueWOs.forEach((wo: any) => {
-    const comp = componentsByCodeMap.get(wo.componentCode || '');
-    const isClassRelated = (comp as any)?.classRelated === 'Yes' || (comp as any)?.classRelated === true;
-    const isSolas = (comp as any)?.solasCritical === 'Yes' || (comp as any)?.solasCritical === true;
-    const isHighPriority = wo.criticality === 'Yes' || wo.jobPriority === 'High';
-
-    if (isSolas) criticalEquipStats.solas.overdue++;
-    if (isClassRelated) criticalEquipStats.classCritical.overdue++;
-    if (isHighPriority) criticalEquipStats.highPriority.overdue++;
-  });
-
-  // Build Excel workbook
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'PMS System';
   workbook.created = new Date();
@@ -1365,14 +1187,13 @@ export async function exportMonthlySummary(
     views: [{ state: 'frozen', ySplit: 6, xSplit: 0 }]
   });
 
-  const totalColumns = 8;
-  const lastColLetter = 'H';
+  const totalColumns = 4;
+  worksheet.getColumn(1).width = 30;
+  worksheet.getColumn(2).width = 15;
+  worksheet.getColumn(3).width = 15;
+  worksheet.getColumn(4).width = 15;
 
-  for (let i = 1; i <= totalColumns; i++) {
-    worksheet.getColumn(i).width = 18;
-  }
-
-  worksheet.mergeCells('A1:H1');
+  worksheet.mergeCells('A1:D1');
   const titleCell = worksheet.getCell('A1');
   titleCell.value = 'SEAFARER TECHNICAL MANAGEMENT SYSTEM';
   titleCell.font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' }, name: 'Arial' };
@@ -1380,7 +1201,7 @@ export async function exportMonthlySummary(
   titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.getRow(1).height = 30;
 
-  worksheet.mergeCells('A2:H2');
+  worksheet.mergeCells('A2:D2');
   const subtitleCell = worksheet.getCell('A2');
   subtitleCell.value = 'MONTHLY MAINTENANCE SUMMARY';
   subtitleCell.font = { size: 12, bold: true, color: { argb: 'FF1E3A8A' }, name: 'Arial' };
@@ -1392,31 +1213,30 @@ export async function exportMonthlySummary(
 
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
                       'July', 'August', 'September', 'October', 'November', 'December'];
-  const reportPeriod = `${monthNames[periodStart.getMonth()]} ${periodStart.getFullYear()}`;
+  const reportPeriod = `${monthNames[month - 1]} ${year}`;
 
   worksheet.getCell('A4').value = `Vessel: ${vesselName}`;
   worksheet.getCell('A4').font = { bold: true, size: 10, name: 'Arial' };
-  worksheet.mergeCells('E4:H4');
-  worksheet.getCell('E4').value = `Report Period: ${reportPeriod}`;
-  worksheet.getCell('E4').font = { size: 10, name: 'Arial' };
-  worksheet.getCell('E4').alignment = { horizontal: 'right' };
+  worksheet.mergeCells('C4:D4');
+  worksheet.getCell('C4').value = `Report Period: ${reportPeriod}`;
+  worksheet.getCell('C4').font = { size: 10, name: 'Arial' };
+  worksheet.getCell('C4').alignment = { horizontal: 'right' };
 
   const genDate = new Date();
   const genDateStr = `${genDate.getDate().toString().padStart(2, '0')}-${monthNames[genDate.getMonth()].slice(0,3)}-${genDate.getFullYear()} ${genDate.getHours().toString().padStart(2,'0')}:${genDate.getMinutes().toString().padStart(2,'0')}`;
   worksheet.getCell('A5').value = `Generated: ${genDateStr}`;
   worksheet.getCell('A5').font = { size: 9, color: { argb: 'FF666666' }, name: 'Arial' };
-  worksheet.mergeCells('E5:H5');
-  worksheet.getCell('E5').value = 'Generated By: PMS System';
-  worksheet.getCell('E5').font = { size: 9, color: { argb: 'FF666666' }, name: 'Arial' };
-  worksheet.getCell('E5').alignment = { horizontal: 'right' };
+  worksheet.mergeCells('C5:D5');
+  worksheet.getCell('C5').value = 'Generated By: PMS System';
+  worksheet.getCell('C5').font = { size: 9, color: { argb: 'FF666666' }, name: 'Arial' };
+  worksheet.getCell('C5').alignment = { horizontal: 'right' };
 
   worksheet.getRow(6).height = 10;
 
   let currentRow = 8;
 
-  // Helper to write section header
-  const writeSectionHeader = (title: string, colSpan: string) => {
-    worksheet.mergeCells(`A${currentRow}:${colSpan}${currentRow}`);
+  const writeSectionHeader = (title: string) => {
+    worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
     const cell = worksheet.getCell(`A${currentRow}`);
     cell.value = title;
     cell.font = { bold: true, size: 11, color: { argb: 'FF1E3A8A' }, name: 'Arial' };
@@ -1426,205 +1246,59 @@ export async function exportMonthlySummary(
     currentRow++;
   };
 
-  // Helper to write table headers
-  const writeTableHeaders = (headers: string[]) => {
-    headers.forEach((header, idx) => {
-      const cell = worksheet.getCell(currentRow, idx + 1);
-      cell.value = header;
-      cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' }, name: 'Arial' };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF93C5FD' } };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = {
-        top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
-        left: { style: 'thin', color: { argb: 'FFFFFFFF' } },
-        bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } },
-        right: { style: 'thin', color: { argb: 'FFFFFFFF' } }
-      };
-    });
-    worksheet.getRow(currentRow).height = 22;
-    currentRow++;
-  };
+  const writeRow = (label: string, value: number | string) => {
+    const bgColor = (currentRow % 2 === 0) ? 'FFFFFFFF' : 'FFF9FAFB';
+    const cellA = worksheet.getCell(currentRow, 1);
+    cellA.value = label;
+    cellA.font = { size: 10, name: 'Arial', color: { argb: 'FF2C3E50' } };
+    cellA.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+    cellA.alignment = { horizontal: 'left', vertical: 'middle' };
 
-  // Helper to write a stats data row with rate coloring
-  const writeStatsRow = (values: any[], hasRate: boolean, overdueCellIdx?: number) => {
-    const idx = currentRow - 8; // approximate row index for alternating
-    const bgColor = idx % 2 === 0 ? 'FFFFFFFF' : 'FFF9FAFB';
+    const cellB = worksheet.getCell(currentRow, 2);
+    cellB.value = value;
+    cellB.font = { size: 10, name: 'Arial', color: { argb: 'FF2C3E50' }, bold: true };
+    cellB.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+    cellB.alignment = { horizontal: 'center', vertical: 'middle' };
 
-    values.forEach((val, colIdx) => {
-      const cell = worksheet.getCell(currentRow, colIdx + 1);
-      cell.value = val;
-
-      let fontColor = 'FF2C3E50';
-      let cellBg = bgColor;
-      let bold = false;
-
-      if (hasRate && colIdx === values.length - 1) {
-        const rateNum = typeof val === 'string' ? parseInt(val) : 0;
-        fontColor = rateNum >= 90 ? 'FF16A34A' : rateNum >= 70 ? 'FF9A3412' : 'FFDC2626';
-        cellBg = rateNum >= 90 ? 'FFD1FAE5' : rateNum >= 70 ? 'FFFEF9C3' : rateNum >= 50 ? 'FFFED7AA' : 'FFFEE2E2';
-      }
-
-      if (overdueCellIdx !== undefined && colIdx === overdueCellIdx && typeof val === 'number' && val > 10) {
-        fontColor = 'FFDC2626';
-        bold = true;
-      }
-
-      cell.font = { size: 10, name: 'Arial', color: { argb: fontColor }, bold };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cellBg } };
-      cell.alignment = { horizontal: colIdx === 0 ? 'left' : 'center', vertical: 'middle' };
-      cell.border = {
+    [cellA, cellB].forEach(c => {
+      c.border = {
         top: { style: 'thin', color: { argb: 'FFE1E8ED' } },
-        left: { style: 'thin', color: { argb: 'FFE1E8ED' } },
         bottom: { style: 'thin', color: { argb: 'FFE1E8ED' } },
-        right: { style: 'thin', color: { argb: 'FFE1E8ED' } }
+        left: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+        right: { style: 'thin', color: { argb: 'FFE1E8ED' } },
       };
     });
     currentRow++;
   };
 
-  // EXECUTIVE SUMMARY
-  writeSectionHeader('EXECUTIVE SUMMARY', 'H');
+  const categories = ['Planned', 'Due', 'Overdue', 'Postponed', 'Unplanned', 'Pending Approval', 'Completed'];
 
-  // KPI Row 1 - Labels
-  const kpiRow1 = currentRow;
-  const kpis1 = [
-    { label: 'Jobs In Scope', value: totalInScope, color: 'FFE0F2FE' },
-    { label: 'Total Completed', value: totalCompleted, color: 'FFD1FAE5' },
-    { label: 'Total Overdue', value: totalOverdue, color: 'FFFEE2E2' },
-    { label: 'Completion Rate', value: `${completionRate}%`, color: 'FFEDE9FE' }
-  ];
-
-  kpis1.forEach((kpi, idx) => {
-    const col = (idx * 2) + 1;
-    worksheet.mergeCells(kpiRow1, col, kpiRow1, col + 1);
-    const cell = worksheet.getCell(kpiRow1, col);
-    cell.value = kpi.label;
-    cell.font = { size: 9, color: { argb: 'FF666666' }, name: 'Arial' };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: kpi.color } };
-    cell.alignment = { horizontal: 'center', vertical: 'middle' };
-    cell.border = { top: { style: 'thin', color: { argb: 'FFE1E8ED' } }, left: { style: 'thin', color: { argb: 'FFE1E8ED' } }, right: { style: 'thin', color: { argb: 'FFE1E8ED' } } };
-  });
-  currentRow++;
-
-  // KPI Row 1 - Values
-  const kpiRow2 = currentRow;
-  kpis1.forEach((kpi, idx) => {
-    const col = (idx * 2) + 1;
-    worksheet.mergeCells(kpiRow2, col, kpiRow2, col + 1);
-    const cell = worksheet.getCell(kpiRow2, col);
-    cell.value = kpi.value;
-    cell.font = { bold: true, size: 16, color: { argb: kpi.label === 'Total Overdue' && totalOverdue > 0 ? 'FFDC2626' : 'FF1E3A8A' }, name: 'Arial' };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: kpi.color } };
-    cell.alignment = { horizontal: 'center', vertical: 'middle' };
-    cell.border = { bottom: { style: 'thin', color: { argb: 'FFE1E8ED' } }, left: { style: 'thin', color: { argb: 'FFE1E8ED' } }, right: { style: 'thin', color: { argb: 'FFE1E8ED' } } };
-  });
-  worksheet.getRow(kpiRow2).height = 35;
-  currentRow++;
-  currentRow++;
-
-  // KPI Row 2 - Labels
-  const kpiRow3 = currentRow;
-  const kpis2 = [
-    { label: 'On-Time %', value: `${onTimeRate}%`, color: 'FFE0F2FE' },
-    { label: 'Critical Jobs', value: criticalWOs.length, color: 'FFFEE2E2' },
-    { label: 'Total Man-Hours', value: totalManHours.toFixed(1), color: 'FFFFFBEB' },
-    { label: 'Active Jobs', value: activeJobs, color: 'FFEDE9FE' }
-  ];
-
-  kpis2.forEach((kpi, idx) => {
-    const col = (idx * 2) + 1;
-    worksheet.mergeCells(kpiRow3, col, kpiRow3, col + 1);
-    const cell = worksheet.getCell(kpiRow3, col);
-    cell.value = kpi.label;
-    cell.font = { size: 9, color: { argb: 'FF666666' }, name: 'Arial' };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: kpi.color } };
-    cell.alignment = { horizontal: 'center', vertical: 'middle' };
-    cell.border = { top: { style: 'thin', color: { argb: 'FFE1E8ED' } }, left: { style: 'thin', color: { argb: 'FFE1E8ED' } }, right: { style: 'thin', color: { argb: 'FFE1E8ED' } } };
-  });
-  currentRow++;
-
-  // KPI Row 2 - Values
-  const kpiRow4 = currentRow;
-  kpis2.forEach((kpi, idx) => {
-    const col = (idx * 2) + 1;
-    worksheet.mergeCells(kpiRow4, col, kpiRow4, col + 1);
-    const cell = worksheet.getCell(kpiRow4, col);
-    cell.value = kpi.value;
-    cell.font = { bold: true, size: 16, color: { argb: 'FF1E3A8A' }, name: 'Arial' };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: kpi.color } };
-    cell.alignment = { horizontal: 'center', vertical: 'middle' };
-    cell.border = { bottom: { style: 'thin', color: { argb: 'FFE1E8ED' } }, left: { style: 'thin', color: { argb: 'FFE1E8ED' } }, right: { style: 'thin', color: { argb: 'FFE1E8ED' } } };
-  });
-  worksheet.getRow(kpiRow4).height = 35;
-  currentRow += 3;
-
-  // WORK ORDER STATISTICS
-  writeSectionHeader('WORK ORDER STATISTICS', 'E');
-  writeTableHeaders(['Category', 'Total', 'Completed', 'Overdue', 'Rate %']);
-
-  const allWOStats = { total: totalInScope, completed: totalCompleted, overdue: totalOverdue };
-  const woStatsData = [
-    { category: 'All Work Orders', ...allWOStats },
-    { category: 'High Priority', ...priorityStats['High'] },
-    { category: 'Medium Priority', ...priorityStats['Medium'] },
-    { category: 'Low Priority', ...priorityStats['Low'] }
-  ];
-
-  woStatsData.forEach(row => {
-    const rate = row.total > 0 ? Math.round((row.completed / row.total) * 100) : 0;
-    writeStatsRow([row.category, row.total, row.completed, row.overdue, `${rate}%`], true, 3);
+  writeSectionHeader('SECTION A — OPENING POSITION');
+  categories.forEach(cat => {
+    writeRow(cat, opening[cat]?.count ?? 0);
   });
   currentRow += 2;
 
-  // DEPARTMENT-WISE BREAKDOWN
-  writeSectionHeader('DEPARTMENT-WISE BREAKDOWN', 'E');
-  writeTableHeaders(['Department', 'Planned', 'Completed', 'Overdue', 'Rate %']);
+  writeSectionHeader('SECTION B — MONTHLY MOVEMENT');
+  writeRow('New Jobs Entered', movement.newJobsEntered.count);
+  writeRow('Completed in Month', movement.completedInMonth.count);
+  writeRow('Postponed in Month', movement.postponedInMonth.count);
+  writeRow('Newly Overdue in Month', movement.newlyOverdue.count);
+  writeRow('Unplanned Jobs Raised', movement.unplannedRaised.count);
+  writeRow('Sent to Pending Approval', movement.sentToPendingApproval.count);
+  currentRow += 2;
 
-  Object.entries(deptStats).sort((a, b) => b[1].planned - a[1].planned).forEach(([dept, stats]) => {
-    const rate = stats.planned > 0 ? Math.round((stats.completed / stats.planned) * 100) : 0;
-    writeStatsRow([dept, stats.planned, stats.completed, stats.overdue, `${rate}%`], true, 3);
+  writeSectionHeader('SECTION C — CLOSING POSITION');
+  categories.forEach(cat => {
+    writeRow(cat, closing[cat]?.count ?? 0);
   });
   currentRow += 2;
 
-  // FREQUENCY ANALYSIS
-  writeSectionHeader('FREQUENCY ANALYSIS', 'D');
-  writeTableHeaders(['Frequency', 'Count', 'Completed', 'Completion %']);
-
-  Object.entries(freqStats).filter(([_, stats]) => stats.count > 0).forEach(([freq, stats]) => {
-    const rate = stats.count > 0 ? Math.round((stats.completed / stats.count) * 100) : 0;
-    writeStatsRow([freq, stats.count, stats.completed, `${rate}%`], true);
-  });
-  currentRow += 2;
-
-  // MAN-HOURS SUMMARY
-  writeSectionHeader('MAN-HOURS SUMMARY', 'B');
-  writeTableHeaders(['Metric', 'Value']);
-
-  const avgHoursPerJob = totalCompleted > 0 ? (totalManHours / totalCompleted).toFixed(1) : '0';
-  const mhData = [
-    { metric: 'Total Man-Hours Used', value: totalManHours.toFixed(1) },
-    { metric: 'Average per Job', value: avgHoursPerJob },
-    ...Object.entries(manHoursByDept).map(([dept, hours]) => ({ metric: `By ${dept}`, value: hours.toFixed(1) }))
-  ];
-
-  mhData.forEach(row => {
-    writeStatsRow([row.metric, row.value], false);
-  });
-  currentRow += 2;
-
-  // CRITICAL EQUIPMENT STATUS
-  writeSectionHeader('CRITICAL EQUIPMENT STATUS', 'D');
-  writeTableHeaders(['Type', 'Total', 'Completed', 'Overdue']);
-
-  const critData = [
-    { type: 'SOLAS Critical', ...criticalEquipStats.solas },
-    { type: 'Class Critical', ...criticalEquipStats.classCritical },
-    { type: 'High Priority', ...criticalEquipStats.highPriority }
-  ];
-
-  critData.forEach(row => {
-    writeStatsRow([row.type, row.total, row.completed, row.overdue], false, 3);
-  });
+  writeSectionHeader('SECTION D — PERFORMANCE INDICATORS');
+  writeRow('Completion Rate', `${indicators.completionRate}%`);
+  writeRow('Overdue Change (Closing - Opening)', indicators.overdueChange > 0 ? `+${indicators.overdueChange}` : `${indicators.overdueChange}`);
+  writeRow('Postponements in Month', indicators.postponementCount);
+  writeRow('Unplanned Jobs in Month', indicators.unplannedCount);
 
   worksheet.pageSetup = {
     orientation: 'portrait',
@@ -1641,7 +1315,7 @@ export async function exportMonthlySummary(
 
   const buffer = await workbook.xlsx.writeBuffer();
   const safeVesselName = vesselName.replace(/[^a-zA-Z0-9]/g, '_');
-  const filename = `PMS_MonthlySummary_${safeVesselName}_${periodStart.getFullYear()}${(periodStart.getMonth()+1).toString().padStart(2,'0')}.xlsx`;
+  const filename = `PMS_MonthlySummary_${safeVesselName}_${year}${String(month).padStart(2,'0')}.xlsx`;
 
   console.log(`[MONTHLY SUMMARY REPORT] Generated: ${filename} (Period: ${reportPeriod})`);
 

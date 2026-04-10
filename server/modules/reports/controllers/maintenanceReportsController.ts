@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import * as maintenanceReportService from '../services/maintenanceReportService';
+import * as monthlySnapshotService from '../services/monthlySnapshotService';
 
 // ═══════════════════════════════════════════════════════════════
 // DUE JOBS (7 DAYS) - GET PREVIEW
@@ -196,6 +197,87 @@ export async function exportPostponementLog(req: Request, res: Response) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// MONTHLY MAINTENANCE SUMMARY - PREVIEW (NEW SNAPSHOT-BASED)
+// ═══════════════════════════════════════════════════════════════
+
+export async function getMonthlySummaryPreview(req: Request, res: Response) {
+  try {
+    const vesselId = req.query.vesselId as string;
+    const year = parseInt(req.query.year as string, 10);
+    const month = parseInt(req.query.month as string, 10);
+
+    if (!vesselId) {
+      return res.status(400).json({ error: "Please select a vessel" });
+    }
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+      return res.status(400).json({ error: "Please provide valid year and month" });
+    }
+
+    const data = await monthlySnapshotService.getMonthlySummaryData(vesselId, year, month);
+    res.json(data);
+  } catch (error: any) {
+    console.error("Error fetching Monthly Summary preview:", error);
+    res.status(500).json({ error: "Failed to fetch report data: " + error.message });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MONTHLY MAINTENANCE SUMMARY - SNAPSHOT DRILL-DOWN
+// ═══════════════════════════════════════════════════════════════
+
+export async function getMonthlySummaryDrilldown(req: Request, res: Response) {
+  try {
+    const vesselId = req.query.vesselId as string;
+    const year = parseInt(req.query.year as string, 10);
+    const month = parseInt(req.query.month as string, 10);
+    const type = req.query.type as string;
+    const category = req.query.category as string;
+
+    if (!vesselId || !type || !category) {
+      return res.status(400).json({ error: "Missing required parameters" });
+    }
+    if (isNaN(year) || isNaN(month)) {
+      return res.status(400).json({ error: "Invalid year or month" });
+    }
+
+    if (type === 'movement') {
+      const data = await monthlySnapshotService.getMovementDrilldown(vesselId, year, month, category);
+      return res.json(data);
+    }
+
+    const data = await monthlySnapshotService.getSnapshotDrilldown(vesselId, year, month, type, category);
+    res.json(data);
+  } catch (error: any) {
+    console.error("Error fetching snapshot drilldown:", error);
+    res.status(500).json({ error: "Failed to fetch drilldown data: " + error.message });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MONTHLY MAINTENANCE SUMMARY - REGENERATE SNAPSHOTS
+// ═══════════════════════════════════════════════════════════════
+
+export async function regenerateMonthlySummarySnapshots(req: Request, res: Response) {
+  try {
+    const { vesselId, year, month } = req.body;
+
+    if (!vesselId) {
+      return res.status(400).json({ error: "Please select a vessel" });
+    }
+    if (!year || !month) {
+      return res.status(400).json({ error: "Please provide year and month" });
+    }
+
+    await monthlySnapshotService.regenerateSnapshots(vesselId, year, month);
+    const data = await monthlySnapshotService.getMonthlySummaryData(vesselId, year, month);
+    res.json(data);
+  } catch (error: any) {
+    console.error("Error regenerating snapshots:", error);
+    res.status(500).json({ error: "Failed to regenerate snapshots: " + error.message });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // MONTHLY MAINTENANCE SUMMARY - EXCEL EXPORT
 // ═══════════════════════════════════════════════════════════════
 
@@ -206,11 +288,21 @@ export async function exportMonthlySummary(req: Request, res: Response) {
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
-    if (!startDate || !endDate) {
-      return res.status(400).json({ error: "Please provide start and end dates for the report period" });
+
+    let year: number;
+    let month: number;
+
+    if (startDate) {
+      const d = new Date(startDate);
+      year = d.getFullYear();
+      month = d.getMonth() + 1;
+    } else {
+      const now = new Date();
+      year = now.getFullYear();
+      month = now.getMonth() + 1;
     }
 
-    const { buffer, filename } = await maintenanceReportService.exportMonthlySummary(vesselId, startDate, endDate);
+    const { buffer, filename } = await maintenanceReportService.exportMonthlySummary(vesselId, year, month);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

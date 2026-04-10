@@ -32,6 +32,7 @@ import { useQuery } from "@tanstack/react-query";
 import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
 import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import InlineReportPreview from "@/components/reports/InlineReportPreview";
+import MonthlySummaryPreview, { type MonthlySummaryData } from "@/components/reports/MonthlySummaryPreview";
 
 interface MaintenanceReport {
   id: string;
@@ -70,6 +71,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   const [globalComponent, setGlobalComponent] = useState<string>(globalFilters?.component || "");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
+  const [monthlySummaryData, setMonthlySummaryData] = useState<{ data: MonthlySummaryData; vesselId: string; year: number; month: number } | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [isFilterRefreshing, setIsFilterRefreshing] = useState(false);
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -111,6 +113,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
       const version = ++previewVersionRef.current;
       setPreviewData(null);
+      setMonthlySummaryData(null);
       setPreviewOpen(false);
       initialLoadRef.current = false;
       generateMaintenancePDF(selectedReportId, 'preview').then((data) => {
@@ -132,6 +135,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     const version = ++previewVersionRef.current;
     filterTimerRef.current = setTimeout(() => {
       setPreviewData(null);
+      setMonthlySummaryData(null);
       generateMaintenancePDF(selectedReportId, 'preview').then((data) => {
         if (previewVersionRef.current === version) {
           if (data) setPreviewData(data);
@@ -555,146 +559,57 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'monthly-summary': {
-        // Parse DD-MMM-YYYY date format
-        const parseDate = (dateStr: string | null | undefined): Date | null => {
-          if (!dateStr) return null;
-          const ddMmmYyyy = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
-          if (ddMmmYyyy) {
-            const months: Record<string, number> = {
-              'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-              'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
-            };
-            const day = parseInt(ddMmmYyyy[1], 10);
-            const month = months[ddMmmYyyy[2]];
-            const year = parseInt(ddMmmYyyy[3], 10);
-            if (month !== undefined) return new Date(year, month, day);
-          }
-          const d = new Date(dateStr);
-          return isNaN(d.getTime()) ? null : d;
-        };
-        
-        // Use date range from global filters or default to current month
-        let periodStart: Date;
-        let periodEnd: Date;
-        if (globalFilters?.dateRange?.from && globalFilters?.dateRange?.to) {
-          periodStart = globalFilters.dateRange.from;
-          periodEnd = new Date(globalFilters.dateRange.to);
+        let periodYear: number;
+        let periodMonth: number;
+        if (globalFilters?.dateRange?.from) {
+          periodYear = globalFilters.dateRange.from.getFullYear();
+          periodMonth = globalFilters.dateRange.from.getMonth() + 1;
         } else {
-          periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-          periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+          periodYear = now.getFullYear();
+          periodMonth = now.getMonth() + 1;
         }
-        periodEnd.setHours(23, 59, 59, 999);
-        
-        // Monthly WOs = jobs due in period OR completed in period
-        const monthlyWOs = vesselWorkOrders.filter((wo: any) => {
-          const dueDate = parseDate(wo.dueDate);
-          const completionDate = wo.completionDateTime ? new Date(wo.completionDateTime) : null;
-          const isDueInMonth = dueDate && dueDate >= periodStart && dueDate <= periodEnd;
-          const isCompletedInMonth = wo.status === 'Completed' 
-            && completionDate 
-            && completionDate >= periodStart 
-            && completionDate <= periodEnd;
-          return isDueInMonth || isCompletedInMonth;
-        });
-        
-        // Completed jobs from monthlyWOs scope
-        const completedWOs = monthlyWOs.filter((wo: any) => wo.status === 'Completed');
-        
-        // CUMULATIVE overdue: ALL work orders with dueDate < periodEnd AND status != Completed
-        const cumulativeOverdue = vesselWorkOrders.filter((wo: any) => {
-          if (!wo.dueDate || wo.status === 'Completed') return false;
-          const dueDate = parseDate(wo.dueDate);
-          return dueDate && dueDate < periodEnd;
-        });
-        
-        const totalInScope = monthlyWOs.length;
-        const totalCompleted = completedWOs.length;
-        const totalOverdue = cumulativeOverdue.length;
-        const completionRate = totalInScope > 0 ? Math.round((totalCompleted / totalInScope) * 100) : 0;
-        
-        // Department breakdown
-        const deptStats: Record<string, { planned: number; completed: number; overdue: number }> = {};
-        monthlyWOs.forEach((wo: any) => {
-          const dept = wo.department || wo.assignedDepartment || 'Unassigned';
-          if (!deptStats[dept]) deptStats[dept] = { planned: 0, completed: 0, overdue: 0 };
-          deptStats[dept].planned++;
-          if (wo.status === 'Completed') deptStats[dept].completed++;
-        });
-        cumulativeOverdue.forEach((wo: any) => {
-          const dept = wo.department || wo.assignedDepartment || 'Unassigned';
-          if (!deptStats[dept]) deptStats[dept] = { planned: 0, completed: 0, overdue: 0 };
-          deptStats[dept].overdue++;
-        });
-        
-        // Priority breakdown (using jobPriority field from database)
-        const priorityStats: Record<string, { total: number; completed: number; overdue: number }> = {
-          'High': { total: 0, completed: 0, overdue: 0 },
-          'Medium': { total: 0, completed: 0, overdue: 0 },
-          'Low': { total: 0, completed: 0, overdue: 0 },
-          'Normal': { total: 0, completed: 0, overdue: 0 }
-        };
-        monthlyWOs.forEach((wo: any) => {
-          const priority = wo.jobPriority || 'Normal';
-          if (!priorityStats[priority]) priorityStats[priority] = { total: 0, completed: 0, overdue: 0 };
-          priorityStats[priority].total++;
-          if (wo.status === 'Completed') priorityStats[priority].completed++;
-        });
-        cumulativeOverdue.forEach((wo: any) => {
-          const priority = wo.jobPriority || 'Normal';
-          if (!priorityStats[priority]) priorityStats[priority] = { total: 0, completed: 0, overdue: 0 };
-          priorityStats[priority].overdue++;
-        });
-        
-        // Man-hours calculation
-        let totalManHours = 0;
-        completedWOs.forEach((wo: any) => {
-          totalManHours += Number(wo.manhours || wo.totalTimeHours || wo.actualHours || 0);
-        });
-        
-        const periodLabel = periodStart.toLocaleString('default', { month: 'long', year: 'numeric' });
-        
-        const columns = [
-          { header: 'Metric', field: 'metric', width: 60 },
-          { header: 'Value', field: 'value', width: 40 },
-          { header: 'Percentage', field: 'percentage', width: 40 }
-        ];
 
-        // Build comprehensive data sections
-        const data = [
-          { metric: '--- EXECUTIVE SUMMARY ---', value: '', percentage: '' },
-          { metric: 'Jobs In Scope (Due/Completed in Period)', value: totalInScope, percentage: '100%' },
-          { metric: 'Completed', value: totalCompleted, percentage: totalInScope > 0 ? `${completionRate}%` : '0%' },
-          { metric: 'Active (In Progress)', value: totalInScope - totalCompleted, percentage: totalInScope > 0 ? `${Math.round((totalInScope - totalCompleted) / totalInScope * 100)}%` : '0%' },
-          { metric: 'Cumulative Overdue', value: totalOverdue, percentage: '-' },
-          { metric: 'Total Man-Hours', value: totalManHours.toFixed(1), percentage: '-' },
-          { metric: '', value: '', percentage: '' },
-          { metric: '--- PRIORITY BREAKDOWN ---', value: '', percentage: '' },
-          ...Object.entries(priorityStats).filter(([_, s]) => s.total > 0 || s.overdue > 0).map(([priority, stats]) => ({
-            metric: `${priority} Priority`, 
-            value: `${stats.total} jobs (${stats.completed} done, ${stats.overdue} overdue)`, 
-            percentage: stats.total > 0 ? `${Math.round(stats.completed / stats.total * 100)}%` : '-'
-          })),
-          { metric: '', value: '', percentage: '' },
-          { metric: '--- DEPARTMENT BREAKDOWN ---', value: '', percentage: '' },
-          ...Object.entries(deptStats).filter(([_, s]) => s.planned > 0 || s.overdue > 0).map(([dept, stats]) => ({
-            metric: dept, 
-            value: `${stats.planned} jobs (${stats.completed} done, ${stats.overdue} overdue)`, 
-            percentage: stats.planned > 0 ? `${Math.round(stats.completed / stats.planned * 100)}%` : '-'
-          }))
-        ];
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'];
+        const periodLabel = `${monthNames[periodMonth - 1]} ${periodYear}`;
 
-        const summary = [
-          { label: 'Completion Rate', value: totalInScope > 0 ? `${completionRate}%` : 'N/A' },
-          { label: 'Jobs In Scope', value: totalInScope },
-          { label: 'Cumulative Overdue', value: totalOverdue }
-        ];
+        const res = await fetch(`/technical/api/reports/maintenance/monthly-summary/preview?vesselId=${effectiveVesselId}&year=${periodYear}&month=${periodMonth}`);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Failed to fetch monthly summary' }));
+          throw new Error(err.error || 'Failed to fetch monthly summary');
+        }
+        const summaryApiData: MonthlySummaryData = await res.json();
 
-        if (mode === 'preview') return { title: 'Monthly Maintenance Summary', subtitle: `Performance metrics for ${periodLabel}`, vessel: vesselName, dateRange: periodLabel, columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') {
+          setMonthlySummaryData({ data: summaryApiData, vesselId: effectiveVesselId, year: periodYear, month: periodMonth });
+          return { title: 'Monthly Maintenance Summary', subtitle: `Control report for ${periodLabel}`, vessel: vesselName, dateRange: periodLabel, columns: [], data: [], summary: [] } as ReportPreviewData;
+        }
+
+        const categories = ['Planned', 'Due', 'Overdue', 'Postponed', 'Unplanned', 'Pending Approval', 'Completed'];
+        const pdfColumns = [
+          { header: 'Category', field: 'category', width: 40 },
+          { header: 'Opening', field: 'opening', width: 20 },
+          { header: 'Movement', field: 'movement', width: 30 },
+          { header: 'Closing', field: 'closing', width: 20 }
+        ];
+        const pdfData = categories.map(c => ({
+          category: c,
+          opening: summaryApiData.opening[c]?.count ?? 0,
+          movement: '-',
+          closing: summaryApiData.closing[c]?.count ?? 0,
+        }));
+        pdfData.push(
+          { category: '', opening: '' as any, movement: '', closing: '' as any },
+          { category: 'New Jobs Entered', opening: '' as any, movement: String(summaryApiData.movement.newJobsEntered.count), closing: '' as any },
+          { category: 'Completed in Month', opening: '' as any, movement: String(summaryApiData.movement.completedInMonth.count), closing: '' as any },
+          { category: 'Postponed in Month', opening: '' as any, movement: String(summaryApiData.movement.postponedInMonth.count), closing: '' as any },
+          { category: 'Newly Overdue', opening: '' as any, movement: String(summaryApiData.movement.newlyOverdue.count), closing: '' as any },
+        );
 
         pdfReportGenerator.generateReport(
-          { title: 'Monthly Maintenance Summary', subtitle: `Performance metrics for ${periodLabel}`, vessel: vesselName, dateRange: periodLabel },
-          columns,
-          data
+          { title: 'Monthly Maintenance Summary', subtitle: `Control report for ${periodLabel}`, vessel: vesselName, dateRange: periodLabel },
+          pdfColumns,
+          pdfData
         );
         break;
       }
@@ -1436,7 +1351,25 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           <span className="text-sm text-muted-foreground">Refreshing report data...</span>
         </div>
       )}
-      {embedded && previewData && (
+      {embedded && previewData && monthlySummaryData && selectedReportId === 'monthly-summary' && (
+        <MonthlySummaryPreview
+          data={monthlySummaryData.data}
+          vesselId={monthlySummaryData.vesselId}
+          year={monthlySummaryData.year}
+          month={monthlySummaryData.month}
+          onRegenerate={async () => {
+            const res = await fetch('/technical/api/reports/maintenance/monthly-summary/regenerate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ vesselId: monthlySummaryData.vesselId, year: monthlySummaryData.year, month: monthlySummaryData.month }),
+            });
+            if (!res.ok) throw new Error('Failed to regenerate');
+            const newData: MonthlySummaryData = await res.json();
+            setMonthlySummaryData({ ...monthlySummaryData, data: newData });
+          }}
+        />
+      )}
+      {embedded && previewData && (!monthlySummaryData || selectedReportId !== 'monthly-summary') && (
         <InlineReportPreview reportData={previewData} embedded={embedded} />
       )}
       {!embedded && (
