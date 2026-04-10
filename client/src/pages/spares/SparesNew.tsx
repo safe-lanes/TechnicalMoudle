@@ -2934,7 +2934,7 @@ const Spares: React.FC = () => {
           <Marker id="E8" />
           Clear
         </Button>
-        {activeTab === 'by-location' && (
+        {activeTab === 'by-location' && canEditSpare && (
           <Button
             onClick={handleSaveAllLocRob}
             disabled={isSavingLocRob || Object.keys(editingLocRob).length === 0}
@@ -3343,8 +3343,8 @@ const Spares: React.FC = () => {
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button
-                                    className={`flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left border border-gray-200 rounded-md px-2 py-1 ${isChangingLocation ? 'opacity-50 pointer-events-none' : ''}`}
-                                    disabled={isChangingLocation}
+                                    className={`flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left border border-gray-200 rounded-md px-2 py-1 ${isChangingLocation || !canEditSpare ? 'opacity-50 pointer-events-none' : ''}`}
+                                    disabled={isChangingLocation || !canEditSpare}
                                     data-testid={`button-change-location-${spare.id}`}
                                   >
                                     <MapPin className="h-3 w-3 flex-shrink-0 text-gray-500" />
@@ -3405,6 +3405,7 @@ const Spares: React.FC = () => {
                                 }}
                                 className="h-7 text-sm text-center w-full"
                                 placeholder="0"
+                                disabled={!canEditSpare}
                                 data-testid={`input-loc-rob-${spare.id}`}
                               />
                             </div>
@@ -5798,6 +5799,7 @@ const Spares: React.FC = () => {
                 </Button>
                 <Button
                   className="bg-[#52baf3] hover:bg-[#3da8e0] text-white"
+                  disabled={!canEditSpare}
                   onClick={() => {
                     handleSaveLocation(locationDialogSpare.id);
                     setLocationDialogSpare(null);
@@ -5854,7 +5856,7 @@ const Spares: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-gray-500">Rotation Item:</span>
-                    {(isSailAdmin || isClientAdmin || isExternal) ? (
+                    {(isSailAdmin || isClientAdmin || isExternal) && canEditSpare ? (
                       <select
                         className="ml-1 px-2 py-0.5 rounded text-xs font-medium border border-gray-300 bg-white cursor-pointer"
                         value={selectedSpare.isRotationItem ? "Yes" : "No"}
