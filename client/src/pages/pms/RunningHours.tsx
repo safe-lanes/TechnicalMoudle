@@ -19,6 +19,7 @@ import { useLocation } from "wouter";
 import { formatProfessionalDateTime } from "@/lib/dateUtils";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { useVessels } from "@/hooks/useVessels";
 import { useAuth } from "@/contexts/AuthContext";
 import { Marker } from "@/components/Marker";
@@ -141,6 +142,8 @@ const RunningHours = () => {
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
   const { isSailAdmin, isClientAdmin, isExternal } = useUIRole();
+  const { canEdit: canEditPerm } = usePermissions();
+  const canEditRH = canEditPerm("pms-running-hrs");
   const { data: vessels = [] } = useVessels();
   
   // Fetch children RH data when popup is open
@@ -1010,6 +1013,7 @@ const RunningHours = () => {
                 <Marker id="D3" /><Download className="h-4 w-4" />
                 Export
               </Button>
+              {canEditRH && (
               <Button 
                 className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
                 size="sm"
@@ -1019,6 +1023,7 @@ const RunningHours = () => {
                 <Marker id="D5" /><Plus className="h-4 w-4 mr-1" />
                 Bulk Update RH
               </Button>
+              )}
             </div>
           )}
         </div>
@@ -1458,6 +1463,7 @@ const RunningHours = () => {
                   )}
                 </td>
                 <td className="py-3 px-4">
+                  {canEditRH ? (
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -1468,6 +1474,9 @@ const RunningHours = () => {
                   >
                     {index === 0 && <Marker id="D19" />}<Settings className="h-4 w-4 text-gray-600" />
                   </Button>
+                  ) : (
+                    <span className="text-gray-400 text-xs">—</span>
+                  )}
                 </td>
                 <td className="py-3 px-4 text-gray-700 truncate" title={item.lastUpdatedBy || ''} data-testid={`text-last-updated-by-${item.id}`}>
                   {item.lastUpdatedBy || <span className="text-gray-400">—</span>}
@@ -1959,6 +1968,7 @@ const RunningHours = () => {
                               {child.lastUpdated !== '-' ? formatProfessionalDateTime(child.lastUpdated) : '-'}
                             </div>
                             <div className="flex justify-center">
+                              {canEditRH && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1969,6 +1979,7 @@ const RunningHours = () => {
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
+                              )}
                             </div>
                           </div>
                         )}
