@@ -408,7 +408,7 @@ export async function getOverdueJobsData(vesselId: string) {
         overdueType,
         assignedTo: wo.assignedTo || job?.assignedTo || '-',
         lastDoneDate: wo.lastDoneDateSnapshot || '-',
-        lastDoneRH: job?.lastDoneRH || '-',
+        lastDoneRH: job?.lastDoneRH ?? '-',
         critical: isCriticalEquipment ? 'YES' : 'No'
       });
     }
@@ -510,7 +510,7 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
       department: job.department,
       jobType: job.maintenanceBasis || '-',
       lastDoneDate: job.lastDoneDate,
-      rhWhenLastDone: job.lastDoneRH || '-',
+      rhWhenLastDone: job.lastDoneRH ?? '-',
       daysRhOverdue,
       assignedTo: job.assignedTo,
       criticalEquipment: isCritical ? 'YES' : 'No',

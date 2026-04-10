@@ -448,7 +448,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             department: job.department,
             jobType: job.maintenanceBasis || '-',
             lastDoneDate: job.lastDoneDate,
-            rhWhenLastDone: job.lastDoneRH || '-',
+            rhWhenLastDone: job.lastDoneRH ?? '-',
             daysRhOverdue,
             assignedTo: job.assignedTo,
             critical: job.critical
