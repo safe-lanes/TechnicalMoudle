@@ -1,0 +1,418 @@
+Task: Redesign and implement Monthly Maintenance Summary using opening snapshot, monthly movement, and closing snapshot
+Objective
+Redesign the Monthly Maintenance Summary report so that it becomes a true monthly control report, not a live mixed summary.
+
+The report must show:
+
+Opening snapshot at the start of the month
+
+Monthly movement during the month
+
+Closing snapshot at the end of the month
+
+This is the only way to get a true monthly maintenance analysis. The monthly summary should be based on the actual PMS work order lifecycle buckets already used in the system:
+
+Planned
+
+Due
+
+Overdue
+
+Postponed
+
+Unplanned
+
+Pending Approval
+
+Completed
+
+Core business requirement
+At the start of each month, the system must capture the exact count and supporting records of all work orders falling into the above sections.
+At the end of each month, the system must again capture the exact count and supporting records of all work orders in those same sections.
+
+Then the Monthly Maintenance Summary report must use these month-boundary snapshots plus in-month movement to present a proper management report.
+
+This is a business-correctness implementation, not just a cosmetic UI change.
+
+What must be implemented
+1. Opening monthly snapshot
+At the beginning of every month, capture and store a snapshot of the vessel/fleet work order position for these categories:
+
+Planned
+
+Due
+
+Overdue
+
+Postponed
+
+Unplanned
+
+Pending Approval
+
+Completed
+
+Snapshot meaning
+This snapshot must represent the actual system position as of the month opening boundary, i.e. start of the month.
+
+Example:
+
+01 May 2026 00:00:00 system position
+
+or an equivalent month-open cutoff rule if your system architecture needs it
+
+But the logic must be explicit and consistent.
+
+2. Closing monthly snapshot
+At the end of every month, capture and store the same snapshot again for the same categories:
+
+Planned
+
+Due
+
+Overdue
+
+Postponed
+
+Unplanned
+
+Pending Approval
+
+Completed
+
+This should represent the actual system position at the month closing boundary.
+
+Example:
+
+31 May 2026 23:59:59
+
+or an equivalent month-close cutoff rule
+
+Again, the exact rule must be explicit and consistent.
+
+3. Monthly movement tracking
+The report must not only show opening and closing counts.
+It must also show what happened during the month.
+
+Track and calculate monthly movement such as:
+
+jobs added/generated into scope during the month
+
+jobs completed during the month
+
+jobs postponed during the month
+
+jobs moved into overdue during the month
+
+unplanned jobs raised during the month
+
+jobs sent to pending approval during the month
+
+any relevant transitions between these categories during the month
+
+Do not guess transitions casually.
+Use the actual PMS logic and status/tab movement rules already implemented in the system.
+
+Report structure required
+The Monthly Maintenance Summary should now be redesigned into three major sections.
+
+Section A — Opening Position
+Show the opening month snapshot for:
+
+Planned
+
+Due
+
+Overdue
+
+Postponed
+
+Unplanned
+
+Pending Approval
+
+Completed
+
+This section must tell us:
+What was the vessel/fleet maintenance position on day 1 of the month?
+
+Section B — Monthly Movement
+Show what changed during the selected month.
+
+At minimum include:
+
+New jobs entered/generated in month
+
+Jobs completed in month
+
+Jobs postponed in month
+
+Jobs newly overdue in month
+
+Unplanned jobs raised in month
+
+Jobs sent to pending approval in month
+
+If there are additional meaningful movements already supported by system logic, include them only if they are real and traceable.
+
+This section must tell us:
+What happened during the month?
+
+Section C — Closing Position
+Show the closing month snapshot for:
+
+Planned
+
+Due
+
+Overdue
+
+Postponed
+
+Unplanned
+
+Pending Approval
+
+Completed
+
+This section must tell us:
+Where did the vessel/fleet stand at the end of the month?
+
+Verification requirement — snapshots must be visible somewhere
+This is extremely important.
+
+I do not want hidden snapshot logic that cannot be verified.
+
+The stored snapshots must be available somewhere in the system so we can inspect and verify that Replit is working correctly.
+
+Required verification mechanism
+Please create a visible and traceable way to inspect the snapshots.
+
+This can be done in one of the following acceptable ways:
+
+Option A — Snapshot verification view inside Reports/Admin
+A page or panel where we can see:
+
+Snapshot month
+
+Vessel
+
+Snapshot type: Opening / Closing
+
+Snapshot timestamp
+
+Category-wise counts
+
+Ability to open supporting work order list behind each category
+
+Option B — Snapshot audit table/view
+A dedicated verification table showing:
+
+month
+
+vessel
+
+snapshot boundary
+
+captured counts by category
+
+created timestamp
+
+created by system/process
+
+ability to drill into underlying records
+
+Option C — Snapshot detail modal/export
+At minimum, from the Monthly Maintenance Summary report, allow us to inspect the opening and closing snapshot details and the exact work orders contributing to each category count
+
+Any of the above is acceptable, but the snapshot data must be visible and auditable somewhere.
+We must be able to verify that the monthly summary is not producing fabricated or unstable numbers.
+
+Critical business rules
+1. Use actual PMS categories
+Use the actual system categories/workflow buckets already relevant to the PMS work order module:
+
+Planned
+
+Due
+
+Overdue
+
+Postponed
+
+Unplanned
+
+Pending Approval
+
+Completed
+
+Do not invent new summary categories unless explicitly needed and clearly documented.
+
+2. Snapshots must be stored, not recalculated loosely
+The month opening and month closing position must be stored as snapshots, not recomputed in an unstable way every time from changing live data.
+
+If historical monthly reporting is to be trusted, there must be a persistent snapshot record.
+
+3. Summary must distinguish backlog vs monthly activity
+The whole point of this redesign is to avoid mixing inherited backlog with current-month activity.
+
+So the new report must clearly separate:
+
+opening backlog/position
+
+in-month movement
+
+closing backlog/position
+
+4. Vessel-level correctness
+If the report is generated for a selected vessel, the opening and closing snapshots must reflect that exact vessel’s work order position.
+If multi-vessel/fleet mode is used, then the aggregation rule must be explicit and verifiable.
+
+5. System timestamps and month boundaries
+Please clearly define the month-boundary logic being used:
+
+timezone
+
+exact opening cutoff
+
+exact closing cutoff
+
+whether snapshots are generated by scheduled job, on-demand fallback, or both
+
+I want this documented in your response.
+
+Suggested data model / implementation direction
+You may implement this cleanly using a persistent monthly snapshot store.
+
+At minimum, capture:
+
+snapshot month
+
+vessel id / vessel code
+
+snapshot type (opening / closing)
+
+snapshot timestamp
+
+category
+
+count
+
+underlying work order ids or reference set if feasible
+
+generated by system flag
+
+created_at / updated_at
+
+If storing underlying work order IDs directly is too heavy, then provide another reliable drill-down mechanism so we can reconstruct and verify the category membership.
+But verification must be possible.
+
+Monthly Summary report output expectation
+The new Monthly Maintenance Summary should no longer be a vague “Metric / Value / Percentage” dump.
+
+Instead it should behave like a proper monthly control report.
+
+Preferred layout
+A. Opening Position
+| Status | Count |
+
+B. Monthly Movement
+| Movement Type | Count |
+
+C. Closing Position
+| Status | Count |
+
+D. Performance Indicators
+Add meaningful monthly indicators such as:
+
+Completion rate for month
+
+Increase/decrease in overdue during month
+
+Postponement count for month
+
+Unplanned jobs raised in month
+
+Only calculate indicators if the denominator and business meaning are clear.
+
+Do not show meaningless percentages or random dashes.
+
+Verification/report drilldown expectation
+Wherever possible, allow drilldown from summary count to supporting records.
+
+Example:
+
+click Opening Overdue count → see work orders included in opening overdue snapshot
+
+click Completed in month → see exact jobs completed in that month
+
+click Closing Pending Approval → see jobs in that closing state
+
+This is important for validation and operational trust.
+
+Do not change unrelated things
+Strict instruction
+Do not change anything else outside what is required for this Monthly Maintenance Summary redesign and snapshot verification support.
+
+Do not change:
+
+unrelated reports
+
+overdue report format
+
+due jobs report
+
+unrelated filters
+
+unrelated exports
+
+work order generation logic
+
+lead time logic
+
+grace period logic
+
+unrelated UI redesigns
+
+unrelated status logic
+
+Only implement what is necessary to:
+
+capture opening snapshots
+
+capture closing snapshots
+
+calculate monthly movement
+
+redesign Monthly Maintenance Summary around these
+
+provide snapshot verification visibility
+
+Clarification I want from you before/after implementation
+Please explicitly confirm whether you understand and are preserving the existing PMS status/category logic for:
+
+Planned
+
+Due
+
+Overdue
+
+Postponed
+
+Unplanned
+
+Pending Approval
+
+Completed
+
+I want you to clearly state:
+
+whether these are derived from current system logic or stored statuses
+
+how you are identifying them at snapshot time
+
+whether any assumption had to be made
+
+whether the month opening and closing boundaries are scheduled or computed on demand
+
+Do not give a vague answer.
