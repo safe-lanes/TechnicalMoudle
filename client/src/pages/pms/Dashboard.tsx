@@ -1521,7 +1521,6 @@ const Dashboard = () => {
         </div>
         )}
       </div>
-
       {/* MAIN CONTENT */}
       <div className="flex-1 overflow-y-auto mt-4" style={{ background: '#f8fafc' }}>
 
@@ -1607,7 +1606,7 @@ const Dashboard = () => {
                         data-testid={card.testId}
                       >
                         <CardContent className="py-2 px-3 flex flex-col justify-center flex-1">
-                          <p className="text-xs font-medium text-gray-600 leading-tight">{card.label}</p>
+                          <p className="font-medium text-gray-600 text-[14px]">{card.label}</p>
                           <p className={`text-xl font-bold mt-0.5 ${card.textColor}`} data-testid={card.valueTestId}>{card.value}</p>
                         </CardContent>
                       </Card>
@@ -2322,7 +2321,6 @@ const Dashboard = () => {
           </div>
         )}
       </div>
-
       <BulkApproveModal
         open={bulkApproveModalOpen}
         onOpenChange={setBulkApproveModalOpen}
@@ -2330,7 +2328,6 @@ const Dashboard = () => {
         vesselId={vesselId}
         vesselName={currentVessel?.name}
       />
-
       <WorkOrdersListModal
         open={woListModal.open}
         onClose={() => setWoListModal({ open: false, title: '', workOrders: [] })}
@@ -2338,7 +2335,6 @@ const Dashboard = () => {
         workOrders={woListModal.workOrders}
         vessels={vessels}
       />
-
       <SparesListModal
         open={sparesListModal.open}
         onClose={() => setSparesListModal({ open: false, title: '', spares: [] })}
@@ -2347,7 +2343,6 @@ const Dashboard = () => {
         vessels={vessels}
         getStockStatus={getStockStatus}
       />
-
       <Dialog open={showBenchmarking} onOpenChange={setShowBenchmarking}>
         <DialogContent className="max-w-[95vw] h-[calc(100vh-10vw)] max-h-[90vh] overflow-hidden flex flex-col [&>button.absolute]:top-6 [&>button.absolute]:translate-y-1">
           <DialogHeader className="pb-2">
