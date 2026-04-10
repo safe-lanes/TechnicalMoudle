@@ -8626,7 +8626,7 @@ export class PostgresStorage {
     return db
       .select()
       .from(admnRoleMaster)
-      .where(eq(admnRoleMaster.isActive, true))
+      .where(and(eq(admnRoleMaster.isActive, true), eq(admnRoleMaster.isDeleted, false)))
       .orderBy(asc(admnRoleMaster.sortOrder));
   }
 
@@ -8635,7 +8635,7 @@ export class PostgresStorage {
     return db
       .select()
       .from(admMenumasterAc)
-      .where(eq(admMenumasterAc.isActive, true))
+      .where(and(eq(admMenumasterAc.isActive, true), eq(admMenumasterAc.isDeleted, false)))
       .orderBy(asc(admMenumasterAc.sortOrder));
   }
 
