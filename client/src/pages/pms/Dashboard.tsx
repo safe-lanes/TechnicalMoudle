@@ -367,6 +367,7 @@ const Dashboard = () => {
   const [showFilters, setShowFilters] = useState(false);
   type OperationCardFilter = 'overdue' | 'overdue-critical' | 'planned-today' | 'pending-approvals' | 'critical-spares' | 'anomalies' | 'modify-pms';
   const [selectedOpCard, setSelectedOpCard] = useState<OperationCardFilter>('overdue');
+  const [hodScope, setHodScope] = useState<'me' | 'myTeam'>('myTeam');
   const [opViewModal, setOpViewModal] = useState<{ open: boolean; workOrder: EnrichedWorkOrder | null }>({ open: false, workOrder: null });
   const [showBenchmarking, setShowBenchmarking] = useState(false);
   const [selectedCriticality, setSelectedCriticality] = useState("");
@@ -1432,20 +1433,49 @@ const Dashboard = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <div style={{ fontSize: '18px', fontWeight: 700, color: '#1a2b4a' }} data-testid="text-current-year">
-              {new Date().getFullYear()}
-            </div>
-            {activeTab === 'overview' && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-                className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
-                data-testid="button-toggle-dashboard-filters"
-              >
-                <Filter className="h-4 w-4" />
-                Filters
-              </Button>
+            {activeTab === 'management' ? (
+              <div className="flex items-center gap-2" data-testid="toggle-hod-scope">
+                <span
+                  className={`text-sm font-medium cursor-pointer transition-colors ${hodScope === 'me' ? 'text-[#1a2b4a]' : 'text-gray-400'}`}
+                  onClick={() => setHodScope('me')}
+                  data-testid="toggle-label-me"
+                >
+                  Me
+                </span>
+                <button
+                  onClick={() => setHodScope(hodScope === 'me' ? 'myTeam' : 'me')}
+                  className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none"
+                  style={{ backgroundColor: hodScope === 'myTeam' ? '#52baf3' : '#d1d5db' }}
+                  data-testid="toggle-switch-hod-scope"
+                >
+                  <span
+                    className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transform transition-transform ${hodScope === 'myTeam' ? 'translate-x-6' : 'translate-x-1'}`}
+                  />
+                </button>
+                <span
+                  className={`text-sm font-medium cursor-pointer transition-colors ${hodScope === 'myTeam' ? 'text-[#1a2b4a]' : 'text-gray-400'}`}
+                  onClick={() => setHodScope('myTeam')}
+                  data-testid="toggle-label-myteam"
+                >
+                  My Team
+                </span>
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: '#1a2b4a' }} data-testid="text-current-year">
+                  {new Date().getFullYear()}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
+                  data-testid="button-toggle-dashboard-filters"
+                >
+                  <Filter className="h-4 w-4" />
+                  Filters
+                </Button>
+              </>
             )}
           </div>
         </div>
