@@ -1096,8 +1096,8 @@ const Dashboard = () => {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const todayEnd = new Date(todayStart.getTime() + 86400000);
     const plannedTodayWOs = safeWOs.filter(wo => {
-      if (!wo.dueDate) return false;
-      const parsed = parseFlexibleDate(wo.dueDate);
+      if (!wo.plannedDate) return false;
+      const parsed = parseFlexibleDate(wo.plannedDate);
       if (!parsed) return false;
       return parsed >= todayStart && parsed < todayEnd;
     });
