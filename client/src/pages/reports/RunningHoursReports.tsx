@@ -32,6 +32,13 @@ import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
 import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
 
+const toLocalDateStr = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 interface RunningHoursReport {
   id: string;
   name: string;
@@ -257,10 +264,10 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         for (const vId of vesselIds) {
           const params = new URLSearchParams({ vesselId: vId });
           if (categoryFilters.dateRange?.from) {
-            params.append('startDate', categoryFilters.dateRange.from.toISOString().split('T')[0]);
+            params.append('startDate', toLocalDateStr(categoryFilters.dateRange.from));
           }
           if (categoryFilters.dateRange?.to) {
-            params.append('endDate', categoryFilters.dateRange.to.toISOString().split('T')[0]);
+            params.append('endDate', toLocalDateStr(categoryFilters.dateRange.to));
           }
           
           const response = await fetch(`/technical/api/reports/equipment-utilization-summary?${params}`);
@@ -350,10 +357,10 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         for (const vId of vesselIds) {
           const params = new URLSearchParams({ vesselId: vId });
           if (categoryFilters.dateRange?.from) {
-            params.append('startDate', categoryFilters.dateRange.from.toISOString().split('T')[0]);
+            params.append('startDate', toLocalDateStr(categoryFilters.dateRange.from));
           }
           if (categoryFilters.dateRange?.to) {
-            params.append('endDate', categoryFilters.dateRange.to.toISOString().split('T')[0]);
+            params.append('endDate', toLocalDateStr(categoryFilters.dateRange.to));
           }
           
           const response = await fetch(`/technical/api/reports/running-hours-anomaly-detection?${params}`);
@@ -508,10 +515,10 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
     
     // Add date range if available
     if (categoryFilters.dateRange?.from) {
-      requestBody.startDate = categoryFilters.dateRange.from.toISOString().split('T')[0];
+      requestBody.startDate = toLocalDateStr(categoryFilters.dateRange.from);
     }
     if (categoryFilters.dateRange?.to) {
-      requestBody.endDate = categoryFilters.dateRange.to.toISOString().split('T')[0];
+      requestBody.endDate = toLocalDateStr(categoryFilters.dateRange.to);
     }
 
     const response = await fetch(endpoint, {

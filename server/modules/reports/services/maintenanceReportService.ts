@@ -578,9 +578,9 @@ export async function getCompletedJobsData(vesselId: string, dateFrom?: string, 
   if (dateFrom || dateTo) {
     filteredJobs = completedWorkOrders.filter(wo => {
       const completedDate = wo.dateCompleted || (wo as any).completionDateTime;
-      if (!completedDate) return true;
+      if (!completedDate) return false;
       const date = new Date(completedDate);
-      if (isNaN(date.getTime())) return true;
+      if (isNaN(date.getTime())) return false;
       if (dateFrom && date < new Date(dateFrom)) return false;
       if (dateTo) {
         const endDate = new Date(dateTo);
@@ -805,8 +805,9 @@ export async function exportUnplannedJobs(vesselId: string, dateFrom?: string, d
   if (dateFrom || dateTo) {
     filteredJobs = unplannedWorkOrders.filter(wo => {
       const createdDate = wo.createdAt || wo.dueDate;
-      if (!createdDate) return true;
+      if (!createdDate) return false;
       const date = new Date(createdDate);
+      if (isNaN(date.getTime())) return false;
       if (dateFrom && date < new Date(dateFrom)) return false;
       if (dateTo && date > new Date(dateTo)) return false;
       return true;

@@ -75,13 +75,12 @@ export async function getCrewWorkloadDistribution(
 
   // Filter work orders
   let filteredWOs = workOrders.filter((wo: any) => {
-    // Date range filter using createdAt
+    // Date range filter using dueDate (primary) or createdAt (fallback)
     if (startDateObj || endDateObj) {
-      const createdDate = parseDate(wo.createdAt);
-      if (createdDate) {
-        if (startDateObj && createdDate < startDateObj) return false;
-        if (endDateObj && createdDate > endDateObj) return false;
-      }
+      const relevantDate = parseDate(wo.dueDate) || parseDate(wo.createdAt);
+      if (!relevantDate) return false;
+      if (startDateObj && relevantDate < startDateObj) return false;
+      if (endDateObj && relevantDate > endDateObj) return false;
     }
 
     // Rank filter
@@ -268,11 +267,10 @@ export async function exportCrewWorkloadDistributionExcel(
   // Filter work orders
   let filteredWOs = workOrders.filter((wo: any) => {
     if (startDateObj || endDateObj) {
-      const createdDate = parseDate(wo.createdAt);
-      if (createdDate) {
-        if (startDateObj && createdDate < startDateObj) return false;
-        if (endDateObj && createdDate > endDateObj) return false;
-      }
+      const relevantDate = parseDate(wo.dueDate) || parseDate(wo.createdAt);
+      if (!relevantDate) return false;
+      if (startDateObj && relevantDate < startDateObj) return false;
+      if (endDateObj && relevantDate > endDateObj) return false;
     }
 
     if (rank && rank !== 'All Ranks' && rank !== 'all') {

@@ -350,6 +350,13 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     }
   };
 
+  const toLocalDateStr = (d: Date): string => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const generateMaintenancePDF = async (reportId: string, mode: 'download' | 'preview' = 'download'): Promise<ReportPreviewData | void> => {
     const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
     const now = new Date();
@@ -481,10 +488,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       case 'completed-jobs': {
         let completedUrl = `/technical/api/reports/completed-jobs/preview?vesselId=${effectiveVesselId}`;
         if (categoryFilters.dateRange?.from) {
-          completedUrl += `&dateFrom=${categoryFilters.dateRange.from.toISOString().split('T')[0]}`;
+          completedUrl += `&dateFrom=${toLocalDateStr(categoryFilters.dateRange.from)}`;
         }
         if (categoryFilters.dateRange?.to) {
-          completedUrl += `&dateTo=${categoryFilters.dateRange.to.toISOString().split('T')[0]}`;
+          completedUrl += `&dateTo=${toLocalDateStr(categoryFilters.dateRange.to)}`;
         }
         const completedResponse = await fetch(completedUrl);
         if (!completedResponse.ok) {
@@ -677,10 +684,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       case 'critical-equipment': {
         let critUrl = `/technical/api/reports/critical-equipment-status?vesselId=${effectiveVesselId}`;
         if (categoryFilters.dateRange?.from) {
-          critUrl += `&startDate=${categoryFilters.dateRange.from.toISOString().split('T')[0]}`;
+          critUrl += `&startDate=${toLocalDateStr(categoryFilters.dateRange.from)}`;
         }
         if (categoryFilters.dateRange?.to) {
-          critUrl += `&endDate=${categoryFilters.dateRange.to.toISOString().split('T')[0]}`;
+          critUrl += `&endDate=${toLocalDateStr(categoryFilters.dateRange.to)}`;
         }
         const response = await fetch(critUrl);
         if (!response.ok) {
@@ -742,8 +749,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         const dateFrom = categoryFilters.dateRange?.from || new Date(now.getFullYear(), now.getMonth(), 1);
         const dateTo = categoryFilters.dateRange?.to || new Date(now.getFullYear(), now.getMonth() + 1, 0);
         
-        const startDate = dateFrom.toISOString().split('T')[0];
-        const endDate = dateTo.toISOString().split('T')[0];
+        const startDate = toLocalDateStr(dateFrom);
+        const endDate = toLocalDateStr(dateTo);
 
         // Fetch data from the API endpoint
         const response = await fetch(
@@ -796,10 +803,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       case 'postponement-log': {
         let postponeUrl = `/technical/api/reports/postponement-log/preview?vesselId=${effectiveVesselId}`;
         if (categoryFilters.dateRange?.from) {
-          postponeUrl += `&dateFrom=${categoryFilters.dateRange.from.toISOString().split('T')[0]}`;
+          postponeUrl += `&dateFrom=${toLocalDateStr(categoryFilters.dateRange.from)}`;
         }
         if (categoryFilters.dateRange?.to) {
-          postponeUrl += `&dateTo=${categoryFilters.dateRange.to.toISOString().split('T')[0]}`;
+          postponeUrl += `&dateTo=${toLocalDateStr(categoryFilters.dateRange.to)}`;
         }
         const postponeResponse = await fetch(postponeUrl);
         if (!postponeResponse.ok) {
@@ -937,15 +944,15 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         let wdStartDate: string;
         let wdEndDate: string;
         if (globalFilters?.dateRange?.from && globalFilters?.dateRange?.to) {
-          wdStartDate = globalFilters.dateRange.from.toISOString().split('T')[0];
-          wdEndDate = globalFilters.dateRange.to.toISOString().split('T')[0];
+          wdStartDate = toLocalDateStr(globalFilters.dateRange.from);
+          wdEndDate = toLocalDateStr(globalFilters.dateRange.to);
         } else if (categoryFilters.dateRange?.from && categoryFilters.dateRange?.to) {
-          wdStartDate = categoryFilters.dateRange.from.toISOString().split('T')[0];
-          wdEndDate = categoryFilters.dateRange.to.toISOString().split('T')[0];
+          wdStartDate = toLocalDateStr(categoryFilters.dateRange.from);
+          wdEndDate = toLocalDateStr(categoryFilters.dateRange.to);
         } else {
           const wdNow = new Date();
-          wdStartDate = new Date(wdNow.getFullYear(), wdNow.getMonth(), 1).toISOString().split('T')[0];
-          wdEndDate = new Date(wdNow.getFullYear(), wdNow.getMonth() + 1, 0).toISOString().split('T')[0];
+          wdStartDate = toLocalDateStr(new Date(wdNow.getFullYear(), wdNow.getMonth(), 1));
+          wdEndDate = toLocalDateStr(new Date(wdNow.getFullYear(), wdNow.getMonth() + 1, 0));
         }
         const wdResponse = await fetch(
           `/technical/api/reports/crew-workload-distribution?vesselId=${effectiveVesselId}&startDate=${wdStartDate}&endDate=${wdEndDate}&viewType=summary`
@@ -1053,10 +1060,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       
       if (reportId !== 'critical-equipment') {
         if (dateFrom) {
-          requestBody.dateFrom = dateFrom.toISOString().split('T')[0];
+          requestBody.dateFrom = toLocalDateStr(dateFrom);
         }
         if (dateTo) {
-          requestBody.dateTo = dateTo.toISOString().split('T')[0];
+          requestBody.dateTo = toLocalDateStr(dateTo);
         }
       }
       
@@ -1075,8 +1082,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           startDate = new Date(now.getFullYear(), now.getMonth(), 1);
           endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         }
-        if (startDate) requestBody.startDate = startDate.toISOString().split('T')[0];
-        if (endDate) requestBody.endDate = endDate.toISOString().split('T')[0];
+        if (startDate) requestBody.startDate = toLocalDateStr(startDate);
+        if (endDate) requestBody.endDate = toLocalDateStr(endDate);
       }
       
       // Add viewType for workload-distribution (default to summary view)
