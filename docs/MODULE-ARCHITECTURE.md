@@ -230,22 +230,122 @@ All `IStorage` interface methods and `PostgresStorage` implementations were upda
 
 ### Migration System
 
-**Dual migration system** — both run on every server startup:
+There are **three** migration tracks cohabiting in this repo, all tracked in a
+single `schema_migrations` table (not Drizzle's own `__drizzle_migrations` —
+that table is never used by this codebase):
 
-1. **Custom SQL** (`server/migrations.ts`): 51 migrations (001-051)
-   - Tracked in `schema_migrations` table
-   - Idempotent SQL with `IF NOT EXISTS`, `DO $ BEGIN...END $` guards
-   - Runs first
+1. **Legacy JS array** (`server/migrations.ts`, lines 17–2752) — **FROZEN at 081**.
+   - 81 hand-coded `Migration` objects with SQL as string literals.
+   - IDs run from `001_date_reported_to_office` through `081_add_rank_view_to_org_chart`.
+   - Applied by `runMigrations()` at server startup.
+   - Do **NOT** add new entries here. Write a new file in `migrations/` instead.
 
-2. **Drizzle auto-generated** (`migrations/*.sql`): 25 migrations
-   - Generated from `shared/schema.ts` diffs
-   - Tracked in Drizzle's own `__drizzle_migrations` journal
-   - Runs after custom migrations
+2. **Drizzle auto-generated** (`migrations/0XXX_*.sql`, 4-digit prefix) —
+   ~62 files as of this writing.
+   - Created by `drizzle-kit generate` against `shared/schema.ts`.
+   - Applied by `runDrizzleMigrations()` at server startup.
+   - **MUST be created manually**, not at runtime — see "Server startup
+     behavior" below.
+
+3. **Hand-written SQL** (`migrations/0XX_*.sql`, 3-digit prefix) — 29 files,
+   running from `001_date_reported_to_office.sql` through
+   `085_master_list_types.sql`.
+   - Used for anything Drizzle can't express: data seeds, partial indexes,
+     `DO $$ ... $$` constraint repairs, cross-table backfills.
+   - Applied by the same `runDrizzleMigrations()` as the 4-digit files.
+   - Must always use `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
+     `ON CONFLICT ... DO NOTHING`, and similar idempotency guards — every file
+     must be safe to re-run.
+   - First six (`001_`–`006_`) duplicate IDs from the legacy JS array. From
+     `012_` onwards the 3-digit SQL files diverge into their own namespace.
+
+**Sort order rule (load-bearing, not obvious)**: `fs.readdirSync(...).sort()`
+uses byte-wise lexicographic ordering. In that ordering, **all 4-digit
+`0XXX_*.sql` files sort before all 3-digit `0XX_*.sql` files** (because `"0"`
+at position 1 is less than any digit at position 1 of a 3-digit name). So
+`runDrizzleMigrations()` always applies the Drizzle baseline (4-digit) first,
+then the hand-written layer (3-digit) on top. Hand-written migrations can
+safely assume that tables already exist from the auto-generated baseline, but
+must still use `IF NOT EXISTS` because `db:push` installs bypass the file
+history entirely.
 
 **Startup sequence:**
 ```
 initStorage() → runBackupAndMigrations() → initializeDatabase() → registerRoutes()
+
+where runBackupAndMigrations() =
+  createDatabaseBackup()                  # pg_dump to backup/
+  runMigrations()                         # legacy JS array (track 1)
+  cleanupDuplicateFleetComponentMappings()
+  runDrizzleMigrations()                  # 4-digit + 3-digit SQL files (tracks 2 + 3)
 ```
+
+**Server startup only APPLIES migrations — it does NOT auto-generate.**
+Prior to April 2026 the startup pipeline also ran `generateDrizzleMigrations()`
+which spawned `drizzle-kit generate` as a child process on every boot. That
+behavior was removed after the 085 master_list_types incident because:
+- It produced duplicate-numbered files when multiple developers generated
+  concurrently (the repo still has 15 duplicate-prefix collision zones from
+  that era — 0043 and 0044 each have three physical files).
+- It silently mutated the working tree on production servers.
+- It generated shadow files that conflicted with hand-written migrations
+  (the root cause of the 085 incident: an auto-generated file created
+  `master_list_types` without a DB-level default for `mltuuid` because
+  `$defaultFn()` doesn't translate to SQL, and the subsequent hand-written
+  085 file then no-op'd its `CREATE TABLE IF NOT EXISTS` and failed on the
+  seed INSERT).
+
+This rule applies universally — Replit forks, DEV server, and PROD server
+all behave identically. No environment gating.
+
+**`$defaultFn()` vs `.default(sql\`...\`)`** — always prefer the latter:
+```ts
+// ❌ DON'T — $defaultFn is application-side only. Drizzle does NOT translate
+//    it to a DB-level DEFAULT, so raw SQL INSERTs (including migration seeds
+//    and db:push-created tables) will fail NOT NULL on the column.
+someUuid: text("some_uuid").notNull().$defaultFn(() => crypto.randomUUID()),
+
+// ✅ DO — emits a real PostgreSQL DEFAULT clause. Works for raw SQL inserts,
+//    drizzle-kit generate, drizzle-kit push, and ORM-level inserts.
+someUuid: text("some_uuid").notNull().default(sql`gen_random_uuid()::text`),
+```
+This pattern caused the 085 incident and is the reason `mltuuid` on
+`master_list_types` was changed in the same commit that removed runtime
+auto-generation.
+
+**`db:push` is for fresh installs only.** `npm run db:push` runs
+`drizzle-kit push` which diffs the current schema against the live DB and
+applies any DDL needed to make them match. It bypasses the entire file-based
+migration history — so it's safe for a brand-new empty database but **never
+safe** on a database that already has application data. Use it when bringing
+up a new laptop or a fresh Replit fork. Never run it on an existing DB that
+has already been through the migration pipeline.
+
+**Schema change workflow (applies to Replit, DEV, and PROD identically):**
+
+1. Edit `shared/schema.ts`.
+2. Run `npm run db:generate` manually. This invokes `drizzle-kit generate`
+   and writes a new `migrations/NNNN_<name>.sql` file plus an updated
+   `migrations/meta/_journal.json` and `migrations/meta/NNNN_snapshot.json`.
+3. Review the generated SQL. Edit it if Drizzle missed something (e.g.,
+   dynamic defaults it can't express). Drizzle never generates data seeds
+   or partial indexes — you'll need step 4 for those.
+4. If the change needs seed data, backfills, partial indexes, or constraint
+   repairs that Drizzle can't express, hand-write a follow-up file using the
+   **next 3-digit prefix** (current max is `085_`). Use idempotency guards
+   (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`, `DO $$ ... $$` blocks).
+5. Commit both files together in the same PR. Reviewer verifies the generated
+   SQL matches the schema change intent and the hand-written follow-up is
+   idempotent.
+6. On next server start (any environment), `runDrizzleMigrations()` applies
+   both files in sort order and records them in `schema_migrations`.
+
+Useful scripts:
+| Command | Purpose |
+|---|---|
+| `npm run db:push` | **Fresh install only.** Diff-apply schema to an empty DB. |
+| `npm run db:generate` | Create a new migration file from schema changes. |
+| `npm run db:check` | Drizzle consistency check (snapshots ↔ journal ↔ schema). |
 
 ### Verification Scripts
 

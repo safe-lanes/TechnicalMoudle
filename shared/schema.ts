@@ -1628,7 +1628,7 @@ export type MasterList = typeof masterLists.$inferSelect;
 // is_system=true rows (seeded) cannot be deleted and their key/section cannot be changed.
 export const masterListTypes = pgTable("master_list_types", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  mltuuid: text("mltuuid").notNull().unique().$defaultFn(() => crypto.randomUUID()),
+  mltuuid: text("mltuuid").notNull().unique().default(sql`gen_random_uuid()::text`),
   listTypeKey: text("list_type_key").notNull().unique(),
   label: text("label").notNull(),
   section: text("section").notNull(), // 'Components' | 'Jobs/WO' | 'Spares'
