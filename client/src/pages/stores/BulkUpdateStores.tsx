@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Search, X, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -38,6 +39,8 @@ export default function BulkUpdateStores() {
   const [, setLocation] = useLocation();
   const { vesselId } = useVessel();
   const { toast } = useToast();
+  const { canEdit } = usePermissions();
+  const canEditStore = canEdit("pms-stores");
   
   const searchParams = new URLSearchParams(window.location.search);
   const tabParam = searchParams.get('tab') as "stores" | "lubes" | "chemicals" | "others" | null;
@@ -816,7 +819,7 @@ export default function BulkUpdateStores() {
           </Button>
           <Button 
             onClick={() => setShowConfirmDialog(true)}
-            disabled={!transactionMode || !hasAnyChanges || bulkUpdateMutation.isPending}
+            disabled={!canEditStore || !transactionMode || !hasAnyChanges || bulkUpdateMutation.isPending}
             data-testid="button-save-updates"
           >
             {bulkUpdateMutation.isPending ? "Saving..." : "Save Updates"}
@@ -824,7 +827,7 @@ export default function BulkUpdateStores() {
           {activeTab === "chemicals" && (
             <Button 
               onClick={handleSaveChemUpdates}
-              disabled={!hasAnyChemChanges || chemUpdateMutation.isPending}
+              disabled={!canEditStore || !hasAnyChemChanges || chemUpdateMutation.isPending}
               className="bg-blue-600 hover:bg-blue-700 text-white"
               data-testid="button-save-chem-updates"
             >
@@ -857,7 +860,7 @@ export default function BulkUpdateStores() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowConfirmDialog(false)} data-testid="button-confirm-cancel">Cancel</Button>
-            <Button onClick={() => { setShowConfirmDialog(false); handleSaveBulkUpdates(); }} data-testid="button-confirm-save">
+            <Button onClick={() => { setShowConfirmDialog(false); handleSaveBulkUpdates(); }} disabled={!canEditStore} data-testid="button-confirm-save">
               Confirm & Save
             </Button>
           </DialogFooter>
