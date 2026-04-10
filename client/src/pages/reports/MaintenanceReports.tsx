@@ -366,6 +366,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
     switch (reportId) {
       case 'due-jobs-7': {
+        // Due Jobs (7 Days) is a current-state report showing jobs due within the next 7 days
+        // from today. It intentionally ignores the global period filter because it always
+        // reflects today's upcoming workload — applying a past/future year filter would
+        // produce an empty or misleading result.
         const dueJobsResponse = await fetch(
           `/technical/api/reports/due-jobs-7-days/preview?vesselId=${effectiveVesselId}`
         );
@@ -415,9 +419,14 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'overdue-jobs': {
-        const overdueResponse = await fetch(
-          `/technical/api/reports/overdue-jobs/preview?vesselId=${effectiveVesselId}`
-        );
+        let overdueUrl = `/technical/api/reports/overdue-jobs/preview?vesselId=${effectiveVesselId}`;
+        if (categoryFilters.dateRange?.from) {
+          overdueUrl += `&dateFrom=${toLocalDateStr(categoryFilters.dateRange.from)}`;
+        }
+        if (categoryFilters.dateRange?.to) {
+          overdueUrl += `&dateTo=${toLocalDateStr(categoryFilters.dateRange.to)}`;
+        }
+        const overdueResponse = await fetch(overdueUrl);
         if (!overdueResponse.ok) {
           throw new Error('Failed to fetch overdue jobs data');
         }
@@ -1054,7 +1063,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     let requestBody: any = { vesselId: effectiveVesselId };
     
     // Add date range for reports that support it
-    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'postponement-log' || reportId === 'critical-equipment') {
+    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'postponement-log' || reportId === 'critical-equipment' || reportId === 'overdue-jobs') {
       const dateFrom = categoryFilters.dateRange?.from;
       const dateTo = categoryFilters.dateRange?.to;
       

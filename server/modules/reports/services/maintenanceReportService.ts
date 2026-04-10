@@ -307,7 +307,7 @@ export async function exportDueJobs7Days(vesselId: string): Promise<{ buffer: Bu
 // OVERDUE JOBS - SHARED DATA FUNCTION
 // ═══════════════════════════════════════════════════════════════
 
-export async function getOverdueJobsData(vesselId: string) {
+export async function getOverdueJobsData(vesselId: string, dateFrom?: string, dateTo?: string) {
   const workOrders = await repo.getWorkOrders(vesselId);
   const jobs = await repo.getJobs(vesselId);
   const components = await repo.getComponents(vesselId);
@@ -318,6 +318,12 @@ export async function getOverdueJobsData(vesselId: string) {
   const jobsMap = new Map(jobs.map(job => [job.juuid, job]));
   const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
   const componentsMap = new Map(components.map(comp => [comp.cuuid, comp]));
+
+  // Period filter: filter overdue jobs by their dueDate within the selected period
+  const filterFromObj = dateFrom ? new Date(dateFrom) : null;
+  const filterToObj = dateTo ? new Date(dateTo) : null;
+  if (filterFromObj) filterFromObj.setHours(0, 0, 0, 0);
+  if (filterToObj) filterToObj.setHours(23, 59, 59, 999);
 
   const now = new Date();
   now.setHours(0, 0, 0, 0);
@@ -369,6 +375,14 @@ export async function getOverdueJobsData(vesselId: string) {
     });
 
     if (computedStatus === 'Overdue') {
+      // Apply period filter by dueDate when a date range is active
+      if (filterFromObj || filterToObj) {
+        const dueDateParsed = dueDate ? parseDate(dueDate) : null;
+        if (!dueDateParsed) continue;
+        if (filterFromObj && dueDateParsed < filterFromObj) continue;
+        if (filterToObj && dueDateParsed > filterToObj) continue;
+      }
+
       const isCriticalEquipment = component?.critical === true || (component?.critical as any) === 'true';
       let daysPastDue = 0;
       let hoursPastDue = 0;
@@ -458,8 +472,8 @@ export async function getOverdueJobsData(vesselId: string) {
 // OVERDUE JOBS - EXCEL EXPORT
 // ═══════════════════════════════════════════════════════════════
 
-export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buffer; filename: string }> {
-  const { data: overdueJobs, vesselName } = await getOverdueJobsData(vesselId);
+export async function exportOverdueJobs(vesselId: string, dateFrom?: string, dateTo?: string): Promise<{ buffer: Buffer; filename: string }> {
+  const { data: overdueJobs, vesselName } = await getOverdueJobsData(vesselId, dateFrom, dateTo);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'PMS System';

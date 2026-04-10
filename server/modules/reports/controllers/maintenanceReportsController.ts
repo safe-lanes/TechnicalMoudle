@@ -26,10 +26,12 @@ export async function getDueJobs7DaysPreview(req: Request, res: Response) {
 export async function getOverdueJobsPreview(req: Request, res: Response) {
   try {
     const vesselId = req.query.vesselId as string;
+    const dateFrom = req.query.dateFrom as string | undefined;
+    const dateTo = req.query.dateTo as string | undefined;
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
-    const result = await maintenanceReportService.getOverdueJobsData(vesselId);
+    const result = await maintenanceReportService.getOverdueJobsData(vesselId, dateFrom, dateTo);
     res.json(result);
   } catch (error: any) {
     console.error("Error fetching Overdue Jobs preview:", error);
@@ -107,13 +109,13 @@ export async function exportDueJobs7Days(req: Request, res: Response) {
 
 export async function exportOverdueJobs(req: Request, res: Response) {
   try {
-    const { vesselId } = req.body;
+    const { vesselId, dateFrom, dateTo } = req.body;
 
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
 
-    const { buffer, filename } = await maintenanceReportService.exportOverdueJobs(vesselId);
+    const { buffer, filename } = await maintenanceReportService.exportOverdueJobs(vesselId, dateFrom, dateTo);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
