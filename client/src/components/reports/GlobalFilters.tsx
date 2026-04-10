@@ -430,7 +430,7 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
         </Button>
       )}
 
-      {getActiveFiltersCount() > 0 && (
+      {(filters.component || filters.periodFilter) && (
         <div className="flex flex-wrap gap-1.5">
           {filters.component && (
             <Badge variant="secondary" className="flex items-center gap-1 text-xs py-0.5">
