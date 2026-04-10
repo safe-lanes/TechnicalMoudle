@@ -56,9 +56,6 @@ const getTypesForSection = (sectionValue: string) => {
   return section ? section.types : [];
 };
 
-const getSectionForType = (typeValue: string) => {
-  return SECTIONS.find((s) => s.types.some((t) => t.value === typeValue))?.value || SECTIONS[0].value;
-};
 
 export default function MasterListsManagement({ onBack }: { onBack?: () => void }) {
   const { toast } = useToast();
