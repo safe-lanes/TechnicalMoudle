@@ -1,10 +1,30 @@
 import { useMemo, useCallback, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import type { ColDef, GridReadyEvent, GridApi, SortChangedEvent } from 'ag-grid-community';
+import { ModuleRegistry } from 'ag-grid-community';
+import {
+  MenuModule,
+  ColumnsToolPanelModule,
+  LicenseManager,
+} from 'ag-grid-enterprise';
 import type { ReportColumn } from '@/components/reports/ReportPreviewModal';
 
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
+
+try {
+  const licenseKey = import.meta.env.VITE_AG_GRID_LICENSE_KEY || import.meta.env.AG_GRID_LICENSE_KEY;
+  if (licenseKey) {
+    LicenseManager.setLicenseKey(licenseKey);
+  }
+} catch (_) {}
+
+try {
+  ModuleRegistry.registerModules([
+    MenuModule,
+    ColumnsToolPanelModule,
+  ]);
+} catch (_) {}
 
 interface ReportAgGridTableProps {
   columns: ReportColumn[];
