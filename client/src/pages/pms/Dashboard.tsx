@@ -1078,7 +1078,7 @@ const Dashboard = () => {
     return [
       { status: 'Overdue', count: overdue, color: '#ff6961' },
       { status: 'Due', count: due, color: '#FF964f' },
-      { status: 'Planned', count: planned, color: '#5dc86f' },
+      { status: 'Planned', count: planned, color: '#9E9E9E' },
     ].filter(d => d.count > 0);
   }, [workOrdersData]);
 
@@ -1637,7 +1637,7 @@ const Dashboard = () => {
                         <div className="flex flex-col gap-0.5">
                           <span className="text-xs font-semibold text-gray-700">Work Orders</span>
                           {[
-                            { status: 'Planned', color: '#5dc86f' },
+                            { status: 'Planned', color: '#9E9E9E' },
                             { status: 'Due', color: '#FF964f' },
                             { status: 'Overdue', color: '#ff6961' },
                           ].map(item => (
