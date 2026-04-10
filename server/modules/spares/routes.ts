@@ -26,24 +26,24 @@ router.post('/spares/bulk-update', requirePMSAdmin, asyncHandler(sparesCtrl.bulk
 // ── Spares: suuid-only routes (no vesselId prefix) ──
 
 // POST /spares/:id/consume — legacy consume (Location A default)
-router.post('/spares/:id/consume', requireAuth, asyncHandler(sparesCtrl.consumeSimple));
+router.post('/spares/:id/consume', requirePMSAdmin, asyncHandler(sparesCtrl.consumeSimple));
 
 // POST /spares/:id/receive — legacy receive (Location A default)
-router.post('/spares/:id/receive', requireAuth, asyncHandler(sparesCtrl.receiveSimple));
+router.post('/spares/:id/receive', requirePMSAdmin, asyncHandler(sparesCtrl.receiveSimple));
 
 // POST /spares/:id/consume-from-location — location-aware consume
-router.post('/spares/:id/consume-from-location', requireAuth, asyncHandler(sparesCtrl.consumeFromLocation));
+router.post('/spares/:id/consume-from-location', requirePMSAdmin, asyncHandler(sparesCtrl.consumeFromLocation));
 
 // POST /spares/:id/receive-to-location — location-aware receive
-router.post('/spares/:id/receive-to-location', requireAuth, asyncHandler(sparesCtrl.receiveToLocation));
+router.post('/spares/:id/receive-to-location', requirePMSAdmin, asyncHandler(sparesCtrl.receiveToLocation));
 
 // ── Spares: vessel-scoped specific paths (BEFORE /:vesselId catch-all) ──
 
 // POST /spares/:vesselId/batch-consume
-router.post('/spares/:vesselId/batch-consume', requireAuth, asyncHandler(sparesCtrl.batchConsume));
+router.post('/spares/:vesselId/batch-consume', requirePMSAdmin, asyncHandler(sparesCtrl.batchConsume));
 
 // POST /spares/:vesselId/batch-receive
-router.post('/spares/:vesselId/batch-receive', requireAuth, asyncHandler(sparesCtrl.batchReceive));
+router.post('/spares/:vesselId/batch-receive', requirePMSAdmin, asyncHandler(sparesCtrl.batchReceive));
 
 // ── Spares: vessel-scoped with sub-resource ID ──
 
@@ -57,10 +57,10 @@ router.get('/spares/:vesselId/low-stock', requireAuth, asyncHandler(sparesCtrl.g
 router.post('/spares/:vesselId/:id/inactivate', requirePMSAdmin, asyncHandler(sparesCtrl.inactivateSpare));
 
 // POST /spares/:vesselId/:id/adjustment — adjust spare ROB at location
-router.post('/spares/:vesselId/:id/adjustment', requireAuth, asyncHandler(sparesCtrl.adjustSpareAtLocation));
+router.post('/spares/:vesselId/:id/adjustment', requirePMSAdmin, asyncHandler(sparesCtrl.adjustSpareAtLocation));
 
 // POST /spares/:vesselId/:id/adjust — adjust spare quantity (+/- buttons)
-router.post('/spares/:vesselId/:id/adjust', requireAuth, asyncHandler(sparesCtrl.adjustSpareQuantity));
+router.post('/spares/:vesselId/:id/adjust', requirePMSAdmin, asyncHandler(sparesCtrl.adjustSpareQuantity));
 
 // ── Spares: vessel-scoped CRUD ──
 
@@ -107,11 +107,11 @@ router.get('/inventory/stock/by-location/:locationId', requireAuth, asyncHandler
 router.get('/inventory/stock/locations-with-stock/:vesselId', requireAuth, asyncHandler(invCtrl.getLocationsWithStock));
 router.get('/inventory/stock/full-by-location/:vesselId/:locationId', requireAuth, asyncHandler(invCtrl.getFullSparesAtLocation));
 router.get('/inventory/stock/:spareId', requireAuth, asyncHandler(invCtrl.getSpareStock));
-router.post('/inventory/stock/:spareId/:locationId', requireAuth, asyncHandler(invCtrl.upsertStock));
+router.post('/inventory/stock/:spareId/:locationId', requirePMSAdmin, asyncHandler(invCtrl.upsertStock));
 
 // ── Inventory: Transactions ──
 
-router.post('/inventory/transactions', requireAuth, asyncHandler(invCtrl.createTransaction));
+router.post('/inventory/transactions', requirePMSAdmin, asyncHandler(invCtrl.createTransaction));
 router.get('/inventory/transactions/:vesselId', requireAuth, asyncHandler(invCtrl.getTransactions));
 
 // ── Inventory: Sibling Backfill ──
