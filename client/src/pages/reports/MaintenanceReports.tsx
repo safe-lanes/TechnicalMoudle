@@ -361,6 +361,15 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
     const now = new Date();
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    // Use globalFilters.dateRange as the authoritative source for date range because
+    // filterFingerprint (which triggers this function) is based on globalFilters.
+    // categoryFilters.dateRange lags one render behind due to its useEffect sync.
+    // When globalFilters is available (embedded mode), always prefer it — even when
+    // both from and to are null (i.e. the filter was cleared).
+    const effectiveDateRange = globalFilters?.dateRange !== undefined
+      ? globalFilters.dateRange
+      : categoryFilters.dateRange;
     
     const vesselWorkOrders = filteredWorkOrders;
 
@@ -408,10 +417,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Critical Priority', value: dueJobsSummary.criticalPriority }
         ];
 
-        if (mode === 'preview') return { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: dueVessel || vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: dueVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
-          { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: dueVessel || vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
+          { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: dueVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to) },
           columns,
           data
         );
@@ -420,11 +429,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
       case 'overdue-jobs': {
         let overdueUrl = `/technical/api/reports/overdue-jobs/preview?vesselId=${effectiveVesselId}`;
-        if (categoryFilters.dateRange?.from) {
-          overdueUrl += `&dateFrom=${toLocalDateStr(categoryFilters.dateRange.from)}`;
+        if (effectiveDateRange?.from) {
+          overdueUrl += `&dateFrom=${toLocalDateStr(effectiveDateRange.from)}`;
         }
-        if (categoryFilters.dateRange?.to) {
-          overdueUrl += `&dateTo=${toLocalDateStr(categoryFilters.dateRange.to)}`;
+        if (effectiveDateRange?.to) {
+          overdueUrl += `&dateTo=${toLocalDateStr(effectiveDateRange.to)}`;
         }
         const overdueResponse = await fetch(overdueUrl);
         if (!overdueResponse.ok) {
@@ -479,14 +488,14 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Calendar/RH', value: `${overdueSummary.calendarOverdue}/${overdueSummary.rhOverdue}` }
         ];
 
-        if (mode === 'preview') return { title: 'OVERDUE JOBS REPORT', subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', vessel: overdueVessel || vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'OVERDUE JOBS REPORT', subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', vessel: overdueVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateOverdueJobsReport(
           { 
             title: 'OVERDUE JOBS REPORT', 
             subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', 
             vessel: overdueVessel || vesselName,
-            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
+            dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to)
           },
           columns,
           data
@@ -496,11 +505,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
       case 'completed-jobs': {
         let completedUrl = `/technical/api/reports/completed-jobs/preview?vesselId=${effectiveVesselId}`;
-        if (categoryFilters.dateRange?.from) {
-          completedUrl += `&dateFrom=${toLocalDateStr(categoryFilters.dateRange.from)}`;
+        if (effectiveDateRange?.from) {
+          completedUrl += `&dateFrom=${toLocalDateStr(effectiveDateRange.from)}`;
         }
-        if (categoryFilters.dateRange?.to) {
-          completedUrl += `&dateTo=${toLocalDateStr(categoryFilters.dateRange.to)}`;
+        if (effectiveDateRange?.to) {
+          completedUrl += `&dateTo=${toLocalDateStr(effectiveDateRange.to)}`;
         }
         const completedResponse = await fetch(completedUrl);
         if (!completedResponse.ok) {
@@ -528,7 +537,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             { label: 'Total Jobs', value: completedSummaryData.totalJobs },
             { label: 'Total Man-Hours', value: completedSummaryData.totalManHours }
           ];
-          return { title: 'COMPLETED JOBS REGISTER', subtitle: `Vessel: ${completedVessel || vesselName}`, vessel: completedVessel || vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns: completedColumns, data, summary: completedSummary } as ReportPreviewData;
+          return { title: 'COMPLETED JOBS REGISTER', subtitle: `Vessel: ${completedVessel || vesselName}`, vessel: completedVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns: completedColumns, data, summary: completedSummary } as ReportPreviewData;
         }
 
         pdfReportGenerator.generateReport(
@@ -537,7 +546,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             subtitle: `${completedSummaryData.totalJobs} completed jobs | ${completedSummaryData.totalManHours} total man-hours`,
             vessel: completedVessel || vesselName,
             orientation: 'landscape',
-            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
+            dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to)
           },
           completedColumns,
           data
@@ -692,11 +701,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
       case 'critical-equipment': {
         let critUrl = `/technical/api/reports/critical-equipment-status?vesselId=${effectiveVesselId}`;
-        if (categoryFilters.dateRange?.from) {
-          critUrl += `&startDate=${toLocalDateStr(categoryFilters.dateRange.from)}`;
+        if (effectiveDateRange?.from) {
+          critUrl += `&startDate=${toLocalDateStr(effectiveDateRange.from)}`;
         }
-        if (categoryFilters.dateRange?.to) {
-          critUrl += `&endDate=${toLocalDateStr(categoryFilters.dateRange.to)}`;
+        if (effectiveDateRange?.to) {
+          critUrl += `&endDate=${toLocalDateStr(effectiveDateRange.to)}`;
         }
         const response = await fetch(critUrl);
         if (!response.ok) {
@@ -734,10 +743,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Class Item Only', value: metadata.classItemOnly },
           { label: 'Both Critical & Class', value: metadata.bothCriticalAndClass },
           { label: 'With Overdue Jobs', value: metadata.equipmentWithOverdue, color: 'highlight' },
-          { label: (categoryFilters.dateRange?.from || categoryFilters.dateRange?.to) ? 'Due in Period' : 'Due Soon (7 days)', value: metadata.equipmentDueSoon }
+          { label: (effectiveDateRange?.from || effectiveDateRange?.to) ? 'Due in Period' : 'Due Soon (7 days)', value: metadata.equipmentDueSoon }
         ];
 
-        if (mode === 'preview') return { title: 'CRITICAL EQUIPMENT STATUS REPORT', subtitle: 'SOLAS-critical and class-critical equipment', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'CRITICAL EQUIPMENT STATUS REPORT', subtitle: 'SOLAS-critical and class-critical equipment', vessel: vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;
 
         // Use specialized critical equipment report generator
         pdfReportGenerator.generateCriticalEquipmentReport(
@@ -745,7 +754,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             title: 'CRITICAL EQUIPMENT STATUS REPORT', 
             subtitle: 'SOLAS-critical and class-critical equipment', 
             vessel: vesselName,
-            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
+            dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to)
           },
           columns,
           data,
@@ -755,8 +764,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'unplanned-jobs': {
-        const dateFrom = categoryFilters.dateRange?.from || new Date(now.getFullYear(), now.getMonth(), 1);
-        const dateTo = categoryFilters.dateRange?.to || new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const dateFrom = effectiveDateRange?.from || new Date(now.getFullYear(), now.getMonth(), 1);
+        const dateTo = effectiveDateRange?.to || new Date(now.getFullYear(), now.getMonth() + 1, 0);
         
         const startDate = toLocalDateStr(dateFrom);
         const endDate = toLocalDateStr(dateTo);
@@ -793,14 +802,14 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Date Range', value: `${startDate} to ${endDate}` }
         ];
 
-        if (mode === 'preview') return { title: 'UNPLANNED/BREAKDOWN JOBS REPORT', subtitle: 'Analysis of breakdown maintenance and unplanned work', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data: unplannedData, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'UNPLANNED/BREAKDOWN JOBS REPORT', subtitle: 'Analysis of breakdown maintenance and unplanned work', vessel: vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data: unplannedData, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateUnplannedBreakdownReport(
           { 
             title: 'UNPLANNED/BREAKDOWN JOBS REPORT', 
             subtitle: 'Analysis of breakdown maintenance and unplanned work', 
             vessel: vesselName,
-            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
+            dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to)
           },
           columns,
           unplannedData,
@@ -811,11 +820,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
       case 'postponement-log': {
         let postponeUrl = `/technical/api/reports/postponement-log/preview?vesselId=${effectiveVesselId}`;
-        if (categoryFilters.dateRange?.from) {
-          postponeUrl += `&dateFrom=${toLocalDateStr(categoryFilters.dateRange.from)}`;
+        if (effectiveDateRange?.from) {
+          postponeUrl += `&dateFrom=${toLocalDateStr(effectiveDateRange.from)}`;
         }
-        if (categoryFilters.dateRange?.to) {
-          postponeUrl += `&dateTo=${toLocalDateStr(categoryFilters.dateRange.to)}`;
+        if (effectiveDateRange?.to) {
+          postponeUrl += `&dateTo=${toLocalDateStr(effectiveDateRange.to)}`;
         }
         const postponeResponse = await fetch(postponeUrl);
         if (!postponeResponse.ok) {
@@ -853,7 +862,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Total Postponed Jobs', value: postponeSummary.totalPostponed }
         ];
 
-        if (mode === 'preview') return { title: 'Job Postponement Log Report', subtitle: 'Audit trail of all postponed jobs with approvals and justifications', vessel: postponeVessel || vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'Job Postponement Log Report', subtitle: 'Audit trail of all postponed jobs with approvals and justifications', vessel: postponeVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
           { 
@@ -861,7 +870,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             subtitle: 'Audit trail of all postponed jobs with approvals and justifications', 
             vessel: postponeVessel || vesselName,
             orientation: 'landscape',
-            dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
+            dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to)
           },
           columns,
           data
@@ -904,10 +913,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           overdue: stats.overdue
         }));
 
-        if (mode === 'preview') return { title: 'Work Priority Performance', subtitle: 'Performance analysis by priority levels', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'Work Priority Performance', subtitle: 'Performance analysis by priority levels', vessel: vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
-          { title: 'Work Priority Performance', subtitle: 'Performance analysis by priority levels', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
+          { title: 'Work Priority Performance', subtitle: 'Performance analysis by priority levels', vessel: vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to) },
           columns,
           data
         );
@@ -939,10 +948,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             };
           });
 
-        if (mode === 'preview') return { title: 'Man-Hours Analysis', subtitle: 'Planned vs Actual hours comparison', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'Man-Hours Analysis', subtitle: 'Planned vs Actual hours comparison', vessel: vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
-          { title: 'Man-Hours Analysis', subtitle: 'Planned vs Actual hours comparison', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
+          { title: 'Man-Hours Analysis', subtitle: 'Planned vs Actual hours comparison', vessel: vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to) },
           columns,
           data
         );
@@ -955,9 +964,9 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         if (globalFilters?.dateRange?.from && globalFilters?.dateRange?.to) {
           wdStartDate = toLocalDateStr(globalFilters.dateRange.from);
           wdEndDate = toLocalDateStr(globalFilters.dateRange.to);
-        } else if (categoryFilters.dateRange?.from && categoryFilters.dateRange?.to) {
-          wdStartDate = toLocalDateStr(categoryFilters.dateRange.from);
-          wdEndDate = toLocalDateStr(categoryFilters.dateRange.to);
+        } else if (effectiveDateRange?.from && effectiveDateRange?.to) {
+          wdStartDate = toLocalDateStr(effectiveDateRange.from);
+          wdEndDate = toLocalDateStr(effectiveDateRange.to);
         } else {
           const wdNow = new Date();
           wdStartDate = toLocalDateStr(new Date(wdNow.getFullYear(), wdNow.getMonth(), 1));
@@ -1011,10 +1020,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         const wdVessel = wdMeta.vesselName || vesselName;
 
-        if (mode === 'preview') return { title: 'Crew Workload Distribution', subtitle: 'Task distribution across crew ranks and assignments', vessel: wdVessel, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'Crew Workload Distribution', subtitle: 'Task distribution across crew ranks and assignments', vessel: wdVessel, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
-          { title: 'Crew Workload Distribution', subtitle: 'Task distribution across crew ranks and assignments', vessel: wdVessel, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
+          { title: 'Crew Workload Distribution', subtitle: 'Task distribution across crew ranks and assignments', vessel: wdVessel, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to) },
           columns,
           data
         );
