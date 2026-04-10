@@ -28,6 +28,10 @@ interface MenuItem {
   sortOrder: number | null;
 }
 
+interface MenuTreeNode extends MenuItem {
+  children: MenuTreeNode[];
+}
+
 interface Permission {
   menuMuid: string;
   canView: boolean;
@@ -61,16 +65,18 @@ export default function AccessControl() {
     enabled: !!selectedRoleRuid,
   });
 
-  const menuTree = useMemo(() => {
+  const menuTree = useMemo((): MenuTreeNode[] => {
     if (!menuItemsQuery.data) return [];
     const items = menuItemsQuery.data.filter((i) => i.name !== "admin-access-control");
-    const parents = items.filter((i) => !i.parentMenu).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-    return parents.map((parent) => ({
-      ...parent,
-      children: items
-        .filter((i) => i.parentMenu === parent.muid)
-        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
-    }));
+    const buildChildren = (parentMuid: string): MenuTreeNode[] =>
+      items
+        .filter((i) => i.parentMenu === parentMuid)
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+        .map((item) => ({ ...item, children: buildChildren(item.muid) }));
+    return items
+      .filter((i) => !i.parentMenu)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      .map((parent) => ({ ...parent, children: buildChildren(parent.muid) }));
   }, [menuItemsQuery.data]);
 
   const loadPermissions = useCallback(
@@ -249,68 +255,62 @@ export default function AccessControl() {
               <ScrollArea className="flex-1">
                 <div className="divide-y divide-gray-100">
                   {menuTree.map((parent) => {
-                    const isExpanded = expandedParents.has(parent.muid);
-                    return (
-                      <div key={parent.muid} data-testid={`menu-group-${parent.name}`}>
-                        <div
-                          className="grid grid-cols-[1fr_80px_80px_80px_80px_80px] gap-1 items-center px-4 py-2.5 bg-gray-50 hover:bg-gray-100 cursor-pointer"
-                          onClick={() => toggleExpand(parent.muid)}
-                          data-testid={`menu-parent-${parent.name}`}
-                        >
-                          <div className="flex items-center gap-2 font-medium text-sm text-gray-800">
-                            {isExpanded ? (
-                              <ChevronDown className="h-4 w-4 text-gray-400" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4 text-gray-400" />
+                    const renderNode = (node: MenuTreeNode, depth: number) => {
+                      const hasChildren = node.children.length > 0;
+                      const isExpanded = expandedParents.has(node.muid);
+                      const isRoot = depth === 0;
+                      const paddingLeft = depth === 0 ? undefined : `${2.5 + depth * 1.5}rem`;
+
+                      return (
+                        <div key={node.muid} data-testid={`menu-${isRoot ? "group" : "child"}-${node.name}`}>
+                          <div
+                            className={cn(
+                              "grid grid-cols-[1fr_80px_80px_80px_80px_80px] gap-1 items-center px-4 py-2",
+                              isRoot && "py-2.5 bg-gray-50 hover:bg-gray-100",
+                              !isRoot && "hover:bg-blue-50/30",
+                              hasChildren && "cursor-pointer"
                             )}
-                            {parent.displayName}
-                          </div>
-                          <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
-                            <Checkbox
-                              checked={isAllChecked(parent.muid) ? true : isSomeChecked(parent.muid) ? "indeterminate" : false}
-                              onCheckedChange={(checked) => toggleSelectAll(parent.muid, !!checked)}
-                              data-testid={`checkbox-selectall-${parent.name}`}
-                            />
-                          </div>
-                          {(["canView", "canCreate", "canEdit", "canDelete"] as const).map((field) => (
-                            <div key={field} className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+                            style={paddingLeft ? { paddingLeft } : undefined}
+                            onClick={hasChildren ? () => toggleExpand(node.muid) : undefined}
+                            data-testid={`menu-parent-${node.name}`}
+                          >
+                            <div className={cn(
+                              "flex items-center gap-2 text-sm",
+                              isRoot ? "font-medium text-gray-800" : "text-gray-600"
+                            )}>
+                              {hasChildren ? (
+                                isExpanded ? (
+                                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                                )
+                              ) : (
+                                <span className="w-4" />
+                              )}
+                              {node.displayName}
+                            </div>
+                            <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
                               <Checkbox
-                                checked={getPermission(parent.muid)[field]}
-                                onCheckedChange={(checked) => updatePermission(parent.muid, field, !!checked)}
-                                data-testid={`checkbox-${field}-${parent.name}`}
+                                checked={isAllChecked(node.muid) ? true : isSomeChecked(node.muid) ? "indeterminate" : false}
+                                onCheckedChange={(checked) => toggleSelectAll(node.muid, !!checked)}
+                                data-testid={`checkbox-selectall-${node.name}`}
                               />
                             </div>
-                          ))}
-                        </div>
-
-                        {isExpanded &&
-                          parent.children.map((child) => (
-                            <div
-                              key={child.muid}
-                              className="grid grid-cols-[1fr_80px_80px_80px_80px_80px] gap-1 items-center px-4 py-2 pl-10 hover:bg-blue-50/30"
-                              data-testid={`menu-child-${child.name}`}
-                            >
-                              <div className="text-sm text-gray-600">{child.displayName}</div>
-                              <div className="flex justify-center">
+                            {(["canView", "canCreate", "canEdit", "canDelete"] as const).map((field) => (
+                              <div key={field} className="flex justify-center" onClick={(e) => e.stopPropagation()}>
                                 <Checkbox
-                                  checked={isAllChecked(child.muid) ? true : isSomeChecked(child.muid) ? "indeterminate" : false}
-                                  onCheckedChange={(checked) => toggleSelectAll(child.muid, !!checked)}
-                                  data-testid={`checkbox-selectall-${child.name}`}
+                                  checked={getPermission(node.muid)[field]}
+                                  onCheckedChange={(checked) => updatePermission(node.muid, field, !!checked)}
+                                  data-testid={`checkbox-${field}-${node.name}`}
                                 />
                               </div>
-                              {(["canView", "canCreate", "canEdit", "canDelete"] as const).map((field) => (
-                                <div key={field} className="flex justify-center">
-                                  <Checkbox
-                                    checked={getPermission(child.muid)[field]}
-                                    onCheckedChange={(checked) => updatePermission(child.muid, field, !!checked)}
-                                    data-testid={`checkbox-${field}-${child.name}`}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          ))}
-                      </div>
-                    );
+                            ))}
+                          </div>
+                          {hasChildren && isExpanded && node.children.map((child) => renderNode(child, depth + 1))}
+                        </div>
+                      );
+                    };
+                    return renderNode(parent, 0);
                   })}
                 </div>
               </ScrollArea>
