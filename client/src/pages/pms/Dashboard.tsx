@@ -1605,7 +1605,7 @@ const Dashboard = () => {
                         onClick={() => setSelectedOpCard(card.key)}
                         data-testid={card.testId}
                       >
-                        <CardContent className="py-2 px-3 flex flex-col justify-center flex-1">
+                        <CardContent className="py-2 px-3 flex flex-col justify-start flex-1">
                           <p className="font-medium text-gray-600 text-[14px]">{card.label}</p>
                           <p className={`text-xl font-bold mt-0.5 ${card.textColor}`} data-testid={card.valueTestId}>{card.value}</p>
                         </CardContent>
