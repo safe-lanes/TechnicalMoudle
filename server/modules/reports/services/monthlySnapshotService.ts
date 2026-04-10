@@ -3,8 +3,25 @@ import { monthlySnapshots } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import * as repo from '../repositories/reportRepository';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
-import type { CompanyStandardGraceConfig } from '@shared/workOrders/status';
+import type { CompanyStandardGraceConfig, VesselGraceSettings } from '@shared/workOrders/status';
+import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { storage } from '../../../storage';
+
+function buildVesselGraceSettings(vesselSettings: Record<string, unknown> | null | undefined): VesselGraceSettings {
+  if (!vesselSettings) {
+    return {
+      calendarGraceMode: 'COMPANY_STANDARD',
+      calendarGraceDays: WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+      rhGraceHours: WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+    };
+  }
+  return {
+    calendarGraceMode: ((vesselSettings.calendarGraceMode as string) || 'COMPANY_STANDARD') as 'COMPANY_STANDARD' | 'CUSTOM_DAYS',
+    calendarGraceDays: (vesselSettings.calendarGraceDays as number) ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+    rhGraceHours: (vesselSettings.rhGraceHours as number) ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+    rhLeadTimeHours: vesselSettings.rhLeadTimeHours as number | undefined,
+  };
+}
 
 const SNAPSHOT_CATEGORIES = ['Planned', 'Due', 'Overdue', 'Postponed', 'Unplanned', 'Pending Approval', 'Completed'] as const;
 type SnapshotCategory = typeof SNAPSHOT_CATEGORIES[number];
@@ -71,7 +88,8 @@ function getMonthBoundaries(year: number, month: number) {
   return { opening, closing, monthKey: `${year}-${String(month).padStart(2, '0')}` };
 }
 
-function isUnplannedWO(wo: WorkOrderRecord): boolean {
+function isUnplannedWO(wo: WorkOrderRecord, hasLinkedJob: boolean): boolean {
+  if (!hasLinkedJob) return true;
   if (wo.workOrderType === 'Unplanned') return true;
   if (wo.taskType && (
     wo.taskType.toLowerCase().includes('unplanned') ||
@@ -89,9 +107,10 @@ function isPendingApprovalExecution(wo: WorkOrderRecord): boolean {
 
 function mapStatusToCategory(
   computedStatus: string,
-  wo: WorkOrderRecord
+  wo: WorkOrderRecord,
+  hasLinkedJob: boolean
 ): SnapshotCategory {
-  if (isUnplannedWO(wo)) return 'Unplanned';
+  if (isUnplannedWO(wo, hasLinkedJob)) return 'Unplanned';
   if (wo.status === 'Postponed') return 'Postponed';
   if (isPendingApprovalExecution(wo)) return 'Pending Approval';
 
@@ -147,6 +166,9 @@ async function computeSnapshotAtTimestamp(
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
   const companyGraceConfig: CompanyStandardGraceConfig = buildCompanyGraceConfig(companyGraceRow);
 
+  const vesselSettings = await repo.getPmsVesselSettings(vesselId);
+  const vesselGraceSettings = buildVesselGraceSettings(vesselSettings);
+
   const categoryCounts: Record<SnapshotCategory, CategoryBucket> = {
     'Planned': { count: 0, woIds: [] },
     'Due': { count: 0, woIds: [] },
@@ -167,9 +189,21 @@ async function computeSnapshotAtTimestamp(
   for (const wo of vesselWOs) {
     const FINALIZED = new Set(['completed', 'approved', 'closed', 'cancelled']);
     const normalizedStatus = (wo.status || '').toLowerCase().trim();
-    if (wo.isExecution && FINALIZED.has(normalizedStatus)) continue;
+
+    const completionDt = wo.completionDateTime ? new Date(wo.completionDateTime) : null;
+    const completedByBoundary = completionDt && !isNaN(completionDt.getTime()) && completionDt <= snapshotDate;
+
+    if (wo.isExecution && FINALIZED.has(normalizedStatus) && completedByBoundary) continue;
+    if (wo.isExecution && FINALIZED.has(normalizedStatus) && !completedByBoundary) {
+    }
+
+    const effectiveCompletionDateTime = completedByBoundary ? wo.completionDateTime : null;
+    const effectiveStatus = (FINALIZED.has(normalizedStatus) && !completedByBoundary)
+      ? (wo.isExecution ? 'In Progress' : 'Active')
+      : wo.status;
 
     const job = wo.jobId ? jobsMap.get(wo.jobId) : undefined;
+    const hasLinkedJob = !!(wo.jobId && job);
     const component = wo.componentCode
       ? componentsByCodeMap.get(wo.componentCode)
       : (wo.component ? componentsMap.get(wo.component) : undefined);
@@ -184,14 +218,15 @@ async function computeSnapshotAtTimestamp(
       dueRH,
       currentRH,
       isExecution: wo.isExecution,
-      status: wo.status,
-      completionDateTime: wo.completionDateTime,
+      status: effectiveStatus,
+      completionDateTime: effectiveCompletionDateTime,
       maintenanceBasis,
+      vesselGraceSettings,
       companyGraceConfig,
       referenceDate: snapshotDate,
     });
 
-    const category = mapStatusToCategory(computedStatus, wo);
+    const category = mapStatusToCategory(computedStatus, wo, hasLinkedJob);
     categoryCounts[category].count++;
     categoryCounts[category].woIds.push(wo.wouuid || wo.id);
   }
@@ -278,6 +313,9 @@ export async function computeMonthlyMovement(vesselId: string, year: number, mon
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
   const companyGraceConfig: CompanyStandardGraceConfig = buildCompanyGraceConfig(companyGraceRow);
 
+  const vesselSettings = await repo.getPmsVesselSettings(vesselId);
+  const vesselGraceSettings = buildVesselGraceSettings(vesselSettings);
+
   const isInMonth = (d: Date | null) => {
     if (!d) return false;
     return d >= opening && d <= closing;
@@ -302,11 +340,14 @@ export async function computeMonthlyMovement(vesselId: string, year: number, mon
     const completionDate = parseDateAny(wo.completionDateTime);
     const woId = wo.wouuid || wo.id;
 
+    const job = wo.jobId ? jobsMap.get(wo.jobId) : undefined;
+    const hasLinkedJob = !!(wo.jobId && job);
+
     if (isInMonth(createdAt)) {
       newJobsEntered++;
       newJobsEnteredIds.push(woId);
 
-      if (isUnplannedWO(wo)) {
+      if (isUnplannedWO(wo, hasLinkedJob)) {
         unplannedRaised++;
         unplannedRaisedIds.push(woId);
       }
@@ -329,7 +370,6 @@ export async function computeMonthlyMovement(vesselId: string, year: number, mon
 
     const dueDate = wo.dueDateSnapshot || wo.dueDate || null;
     if (dueDate && !FINALIZED.has(normalizedStatus)) {
-      const job = wo.jobId ? jobsMap.get(wo.jobId) : undefined;
       const maintenanceBasis = wo.maintenanceBasis || job?.maintenanceBasis || 'Calendar';
 
       if (maintenanceBasis === 'Calendar') {
@@ -339,6 +379,7 @@ export async function computeMonthlyMovement(vesselId: string, year: number, mon
           status: wo.status,
           completionDateTime: wo.completionDateTime,
           maintenanceBasis,
+          vesselGraceSettings,
           companyGraceConfig,
           referenceDate: opening,
         });
@@ -348,6 +389,7 @@ export async function computeMonthlyMovement(vesselId: string, year: number, mon
           status: wo.status,
           completionDateTime: wo.completionDateTime,
           maintenanceBasis,
+          vesselGraceSettings,
           companyGraceConfig,
           referenceDate: closing,
         });
