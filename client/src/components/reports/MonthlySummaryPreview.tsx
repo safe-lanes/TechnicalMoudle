@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, RefreshCw, ChevronDown, ChevronRight, TrendingUp, TrendingDown, ArrowRight, CheckCircle, AlertTriangle, Clock, XCircle, Wrench, FileWarning, ShieldCheck } from "lucide-react";
+import { Loader2, RefreshCw, ChevronDown, ChevronRight, TrendingUp, TrendingDown, ArrowRight, CheckCircle, AlertTriangle, Clock, XCircle, Wrench, FileWarning, ShieldCheck, type LucideIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface CategoryData {
@@ -67,7 +67,7 @@ interface MonthlySummaryPreviewProps {
 
 const CATEGORIES = ['Planned', 'Due', 'Overdue', 'Postponed', 'Unplanned', 'Pending Approval', 'Completed'] as const;
 
-const CATEGORY_STYLES: Record<string, { icon: any; color: string; bg: string }> = {
+const CATEGORY_STYLES: Record<string, { icon: LucideIcon; color: string; bg: string }> = {
   'Planned': { icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950/30' },
   'Due': { icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/30' },
   'Overdue': { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-950/30' },
@@ -108,8 +108,9 @@ const MonthlySummaryPreview: React.FC<MonthlySummaryPreviewProps> = ({ data, ves
       if (!res.ok) throw new Error('Failed to fetch drilldown');
       const rows = await res.json();
       setDrilldownData(rows);
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'An error occurred';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
       setDrilldownData([]);
     } finally {
       setDrilldownLoading(false);
@@ -128,8 +129,9 @@ const MonthlySummaryPreview: React.FC<MonthlySummaryPreviewProps> = ({ data, ves
       if (!res.ok) throw new Error('Failed to fetch drilldown');
       const rows = await res.json();
       setDrilldownData(rows);
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'An error occurred';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
       setDrilldownData([]);
     } finally {
       setDrilldownLoading(false);
@@ -141,8 +143,9 @@ const MonthlySummaryPreview: React.FC<MonthlySummaryPreviewProps> = ({ data, ves
     try {
       await onRegenerate();
       toast({ title: 'Success', description: 'Snapshots regenerated' });
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'An error occurred';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     } finally {
       setRegenerating(false);
     }
@@ -244,7 +247,7 @@ const MonthlySummaryPreview: React.FC<MonthlySummaryPreviewProps> = ({ data, ves
               { key: 'sentToPendingApproval', label: 'Sent to Pending Approval', icon: ShieldCheck, color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-950/30' },
             ].map(item => {
               const Icon = item.icon;
-              const count = (movement as any)[item.key]?.count || 0;
+              const count = movement[item.key as keyof MovementData]?.count || 0;
               return (
                 <div key={item.key} className={`flex items-center justify-between px-2 py-1.5 rounded ${item.bg}`}>
                   <div className="flex items-center gap-2">

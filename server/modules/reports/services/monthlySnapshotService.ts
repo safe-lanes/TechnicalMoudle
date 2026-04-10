@@ -18,6 +18,7 @@ interface WorkOrderRecord {
   wouuid?: string;
   id: string;
   workOrderType?: string;
+  taskType?: string | null;
   status?: string;
   isExecution?: boolean;
   dataScope?: string;
@@ -70,13 +71,29 @@ function getMonthBoundaries(year: number, month: number) {
   return { opening, closing, monthKey: `${year}-${String(month).padStart(2, '0')}` };
 }
 
+function isUnplannedWO(wo: WorkOrderRecord): boolean {
+  if (wo.workOrderType === 'Unplanned') return true;
+  if (wo.taskType && (
+    wo.taskType.toLowerCase().includes('unplanned') ||
+    wo.taskType.toLowerCase().includes('breakdown')
+  )) return true;
+  if (wo.workOrderNo && wo.workOrderNo.startsWith('UWO')) return true;
+  return false;
+}
+
+function isPendingApprovalExecution(wo: WorkOrderRecord): boolean {
+  const FINALIZED_STATUSES = new Set(['completed', 'approved', 'closed', 'cancelled']);
+  const normalizedStatus = (wo.status || '').toLowerCase().trim();
+  return wo.isExecution === true && !FINALIZED_STATUSES.has(normalizedStatus);
+}
+
 function mapStatusToCategory(
   computedStatus: string,
   wo: WorkOrderRecord
 ): SnapshotCategory {
-  if (wo.workOrderType === 'Unplanned') return 'Unplanned';
+  if (isUnplannedWO(wo)) return 'Unplanned';
   if (wo.status === 'Postponed') return 'Postponed';
-  if (wo.status === 'Pending Approval') return 'Pending Approval';
+  if (isPendingApprovalExecution(wo)) return 'Pending Approval';
 
   switch (computedStatus) {
     case 'Completed':
@@ -143,7 +160,9 @@ async function computeSnapshotAtTimestamp(
   const vesselWOs = allWorkOrders.filter(wo => wo.dataScope === 'vessel');
 
   for (const wo of vesselWOs) {
-    if (wo.isExecution && wo.status !== 'Pending Approval') continue;
+    const FINALIZED = new Set(['completed', 'approved', 'closed', 'cancelled']);
+    const normalizedStatus = (wo.status || '').toLowerCase().trim();
+    if (wo.isExecution && FINALIZED.has(normalizedStatus)) continue;
 
     const job = wo.jobId ? jobsMap.get(wo.jobId) : undefined;
     const component = wo.componentCode
@@ -270,8 +289,11 @@ export async function computeMonthlyMovement(vesselId: string, year: number, mon
   let newlyOverdue = 0;
   const newlyOverdueIds: string[] = [];
 
+  const jobs = await repo.getJobs(vesselId) as unknown as JobRecord[];
+  const jobsMap = new Map(jobs.map(j => [j.juuid, j]));
+
   for (const wo of vesselWOs) {
-    const createdAt = wo.createdAt ? new Date(wo.createdAt) : null;
+    const createdAt = wo.createdAt ? new Date(wo.createdAt as string | Date) : null;
     const completionDate = parseDateAny(wo.completionDateTime);
     const woId = wo.wouuid || wo.id;
 
@@ -279,7 +301,7 @@ export async function computeMonthlyMovement(vesselId: string, year: number, mon
       newJobsEntered++;
       newJobsEnteredIds.push(woId);
 
-      if (wo.workOrderType === 'Unplanned') {
+      if (isUnplannedWO(wo)) {
         unplannedRaised++;
         unplannedRaisedIds.push(woId);
       }
@@ -292,8 +314,8 @@ export async function computeMonthlyMovement(vesselId: string, year: number, mon
       completedInMonthIds.push(woId);
     }
 
-    if (wo.isExecution && wo.status === 'Pending Approval') {
-      const execCreatedAt = wo.createdAt ? new Date(wo.createdAt) : null;
+    if (wo.isExecution) {
+      const execCreatedAt = wo.createdAt ? new Date(wo.createdAt as string | Date) : null;
       if (isInMonth(execCreatedAt)) {
         sentToPendingApproval++;
         sentToPendingApprovalIds.push(woId);
@@ -301,10 +323,8 @@ export async function computeMonthlyMovement(vesselId: string, year: number, mon
     }
 
     const dueDate = wo.dueDateSnapshot || wo.dueDate || null;
-    if (dueDate && wo.status !== 'Completed') {
-      const jobs = await repo.getJobs(vesselId) as unknown as JobRecord[];
-      const components = await repo.getComponents(vesselId) as unknown as ComponentRecord[];
-      const job = wo.jobId ? jobs.find(j => j.juuid === wo.jobId) : undefined;
+    if (dueDate && !FINALIZED.has(normalizedStatus)) {
+      const job = wo.jobId ? jobsMap.get(wo.jobId) : undefined;
       const maintenanceBasis = wo.maintenanceBasis || job?.maintenanceBasis || 'Calendar';
 
       if (maintenanceBasis === 'Calendar') {

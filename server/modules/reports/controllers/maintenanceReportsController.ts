@@ -215,9 +215,10 @@ export async function getMonthlySummaryPreview(req: Request, res: Response) {
 
     const data = await monthlySnapshotService.getMonthlySummaryData(vesselId, year, month);
     res.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching Monthly Summary preview:", error);
-    res.status(500).json({ error: "Failed to fetch report data: " + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: "Failed to fetch report data: " + message });
   }
 }
 
@@ -247,9 +248,10 @@ export async function getMonthlySummarySnapshotDetail(req: Request, res: Respons
 
     const data = await monthlySnapshotService.getSnapshotDetail(vesselId, year, month, type, category);
     res.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching snapshot detail:", error);
-    res.status(500).json({ error: "Failed to fetch snapshot detail: " + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: "Failed to fetch snapshot detail: " + message });
   }
 }
 
@@ -271,9 +273,10 @@ export async function regenerateMonthlySummarySnapshots(req: Request, res: Respo
     await monthlySnapshotService.regenerateSnapshots(vesselId, year, month);
     const data = await monthlySnapshotService.getMonthlySummaryData(vesselId, year, month);
     res.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error regenerating snapshots:", error);
-    res.status(500).json({ error: "Failed to regenerate snapshots: " + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: "Failed to regenerate snapshots: " + message });
   }
 }
 
@@ -283,7 +286,7 @@ export async function regenerateMonthlySummarySnapshots(req: Request, res: Respo
 
 export async function exportMonthlySummary(req: Request, res: Response) {
   try {
-    const { vesselId, startDate, endDate } = req.body;
+    const { vesselId, startDate } = req.body;
 
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
@@ -307,8 +310,9 @@ export async function exportMonthlySummary(req: Request, res: Response) {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error generating Monthly Maintenance Summary report:", error);
-    res.status(500).json({ error: "Failed to generate report: " + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: "Failed to generate report: " + message });
   }
 }
