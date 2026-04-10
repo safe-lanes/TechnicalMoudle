@@ -1677,7 +1677,7 @@ const RunningHours = () => {
             <Button 
               className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white" 
               onClick={handleSaveUpdate}
-              disabled={!!individualValidationError}
+              disabled={!!individualValidationError || !canEditRH}
             >
               Save
             </Button>
@@ -1828,7 +1828,7 @@ const RunningHours = () => {
             <Button 
               className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white" 
               onClick={handleBulkSave}
-              disabled={hasBulkValidationErrors}
+              disabled={hasBulkValidationErrors || !canEditRH}
             >
               Save
             </Button>
@@ -1928,7 +1928,7 @@ const RunningHours = () => {
                                   size="sm"
                                   className="h-7 w-7 p-0 text-green-600 hover:text-green-800 hover:bg-green-50"
                                   onClick={saveChildRHEdit}
-                                  disabled={updateChildRHMutation.isPending}
+                                  disabled={updateChildRHMutation.isPending || !canEditRH}
                                   title="Save"
                                   data-testid={`button-save-child-rh-${child.id}`}
                                 >
