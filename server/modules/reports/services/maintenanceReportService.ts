@@ -493,10 +493,13 @@ export async function exportOverdueJobs(vesselId: string): Promise<{ buffer: Buf
 
   const preparedData: WorkOrderRowData[] = overdueJobs.map((job, index) => {
     const isCritical = job.critical === 'YES';
-    const isRHBased = job.maintenanceBasis === 'Running Hours';
-    const daysRhOverdue = isRHBased
-      ? (job.hoursPastDue > 0 ? `${job.hoursPastDue} RH` : '-')
-      : (job.daysPastDue > 0 ? `${job.daysPastDue} days` : '-');
+    const overdueType = job.overdueType || '';
+    let daysRhOverdue = '-';
+    if (overdueType === 'RH' || overdueType === 'Both') {
+      daysRhOverdue = job.hoursPastDue > 0 ? `${job.hoursPastDue} RH` : '-';
+    } else if (overdueType === 'Calendar') {
+      daysRhOverdue = job.daysPastDue > 0 ? `${job.daysPastDue} days` : '-';
+    }
 
     return {
       sno: index + 1,

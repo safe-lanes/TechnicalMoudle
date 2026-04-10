@@ -432,10 +432,13 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         ];
 
         const data = overdueRaw.map((job: any, index: number) => {
-          const isRHBased = job.maintenanceBasis === 'Running Hours';
-          const daysRhOverdue = isRHBased
-            ? (job.hoursPastDue > 0 ? `${job.hoursPastDue} RH` : '-')
-            : (job.daysPastDue > 0 ? `${job.daysPastDue} days` : '-');
+          const overdueType = job.overdueType || '';
+          let daysRhOverdue = '-';
+          if (overdueType === 'RH' || overdueType === 'Both') {
+            daysRhOverdue = job.hoursPastDue > 0 ? `${job.hoursPastDue} RH` : '-';
+          } else if (overdueType === 'Calendar') {
+            daysRhOverdue = job.daysPastDue > 0 ? `${job.daysPastDue} days` : '-';
+          }
           return {
             sNo: index + 1,
             workOrderNo: job.workOrderNo,
