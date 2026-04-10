@@ -1182,9 +1182,9 @@ const Dashboard = () => {
       case 'critical-spares': return 'Critical Spares Low';
       case 'anomalies': return 'W.O Anomalies';
       case 'modify-pms': return 'Modify PMS Requests';
-      case 'donut-overdue': return 'Overdue Work Orders';
-      case 'donut-due': return 'Due Work Orders';
-      case 'donut-planned': return 'Planned Work Orders';
+      case 'donut-overdue': return 'Overdue Work Orders (from chart)';
+      case 'donut-due': return 'Due Work Orders (from chart)';
+      case 'donut-planned': return 'Planned Work Orders (from chart)';
       default: return 'Work Orders';
     }
   }, [selectedOpCard]);
