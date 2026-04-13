@@ -65,6 +65,7 @@ export const requireVesselAccess = (req: AuthenticatedRequest, res: Response, ne
 };
 
 export const mockAuthMiddleware = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const headerDesignation = req.headers['x-user-designation'] as string | undefined;
   req.user = {
     id: 1,
     username: "sail_admin",
@@ -76,6 +77,8 @@ export const mockAuthMiddleware = (req: AuthenticatedRequest, res: Response, nex
     vesselId: null,
     isActive: true,
     userUuid: "00000000-0000-0000-0000-000000000001",
+    crewDesignation: headerDesignation || "Marine Manager",
+    userType: "Office",
     createdAt: new Date(),
     updatedAt: new Date(),
   };

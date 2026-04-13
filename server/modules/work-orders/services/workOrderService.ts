@@ -1602,6 +1602,28 @@ export async function saveOverdueReason(id: string, overdueReason: string, overd
   return updated;
 }
 
+function buildLabelToRankIdMap(allRanks: any[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const r of allRanks) {
+    if (r.name) map.set(r.name.toLowerCase().trim(), r.rankId);
+    if (r.label) map.set(r.label.toLowerCase().trim(), r.rankId);
+  }
+  return map;
+}
+
+function filterWorkOrdersByRankIds(
+  workOrders: any[],
+  scopeRankIds: Set<string>,
+  labelToRankId: Map<string, string>
+): any[] {
+  return workOrders.filter((wo: any) => {
+    const assigned = (wo.assignedTo || '').toLowerCase().trim();
+    if (!assigned) return false;
+    const resolvedRankId = labelToRankId.get(assigned);
+    return resolvedRankId ? scopeRankIds.has(resolvedRankId) : false;
+  });
+}
+
 export async function getScopedOperationData(
   vesselId: string,
   crewDesignation: string,
@@ -1610,14 +1632,18 @@ export async function getScopedOperationData(
   const { resolveHierarchyScope, getAllRanks } = await import('../../ranks/service');
 
   const allRanks = await getAllRanks();
+  const labelToRankId = buildLabelToRankIdMap(allRanks);
   const designationLower = crewDesignation.toLowerCase().trim();
-  const matchingRanks = allRanks.filter(
-    (r: any) =>
-      r.name?.toLowerCase().trim() === designationLower ||
-      r.label?.toLowerCase().trim() === designationLower
-  );
 
-  if (matchingRanks.length === 0) {
+  const matchingRankIds = allRanks
+    .filter(
+      (r: any) =>
+        r.name?.toLowerCase().trim() === designationLower ||
+        r.label?.toLowerCase().trim() === designationLower
+    )
+    .map((r: any) => r.rankId as string);
+
+  if (matchingRankIds.length === 0) {
     return {
       workOrders: [],
       scopeMeta: {
@@ -1636,37 +1662,25 @@ export async function getScopedOperationData(
   const allWOs = await listWorkOrders(vesselId);
 
   if (!scope.hasMapping) {
-    const directMatchSet = new Set(
-      matchingRanks
-        .flatMap((r: any) => [r.name, r.label].filter(Boolean))
-        .map((s: string) => s.toLowerCase().trim())
-    );
-    const meWOs = allWOs.filter((wo: any) => {
-      const assigned = (wo.assignedTo || '').toLowerCase().trim();
-      return directMatchSet.has(assigned);
-    });
+    const fallbackRankIdSet = new Set(matchingRankIds);
+    const meWOs = filterWorkOrdersByRankIds(allWOs, fallbackRankIdSet, labelToRankId);
     return {
       workOrders: meWOs,
       scopeMeta: {
         hasMapping: false,
         hasDescendants: false,
         mode,
-        appliedRankIds: matchingRanks.map((r: any) => r.rankId),
+        appliedRankIds: matchingRankIds,
         scopedResourceTypes: ['workOrders'] as string[],
         unscopedResourceTypes: ['spares', 'anomalies', 'changeRequests'] as string[],
-        fallback: 'designation-direct-match',
+        fallback: 'designation-rankId-match',
       },
     };
   }
 
   const bucket = mode === 'me' ? scope.me : scope.myTeam;
-  const scopeSet = new Set(
-    bucket.assignmentKeys.map((k: string) => k.toLowerCase().trim())
-  );
-  const filteredWOs = allWOs.filter((wo: any) => {
-    const assigned = (wo.assignedTo || '').toLowerCase().trim();
-    return scopeSet.has(assigned);
-  });
+  const scopeRankIdSet = new Set(bucket.rankIds);
+  const filteredWOs = filterWorkOrdersByRankIds(allWOs, scopeRankIdSet, labelToRankId);
 
   return {
     workOrders: filteredWOs,
