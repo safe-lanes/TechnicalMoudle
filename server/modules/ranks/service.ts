@@ -1,6 +1,6 @@
 import * as repo from './repository';
 import { getPostgresClient } from '../../postgresClient';
-import { admAvailableRanks, admVesselOrgChart, vesselOrgChartNodes } from '@shared/schema';
+import { admAvailableRanks, admVesselOrgChart, vesselOrgChartNodes, masterLists } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 
 export async function getAllRanks() {
@@ -386,7 +386,19 @@ export async function deleteVesselOrgChartNode(vesselId: string, nodeUuid: strin
 export async function getVesselDepartmentConfig(vesselId: string) {
   if (!vesselId) throw createHttpError("vesselId required", 400);
   const configs = await repo.getVesselDepartmentConfig(vesselId);
-  return configs || [];
+  if (configs && configs.length > 0) return configs;
+
+  const postgres = getPostgresClient();
+  if (!postgres) return [];
+  const depts = await postgres.db.select().from(masterLists).where(
+    and(eq(masterLists.listType, 'department'), eq(masterLists.isActive, true))
+  );
+  return depts.map((d: any, i: number) => ({
+    vesselId,
+    department: d.listValue,
+    isEnabled: true,
+    sortOrder: d.displayOrder ?? i,
+  }));
 }
 
 export async function saveVesselDepartmentConfig(vesselId: string, configs: { department: string; isEnabled: boolean; sortOrder: number }[]) {

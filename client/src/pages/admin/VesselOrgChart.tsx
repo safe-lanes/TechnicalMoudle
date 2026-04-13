@@ -421,10 +421,12 @@ export default function VesselOrgChart() {
     setNodes(prev => {
       const target = prev.find(n => n.nodeUuid === nodeUuid);
       if (!target) return prev;
-      if (target.isHod && parentNodeUuid !== null) return prev;
       if (parentNodeUuid !== null) {
         const parent = prev.find(n => n.nodeUuid === parentNodeUuid);
-        if (parent && parent.department !== target.department) return prev;
+        if (!parent) return prev;
+        const targetLayer = target.nodeLayer;
+        const parentLayer = parent.nodeLayer;
+        if (targetLayer === 'department' && parentLayer === 'department' && parent.department !== target.department) return prev;
       }
       return prev.map(n => n.nodeUuid === nodeUuid ? { ...n, parentNodeUuid } : n);
     });
@@ -467,9 +469,9 @@ export default function VesselOrgChart() {
       if (dropped.isHod && position === 'child') return prev;
 
       if (position === 'child') {
-        if (target.department !== dropped.department) return prev;
+        if (dropped.nodeLayer === 'department' && target.nodeLayer === 'department' && target.department !== dropped.department) return prev;
         const childrenOfTarget = prev
-          .filter(n => n.parentNodeUuid === targetUuid && n.department === target.department)
+          .filter(n => n.parentNodeUuid === targetUuid)
           .sort((a, b) => a.sortOrder - b.sortOrder);
         const newSort = childrenOfTarget.length + 1;
         return prev.map(n => n.nodeUuid === droppedUuid
@@ -478,7 +480,7 @@ export default function VesselOrgChart() {
         );
       }
 
-      if (target.department !== dropped.department) return prev;
+      if (dropped.nodeLayer === 'department' && target.nodeLayer === 'department' && target.department !== dropped.department) return prev;
       const newParent = target.parentNodeUuid;
       const siblings = prev
         .filter(n => n.department === target.department && n.parentNodeUuid === newParent && n.nodeUuid !== droppedUuid)
@@ -692,9 +694,11 @@ export default function VesselOrgChart() {
     const indent = depth * 24;
     const isEditingLabel = editingLabelNodeUuid === node.nodeUuid;
     const descendants = getDescendants(node.nodeUuid, deptNodes);
-    const possibleParents = deptNodes.filter(
+    const sameDeptParents = deptNodes.filter(
       n => n.nodeUuid !== node.nodeUuid && !descendants.has(n.nodeUuid)
     );
+    const crossLayerParents = overallHeadNodes.filter(n => n.nodeUuid !== node.nodeUuid);
+    const possibleParents = [...crossLayerParents, ...sameDeptParents];
 
     return (
       <div key={node.nodeUuid} data-testid={`dept-node-${node.nodeUuid}`}>
@@ -839,9 +843,20 @@ export default function VesselOrgChart() {
     );
   };
 
+  const getLayerParentOptions = useCallback((node: OrgNode): OrgNode[] => {
+    if (node.nodeLayer === 'overall-head') {
+      return nodes.filter(n => n.nodeLayer === 'supervisory' && n.isAssigned && n.nodeUuid !== node.nodeUuid);
+    }
+    if (node.nodeLayer === 'supervisory') {
+      return [];
+    }
+    return [];
+  }, [nodes]);
+
   const renderLayerNode = (node: OrgNode, layer: NodeLayer) => {
     const label = getRankDisplay(node.rankId, node.nodeLabel);
     const isEditingLabel = editingLabelNodeUuid === node.nodeUuid;
+    const parentOptions = getLayerParentOptions(node);
 
     return (
       <div key={node.nodeUuid} className="flex items-center py-1.5 px-2 hover:bg-gray-50 rounded transition-colors group" data-testid={`layer-node-${node.nodeUuid}`}>
@@ -879,6 +894,25 @@ export default function VesselOrgChart() {
               <Pencil className="h-3 w-3" />
             </button>
           </div>
+        )}
+
+        {parentOptions.length > 0 && (
+          <Select
+            value={node.parentNodeUuid || "__none__"}
+            onValueChange={(v) => setParentNode(node.nodeUuid, v === "__none__" ? null : v)}
+          >
+            <SelectTrigger className="h-6 w-[120px] ml-1.5 text-[10px]" data-testid={`parent-select-${node.nodeUuid}`}>
+              <SelectValue placeholder="Root" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Root</SelectItem>
+              {parentOptions.map(p => (
+                <SelectItem key={p.nodeUuid} value={p.nodeUuid}>
+                  {getRankDisplay(p.rankId, p.nodeLabel)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
 
         <Select
@@ -1092,8 +1126,42 @@ export default function VesselOrgChart() {
     </div>
   );
 
+  const buildUnifiedTree = useCallback((allNodes: OrgNode[]): TreeNode[] => {
+    const nodeMap = new Map<string, TreeNode>();
+    allNodes.forEach(n => nodeMap.set(n.nodeUuid, { node: n, children: [] }));
+    const roots: TreeNode[] = [];
+    allNodes.forEach(n => {
+      const treeNode = nodeMap.get(n.nodeUuid)!;
+      if (n.parentNodeUuid && nodeMap.has(n.parentNodeUuid)) {
+        nodeMap.get(n.parentNodeUuid)!.children.push(treeNode);
+      } else {
+        roots.push(treeNode);
+      }
+    });
+    const layerOrder: Record<string, number> = { 'supervisory': 0, 'overall-head': 1, 'department': 2 };
+    const sortFn = (arr: TreeNode[]) => {
+      arr.sort((a, b) => {
+        const la = layerOrder[a.node.nodeLayer] ?? 2;
+        const lb = layerOrder[b.node.nodeLayer] ?? 2;
+        if (la !== lb) return la - lb;
+        if (a.node.isHod !== b.node.isHod) return a.node.isHod ? -1 : 1;
+        return a.node.sortOrder - b.node.sortOrder;
+      });
+      arr.forEach(t => sortFn(t.children));
+    };
+    sortFn(roots);
+    return roots;
+  }, []);
+
   const renderArea3 = () => {
-    const allAssigned = overallHeadNodes.length + supervisoryNodes.length + assignedNodes.length;
+    const allAssigned = [...supervisoryNodes, ...overallHeadNodes, ...assignedNodes];
+    const enabledDeptSet = new Set(enabledDepartments);
+    const filteredAssigned = allAssigned.filter(n => {
+      if (n.nodeLayer !== 'department') return true;
+      return n.department && enabledDeptSet.has(n.department);
+    });
+    const unifiedTree = buildUnifiedTree(filteredAssigned);
+
     return (
       <div className="flex flex-col h-full min-h-0" data-testid="area-preview">
         <div className="flex-shrink-0 p-3 border-b bg-gray-50">
@@ -1102,58 +1170,9 @@ export default function VesselOrgChart() {
           </h3>
         </div>
         <div className="flex-1 overflow-y-auto thin-scrollbar p-3">
-          {overallHeadNodes.length > 0 && (
-            <div className="mb-4" data-testid="preview-overall-head">
-              <h4 className="text-xs font-semibold uppercase tracking-wider mb-1.5 pb-1 border-b text-rose-600 flex items-center gap-1">
-                <Crown className="h-3 w-3" /> Overall Head
-              </h4>
-              {overallHeadNodes.map(n => (
-                <div key={n.nodeUuid} className="flex items-center py-1" data-testid={`preview-node-${n.nodeUuid}`}>
-                  <span className={cn("inline-block px-3 py-1 rounded text-white text-xs font-medium whitespace-nowrap", LAYER_COLORS['overall-head'])}>
-                    {getRankDisplay(n.rankId, n.nodeLabel)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {supervisoryNodes.length > 0 && (
-            <div className="mb-4" data-testid="preview-supervisory">
-              <h4 className="text-xs font-semibold uppercase tracking-wider mb-1.5 pb-1 border-b text-slate-600 flex items-center gap-1">
-                <Building2 className="h-3 w-3" /> Supervisory / Shore
-              </h4>
-              {supervisoryNodes.map(n => (
-                <div key={n.nodeUuid} className="flex items-center py-1" data-testid={`preview-node-${n.nodeUuid}`}>
-                  <span className={cn("inline-block px-3 py-1 rounded text-white text-xs font-medium whitespace-nowrap", LAYER_COLORS['supervisory'])}>
-                    {getRankDisplay(n.rankId, n.nodeLabel)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {enabledDepartments.map(dept => {
-            const deptNodes = nodesByDept.get(dept);
-            if (!deptNodes || deptNodes.length === 0) return null;
-            const tree = buildTree(deptNodes);
-            return (
-              <div key={dept} className="mb-4" data-testid={`preview-dept-${dept}`}>
-                <h4 className={cn("text-xs font-semibold uppercase tracking-wider mb-1.5 pb-1 border-b", "text-gray-600")}>
-                  {dept}
-                  {(() => {
-                    const hod = deptNodes.find(n => n.isHod);
-                    return hod ? (
-                      <span className="ml-2 text-[10px] font-normal text-yellow-600 normal-case">
-                        HOD: {getRankDisplay(hod.rankId, hod.nodeLabel)}
-                      </span>
-                    ) : null;
-                  })()}
-                </h4>
-                {tree.map(rootNode => renderPreviewNode(rootNode, 0))}
-              </div>
-            );
-          })}
-          {allAssigned === 0 && (
+          {filteredAssigned.length > 0 ? (
+            unifiedTree.map(rootNode => renderPreviewNode(rootNode, 0))
+          ) : (
             <div className="text-center py-8 text-gray-400 text-xs" data-testid="text-preview-empty">
               No assigned ranks yet. Create and assign ranks to departments to see the hierarchy preview.
             </div>
