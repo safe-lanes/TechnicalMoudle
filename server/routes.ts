@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import * as fs from "fs";
 import * as path from "path";
 import moduleRouter from "./modules";
-import { mockAuthMiddleware, setMockUserDesignation, getMockUserDesignation } from "./middleware/auth";
+import { mockAuthMiddleware } from "./middleware/auth";
 import { ensureMaintenanceHistoryImmutability } from "./initDb";
 import { getSeedDefectsData, ALL_SEED_IDS } from "./modules/defects/services/seedData";
 
@@ -25,18 +25,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // This populates req.user with an admin user for testing purposes
   app.use('/technical/api', mockAuthMiddleware);
   console.log('🔒 Mock authentication enabled for /technical/api/* routes');
-
-  app.post('/technical/api/dev/mock-user-designation', (req, res) => {
-    const { designation } = req.body;
-    if (!designation || typeof designation !== 'string') {
-      return res.status(400).json({ error: 'designation string required' });
-    }
-    setMockUserDesignation(designation.trim());
-    res.json({ designation: getMockUserDesignation() });
-  });
-  app.get('/technical/api/dev/mock-user-designation', (_req, res) => {
-    res.json({ designation: getMockUserDesignation() });
-  });
 
   // Mount modular architecture router (modules extracted from routes.ts go here)
   app.use('/technical/api', moduleRouter);

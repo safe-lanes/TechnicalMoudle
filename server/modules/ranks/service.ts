@@ -417,7 +417,7 @@ export async function resolveHierarchyScope(vesselId: string, crewDesignation: s
 
   const nodes = await repo.getVesselOrgChartNodes(vesselId);
   if (!nodes || nodes.length === 0) {
-    return { vesselId, hasMapping: false, hasDescendants: false, me: { nodeUuids: [], rankIds: [], assignmentKeys: [] }, myTeam: { nodeUuids: [], rankIds: [], assignmentKeys: [] } };
+    return { vesselId, hasMapping: false, hasDescendants: false, me: { nodeUuids: [], rankIds: [] }, myTeam: { nodeUuids: [], rankIds: [] } };
   }
 
   const designationLower = crewDesignation.toLowerCase().trim();
@@ -427,7 +427,7 @@ export async function resolveHierarchyScope(vesselId: string, crewDesignation: s
   );
 
   if (matchingRanks.length === 0) {
-    return { vesselId, hasMapping: false, hasDescendants: false, me: { nodeUuids: [], rankIds: [], assignmentKeys: [] }, myTeam: { nodeUuids: [], rankIds: [], assignmentKeys: [] } };
+    return { vesselId, hasMapping: false, hasDescendants: false, me: { nodeUuids: [], rankIds: [] }, myTeam: { nodeUuids: [], rankIds: [] } };
   }
 
   const matchingRankIds = new Set(matchingRanks.map(r => r.rankId));
@@ -436,13 +436,7 @@ export async function resolveHierarchyScope(vesselId: string, crewDesignation: s
   const meNodes = assignedNodes.filter(n => matchingRankIds.has(n.rankId));
 
   if (meNodes.length === 0) {
-    return { vesselId, hasMapping: false, hasDescendants: false, me: { nodeUuids: [], rankIds: [], assignmentKeys: [] }, myTeam: { nodeUuids: [], rankIds: [], assignmentKeys: [] } };
-  }
-
-  const rankIdToLabels = new Map<string, string[]>();
-  for (const r of allRanks) {
-    const labels = [r.name, r.label].filter(Boolean) as string[];
-    rankIdToLabels.set(r.rankId, labels);
+    return { vesselId, hasMapping: false, hasDescendants: false, me: { nodeUuids: [], rankIds: [] }, myTeam: { nodeUuids: [], rankIds: [] } };
   }
 
   const nodeByUuid = new Map(assignedNodes.map(n => [n.nodeUuid, n]));
@@ -472,20 +466,12 @@ export async function resolveHierarchyScope(vesselId: string, crewDesignation: s
 
   const meUuids = meNodes.map(n => n.nodeUuid);
   const meRankIds = new Set(meNodes.map(n => n.rankId));
-  const meLabels = new Set<string>();
-  for (const rid of meRankIds) {
-    for (const l of (rankIdToLabels.get(rid) || [])) meLabels.add(l);
-  }
 
   const teamUuids = collectDescendants(meUuids);
   const teamRankIds = new Set<string>();
   for (const uuid of teamUuids) {
     const node = nodeByUuid.get(uuid);
     if (node) teamRankIds.add(node.rankId);
-  }
-  const teamLabels = new Set<string>();
-  for (const rid of teamRankIds) {
-    for (const l of (rankIdToLabels.get(rid) || [])) teamLabels.add(l);
   }
 
   const hasDescendants = teamUuids.size > meUuids.length;
@@ -494,8 +480,8 @@ export async function resolveHierarchyScope(vesselId: string, crewDesignation: s
     vesselId,
     hasMapping: true,
     hasDescendants,
-    me: { nodeUuids: meUuids, rankIds: Array.from(meRankIds), assignmentKeys: Array.from(meLabels) },
-    myTeam: { nodeUuids: Array.from(teamUuids), rankIds: Array.from(teamRankIds), assignmentKeys: Array.from(teamLabels) },
+    me: { nodeUuids: meUuids, rankIds: Array.from(meRankIds) },
+    myTeam: { nodeUuids: Array.from(teamUuids), rankIds: Array.from(teamRankIds) },
   };
 }
 

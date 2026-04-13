@@ -4,7 +4,6 @@ import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/rea
 import { format } from "date-fns";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
-import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -384,7 +383,6 @@ const Dashboard = () => {
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isHeadOfDept, isVessel } = useUIRole();
   const { toast } = useToast();
-  const { currentUser } = useAuth();
   const queryClient = useQueryClient();
 
   const [mgmtVesselId, setMgmtVesselId] = useState<string>(vesselId);
@@ -418,18 +416,8 @@ const Dashboard = () => {
     scopeMeta: ScopeMeta;
   }
 
-  useEffect(() => {
-    if (currentUser?.crewDesignation) {
-      fetch('/technical/api/dev/mock-user-designation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ designation: currentUser.crewDesignation }),
-      }).catch(() => {});
-    }
-  }, [currentUser?.crewDesignation]);
-
   const { data: scopedResponse } = useQuery<ScopedOperationResponse>({
-    queryKey: ['/technical/api/scoped-operation-data', effectiveVesselId, hodScope, currentUser?.crewDesignation],
+    queryKey: ['/technical/api/scoped-operation-data', effectiveVesselId, hodScope],
     queryFn: async () => {
       const response = await fetch(
         `/technical/api/scoped-operation-data/${effectiveVesselId}?mode=${hodScope}`
@@ -437,12 +425,12 @@ const Dashboard = () => {
       if (!response.ok) throw new Error('Failed to fetch scoped operation data');
       return response.json();
     },
-    enabled: !!effectiveVesselId && !isAllVessels && !!currentUser?.crewDesignation,
+    enabled: !!effectiveVesselId && !isAllVessels,
   });
 
   const scopeMeta = scopedResponse?.scopeMeta ?? null;
-  const hasValidScope = !!scopeMeta;
-  const toggleDisabled = !!scopeMeta && !scopeMeta.hasMapping && !scopeMeta.fallback;
+  const hasValidScope = !!scopedResponse;
+  const toggleDisabled = !scopeMeta || (!scopeMeta.hasMapping && !scopeMeta.fallback);
 
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
@@ -1140,11 +1128,14 @@ const Dashboard = () => {
   const completionRate = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.completed / workOrderKPIs.total) * 100) : 0;
 
   const operationWOs = useMemo(() => {
-    if (hasValidScope && scopedResponse) {
+    if (isAllVessels) {
+      return workOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
+    }
+    if (scopedResponse) {
       return scopedResponse.workOrders.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
     }
-    return workOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
-  }, [hasValidScope, scopedResponse, workOrdersData]);
+    return [];
+  }, [isAllVessels, scopedResponse, workOrdersData]);
 
   const operationDonutData = useMemo(() => {
     const safeWOs = operationWOs;
@@ -1194,7 +1185,7 @@ const Dashboard = () => {
     });
     const plannedTodayCount = plannedTodayWOs.length;
 
-    const effectiveSpares = hasValidScope && scopedResponse ? scopedResponse.spares : sparesData;
+    const effectiveSpares = isAllVessels ? sparesData : (scopedResponse ? scopedResponse.spares : []);
     const criticalSparesLowList = effectiveSpares.filter(spare => {
       const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes';
       if (!isCritical) return false;
@@ -1209,9 +1200,9 @@ const Dashboard = () => {
     );
     const pendingApprovalCount = pendingApprovalWOs.length;
 
-    const effectiveAnomalyIndicators = hasValidScope && scopedResponse
-      ? scopedResponse.anomalyIndicators
-      : (complianceAnomalies || null);
+    const effectiveAnomalyIndicators = isAllVessels
+      ? (complianceAnomalies || null)
+      : (scopedResponse ? scopedResponse.anomalyIndicators : null);
     const anomalyCount = effectiveAnomalyIndicators ? [
       effectiveAnomalyIndicators.cycleSkipRate,
       effectiveAnomalyIndicators.backdatingFrequency,
@@ -1219,7 +1210,7 @@ const Dashboard = () => {
       effectiveAnomalyIndicators.scheduleDrift,
     ].map(s => typeof s === 'object' ? (s as any).severity : s).filter(s => s !== 'green').length : 0;
 
-    const effectiveChangeRequests = hasValidScope && scopedResponse ? scopedResponse.changeRequests : changeRequestsData;
+    const effectiveChangeRequests = isAllVessels ? changeRequestsData : (scopedResponse ? scopedResponse.changeRequests : []);
     const openChangeRequestsList = effectiveChangeRequests.filter(cr => {
       const s = cr.status?.toLowerCase();
       return s !== 'approved' && s !== 'rejected';
