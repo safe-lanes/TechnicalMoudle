@@ -217,9 +217,9 @@ export async function saveVesselDepartmentConfig(req: Request, res: Response) {
 export async function getHierarchyScope(req: Request, res: Response) {
   try {
     const { vesselId } = req.params;
-    const crewDesignation = req.query.crewDesignation as string;
+    const crewDesignation = req.headers['x-user-designation'] as string;
     if (!vesselId) return res.status(400).json({ error: "vesselId required" });
-    if (!crewDesignation) return res.status(400).json({ error: "crewDesignation query parameter required" });
+    if (!crewDesignation) return res.status(400).json({ error: "X-User-Designation header required" });
     const result = await service.resolveHierarchyScope(vesselId, crewDesignation);
     res.json(result);
   } catch (error: any) {

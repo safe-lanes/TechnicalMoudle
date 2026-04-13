@@ -405,21 +405,28 @@ const Dashboard = () => {
   interface HierarchyScope {
     vesselId: string;
     hasMapping: boolean;
-    me: { nodeUuids: string[]; assignmentKeys: string[] };
-    myTeam: { nodeUuids: string[]; assignmentKeys: string[] };
+    me: { nodeUuids: string[]; rankIds: string[]; assignmentKeys: string[] };
+    myTeam: { nodeUuids: string[]; rankIds: string[]; assignmentKeys: string[] };
   }
 
   const { data: hierarchyScope } = useQuery<HierarchyScope>({
     queryKey: ['/technical/api/hierarchy-scope', effectiveVesselId, currentUser?.crewDesignation],
     queryFn: async () => {
       const response = await fetch(
-        `/technical/api/hierarchy-scope/${effectiveVesselId}?crewDesignation=${encodeURIComponent(currentUser?.crewDesignation || '')}`
+        `/technical/api/hierarchy-scope/${effectiveVesselId}`,
+        { headers: { 'X-User-Designation': currentUser?.crewDesignation || '' } }
       );
       if (!response.ok) throw new Error('Failed to fetch hierarchy scope');
       return response.json();
     },
     enabled: !!effectiveVesselId && !isAllVessels && !!currentUser?.crewDesignation,
   });
+
+  const scopeAssignmentKeys = useMemo(() => {
+    if (!hierarchyScope?.hasMapping) return null;
+    const keys = hodScope === 'me' ? hierarchyScope.me.assignmentKeys : hierarchyScope.myTeam.assignmentKeys;
+    return keys.length > 0 ? keys : null;
+  }, [hierarchyScope, hodScope]);
 
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
@@ -433,6 +440,19 @@ const Dashboard = () => {
       return await response.json();
     },
     enabled: !!effectiveVesselId
+  });
+
+  const { data: scopedWorkOrdersData = [], isLoading: isScopedWOsLoading } = useQuery<WorkOrder[]>({
+    queryKey: ['/technical/api/work-orders', effectiveVesselId, 'scoped', scopeAssignmentKeys],
+    queryFn: async () => {
+      const scopeParam = scopeAssignmentKeys!.join(',');
+      const response = await fetch(
+        `/technical/api/work-orders?vesselId=${effectiveVesselId}&assignmentScope=${encodeURIComponent(scopeParam)}`
+      );
+      if (!response.ok) throw new Error('Failed to fetch scoped work orders');
+      return response.json();
+    },
+    enabled: !!effectiveVesselId && !isAllVessels && !!scopeAssignmentKeys,
   });
 
   // Fetch spares data - for all vessels, fetch each vessel's spares and combine
@@ -1116,8 +1136,15 @@ const Dashboard = () => {
     : 0;
   const completionRate = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.completed / workOrderKPIs.total) * 100) : 0;
 
+  const operationWOs = useMemo(() => {
+    if (scopeAssignmentKeys) {
+      return scopedWorkOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
+    }
+    return workOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
+  }, [scopeAssignmentKeys, scopedWorkOrdersData, workOrdersData]);
+
   const operationDonutData = useMemo(() => {
-    const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
+    const safeWOs = operationWOs;
     const overdue = safeWOs.filter(wo => (wo as EnrichedWorkOrder).computedStatus === 'Overdue').length;
     const due = safeWOs.filter(wo => {
       const s = (wo as EnrichedWorkOrder).computedStatus;
@@ -1132,24 +1159,10 @@ const Dashboard = () => {
       { status: 'Due', count: due, color: '#FF964f' },
       { status: 'Scheduled', count: planned, color: '#9E9E9E' },
     ].filter(d => d.count > 0);
-  }, [workOrdersData]);
-
-  const scopeFilteredWOs = useMemo(() => {
-    const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
-    if (!hierarchyScope?.hasMapping) return safeWOs;
-
-    const keys = hodScope === 'me' ? hierarchyScope.me.assignmentKeys : hierarchyScope.myTeam.assignmentKeys;
-    if (keys.length === 0) return safeWOs;
-
-    const keySet = new Set(keys.map(k => k.toLowerCase().trim()));
-    return safeWOs.filter(wo => {
-      const assigned = (wo.assignedTo || '').toLowerCase().trim();
-      return keySet.has(assigned);
-    });
-  }, [workOrdersData, hierarchyScope, hodScope]);
+  }, [operationWOs]);
 
   const operationKPIs = useMemo(() => {
-    const safeWOs = scopeFilteredWOs;
+    const safeWOs = operationWOs;
     const overdueWOs = safeWOs.filter(wo => (wo as EnrichedWorkOrder).computedStatus === 'Overdue');
     const overdueCount = overdueWOs.length;
 
@@ -1222,7 +1235,7 @@ const Dashboard = () => {
       openChangeRequests,
       openChangeRequestsList,
     };
-  }, [scopeFilteredWOs, sparesData, changeRequestsData, complianceAnomalies]);
+  }, [operationWOs, sparesData, changeRequestsData, complianceAnomalies]);
 
   const operationTableData = useMemo(() => {
     switch (selectedOpCard) {

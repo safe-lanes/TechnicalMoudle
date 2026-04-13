@@ -417,7 +417,7 @@ export async function resolveHierarchyScope(vesselId: string, crewDesignation: s
 
   const nodes = await repo.getVesselOrgChartNodes(vesselId);
   if (!nodes || nodes.length === 0) {
-    return { vesselId, hasMapping: false, me: { nodeUuids: [], assignmentKeys: [] }, myTeam: { nodeUuids: [], assignmentKeys: [] } };
+    return { vesselId, hasMapping: false, me: { nodeUuids: [], rankIds: [], assignmentKeys: [] }, myTeam: { nodeUuids: [], rankIds: [], assignmentKeys: [] } };
   }
 
   const designationLower = crewDesignation.toLowerCase().trim();
@@ -427,7 +427,7 @@ export async function resolveHierarchyScope(vesselId: string, crewDesignation: s
   );
 
   if (matchingRanks.length === 0) {
-    return { vesselId, hasMapping: false, me: { nodeUuids: [], assignmentKeys: [] }, myTeam: { nodeUuids: [], assignmentKeys: [] } };
+    return { vesselId, hasMapping: false, me: { nodeUuids: [], rankIds: [], assignmentKeys: [] }, myTeam: { nodeUuids: [], rankIds: [], assignmentKeys: [] } };
   }
 
   const matchingRankIds = new Set(matchingRanks.map(r => r.rankId));
@@ -436,7 +436,7 @@ export async function resolveHierarchyScope(vesselId: string, crewDesignation: s
   const meNodes = assignedNodes.filter(n => matchingRankIds.has(n.rankId));
 
   if (meNodes.length === 0) {
-    return { vesselId, hasMapping: false, me: { nodeUuids: [], assignmentKeys: [] }, myTeam: { nodeUuids: [], assignmentKeys: [] } };
+    return { vesselId, hasMapping: false, me: { nodeUuids: [], rankIds: [], assignmentKeys: [] }, myTeam: { nodeUuids: [], rankIds: [], assignmentKeys: [] } };
   }
 
   const rankIdToLabels = new Map<string, string[]>();
@@ -491,7 +491,7 @@ export async function resolveHierarchyScope(vesselId: string, crewDesignation: s
   return {
     vesselId,
     hasMapping: true,
-    me: { nodeUuids: meUuids, assignmentKeys: Array.from(meLabels) },
-    myTeam: { nodeUuids: Array.from(teamUuids), assignmentKeys: Array.from(teamLabels) },
+    me: { nodeUuids: meUuids, rankIds: Array.from(meRankIds), assignmentKeys: Array.from(meLabels) },
+    myTeam: { nodeUuids: Array.from(teamUuids), rankIds: Array.from(teamRankIds), assignmentKeys: Array.from(teamLabels) },
   };
 }
