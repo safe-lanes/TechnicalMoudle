@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -10,8 +9,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Plus, Save, Loader2, ChevronUp, ChevronDown, ArrowLeft,
-  Network, Star, X, Search, Users, Eye, GripVertical, Trash2
+  Network, Star, X, Search, Users, Eye, GripVertical, Trash2,
+  AlertTriangle, Pencil, Check
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -73,9 +83,13 @@ export default function VesselOrgChart() {
   const [selectedVesselId, setSelectedVesselId] = useState<string>("");
   const [nodes, setNodes] = useState<OrgNode[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
   const [rankSearch, setRankSearch] = useState("");
   const [activeDept, setActiveDept] = useState<string | null>(null);
+  const [deleteConfirmNode, setDeleteConfirmNode] = useState<OrgNode | null>(null);
+  const [editingLabelNodeUuid, setEditingLabelNodeUuid] = useState<string | null>(null);
+  const [editingLabelValue, setEditingLabelValue] = useState("");
+  const [draggedNodeUuid, setDraggedNodeUuid] = useState<string | null>(null);
+  const [dragOverDept, setDragOverDept] = useState<string | null>(null);
 
   const { data: savedRanks = [] } = useQuery<RankRow[]>({
     queryKey: ['/technical/api/admin/available-ranks'],
@@ -97,7 +111,6 @@ export default function VesselOrgChart() {
       setNodes(savedNodes.map(n => ({ ...n })));
       setHasUnsavedChanges(false);
       const depts = new Set(savedNodes.filter(n => n.department).map(n => n.department!));
-      setExpandedDepts(depts);
       if (depts.size > 0 && !activeDept) {
         setActiveDept([...depts][0]);
       }
@@ -213,7 +226,7 @@ export default function VesselOrgChart() {
         sortOrder: deptNodes.length + 1,
       };
     }));
-    setExpandedDepts(prev => new Set([...prev, department]));
+    if (!activeDept) setActiveDept(department);
     setHasUnsavedChanges(true);
   };
 
@@ -228,12 +241,37 @@ export default function VesselOrgChart() {
     setHasUnsavedChanges(true);
   };
 
-  const removeNodePermanently = (nodeUuid: string) => {
+  const confirmDeleteNode = (node: OrgNode) => {
+    setDeleteConfirmNode(node);
+  };
+
+  const executeDeleteNode = () => {
+    if (!deleteConfirmNode) return;
+    const nodeUuid = deleteConfirmNode.nodeUuid;
     setNodes(prev => prev.filter(n => n.nodeUuid !== nodeUuid).map(n => {
       if (n.parentNodeUuid === nodeUuid) return { ...n, parentNodeUuid: null };
       return n;
     }));
     setHasUnsavedChanges(true);
+    setDeleteConfirmNode(null);
+  };
+
+  const startEditLabel = (node: OrgNode) => {
+    setEditingLabelNodeUuid(node.nodeUuid);
+    setEditingLabelValue(node.nodeLabel || "");
+  };
+
+  const commitEditLabel = () => {
+    if (editingLabelNodeUuid && editingLabelValue.trim()) {
+      updateNodeField(editingLabelNodeUuid, 'nodeLabel', editingLabelValue.trim());
+    }
+    setEditingLabelNodeUuid(null);
+    setEditingLabelValue("");
+  };
+
+  const cancelEditLabel = () => {
+    setEditingLabelNodeUuid(null);
+    setEditingLabelValue("");
   };
 
   const toggleHod = (nodeUuid: string, department: string) => {
@@ -379,7 +417,17 @@ export default function VesselOrgChart() {
             {unassignedNodes.map(node => (
               <div
                 key={node.nodeUuid}
-                className="flex items-center justify-between p-2 mb-1 bg-white rounded border hover:border-blue-300 transition-colors group"
+                draggable
+                onDragStart={(e) => {
+                  setDraggedNodeUuid(node.nodeUuid);
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', node.nodeUuid);
+                }}
+                onDragEnd={() => { setDraggedNodeUuid(null); setDragOverDept(null); }}
+                className={cn(
+                  "flex items-center justify-between p-2 mb-1 bg-white rounded border hover:border-blue-300 transition-colors group cursor-grab active:cursor-grabbing",
+                  draggedNodeUuid === node.nodeUuid && "opacity-50"
+                )}
                 data-testid={`unassigned-node-${node.nodeUuid}`}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -399,7 +447,7 @@ export default function VesselOrgChart() {
                     </SelectContent>
                   </Select>
                   <button
-                    onClick={() => removeNodePermanently(node.nodeUuid)}
+                    onClick={() => confirmDeleteNode(node)}
                     className="text-red-400 hover:text-red-600 p-0.5"
                     data-testid={`delete-node-${node.nodeUuid}`}
                   >
@@ -416,7 +464,12 @@ export default function VesselOrgChart() {
           {availableRanksForAdd.map(rank => (
             <div
               key={rank.rankId}
-              className="flex items-center justify-between p-1.5 mb-0.5 hover:bg-blue-50 rounded cursor-pointer transition-colors group"
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = 'copy';
+                e.dataTransfer.setData('application/rank-id', rank.rankId);
+              }}
+              className="flex items-center justify-between p-1.5 mb-0.5 hover:bg-blue-50 rounded cursor-grab active:cursor-grabbing transition-colors group"
               data-testid={`rank-catalog-${rank.rankId}`}
             >
               <div className="flex items-center gap-1.5 min-w-0">
@@ -447,6 +500,7 @@ export default function VesselOrgChart() {
     const { node } = treeNode;
     const label = getRankDisplay(node.rankId, node.nodeLabel);
     const indent = depth * 24;
+    const isEditingLabel = editingLabelNodeUuid === node.nodeUuid;
     const descendants = getDescendants(node.nodeUuid, deptNodes);
     const possibleParents = deptNodes.filter(
       n => n.nodeUuid !== node.nodeUuid && !descendants.has(n.nodeUuid)
@@ -467,9 +521,41 @@ export default function VesselOrgChart() {
             </button>
           </div>
 
-          <span className={cn("inline-block px-2.5 py-0.5 rounded text-white text-xs font-medium whitespace-nowrap", getDeptColor(node.department))}>
-            {label}
-          </span>
+          {isEditingLabel ? (
+            <div className="flex items-center gap-1">
+              <Input
+                value={editingLabelValue}
+                onChange={(e) => setEditingLabelValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitEditLabel();
+                  if (e.key === 'Escape') cancelEditLabel();
+                }}
+                className="h-6 w-[140px] text-xs px-2"
+                autoFocus
+                data-testid={`input-label-${node.nodeUuid}`}
+              />
+              <button onClick={commitEditLabel} className="text-green-500 hover:text-green-700 p-0.5" data-testid={`save-label-${node.nodeUuid}`}>
+                <Check className="h-3 w-3" />
+              </button>
+              <button onClick={cancelEditLabel} className="text-gray-400 hover:text-gray-600 p-0.5" data-testid={`cancel-label-${node.nodeUuid}`}>
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <span className={cn("inline-block px-2.5 py-0.5 rounded text-white text-xs font-medium whitespace-nowrap", getDeptColor(node.department))}>
+                {label}
+              </span>
+              <button
+                onClick={() => startEditLabel(node)}
+                className="text-gray-300 hover:text-blue-500 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Edit label"
+                data-testid={`edit-label-${node.nodeUuid}`}
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            </div>
+          )}
 
           <button
             onClick={() => node.department && toggleHod(node.nodeUuid, node.department)}
@@ -538,15 +624,48 @@ export default function VesselOrgChart() {
         <div className="flex flex-wrap gap-1 p-2">
           {departments.map(dept => {
             const count = nodesByDept.get(dept)?.length || 0;
+            const isDragOver = dragOverDept === dept;
             return (
               <button
                 key={dept}
                 onClick={() => setActiveDept(dept === activeDept ? null : dept)}
+                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverDept(dept); }}
+                onDragLeave={() => setDragOverDept(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const nodeUuid = e.dataTransfer.getData('text/plain');
+                  const rankId = e.dataTransfer.getData('application/rank-id');
+                  if (nodeUuid) {
+                    assignNodeToDept(nodeUuid, dept);
+                    setActiveDept(dept);
+                  } else if (rankId && selectedVesselId) {
+                    const rank = ranksMap.get(rankId);
+                    const newNode: OrgNode = {
+                      nodeUuid: generateTempUuid(),
+                      vesselId: selectedVesselId,
+                      rankId,
+                      nodeLabel: rank ? (rank.label || rank.name) : rankId,
+                      department: dept,
+                      parentNodeUuid: null,
+                      isHod: false,
+                      isAssigned: true,
+                      viewMode: rank?.viewMode || null,
+                      sortOrder: (nodesByDept.get(dept)?.length || 0) + 1,
+                      isNew: true,
+                    };
+                    setNodes(prev => [...prev, newNode]);
+                    setHasUnsavedChanges(true);
+                    setActiveDept(dept);
+                  }
+                  setDraggedNodeUuid(null);
+                  setDragOverDept(null);
+                }}
                 className={cn(
                   "text-xs px-2.5 py-1 rounded-full border transition-colors",
                   activeDept === dept
                     ? "bg-blue-50 border-blue-300 text-blue-700 font-medium"
-                    : "border-gray-200 text-gray-500 hover:border-gray-300"
+                    : "border-gray-200 text-gray-500 hover:border-gray-300",
+                  isDragOver && "ring-2 ring-blue-400 bg-blue-100 border-blue-400 scale-105"
                 )}
                 data-testid={`dept-tab-${dept}`}
               >
@@ -569,8 +688,15 @@ export default function VesselOrgChart() {
               );
             }
             const tree = buildTree(deptNodes);
+            const hasHod = deptNodes.some(n => n.isHod);
             return (
               <div>
+                {!hasHod && (
+                  <div className="flex items-center gap-1.5 px-2 py-1.5 mb-2 bg-amber-50 border border-amber-200 rounded text-amber-700 text-xs" data-testid={`no-hod-warning-${activeDept}`}>
+                    <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span>No HOD assigned for {activeDept}. Click the star icon on a rank to set it as Head of Department.</span>
+                  </div>
+                )}
                 {tree.map(rootNode => renderDeptNode(rootNode, 0, deptNodes))}
               </div>
             );
@@ -692,6 +818,27 @@ export default function VesselOrgChart() {
           {renderArea3()}
         </div>
       )}
+
+      <AlertDialog open={!!deleteConfirmNode} onOpenChange={(open) => { if (!open) setDeleteConfirmNode(null); }}>
+        <AlertDialogContent data-testid="dialog-confirm-delete">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently delete this node?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove <strong>{deleteConfirmNode ? getRankDisplay(deleteConfirmNode.rankId, deleteConfirmNode.nodeLabel) : ''}</strong> ({deleteConfirmNode?.rankId}) from this vessel's org chart. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeDeleteNode}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="button-confirm-delete"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
