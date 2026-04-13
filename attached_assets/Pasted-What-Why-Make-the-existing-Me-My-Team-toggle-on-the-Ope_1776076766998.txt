@@ -1,0 +1,283 @@
+What & Why
+Make the existing Me / My Team toggle on the Operation dashboard fully functional using the saved vessel org chart hierarchy as the source of truth for team membership.
+
+Currently, the toggle is UI-only; toggling it does not change any data.
+
+When set to “Me”, the dashboard must show only records for the logged-in user’s own hierarchy node(s) on the selected vessel.
+
+When set to “My Team”, it must show records for the logged-in user plus all descendant nodes under that user in the vessel org chart parent-child tree.
+
+This turns the vessel org chart from a visual tool into an operational driver for dashboard scopes.
+
+Critical: Do not use display labels alone as the identity key. Labels are editable and repeated. All logic must be based on vessel org chart node identity + rank/role mapping, then mapped carefully to work-order assignment fields.
+
+Done looks like
+The Me / My Team toggle on the Operation dashboard actually changes all dashboard data.
+
+Me:
+
+All KPIs, counts, and tables are filtered to only the logged-in user’s own node(s) for the currently selected vessel.
+
+My Team:
+
+All KPIs, counts, and tables are filtered to the logged-in user’s own node(s) plus all descendant nodes in the saved vessel org chart hierarchy for that vessel (multi-level, not just direct children).
+
+Team membership is derived only from the saved vessel org chart node structure (parentNodeUuid, vesselId, etc.), not from:
+
+department name alone,
+
+rank title assumptions,
+
+or free-text label matching.
+
+Works correctly for:
+
+Department HODs (e.g. Chief Engineer sees their Engine tree, Chief Officer sees Deck tree),
+
+Overall Heads (e.g. Master sees all department trees beneath their node),
+
+Leaf nodes (no subordinates → My Team = Me).
+
+Switching vessels recalculates team scope from the new vessel’s org chart; no cross-vessel leakage.
+
+Missing or incomplete org chart data fails safe:
+
+Me still works for that user,
+
+My Team either equals Me or is disabled gracefully.
+
+Filtering is enforced on the backend/query layer, not just by hiding rows in the UI.
+
+Out of scope
+Creating or editing the org chart structure itself (already implemented in #121 – use existing vessel org chart nodes).
+
+New admin UI to map users to ranks; use existing user–rank/role/vessel mapping as the source of truth.
+
+Applying Me/My Team filtering to modules outside the Operation dashboard.
+
+Advanced supervisory / shore aggregation logic beyond “use it only if explicitly part of the same org chart tree for that vessel”.
+
+Core principles (must not be violated)
+Hierarchy-first, not label-first
+
+Resolve team scope from org chart node IDs and parent-child relationships, not from labels.
+
+Labels (label, display name) are for UI, not for security or filter identity.
+
+Vessel-specific
+
+All scope resolution is per vesselId and uses that vessel’s org chart only.
+
+Single source of truth
+
+The vessel org chart nodes table is the authority on “who reports to whom” on that vessel.
+
+Backend enforced
+
+Me/My Team must affect all dashboard queries and KPIs at the backend level.
+
+Tasks
+1) Backend – Hierarchy scope resolution (new endpoint)
+Create a backend service + endpoint that, given:
+
+vesselId
+
+the current authenticated user (from existing auth/user-role mapping)
+
+returns a resolved hierarchy scope object, not just labels.
+
+1.1 Resolve the user’s org chart node(s)
+Using existing user → rank / role / position mapping and vessel access, determine which org chart node(s) correspond to the logged-in user for the selected vesselId.
+
+Support the case where a user may map to:
+
+one node (typical),
+
+or multiple nodes (if your system already supports this).
+
+If no node is found for that vessel:
+
+Mark the scope as “noMapping” and fall back to Me-only behavior in the dashboard.
+
+1.2 Traverse descendants via org chart hierarchy
+Start from each resolved user node and recursively traverse all descendants using parentNodeUuid (or the equivalent parent reference in vessel_org_chart_nodes).
+
+Build:
+
+selfNodeIds – the nodeId(s) that represent the logged-in user,
+
+teamNodeIds – all descendant nodeIds (direct + indirect),
+
+fullScopeNodeIds – union of self + descendants.
+
+1.3 Map hierarchy node IDs to operational “assignment units”
+Each org chart node is already linked to a master rank; some also have labels and view modes.
+
+Define and document the mapping from a nodeId to the work-order ownership field (e.g. assignedTo, assignedRankId, or similar).
+
+If existing work orders use assignedTo as a rank label, do not use the raw label as the only key. Instead:
+
+Prefer a stable rank or position identifier (e.g. rankId, nodeUuid, or a dedicated “position key” on the node).
+
+If label is currently the only link, introduce a stable ID mapping layer (e.g. node’s positionKey) and adjust assignment logic to use that.
+
+The endpoint should return both:
+
+the list of nodeIds for Me and My Team, and
+
+the corresponding “assignment keys” that the dashboard queries will use to filter work orders and related data.
+
+1.4 API response shape (example)
+json
+{
+  "vesselId": "V004",
+  "hasMapping": true,
+  "me": {
+    "nodeIds": ["node-CE-1"],
+    "assignmentKeys": ["CE_V004"]   // example stable key
+  },
+  "myTeam": {
+    "nodeIds": ["node-CE-1", "node-2E-1", "node-3E-1", "node-4E-1", "node-EO-1"],
+    "assignmentKeys": ["CE_V004", "2E_V004", "3E_V004", "4E_V004", "EO_V004"]
+  }
+}
+If no mapping or no org chart:
+
+hasMapping = false, myTeam.assignmentKeys can be empty or equal to me.assignmentKeys (decide and document), and the frontend should treat My Team as disabled or same as Me.
+
+2) Backend – Apply scope to dashboard data and work order lists
+Extend relevant services to accept an optional scope filter based on these assignment keys.
+
+2.1 Work orders
+Update listWorkOrders and any dashboard aggregate methods to accept a rankScope or more generically assignmentScope parameter – an array of assignment keys (not just visible labels).
+
+When provided, filter work orders to only those whose owner/assignee matches any of the keys in the scope.
+
+Ensure:
+
+The main dashboard work order table respects the scope.
+
+Counts such as Overdue WO, Overdue WO – Critical Eqpt, WO Planned for Today etc. are computed from the filtered dataset, not from all vessel data.
+
+2.2 Other dashboard widgets
+Apply equivalent scope to:
+
+Critical spares / low stock (if they are tied to components → departments → ranks),
+
+Pending approvals (based on who is supposed to approve or whose jobs they are),
+
+Anomalies and any other metrics included in Operation dashboard widgets.
+
+The scope must be consistent across all widgets; do not apply Me/My Team only to the list while leaving KPIs unfiltered.
+
+3) Frontend – Wire Me/My Team toggle to scope API and queries
+In client/src/pages/pms/Dashboard.tsx:
+
+3.1 Fetch scope on vessel change and on login
+When the user logs in and/or when the selected vessel changes, call the new hierarchy scope endpoint with vesselId.
+
+Store the result in a suitable context or local state (e.g. hodScope / teamScope) together with flags:
+
+hasMapping,
+
+hasDescendants (My Team different from Me),
+
+fallbackToMe.
+
+3.2 Toggle behavior
+When toggle is Me:
+
+Pass scope.me.assignmentKeys into all Operation dashboard data queries.
+
+When toggle is My Team:
+
+If hasMapping and myTeam.assignmentKeys is non-empty:
+
+Pass scope.myTeam.assignmentKeys into all queries.
+
+Else:
+
+Either disable the toggle or treat My Team = Me; ensure the UI makes this obvious.
+
+3.3 UI/UX
+Keep the existing Me/My Team toggle, but:
+
+Add a tooltip / helper:
+
+Me: “Only my work orders and KPIs for this vessel”
+
+My Team: “My work plus all ranks reporting to me in this vessel hierarchy”
+
+If there is no valid mapping / descendants for this user/vessel:
+
+Disable My Team or show it but with tooltip “No team configured in vessel org chart; showing only my data”.
+
+3.4 Single source for filtered data
+The dashboard should have a single pathway for loading data that always includes the computed assignmentScope.
+
+operationKPIs and operationTableData must always be derived from the already filtered responses; do not re-filter on the client from full datasets.
+
+Edge cases (must be tested)
+Chief Engineer on Vessel 4
+
+Org chart: Chief Engineer node with 2nd, 3rd, 4th Engineer and Electrical Officer beneath.
+
+Me: only work orders and KPIs assigned to Chief Engineer’s assignment key(s).
+
+My Team: Chief Engineer + all those engine subordinates.
+
+Chief Officer on Vessel 4
+
+Org chart: Chief Officer node with 2nd and 3rd Officer beneath.
+
+Me: only Chief Officer.
+
+My Team: Chief Officer + 2nd Officer + 3rd Officer.
+
+No engine ranks should appear in this scope.
+
+Master as Overall Head
+
+Org chart: Master in Overall Head section; department HODs below (Chief Officer, Chief Engineer, etc.), with further subordinates below them.
+
+Me: only Master’s own scope.
+
+My Team: Master + all department heads + all ranks under those heads.
+
+Leaf node with no subordinates
+
+My Team should equal Me, or the toggle should be disabled with an explanatory tooltip.
+
+No org chart configured for vessel
+
+Dashboard must not break; treat as Me-only behavior and disable My Team.
+
+User exists but not mapped to any org chart node on that vessel
+
+Treat as Me-only; My Team disabled or same as Me, not random department-level guessing.
+
+Label changes in org chart
+
+Changing a node’s display label must not affect team resolution or dashboard scope, because scope uses stable IDs/assignment keys, not label text.
+
+Final constraints
+Do not:
+
+Use rank labels or display names as the core identity for filtering.
+
+Guess team scope purely by department or rank title.
+
+Implement Me/My Team as a front-end-only filter on unscoped data.
+
+Leave some widgets unfiltered while others obey the scope.
+
+Do:
+
+Treat vessel org chart nodes as the canonical hierarchy model.
+
+Use a stable mapping from node → assignment key for work orders and dashboard data.
+
+Apply the same scope consistently across all Operation dashboard queries.
+
+Fail safe to Me-only behavior when hierarchy or mapping is missing.
+

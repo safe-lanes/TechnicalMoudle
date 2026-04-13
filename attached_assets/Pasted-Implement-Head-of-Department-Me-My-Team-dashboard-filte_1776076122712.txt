@@ -1,0 +1,233 @@
+Implement Head of Department “Me / My Team” dashboard filtering in the Operation dashboard by using the already-configured Vessel Org Chart hierarchy as the source of team membership. The current product already shows a Me / My Team toggle in the Operation dashboard, and the Vessel Org Chart page already supports vessel-specific hierarchy with Overall Head, Supervisory / Shore, department blocks, HOD marking, parent-child structure, and per-node View Mode settings such as Head of Dept and Vessel.
+
+Objective
+Make the Me / My Team toggle actually functional for department-level users, especially users operating in Head of Dept context. When the toggle is on Me, the dashboard must show only the records relevant to the logged-in user’s own mapped rank / position. When the toggle is changed to My Team, the dashboard must show cumulative data for the logged-in user plus all subordinate ranks under that user in the vessel hierarchy.
+
+Core business meaning
+The Vessel Org Chart is no longer only a visual chart. It must now drive real operational filtering behavior in the dashboard. Team membership must be derived from the vessel-specific hierarchy built in admin/vessel-org-chart, where ranks are assigned into department structures and subordinate relationships are defined by parent-child hierarchy.
+
+Scope
+This feature is specifically for dashboard filtering behavior in the Operation dashboard. It must use the selected vessel context and the logged-in user’s effective hierarchy position for that vessel. The Me / My Team toggle should not be a cosmetic UI control; it must change the underlying dashboard query scope.
+
+Business rules
+1. “Me” behavior
+When the toggle is set to Me, the dashboard must show only the records belonging to the logged-in user’s own rank / assignment context for the selected vessel. For example, if the logged-in user is acting as Chief Engineer, then Me should show only Chief Engineer scoped records, not the entire engine department.
+
+2. “My Team” behavior
+When the toggle is set to My Team, the dashboard must show:
+
+the logged-in user’s own records, and
+
+all records belonging to ranks that are subordinate to that user in the vessel org chart hierarchy for the selected vessel.
+
+For example, if the logged-in user is Chief Engineer and in the org chart 2nd Engineer, 3rd Engineer, 4th Engineer, and Electrical Officer are under Chief Engineer, then My Team must show cumulative dashboard data for all of those positions together with Chief Engineer. Similarly, if the logged-in user is Chief Officer, then My Team must include Chief Officer plus ranks like 2nd Officer and 3rd Officer that are below Chief Officer in the deck hierarchy.
+
+3. Team derivation source
+Do not hardcode team membership by department name or by rank title assumptions. Team membership must come from the actual saved Vessel Org Chart hierarchy for the selected vessel. That means the “My Team” scope must follow the configured parent-child structure, not a guessed department mapping.
+
+4. HOD / hierarchy logic
+The feature should work primarily for users who are department heads or otherwise have subordinate nodes under them in the org chart. If a user has no child nodes in the hierarchy, then My Team should return the same result as Me, or optionally the toggle can be disabled for that user; choose the cleaner UX but keep behavior explicit and stable.
+
+5. Vessel sensitivity
+The team must be resolved per vessel. If the same user or same rank exists differently across vessels, the dashboard filter must always respect the currently selected vessel and its saved org chart configuration.
+
+Identity and mapping requirement
+This part is critical and must be handled carefully.
+
+The system must determine the logged-in user’s hierarchy node for the selected vessel based on the application’s existing identity, vessel access, rank mapping, and role/view-mode logic. The solution must not assume that the login name alone is enough unless that mapping already exists cleanly in the app.
+
+Replit must identify:
+
+the logged-in user,
+
+the selected vessel,
+
+the user’s effective vessel role or mapped rank/node in that vessel org chart,
+
+and then derive subordinates from that node downward.
+
+If multiple mappings are possible, use the application’s existing source of truth and do not invent a temporary shortcut model that will break later.
+
+Hierarchy resolution logic
+When a user selects My Team, the backend or shared filtering logic must:
+
+Identify the current vessel.
+
+Identify the logged-in user’s org chart node for that vessel.
+
+Start from that node.
+
+Traverse all descendants recursively through the saved parent-child org chart structure.
+
+Build the full set of included rank/node scopes consisting of:
+
+self node
+
+direct reports
+
+indirect reports further down the tree.
+
+Apply this scope to all dashboard KPIs, cards, counts, tables, and lists shown in the Operation dashboard.
+
+This must work for both direct and multi-level reporting lines, not just one level below.
+
+Overall Head and top hierarchy behavior
+Because the Vessel Org Chart now includes Overall Head and can place ranks like Master above department HODs, the same logic must work there too. If the logged-in user is the overall head and the hierarchy places department heads below that node, then My Team should include the overall head plus all subordinate department trees beneath that node.
+
+This means the implementation must support:
+
+department head team scope,
+
+overall head total vessel scope,
+
+and future supervisory scope if needed.
+
+Supervisory / Shore roles
+The org chart also has a Supervisory / Shore section. For now, if those roles are present, only include them in team calculations if they are truly part of the same saved hierarchy tree for the selected vessel and are mapped to the logged-in user’s node path. Do not blindly mix all shore roles into every team result.
+
+UI behavior in dashboard
+The existing Me / My Team toggle in the Operation dashboard should remain the main control. It must become functional and its state must clearly affect all dashboard content in that view.
+
+Expected UI behavior:
+
+Me = only own scoped data.
+
+My Team = own + hierarchy descendants.
+
+The state should update KPIs, summary cards, pending approvals, work order lists, anomalies, and any other operational widgets in that dashboard scope.
+
+The dashboard should not show mixed or stale counts after toggle change.
+
+If needed, show a small helper label or tooltip explaining:
+
+Me = only my records
+
+My Team = my records plus subordinate hierarchy for this vessel
+
+Filtering target
+This filtering must apply consistently across all relevant dashboard data sources in the Operation dashboard, including but not limited to:
+
+KPI cards,
+
+overdue work order counts,
+
+critical equipment overdue counts,
+
+pending approvals,
+
+anomalies,
+
+listed work orders,
+
+and any other operational widgets already shown in the dashboard.
+
+Do not implement the toggle for one widget only while leaving others unfiltered. The scope must be consistent across the full dashboard response.
+
+Data model expectation
+Do not create a parallel fake team table just for this dashboard if the org chart hierarchy already exists. Use the saved vessel org chart node structure as the source of hierarchy truth.
+
+At minimum, the logic must be able to work with:
+
+vessel,
+
+org chart node,
+
+parent node,
+
+rank reference,
+
+label,
+
+view mode,
+
+HOD / overall head flags where relevant.
+
+If an additional user-to-node mapping layer is needed, add it properly and explicitly rather than hiding assumptions in the dashboard query logic.
+
+Fallback behavior
+The implementation must handle incomplete org chart configuration safely.
+
+Expected fallback rules:
+
+If the user has no mapped org chart node for the selected vessel, default safely to Me scope only.
+
+If the hierarchy exists but the user has no descendants, My Team should behave same as Me or the toggle can be visually disabled.
+
+If the org chart is missing for the vessel, the dashboard must not break; default to Me scope only.
+
+If hierarchy data is partially configured, never return unrelated users or unrelated departments by accident.
+
+Security and correctness rule
+This feature must not be implemented as only a front-end visual filter. The data scope must be enforced in the query / backend filtering logic so that dashboard totals and records are truly filtered to the allowed hierarchy scope.
+
+In other words:
+
+do not fetch full vessel data and merely hide rows in UI,
+
+do not compute KPIs from unfiltered datasets,
+
+do not assume department name equals team scope,
+
+and do not assume all users in the same department belong to the same team if the hierarchy says otherwise.
+
+Performance requirement
+The hierarchy resolution should be efficient. The app should not repeatedly recompute large descendant trees separately for every single widget if one reusable scoped node set can be derived once per dashboard request.
+
+Preferred behavior:
+
+resolve the effective node scope once,
+
+derive included subordinate node/rank scope,
+
+reuse that same scope across all dashboard queries and KPI calculations.
+
+Edge cases
+The implementation must handle these cases correctly:
+
+Chief Engineer with four engine subordinates under him: My Team includes all of them.
+
+Chief Officer with only two deck subordinates: My Team includes only those subordinates, not engine staff.
+
+Master as overall head: My Team includes all subordinate department trees below Master.
+
+A node with no subordinates: My Team does not expand beyond self.
+
+A vessel with no configured hierarchy: dashboard falls back safely to self-only filtering.
+
+A user with Head of Dept view mode but missing org chart placement: do not guess team using department names alone; fallback safely.
+
+A user switched from one vessel to another: team scope must refresh using the second vessel’s hierarchy, not cached data from the first vessel.
+
+Acceptance criteria
+This feature is complete only if all of the following are true:
+
+The Me / My Team toggle on the Operation dashboard changes actual dashboard results.
+
+For a mapped HOD user, Me shows only self-scoped data.
+
+For the same user, My Team shows self plus all hierarchy descendants from the selected vessel org chart.
+
+The subordinate set is derived from saved parent-child org chart hierarchy, not hardcoded department rules.
+
+KPI cards and detailed lists both follow the same scope.
+
+Switching vessels recalculates team membership correctly.
+
+Missing or incomplete org chart configuration does not break the dashboard and safely falls back to self-only behavior.
+
+Overall Head logic works so a top node like Master can see cumulative subordinate structure on My Team.
+
+What not to do
+Make these restrictions explicit to Replit:
+
+Do not hardcode team scope by rank names like “Chief Engineer means engine team.”
+
+Do not derive team only from department name.
+
+Do not make My Team a front-end-only cosmetic toggle.
+
+Do not filter only table rows while leaving KPI counts unfiltered.
+
+Do not ignore vessel context.
+
+Do not break when org chart data is missing or incomplete.
