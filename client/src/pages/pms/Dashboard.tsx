@@ -1754,7 +1754,7 @@ const Dashboard = () => {
                         {operationKPIs.pendingApprovalWOs.length === 0 ? (
                           <div className="text-center py-8 text-gray-500 text-sm">No work orders pending approval</div>
                         ) : (
-                          operationKPIs.pendingApprovalWOs.map((wo: any) => (
+                          operationKPIs.pendingApprovalWOs.map((wo) => (
                             <div
                               key={wo.id}
                               className="flex items-center justify-between p-3 rounded-lg border transition-colors"
@@ -2469,7 +2469,7 @@ const Dashboard = () => {
       <BulkApproveModal
         open={bulkApproveModalOpen}
         onOpenChange={setBulkApproveModalOpen}
-        workOrders={activeTab === 'management' && selectedOpCard === 'pending-approvals' ? (operationKPIs.pendingApprovalWOs as any[]) : (workOrderKPIs.pendingApprovalFull || [])}
+        workOrders={activeTab === 'management' && selectedOpCard === 'pending-approvals' ? operationKPIs.pendingApprovalWOs : (workOrderKPIs.pendingApprovalFull || [])}
         vesselId={vesselId}
         vesselName={currentVessel?.name}
       />
