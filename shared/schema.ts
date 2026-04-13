@@ -922,6 +922,7 @@ export const jobs = pgTable("jobs", {
   jobNo: text("job_no").notNull(), // Auto-generated JOB-XXXXXXX (not globally unique - same job_no can exist across vessels/components)
   jobTitle: text("job_title").notNull(),
   assignedTo: text("assigned_to"),
+  assignedToRankId: text("assigned_to_rank_id"),
   maintenanceType: text("maintenance_type"), // 'Inspection' | 'Overhaul' | 'Service' | 'Testing'
   maintenanceBasis: text("maintenance_basis"), // 'Calendar' | 'Running Hours'
   frequencyType: text("frequency_type"), // Alias for maintenanceBasis for compliance

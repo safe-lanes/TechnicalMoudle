@@ -405,14 +405,10 @@ const Dashboard = () => {
     hasDescendants: boolean;
     mode: 'me' | 'myTeam';
     appliedRankIds: string[];
-    fallback?: string;
   }
 
   interface ScopedOperationResponse {
     workOrders: WorkOrder[];
-    spares: Spare[];
-    changeRequests: ChangeRequest[];
-    anomalyIndicators: { cycleSkipRate: string; backdatingFrequency: string; bulkCompletions: string; scheduleDrift: string };
     scopeMeta: ScopeMeta;
   }
 
@@ -429,8 +425,8 @@ const Dashboard = () => {
   });
 
   const scopeMeta = scopedResponse?.scopeMeta ?? null;
-  const hasValidScope = !!scopedResponse;
-  const toggleDisabled = !scopeMeta || (!scopeMeta.hasMapping && !scopeMeta.fallback);
+  const isScopeActive = !!scopeMeta?.hasMapping;
+  const toggleDisabled = !!scopeMeta && !scopeMeta.hasMapping;
 
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
@@ -1131,11 +1127,11 @@ const Dashboard = () => {
     if (isAllVessels) {
       return workOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
     }
-    if (scopedResponse) {
+    if (isScopeActive && scopedResponse) {
       return scopedResponse.workOrders.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
     }
-    return [];
-  }, [isAllVessels, scopedResponse, workOrdersData]);
+    return workOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
+  }, [isAllVessels, isScopeActive, scopedResponse, workOrdersData]);
 
   const operationDonutData = useMemo(() => {
     const safeWOs = operationWOs;
@@ -1185,7 +1181,7 @@ const Dashboard = () => {
     });
     const plannedTodayCount = plannedTodayWOs.length;
 
-    const effectiveSpares = isAllVessels ? sparesData : (scopedResponse ? scopedResponse.spares : []);
+    const effectiveSpares = sparesData;
     const criticalSparesLowList = effectiveSpares.filter(spare => {
       const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes';
       if (!isCritical) return false;
@@ -1200,17 +1196,18 @@ const Dashboard = () => {
     );
     const pendingApprovalCount = pendingApprovalWOs.length;
 
-    const effectiveAnomalyIndicators = isAllVessels
-      ? (complianceAnomalies || null)
-      : (scopedResponse ? scopedResponse.anomalyIndicators : null);
+    const effectiveAnomalyIndicators = complianceAnomalies || null;
     const anomalyCount = effectiveAnomalyIndicators ? [
       effectiveAnomalyIndicators.cycleSkipRate,
       effectiveAnomalyIndicators.backdatingFrequency,
       effectiveAnomalyIndicators.bulkCompletions,
       effectiveAnomalyIndicators.scheduleDrift,
-    ].map(s => typeof s === 'object' ? (s as any).severity : s).filter(s => s !== 'green').length : 0;
+    ].filter(s => {
+      const severity = typeof s === 'string' ? s : (s as { severity: string }).severity;
+      return severity !== 'green';
+    }).length : 0;
 
-    const effectiveChangeRequests = isAllVessels ? changeRequestsData : (scopedResponse ? scopedResponse.changeRequests : []);
+    const effectiveChangeRequests = changeRequestsData;
     const openChangeRequestsList = effectiveChangeRequests.filter(cr => {
       const s = cr.status?.toLowerCase();
       return s !== 'approved' && s !== 'rejected';
@@ -1234,7 +1231,7 @@ const Dashboard = () => {
       openChangeRequests,
       openChangeRequestsList,
     };
-  }, [operationWOs, sparesData, changeRequestsData, complianceAnomalies, hasValidScope, scopeMeta, scopedResponse]);
+  }, [operationWOs, sparesData, changeRequestsData, complianceAnomalies, isScopeActive, scopeMeta, scopedResponse]);
 
   const operationTableData = useMemo(() => {
     switch (selectedOpCard) {

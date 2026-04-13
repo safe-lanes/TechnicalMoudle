@@ -9,6 +9,17 @@ import { getDb } from '../../../db';
 import { plannerDates } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
+async function resolveRankIdFromLabel(assignedTo: string | null | undefined): Promise<string | null> {
+  if (!assignedTo) return null;
+  const { getAllRanks } = await import('../../ranks/service');
+  const allRanks = await getAllRanks();
+  const label = assignedTo.toLowerCase().trim();
+  const match = allRanks.find(
+    (r: any) => r.name?.toLowerCase().trim() === label || r.label?.toLowerCase().trim() === label
+  );
+  return match?.rankId ?? null;
+}
+
 function calculateBackdatingDaysForApproval(completionDate: string | null | undefined, submittedDate: string | null | undefined): number {
   if (!completionDate) return 0;
   const comp = new Date(completionDate);
@@ -626,6 +637,13 @@ export async function createWorkOrder(body: any) {
     }
   }
 
+  if (workOrderData.assignedTo && !workOrderData.assignedToRankId) {
+    const rankId = await resolveRankIdFromLabel(workOrderData.assignedTo);
+    if (rankId) {
+      workOrderData = { ...workOrderData, assignedToRankId: rankId };
+    }
+  }
+
   const workOrder = await repo.create(workOrderData);
   return workOrder;
 }
@@ -676,6 +694,13 @@ export async function updateWorkOrder(id: string, body: any) {
   }
 
   let updateData = { ...body };
+
+  if (updateData.assignedTo && !updateData.assignedToRankId) {
+    const rankId = await resolveRankIdFromLabel(updateData.assignedTo);
+    if (rankId) {
+      updateData.assignedToRankId = rankId;
+    }
+  }
 
   // Remove any undefined values
   Object.keys(updateData).forEach((key: string) => {
@@ -1602,25 +1627,14 @@ export async function saveOverdueReason(id: string, overdueReason: string, overd
   return updated;
 }
 
-function buildLabelToRankIdMap(allRanks: any[]): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const r of allRanks) {
-    if (r.name) map.set(r.name.toLowerCase().trim(), r.rankId);
-    if (r.label) map.set(r.label.toLowerCase().trim(), r.rankId);
-  }
-  return map;
-}
-
-function filterWorkOrdersByRankIds(
+function filterWorkOrdersByRankId(
   workOrders: any[],
-  scopeRankIds: Set<string>,
-  labelToRankId: Map<string, string>
+  scopeRankIds: Set<string>
 ): any[] {
   return workOrders.filter((wo: any) => {
-    const assigned = (wo.assignedTo || '').toLowerCase().trim();
-    if (!assigned) return false;
-    const resolvedRankId = labelToRankId.get(assigned);
-    return resolvedRankId ? scopeRankIds.has(resolvedRankId) : false;
+    const rankId = wo.assignedToRankId;
+    if (!rankId) return false;
+    return scopeRankIds.has(rankId);
   });
 }
 
@@ -1629,33 +1643,13 @@ export async function getScopedOperationData(
   crewDesignation: string,
   mode: 'me' | 'myTeam'
 ) {
-  const { resolveHierarchyScope, getAllRanks } = await import('../../ranks/service');
-  const complianceAnomalyService = await import('./complianceAnomalyService');
+  const { resolveHierarchyScope } = await import('../../ranks/service');
 
-  const allRanks = await getAllRanks();
-  const labelToRankId = buildLabelToRankIdMap(allRanks);
-  const designationLower = crewDesignation.toLowerCase().trim();
+  const scope = await resolveHierarchyScope(vesselId, crewDesignation);
 
-  const matchingRankIds = allRanks
-    .filter(
-      (r: any) =>
-        r.name?.toLowerCase().trim() === designationLower ||
-        r.label?.toLowerCase().trim() === designationLower
-    )
-    .map((r: any) => r.rankId as string);
-
-  const [allWOs, spares, changeRequests] = await Promise.all([
-    listWorkOrders(vesselId),
-    storage.getSpares(vesselId),
-    storage.getChangeRequests({ vesselId }),
-  ]);
-
-  if (matchingRankIds.length === 0) {
+  if (!scope.hasMapping) {
     return {
       workOrders: [],
-      spares,
-      changeRequests,
-      anomalyIndicators: { cycleSkipRate: 'green', backdatingFrequency: 'green', bulkCompletions: 'green', scheduleDrift: 'green' },
       scopeMeta: {
         hasMapping: false,
         hasDescendants: false,
@@ -1665,48 +1659,19 @@ export async function getScopedOperationData(
     };
   }
 
-  const scope = await resolveHierarchyScope(vesselId, crewDesignation);
+  const bucket = mode === 'me' ? scope.me : scope.myTeam;
+  const scopeRankIdSet = new Set(bucket.rankIds);
 
-  let filteredWOs: any[];
-  let appliedRankIds: string[];
-  let hasMapping: boolean;
-  let hasDescendants: boolean;
-  let fallback: string | undefined;
-
-  if (!scope.hasMapping) {
-    const fallbackRankIdSet = new Set(matchingRankIds);
-    filteredWOs = filterWorkOrdersByRankIds(allWOs, fallbackRankIdSet, labelToRankId);
-    appliedRankIds = matchingRankIds;
-    hasMapping = false;
-    hasDescendants = false;
-    fallback = 'designation-rankId-match';
-  } else {
-    const bucket = mode === 'me' ? scope.me : scope.myTeam;
-    const scopeRankIdSet = new Set(bucket.rankIds);
-    filteredWOs = filterWorkOrdersByRankIds(allWOs, scopeRankIdSet, labelToRankId);
-    appliedRankIds = bucket.rankIds;
-    hasMapping = true;
-    hasDescendants = scope.hasDescendants;
-  }
-
-  const anomalies = await complianceAnomalyService.getComplianceAnomalies(vesselId);
+  const allWOs = await listWorkOrders(vesselId);
+  const filteredWOs = filterWorkOrdersByRankId(allWOs, scopeRankIdSet);
 
   return {
     workOrders: filteredWOs,
-    spares,
-    changeRequests,
-    anomalyIndicators: {
-      cycleSkipRate: anomalies.cycleSkipRate.severity,
-      backdatingFrequency: anomalies.backdatingFrequency.severity,
-      bulkCompletions: anomalies.bulkCompletions.severity,
-      scheduleDrift: anomalies.scheduleDrift.severity,
-    },
     scopeMeta: {
-      hasMapping,
-      hasDescendants,
+      hasMapping: true,
+      hasDescendants: scope.hasDescendants,
       mode,
-      appliedRankIds,
-      ...(fallback ? { fallback } : {}),
+      appliedRankIds: bucket.rankIds,
     },
   };
 }
