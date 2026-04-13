@@ -522,7 +522,7 @@ export function normalizeColumnNames(data: any[], type: string): any[] {
   });
 }
 
-// Component categories fallback (used when master list is not yet loaded)
+// Component categories (used ONLY for template/reference sheet generation, NOT for validation)
 export const COMPONENT_CATEGORIES = [
   "1 Ship General",
   "2 Hull",
@@ -534,17 +534,6 @@ export const COMPONENT_CATEGORIES = [
   "8 Ship Common Systems"
 ];
 
-const FALLBACK_CATEGORY_MAP: Record<number, string> = {
-  1: "1 Ship General",
-  2: "2 Hull",
-  3: "3 Equipment for Cargo",
-  4: "4 Ship Equipment",
-  5: "5 Equipment for Crew and Passengers",
-  6: "6 Machinery Main Components",
-  7: "7 Systems for Machinery Main Components",
-  8: "8 Ship Common Systems",
-};
-
 let _dynamicCategoryMap: Record<number, string> | null = null;
 let _dynamicCategoryValues: string[] | null = null;
 
@@ -554,7 +543,7 @@ export function setDynamicComponentCategories(categories: { listKey: string; lis
   for (const c of categories) {
     const key = parseInt(c.listKey);
     if (!isNaN(key)) {
-      const fullEntry = `${c.listKey} ${c.listValue}`;
+      const fullEntry = c.listKey;
       _dynamicCategoryMap[key] = fullEntry;
       _dynamicCategoryValues.push(fullEntry);
     }
@@ -568,12 +557,15 @@ export function resetDynamicComponentCategories() {
 }
 
 export function getEffectiveComponentCategories(): string[] {
-  return _dynamicCategoryValues || COMPONENT_CATEGORIES;
+  if (!_dynamicCategoryValues) {
+    console.warn('⚠️ Component categories not loaded from master list — category validation will be skipped');
+  }
+  return _dynamicCategoryValues || [];
 }
 
 export function getComponentCategory(mainGroupCode: number): string | null {
-  const map = _dynamicCategoryMap || FALLBACK_CATEGORY_MAP;
-  return map[mainGroupCode] || null;
+  if (!_dynamicCategoryMap) return null;
+  return _dynamicCategoryMap[mainGroupCode] || null;
 }
 
 // Helper function to extract Sub Group Code (first 2 digits) from SFI code

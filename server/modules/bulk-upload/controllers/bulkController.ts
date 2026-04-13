@@ -703,10 +703,12 @@ export async function dryRun(req: Request, res: Response) {
         .where(and(eq(masterLists.listType, 'componentCategory'), eq(masterLists.isActive, true)));
       if (mlItems.length > 0) {
         setDynamicComponentCategories(mlItems);
+        const effectiveCats = getEffectiveComponentCategories();
+        console.log(`📋 Effective component categories (${effectiveCats.length}): ${effectiveCats.join(', ')}`);
       }
     } catch (e) {
       resetDynamicComponentCategories();
-      console.warn('⚠️ Could not load component categories from master list, using fallback');
+      console.warn('⚠️ Could not load component categories from master list — category validation will be skipped');
     }
 
     // Validate data
