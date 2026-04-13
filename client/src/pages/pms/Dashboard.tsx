@@ -418,12 +418,21 @@ const Dashboard = () => {
     scopeMeta: ScopeMeta;
   }
 
+  useEffect(() => {
+    if (currentUser?.crewDesignation) {
+      fetch('/technical/api/dev/mock-user-designation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ designation: currentUser.crewDesignation }),
+      }).catch(() => {});
+    }
+  }, [currentUser?.crewDesignation]);
+
   const { data: scopedResponse } = useQuery<ScopedOperationResponse>({
     queryKey: ['/technical/api/scoped-operation-data', effectiveVesselId, hodScope, currentUser?.crewDesignation],
     queryFn: async () => {
       const response = await fetch(
-        `/technical/api/scoped-operation-data/${effectiveVesselId}?mode=${hodScope}`,
-        { headers: { 'X-User-Designation': currentUser?.crewDesignation || '' } }
+        `/technical/api/scoped-operation-data/${effectiveVesselId}?mode=${hodScope}`
       );
       if (!response.ok) throw new Error('Failed to fetch scoped operation data');
       return response.json();
