@@ -705,6 +705,9 @@ export async function dryRun(req: Request, res: Response) {
         setDynamicComponentCategories(mlItems);
         const effectiveCats = getEffectiveComponentCategories();
         console.log(`📋 Effective component categories (${effectiveCats.length}): ${effectiveCats.join(', ')}`);
+      } else {
+        resetDynamicComponentCategories();
+        console.warn('⚠️ No active component categories found in master list — category validation will be skipped');
       }
     } catch (e) {
       resetDynamicComponentCategories();
