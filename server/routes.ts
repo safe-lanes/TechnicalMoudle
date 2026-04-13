@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import * as fs from "fs";
 import * as path from "path";
 import moduleRouter from "./modules";
-import { mockAuthMiddleware } from "./middleware/auth";
+import { mockAuthMiddleware, initMockAuthRankId } from "./middleware/auth";
 import { ensureMaintenanceHistoryImmutability } from "./initDb";
 import { getSeedDefectsData, ALL_SEED_IDS } from "./modules/defects/services/seedData";
 
@@ -23,6 +23,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Apply mock authentication middleware for all API routes during development
   // This populates req.user with an admin user for testing purposes
+  await initMockAuthRankId();
   app.use('/technical/api', mockAuthMiddleware);
   console.log('🔒 Mock authentication enabled for /technical/api/* routes');
 

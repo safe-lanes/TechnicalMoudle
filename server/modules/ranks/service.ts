@@ -415,11 +415,6 @@ export async function resolveHierarchyScope(vesselId: string, crewDesignation: s
   const allRanks = await repo.getAllRanks();
   if (!allRanks) throw createHttpError("Database not available", 503);
 
-  const nodes = await repo.getVesselOrgChartNodes(vesselId);
-  if (!nodes || nodes.length === 0) {
-    return { vesselId, hasMapping: false, hasDescendants: false, me: { nodeUuids: [], rankIds: [] }, myTeam: { nodeUuids: [], rankIds: [] } };
-  }
-
   const designationLower = crewDesignation.toLowerCase().trim();
   const matchingRanks = allRanks.filter(r =>
     r.name?.toLowerCase().trim() === designationLower ||
@@ -430,10 +425,21 @@ export async function resolveHierarchyScope(vesselId: string, crewDesignation: s
     return { vesselId, hasMapping: false, hasDescendants: false, me: { nodeUuids: [], rankIds: [] }, myTeam: { nodeUuids: [], rankIds: [] } };
   }
 
-  const matchingRankIds = new Set(matchingRanks.map(r => r.rankId));
+  const matchingRankIds = matchingRanks.map(r => r.rankId);
+  return resolveHierarchyScopeByRankId(vesselId, matchingRankIds[0]);
+}
+
+export async function resolveHierarchyScopeByRankId(vesselId: string, userRankId: string) {
+  if (!vesselId) throw createHttpError("vesselId required", 400);
+  if (!userRankId) throw createHttpError("rankId required", 400);
+
+  const nodes = await repo.getVesselOrgChartNodes(vesselId);
+  if (!nodes || nodes.length === 0) {
+    return { vesselId, hasMapping: false, hasDescendants: false, me: { nodeUuids: [], rankIds: [] }, myTeam: { nodeUuids: [], rankIds: [] } };
+  }
 
   const assignedNodes = nodes.filter(n => n.isAssigned);
-  const meNodes = assignedNodes.filter(n => matchingRankIds.has(n.rankId));
+  const meNodes = assignedNodes.filter(n => n.rankId === userRankId);
 
   if (meNodes.length === 0) {
     return { vesselId, hasMapping: false, hasDescendants: false, me: { nodeUuids: [], rankIds: [] }, myTeam: { nodeUuids: [], rankIds: [] } };

@@ -5,6 +5,8 @@ export interface AuthenticatedRequest extends Request {
   user?: PublicUser;
 }
 
+let resolvedMockRankId: string | undefined;
+
 export const requireAuth = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   if (!req.user) {
     return res.status(401).json({ error: "Unauthorized - Authentication required" });
@@ -64,6 +66,25 @@ export const requireVesselAccess = (req: AuthenticatedRequest, res: Response, ne
   next();
 };
 
+export async function initMockAuthRankId() {
+  try {
+    const { getAllRanks } = await import('../modules/ranks/service');
+    const ranks = await getAllRanks();
+    const designation = "Marine Manager";
+    const match = ranks.find(
+      (r: any) =>
+        r.name?.toLowerCase().trim() === designation.toLowerCase() ||
+        r.label?.toLowerCase().trim() === designation.toLowerCase()
+    );
+    resolvedMockRankId = match?.rankId;
+    console.log(resolvedMockRankId
+      ? `✅ Mock auth rankId resolved: ${resolvedMockRankId}`
+      : `⚠️ Mock auth: no rank found for "${designation}"`);
+  } catch {
+    console.warn('⚠️ Mock auth: could not resolve rankId at startup');
+  }
+}
+
 export const mockAuthMiddleware = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   req.user = {
     id: 1,
@@ -77,6 +98,7 @@ export const mockAuthMiddleware = (req: AuthenticatedRequest, res: Response, nex
     isActive: true,
     userUuid: "00000000-0000-0000-0000-000000000001",
     crewDesignation: "Marine Manager",
+    rankId: resolvedMockRankId,
     userType: "Office",
     createdAt: new Date(),
     updatedAt: new Date(),

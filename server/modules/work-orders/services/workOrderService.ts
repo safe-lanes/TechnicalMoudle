@@ -1640,12 +1640,24 @@ function filterWorkOrdersByRankId(
 
 export async function getScopedOperationData(
   vesselId: string,
-  crewDesignation: string,
+  userRankId: string | undefined,
   mode: 'me' | 'myTeam'
 ) {
-  const { resolveHierarchyScope } = await import('../../ranks/service');
+  if (!userRankId) {
+    return {
+      workOrders: [],
+      scopeMeta: {
+        hasMapping: false,
+        hasDescendants: false,
+        mode,
+        appliedRankIds: [] as string[],
+      },
+    };
+  }
 
-  const scope = await resolveHierarchyScope(vesselId, crewDesignation);
+  const { resolveHierarchyScopeByRankId } = await import('../../ranks/service');
+
+  const scope = await resolveHierarchyScopeByRankId(vesselId, userRankId);
 
   if (!scope.hasMapping) {
     return {

@@ -1127,11 +1127,10 @@ const Dashboard = () => {
     if (isAllVessels) {
       return workOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
     }
-    if (isScopeActive && scopedResponse) {
-      return scopedResponse.workOrders.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
-    }
-    return workOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
-  }, [isAllVessels, isScopeActive, scopedResponse, workOrdersData]);
+    if (!scopedResponse) return [];
+    if (!scopedResponse.scopeMeta.hasMapping) return [];
+    return scopedResponse.workOrders.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
+  }, [isAllVessels, scopedResponse, workOrdersData]);
 
   const operationDonutData = useMemo(() => {
     const safeWOs = operationWOs;
