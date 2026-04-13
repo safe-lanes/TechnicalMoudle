@@ -26,9 +26,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { getComponentCategory } from "@/utils/componentUtils";
 import { useVessels } from "@/hooks/useVessels";
-import { useDepartmentOptions } from "@/hooks/useDepartments";
+import { useDepartmentOptions, useMasterListOptions } from "@/hooks/useDepartments";
 import type { ComponentDocument } from "@shared/schema";
 
 interface ComponentNode {
@@ -58,6 +57,7 @@ export default function ComponentRegisterAddEdit({
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { options: departmentOptions } = useDepartmentOptions();
+  const { options: componentCategoryOptions, items: componentCategoryItems } = useMasterListOptions('componentCategory');
   const { canCreate: canCreatePerm, canEdit: canEditPerm } = usePermissions();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTreeNode, setSelectedTreeNode] = useState<string | null>(null);
@@ -102,7 +102,7 @@ export default function ComponentRegisterAddEdit({
     componentCode: "",
     // Row 2: Component Name, Component Category, Maker, Maker Code
     componentName: "",
-    eqptSystemCategory: parentComponent?.code ? getComponentCategory(parentComponent.code) : "",
+    eqptSystemCategory: "",
     maker: "",
     makerCode: "",
     // Row 3: Model, Model Code, Serial No, Drawing No
@@ -254,7 +254,7 @@ export default function ComponentRegisterAddEdit({
         setComponentData(prev => ({
           ...prev,
           componentCode: nextCode,
-          eqptSystemCategory: getComponentCategory(nextCode),
+          eqptSystemCategory: deriveComponentCategory(nextCode),
         }));
       }
     }
@@ -464,7 +464,7 @@ export default function ComponentRegisterAddEdit({
         componentCode: comp.componentCode || "",
         // Row 2
         componentName: comp.name || "",
-        eqptSystemCategory: comp.componentCategory || getComponentCategory(comp.id),
+        eqptSystemCategory: comp.componentCategory || deriveComponentCategory(comp.componentCode || comp.id),
         maker: comp.maker || "",
         makerCode: comp.makerCode || "",
         // Row 3
@@ -549,15 +549,37 @@ export default function ComponentRegisterAddEdit({
     }
   }, [existingComponent, isLoadingComponent, isEditMode, allJobs, allSpares, componentId, propComponentCode, components]);
 
-  // Auto-update eqptSystemCategory when componentCode changes
+  const deriveComponentCategory = (codeOrId: string): string => {
+    if (!codeOrId) return '';
+    const firstChar = codeOrId.includes('.') ? codeOrId.split('.')[0].charAt(0) : codeOrId.charAt(0);
+    const mlItem = componentCategoryItems.find(item => item.listKey === firstChar && item.isActive);
+    if (mlItem) return mlItem.listValue;
+    return '';
+  };
+
+  const prevComponentCodeRef = useRef<string>('');
+  const masterListLoadedRef = useRef<boolean>(false);
+
   useEffect(() => {
-    if (componentData.componentCode) {
-      const derivedCategory = getComponentCategory(componentData.componentCode);
-      if (derivedCategory && derivedCategory !== componentData.eqptSystemCategory) {
-        setComponentData(prev => ({ ...prev, eqptSystemCategory: derivedCategory }));
+    if (!componentData.componentCode || componentCategoryItems.length === 0) return;
+    const codeChanged = prevComponentCodeRef.current !== '' && prevComponentCodeRef.current !== componentData.componentCode;
+    const categoryEmpty = !componentData.eqptSystemCategory;
+    const masterListJustLoaded = !masterListLoadedRef.current;
+    if (codeChanged || categoryEmpty || masterListJustLoaded) {
+      const derivedCategory = deriveComponentCategory(componentData.componentCode);
+      if (derivedCategory) {
+        setComponentData(prev => {
+          if (prev.eqptSystemCategory && !categoryEmpty && !codeChanged && masterListJustLoaded) {
+            const currentIsValid = componentCategoryItems.some(item => item.listValue === prev.eqptSystemCategory && item.isActive);
+            if (currentIsValid) return prev;
+          }
+          return { ...prev, eqptSystemCategory: derivedCategory };
+        });
       }
     }
-  }, [componentData.componentCode]);
+    prevComponentCodeRef.current = componentData.componentCode;
+    masterListLoadedRef.current = true;
+  }, [componentData.componentCode, componentCategoryItems]);
 
   const isCritical = (comp: any): boolean => {
     if (comp.critical === true) return true;
@@ -977,7 +999,7 @@ export default function ComponentRegisterAddEdit({
       componentCode: comp.componentCode || comp.code || "",
       // Row 2
       componentName: comp.name || "",
-      eqptSystemCategory: comp.componentCategory || getComponentCategory(comp.id),
+      eqptSystemCategory: comp.componentCategory || deriveComponentCategory(comp.componentCode || comp.id),
       maker: comp.maker || "",
       makerCode: comp.makerCode || "",
       // Row 3
@@ -1117,7 +1139,7 @@ export default function ComponentRegisterAddEdit({
                 const isCategory = selectedTreeNode ? isMainCategory(selectedTreeNode) : false;
                 const parentId = selectedTreeNode || "";
                 const nextCode = selectedTreeNode ? generateNextComponentCode(selectedTreeNode, isCategory) : "";
-                const derivedCategory = nextCode ? getComponentCategory(nextCode) : (selectedTreeNode ? getComponentCategory(selectedTreeNode) : "");
+                const derivedCategory = nextCode ? deriveComponentCategory(nextCode) : (selectedTreeNode ? deriveComponentCategory(selectedTreeNode) : "");
                 
                 setIsAddingNew(true);
                 setSelectedComponentId(null);
@@ -1308,13 +1330,18 @@ export default function ComponentRegisterAddEdit({
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1 block">Component Category<span className="text-red-500 ml-0.5">*</span></label>
-                    <Input
+                    <select
                       value={componentData.eqptSystemCategory}
-                      readOnly
-                      className={`h-8 text-sm bg-gray-50 text-gray-700 cursor-not-allowed ${validationErrors.eqptSystemCategory ? 'border-red-500' : ''}`}
-                      data-testid="input-component-category"
-                      title="Auto-populated based on component group (1-8)"
-                    />
+                      onChange={(e) => handleFieldChange('eqptSystemCategory', e.target.value)}
+                      className={`h-8 text-sm w-full px-2 border rounded ${validationErrors.eqptSystemCategory ? 'border-red-500 text-red-700' : 'text-[#52BAF3] border-[#52BAF3]'}`}
+                      data-testid="select-component-category"
+                      title="Auto-populated based on component group (1-8), can be overridden"
+                    >
+                      <option value="">Select Category</option>
+                      {componentCategoryOptions.map(opt => (
+                        <option key={opt.value} value={opt.label}>{opt.label}</option>
+                      ))}
+                    </select>
                     {validationErrors.eqptSystemCategory && <span className="text-xs text-red-500" data-testid="validation-error-eqptSystemCategory">This field is required</span>}
                   </div>
                   <div>
