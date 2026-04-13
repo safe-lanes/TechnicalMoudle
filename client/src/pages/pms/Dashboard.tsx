@@ -21,7 +21,8 @@ import {
   ArrowDown,
   Loader2,
   Filter,
-  BarChart3
+  BarChart3,
+  Info
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend, BarChart, Bar } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -427,6 +428,7 @@ const Dashboard = () => {
   const scopeMeta = scopedResponse?.scopeMeta ?? null;
   const isScopeActive = !!scopeMeta?.hasMapping;
   const toggleDisabled = !!scopeMeta && !scopeMeta.hasMapping;
+  const scopeNotConfigured = toggleDisabled;
 
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
@@ -1124,13 +1126,11 @@ const Dashboard = () => {
   const completionRate = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.completed / workOrderKPIs.total) * 100) : 0;
 
   const operationWOs = useMemo(() => {
-    if (isAllVessels) {
-      return workOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
-    }
-    if (!scopedResponse) return [];
-    if (!scopedResponse.scopeMeta.hasMapping) return [];
-    return scopedResponse.workOrders.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
-  }, [isAllVessels, scopedResponse, workOrdersData]);
+    const filterExec = (wos: WorkOrder[]) => wos.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
+    if (isAllVessels) return filterExec(workOrdersData);
+    if (isScopeActive && scopedResponse) return filterExec(scopedResponse.workOrders);
+    return filterExec(workOrdersData);
+  }, [isAllVessels, isScopeActive, scopedResponse, workOrdersData]);
 
   const operationDonutData = useMemo(() => {
     const safeWOs = operationWOs;
@@ -1566,11 +1566,13 @@ const Dashboard = () => {
                       </span>
                     </div>
                   </TooltipTrigger>
-                  {toggleDisabled && (
-                    <TooltipContent data-testid="tooltip-no-mapping">
-                      <p>Your designation is not mapped to this vessel's org chart</p>
-                    </TooltipContent>
-                  )}
+
+                  <TooltipContent data-testid="tooltip-scope-info">
+                    {toggleDisabled
+                      ? <p>Team scope not configured for this vessel/user; showing standard data</p>
+                      : <p>Filters work-order data by assigned rank hierarchy (Phase 1)</p>
+                    }
+                  </TooltipContent>
                 </UITooltip>
               </TooltipProvider>
             ) : (
@@ -1677,6 +1679,22 @@ const Dashboard = () => {
               </div>
             ) : (
               <>
+                {scopeNotConfigured && !isAllVessels && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700" data-testid="banner-scope-not-configured">
+                    <Info className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span>Team scope not configured for this vessel/user. Showing standard vessel-wide data.</span>
+                  </div>
+                )}
+                {isScopeActive && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-600" data-testid="banner-scope-active">
+                    <Info className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span>
+                      Showing <strong>{hodScope === 'me' ? 'Me' : 'My Team'}</strong> scope.
+                      Work-order KPIs are filtered by assigned rank hierarchy.
+                      Spares, anomalies, and PMS requests remain vessel-wide.
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-stretch gap-3 mb-3" data-testid="section-operation-top">
                   <div className="flex items-center gap-3 flex-shrink-0" data-testid="card-operation-wo-donut">
                     {operationDonutData.length > 0 ? (
@@ -1748,13 +1766,13 @@ const Dashboard = () => {
 
                   <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2" data-testid="section-operation-kpi-cards">
                     {([
-                      { key: 'overdue' as OperationCardFilter, label: 'Overdue WO', value: operationKPIs.overdueCount, borderColor: 'border-l-red-500', textColor: 'text-red-600', testId: 'card-kpi-overdue-wo', valueTestId: 'kpi-overdue-wo' },
-                      { key: 'overdue-critical' as OperationCardFilter, label: 'Overdue WO – Critical Eqpt', value: operationKPIs.overdueCriticalCount, borderColor: 'border-l-red-500', textColor: 'text-red-600', testId: 'card-kpi-overdue-wo-critical', valueTestId: 'kpi-overdue-wo-critical' },
-                      { key: 'planned-today' as OperationCardFilter, label: 'WO – Planned for Today', value: operationKPIs.plannedTodayCount, borderColor: 'border-l-green-500', textColor: 'text-green-600', testId: 'card-kpi-planned-today', valueTestId: 'kpi-planned-today' },
-                      { key: 'critical-spares' as OperationCardFilter, label: 'Critical Spares Low', value: operationKPIs.criticalSparesLowCount, borderColor: 'border-l-orange-500', textColor: 'text-orange-600', testId: 'card-kpi-critical-spares-low', valueTestId: 'kpi-critical-spares-low' },
-                      { key: 'pending-approvals' as OperationCardFilter, label: 'Pending Approvals', value: operationKPIs.pendingApprovalCount, borderColor: 'border-l-orange-500', textColor: 'text-orange-600', testId: 'card-kpi-pending-approvals', valueTestId: 'kpi-pending-approvals' },
-                      { key: 'anomalies' as OperationCardFilter, label: 'W.O Anomalies', value: operationKPIs.anomalyCount, borderColor: 'border-l-orange-500', textColor: 'text-orange-600', testId: 'card-kpi-wo-anomalies', valueTestId: 'kpi-wo-anomalies' },
-                      { key: 'modify-pms' as OperationCardFilter, label: 'Modify PMS Requests', value: operationKPIs.openChangeRequests, borderColor: 'border-l-gray-400', textColor: 'text-gray-600', testId: 'card-kpi-modify-pms-requests', valueTestId: 'kpi-modify-pms-requests' },
+                      { key: 'overdue' as OperationCardFilter, label: 'Overdue WO', value: operationKPIs.overdueCount, borderColor: 'border-l-red-500', textColor: 'text-red-600', testId: 'card-kpi-overdue-wo', valueTestId: 'kpi-overdue-wo', rankScoped: true },
+                      { key: 'overdue-critical' as OperationCardFilter, label: 'Overdue WO – Critical Eqpt', value: operationKPIs.overdueCriticalCount, borderColor: 'border-l-red-500', textColor: 'text-red-600', testId: 'card-kpi-overdue-wo-critical', valueTestId: 'kpi-overdue-wo-critical', rankScoped: true },
+                      { key: 'planned-today' as OperationCardFilter, label: 'WO – Planned for Today', value: operationKPIs.plannedTodayCount, borderColor: 'border-l-green-500', textColor: 'text-green-600', testId: 'card-kpi-planned-today', valueTestId: 'kpi-planned-today', rankScoped: true },
+                      { key: 'critical-spares' as OperationCardFilter, label: 'Critical Spares Low', value: operationKPIs.criticalSparesLowCount, borderColor: 'border-l-orange-500', textColor: 'text-orange-600', testId: 'card-kpi-critical-spares-low', valueTestId: 'kpi-critical-spares-low', rankScoped: false },
+                      { key: 'pending-approvals' as OperationCardFilter, label: 'Pending Approvals', value: operationKPIs.pendingApprovalCount, borderColor: 'border-l-orange-500', textColor: 'text-orange-600', testId: 'card-kpi-pending-approvals', valueTestId: 'kpi-pending-approvals', rankScoped: true },
+                      { key: 'anomalies' as OperationCardFilter, label: 'W.O Anomalies', value: operationKPIs.anomalyCount, borderColor: 'border-l-orange-500', textColor: 'text-orange-600', testId: 'card-kpi-wo-anomalies', valueTestId: 'kpi-wo-anomalies', rankScoped: false },
+                      { key: 'modify-pms' as OperationCardFilter, label: 'Modify PMS Requests', value: operationKPIs.openChangeRequests, borderColor: 'border-l-gray-400', textColor: 'text-gray-600', testId: 'card-kpi-modify-pms-requests', valueTestId: 'kpi-modify-pms-requests', rankScoped: false },
                     ]).map(card => (
                       <Card
                         key={card.key}
@@ -1765,6 +1783,11 @@ const Dashboard = () => {
                         <CardContent className="py-2 px-3 flex flex-col justify-start flex-1">
                           <p className="font-medium text-gray-600 text-[14px]">{card.label}</p>
                           <p className={`text-xl font-bold mt-0.5 ${card.textColor}`} data-testid={card.valueTestId}>{card.value}</p>
+                          {isScopeActive && (
+                            <span className={`text-[9px] mt-auto ${card.rankScoped ? 'text-blue-500' : 'text-gray-400'}`} data-testid={`scope-label-${card.key}`}>
+                              {card.rankScoped ? (hodScope === 'me' ? 'Filtered: Me' : 'Filtered: My Team') : 'Vessel-wide'}
+                            </span>
+                          )}
                         </CardContent>
                       </Card>
                     ))}
