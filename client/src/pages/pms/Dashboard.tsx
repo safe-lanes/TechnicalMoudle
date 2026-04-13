@@ -385,27 +385,38 @@ const Dashboard = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const isAllVessels = vesselId === 'all';
+  const [mgmtVesselId, setMgmtVesselId] = useState<string>(vesselId);
+  useEffect(() => {
+    if (!mgmtVesselId && vesselId) {
+      setMgmtVesselId(vesselId);
+      return;
+    }
+    if (mgmtVesselId && mgmtVesselId !== 'all' && vessels.length > 0 && !vessels.some(v => v.id === mgmtVesselId)) {
+      setMgmtVesselId(vesselId || vessels[0].id);
+    }
+  }, [vesselId, mgmtVesselId, vessels]);
+  const effectiveVesselId = activeTab === 'overview' ? mgmtVesselId : vesselId;
+  const isAllVessels = effectiveVesselId === 'all';
   
   const currentVessel = vessels.find(v => v.id === vesselId);
 
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
-    queryKey: ['/technical/api/work-orders', vesselId],
+    queryKey: ['/technical/api/work-orders', effectiveVesselId],
     queryFn: async () => {
       const url = isAllVessels 
         ? '/technical/api/work-orders' 
-        : `/technical/api/work-orders?vesselId=${vesselId}`;
+        : `/technical/api/work-orders?vesselId=${effectiveVesselId}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch work orders');
       return await response.json();
     },
-    enabled: !!vesselId
+    enabled: !!effectiveVesselId
   });
 
   // Fetch spares data - for all vessels, fetch each vessel's spares and combine
   const { data: sparesData = [], isLoading: isSparesLoading } = useQuery<Spare[]>({
-    queryKey: ['/technical/api/spares', vesselId],
+    queryKey: ['/technical/api/spares', effectiveVesselId],
     queryFn: async () => {
       if (isAllVessels) {
         const allSpares: Spare[] = [];
@@ -422,16 +433,16 @@ const Dashboard = () => {
         }
         return allSpares;
       }
-      const response = await fetch(`/technical/api/spares/${vesselId}`);
+      const response = await fetch(`/technical/api/spares/${effectiveVesselId}`);
       if (!response.ok) throw new Error('Failed to fetch spares');
       return response.json();
     },
-    enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
+    enabled: !!effectiveVesselId && (isAllVessels ? vessels.length > 0 : true)
   });
 
   // Fetch stores data - for all vessels, fetch each vessel's stores and combine
   const { data: storesData = [], isLoading: isStoresLoading } = useQuery<StoresItem[]>({
-    queryKey: ['/technical/api/stores', vesselId],
+    queryKey: ['/technical/api/stores', effectiveVesselId],
     queryFn: async () => {
       if (isAllVessels) {
         const allStores: StoresItem[] = [];
@@ -448,16 +459,16 @@ const Dashboard = () => {
         }
         return allStores;
       }
-      const response = await fetch(`/technical/api/stores/${vesselId}`);
+      const response = await fetch(`/technical/api/stores/${effectiveVesselId}`);
       if (!response.ok) throw new Error('Failed to fetch stores');
       return response.json();
     },
-    enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
+    enabled: !!effectiveVesselId && (isAllVessels ? vessels.length > 0 : true)
   });
 
   // Fetch components data - for all vessels, fetch each vessel's components and combine
   const { data: componentsData = [], isLoading: isComponentsLoading } = useQuery<Component[]>({
-    queryKey: ['/technical/api/components', vesselId],
+    queryKey: ['/technical/api/components', effectiveVesselId],
     queryFn: async () => {
       if (isAllVessels) {
         const allComponents: Component[] = [];
@@ -474,15 +485,15 @@ const Dashboard = () => {
         }
         return allComponents;
       }
-      const response = await fetch(`/technical/api/components/${vesselId}`);
+      const response = await fetch(`/technical/api/components/${effectiveVesselId}`);
       if (!response.ok) throw new Error('Failed to fetch components');
       return response.json();
     },
-    enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
+    enabled: !!effectiveVesselId && (isAllVessels ? vessels.length > 0 : true)
   });
 
   const { data: rhParentsData = [], isLoading: isRHLoading } = useQuery<RHParentComponent[]>({
-    queryKey: ['/technical/api/running-hours/parents', vesselId],
+    queryKey: ['/technical/api/running-hours/parents', effectiveVesselId],
     queryFn: async () => {
       if (isAllVessels) {
         const results = await Promise.allSettled(
@@ -493,15 +504,15 @@ const Dashboard = () => {
         );
         return results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
       }
-      const response = await fetch(`/technical/api/running-hours/parents?vesselId=${vesselId}`);
+      const response = await fetch(`/technical/api/running-hours/parents?vesselId=${effectiveVesselId}`);
       if (!response.ok) throw new Error('Failed to fetch running hours');
       return response.json();
     },
-    enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
+    enabled: !!effectiveVesselId && (isAllVessels ? vessels.length > 0 : true)
   });
 
   const { data: sparesHistoryData = [], isLoading: isSparesHistoryLoading } = useQuery<SparesHistoryItem[]>({
-    queryKey: ['/technical/api/spares/history', vesselId],
+    queryKey: ['/technical/api/spares/history', effectiveVesselId],
     queryFn: async () => {
       if (isAllVessels) {
         const results = await Promise.allSettled(
@@ -512,22 +523,24 @@ const Dashboard = () => {
         );
         return results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
       }
-      const response = await fetch(`/technical/api/spares/history/${vesselId}`);
+      const response = await fetch(`/technical/api/spares/history/${effectiveVesselId}`);
       if (!response.ok) throw new Error('Failed to fetch spares history');
       return response.json();
     },
-    enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
+    enabled: !!effectiveVesselId && (isAllVessels ? vessels.length > 0 : true)
   });
 
   const { data: changeRequestsData = [] } = useQuery<ChangeRequest[]>({
-    queryKey: ['/technical/api/change-requests', vesselId],
+    queryKey: ['/technical/api/change-requests', effectiveVesselId],
     queryFn: async () => {
-      const url = `/technical/api/change-requests?vesselId=${vesselId}`;
+      const url = isAllVessels
+        ? '/technical/api/change-requests'
+        : `/technical/api/change-requests?vesselId=${effectiveVesselId}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch change requests');
       return response.json();
     },
-    enabled: !!vesselId,
+    enabled: !!effectiveVesselId,
   });
 
   useEffect(() => {
@@ -542,16 +555,16 @@ const Dashboard = () => {
   }, [changeRequestsData]);
 
   const { data: superintendentSummary } = useQuery<{ pendingCount: number; acknowledgedThisMonthCount: number }>({
-    queryKey: ['/technical/api/superintendent/notifications/summary', vesselId],
+    queryKey: ['/technical/api/superintendent/notifications/summary', effectiveVesselId],
     queryFn: async () => {
       const url = isAllVessels
         ? '/technical/api/superintendent/notifications/summary'
-        : `/technical/api/superintendent/notifications/summary?vesselId=${vesselId}`;
+        : `/technical/api/superintendent/notifications/summary?vesselId=${effectiveVesselId}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch superintendent summary');
       return response.json();
     },
-    enabled: !!vesselId,
+    enabled: !!effectiveVesselId,
   });
 
   const { data: complianceAnomalies } = useQuery<{
@@ -560,16 +573,16 @@ const Dashboard = () => {
     bulkCompletions: { severity: string; eventCount: number };
     scheduleDrift: { severity: string };
   }>({
-    queryKey: ['/technical/api/dashboard/compliance-anomalies', vesselId],
+    queryKey: ['/technical/api/dashboard/compliance-anomalies', effectiveVesselId],
     queryFn: async () => {
       const url = isAllVessels
         ? '/technical/api/dashboard/compliance-anomalies'
-        : `/technical/api/dashboard/compliance-anomalies?vesselId=${vesselId}`;
+        : `/technical/api/dashboard/compliance-anomalies?vesselId=${effectiveVesselId}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to fetch compliance anomalies');
       return res.json();
     },
-    enabled: activeTab === 'management' && !!vesselId,
+    enabled: activeTab === 'management' && !!effectiveVesselId,
   });
 
   // Helper: Calculate stock status
@@ -649,7 +662,7 @@ const Dashboard = () => {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Work order approved successfully" });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to approve work order", variant: "destructive" });
@@ -668,7 +681,7 @@ const Dashboard = () => {
     },
     onSuccess: () => {
       toast({ title: "Rejected", description: "Work order rejected and sent back to Due" });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to reject work order", variant: "destructive" });
@@ -991,21 +1004,21 @@ const Dashboard = () => {
   };
 
   const handleVesselChange = (newVesselId: string) => {
-    setVesselId(newVesselId);
+    setMgmtVesselId(newVesselId);
   };
 
   const handleAllVesselsChange = (isAll: boolean) => {
     if (isAll) {
-      setVesselId('all');
+      setMgmtVesselId('all');
     } else {
-      if (vesselId === 'all' && vessels.length > 0) {
-        setVesselId(vessels[0].id);
+      if (mgmtVesselId === 'all' && vessels.length > 0) {
+        setMgmtVesselId(vessels[0].id);
       }
     }
   };
 
   const handleFleetVesselSelect = (selectedVesselId: string) => {
-    setVesselId(selectedVesselId);
+    setMgmtVesselId(selectedVesselId);
   };
 
   const handleRefresh = () => {
@@ -1346,11 +1359,11 @@ const Dashboard = () => {
   const dotMatrixVesselData = useMemo(() => {
     if (vessels.length === 0) return [];
     if (!isAllVessels) {
-      const selected = vessels.find(v => v.id === vesselId);
+      const selected = vessels.find(v => v.id === effectiveVesselId);
       return selected ? [selected] : [];
     }
     return vessels.slice(0, 8);
-  }, [vessels, isAllVessels, vesselId]);
+  }, [vessels, isAllVessels, effectiveVesselId]);
 
   const dotMatrixWoQueries = useQueries({
     queries: dotMatrixVesselData.map(vessel => ({
@@ -1529,7 +1542,7 @@ const Dashboard = () => {
         <div className="flex items-center gap-3 flex-wrap" data-testid="bar-fleet-vessel-context">
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 font-medium">Vessel:</span>
-            <Select value={vesselId} onValueChange={handleVesselChange}>
+            <Select value={mgmtVesselId} onValueChange={handleVesselChange}>
               <SelectTrigger className="w-[180px]" data-testid="select-context-vessel">
                 <SelectValue placeholder="Select vessel" />
               </SelectTrigger>
@@ -1544,7 +1557,7 @@ const Dashboard = () => {
 
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 font-medium">Scope:</span>
-            <Select value={isAllVessels ? 'all' : 'my'} onValueChange={(val) => handleAllVesselsChange(val === 'all')}>
+            <Select value={mgmtVesselId === 'all' ? 'all' : 'my'} onValueChange={(val) => handleAllVesselsChange(val === 'all')}>
               <SelectTrigger className="w-[140px]" data-testid="select-vessel-scope">
                 <SelectValue />
               </SelectTrigger>
@@ -1755,7 +1768,7 @@ const Dashboard = () => {
                   {isNonWOCard ? (
                     <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white">
                       <ComplianceAnomalyPanel
-                        vesselId={vesselId}
+                        vesselId={effectiveVesselId}
                         superintendentSummary={superintendentSummary}
                         onNavigateToSuperintendent={() => setLocation('/pms/superintendent')}
                       />
@@ -2699,7 +2712,7 @@ const Dashboard = () => {
         open={bulkApproveModalOpen}
         onOpenChange={setBulkApproveModalOpen}
         workOrders={activeTab === 'management' && selectedOpCard === 'pending-approvals' ? operationKPIs.pendingApprovalWOs : (workOrderKPIs.pendingApprovalFull || [])}
-        vesselId={vesselId}
+        vesselId={effectiveVesselId}
         vesselName={currentVessel?.name}
       />
       <WorkOrdersListModal
