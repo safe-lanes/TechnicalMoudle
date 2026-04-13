@@ -1630,6 +1630,7 @@ export async function getScopedOperationData(
   mode: 'me' | 'myTeam'
 ) {
   const { resolveHierarchyScope, getAllRanks } = await import('../../ranks/service');
+  const complianceAnomalyService = await import('./complianceAnomalyService');
 
   const allRanks = await getAllRanks();
   const labelToRankId = buildLabelToRankIdMap(allRanks);
@@ -1643,54 +1644,69 @@ export async function getScopedOperationData(
     )
     .map((r: any) => r.rankId as string);
 
+  const [allWOs, spares, changeRequests] = await Promise.all([
+    listWorkOrders(vesselId),
+    storage.getSpares(vesselId),
+    storage.getChangeRequests({ vesselId }),
+  ]);
+
   if (matchingRankIds.length === 0) {
     return {
       workOrders: [],
+      spares,
+      changeRequests,
+      anomalyIndicators: { cycleSkipRate: 'green', backdatingFrequency: 'green', bulkCompletions: 'green', scheduleDrift: 'green' },
       scopeMeta: {
         hasMapping: false,
         hasDescendants: false,
         mode,
         appliedRankIds: [] as string[],
-        scopedResourceTypes: ['workOrders'] as string[],
-        unscopedResourceTypes: ['spares', 'anomalies', 'changeRequests'] as string[],
       },
     };
   }
 
   const scope = await resolveHierarchyScope(vesselId, crewDesignation);
 
-  const allWOs = await listWorkOrders(vesselId);
+  let filteredWOs: any[];
+  let appliedRankIds: string[];
+  let hasMapping: boolean;
+  let hasDescendants: boolean;
+  let fallback: string | undefined;
 
   if (!scope.hasMapping) {
     const fallbackRankIdSet = new Set(matchingRankIds);
-    const meWOs = filterWorkOrdersByRankIds(allWOs, fallbackRankIdSet, labelToRankId);
-    return {
-      workOrders: meWOs,
-      scopeMeta: {
-        hasMapping: false,
-        hasDescendants: false,
-        mode,
-        appliedRankIds: matchingRankIds,
-        scopedResourceTypes: ['workOrders'] as string[],
-        unscopedResourceTypes: ['spares', 'anomalies', 'changeRequests'] as string[],
-        fallback: 'designation-rankId-match',
-      },
-    };
+    filteredWOs = filterWorkOrdersByRankIds(allWOs, fallbackRankIdSet, labelToRankId);
+    appliedRankIds = matchingRankIds;
+    hasMapping = false;
+    hasDescendants = false;
+    fallback = 'designation-rankId-match';
+  } else {
+    const bucket = mode === 'me' ? scope.me : scope.myTeam;
+    const scopeRankIdSet = new Set(bucket.rankIds);
+    filteredWOs = filterWorkOrdersByRankIds(allWOs, scopeRankIdSet, labelToRankId);
+    appliedRankIds = bucket.rankIds;
+    hasMapping = true;
+    hasDescendants = scope.hasDescendants;
   }
 
-  const bucket = mode === 'me' ? scope.me : scope.myTeam;
-  const scopeRankIdSet = new Set(bucket.rankIds);
-  const filteredWOs = filterWorkOrdersByRankIds(allWOs, scopeRankIdSet, labelToRankId);
+  const anomalies = await complianceAnomalyService.getComplianceAnomalies(vesselId);
 
   return {
     workOrders: filteredWOs,
+    spares,
+    changeRequests,
+    anomalyIndicators: {
+      cycleSkipRate: anomalies.cycleSkipRate.severity,
+      backdatingFrequency: anomalies.backdatingFrequency.severity,
+      bulkCompletions: anomalies.bulkCompletions.severity,
+      scheduleDrift: anomalies.scheduleDrift.severity,
+    },
     scopeMeta: {
-      hasMapping: true,
-      hasDescendants: scope.hasDescendants,
+      hasMapping,
+      hasDescendants,
       mode,
-      appliedRankIds: bucket.rankIds,
-      scopedResourceTypes: ['workOrders'] as string[],
-      unscopedResourceTypes: ['spares', 'anomalies', 'changeRequests'] as string[],
+      appliedRankIds,
+      ...(fallback ? { fallback } : {}),
     },
   };
 }

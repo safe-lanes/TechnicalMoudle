@@ -407,13 +407,14 @@ const Dashboard = () => {
     hasDescendants: boolean;
     mode: 'me' | 'myTeam';
     appliedRankIds: string[];
-    scopedResourceTypes: string[];
-    unscopedResourceTypes: string[];
     fallback?: string;
   }
 
   interface ScopedOperationResponse {
     workOrders: WorkOrder[];
+    spares: Spare[];
+    changeRequests: ChangeRequest[];
+    anomalyIndicators: { cycleSkipRate: string; backdatingFrequency: string; bulkCompletions: string; scheduleDrift: string };
     scopeMeta: ScopeMeta;
   }
 
@@ -1184,8 +1185,7 @@ const Dashboard = () => {
     });
     const plannedTodayCount = plannedTodayWOs.length;
 
-    const sparesUnscoped = scopeMeta?.unscopedResourceTypes?.includes('spares') && hasValidScope;
-    const effectiveSpares = sparesUnscoped ? [] : sparesData;
+    const effectiveSpares = hasValidScope && scopedResponse ? scopedResponse.spares : sparesData;
     const criticalSparesLowList = effectiveSpares.filter(spare => {
       const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes';
       if (!isCritical) return false;
@@ -1200,16 +1200,17 @@ const Dashboard = () => {
     );
     const pendingApprovalCount = pendingApprovalWOs.length;
 
-    const anomaliesUnscoped = scopeMeta?.unscopedResourceTypes?.includes('anomalies') && hasValidScope;
-    const anomalyCount = anomaliesUnscoped ? 0 : (complianceAnomalies ? [
-      complianceAnomalies.cycleSkipRate.severity,
-      complianceAnomalies.backdatingFrequency.severity,
-      complianceAnomalies.bulkCompletions.severity,
-      complianceAnomalies.scheduleDrift.severity,
-    ].filter(s => s !== 'green').length : 0);
+    const effectiveAnomalyIndicators = hasValidScope && scopedResponse
+      ? scopedResponse.anomalyIndicators
+      : (complianceAnomalies || null);
+    const anomalyCount = effectiveAnomalyIndicators ? [
+      effectiveAnomalyIndicators.cycleSkipRate,
+      effectiveAnomalyIndicators.backdatingFrequency,
+      effectiveAnomalyIndicators.bulkCompletions,
+      effectiveAnomalyIndicators.scheduleDrift,
+    ].map(s => typeof s === 'object' ? (s as any).severity : s).filter(s => s !== 'green').length : 0;
 
-    const crUnscoped = scopeMeta?.unscopedResourceTypes?.includes('changeRequests') && hasValidScope;
-    const effectiveChangeRequests = crUnscoped ? [] : changeRequestsData;
+    const effectiveChangeRequests = hasValidScope && scopedResponse ? scopedResponse.changeRequests : changeRequestsData;
     const openChangeRequestsList = effectiveChangeRequests.filter(cr => {
       const s = cr.status?.toLowerCase();
       return s !== 'approved' && s !== 'rejected';
@@ -1233,7 +1234,7 @@ const Dashboard = () => {
       openChangeRequests,
       openChangeRequestsList,
     };
-  }, [operationWOs, sparesData, changeRequestsData, complianceAnomalies, hasValidScope, scopeMeta]);
+  }, [operationWOs, sparesData, changeRequestsData, complianceAnomalies, hasValidScope, scopeMeta, scopedResponse]);
 
   const operationTableData = useMemo(() => {
     switch (selectedOpCard) {
