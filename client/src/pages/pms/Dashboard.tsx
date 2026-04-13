@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -365,6 +365,9 @@ const Dashboard = () => {
   const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: EnrichedWorkOrder[] }>({ open: false, title: '', workOrders: [] });
   const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
   const [crListModal, setCrListModal] = useState<{ open: boolean; title: string; changeRequests: ChangeRequest[] }>({ open: false, title: '', changeRequests: [] });
+  const crListModalOpenRef = useRef(false);
+  crListModalOpenRef.current = crListModal.open;
+
   const [activeTab, setActiveTab] = useState('overview');
   const [showFilters, setShowFilters] = useState(false);
   type OperationCardFilter = 'overdue' | 'overdue-critical' | 'planned-today' | 'pending-approvals' | 'critical-spares' | 'anomalies' | 'modify-pms' | 'donut-overdue' | 'donut-due' | 'donut-planned';
@@ -526,6 +529,17 @@ const Dashboard = () => {
     },
     enabled: !!vesselId,
   });
+
+  useEffect(() => {
+    if (crListModalOpenRef.current) {
+      const currentYear = new Date().getFullYear();
+      const refreshed = changeRequestsData.filter(cr => {
+        const created = cr.createdAt ? new Date(cr.createdAt) : null;
+        return created !== null && created.getFullYear() === currentYear;
+      });
+      setCrListModal(prev => ({ ...prev, changeRequests: refreshed }));
+    }
+  }, [changeRequestsData]);
 
   const { data: superintendentSummary } = useQuery<{ pendingCount: number; acknowledgedThisMonthCount: number }>({
     queryKey: ['/technical/api/superintendent/notifications/summary', vesselId],
@@ -2223,183 +2237,6 @@ const Dashboard = () => {
                   </Dialog>
                 )}
 
-                {opDetailChangeRequest && (
-                  <Dialog open={!!opDetailChangeRequest} onOpenChange={(isOpen) => !isOpen && setOpDetailChangeRequest(null)}>
-                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle className="text-lg font-semibold text-[#0f4c81]" data-testid="text-op-cr-detail-title">
-                          Change Request Details
-                        </DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-6">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <span className="text-sm font-medium text-gray-500">Title</span>
-                            <p className="text-gray-900 font-medium" data-testid="text-op-cr-title">{opDetailChangeRequest.title}</p>
-                          </div>
-                          <div>
-                            <span className="text-sm font-medium text-gray-500">Category</span>
-                            <p className="text-gray-900 capitalize" data-testid="text-op-cr-category">{opDetailChangeRequest.category}</p>
-                          </div>
-                          <div>
-                            <span className="text-sm font-medium text-gray-500">Requested By</span>
-                            <p className="text-gray-900" data-testid="text-op-cr-requested-by">
-                              {opDetailChangeRequest.requestedByUserId === 'current_user' ? 'Chief Engineer' :
-                               opDetailChangeRequest.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
-                               opDetailChangeRequest.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
-                               opDetailChangeRequest.requestedByUserId}
-                            </p>
-                          </div>
-                          <div>
-                            <span className="text-sm font-medium text-gray-500">Status</span>
-                            <div className="mt-1" data-testid="text-op-cr-status">
-                              {(() => {
-                                const st = opDetailChangeRequest.status?.toLowerCase();
-                                if (st === 'submitted' || st === 'pending') return <Badge className="bg-[#52BAF3] text-white">Pending Approval</Badge>;
-                                if (st === 'approved') return <Badge className="bg-green-500 text-white">Approved</Badge>;
-                                if (st === 'rejected') return <Badge className="bg-red-500 text-white">Rejected</Badge>;
-                                if (st === 'draft') return <Badge className="bg-gray-500 text-white">Draft</Badge>;
-                                if (st === 'returned') return <Badge className="bg-yellow-500 text-white">Returned</Badge>;
-                                return <Badge className="bg-gray-400 text-white">{opDetailChangeRequest.status}</Badge>;
-                              })()}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div>
-                          <span className="text-sm font-medium text-gray-500">Reason</span>
-                          <p className="text-gray-900 mt-1" data-testid="text-op-cr-reason">{opDetailChangeRequest.reason || 'No reason provided'}</p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <span className="text-sm font-medium text-gray-500">Created</span>
-                            <p className="text-gray-900" data-testid="text-op-cr-created">{new Date(opDetailChangeRequest.createdAt).toLocaleDateString()}</p>
-                          </div>
-                          {opDetailChangeRequest.submittedAt && (
-                            <div>
-                              <span className="text-sm font-medium text-gray-500">Submitted</span>
-                              <p className="text-gray-900" data-testid="text-op-cr-submitted">{new Date(opDetailChangeRequest.submittedAt).toLocaleDateString()}</p>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="border-t pt-4">
-                          <div className="flex items-center gap-2 mb-3">
-                            <Eye className="w-5 h-5 text-red-600" />
-                            <span className="text-base font-semibold text-gray-800">Changes Made</span>
-                          </div>
-                          {opDetailChangeRequest.proposedChangesJson && Array.isArray(opDetailChangeRequest.proposedChangesJson) && (opDetailChangeRequest.proposedChangesJson as Array<Record<string, unknown>>).length > 0 ? (
-                            <div className="space-y-3">
-                              {(opDetailChangeRequest.proposedChangesJson as Array<Record<string, unknown>>).map((change, index) => (
-                                <div key={index} className="bg-red-50 p-4 rounded-lg border border-red-200" data-testid={`op-cr-change-${index}`}>
-                                  <div className="mb-2">
-                                    <span className="font-semibold text-gray-800 text-sm uppercase tracking-wide">
-                                      {String(change.field || change.fieldName || change.label || `Field ${index + 1}`)}
-                                    </span>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                      <span className="text-xs text-gray-500 block mb-1">Previous Value</span>
-                                      <span className="text-gray-700 bg-white px-2 py-1 rounded border inline-block">
-                                        {change.oldValue !== undefined ? String(change.oldValue) :
-                                         change.originalValue !== undefined ? String(change.originalValue) :
-                                         change.previousValue !== undefined ? String(change.previousValue) : '—'}
-                                      </span>
-                                    </div>
-                                    <div>
-                                      <span className="text-xs text-gray-500 block mb-1">New Value</span>
-                                      <span className="text-red-600 font-bold bg-red-100 px-2 py-1 rounded border border-red-300 inline-block">
-                                        {change.newValue !== undefined ? String(change.newValue) :
-                                         change.currentValue !== undefined ? String(change.currentValue) :
-                                         change.proposedValue !== undefined ? String(change.proposedValue) : '—'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-gray-500 text-center">
-                              No specific field changes recorded for this request.
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <DialogFooter className="flex justify-between mt-4">
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              const changesSection = document.querySelector('[data-testid="op-cr-change-0"]');
-                              if (changesSection) changesSection.scrollIntoView({ behavior: 'smooth' });
-                            }}
-                            data-testid="button-op-cr-view-changes"
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View Changes
-                          </Button>
-                          {opDetailChangeRequest.status?.toLowerCase() === 'submitted' && !isVessel && !isHeadOfDept && (
-                            <>
-                              <Button
-                                variant="destructive"
-                                onClick={() => {
-                                  const comment = prompt('Please provide a reason for rejection:');
-                                  if (comment) {
-                                    fetch(`/technical/api/change-requests/${opDetailChangeRequest.id}/reject`, {
-                                      method: 'PUT',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ comment, reviewerId: 'current_user' })
-                                    }).then(() => {
-                                      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
-                                      setOpDetailChangeRequest(null);
-                                      toast({
-                                        title: "Change request rejected",
-                                        description: "The change request has been rejected"
-                                      });
-                                    });
-                                  }
-                                }}
-                                data-testid="button-op-cr-reject"
-                              >
-                                <XCircle className="h-4 w-4 mr-1" />
-                                Reject
-                              </Button>
-                              <Button
-                                variant="default"
-                                className="bg-green-600 hover:bg-green-700"
-                                onClick={() => {
-                                  const comment = prompt('Please provide approval comments:');
-                                  if (comment) {
-                                    fetch(`/technical/api/change-requests/${opDetailChangeRequest.id}/approve`, {
-                                      method: 'PUT',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ comment, reviewerId: 'current_user' })
-                                    }).then(() => {
-                                      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
-                                      setOpDetailChangeRequest(null);
-                                      toast({
-                                        title: "Change request approved",
-                                        description: "The change request has been approved successfully"
-                                      });
-                                    });
-                                  }
-                                }}
-                                data-testid="button-op-cr-approve"
-                              >
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Approve
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                        <Button variant="outline" onClick={() => setOpDetailChangeRequest(null)} data-testid="button-op-cr-close">
-                          Close
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                )}
               </>
             )}
           </div>
@@ -3079,6 +2916,186 @@ const Dashboard = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {opDetailChangeRequest && (
+        <Dialog open={!!opDetailChangeRequest} onOpenChange={(isOpen) => !isOpen && setOpDetailChangeRequest(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-semibold text-[#0f4c81]" data-testid="text-op-cr-detail-title">
+                Change Request Details
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-sm font-medium text-gray-500">Title</span>
+                  <p className="text-gray-900 font-medium" data-testid="text-op-cr-title">{opDetailChangeRequest.title}</p>
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-gray-500">Category</span>
+                  <p className="text-gray-900 capitalize" data-testid="text-op-cr-category">{opDetailChangeRequest.category}</p>
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-gray-500">Requested By</span>
+                  <p className="text-gray-900" data-testid="text-op-cr-requested-by">
+                    {opDetailChangeRequest.requestedByUserId === 'current_user' ? 'Chief Engineer' :
+                     opDetailChangeRequest.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
+                     opDetailChangeRequest.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
+                     opDetailChangeRequest.requestedByUserId}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-gray-500">Status</span>
+                  <div className="mt-1" data-testid="text-op-cr-status">
+                    {(() => {
+                      const st = opDetailChangeRequest.status?.toLowerCase();
+                      if (st === 'submitted' || st === 'pending') return <Badge className="bg-[#52BAF3] text-white">Pending Approval</Badge>;
+                      if (st === 'approved') return <Badge className="bg-green-500 text-white">Approved</Badge>;
+                      if (st === 'rejected') return <Badge className="bg-red-500 text-white">Rejected</Badge>;
+                      if (st === 'draft') return <Badge className="bg-gray-500 text-white">Draft</Badge>;
+                      if (st === 'returned') return <Badge className="bg-yellow-500 text-white">Returned</Badge>;
+                      return <Badge className="bg-gray-400 text-white">{opDetailChangeRequest.status}</Badge>;
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-sm font-medium text-gray-500">Reason</span>
+                <p className="text-gray-900 mt-1" data-testid="text-op-cr-reason">{opDetailChangeRequest.reason || 'No reason provided'}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-sm font-medium text-gray-500">Created</span>
+                  <p className="text-gray-900" data-testid="text-op-cr-created">{new Date(opDetailChangeRequest.createdAt).toLocaleDateString()}</p>
+                </div>
+                {opDetailChangeRequest.submittedAt && (
+                  <div>
+                    <span className="text-sm font-medium text-gray-500">Submitted</span>
+                    <p className="text-gray-900" data-testid="text-op-cr-submitted">{new Date(opDetailChangeRequest.submittedAt).toLocaleDateString()}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Eye className="w-5 h-5 text-red-600" />
+                  <span className="text-base font-semibold text-gray-800">Changes Made</span>
+                </div>
+                {opDetailChangeRequest.proposedChangesJson && Array.isArray(opDetailChangeRequest.proposedChangesJson) && (opDetailChangeRequest.proposedChangesJson as Array<Record<string, unknown>>).length > 0 ? (
+                  <div className="space-y-3">
+                    {(opDetailChangeRequest.proposedChangesJson as Array<Record<string, unknown>>).map((change, index) => (
+                      <div key={index} className="bg-red-50 p-4 rounded-lg border border-red-200" data-testid={`op-cr-change-${index}`}>
+                        <div className="mb-2">
+                          <span className="font-semibold text-gray-800 text-sm uppercase tracking-wide">
+                            {String(change.field || change.fieldName || change.label || `Field ${index + 1}`)}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-xs text-gray-500 block mb-1">Previous Value</span>
+                            <span className="text-gray-700 bg-white px-2 py-1 rounded border inline-block">
+                              {change.oldValue !== undefined ? String(change.oldValue) :
+                               change.originalValue !== undefined ? String(change.originalValue) :
+                               change.previousValue !== undefined ? String(change.previousValue) : '—'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-500 block mb-1">New Value</span>
+                            <span className="text-red-600 font-bold bg-red-100 px-2 py-1 rounded border border-red-300 inline-block">
+                              {change.newValue !== undefined ? String(change.newValue) :
+                               change.currentValue !== undefined ? String(change.currentValue) :
+                               change.proposedValue !== undefined ? String(change.proposedValue) : '—'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-gray-500 text-center">
+                    No specific field changes recorded for this request.
+                  </div>
+                )}
+              </div>
+            </div>
+            <DialogFooter className="flex justify-between mt-4">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const changesSection = document.querySelector('[data-testid="op-cr-change-0"]');
+                    if (changesSection) changesSection.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  data-testid="button-op-cr-view-changes"
+                >
+                  <Eye className="h-4 w-4 mr-1" />
+                  View Changes
+                </Button>
+                {opDetailChangeRequest.status?.toLowerCase() === 'submitted' && !isVessel && !isHeadOfDept && (
+                  <>
+                    <Button
+                      variant="destructive"
+                      onClick={async () => {
+                        const comment = prompt('Please provide a reason for rejection:');
+                        if (comment) {
+                          try {
+                            const response = await fetch(`/technical/api/change-requests/${opDetailChangeRequest.id}/reject`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ comment, reviewerId: 'current_user' })
+                            });
+                            if (!response.ok) throw new Error('Failed to reject');
+                            queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
+                            setOpDetailChangeRequest(null);
+                            toast({ title: "Change request rejected", description: "The change request has been rejected" });
+                          } catch {
+                            toast({ title: "Error", description: "Failed to reject the change request", variant: "destructive" });
+                          }
+                        }
+                      }}
+                      data-testid="button-op-cr-reject"
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      Reject
+                    </Button>
+                    <Button
+                      variant="default"
+                      className="bg-green-600 hover:bg-green-700"
+                      onClick={async () => {
+                        const comment = prompt('Please provide approval comments:');
+                        if (comment) {
+                          try {
+                            const response = await fetch(`/technical/api/change-requests/${opDetailChangeRequest.id}/approve`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ comment, reviewerId: 'current_user' })
+                            });
+                            if (!response.ok) throw new Error('Failed to approve');
+                            queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
+                            setOpDetailChangeRequest(null);
+                            toast({ title: "Change request approved", description: "The change request has been approved successfully" });
+                          } catch {
+                            toast({ title: "Error", description: "Failed to approve the change request", variant: "destructive" });
+                          }
+                        }
+                      }}
+                      data-testid="button-op-cr-approve"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Approve
+                    </Button>
+                  </>
+                )}
+              </div>
+              <Button variant="outline" onClick={() => setOpDetailChangeRequest(null)} data-testid="button-op-cr-close">
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
