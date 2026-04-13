@@ -324,7 +324,12 @@ export default function VesselOrgChart() {
   const setParentNode = (nodeUuid: string, parentNodeUuid: string | null) => {
     setNodes(prev => {
       const target = prev.find(n => n.nodeUuid === nodeUuid);
-      if (target?.isHod && parentNodeUuid !== null) return prev;
+      if (!target) return prev;
+      if (target.isHod && parentNodeUuid !== null) return prev;
+      if (parentNodeUuid !== null) {
+        const parent = prev.find(n => n.nodeUuid === parentNodeUuid);
+        if (parent && parent.department !== target.department) return prev;
+      }
       return prev.map(n => n.nodeUuid === nodeUuid ? { ...n, parentNodeUuid } : n);
     });
     setHasUnsavedChanges(true);
