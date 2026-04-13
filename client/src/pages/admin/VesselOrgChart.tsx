@@ -488,7 +488,7 @@ export default function VesselOrgChart() {
   }, []);
 
   const renderArea1 = () => (
-    <div className="flex flex-col h-full border-r" data-testid="area-unassigned">
+    <div className="flex flex-col h-full min-h-0 border-r" data-testid="area-unassigned">
       <div className="flex-shrink-0 p-3 border-b bg-gray-50">
         <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1">
           <Users className="h-4 w-4" /> Available Ranks
@@ -505,7 +505,7 @@ export default function VesselOrgChart() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto thin-scrollbar">
         {unassignedNodes.length > 0 && (
           <div className="p-2">
             <h4 className="text-[11px] uppercase text-gray-400 font-semibold mb-1 px-1">Unassigned Instances</h4>
@@ -745,14 +745,14 @@ export default function VesselOrgChart() {
   };
 
   const renderArea2 = () => (
-    <div className="flex flex-col h-full border-r" data-testid="area-departments">
+    <div className="flex flex-col h-full min-h-0 border-r" data-testid="area-departments">
       <div className="flex-shrink-0 p-3 border-b bg-gray-50">
         <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1">
           <Network className="h-4 w-4" /> Department Hierarchy
         </h3>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+      <div className="flex-1 overflow-y-auto thin-scrollbar p-2 space-y-2">
         {departments.map(dept => {
           const deptNodes = nodesByDept.get(dept) || [];
           const count = deptNodes.length;
@@ -863,13 +863,13 @@ export default function VesselOrgChart() {
   );
 
   const renderArea3 = () => (
-    <div className="flex flex-col h-full" data-testid="area-preview">
+    <div className="flex flex-col h-full min-h-0" data-testid="area-preview">
       <div className="flex-shrink-0 p-3 border-b bg-gray-50">
         <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1">
           <Eye className="h-4 w-4" /> Live Preview
         </h3>
       </div>
-      <div className="flex-1 overflow-y-auto p-3">
+      <div className="flex-1 overflow-y-auto thin-scrollbar p-3">
         {departments.map(dept => {
           const deptNodes = nodesByDept.get(dept);
           if (!deptNodes || deptNodes.length === 0) return null;
