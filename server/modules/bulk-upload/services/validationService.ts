@@ -325,7 +325,7 @@ export async function validateData(type: string, data: any[], mode: string, vess
           if (!isNaN(firstDigit) && firstDigit >= 1 && firstDigit <= 8) {
             const category = getComponentCategory(firstDigit);
             if (category && !row['Component Category']) {
-              normalized['Component Category'] = `${firstDigit} ${category}`;
+              normalized['Component Category'] = category;
             }
           }
         }
@@ -335,10 +335,15 @@ export async function validateData(type: string, data: any[], mode: string, vess
       if (providedCategory && typeof providedCategory === 'string') {
         const activeCats = getEffectiveComponentCategories();
         const catValue = providedCategory.trim();
-        const isValid = activeCats.some(ac => ac === catValue || ac.endsWith(` ${catValue}`) || catValue.endsWith(ac.replace(/^\d+\s+/, '')));
+        const catNameOnly = catValue.replace(/^\d+\s+/, '');
+        const isValid = activeCats.some(ac => {
+          const acName = ac.replace(/^\d+\s+/, '');
+          return ac === catValue || acName === catValue || acName === catNameOnly;
+        });
         if (!isValid && activeCats.length > 0) {
-          const allowedValues = activeCats.map(c => c.replace(/^\d+\s+/, '')).join(', ');
-          warnings.push(`Row ${rowNum}: Component Category "${catValue}" does not match active master list values (${allowedValues})`);
+          const allowedValues = activeCats.join(', ');
+          errors.push({ row: rowNum, field: 'Component Category', message: `Invalid Component Category "${catValue}". Allowed values: ${allowedValues}`, data: row });
+          continue;
         }
       }
       

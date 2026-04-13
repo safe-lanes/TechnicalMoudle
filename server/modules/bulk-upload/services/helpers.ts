@@ -534,24 +534,41 @@ export const COMPONENT_CATEGORIES = [
   "8 Ship Common Systems"
 ];
 
-let _dynamicCategories: string[] | null = null;
+const FALLBACK_CATEGORY_MAP: Record<number, string> = {
+  1: "1 Ship General",
+  2: "2 Hull",
+  3: "3 Equipment for Cargo",
+  4: "4 Ship Equipment",
+  5: "5 Equipment for Crew and Passengers",
+  6: "6 Machinery Main Components",
+  7: "7 Systems for Machinery Main Components",
+  8: "8 Ship Common Systems",
+};
+
+let _dynamicCategoryMap: Record<number, string> | null = null;
+let _dynamicCategoryValues: string[] | null = null;
 
 export function setDynamicComponentCategories(categories: { listKey: string; listValue: string }[]) {
-  _dynamicCategories = categories
-    .sort((a, b) => parseInt(a.listKey) - parseInt(b.listKey))
-    .map(c => `${c.listKey} ${c.listValue}`);
+  _dynamicCategoryMap = {};
+  _dynamicCategoryValues = [];
+  for (const c of categories) {
+    const key = parseInt(c.listKey);
+    if (!isNaN(key)) {
+      const fullEntry = `${c.listKey} ${c.listValue}`;
+      _dynamicCategoryMap[key] = fullEntry;
+      _dynamicCategoryValues.push(fullEntry);
+    }
+  }
+  _dynamicCategoryValues.sort((a, b) => parseInt(a) - parseInt(b));
 }
 
 export function getEffectiveComponentCategories(): string[] {
-  return _dynamicCategories || COMPONENT_CATEGORIES;
+  return _dynamicCategoryValues || COMPONENT_CATEGORIES;
 }
 
 export function getComponentCategory(mainGroupCode: number): string | null {
-  const cats = getEffectiveComponentCategories();
-  if (mainGroupCode >= 1 && mainGroupCode <= cats.length) {
-    return cats[mainGroupCode - 1];
-  }
-  return null;
+  const map = _dynamicCategoryMap || FALLBACK_CATEGORY_MAP;
+  return map[mainGroupCode] || null;
 }
 
 // Helper function to extract Sub Group Code (first 2 digits) from SFI code
