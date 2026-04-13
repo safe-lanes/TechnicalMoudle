@@ -185,3 +185,31 @@ export async function deleteVesselOrgChartNode(req: Request, res: Response) {
     res.status(500).json({ error: "Failed to delete node" });
   }
 }
+
+export async function getVesselDepartmentConfig(req: Request, res: Response) {
+  try {
+    const { vesselId } = req.params;
+    if (!vesselId) return res.status(400).json({ error: "vesselId required" });
+    const configs = await service.getVesselDepartmentConfig(vesselId);
+    res.json(configs);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("Error fetching vessel department config:", error);
+    res.status(500).json({ error: "Failed to fetch vessel department config" });
+  }
+}
+
+export async function saveVesselDepartmentConfig(req: Request, res: Response) {
+  try {
+    const { vesselId } = req.params;
+    const { configs } = req.body;
+    if (!vesselId) return res.status(400).json({ error: "vesselId required" });
+    if (!Array.isArray(configs)) return res.status(400).json({ error: "configs array required" });
+    const result = await service.saveVesselDepartmentConfig(vesselId, configs);
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("Error saving vessel department config:", error);
+    res.status(500).json({ error: "Failed to save vessel department config" });
+  }
+}

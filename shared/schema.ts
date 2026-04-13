@@ -3472,6 +3472,7 @@ export const vesselOrgChartNodes = pgTable("vessel_org_chart_nodes", {
   isAssigned: boolean("is_assigned").default(false),
   viewMode: text("view_mode"),
   sortOrder: integer("sort_order").default(0),
+  nodeLayer: text("node_layer").default("department").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdateFn(() => new Date()),
   createdByUuid: text("created_by_uuid"),
@@ -3488,6 +3489,27 @@ export const insertVesselOrgChartNodeSchema = createInsertSchema(vesselOrgChartN
 
 export type InsertVesselOrgChartNode = z.infer<typeof insertVesselOrgChartNodeSchema>;
 export type VesselOrgChartNode = typeof vesselOrgChartNodes.$inferSelect;
+
+export const vesselDepartmentConfig = pgTable("vessel_department_config", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
+  department: text("department").notNull(),
+  isEnabled: boolean("is_enabled").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdateFn(() => new Date()),
+}, (table) => ({
+  vesselDeptUnique: unique("vessel_dept_config_unique").on(table.vesselId, table.department),
+}));
+
+export const insertVesselDepartmentConfigSchema = createInsertSchema(vesselDepartmentConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertVesselDepartmentConfig = z.infer<typeof insertVesselDepartmentConfigSchema>;
+export type VesselDepartmentConfig = typeof vesselDepartmentConfig.$inferSelect;
 
 // ====== MONTHLY MAINTENANCE SNAPSHOTS ======
 export const monthlySnapshots = pgTable("monthly_snapshots", {

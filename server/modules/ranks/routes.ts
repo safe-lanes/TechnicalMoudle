@@ -22,4 +22,7 @@ router.post('/admin/vessel-org-chart-nodes/:vesselId/bulk-save', asyncHandler(ct
 router.patch('/admin/vessel-org-chart-nodes/:vesselId/:nodeUuid/unassign', asyncHandler(ctrl.unassignVesselOrgChartNode));
 router.delete('/admin/vessel-org-chart-nodes/:vesselId/:nodeUuid', asyncHandler(ctrl.deleteVesselOrgChartNode));
 
+router.get('/admin/vessel-department-config/:vesselId', asyncHandler(ctrl.getVesselDepartmentConfig));
+router.post('/admin/vessel-department-config/:vesselId', asyncHandler(ctrl.saveVesselDepartmentConfig));
+
 export default router;

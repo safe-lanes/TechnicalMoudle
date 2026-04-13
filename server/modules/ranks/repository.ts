@@ -1,5 +1,5 @@
 import { getPostgresClient } from '../../postgresClient';
-import { admAvailableRanks, admVesselOrgChart, vesselOrgChartNodes } from '@shared/schema';
+import { admAvailableRanks, admVesselOrgChart, vesselOrgChartNodes, vesselDepartmentConfig } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 
 function getDb() {
@@ -151,4 +151,39 @@ export async function softDeleteVesselOrgChartNode(nodeUuid: string) {
   return db.update(vesselOrgChartNodes)
     .set({ isDeleted: true, updatedAt: new Date() })
     .where(eq(vesselOrgChartNodes.nodeUuid, nodeUuid));
+}
+
+export async function getVesselDepartmentConfig(vesselId: string) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.select().from(vesselDepartmentConfig)
+    .where(eq(vesselDepartmentConfig.vesselId, vesselId))
+    .orderBy(vesselDepartmentConfig.sortOrder);
+}
+
+export async function upsertVesselDepartmentConfig(vesselId: string, configs: { department: string; isEnabled: boolean; sortOrder: number }[]) {
+  const db = await getDb();
+  if (!db) return null;
+  const results = [];
+  for (const cfg of configs) {
+    const existing = await db.select().from(vesselDepartmentConfig)
+      .where(and(
+        eq(vesselDepartmentConfig.vesselId, vesselId),
+        eq(vesselDepartmentConfig.department, cfg.department)
+      ))
+      .limit(1);
+    if (existing.length > 0) {
+      const updated = await db.update(vesselDepartmentConfig)
+        .set({ isEnabled: cfg.isEnabled, sortOrder: cfg.sortOrder, updatedAt: new Date() })
+        .where(eq(vesselDepartmentConfig.id, existing[0].id))
+        .returning();
+      results.push(updated[0]);
+    } else {
+      const inserted = await db.insert(vesselDepartmentConfig)
+        .values({ vesselId, department: cfg.department, isEnabled: cfg.isEnabled, sortOrder: cfg.sortOrder })
+        .returning();
+      results.push(inserted[0]);
+    }
+  }
+  return results;
 }

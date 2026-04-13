@@ -18,10 +18,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
 import {
   Plus, Save, Loader2, ChevronUp, ChevronDown, ArrowLeft,
   Network, Star, X, Search, Users, Eye, GripVertical, Trash2,
-  AlertTriangle, Pencil, Check
+  AlertTriangle, Pencil, Check, Crown, Building2, ToggleLeft
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -32,6 +33,8 @@ import { useDepartmentOptions } from "@/hooks/useDepartments";
 import { VISIBLE_UI_ROLES, UI_ROLE_LABELS } from "@shared/uiRoles";
 import type { UIRole } from "@shared/uiRoles";
 import { useLocation } from "wouter";
+
+type NodeLayer = 'department' | 'overall-head' | 'supervisory';
 
 interface OrgNode {
   nodeUuid: string;
@@ -44,7 +47,14 @@ interface OrgNode {
   isAssigned: boolean;
   viewMode: string | null;
   sortOrder: number;
+  nodeLayer: NodeLayer;
   isNew?: boolean;
+}
+
+interface DeptConfig {
+  department: string;
+  isEnabled: boolean;
+  sortOrder: number;
 }
 
 interface RankRow {
@@ -65,7 +75,14 @@ const DEPT_COLORS: Record<string, string> = {
   Radio: "bg-indigo-500",
 };
 
-function getDeptColor(dept: string | null): string {
+const LAYER_COLORS: Record<NodeLayer, string> = {
+  'overall-head': 'bg-rose-600',
+  'supervisory': 'bg-slate-600',
+  'department': 'bg-gray-400',
+};
+
+function getDeptColor(dept: string | null, layer?: NodeLayer): string {
+  if (layer && layer !== 'department') return LAYER_COLORS[layer];
   if (!dept) return "bg-gray-400";
   return DEPT_COLORS[dept] || "bg-teal-500";
 }
@@ -89,6 +106,7 @@ export default function VesselOrgChart() {
 
   const [selectedVesselId, setSelectedVesselId] = useState<string>("");
   const [nodes, setNodes] = useState<OrgNode[]>([]);
+  const [deptConfigs, setDeptConfigs] = useState<DeptConfig[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [rankSearch, setRankSearch] = useState("");
   const [activeDept, setActiveDept] = useState<string | null>(null);
@@ -98,6 +116,7 @@ export default function VesselOrgChart() {
   const [draggedNodeUuid, setDraggedNodeUuid] = useState<string | null>(null);
   const [dragOverDept, setDragOverDept] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ nodeUuid: string; position: 'before' | 'after' | 'child' } | null>(null);
+  const [showDeptSettings, setShowDeptSettings] = useState(false);
 
   const { data: savedRanks = [] } = useQuery<RankRow[]>({
     queryKey: ['/technical/api/admin/available-ranks'],
@@ -114,16 +133,33 @@ export default function VesselOrgChart() {
     enabled: !!selectedVesselId,
   });
 
+  const { data: savedDeptConfigs } = useQuery<DeptConfig[]>({
+    queryKey: ['/technical/api/admin/vessel-department-config', selectedVesselId],
+    queryFn: async () => {
+      if (!selectedVesselId) return [];
+      const res = await fetch(`/technical/api/admin/vessel-department-config/${selectedVesselId}`);
+      if (!res.ok) throw new Error("Failed to fetch dept config");
+      return res.json();
+    },
+    enabled: !!selectedVesselId,
+  });
+
   useEffect(() => {
     if (savedNodes && Array.isArray(savedNodes)) {
-      setNodes(savedNodes.map(n => ({ ...n })));
+      setNodes(savedNodes.map(n => ({ ...n, nodeLayer: (n.nodeLayer || 'department') as NodeLayer })));
       setHasUnsavedChanges(false);
-      const depts = new Set(savedNodes.filter(n => n.department).map(n => n.department!));
+      const depts = new Set(savedNodes.filter(n => n.department && n.nodeLayer === 'department').map(n => n.department!));
       if (depts.size > 0 && !activeDept) {
         setActiveDept([...depts][0]);
       }
     }
   }, [savedNodes]);
+
+  useEffect(() => {
+    if (savedDeptConfigs && Array.isArray(savedDeptConfigs)) {
+      setDeptConfigs(savedDeptConfigs.map(c => ({ department: c.department, isEnabled: c.isEnabled, sortOrder: c.sortOrder })));
+    }
+  }, [savedDeptConfigs]);
 
   const bulkSaveMutation = useMutation({
     mutationFn: async (payload: OrgNode[]) => {
@@ -138,6 +174,7 @@ export default function VesselOrgChart() {
           isAssigned: n.isAssigned,
           viewMode: n.viewMode,
           sortOrder: n.sortOrder,
+          nodeLayer: n.nodeLayer,
         })),
       });
       return response.json();
@@ -152,15 +189,28 @@ export default function VesselOrgChart() {
     },
   });
 
+  const deptConfigMutation = useMutation({
+    mutationFn: async (configs: DeptConfig[]) => {
+      const response = await apiRequest('POST', `/technical/api/admin/vessel-department-config/${selectedVesselId}`, { configs });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-department-config', selectedVesselId] });
+    },
+  });
+
   const handleSave = () => {
     if (!selectedVesselId) return;
     const normalized = nodes.map(n => {
-      if (n.isAssigned && !n.department) {
+      if (n.isAssigned && !n.department && n.nodeLayer === 'department') {
         return { ...n, isAssigned: false, parentNodeUuid: null, isHod: false, sortOrder: 0 };
       }
       return n;
     });
     bulkSaveMutation.mutate(normalized);
+    if (deptConfigs.length > 0) {
+      deptConfigMutation.mutate(deptConfigs);
+    }
   };
 
   const ranksMap = useMemo(() => {
@@ -175,8 +225,10 @@ export default function VesselOrgChart() {
     return rank ? (rank.label || rank.name) : rankId;
   }, [ranksMap]);
 
-  const assignedNodes = useMemo(() => nodes.filter(n => n.isAssigned && n.department), [nodes]);
-  const unassignedNodes = useMemo(() => nodes.filter(n => !n.isAssigned || !n.department), [nodes]);
+  const overallHeadNodes = useMemo(() => nodes.filter(n => n.nodeLayer === 'overall-head' && n.isAssigned).sort((a, b) => a.sortOrder - b.sortOrder), [nodes]);
+  const supervisoryNodes = useMemo(() => nodes.filter(n => n.nodeLayer === 'supervisory' && n.isAssigned).sort((a, b) => a.sortOrder - b.sortOrder), [nodes]);
+  const assignedNodes = useMemo(() => nodes.filter(n => n.isAssigned && n.department && n.nodeLayer === 'department'), [nodes]);
+  const unassignedNodes = useMemo(() => nodes.filter(n => !n.isAssigned), [nodes]);
 
   const departments = useMemo(() => {
     const deptSet = new Set<string>();
@@ -184,6 +236,14 @@ export default function VesselOrgChart() {
     departmentOptions.forEach(d => deptSet.add(d.value));
     return [...deptSet].sort();
   }, [assignedNodes, departmentOptions]);
+
+  const enabledDepartments = useMemo(() => {
+    const configMap = new Map(deptConfigs.map(c => [c.department, c]));
+    return departments.filter(d => {
+      const cfg = configMap.get(d);
+      return !cfg || cfg.isEnabled;
+    });
+  }, [departments, deptConfigs]);
 
   const nodesByDept = useMemo(() => {
     const map = new Map<string, OrgNode[]>();
@@ -208,7 +268,7 @@ export default function VesselOrgChart() {
     return filtered.sort((a, b) => a.sortOrder - b.sortOrder);
   }, [savedRanks, rankSearch]);
 
-  const createNodeInstance = (rankId: string) => {
+  const createNodeInstance = (rankId: string, layer: NodeLayer = 'department') => {
     if (!selectedVesselId) return;
     const rank = ranksMap.get(rankId);
     const newNode: OrgNode = {
@@ -219,9 +279,10 @@ export default function VesselOrgChart() {
       department: null,
       parentNodeUuid: null,
       isHod: false,
-      isAssigned: false,
+      isAssigned: layer !== 'department',
       viewMode: rank?.viewMode || null,
       sortOrder: 0,
+      nodeLayer: layer,
       isNew: true,
     };
     setNodes(prev => [...prev, newNode]);
@@ -232,7 +293,7 @@ export default function VesselOrgChart() {
     setNodes(prev => {
       const target = prev.find(n => n.nodeUuid === nodeUuid);
       const oldDept = target?.department;
-      const deptNodes = prev.filter(x => x.department === department && x.isAssigned);
+      const deptNodes = prev.filter(x => x.department === department && x.isAssigned && x.nodeLayer === 'department');
       return prev.map(n => {
         if (n.nodeUuid === nodeUuid) {
           return {
@@ -242,6 +303,7 @@ export default function VesselOrgChart() {
             parentNodeUuid: null,
             isHod: false,
             sortOrder: deptNodes.length + 1,
+            nodeLayer: 'department' as NodeLayer,
           };
         }
         if (oldDept && n.department === oldDept && n.parentNodeUuid === nodeUuid) {
@@ -257,7 +319,7 @@ export default function VesselOrgChart() {
   const unassignNode = (nodeUuid: string) => {
     setNodes(prev => prev.map(n => {
       if (n.nodeUuid !== nodeUuid) return n;
-      return { ...n, department: null, parentNodeUuid: null, isAssigned: false, isHod: false, sortOrder: 0 };
+      return { ...n, department: null, parentNodeUuid: null, isAssigned: false, isHod: false, sortOrder: 0, nodeLayer: 'department' as NodeLayer };
     }).map(n => {
       if (n.parentNodeUuid === nodeUuid) return { ...n, parentNodeUuid: null };
       return n;
@@ -326,6 +388,33 @@ export default function VesselOrgChart() {
   const updateNodeField = (nodeUuid: string, field: keyof OrgNode, value: any) => {
     setNodes(prev => prev.map(n => n.nodeUuid === nodeUuid ? { ...n, [field]: value } : n));
     setHasUnsavedChanges(true);
+  };
+
+  const assignNodeToLayer = (nodeUuid: string, layer: NodeLayer) => {
+    setNodes(prev => {
+      const layerNodes = prev.filter(n => n.nodeLayer === layer && n.isAssigned);
+      return prev.map(n => {
+        if (n.nodeUuid !== nodeUuid) return n;
+        return { ...n, nodeLayer: layer, isAssigned: true, department: null, parentNodeUuid: null, isHod: false, sortOrder: layerNodes.length + 1 };
+      });
+    });
+    setHasUnsavedChanges(true);
+  };
+
+  const toggleDeptEnabled = (department: string) => {
+    setDeptConfigs(prev => {
+      const existing = prev.find(c => c.department === department);
+      if (existing) {
+        return prev.map(c => c.department === department ? { ...c, isEnabled: !c.isEnabled } : c);
+      }
+      return [...prev, { department, isEnabled: false, sortOrder: prev.length }];
+    });
+    setHasUnsavedChanges(true);
+  };
+
+  const isDeptEnabled = (department: string): boolean => {
+    const cfg = deptConfigs.find(c => c.department === department);
+    return !cfg || cfg.isEnabled;
   };
 
   const setParentNode = (nodeUuid: string, parentNodeUuid: string | null) => {
@@ -445,7 +534,7 @@ export default function VesselOrgChart() {
   const renderPreviewNode = (treeNode: TreeNode, depth: number): JSX.Element => {
     const { node } = treeNode;
     const label = getRankDisplay(node.rankId, node.nodeLabel);
-    const color = getDeptColor(node.department);
+    const color = getDeptColor(node.department, node.nodeLayer);
     const indent = depth * 28;
 
     return (
@@ -531,12 +620,18 @@ export default function VesselOrgChart() {
                   <span className="text-[10px] text-gray-400">({node.rankId})</span>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Select onValueChange={(dept) => assignNodeToDept(node.nodeUuid, dept)}>
+                  <Select onValueChange={(val) => {
+                    if (val === '__overall-head__') assignNodeToLayer(node.nodeUuid, 'overall-head');
+                    else if (val === '__supervisory__') assignNodeToLayer(node.nodeUuid, 'supervisory');
+                    else assignNodeToDept(node.nodeUuid, val);
+                  }}>
                     <SelectTrigger className="h-6 w-[100px] text-[10px]" data-testid={`assign-dept-${node.nodeUuid}`}>
                       <SelectValue placeholder="Assign..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {departments.map(d => (
+                      <SelectItem value="__overall-head__">Overall Head</SelectItem>
+                      <SelectItem value="__supervisory__">Supervisory</SelectItem>
+                      {enabledDepartments.map(d => (
                         <SelectItem key={d} value={d}>{d}</SelectItem>
                       ))}
                     </SelectContent>
@@ -675,7 +770,7 @@ export default function VesselOrgChart() {
             </div>
           ) : (
             <div className="flex items-center gap-1">
-              <span className={cn("inline-block px-2.5 py-0.5 rounded text-white text-xs font-medium whitespace-nowrap", getDeptColor(node.department))}>
+              <span className={cn("inline-block px-2.5 py-0.5 rounded text-white text-xs font-medium whitespace-nowrap", getDeptColor(node.department, node.nodeLayer))}>
                 {label}
               </span>
               <button
@@ -744,16 +839,150 @@ export default function VesselOrgChart() {
     );
   };
 
+  const renderLayerNode = (node: OrgNode, layer: NodeLayer) => {
+    const label = getRankDisplay(node.rankId, node.nodeLabel);
+    const isEditingLabel = editingLabelNodeUuid === node.nodeUuid;
+
+    return (
+      <div key={node.nodeUuid} className="flex items-center py-1.5 px-2 hover:bg-gray-50 rounded transition-colors group" data-testid={`layer-node-${node.nodeUuid}`}>
+        {isEditingLabel ? (
+          <div className="flex items-center gap-1">
+            <Input
+              value={editingLabelValue}
+              onChange={(e) => setEditingLabelValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitEditLabel();
+                if (e.key === 'Escape') cancelEditLabel();
+              }}
+              className="h-6 w-[140px] text-xs px-2"
+              autoFocus
+              data-testid={`input-label-${node.nodeUuid}`}
+            />
+            <button onClick={commitEditLabel} className="text-green-500 hover:text-green-700 p-0.5" data-testid={`save-label-${node.nodeUuid}`}>
+              <Check className="h-3 w-3" />
+            </button>
+            <button onClick={cancelEditLabel} className="text-gray-400 hover:text-gray-600 p-0.5" data-testid={`cancel-label-${node.nodeUuid}`}>
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1">
+            <span className={cn("inline-block px-2.5 py-0.5 rounded text-white text-xs font-medium whitespace-nowrap", LAYER_COLORS[layer])}>
+              {label}
+            </span>
+            <button
+              onClick={() => startEditLabel(node)}
+              className="text-gray-300 hover:text-blue-500 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Edit label"
+              data-testid={`edit-label-${node.nodeUuid}`}
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+
+        <Select
+          value={node.viewMode || "__none__"}
+          onValueChange={(v) => updateNodeField(node.nodeUuid, 'viewMode', v === "__none__" ? null : v)}
+        >
+          <SelectTrigger className="h-6 w-[100px] ml-1 text-[10px]" data-testid={`viewmode-select-${node.nodeUuid}`}>
+            <SelectValue placeholder="View" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">None</SelectItem>
+            {VISIBLE_UI_ROLES.map(role => (
+              <SelectItem key={role} value={role}>{UI_ROLE_LABELS[role]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <button
+          onClick={() => unassignNode(node.nodeUuid)}
+          className="ml-auto text-gray-300 hover:text-red-500 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+          title="Unassign"
+          data-testid={`unassign-${node.nodeUuid}`}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    );
+  };
+
   const renderArea2 = () => (
     <div className="flex flex-col h-full min-h-0 border-r" data-testid="area-departments">
       <div className="flex-shrink-0 p-3 border-b bg-gray-50">
-        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1">
-          <Network className="h-4 w-4" /> Department Hierarchy
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+            <Network className="h-4 w-4" /> Hierarchy Builder
+          </h3>
+          <button
+            onClick={() => setShowDeptSettings(!showDeptSettings)}
+            className={cn("p-1 rounded transition-colors", showDeptSettings ? "bg-blue-100 text-blue-600" : "text-gray-400 hover:text-gray-600")}
+            title="Department settings"
+            data-testid="button-dept-settings"
+          >
+            <ToggleLeft className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto thin-scrollbar p-2 space-y-2">
-        {departments.map(dept => {
+        {showDeptSettings && (
+          <div className="border rounded-lg border-blue-200 bg-blue-50/50 p-2 space-y-1" data-testid="dept-settings-panel">
+            <h4 className="text-[11px] uppercase text-blue-600 font-semibold px-1 mb-1">Department Visibility</h4>
+            {departments.map(dept => (
+              <div key={dept} className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-blue-100/50" data-testid={`dept-toggle-${dept}`}>
+                <span className="text-xs font-medium text-gray-700">{dept}</span>
+                <Switch
+                  checked={isDeptEnabled(dept)}
+                  onCheckedChange={() => toggleDeptEnabled(dept)}
+                  className="scale-75"
+                  data-testid={`switch-dept-${dept}`}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="border rounded-lg border-rose-200" data-testid="overall-head-section">
+          <div className="flex items-center justify-between px-3 py-2 bg-rose-50 rounded-t-lg">
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-rose-700">
+              <Crown className="h-3.5 w-3.5" />
+              Overall Head
+              {overallHeadNodes.length > 0 && <span className="text-[10px] font-normal text-rose-400">({overallHeadNodes.length})</span>}
+            </span>
+          </div>
+          <div className="px-2 pb-2 pt-1">
+            {overallHeadNodes.length === 0 ? (
+              <div className="text-center py-3 text-gray-400 text-xs" data-testid="text-overall-head-empty">
+                No overall head assigned. Drag ranks here or use the assign menu.
+              </div>
+            ) : (
+              overallHeadNodes.map(n => renderLayerNode(n, 'overall-head'))
+            )}
+          </div>
+        </div>
+
+        <div className="border rounded-lg border-slate-200" data-testid="supervisory-section">
+          <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-t-lg">
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+              <Building2 className="h-3.5 w-3.5" />
+              Supervisory / Shore
+              {supervisoryNodes.length > 0 && <span className="text-[10px] font-normal text-slate-400">({supervisoryNodes.length})</span>}
+            </span>
+          </div>
+          <div className="px-2 pb-2 pt-1">
+            {supervisoryNodes.length === 0 ? (
+              <div className="text-center py-3 text-gray-400 text-xs" data-testid="text-supervisory-empty">
+                No supervisory roles assigned. Drag ranks here or use the assign menu.
+              </div>
+            ) : (
+              supervisoryNodes.map(n => renderLayerNode(n, 'supervisory'))
+            )}
+          </div>
+        </div>
+
+        {enabledDepartments.map(dept => {
           const deptNodes = nodesByDept.get(dept) || [];
           const count = deptNodes.length;
           const isExpanded = activeDept === dept;
@@ -791,6 +1020,7 @@ export default function VesselOrgChart() {
                     isAssigned: true,
                     viewMode: rank?.viewMode || null,
                     sortOrder: count + 1,
+                    nodeLayer: 'department' as NodeLayer,
                     isNew: true,
                   };
                   setNodes(prev => [...prev, newNode]);
@@ -862,43 +1092,76 @@ export default function VesselOrgChart() {
     </div>
   );
 
-  const renderArea3 = () => (
-    <div className="flex flex-col h-full min-h-0" data-testid="area-preview">
-      <div className="flex-shrink-0 p-3 border-b bg-gray-50">
-        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1">
-          <Eye className="h-4 w-4" /> Live Preview
-        </h3>
-      </div>
-      <div className="flex-1 overflow-y-auto thin-scrollbar p-3">
-        {departments.map(dept => {
-          const deptNodes = nodesByDept.get(dept);
-          if (!deptNodes || deptNodes.length === 0) return null;
-          const tree = buildTree(deptNodes);
-          return (
-            <div key={dept} className="mb-4" data-testid={`preview-dept-${dept}`}>
-              <h4 className={cn("text-xs font-semibold uppercase tracking-wider mb-1.5 pb-1 border-b", `text-gray-600`)}>
-                {dept}
-                {(() => {
-                  const hod = deptNodes.find(n => n.isHod);
-                  return hod ? (
-                    <span className="ml-2 text-[10px] font-normal text-yellow-600 normal-case">
-                      HOD: {getRankDisplay(hod.rankId, hod.nodeLabel)}
-                    </span>
-                  ) : null;
-                })()}
+  const renderArea3 = () => {
+    const allAssigned = overallHeadNodes.length + supervisoryNodes.length + assignedNodes.length;
+    return (
+      <div className="flex flex-col h-full min-h-0" data-testid="area-preview">
+        <div className="flex-shrink-0 p-3 border-b bg-gray-50">
+          <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+            <Eye className="h-4 w-4" /> Live Preview
+          </h3>
+        </div>
+        <div className="flex-1 overflow-y-auto thin-scrollbar p-3">
+          {overallHeadNodes.length > 0 && (
+            <div className="mb-4" data-testid="preview-overall-head">
+              <h4 className="text-xs font-semibold uppercase tracking-wider mb-1.5 pb-1 border-b text-rose-600 flex items-center gap-1">
+                <Crown className="h-3 w-3" /> Overall Head
               </h4>
-              {tree.map(rootNode => renderPreviewNode(rootNode, 0))}
+              {overallHeadNodes.map(n => (
+                <div key={n.nodeUuid} className="flex items-center py-1" data-testid={`preview-node-${n.nodeUuid}`}>
+                  <span className={cn("inline-block px-3 py-1 rounded text-white text-xs font-medium whitespace-nowrap", LAYER_COLORS['overall-head'])}>
+                    {getRankDisplay(n.rankId, n.nodeLabel)}
+                  </span>
+                </div>
+              ))}
             </div>
-          );
-        })}
-        {assignedNodes.length === 0 && (
-          <div className="text-center py-8 text-gray-400 text-xs" data-testid="text-preview-empty">
-            No assigned ranks yet. Create and assign ranks to departments to see the hierarchy preview.
-          </div>
-        )}
+          )}
+
+          {supervisoryNodes.length > 0 && (
+            <div className="mb-4" data-testid="preview-supervisory">
+              <h4 className="text-xs font-semibold uppercase tracking-wider mb-1.5 pb-1 border-b text-slate-600 flex items-center gap-1">
+                <Building2 className="h-3 w-3" /> Supervisory / Shore
+              </h4>
+              {supervisoryNodes.map(n => (
+                <div key={n.nodeUuid} className="flex items-center py-1" data-testid={`preview-node-${n.nodeUuid}`}>
+                  <span className={cn("inline-block px-3 py-1 rounded text-white text-xs font-medium whitespace-nowrap", LAYER_COLORS['supervisory'])}>
+                    {getRankDisplay(n.rankId, n.nodeLabel)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {enabledDepartments.map(dept => {
+            const deptNodes = nodesByDept.get(dept);
+            if (!deptNodes || deptNodes.length === 0) return null;
+            const tree = buildTree(deptNodes);
+            return (
+              <div key={dept} className="mb-4" data-testid={`preview-dept-${dept}`}>
+                <h4 className={cn("text-xs font-semibold uppercase tracking-wider mb-1.5 pb-1 border-b", "text-gray-600")}>
+                  {dept}
+                  {(() => {
+                    const hod = deptNodes.find(n => n.isHod);
+                    return hod ? (
+                      <span className="ml-2 text-[10px] font-normal text-yellow-600 normal-case">
+                        HOD: {getRankDisplay(hod.rankId, hod.nodeLabel)}
+                      </span>
+                    ) : null;
+                  })()}
+                </h4>
+                {tree.map(rootNode => renderPreviewNode(rootNode, 0))}
+              </div>
+            );
+          })}
+          {allAssigned === 0 && (
+            <div className="text-center py-8 text-gray-400 text-xs" data-testid="text-preview-empty">
+              No assigned ranks yet. Create and assign ranks to departments to see the hierarchy preview.
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   if (isLoadingVessels) {
     return (

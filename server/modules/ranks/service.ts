@@ -238,6 +238,7 @@ interface OrgNodePayload {
   isAssigned?: boolean;
   viewMode?: string | null;
   sortOrder?: number;
+  nodeLayer?: string;
 }
 
 function createHttpError(message: string, statusCode: number): Error {
@@ -257,6 +258,7 @@ function toNodeData(vesselId: string, node: OrgNodePayload) {
     isAssigned: node.isAssigned ?? false,
     viewMode: node.viewMode || null,
     sortOrder: node.sortOrder ?? 0,
+    nodeLayer: node.nodeLayer || 'department',
     isDeleted: false,
   };
 }
@@ -272,7 +274,8 @@ export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: OrgNo
 
   const hodPerDept = new Map<string, number>();
   for (const n of nodes) {
-    if (n.isAssigned && !n.department) {
+    const layer = n.nodeLayer || 'department';
+    if (n.isAssigned && !n.department && layer === 'department') {
       throw createHttpError(
         `Node ${n.nodeUuid || 'new'} is marked as assigned but has no department`,
         400
@@ -280,7 +283,8 @@ export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: OrgNo
     }
     if (n.parentNodeUuid && nodeMap.has(n.parentNodeUuid)) {
       const parent = nodeMap.get(n.parentNodeUuid)!;
-      if (parent.department !== n.department) {
+      const parentLayer = parent.nodeLayer || 'department';
+      if (layer === 'department' && parentLayer === 'department' && parent.department !== n.department) {
         throw createHttpError(
           `Cross-department parent reference: node ${n.nodeUuid} (dept: ${n.department}) references parent ${n.parentNodeUuid} (dept: ${parent.department})`,
           400
@@ -377,4 +381,17 @@ export async function deleteVesselOrgChartNode(vesselId: string, nodeUuid: strin
   if (node.vesselId !== vesselId) throw createHttpError("Node does not belong to this vessel", 403);
   await repo.softDeleteVesselOrgChartNode(nodeUuid);
   return { success: true, message: `Node ${nodeUuid} deleted` };
+}
+
+export async function getVesselDepartmentConfig(vesselId: string) {
+  if (!vesselId) throw createHttpError("vesselId required", 400);
+  const configs = await repo.getVesselDepartmentConfig(vesselId);
+  return configs || [];
+}
+
+export async function saveVesselDepartmentConfig(vesselId: string, configs: { department: string; isEnabled: boolean; sortOrder: number }[]) {
+  if (!vesselId) throw createHttpError("vesselId required", 400);
+  if (!Array.isArray(configs)) throw createHttpError("configs array required", 400);
+  const result = await repo.upsertVesselDepartmentConfig(vesselId, configs);
+  return { success: true, configs: result };
 }
