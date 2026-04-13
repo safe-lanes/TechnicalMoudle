@@ -2909,7 +2909,7 @@ const Dashboard = () => {
                   { header: 'Status', field: 'status', width: 15 },
                 ];
                 const data = crListModal.changeRequests.map(cr => ({
-                  vessel: (cr.vesselId ? vessels.find(v => v.id === cr.vesselId)?.name : undefined) || '-',
+                  vessel: (cr.vesselId ? vessels.find(v => v.id === cr.vesselId)?.name || cr.vesselId : '-'),
                   title: cr.title || '-',
                   requestedBy: cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
                     cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
