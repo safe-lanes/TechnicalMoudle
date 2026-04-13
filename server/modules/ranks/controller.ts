@@ -158,12 +158,14 @@ export async function bulkSaveVesselOrgChartNodes(req: Request, res: Response) {
 
 export async function unassignVesselOrgChartNode(req: Request, res: Response) {
   try {
-    const { nodeUuid } = req.params;
+    const { vesselId, nodeUuid } = req.params;
+    if (!vesselId) return res.status(400).json({ error: "vesselId required" });
     if (!nodeUuid) return res.status(400).json({ error: "nodeUuid required" });
-    const result = await service.unassignVesselOrgChartNode(nodeUuid);
+    const result = await service.unassignVesselOrgChartNode(vesselId, nodeUuid);
     res.json(result);
-  } catch (error: any) {
-    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+  } catch (error: unknown) {
+    const err = error as Error & { statusCode?: number };
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     console.error("Error unassigning vessel org chart node:", error);
     res.status(500).json({ error: "Failed to unassign node" });
   }
@@ -171,12 +173,14 @@ export async function unassignVesselOrgChartNode(req: Request, res: Response) {
 
 export async function deleteVesselOrgChartNode(req: Request, res: Response) {
   try {
-    const { nodeUuid } = req.params;
+    const { vesselId, nodeUuid } = req.params;
+    if (!vesselId) return res.status(400).json({ error: "vesselId required" });
     if (!nodeUuid) return res.status(400).json({ error: "nodeUuid required" });
-    const result = await service.deleteVesselOrgChartNode(nodeUuid);
+    const result = await service.deleteVesselOrgChartNode(vesselId, nodeUuid);
     res.json(result);
-  } catch (error: any) {
-    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+  } catch (error: unknown) {
+    const err = error as Error & { statusCode?: number };
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     console.error("Error deleting vessel org chart node:", error);
     res.status(500).json({ error: "Failed to delete node" });
   }

@@ -228,28 +228,79 @@ export async function createVesselOrgChartNode(vesselId: string, rankId: string,
   return node;
 }
 
-export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: any[]) {
-  const postgres = getPostgresClient();
-  if (!postgres) {
-    const err: any = new Error("Database not available");
-    err.statusCode = 503;
-    throw err;
+interface OrgNodePayload {
+  nodeUuid?: string;
+  rankId: string;
+  nodeLabel?: string | null;
+  department?: string | null;
+  parentNodeUuid?: string | null;
+  isHod?: boolean;
+  isAssigned?: boolean;
+  viewMode?: string | null;
+  sortOrder?: number;
+}
+
+function createHttpError(message: string, statusCode: number): Error {
+  const err = new Error(message) as Error & { statusCode: number };
+  err.statusCode = statusCode;
+  return err;
+}
+
+function toNodeData(vesselId: string, node: OrgNodePayload) {
+  return {
+    vesselId,
+    rankId: node.rankId,
+    nodeLabel: node.nodeLabel || null,
+    department: node.department || null,
+    parentNodeUuid: node.parentNodeUuid || null,
+    isHod: node.isHod ?? false,
+    isAssigned: node.isAssigned ?? false,
+    viewMode: node.viewMode || null,
+    sortOrder: node.sortOrder ?? 0,
+    isDeleted: false,
+  };
+}
+
+function topologicalSort(items: OrgNodePayload[], withinSet: Set<string>): OrgNodePayload[] {
+  const sorted: OrgNodePayload[] = [];
+  const visited = new Set<string>();
+  const uuidToNode = new Map<string, OrgNodePayload>();
+  for (const n of items) {
+    if (n.nodeUuid) uuidToNode.set(n.nodeUuid, n);
   }
 
-  const nodeMap = new Map<string, any>();
+  function visit(node: OrgNodePayload) {
+    if (!node.nodeUuid || visited.has(node.nodeUuid)) return;
+    visited.add(node.nodeUuid);
+    if (node.parentNodeUuid && withinSet.has(node.parentNodeUuid)) {
+      const parent = uuidToNode.get(node.parentNodeUuid);
+      if (parent) visit(parent);
+    }
+    sorted.push(node);
+  }
+
+  for (const n of items) visit(n);
+  return sorted;
+}
+
+export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: OrgNodePayload[]) {
+  const postgres = getPostgresClient();
+  if (!postgres) throw createHttpError("Database not available", 503);
+
+  const nodeMap = new Map<string, OrgNodePayload>();
   for (const n of nodes) {
     if (n.nodeUuid) nodeMap.set(n.nodeUuid, n);
   }
+
   const hodPerDept = new Map<string, number>();
   for (const n of nodes) {
     if (n.parentNodeUuid && nodeMap.has(n.parentNodeUuid)) {
-      const parent = nodeMap.get(n.parentNodeUuid);
+      const parent = nodeMap.get(n.parentNodeUuid)!;
       if (parent.department !== n.department) {
-        const err: any = new Error(
-          `Cross-department parent reference: node ${n.nodeUuid} (dept: ${n.department}) references parent ${n.parentNodeUuid} (dept: ${parent.department})`
+        throw createHttpError(
+          `Cross-department parent reference: node ${n.nodeUuid} (dept: ${n.department}) references parent ${n.parentNodeUuid} (dept: ${parent.department})`,
+          400
         );
-        err.statusCode = 400;
-        throw err;
       }
     }
     if (n.isHod && n.department) {
@@ -258,11 +309,7 @@ export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: any[]
   }
   for (const [dept, count] of hodPerDept) {
     if (count > 1) {
-      const err: any = new Error(
-        `Multiple HOD nodes in department "${dept}": only one HOD is allowed per department`
-      );
-      err.statusCode = 400;
-      throw err;
+      throw createHttpError(`Multiple HOD nodes in department "${dept}": only one HOD is allowed per department`, 400);
     }
   }
 
@@ -277,7 +324,7 @@ export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: any[]
       ));
 
     const existingUuids = new Set(existingNodes.map(n => n.nodeUuid));
-    const incomingUuids = new Set(nodes.filter(n => n.nodeUuid).map((n: any) => n.nodeUuid));
+    const incomingUuids = new Set(nodes.filter(n => n.nodeUuid).map(n => n.nodeUuid!));
 
     for (const existingNode of existingNodes) {
       if (!incomingUuids.has(existingNode.nodeUuid)) {
@@ -287,50 +334,22 @@ export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: any[]
       }
     }
 
-    const updateNodes = nodes.filter((n: any) => n.nodeUuid && existingUuids.has(n.nodeUuid));
-    const newNodes = nodes.filter((n: any) => !n.nodeUuid || !existingUuids.has(n.nodeUuid));
+    const updateNodes = nodes.filter(n => n.nodeUuid && existingUuids.has(n.nodeUuid));
+    const newNodes = nodes.filter(n => !n.nodeUuid || !existingUuids.has(n.nodeUuid));
 
     for (const node of updateNodes) {
-      const data = {
-        vesselId,
-        rankId: node.rankId,
-        nodeLabel: node.nodeLabel || null,
-        department: node.department || null,
-        parentNodeUuid: node.parentNodeUuid || null,
-        isHod: node.isHod ?? false,
-        isAssigned: node.isAssigned ?? false,
-        viewMode: node.viewMode || null,
-        sortOrder: node.sortOrder ?? 0,
-        isDeleted: false,
-      };
       await tx.update(vesselOrgChartNodes)
-        .set({ ...data, updatedAt: new Date() })
-        .where(eq(vesselOrgChartNodes.nodeUuid, node.nodeUuid));
+        .set({ ...toNodeData(vesselId, node), updatedAt: new Date() })
+        .where(eq(vesselOrgChartNodes.nodeUuid, node.nodeUuid!));
       updated++;
     }
 
-    const newUuids = new Set(newNodes.map((n: any) => n.nodeUuid).filter(Boolean));
-    const roots = newNodes.filter((n: any) => !n.parentNodeUuid || !newUuids.has(n.parentNodeUuid));
-    const children = newNodes.filter((n: any) => n.parentNodeUuid && newUuids.has(n.parentNodeUuid));
-    const orderedNew = [...roots, ...children];
+    const newUuids = new Set(newNodes.map(n => n.nodeUuid).filter((u): u is string => !!u));
+    const orderedNew = topologicalSort(newNodes, newUuids);
 
     for (const node of orderedNew) {
-      const data = {
-        vesselId,
-        rankId: node.rankId,
-        nodeLabel: node.nodeLabel || null,
-        department: node.department || null,
-        parentNodeUuid: node.parentNodeUuid || null,
-        isHod: node.isHod ?? false,
-        isAssigned: node.isAssigned ?? false,
-        viewMode: node.viewMode || null,
-        sortOrder: node.sortOrder ?? 0,
-        isDeleted: false,
-      };
-      const insertData: any = { ...data };
-      if (node.nodeUuid) {
-        insertData.nodeUuid = node.nodeUuid;
-      }
+      const data = toNodeData(vesselId, node);
+      const insertData = node.nodeUuid ? { ...data, nodeUuid: node.nodeUuid } : data;
       await tx.insert(vesselOrgChartNodes).values(insertData);
       inserted++;
     }
@@ -339,13 +358,10 @@ export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: any[]
   });
 }
 
-export async function unassignVesselOrgChartNode(nodeUuid: string) {
+export async function unassignVesselOrgChartNode(vesselId: string, nodeUuid: string) {
   const node = await repo.getVesselOrgChartNodeByUuid(nodeUuid);
-  if (!node) {
-    const err: any = new Error("Node not found");
-    err.statusCode = 404;
-    throw err;
-  }
+  if (!node) throw createHttpError("Node not found", 404);
+  if (node.vesselId !== vesselId) throw createHttpError("Node does not belong to this vessel", 403);
   const result = await repo.updateVesselOrgChartNode(nodeUuid, {
     isAssigned: false,
     department: null,
@@ -355,13 +371,10 @@ export async function unassignVesselOrgChartNode(nodeUuid: string) {
   return { success: true, node: result };
 }
 
-export async function deleteVesselOrgChartNode(nodeUuid: string) {
+export async function deleteVesselOrgChartNode(vesselId: string, nodeUuid: string) {
   const node = await repo.getVesselOrgChartNodeByUuid(nodeUuid);
-  if (!node) {
-    const err: any = new Error("Node not found");
-    err.statusCode = 404;
-    throw err;
-  }
+  if (!node) throw createHttpError("Node not found", 404);
+  if (node.vesselId !== vesselId) throw createHttpError("Node does not belong to this vessel", 403);
   await repo.softDeleteVesselOrgChartNode(nodeUuid);
   return { success: true, message: `Node ${nodeUuid} deleted` };
 }
