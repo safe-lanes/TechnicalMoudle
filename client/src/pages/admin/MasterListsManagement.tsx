@@ -257,6 +257,12 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
   // ── Item handlers ──
   const handleAddNew = () => {
     if (!selectedListType) {
+      if (canManageTypes && typesForCurrentSection.length === 0) {
+        setNewTypeSection(activeSection);
+        setNewTypeLabel("");
+        setIsCreateTypeOpen(true);
+        return;
+      }
       toast({ title: "Select a list type first", variant: "destructive" });
       return;
     }
@@ -458,9 +464,24 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
           <div className="text-center py-12">
             <p className="text-gray-500">
               {typesForCurrentSection.length === 0
-                ? `No list types in the ${activeSection} section yet.${canManageTypes ? " Use the Add New button to create one." : ""}`
+                ? `No list types in the ${activeSection} section yet.`
                 : "Select a list type above."}
             </p>
+            {typesForCurrentSection.length === 0 && canManageTypes && (
+              <Button
+                size="sm"
+                className="mt-4 bg-[#5dc86f] hover:bg-[#4db85f] text-white"
+                onClick={() => {
+                  setNewTypeSection(activeSection);
+                  setNewTypeLabel("");
+                  setIsCreateTypeOpen(true);
+                }}
+                data-testid="button-create-first-list-type"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Create List Type
+              </Button>
+            )}
           </div>
         ) : isLoading ? (
           <div className="space-y-3">
