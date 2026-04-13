@@ -3,6 +3,7 @@ import { getSFIName } from '../../../utils/sfiLookup';
 import {
   normalizeColumnNames,
   getComponentCategory,
+  getEffectiveComponentCategories,
   getSubGroupCode,
   getSubGroupName,
   stripSFISuffix,
@@ -327,6 +328,17 @@ export async function validateData(type: string, data: any[], mode: string, vess
               normalized['Component Category'] = `${firstDigit} ${category}`;
             }
           }
+        }
+      }
+
+      const providedCategory = normalized['Component Category'] || row['Component Category'];
+      if (providedCategory && typeof providedCategory === 'string') {
+        const activeCats = getEffectiveComponentCategories();
+        const catValue = providedCategory.trim();
+        const isValid = activeCats.some(ac => ac === catValue || ac.endsWith(` ${catValue}`) || catValue.endsWith(ac.replace(/^\d+\s+/, '')));
+        if (!isValid && activeCats.length > 0) {
+          const allowedValues = activeCats.map(c => c.replace(/^\d+\s+/, '')).join(', ');
+          warnings.push(`Row ${rowNum}: Component Category "${catValue}" does not match active master list values (${allowedValues})`);
         }
       }
       

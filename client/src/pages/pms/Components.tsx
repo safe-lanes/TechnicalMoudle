@@ -208,15 +208,15 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     }
   }, [isChangeMode, isModifyMode, componentData, originalComponentData]);
 
-  // Auto-update componentCategory when componentCode changes (for new components)
+  // Auto-update componentCategory when componentCode changes or master list loads
   useEffect(() => {
-    if (componentData.componentCode) {
+    if (componentData.componentCode && componentCategoryItems.length > 0) {
       const derivedCategory = deriveComponentCategory(componentData.componentCode);
       if (derivedCategory && derivedCategory !== componentData.componentCategory) {
         setComponentData(prev => ({ ...prev, componentCategory: derivedCategory }));
       }
     }
-  }, [componentData.componentCode]);
+  }, [componentData.componentCode, componentCategoryItems]);
   
   // Track which fields have been changed
   const [changedFields, setChangedFields] = useState<Set<string>>(new Set());
