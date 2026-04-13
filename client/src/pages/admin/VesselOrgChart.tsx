@@ -70,8 +70,15 @@ function getDeptColor(dept: string | null): string {
   return DEPT_COLORS[dept] || "bg-teal-500";
 }
 
-function generateTempUuid(): string {
-  return "temp-" + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+function generateNodeUuid(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 export default function VesselOrgChart() {
@@ -121,7 +128,7 @@ export default function VesselOrgChart() {
     mutationFn: async (payload: OrgNode[]) => {
       const response = await apiRequest('POST', `/technical/api/admin/vessel-org-chart-nodes/${selectedVesselId}/bulk-save`, {
         nodes: payload.map(n => ({
-          nodeUuid: n.isNew ? undefined : n.nodeUuid,
+          nodeUuid: n.nodeUuid,
           rankId: n.rankId,
           nodeLabel: n.nodeLabel,
           department: n.department,
@@ -155,8 +162,8 @@ export default function VesselOrgChart() {
     return map;
   }, [savedRanks]);
 
-  const getRankDisplay = useCallback((rankId: string, nodeLabel?: string) => {
-    if (nodeLabel) return nodeLabel;
+  const getRankDisplay = useCallback((rankId: string, nodeLabel?: string | null) => {
+    if (nodeLabel && nodeLabel.trim()) return nodeLabel;
     const rank = ranksMap.get(rankId);
     return rank ? (rank.label || rank.name) : rankId;
   }, [ranksMap]);
@@ -198,10 +205,10 @@ export default function VesselOrgChart() {
     if (!selectedVesselId) return;
     const rank = ranksMap.get(rankId);
     const newNode: OrgNode = {
-      nodeUuid: generateTempUuid(),
+      nodeUuid: generateNodeUuid(),
       vesselId: selectedVesselId,
       rankId,
-      nodeLabel: rank ? (rank.label || rank.name) : rankId,
+      nodeLabel: "",
       department: null,
       parentNodeUuid: null,
       isHod: false,
@@ -262,8 +269,8 @@ export default function VesselOrgChart() {
   };
 
   const commitEditLabel = () => {
-    if (editingLabelNodeUuid && editingLabelValue.trim()) {
-      updateNodeField(editingLabelNodeUuid, 'nodeLabel', editingLabelValue.trim());
+    if (editingLabelNodeUuid) {
+      updateNodeField(editingLabelNodeUuid, 'nodeLabel', editingLabelValue.trim() || "");
     }
     setEditingLabelNodeUuid(null);
     setEditingLabelValue("");
@@ -509,7 +516,35 @@ export default function VesselOrgChart() {
     return (
       <div key={node.nodeUuid} data-testid={`dept-node-${node.nodeUuid}`}>
         <div
-          className="flex items-center py-1.5 px-2 hover:bg-gray-50 rounded transition-colors group"
+          draggable
+          onDragStart={(e) => {
+            e.stopPropagation();
+            setDraggedNodeUuid(node.nodeUuid);
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', node.nodeUuid);
+          }}
+          onDragEnd={() => { setDraggedNodeUuid(null); setDragOverDept(null); }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const droppedUuid = e.dataTransfer.getData('text/plain');
+            if (droppedUuid && droppedUuid !== node.nodeUuid) {
+              const droppedDescendants = getDescendants(droppedUuid, deptNodes);
+              if (!droppedDescendants.has(node.nodeUuid)) {
+                setParentNode(droppedUuid, node.nodeUuid);
+              }
+            }
+            setDraggedNodeUuid(null);
+          }}
+          className={cn(
+            "flex items-center py-1.5 px-2 hover:bg-gray-50 rounded transition-colors group cursor-grab active:cursor-grabbing",
+            draggedNodeUuid === node.nodeUuid && "opacity-50 bg-blue-50"
+          )}
           style={{ paddingLeft: indent + 8 }}
         >
           <div className="flex items-center gap-1 mr-1 flex-shrink-0">
@@ -641,10 +676,10 @@ export default function VesselOrgChart() {
                   } else if (rankId && selectedVesselId) {
                     const rank = ranksMap.get(rankId);
                     const newNode: OrgNode = {
-                      nodeUuid: generateTempUuid(),
+                      nodeUuid: generateNodeUuid(),
                       vesselId: selectedVesselId,
                       rankId,
-                      nodeLabel: rank ? (rank.label || rank.name) : rankId,
+                      nodeLabel: "",
                       department: dept,
                       parentNodeUuid: null,
                       isHod: false,
@@ -698,6 +733,23 @@ export default function VesselOrgChart() {
                   </div>
                 )}
                 {tree.map(rootNode => renderDeptNode(rootNode, 0, deptNodes))}
+                {draggedNodeUuid && (
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const droppedUuid = e.dataTransfer.getData('text/plain');
+                      if (droppedUuid) {
+                        setParentNode(droppedUuid, null);
+                      }
+                      setDraggedNodeUuid(null);
+                    }}
+                    className="mt-2 p-2 border-2 border-dashed border-gray-300 rounded text-center text-xs text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors"
+                    data-testid="drop-zone-root"
+                  >
+                    Drop here to make root level
+                  </div>
+                )}
               </div>
             );
           })()
