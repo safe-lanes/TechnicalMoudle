@@ -22,7 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Plus, Save, Loader2, ChevronUp, ChevronDown, ArrowLeft,
   Network, Star, X, Search, Users, Eye, GripVertical, Trash2,
-  AlertTriangle, Pencil, Check, Crown, Building2, ToggleLeft
+  AlertTriangle, Pencil, Check, Crown, Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -116,7 +116,6 @@ export default function VesselOrgChart() {
   const [draggedNodeUuid, setDraggedNodeUuid] = useState<string | null>(null);
   const [dragOverDept, setDragOverDept] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ nodeUuid: string; position: 'before' | 'after' | 'child' } | null>(null);
-  const [showDeptSettings, setShowDeptSettings] = useState(false);
 
   const { data: savedRanks = [] } = useQuery<RankRow[]>({
     queryKey: ['/technical/api/admin/available-ranks'],
@@ -942,43 +941,35 @@ export default function VesselOrgChart() {
     );
   };
 
+  const handleLayerDrop = (e: React.DragEvent, layer: NodeLayer) => {
+    e.preventDefault();
+    const nodeUuid = e.dataTransfer.getData('text/plain');
+    const rankId = e.dataTransfer.getData('application/rank-id');
+    if (nodeUuid) {
+      assignNodeToLayer(nodeUuid, layer);
+    } else if (rankId && selectedVesselId) {
+      createNodeInstance(rankId, layer);
+    }
+    setDraggedNodeUuid(null);
+    setDragOverDept(null);
+  };
+
   const renderArea2 = () => (
     <div className="flex flex-col h-full min-h-0 border-r" data-testid="area-departments">
       <div className="flex-shrink-0 p-3 border-b bg-gray-50">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1">
-            <Network className="h-4 w-4" /> Hierarchy Builder
-          </h3>
-          <button
-            onClick={() => setShowDeptSettings(!showDeptSettings)}
-            className={cn("p-1 rounded transition-colors", showDeptSettings ? "bg-blue-100 text-blue-600" : "text-gray-400 hover:text-gray-600")}
-            title="Department settings"
-            data-testid="button-dept-settings"
-          >
-            <ToggleLeft className="h-4 w-4" />
-          </button>
-        </div>
+        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+          <Network className="h-4 w-4" /> Hierarchy Builder
+        </h3>
       </div>
 
       <div className="flex-1 overflow-y-auto thin-scrollbar p-2 space-y-2">
-        {showDeptSettings && (
-          <div className="border rounded-lg border-blue-200 bg-blue-50/50 p-2 space-y-1" data-testid="dept-settings-panel">
-            <h4 className="text-[11px] uppercase text-blue-600 font-semibold px-1 mb-1">Department Visibility</h4>
-            {departments.map(dept => (
-              <div key={dept} className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-blue-100/50" data-testid={`dept-toggle-${dept}`}>
-                <span className="text-xs font-medium text-gray-700">{dept}</span>
-                <Switch
-                  checked={isDeptEnabled(dept)}
-                  onCheckedChange={() => toggleDeptEnabled(dept)}
-                  className="scale-75"
-                  data-testid={`switch-dept-${dept}`}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="border rounded-lg border-rose-200" data-testid="overall-head-section">
+        <div
+          className={cn("border rounded-lg border-rose-200", dragOverDept === '__overall-head__' && "ring-2 ring-rose-400 bg-rose-50")}
+          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverDept('__overall-head__'); }}
+          onDragLeave={() => { if (dragOverDept === '__overall-head__') setDragOverDept(null); }}
+          onDrop={(e) => handleLayerDrop(e, 'overall-head')}
+          data-testid="overall-head-section"
+        >
           <div className="flex items-center justify-between px-3 py-2 bg-rose-50 rounded-t-lg">
             <span className="flex items-center gap-1.5 text-xs font-semibold text-rose-700">
               <Crown className="h-3.5 w-3.5" />
@@ -997,7 +988,13 @@ export default function VesselOrgChart() {
           </div>
         </div>
 
-        <div className="border rounded-lg border-slate-200" data-testid="supervisory-section">
+        <div
+          className={cn("border rounded-lg border-slate-200", dragOverDept === '__supervisory__' && "ring-2 ring-slate-400 bg-slate-50")}
+          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverDept('__supervisory__'); }}
+          onDragLeave={() => { if (dragOverDept === '__supervisory__') setDragOverDept(null); }}
+          onDrop={(e) => handleLayerDrop(e, 'supervisory')}
+          data-testid="supervisory-section"
+        >
           <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-t-lg">
             <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
               <Building2 className="h-3.5 w-3.5" />
@@ -1016,7 +1013,8 @@ export default function VesselOrgChart() {
           </div>
         </div>
 
-        {enabledDepartments.map(dept => {
+        {departments.map(dept => {
+          const enabled = isDeptEnabled(dept);
           const deptNodes = nodesByDept.get(dept) || [];
           const count = deptNodes.length;
           const isExpanded = activeDept === dept;
@@ -1029,12 +1027,14 @@ export default function VesselOrgChart() {
               key={dept}
               className={cn(
                 "border rounded-lg transition-colors",
-                isDragOver && "ring-2 ring-blue-400 border-blue-400 bg-blue-50",
+                !enabled && "opacity-50",
+                isDragOver && enabled && "ring-2 ring-blue-400 border-blue-400 bg-blue-50",
                 !isDragOver && "border-gray-200"
               )}
-              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverDept(dept); }}
+              onDragOver={(e) => { if (!enabled) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverDept(dept); }}
               onDragLeave={() => setDragOverDept(null)}
               onDrop={(e) => {
+                if (!enabled) return;
                 e.preventDefault();
                 const nodeUuid = e.dataTransfer.getData('text/plain');
                 const rankId = e.dataTransfer.getData('application/rank-id');
@@ -1066,24 +1066,33 @@ export default function VesselOrgChart() {
               }}
               data-testid={`dept-block-${dept}`}
             >
-              <button
-                onClick={() => setActiveDept(isExpanded ? null : dept)}
+              <div
                 className={cn(
-                  "w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors",
-                  isExpanded ? "bg-blue-50 text-blue-700" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                  "flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors",
+                  isExpanded ? "bg-blue-50 text-blue-700" : "bg-gray-50 text-gray-600"
                 )}
-                data-testid={`dept-tab-${dept}`}
               >
-                <span className="flex items-center gap-1.5">
+                <button
+                  onClick={() => enabled && setActiveDept(isExpanded ? null : dept)}
+                  className="flex items-center gap-1.5 flex-1 text-left"
+                  disabled={!enabled}
+                  data-testid={`dept-tab-${dept}`}
+                >
                   <Users className="h-3.5 w-3.5" />
                   {dept}
                   {count > 0 && <span className="text-[10px] font-normal text-gray-400">({count})</span>}
-                  {!hasHod && count > 0 && <AlertTriangle className="h-3 w-3 text-amber-500" />}
-                </span>
-                {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-              </button>
+                  {!hasHod && count > 0 && enabled && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                  {isExpanded && enabled ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </button>
+                <Switch
+                  checked={enabled}
+                  onCheckedChange={() => toggleDeptEnabled(dept)}
+                  className="scale-75"
+                  data-testid={`switch-dept-${dept}`}
+                />
+              </div>
 
-              {isExpanded && (
+              {isExpanded && enabled && (
                 <div className="px-2 pb-2 pt-1">
                   {count === 0 ? (
                     <div className="text-center py-4 text-gray-400 text-xs" data-testid="text-dept-empty">

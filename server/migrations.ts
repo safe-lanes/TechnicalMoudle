@@ -2902,6 +2902,19 @@ const migrations: Migration[] = [
         CONSTRAINT vessel_dept_config_unique UNIQUE(vessel_id, department)
       );
     `
+  },
+  {
+    id: '087_seed_vessel_department_config',
+    name: 'Seed vessel_department_config for all existing vessels',
+    description: 'Inserts enabled department config rows for every existing vessel using master department list',
+    sql: `
+      INSERT INTO vessel_department_config (vessel_id, department, is_enabled, sort_order)
+      SELECT v.vuuid, ml.list_value, true, ml.display_order
+      FROM vessels v
+      CROSS JOIN master_lists ml
+      WHERE ml.list_type = 'department' AND ml.is_active = true
+      ON CONFLICT (vessel_id, department) DO NOTHING;
+    `
   }
 ];
 
