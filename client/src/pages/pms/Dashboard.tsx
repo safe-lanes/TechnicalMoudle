@@ -1753,8 +1753,12 @@ const Dashboard = () => {
                   </div>
 
                   {isNonWOCard ? (
-                    <div className="flex-1 flex items-center justify-center border border-gray-200 rounded-lg bg-white">
-                      <p className="text-sm text-gray-400">No work orders for this category — detailed view coming soon.</p>
+                    <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white">
+                      <ComplianceAnomalyPanel
+                        vesselId={vesselId}
+                        superintendentSummary={superintendentSummary}
+                        onNavigateToSuperintendent={() => setLocation('/pms/superintendent')}
+                      />
                     </div>
                   ) : selectedOpCard === 'pending-approvals' ? (
                     <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white" data-testid="section-op-pending-approvals">
@@ -2686,12 +2690,6 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* ROW 2: Compliance Anomaly Detection (includes Work Order Anomalies + Superintendent Notifications) */}
-            <ComplianceAnomalyPanel
-              vesselId={vesselId}
-              superintendentSummary={superintendentSummary}
-              onNavigateToSuperintendent={() => setLocation('/pms/superintendent')}
-            />
 
             {/* Pending Approval Section (Head of Dept) */}
             {(isSailAdmin || isClientAdmin) && workOrderKPIs.pendingApproval > 0 && (
