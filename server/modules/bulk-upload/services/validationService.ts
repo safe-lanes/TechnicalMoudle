@@ -3,7 +3,6 @@ import { getSFIName } from '../../../utils/sfiLookup';
 import {
   normalizeColumnNames,
   getComponentCategory,
-  getEffectiveComponentCategories,
   getSubGroupCode,
   getSubGroupName,
   stripSFISuffix,
@@ -325,25 +324,9 @@ export async function validateData(type: string, data: any[], mode: string, vess
           if (!isNaN(firstDigit) && firstDigit >= 1 && firstDigit <= 8) {
             const category = getComponentCategory(firstDigit);
             if (category && !row['Component Category']) {
-              normalized['Component Category'] = category;
+              normalized['Component Category'] = `${firstDigit} ${category}`;
             }
           }
-        }
-      }
-
-      const providedCategory = normalized['Component Category'] || row['Component Category'];
-      if (providedCategory && typeof providedCategory === 'string') {
-        const activeCats = getEffectiveComponentCategories();
-        const catValue = providedCategory.trim();
-        const catNameOnly = catValue.replace(/^\d+\s+/, '');
-        const isValid = activeCats.some(ac => {
-          const acName = ac.replace(/^\d+\s+/, '');
-          return ac === catValue || acName === catValue || acName === catNameOnly;
-        });
-        if (!isValid && activeCats.length > 0) {
-          const allowedValues = activeCats.join(', ');
-          errors.push(`Row ${rowNum}: Invalid Component Category "${catValue}". Allowed values: ${allowedValues}`);
-          continue;
         }
       }
       

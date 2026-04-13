@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -52,7 +52,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 
 interface Spare {
@@ -364,59 +363,42 @@ const Dashboard = () => {
   const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
   const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: EnrichedWorkOrder[] }>({ open: false, title: '', workOrders: [] });
   const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
-  const [crListModal, setCrListModal] = useState<{ open: boolean; title: string; changeRequests: ChangeRequest[] }>({ open: false, title: '', changeRequests: [] });
-  const crListModalOpenRef = useRef(false);
-  crListModalOpenRef.current = crListModal.open;
-
   const [activeTab, setActiveTab] = useState('overview');
   const [showFilters, setShowFilters] = useState(false);
   type OperationCardFilter = 'overdue' | 'overdue-critical' | 'planned-today' | 'pending-approvals' | 'critical-spares' | 'anomalies' | 'modify-pms' | 'donut-overdue' | 'donut-due' | 'donut-planned';
   const [selectedOpCard, setSelectedOpCard] = useState<OperationCardFilter>('overdue');
   const [hodScope, setHodScope] = useState<'me' | 'myTeam'>('myTeam');
   const [opViewModal, setOpViewModal] = useState<{ open: boolean; workOrder: EnrichedWorkOrder | null }>({ open: false, workOrder: null });
-  const [opDetailSpare, setOpDetailSpare] = useState<Spare | null>(null);
-  const [opDetailChangeRequest, setOpDetailChangeRequest] = useState<ChangeRequest | null>(null);
   const [showBenchmarking, setShowBenchmarking] = useState(false);
   const [selectedCriticality, setSelectedCriticality] = useState("");
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
-  const { vesselId } = useVessel();
+  const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
-  const { isSailAdmin, isClientAdmin, isHeadOfDept, isVessel } = useUIRole();
+  const { isSailAdmin, isClientAdmin, isHeadOfDept } = useUIRole();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [mgmtVesselId, setMgmtVesselId] = useState<string>(vesselId);
-  useEffect(() => {
-    if (!mgmtVesselId && vesselId) {
-      setMgmtVesselId(vesselId);
-      return;
-    }
-    if (mgmtVesselId && mgmtVesselId !== 'all' && vessels.length > 0 && !vessels.some(v => v.id === mgmtVesselId)) {
-      setMgmtVesselId(vesselId || vessels[0].id);
-    }
-  }, [vesselId, mgmtVesselId, vessels]);
-  const effectiveVesselId = activeTab === 'overview' ? mgmtVesselId : vesselId;
-  const isAllVessels = effectiveVesselId === 'all';
+  const isAllVessels = vesselId === 'all';
   
-  const currentVessel = vessels.find(v => v.id === effectiveVesselId);
+  const currentVessel = vessels.find(v => v.id === vesselId);
 
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
-    queryKey: ['/technical/api/work-orders', effectiveVesselId],
+    queryKey: ['/technical/api/work-orders', vesselId],
     queryFn: async () => {
       const url = isAllVessels 
         ? '/technical/api/work-orders' 
-        : `/technical/api/work-orders?vesselId=${effectiveVesselId}`;
+        : `/technical/api/work-orders?vesselId=${vesselId}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch work orders');
       return await response.json();
     },
-    enabled: !!effectiveVesselId
+    enabled: !!vesselId
   });
 
   // Fetch spares data - for all vessels, fetch each vessel's spares and combine
   const { data: sparesData = [], isLoading: isSparesLoading } = useQuery<Spare[]>({
-    queryKey: ['/technical/api/spares', effectiveVesselId],
+    queryKey: ['/technical/api/spares', vesselId],
     queryFn: async () => {
       if (isAllVessels) {
         const allSpares: Spare[] = [];
@@ -433,16 +415,16 @@ const Dashboard = () => {
         }
         return allSpares;
       }
-      const response = await fetch(`/technical/api/spares/${effectiveVesselId}`);
+      const response = await fetch(`/technical/api/spares/${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch spares');
       return response.json();
     },
-    enabled: !!effectiveVesselId && (isAllVessels ? vessels.length > 0 : true)
+    enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
   });
 
   // Fetch stores data - for all vessels, fetch each vessel's stores and combine
   const { data: storesData = [], isLoading: isStoresLoading } = useQuery<StoresItem[]>({
-    queryKey: ['/technical/api/stores', effectiveVesselId],
+    queryKey: ['/technical/api/stores', vesselId],
     queryFn: async () => {
       if (isAllVessels) {
         const allStores: StoresItem[] = [];
@@ -459,16 +441,16 @@ const Dashboard = () => {
         }
         return allStores;
       }
-      const response = await fetch(`/technical/api/stores/${effectiveVesselId}`);
+      const response = await fetch(`/technical/api/stores/${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch stores');
       return response.json();
     },
-    enabled: !!effectiveVesselId && (isAllVessels ? vessels.length > 0 : true)
+    enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
   });
 
   // Fetch components data - for all vessels, fetch each vessel's components and combine
   const { data: componentsData = [], isLoading: isComponentsLoading } = useQuery<Component[]>({
-    queryKey: ['/technical/api/components', effectiveVesselId],
+    queryKey: ['/technical/api/components', vesselId],
     queryFn: async () => {
       if (isAllVessels) {
         const allComponents: Component[] = [];
@@ -485,15 +467,15 @@ const Dashboard = () => {
         }
         return allComponents;
       }
-      const response = await fetch(`/technical/api/components/${effectiveVesselId}`);
+      const response = await fetch(`/technical/api/components/${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch components');
       return response.json();
     },
-    enabled: !!effectiveVesselId && (isAllVessels ? vessels.length > 0 : true)
+    enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
   });
 
   const { data: rhParentsData = [], isLoading: isRHLoading } = useQuery<RHParentComponent[]>({
-    queryKey: ['/technical/api/running-hours/parents', effectiveVesselId],
+    queryKey: ['/technical/api/running-hours/parents', vesselId],
     queryFn: async () => {
       if (isAllVessels) {
         const results = await Promise.allSettled(
@@ -504,15 +486,15 @@ const Dashboard = () => {
         );
         return results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
       }
-      const response = await fetch(`/technical/api/running-hours/parents?vesselId=${effectiveVesselId}`);
+      const response = await fetch(`/technical/api/running-hours/parents?vesselId=${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch running hours');
       return response.json();
     },
-    enabled: !!effectiveVesselId && (isAllVessels ? vessels.length > 0 : true)
+    enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
   });
 
   const { data: sparesHistoryData = [], isLoading: isSparesHistoryLoading } = useQuery<SparesHistoryItem[]>({
-    queryKey: ['/technical/api/spares/history', effectiveVesselId],
+    queryKey: ['/technical/api/spares/history', vesselId],
     queryFn: async () => {
       if (isAllVessels) {
         const results = await Promise.allSettled(
@@ -523,48 +505,35 @@ const Dashboard = () => {
         );
         return results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
       }
-      const response = await fetch(`/technical/api/spares/history/${effectiveVesselId}`);
+      const response = await fetch(`/technical/api/spares/history/${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch spares history');
       return response.json();
     },
-    enabled: !!effectiveVesselId && (isAllVessels ? vessels.length > 0 : true)
+    enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
   });
 
   const { data: changeRequestsData = [] } = useQuery<ChangeRequest[]>({
-    queryKey: ['/technical/api/change-requests', effectiveVesselId],
+    queryKey: ['/api/change-requests', vesselId],
     queryFn: async () => {
-      const url = isAllVessels
-        ? '/technical/api/change-requests'
-        : `/technical/api/change-requests?vesselId=${effectiveVesselId}`;
+      const url = `/api/change-requests?vesselId=${vesselId}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch change requests');
       return response.json();
     },
-    enabled: !!effectiveVesselId,
+    enabled: !!vesselId,
   });
 
-  useEffect(() => {
-    if (crListModalOpenRef.current) {
-      const currentYear = new Date().getFullYear();
-      const refreshed = changeRequestsData.filter(cr => {
-        const created = cr.createdAt ? new Date(cr.createdAt) : null;
-        return created !== null && created.getFullYear() === currentYear;
-      });
-      setCrListModal(prev => ({ ...prev, changeRequests: refreshed }));
-    }
-  }, [changeRequestsData]);
-
   const { data: superintendentSummary } = useQuery<{ pendingCount: number; acknowledgedThisMonthCount: number }>({
-    queryKey: ['/technical/api/superintendent/notifications/summary', effectiveVesselId],
+    queryKey: ['/technical/api/superintendent/notifications/summary', vesselId],
     queryFn: async () => {
       const url = isAllVessels
         ? '/technical/api/superintendent/notifications/summary'
-        : `/technical/api/superintendent/notifications/summary?vesselId=${effectiveVesselId}`;
+        : `/technical/api/superintendent/notifications/summary?vesselId=${vesselId}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch superintendent summary');
       return response.json();
     },
-    enabled: !!effectiveVesselId,
+    enabled: !!vesselId,
   });
 
   const { data: complianceAnomalies } = useQuery<{
@@ -573,16 +542,16 @@ const Dashboard = () => {
     bulkCompletions: { severity: string; eventCount: number };
     scheduleDrift: { severity: string };
   }>({
-    queryKey: ['/technical/api/dashboard/compliance-anomalies', effectiveVesselId],
+    queryKey: ['/technical/api/dashboard/compliance-anomalies', vesselId],
     queryFn: async () => {
       const url = isAllVessels
         ? '/technical/api/dashboard/compliance-anomalies'
-        : `/technical/api/dashboard/compliance-anomalies?vesselId=${effectiveVesselId}`;
+        : `/technical/api/dashboard/compliance-anomalies?vesselId=${vesselId}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to fetch compliance anomalies');
       return res.json();
     },
-    enabled: activeTab === 'management' && !!effectiveVesselId,
+    enabled: activeTab === 'management' && !!vesselId,
   });
 
   // Helper: Calculate stock status
@@ -662,7 +631,7 @@ const Dashboard = () => {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Work order approved successfully" });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to approve work order", variant: "destructive" });
@@ -681,7 +650,7 @@ const Dashboard = () => {
     },
     onSuccess: () => {
       toast({ title: "Rejected", description: "Work order rejected and sent back to Due" });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to reject work order", variant: "destructive" });
@@ -793,7 +762,7 @@ const Dashboard = () => {
     ).length;
 
     return [
-      { status: 'Scheduled', count: planned, color: '#9E9E9E' },
+      { status: 'Planned', count: planned, color: '#9E9E9E' },
       { status: 'Due', count: due, color: '#FF964f' },
       { status: 'Overdue', count: overdue, color: '#ff6961' },
       { status: 'Completed', count: completed, color: '#5dc86f' },
@@ -1004,21 +973,21 @@ const Dashboard = () => {
   };
 
   const handleVesselChange = (newVesselId: string) => {
-    setMgmtVesselId(newVesselId);
+    setVesselId(newVesselId);
   };
 
   const handleAllVesselsChange = (isAll: boolean) => {
     if (isAll) {
-      setMgmtVesselId('all');
+      setVesselId('all');
     } else {
-      if (mgmtVesselId === 'all' && vessels.length > 0) {
-        setMgmtVesselId(vessels[0].id);
+      if (vesselId === 'all' && vessels.length > 0) {
+        setVesselId(vessels[0].id);
       }
     }
   };
 
   const handleFleetVesselSelect = (selectedVesselId: string) => {
-    setMgmtVesselId(selectedVesselId);
+    setVesselId(selectedVesselId);
   };
 
   const handleRefresh = () => {
@@ -1109,7 +1078,7 @@ const Dashboard = () => {
     return [
       { status: 'Overdue', count: overdue, color: '#ff6961' },
       { status: 'Due', count: due, color: '#FF964f' },
-      { status: 'Scheduled', count: planned, color: '#9E9E9E' },
+      { status: 'Planned', count: planned, color: '#9E9E9E' },
     ].filter(d => d.count > 0);
   }, [workOrdersData]);
 
@@ -1143,14 +1112,13 @@ const Dashboard = () => {
     });
     const plannedTodayCount = plannedTodayWOs.length;
 
-    const criticalSparesLowList = sparesData.filter(spare => {
+    const criticalSparesLowCount = sparesData.filter(spare => {
       const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes';
       if (!isCritical) return false;
       const rob = typeof spare.rob === 'number' ? spare.rob : parseInt(String(spare.rob)) || 0;
       const min = typeof spare.min === 'number' ? spare.min : parseInt(String(spare.min)) || 0;
       return rob < min && min > 0;
-    });
-    const criticalSparesLowCount = criticalSparesLowList.length;
+    }).length;
 
     const pendingApprovalWOs = safeWOs.filter(wo =>
       (wo as EnrichedWorkOrder).computedStatus === 'Pending Approval'
@@ -1164,11 +1132,9 @@ const Dashboard = () => {
       complianceAnomalies.scheduleDrift.severity,
     ].filter(s => s !== 'green').length : 0;
 
-    const openChangeRequestsList = changeRequestsData.filter(cr => {
-      const s = cr.status?.toLowerCase();
-      return s !== 'approved' && s !== 'rejected';
-    });
-    const openChangeRequests = openChangeRequestsList.length;
+    const openChangeRequests = changeRequestsData.filter(cr =>
+      cr.status !== 'approved' && cr.status !== 'rejected'
+    ).length;
 
     return {
       overdueCount,
@@ -1180,12 +1146,10 @@ const Dashboard = () => {
       plannedTodayCount,
       plannedTodayWOs: plannedTodayWOs as EnrichedWorkOrder[],
       criticalSparesLowCount,
-      criticalSparesLowList,
       pendingApprovalCount,
       pendingApprovalWOs: pendingApprovalWOs as EnrichedWorkOrder[],
       anomalyCount,
       openChangeRequests,
-      openChangeRequestsList,
     };
   }, [workOrdersData, sparesData, changeRequestsData, complianceAnomalies]);
 
@@ -1220,13 +1184,13 @@ const Dashboard = () => {
       case 'modify-pms': return 'Modify PMS Requests';
       case 'donut-overdue': return 'Overdue Work Orders (from chart)';
       case 'donut-due': return 'Due Work Orders (from chart)';
-      case 'donut-planned': return 'Scheduled Work Orders (from chart)';
+      case 'donut-planned': return 'Planned Work Orders (from chart)';
       default: return 'Work Orders';
     }
   }, [selectedOpCard]);
 
   const isDonutFilter = selectedOpCard?.startsWith('donut-');
-  const isNonWOCard = selectedOpCard === 'anomalies';
+  const isNonWOCard = selectedOpCard === 'critical-spares' || selectedOpCard === 'anomalies' || selectedOpCard === 'modify-pms';
 
   const ytdKPIs = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -1244,11 +1208,10 @@ const Dashboard = () => {
     const unplannedFull = ytdWOs.filter(wo => wo.workOrderType === 'Unplanned');
     const unplanned = unplannedFull.length;
 
-    const changeRequestsFull = changeRequestsData.filter(cr => {
+    const changeRequestCountYTD = changeRequestsData.filter(cr => {
       const created = cr.createdAt ? new Date(cr.createdAt) : null;
       return created !== null && created.getFullYear() === currentYear;
-    });
-    const changeRequestCountYTD = changeRequestsFull.length;
+    }).length;
     const changeRequestPercent = total > 0 ? Math.round((changeRequestCountYTD / total) * 100) : 0;
 
     return {
@@ -1260,7 +1223,6 @@ const Dashboard = () => {
       unplannedFull,
       unplannedPercent: total > 0 ? Math.round((unplanned / total) * 100) : 0,
       changeRequests: changeRequestCountYTD,
-      changeRequestsFull,
       changeRequestPercent,
     };
   }, [workOrdersData, changeRequestsData]);
@@ -1359,11 +1321,11 @@ const Dashboard = () => {
   const dotMatrixVesselData = useMemo(() => {
     if (vessels.length === 0) return [];
     if (!isAllVessels) {
-      const selected = vessels.find(v => v.id === effectiveVesselId);
+      const selected = vessels.find(v => v.id === vesselId);
       return selected ? [selected] : [];
     }
     return vessels.slice(0, 8);
-  }, [vessels, isAllVessels, effectiveVesselId]);
+  }, [vessels, isAllVessels, vesselId]);
 
   const dotMatrixWoQueries = useQueries({
     queries: dotMatrixVesselData.map(vessel => ({
@@ -1542,7 +1504,7 @@ const Dashboard = () => {
         <div className="flex items-center gap-3 flex-wrap" data-testid="bar-fleet-vessel-context">
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 font-medium">Vessel:</span>
-            <Select value={mgmtVesselId} onValueChange={handleVesselChange}>
+            <Select value={vesselId} onValueChange={handleVesselChange}>
               <SelectTrigger className="w-[180px]" data-testid="select-context-vessel">
                 <SelectValue placeholder="Select vessel" />
               </SelectTrigger>
@@ -1557,7 +1519,7 @@ const Dashboard = () => {
 
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 font-medium">Scope:</span>
-            <Select value={mgmtVesselId === 'all' ? 'all' : 'my'} onValueChange={(val) => handleAllVesselsChange(val === 'all')}>
+            <Select value={isAllVessels ? 'all' : 'my'} onValueChange={(val) => handleAllVesselsChange(val === 'all')}>
               <SelectTrigger className="w-[140px]" data-testid="select-vessel-scope">
                 <SelectValue />
               </SelectTrigger>
@@ -1645,7 +1607,7 @@ const Dashboard = () => {
                                   const filterMap: Record<string, OperationCardFilter> = {
                                     'Overdue': 'donut-overdue',
                                     'Due': 'donut-due',
-                                    'Scheduled': 'donut-planned',
+                                    'Planned': 'donut-planned',
                                   };
                                   const newFilter = filterMap[segment.status];
                                   if (newFilter) {
@@ -1675,7 +1637,7 @@ const Dashboard = () => {
                         <div className="flex flex-col gap-0.5">
                           <span className="text-xs font-semibold text-gray-700">Work Orders</span>
                           {[
-                            { status: 'Scheduled', color: '#9E9E9E' },
+                            { status: 'Planned', color: '#9E9E9E' },
                             { status: 'Due', color: '#FF964f' },
                             { status: 'Overdue', color: '#ff6961' },
                           ].map(item => (
@@ -1719,7 +1681,7 @@ const Dashboard = () => {
                 <div className="flex-1 flex flex-col min-h-0">
                   <div className="flex items-center justify-between mb-2">
                     <h2 className="text-base font-semibold text-gray-800" data-testid="text-operation-table-title">{operationTableTitle}</h2>
-                    {!isNonWOCard && selectedOpCard !== 'pending-approvals' && selectedOpCard !== 'critical-spares' && selectedOpCard !== 'modify-pms' && operationTableData.length > 0 && (
+                    {!isNonWOCard && operationTableData.length > 0 && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1766,315 +1728,8 @@ const Dashboard = () => {
                   </div>
 
                   {isNonWOCard ? (
-                    <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white">
-                      <ComplianceAnomalyPanel
-                        vesselId={effectiveVesselId}
-                        superintendentSummary={superintendentSummary}
-                        onNavigateToSuperintendent={() => setLocation('/pms/superintendent')}
-                      />
-                    </div>
-                  ) : selectedOpCard === 'pending-approvals' ? (
-                    <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white" data-testid="section-op-pending-approvals">
-                      <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E0E0E0' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 500, color: '#212121' }}>
-                          {operationKPIs.pendingApprovalCount} work order{operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} require your review
-                        </span>
-                        {operationKPIs.pendingApprovalCount > 0 && (
-                          <Button
-                            onClick={() => setBulkApproveModalOpen(true)}
-                            style={{ background: '#1565C0' }}
-                            className="text-white hover:opacity-90"
-                            size="sm"
-                            data-testid="button-op-bulk-approve-open"
-                          >
-                            <CheckSquare className="w-4 h-4 mr-2" />
-                            Bulk Approve ({operationKPIs.pendingApprovalCount})
-                          </Button>
-                        )}
-                      </div>
-                      <div className="p-4 space-y-2">
-                        {operationKPIs.pendingApprovalWOs.length === 0 ? (
-                          <div className="text-center py-8 text-gray-500 text-sm">No work orders pending approval</div>
-                        ) : (
-                          operationKPIs.pendingApprovalWOs.map((wo) => (
-                            <div
-                              key={wo.id}
-                              className="flex items-center justify-between p-3 rounded-lg border transition-colors"
-                              style={{ background: wo.wasRejected ? '#FFEBEE' : '#E3F2FD', borderColor: wo.wasRejected ? '#FFCDD2' : '#BBDEFB' }}
-                              data-testid={`row-op-pending-approval-wo-${wo.id}`}
-                            >
-                              <div className="flex-1 cursor-pointer" onClick={() => navigateToWorkOrder(wo.id)}>
-                                <div className="font-medium text-sm" style={{ color: wo.wasRejected ? '#C62828' : '#212121' }}>
-                                  {wo.workOrderNo || `WO-${wo.id}`}
-                                  {wo.wasRejected && (
-                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ background: '#E53935' }}>Resubmitted</span>
-                                  )}
-                                </div>
-                                <div className="text-xs mt-0.5" style={{ color: wo.wasRejected ? '#E53935' : '#616161' }}>
-                                  {wo.jobTitle || 'No description'} - {wo.component}
-                                </div>
-                                <div className="text-xs mt-1" style={{ color: '#9E9E9E' }}>
-                                  Assigned: {wo.assignedTo} | Submitted: {wo.submittedDate ? new Date(wo.submittedDate).toLocaleDateString() : 'N/A'}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Button variant="ghost" size="icon" onClick={() => navigateToWorkOrder(wo.id)} data-testid={`button-op-view-pending-wo-${wo.id}`}>
-                                  <Eye className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    const reason = window.prompt("Enter rejection reason:");
-                                    if (reason) {
-                                      rejectMutation.mutate({ workOrderId: wo.id, comments: reason });
-                                    }
-                                  }}
-                                  style={{ borderColor: '#E53935', color: '#E53935' }}
-                                  disabled={rejectMutation.isPending}
-                                  data-testid={`button-op-reject-wo-${wo.id}`}
-                                >
-                                  <XCircle className="w-4 h-4 mr-1" />
-                                  Reject
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  onClick={() => approveMutation.mutate(wo.id)}
-                                  style={{ background: '#2E7D32' }}
-                                  className="text-white hover:opacity-90"
-                                  disabled={approveMutation.isPending}
-                                  data-testid={`button-op-approve-wo-${wo.id}`}
-                                >
-                                  <CheckCircle className="w-4 h-4 mr-1" />
-                                  Approve
-                                </Button>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  ) : selectedOpCard === 'critical-spares' ? (
-                    <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white" data-testid="section-op-critical-spares">
-                      <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E0E0E0' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 500, color: '#212121' }}>
-                          {operationKPIs.criticalSparesLowCount} critical spare{operationKPIs.criticalSparesLowCount !== 1 ? 's' : ''} with low stock
-                        </span>
-                        {operationKPIs.criticalSparesLowCount > 0 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 gap-1.5 text-xs border-[#e1e8ed] text-[#8798ad]"
-                            onClick={() => {
-                              const columns: TableColumn[] = [
-                                { header: 'Vessel', field: 'vessel', width: 20 },
-                                { header: 'Part Code', field: 'partCode', width: 20 },
-                                { header: 'Part Name', field: 'partName', width: 40 },
-                                { header: 'Component', field: 'component', width: 30 },
-                                { header: 'ROB', field: 'rob', width: 12 },
-                                { header: 'Min', field: 'min', width: 12 },
-                                { header: 'Stock Status', field: 'stockStatus', width: 15 },
-                                { header: 'Criticality', field: 'criticality', width: 15 },
-                              ];
-                              const rows = operationKPIs.criticalSparesLowList.map(spare => ({
-                                vessel: (spare.vesselId ? vessels.find(v => v.id === spare.vesselId)?.name : undefined) || '-',
-                                partCode: spare.partCode || spare.partNumber || '-',
-                                partName: spare.partName || '-',
-                                component: spare.componentName || '-',
-                                rob: spare.rob?.toString() || '0',
-                                min: spare.min?.toString() || '0',
-                                stockStatus: getStockStatus(spare.rob, spare.min).label,
-                                criticality: String(spare.critical ?? '-'),
-                              }));
-                              pdfReportGenerator.generateReport(
-                                { title: 'Critical Spares Low', subtitle: `Total: ${rows.length} spare${rows.length !== 1 ? 's' : ''}`, orientation: 'landscape' },
-                                columns,
-                                rows
-                              );
-                            }}
-                            data-testid="button-op-export-critical-spares"
-                          >
-                            <Download className="h-3 w-3" />
-                            Export
-                          </Button>
-                        )}
-                      </div>
-                      <Table>
-                        <TableHeader className="sticky top-0 bg-[#eff6ff] z-10">
-                          <TableRow>
-                            <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81] text-xs">Vessel</TableHead>
-                            <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81] text-xs">Part Code</TableHead>
-                            <TableHead className="font-medium min-w-[200px] bg-[#eff6ff] text-[#0e4c81] text-xs">Part Name</TableHead>
-                            <TableHead className="font-medium w-[160px] bg-[#eff6ff] text-[#0e4c81] text-xs">Component</TableHead>
-                            <TableHead className="font-medium w-[80px] bg-[#eff6ff] text-[#0e4c81] text-xs">ROB</TableHead>
-                            <TableHead className="font-medium w-[80px] bg-[#eff6ff] text-[#0e4c81] text-xs">Min</TableHead>
-                            <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81] text-xs">Stock Status</TableHead>
-                            <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81] text-xs">Criticality</TableHead>
-                            <TableHead className="font-medium w-[80px] text-center bg-[#eff6ff] text-[#0e4c81] text-xs">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {operationKPIs.criticalSparesLowList.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={9} className="text-center py-8 text-gray-500 text-sm">
-                                No critical spares with low stock
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            operationKPIs.criticalSparesLowList.map((spare) => {
-                              const stockStatus = getStockStatus(spare.rob, spare.min);
-                              const vesselName = vessels.find(v => v.id === spare.vesselId)?.name;
-                              return (
-                                <TableRow key={`${spare.vesselId || 'v'}-${spare.id}`} className="hover:bg-gray-50" data-testid={`row-op-critical-spare-${spare.id}`}>
-                                  <TableCell className="text-xs py-2">{vesselName || '-'}</TableCell>
-                                  <TableCell className="text-xs py-2">{spare.partCode || spare.partNumber || '-'}</TableCell>
-                                  <TableCell className="whitespace-normal break-words max-w-[300px] font-medium text-blue-600 text-xs py-2">{spare.partName || '-'}</TableCell>
-                                  <TableCell className="text-xs py-2">{spare.componentName || '-'}</TableCell>
-                                  <TableCell className="text-xs py-2">{spare.rob}</TableCell>
-                                  <TableCell className="text-xs py-2">{spare.min}</TableCell>
-                                  <TableCell className="py-2">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${stockStatus.label === 'Low' ? 'bg-red-500' : stockStatus.label === 'At Min' ? 'bg-orange-500' : 'bg-green-500'}`}>
-                                      {stockStatus.label}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell className="py-2">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${(spare.critical?.toLowerCase() === 'critical' || spare.critical?.toLowerCase() === 'yes') ? 'bg-red-500' : 'bg-gray-400'}`}>
-                                      {spare.critical}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell className="py-2">
-                                    <div className="flex gap-1 justify-center">
-                                      <TooltipProvider>
-                                        <UITooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              size="icon"
-                                              variant="ghost"
-                                              className="h-6 w-6"
-                                              onClick={() => setOpDetailSpare(spare)}
-                                              data-testid={`op-view-spare-${spare.id}`}
-                                            >
-                                              <Eye className="h-3.5 w-3.5 text-gray-500" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>View Details</TooltipContent>
-                                        </UITooltip>
-                                      </TooltipProvider>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })
-                          )}
-                        </TableBody>
-                      </Table>
-                      <div className="border-t px-4 py-2 text-xs text-gray-500">
-                        Total: {operationKPIs.criticalSparesLowCount} spare{operationKPIs.criticalSparesLowCount !== 1 ? 's' : ''}
-                      </div>
-                    </div>
-                  ) : selectedOpCard === 'modify-pms' ? (
-                    <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white" data-testid="section-op-modify-pms">
-                      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200">
-                        <span className="text-xs font-medium text-gray-700" data-testid="text-op-modify-pms-count">
-                          {operationKPIs.openChangeRequests} request{operationKPIs.openChangeRequests !== 1 ? 's' : ''}
-                        </span>
-                        {operationKPIs.openChangeRequests > 0 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 gap-1.5 text-xs border-[#e1e8ed] text-[#8798ad]"
-                            onClick={() => {
-                              const columns: TableColumn[] = [
-                                { header: 'Request Title', field: 'title', width: 50 },
-                                { header: 'Category', field: 'category', width: 15 },
-                                { header: 'Requested By', field: 'requestedBy', width: 20 },
-                                { header: 'Date', field: 'date', width: 15 },
-                                { header: 'Status', field: 'status', width: 15 },
-                              ];
-                              const rows = operationKPIs.openChangeRequestsList.map(cr => ({
-                                title: cr.title || '-',
-                                category: cr.category ? cr.category.charAt(0).toUpperCase() + cr.category.slice(1) : '-',
-                                requestedBy: cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
-                                  cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
-                                  cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
-                                  cr.requestedByUserId || '-',
-                                date: cr.submittedAt
-                                  ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')
-                                  : new Date(cr.createdAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' '),
-                                status: (() => {
-                                  const st = cr.status?.toLowerCase();
-                                  if (st === 'submitted' || st === 'pending') return 'Pending Approval';
-                                  if (st === 'returned') return 'Returned';
-                                  if (st === 'draft') return 'Draft';
-                                  return cr.status || '-';
-                                })(),
-                              }));
-                              pdfReportGenerator.generateReport(
-                                { title: 'Modify PMS Requests', subtitle: `Total: ${rows.length} request${rows.length !== 1 ? 's' : ''}`, orientation: 'landscape' },
-                                columns,
-                                rows
-                              );
-                            }}
-                            data-testid="button-op-export-modify-pms"
-                          >
-                            <Download className="h-3 w-3" />
-                            Export
-                          </Button>
-                        )}
-                      </div>
-                      <Table>
-                        <TableHeader className="sticky top-0 bg-[#eff6ff] z-10">
-                          <TableRow>
-                            <TableHead className="font-medium min-w-[200px] bg-[#eff6ff] text-[#0e4c81] text-xs">Request Title</TableHead>
-                            <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81] text-xs">Requested By</TableHead>
-                            <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81] text-xs">Date</TableHead>
-                            <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81] text-xs">Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {operationKPIs.openChangeRequests === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={4} className="text-center py-8 text-gray-500 text-sm">
-                                No open change requests found
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            operationKPIs.openChangeRequestsList.map((cr) => (
-                              <TableRow
-                                key={cr.id}
-                                className="hover:bg-gray-50 cursor-pointer"
-                                onClick={() => setOpDetailChangeRequest(cr)}
-                                data-testid={`row-op-change-request-${cr.id}`}
-                              >
-                                <TableCell className="font-medium text-gray-900 text-xs py-2">{cr.title}</TableCell>
-                                <TableCell className="text-xs py-2">
-                                  {cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
-                                   cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
-                                   cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
-                                   cr.requestedByUserId}
-                                </TableCell>
-                                <TableCell className="text-xs py-2">
-                                  {cr.submittedAt
-                                    ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')
-                                    : new Date(cr.createdAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')}
-                                </TableCell>
-                                <TableCell className="py-2">
-                                  {(() => {
-                                    const st = cr.status?.toLowerCase();
-                                    if (st === 'submitted' || st === 'pending') return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-blue-600">Pending Approval</span>;
-                                    if (st === 'draft') return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-gray-500">Draft</span>;
-                                    if (st === 'returned') return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-yellow-500">Returned</span>;
-                                    return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-gray-400">{cr.status}</span>;
-                                  })()}
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                      <div className="border-t px-4 py-2 text-xs text-gray-500">
-                        Total: {operationKPIs.openChangeRequests} request{operationKPIs.openChangeRequests !== 1 ? 's' : ''}
-                      </div>
+                    <div className="flex-1 flex items-center justify-center border border-gray-200 rounded-lg bg-white">
+                      <p className="text-sm text-gray-400">No work orders for this category — detailed view coming soon.</p>
                     </div>
                   ) : (
                     <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white">
@@ -2195,65 +1850,6 @@ const Dashboard = () => {
                     mode="template"
                   />
                 )}
-
-                {opDetailSpare && (
-                  <Dialog open={!!opDetailSpare} onOpenChange={(isOpen) => !isOpen && setOpDetailSpare(null)}>
-                    <DialogContent className="max-w-lg">
-                      <DialogHeader>
-                        <DialogTitle className="text-lg font-semibold text-[#0f4c81]">
-                          Spare Part Details
-                        </DialogTitle>
-                      </DialogHeader>
-                      <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm mt-2">
-                        <div>
-                          <span className="text-gray-500 text-xs">Vessel</span>
-                          <p className="font-medium" data-testid="text-op-detail-vessel">
-                            {opDetailSpare.vesselId ? (vessels.find(v => v.id === opDetailSpare.vesselId)?.name || opDetailSpare.vesselId) : '-'}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-gray-500 text-xs">Part Code</span>
-                          <p className="font-medium" data-testid="text-op-detail-part-code">
-                            {opDetailSpare.partCode || opDetailSpare.partNumber || '-'}
-                          </p>
-                        </div>
-                        <div className="col-span-2">
-                          <span className="text-gray-500 text-xs">Part Name</span>
-                          <p className="font-medium" data-testid="text-op-detail-part-name">{opDetailSpare.partName || '-'}</p>
-                        </div>
-                        <div className="col-span-2">
-                          <span className="text-gray-500 text-xs">Component</span>
-                          <p className="font-medium" data-testid="text-op-detail-component">{opDetailSpare.componentName || '-'}</p>
-                        </div>
-                        <div>
-                          <span className="text-gray-500 text-xs">ROB</span>
-                          <p className="font-medium" data-testid="text-op-detail-rob">{opDetailSpare.rob}</p>
-                        </div>
-                        <div>
-                          <span className="text-gray-500 text-xs">Min</span>
-                          <p className="font-medium" data-testid="text-op-detail-min">{opDetailSpare.min}</p>
-                        </div>
-                        <div>
-                          <span className="text-gray-500 text-xs">Stock Status</span>
-                          <p data-testid="text-op-detail-stock-status">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white ${getStockStatus(opDetailSpare.rob, opDetailSpare.min).label === 'Low' ? 'bg-red-500' : getStockStatus(opDetailSpare.rob, opDetailSpare.min).label === 'At Min' ? 'bg-orange-500' : 'bg-green-500'}`}>
-                              {getStockStatus(opDetailSpare.rob, opDetailSpare.min).label}
-                            </span>
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-gray-500 text-xs">Criticality</span>
-                          <p data-testid="text-op-detail-criticality">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white ${(opDetailSpare.critical?.toLowerCase() === 'critical' || opDetailSpare.critical?.toLowerCase() === 'yes') ? 'bg-red-500' : 'bg-gray-400'}`}>
-                              {opDetailSpare.critical || '-'}
-                            </span>
-                          </p>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                )}
-
               </>
             )}
           </div>
@@ -2443,7 +2039,7 @@ const Dashboard = () => {
                                     return (
                                       <div style={{ background: '#FFFFFF', border: '1px solid #E0E0E0', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '8px 12px' }} data-testid="tooltip-trend-line">
                                         <div className="font-semibold text-xs mb-1" style={{ color: '#212121' }}>{d.month}</div>
-                                        <div className="text-xs" style={{ color: '#616161' }}>Total scheduled: {d.totalPlanned}</div>
+                                        <div className="text-xs" style={{ color: '#616161' }}>Total planned: {d.totalPlanned}</div>
                                         <div className="text-xs" style={{ color: '#2ecc71' }}>Completed: {d.completedPercent}% ({d.completed})</div>
                                         <div className="text-xs" style={{ color: '#f39c12' }}>Outstanding: {d.outstandingPercent}% ({d.outstanding})</div>
                                         <div className="text-xs" style={{ color: '#e74c3c' }}>Overdue: {d.overduePercent}% ({d.overdue})</div>
@@ -2695,15 +2291,96 @@ const Dashboard = () => {
                       color="#e74c3c"
                       displayValue={ytdKPIs.changeRequests.toString()}
                       subtitle={`${ytdKPIs.changeRequestPercent}% of total`}
-                      onClick={() => setCrListModal({ open: true, title: 'Modify PMS Requests YTD', changeRequests: ytdKPIs.changeRequestsFull })}
-                      testId="gauge-modify-pms-ytd"
                     />
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* ROW 2: Compliance Anomaly Detection (includes Work Order Anomalies + Superintendent Notifications) */}
+            <ComplianceAnomalyPanel
+              vesselId={vesselId}
+              superintendentSummary={superintendentSummary}
+              onNavigateToSuperintendent={() => setLocation('/pms/superintendent')}
+            />
 
+            {/* Pending Approval Section (Head of Dept) */}
+            {(isSailAdmin || isClientAdmin) && workOrderKPIs.pendingApproval > 0 && (
+              <div className={cardStyle} data-testid="card-pending-approval-section">
+                <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E0E0E0' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 500, color: '#212121' }}>
+                    {workOrderKPIs.pendingApproval} work orders from {currentVessel?.name || 'vessel'} require your review
+                  </span>
+                  <Button
+                    onClick={() => setBulkApproveModalOpen(true)}
+                    style={{ background: '#1565C0' }}
+                    className="text-white hover:opacity-90"
+                    size="sm"
+                    data-testid="button-bulk-approve-open"
+                  >
+                    <CheckSquare className="w-4 h-4 mr-2" />
+                    Bulk Approve ({workOrderKPIs.pendingApproval})
+                  </Button>
+                </div>
+                <div className="p-4 space-y-2">
+                  {workOrderKPIs.pendingApprovalList.map((wo: any) => (
+                    <div
+                      key={wo.id}
+                      className="flex items-center justify-between p-3 rounded-lg border transition-colors"
+                      style={{ background: wo.wasRejected ? '#FFEBEE' : '#E3F2FD', borderColor: wo.wasRejected ? '#FFCDD2' : '#BBDEFB' }}
+                      data-testid={`row-pending-approval-wo-${wo.id}`}
+                    >
+                      <div className="flex-1 cursor-pointer" onClick={() => navigateToWorkOrder(wo.id)}>
+                        <div className="font-medium text-sm" style={{ color: wo.wasRejected ? '#C62828' : '#212121' }}>
+                          {wo.workOrderNo || `WO-${wo.id}`}
+                          {wo.wasRejected && (
+                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ background: '#E53935' }}>Resubmitted</span>
+                          )}
+                        </div>
+                        <div className="text-xs mt-0.5" style={{ color: wo.wasRejected ? '#E53935' : '#616161' }}>
+                          {wo.jobTitle || 'No description'} - {wo.component}
+                        </div>
+                        <div className="text-xs mt-1" style={{ color: '#9E9E9E' }}>
+                          Assigned: {wo.assignedTo} | Submitted: {wo.submittedDate ? new Date(wo.submittedDate).toLocaleDateString() : 'N/A'}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => navigateToWorkOrder(wo.id)} data-testid={`button-view-pending-wo-${wo.id}`}>
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const reason = window.prompt("Enter rejection reason:");
+                            if (reason) {
+                              rejectMutation.mutate({ workOrderId: wo.id, comments: reason });
+                            }
+                          }}
+                          style={{ borderColor: '#E53935', color: '#E53935' }}
+                          disabled={rejectMutation.isPending}
+                          data-testid={`button-reject-wo-${wo.id}`}
+                        >
+                          <XCircle className="w-4 h-4 mr-1" />
+                          Reject
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => approveMutation.mutate(wo.id)}
+                          style={{ background: '#2E7D32' }}
+                          className="text-white hover:opacity-90"
+                          disabled={approveMutation.isPending}
+                          data-testid={`button-approve-wo-${wo.id}`}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          Approve
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
           </div>
         )}
@@ -2711,8 +2388,8 @@ const Dashboard = () => {
       <BulkApproveModal
         open={bulkApproveModalOpen}
         onOpenChange={setBulkApproveModalOpen}
-        workOrders={activeTab === 'management' && selectedOpCard === 'pending-approvals' ? operationKPIs.pendingApprovalWOs : (workOrderKPIs.pendingApprovalFull || [])}
-        vesselId={effectiveVesselId}
+        workOrders={workOrderKPIs.pendingApprovalFull || []}
+        vesselId={vesselId}
         vesselName={currentVessel?.name}
       />
       <WorkOrdersListModal
@@ -2730,112 +2407,6 @@ const Dashboard = () => {
         vessels={vessels}
         getStockStatus={getStockStatus}
       />
-      <Dialog open={crListModal.open} onOpenChange={(isOpen) => !isOpen && setCrListModal({ open: false, title: '', changeRequests: [] })}>
-        <DialogContent className="max-w-[90vw] h-[calc(100vh-10vw)] max-h-[90vh] overflow-hidden flex flex-col [&>button.absolute]:top-6 [&>button.absolute]:translate-y-1">
-          <DialogHeader className="pb-4 flex flex-row items-center justify-between gap-4">
-            <DialogTitle className="text-xl font-semibold text-[#0f4c81]" data-testid="title-cr-list-modal">
-              {crListModal.title}
-            </DialogTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-xs text-[#8798ad] border-[#e1e8ed] mr-8"
-              onClick={() => {
-                const columns: TableColumn[] = [
-                  { header: 'Vessel', field: 'vessel', width: 20 },
-                  { header: 'Request Title', field: 'title', width: 40 },
-                  { header: 'Requested By', field: 'requestedBy', width: 20 },
-                  { header: 'Date', field: 'date', width: 18 },
-                  { header: 'Status', field: 'status', width: 15 },
-                ];
-                const data = crListModal.changeRequests.map(cr => ({
-                  vessel: (cr.vesselId ? vessels.find(v => v.id === cr.vesselId)?.name || cr.vesselId : '-'),
-                  title: cr.title || '-',
-                  requestedBy: cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
-                    cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
-                    cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
-                    cr.requestedByUserId || '-',
-                  date: cr.submittedAt
-                    ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')
-                    : new Date(cr.createdAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' '),
-                  status: (() => {
-                    const st = cr.status?.toLowerCase();
-                    if (st === 'submitted' || st === 'pending') return 'Pending Approval';
-                    if (st === 'approved') return 'Approved';
-                    if (st === 'rejected') return 'Rejected';
-                    if (st === 'returned') return 'Returned';
-                    if (st === 'draft') return 'Draft';
-                    return cr.status || '-';
-                  })(),
-                }));
-                pdfReportGenerator.generateReport(
-                  { title: crListModal.title, subtitle: `Total: ${data.length} request${data.length !== 1 ? 's' : ''}`, orientation: 'landscape' },
-                  columns,
-                  data
-                );
-              }}
-              data-testid="button-export-cr-modal-pdf"
-            >
-              <Download className="h-3.5 w-3.5 mr-1" />
-              Export
-            </Button>
-          </DialogHeader>
-          <div className="flex-1 overflow-auto border border-gray-200 rounded-lg">
-            <Table>
-              <TableHeader className="sticky top-0 bg-[#eff6ff] z-10">
-                <TableRow>
-                  <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81]">Vessel</TableHead>
-                  <TableHead className="font-medium min-w-[200px] bg-[#eff6ff] text-[#0e4c81]">Request Title</TableHead>
-                  <TableHead className="font-medium w-[140px] bg-[#eff6ff] text-[#0e4c81]">Requested By</TableHead>
-                  <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81]">Date</TableHead>
-                  <TableHead className="font-medium w-[140px] bg-[#eff6ff] text-[#0e4c81]">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {crListModal.changeRequests.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                      No change requests found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  crListModal.changeRequests.map((cr) => (
-                    <TableRow key={cr.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setOpDetailChangeRequest(cr)} data-testid={`row-cr-modal-${cr.id}`}>
-                      <TableCell>{cr.vesselId ? vessels.find(v => v.id === cr.vesselId)?.name || cr.vesselId : '-'}</TableCell>
-                      <TableCell className="font-medium text-gray-900">{cr.title}</TableCell>
-                      <TableCell>
-                        {cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
-                         cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
-                         cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
-                         cr.requestedByUserId}
-                      </TableCell>
-                      <TableCell>
-                        {cr.submittedAt
-                          ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')
-                          : new Date(cr.createdAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')}
-                      </TableCell>
-                      <TableCell>
-                        {(() => {
-                          const st = cr.status?.toLowerCase();
-                          if (st === 'submitted' || st === 'pending') return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white bg-blue-600">Pending Approval</span>;
-                          if (st === 'approved') return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white bg-green-500">Approved</span>;
-                          if (st === 'rejected') return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white bg-red-500">Rejected</span>;
-                          if (st === 'draft') return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white bg-gray-500">Draft</span>;
-                          if (st === 'returned') return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white bg-yellow-500">Returned</span>;
-                          return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white bg-gray-400">{cr.status}</span>;
-                        })()}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          <div className="border-t pt-3 flex justify-between items-center text-sm text-gray-600">
-            <span>Total: {crListModal.changeRequests.length} request{crListModal.changeRequests.length !== 1 ? 's' : ''}</span>
-          </div>
-        </DialogContent>
-      </Dialog>
       <Dialog open={showBenchmarking} onOpenChange={setShowBenchmarking}>
         <DialogContent className="max-w-[95vw] h-[calc(100vh-10vw)] max-h-[90vh] overflow-hidden flex flex-col [&>button.absolute]:top-6 [&>button.absolute]:translate-y-1">
           <DialogHeader className="pb-2">
@@ -2850,186 +2421,6 @@ const Dashboard = () => {
           </div>
         </DialogContent>
       </Dialog>
-
-      {opDetailChangeRequest && (
-        <Dialog open={!!opDetailChangeRequest} onOpenChange={(isOpen) => !isOpen && setOpDetailChangeRequest(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-lg font-semibold text-[#0f4c81]" data-testid="text-op-cr-detail-title">
-                Change Request Details
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="text-sm font-medium text-gray-500">Title</span>
-                  <p className="text-gray-900 font-medium" data-testid="text-op-cr-title">{opDetailChangeRequest.title}</p>
-                </div>
-                <div>
-                  <span className="text-sm font-medium text-gray-500">Category</span>
-                  <p className="text-gray-900 capitalize" data-testid="text-op-cr-category">{opDetailChangeRequest.category}</p>
-                </div>
-                <div>
-                  <span className="text-sm font-medium text-gray-500">Requested By</span>
-                  <p className="text-gray-900" data-testid="text-op-cr-requested-by">
-                    {opDetailChangeRequest.requestedByUserId === 'current_user' ? 'Chief Engineer' :
-                     opDetailChangeRequest.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
-                     opDetailChangeRequest.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
-                     opDetailChangeRequest.requestedByUserId}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-sm font-medium text-gray-500">Status</span>
-                  <div className="mt-1" data-testid="text-op-cr-status">
-                    {(() => {
-                      const st = opDetailChangeRequest.status?.toLowerCase();
-                      if (st === 'submitted' || st === 'pending') return <Badge className="bg-[#52BAF3] text-white">Pending Approval</Badge>;
-                      if (st === 'approved') return <Badge className="bg-green-500 text-white">Approved</Badge>;
-                      if (st === 'rejected') return <Badge className="bg-red-500 text-white">Rejected</Badge>;
-                      if (st === 'draft') return <Badge className="bg-gray-500 text-white">Draft</Badge>;
-                      if (st === 'returned') return <Badge className="bg-yellow-500 text-white">Returned</Badge>;
-                      return <Badge className="bg-gray-400 text-white">{opDetailChangeRequest.status}</Badge>;
-                    })()}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <span className="text-sm font-medium text-gray-500">Reason</span>
-                <p className="text-gray-900 mt-1" data-testid="text-op-cr-reason">{opDetailChangeRequest.reason || 'No reason provided'}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="text-sm font-medium text-gray-500">Created</span>
-                  <p className="text-gray-900" data-testid="text-op-cr-created">{new Date(opDetailChangeRequest.createdAt).toLocaleDateString()}</p>
-                </div>
-                {opDetailChangeRequest.submittedAt && (
-                  <div>
-                    <span className="text-sm font-medium text-gray-500">Submitted</span>
-                    <p className="text-gray-900" data-testid="text-op-cr-submitted">{new Date(opDetailChangeRequest.submittedAt).toLocaleDateString()}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="border-t pt-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Eye className="w-5 h-5 text-red-600" />
-                  <span className="text-base font-semibold text-gray-800">Changes Made</span>
-                </div>
-                {opDetailChangeRequest.proposedChangesJson && Array.isArray(opDetailChangeRequest.proposedChangesJson) && (opDetailChangeRequest.proposedChangesJson as Array<Record<string, unknown>>).length > 0 ? (
-                  <div className="space-y-3">
-                    {(opDetailChangeRequest.proposedChangesJson as Array<Record<string, unknown>>).map((change, index) => (
-                      <div key={index} className="bg-red-50 p-4 rounded-lg border border-red-200" data-testid={`op-cr-change-${index}`}>
-                        <div className="mb-2">
-                          <span className="font-semibold text-gray-800 text-sm uppercase tracking-wide">
-                            {String(change.field || change.fieldName || change.label || `Field ${index + 1}`)}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <span className="text-xs text-gray-500 block mb-1">Previous Value</span>
-                            <span className="text-gray-700 bg-white px-2 py-1 rounded border inline-block">
-                              {change.oldValue !== undefined ? String(change.oldValue) :
-                               change.originalValue !== undefined ? String(change.originalValue) :
-                               change.previousValue !== undefined ? String(change.previousValue) : '—'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-xs text-gray-500 block mb-1">New Value</span>
-                            <span className="text-red-600 font-bold bg-red-100 px-2 py-1 rounded border border-red-300 inline-block">
-                              {change.newValue !== undefined ? String(change.newValue) :
-                               change.currentValue !== undefined ? String(change.currentValue) :
-                               change.proposedValue !== undefined ? String(change.proposedValue) : '—'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-gray-500 text-center">
-                    No specific field changes recorded for this request.
-                  </div>
-                )}
-              </div>
-            </div>
-            <DialogFooter className="flex justify-between mt-4">
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    const changesSection = document.querySelector('[data-testid="op-cr-change-0"]');
-                    if (changesSection) changesSection.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  data-testid="button-op-cr-view-changes"
-                >
-                  <Eye className="h-4 w-4 mr-1" />
-                  View Changes
-                </Button>
-                {opDetailChangeRequest.status?.toLowerCase() === 'submitted' && !isVessel && !isHeadOfDept && (
-                  <>
-                    <Button
-                      variant="destructive"
-                      onClick={async () => {
-                        const comment = prompt('Please provide a reason for rejection:');
-                        if (comment) {
-                          try {
-                            const response = await fetch(`/technical/api/change-requests/${opDetailChangeRequest.id}/reject`, {
-                              method: 'PUT',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ comment, reviewerId: 'current_user' })
-                            });
-                            if (!response.ok) throw new Error('Failed to reject');
-                            queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
-                            setOpDetailChangeRequest(null);
-                            toast({ title: "Change request rejected", description: "The change request has been rejected" });
-                          } catch {
-                            toast({ title: "Error", description: "Failed to reject the change request", variant: "destructive" });
-                          }
-                        }
-                      }}
-                      data-testid="button-op-cr-reject"
-                    >
-                      <XCircle className="h-4 w-4 mr-1" />
-                      Reject
-                    </Button>
-                    <Button
-                      variant="default"
-                      className="bg-green-600 hover:bg-green-700"
-                      onClick={async () => {
-                        const comment = prompt('Please provide approval comments:');
-                        if (comment) {
-                          try {
-                            const response = await fetch(`/technical/api/change-requests/${opDetailChangeRequest.id}/approve`, {
-                              method: 'PUT',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ comment, reviewerId: 'current_user' })
-                            });
-                            if (!response.ok) throw new Error('Failed to approve');
-                            queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
-                            setOpDetailChangeRequest(null);
-                            toast({ title: "Change request approved", description: "The change request has been approved successfully" });
-                          } catch {
-                            toast({ title: "Error", description: "Failed to approve the change request", variant: "destructive" });
-                          }
-                        }
-                      }}
-                      data-testid="button-op-cr-approve"
-                    >
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Approve
-                    </Button>
-                  </>
-                )}
-              </div>
-              <Button variant="outline" onClick={() => setOpDetailChangeRequest(null)} data-testid="button-op-cr-close">
-                Close
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 };

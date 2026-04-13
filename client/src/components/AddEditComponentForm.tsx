@@ -29,7 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useMasterListOptions } from "@/hooks/useDepartments";
+import { getComponentCategory } from "@/utils/componentUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { AdminOnly } from "@/components/RoleGuard";
 import { FEATURES } from '@/config/features';
@@ -240,8 +240,6 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   const { data: makersList = [] } = useQuery<any[]>({
     queryKey: ['/technical/api/fleet/makers'],
   });
-
-  const { options: componentCategoryOptions, items: componentCategoryItems } = useMasterListOptions('componentCategory');
 
   // Component data state - matches exact field structure from Components.tsx Section A
   // Boolean fields default to "No" per specification
@@ -463,14 +461,6 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     ? allSpares.filter(s => s.componentId === componentId)
     : [];
 
-  const deriveComponentCategory = (codeOrId: string): string => {
-    if (!codeOrId) return '';
-    const firstChar = codeOrId.includes('.') ? codeOrId.split('.')[0].charAt(0) : codeOrId.charAt(0);
-    const mlItem = componentCategoryItems.find(item => item.listKey === firstChar && item.isActive);
-    if (mlItem) return mlItem.listValue;
-    return '';
-  };
-
   // Populate form in edit mode
   useEffect(() => {
     if (isEditMode && existingComponent && !isLoadingComponent) {
@@ -480,7 +470,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
         parentComponent: existingComponent.parentId || "",
         componentCode: existingComponent.componentCode || "",
         componentName: existingComponent.name || "",
-        componentCategory: existingComponent.componentCategory || deriveComponentCategory(existingComponent.componentCode || existingComponent.id),
+        componentCategory: existingComponent.componentCategory || getComponentCategory(existingComponent.componentCode || existingComponent.id),
         maker: existingComponent.maker || "",
         makerCode: existingComponent.makerCode || "",
         model: existingComponent.model || "",
@@ -511,7 +501,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
       setComponentData(prev => ({
         ...prev,
         parentComponent: parentComponent.code,
-        componentCategory: deriveComponentCategory(parentComponent.code),
+        componentCategory: getComponentCategory(parentComponent.code),
         vesselCode: vesselId || "",
       }));
       setIsDataLoaded(true);
@@ -520,33 +510,15 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     }
   }, [existingComponent, isLoadingComponent, isEditMode, parentComponent, vesselId]);
 
-  const prevComponentCodeRef = React.useRef<string>('');
-  const masterListLoadedRef = React.useRef<boolean>(false);
-
-  // Auto-update componentCategory when componentCode changes, category is empty,
-  // or master list items arrive for the first time (reconciliation)
+  // Auto-update componentCategory when componentCode changes
   useEffect(() => {
-    if (!componentData.componentCode || componentCategoryItems.length === 0) return;
-    const codeChanged = prevComponentCodeRef.current !== '' && prevComponentCodeRef.current !== componentData.componentCode;
-    const categoryEmpty = !componentData.componentCategory;
-    const masterListJustLoaded = !masterListLoadedRef.current;
-    if (codeChanged || categoryEmpty || masterListJustLoaded) {
-      const derivedCategory = deriveComponentCategory(componentData.componentCode);
-      if (derivedCategory) {
-        if (categoryEmpty || codeChanged || masterListJustLoaded) {
-          setComponentData(prev => {
-            if (prev.componentCategory && !categoryEmpty && !codeChanged && masterListJustLoaded) {
-              const currentIsValid = componentCategoryItems.some(item => item.listValue === prev.componentCategory && item.isActive);
-              if (currentIsValid) return prev;
-            }
-            return { ...prev, componentCategory: derivedCategory };
-          });
-        }
+    if (componentData.componentCode) {
+      const derivedCategory = getComponentCategory(componentData.componentCode);
+      if (derivedCategory && derivedCategory !== componentData.componentCategory) {
+        setComponentData(prev => ({ ...prev, componentCategory: derivedCategory }));
       }
     }
-    prevComponentCodeRef.current = componentData.componentCode;
-    masterListLoadedRef.current = true;
-  }, [componentData.componentCode, componentCategoryItems]);
+  }, [componentData.componentCode]);
 
   const PARENT_OPTIONAL_FIELDS = ['eqptSystemDept'];
 
@@ -870,18 +842,14 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                             </div>
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Component Category<span className="text-red-500 ml-0.5">*</span></label>
-                              <select
+                              <input
+                                type="text"
                                 value={componentData.componentCategory}
-                                onChange={(e) => handleFieldChange('componentCategory', e.target.value)}
-                                className={`text-sm w-full px-2 py-1 border rounded ${validationErrors.componentCategory ? 'border-red-500 text-red-700' : 'text-[#52BAF3] border-[#52BAF3]'}`}
-                                data-testid="select-component-category"
-                                title="Auto-populated based on component group (1-8), can be overridden"
-                              >
-                                <option value="">Select Category</option>
-                                {componentCategoryOptions.map(opt => (
-                                  <option key={opt.value} value={opt.label}>{opt.label}</option>
-                                ))}
-                              </select>
+                                readOnly
+                                className={`text-sm w-full px-2 py-1 border rounded bg-gray-50 cursor-not-allowed ${validationErrors.componentCategory ? 'border-red-500 text-red-700' : 'text-gray-700 border-gray-300'}`}
+                                data-testid="input-component-category"
+                                title="Auto-populated based on component group (1-8)"
+                              />
                               {validationErrors.componentCategory && <span className="text-xs text-red-500" data-testid="validation-error-componentCategory">This field is required</span>}
                             </div>
                             <div>

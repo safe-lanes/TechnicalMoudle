@@ -21,7 +21,7 @@ import { ReviewChangesDrawer } from "@/components/ReviewChangesDrawer";
 import { useChangeRequest } from "@/contexts/ChangeRequestContext";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { useLocation } from "wouter";
-import { useMasterListOptions } from "@/hooks/useDepartments";
+import { getComponentCategory } from "@/utils/componentUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { FEATURES } from '@/config/features';
@@ -93,17 +93,8 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     return change ? (change.newValue || change.currentValue) : null;
   };
 
-  const { items: componentCategoryItems } = useMasterListOptions('componentCategory');
-
-  const deriveComponentCategory = (codeOrId: string): string => {
-    if (!codeOrId) return '';
-    const firstChar = codeOrId.includes('.') ? codeOrId.split('.')[0].charAt(0) : codeOrId.charAt(0);
-    const mlItem = componentCategoryItems.find(item => item.listKey === firstChar && item.isActive);
-    if (mlItem) return mlItem.listValue;
-    return '';
-  };
-
-  const componentCategory = selectedComponent ? deriveComponentCategory(selectedComponent.id) : '';
+  // Derive Component Category from the component's tree position
+  const componentCategory = selectedComponent ? getComponentCategory(selectedComponent.id) : '';
 
   // Component data - uses selected component code or defaults (empty until populated from Excel)
   const [componentData, setComponentData] = useState({
@@ -161,7 +152,8 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         parentComponent: comp.parentId || "",
         componentCode: selectedComponent.code,
         componentName: comp.name || selectedComponent.name || "",
-        componentCategory: comp.componentCategory || comp.category || deriveComponentCategory(selectedComponent.id),
+        // Use stored componentCategory from Excel first, fall back to derived category only if not present
+        componentCategory: comp.componentCategory || comp.category || getComponentCategory(selectedComponent.id),
         maker: comp.maker || "",
         makerCode: comp.makerCode || "",
         model: comp.model || "",
@@ -207,31 +199,15 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     }
   }, [isChangeMode, isModifyMode, componentData, originalComponentData]);
 
-  const prevCompCodeRef = useRef<string>('');
-  const masterListLoadedRef = useRef<boolean>(false);
-
-  // Auto-update componentCategory when componentCode changes, category is empty,
-  // or master list items arrive for the first time (reconciliation)
+  // Auto-update componentCategory when componentCode changes (for new components)
   useEffect(() => {
-    if (!componentData.componentCode || componentCategoryItems.length === 0) return;
-    const codeChanged = prevCompCodeRef.current !== '' && prevCompCodeRef.current !== componentData.componentCode;
-    const categoryEmpty = !componentData.componentCategory;
-    const masterListJustLoaded = !masterListLoadedRef.current;
-    if (codeChanged || categoryEmpty || masterListJustLoaded) {
-      const derivedCategory = deriveComponentCategory(componentData.componentCode);
-      if (derivedCategory) {
-        setComponentData(prev => {
-          if (prev.componentCategory && !categoryEmpty && !codeChanged && masterListJustLoaded) {
-            const currentIsValid = componentCategoryItems.some(item => item.listValue === prev.componentCategory && item.isActive);
-            if (currentIsValid) return prev;
-          }
-          return { ...prev, componentCategory: derivedCategory };
-        });
+    if (componentData.componentCode) {
+      const derivedCategory = getComponentCategory(componentData.componentCode);
+      if (derivedCategory && derivedCategory !== componentData.componentCategory) {
+        setComponentData(prev => ({ ...prev, componentCategory: derivedCategory }));
       }
     }
-    prevCompCodeRef.current = componentData.componentCode;
-    masterListLoadedRef.current = true;
-  }, [componentData.componentCode, componentCategoryItems]);
+  }, [componentData.componentCode]);
   
   // Track which fields have been changed
   const [changedFields, setChangedFields] = useState<Set<string>>(new Set());

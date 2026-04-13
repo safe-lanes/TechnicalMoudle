@@ -102,12 +102,11 @@ export async function getTargetEntity(targetType: string, targetId: string) {
 export async function getChangeRequests(query: { vesselId?: string; status?: string; category?: string; requestedBy?: string; periodFrom?: string; periodTo?: string }) {
   const { vesselId, status, category, requestedBy, periodFrom, periodTo } = query;
 
-  const filters: { vesselId?: string } = {};
-  if (vesselId) {
-    filters.vesselId = vesselId;
+  if (!vesselId) {
+    throw new ValidationError('vesselId is required for change requests');
   }
 
-  let requests = await crRepo.getChangeRequests(filters);
+  let requests = await crRepo.getChangeRequests({ vesselId });
 
   if (status) {
     requests = requests.filter(r => r.status === status);
