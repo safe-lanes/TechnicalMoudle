@@ -96,7 +96,7 @@ export async function createSuperintendentNotificationForWO(wo: any, daysLate: n
 
 // ── List Work Orders with Enrichment ──
 
-export async function listWorkOrders(vesselId?: string, assignmentScope?: string[]) {
+export async function listWorkOrders(vesselId?: string) {
   const workOrders = await repo.findWorkOrders(vesselId);
 
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
@@ -330,14 +330,6 @@ export async function listWorkOrders(vesselId?: string, assignmentScope?: string
 
     return 0;
   });
-
-  if (assignmentScope && assignmentScope.length > 0) {
-    const scopeSet = new Set(assignmentScope.map(s => s.toLowerCase().trim()));
-    return sortedWorkOrders.filter((wo: any) => {
-      const assigned = (wo.assignedTo || '').toLowerCase().trim();
-      return scopeSet.has(assigned);
-    });
-  }
 
   return sortedWorkOrders;
 }

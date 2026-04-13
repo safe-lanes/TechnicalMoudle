@@ -402,31 +402,33 @@ const Dashboard = () => {
   
   const currentVessel = vessels.find(v => v.id === effectiveVesselId);
 
-  interface HierarchyScope {
-    vesselId: string;
+  interface ScopeMeta {
     hasMapping: boolean;
-    me: { nodeUuids: string[]; rankIds: string[]; assignmentKeys: string[] };
-    myTeam: { nodeUuids: string[]; rankIds: string[]; assignmentKeys: string[] };
+    hasDescendants: boolean;
+    mode: 'me' | 'myTeam';
+    appliedRankIds: string[];
   }
 
-  const { data: hierarchyScope } = useQuery<HierarchyScope>({
-    queryKey: ['/technical/api/hierarchy-scope', effectiveVesselId, currentUser?.crewDesignation],
+  interface ScopedWOResponse {
+    workOrders: WorkOrder[];
+    scopeMeta: ScopeMeta;
+  }
+
+  const { data: scopedResponse } = useQuery<ScopedWOResponse>({
+    queryKey: ['/technical/api/scoped-work-orders', effectiveVesselId, hodScope, currentUser?.crewDesignation],
     queryFn: async () => {
       const response = await fetch(
-        `/technical/api/hierarchy-scope/${effectiveVesselId}`,
+        `/technical/api/scoped-work-orders/${effectiveVesselId}?mode=${hodScope}`,
         { headers: { 'X-User-Designation': currentUser?.crewDesignation || '' } }
       );
-      if (!response.ok) throw new Error('Failed to fetch hierarchy scope');
+      if (!response.ok) throw new Error('Failed to fetch scoped work orders');
       return response.json();
     },
     enabled: !!effectiveVesselId && !isAllVessels && !!currentUser?.crewDesignation,
   });
 
-  const scopeAssignmentKeys = useMemo(() => {
-    if (!hierarchyScope?.hasMapping) return null;
-    const keys = hodScope === 'me' ? hierarchyScope.me.assignmentKeys : hierarchyScope.myTeam.assignmentKeys;
-    return keys.length > 0 ? keys : null;
-  }, [hierarchyScope, hodScope]);
+  const scopeMeta = scopedResponse?.scopeMeta ?? null;
+  const scopeActive = !!scopeMeta?.hasMapping;
 
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
@@ -440,19 +442,6 @@ const Dashboard = () => {
       return await response.json();
     },
     enabled: !!effectiveVesselId
-  });
-
-  const { data: scopedWorkOrdersData = [], isLoading: isScopedWOsLoading } = useQuery<WorkOrder[]>({
-    queryKey: ['/technical/api/work-orders', effectiveVesselId, 'scoped', scopeAssignmentKeys],
-    queryFn: async () => {
-      const scopeParam = scopeAssignmentKeys!.join(',');
-      const response = await fetch(
-        `/technical/api/work-orders?vesselId=${effectiveVesselId}&assignmentScope=${encodeURIComponent(scopeParam)}`
-      );
-      if (!response.ok) throw new Error('Failed to fetch scoped work orders');
-      return response.json();
-    },
-    enabled: !!effectiveVesselId && !isAllVessels && !!scopeAssignmentKeys,
   });
 
   // Fetch spares data - for all vessels, fetch each vessel's spares and combine
@@ -1137,11 +1126,14 @@ const Dashboard = () => {
   const completionRate = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.completed / workOrderKPIs.total) * 100) : 0;
 
   const operationWOs = useMemo(() => {
-    if (scopeAssignmentKeys) {
-      return scopedWorkOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
+    if (scopeActive && scopedResponse) {
+      return scopedResponse.workOrders.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
+    }
+    if (scopeMeta && !scopeMeta.hasMapping) {
+      return [];
     }
     return workOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
-  }, [scopeAssignmentKeys, scopedWorkOrdersData, workOrdersData]);
+  }, [scopeActive, scopedResponse, scopeMeta, workOrdersData]);
 
   const operationDonutData = useMemo(() => {
     const safeWOs = operationWOs;
@@ -1191,7 +1183,8 @@ const Dashboard = () => {
     });
     const plannedTodayCount = plannedTodayWOs.length;
 
-    const criticalSparesLowList = sparesData.filter(spare => {
+    const effectiveSpares = scopeActive ? [] : sparesData;
+    const criticalSparesLowList = effectiveSpares.filter(spare => {
       const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes';
       if (!isCritical) return false;
       const rob = typeof spare.rob === 'number' ? spare.rob : parseInt(String(spare.rob)) || 0;
@@ -1205,14 +1198,15 @@ const Dashboard = () => {
     );
     const pendingApprovalCount = pendingApprovalWOs.length;
 
-    const anomalyCount = complianceAnomalies ? [
+    const anomalyCount = scopeActive ? 0 : (complianceAnomalies ? [
       complianceAnomalies.cycleSkipRate.severity,
       complianceAnomalies.backdatingFrequency.severity,
       complianceAnomalies.bulkCompletions.severity,
       complianceAnomalies.scheduleDrift.severity,
-    ].filter(s => s !== 'green').length : 0;
+    ].filter(s => s !== 'green').length : 0);
 
-    const openChangeRequestsList = changeRequestsData.filter(cr => {
+    const effectiveChangeRequests = scopeActive ? [] : changeRequestsData;
+    const openChangeRequestsList = effectiveChangeRequests.filter(cr => {
       const s = cr.status?.toLowerCase();
       return s !== 'approved' && s !== 'rejected';
     });
@@ -1235,7 +1229,7 @@ const Dashboard = () => {
       openChangeRequests,
       openChangeRequestsList,
     };
-  }, [operationWOs, sparesData, changeRequestsData, complianceAnomalies]);
+  }, [operationWOs, sparesData, changeRequestsData, complianceAnomalies, scopeActive]);
 
   const operationTableData = useMemo(() => {
     switch (selectedOpCard) {
@@ -1543,19 +1537,19 @@ const Dashboard = () => {
               <TooltipProvider>
                 <UITooltip>
                   <TooltipTrigger asChild>
-                    <div className={`flex items-center gap-2 ${!hierarchyScope?.hasMapping ? 'opacity-50' : ''}`} data-testid="toggle-hod-scope">
+                    <div className={`flex items-center gap-2 ${!scopeActive ? 'opacity-50' : ''}`} data-testid="toggle-hod-scope">
                       <span
                         className={`text-sm font-medium cursor-pointer transition-colors ${hodScope === 'me' ? 'text-[#1a2b4a]' : 'text-gray-400'}`}
-                        onClick={() => hierarchyScope?.hasMapping && setHodScope('me')}
+                        onClick={() => scopeActive && setHodScope('me')}
                         data-testid="toggle-label-me"
                       >
                         Me
                       </span>
                       <button
-                        onClick={() => hierarchyScope?.hasMapping && setHodScope(hodScope === 'me' ? 'myTeam' : 'me')}
+                        onClick={() => scopeActive && setHodScope(hodScope === 'me' ? 'myTeam' : 'me')}
                         className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none"
                         style={{ backgroundColor: hodScope === 'myTeam' ? '#52baf3' : '#d1d5db' }}
-                        disabled={!hierarchyScope?.hasMapping}
+                        disabled={!scopeActive}
                         data-testid="toggle-switch-hod-scope"
                       >
                         <span
@@ -1564,14 +1558,14 @@ const Dashboard = () => {
                       </button>
                       <span
                         className={`text-sm font-medium cursor-pointer transition-colors ${hodScope === 'myTeam' ? 'text-[#1a2b4a]' : 'text-gray-400'}`}
-                        onClick={() => hierarchyScope?.hasMapping && setHodScope('myTeam')}
+                        onClick={() => scopeActive && setHodScope('myTeam')}
                         data-testid="toggle-label-myteam"
                       >
                         My Team
                       </span>
                     </div>
                   </TooltipTrigger>
-                  {!hierarchyScope?.hasMapping && (
+                  {!scopeActive && (
                     <TooltipContent data-testid="tooltip-no-mapping">
                       <p>Your designation is not mapped to this vessel's org chart</p>
                     </TooltipContent>
