@@ -1991,12 +1991,12 @@ const Dashboard = () => {
                         )}
                       </div>
                       <Table>
-                        <TableHeader>
-                          <TableRow className="bg-[#52BAF3] hover:bg-[#52BAF3] border-b-0">
-                            <TableHead className="text-white font-medium py-3 px-6 text-xs">Request Title</TableHead>
-                            <TableHead className="text-white font-medium py-3 px-6 text-xs">Requested By</TableHead>
-                            <TableHead className="text-white font-medium py-3 px-6 text-xs">Date</TableHead>
-                            <TableHead className="text-white font-medium py-3 px-6 text-xs">Status</TableHead>
+                        <TableHeader className="sticky top-0 bg-[#eff6ff] z-10">
+                          <TableRow>
+                            <TableHead className="font-medium min-w-[200px] bg-[#eff6ff] text-[#0e4c81] text-xs">Request Title</TableHead>
+                            <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81] text-xs">Requested By</TableHead>
+                            <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81] text-xs">Date</TableHead>
+                            <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81] text-xs">Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -2010,31 +2010,29 @@ const Dashboard = () => {
                             operationKPIs.openChangeRequestsList.map((cr) => (
                               <TableRow
                                 key={cr.id}
-                                className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer"
+                                className="hover:bg-gray-50 cursor-pointer"
                                 onClick={() => setOpDetailChangeRequest(cr)}
                                 data-testid={`row-op-change-request-${cr.id}`}
                               >
-                                <TableCell className="py-3 px-6">
-                                  <div className="font-medium text-gray-900 text-xs">{cr.title}</div>
-                                </TableCell>
-                                <TableCell className="py-3 px-6 text-gray-700 text-xs">
+                                <TableCell className="font-medium text-gray-900 text-xs py-2">{cr.title}</TableCell>
+                                <TableCell className="text-xs py-2">
                                   {cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
                                    cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
                                    cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
                                    cr.requestedByUserId}
                                 </TableCell>
-                                <TableCell className="py-3 px-6 text-gray-700 text-xs">
+                                <TableCell className="text-xs py-2">
                                   {cr.submittedAt
                                     ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')
                                     : new Date(cr.createdAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')}
                                 </TableCell>
-                                <TableCell className="py-3 px-6">
+                                <TableCell className="py-2">
                                   {(() => {
                                     const st = cr.status?.toLowerCase();
-                                    if (st === 'submitted' || st === 'pending') return <Badge className="bg-[#52BAF3] text-white px-3 py-1 text-xs rounded-full">Pending Approval</Badge>;
-                                    if (st === 'draft') return <Badge className="bg-gray-500 text-white px-3 py-1 text-xs rounded-full">Draft</Badge>;
-                                    if (st === 'returned') return <Badge className="bg-yellow-500 text-white px-3 py-1 text-xs rounded-full">Returned</Badge>;
-                                    return <Badge className="bg-gray-400 text-white px-3 py-1 text-xs rounded-full">{cr.status}</Badge>;
+                                    if (st === 'submitted' || st === 'pending') return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-blue-600">Pending Approval</span>;
+                                    if (st === 'draft') return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-gray-500">Draft</span>;
+                                    if (st === 'returned') return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-yellow-500">Returned</span>;
+                                    return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-gray-400">{cr.status}</span>;
                                   })()}
                                 </TableCell>
                               </TableRow>
@@ -2893,63 +2891,104 @@ const Dashboard = () => {
         getStockStatus={getStockStatus}
       />
       <Dialog open={crListModal.open} onOpenChange={(isOpen) => !isOpen && setCrListModal({ open: false, title: '', changeRequests: [] })}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-[#0f4c81]" data-testid="title-cr-list-modal">
+        <DialogContent className="max-w-[90vw] h-[calc(100vh-10vw)] max-h-[90vh] overflow-hidden flex flex-col [&>button.absolute]:top-6 [&>button.absolute]:translate-y-1">
+          <DialogHeader className="pb-4 flex flex-row items-center justify-between gap-4">
+            <DialogTitle className="text-xl font-semibold text-[#0f4c81]" data-testid="title-cr-list-modal">
               {crListModal.title}
             </DialogTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs text-[#8798ad] border-[#e1e8ed] mr-8"
+              onClick={() => {
+                const columns: TableColumn[] = [
+                  { header: 'Request Title', field: 'title', width: 50 },
+                  { header: 'Requested By', field: 'requestedBy', width: 20 },
+                  { header: 'Date', field: 'date', width: 18 },
+                  { header: 'Status', field: 'status', width: 15 },
+                ];
+                const data = crListModal.changeRequests.map(cr => ({
+                  title: cr.title || '-',
+                  requestedBy: cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
+                    cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
+                    cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
+                    cr.requestedByUserId || '-',
+                  date: cr.submittedAt
+                    ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')
+                    : new Date(cr.createdAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' '),
+                  status: (() => {
+                    const st = cr.status?.toLowerCase();
+                    if (st === 'submitted' || st === 'pending') return 'Pending Approval';
+                    if (st === 'approved') return 'Approved';
+                    if (st === 'rejected') return 'Rejected';
+                    if (st === 'returned') return 'Returned';
+                    if (st === 'draft') return 'Draft';
+                    return cr.status || '-';
+                  })(),
+                }));
+                pdfReportGenerator.generateReport(
+                  { title: crListModal.title, subtitle: `Total: ${data.length} request${data.length !== 1 ? 's' : ''}`, orientation: 'landscape' },
+                  columns,
+                  data
+                );
+              }}
+              data-testid="button-export-cr-modal-pdf"
+            >
+              <Download className="h-3.5 w-3.5 mr-1" />
+              Export
+            </Button>
           </DialogHeader>
-          <div className="flex-1 overflow-auto">
-            {crListModal.changeRequests.length === 0 ? (
-              <div className="flex items-center justify-center py-12 text-gray-400 text-sm">
-                No change requests found
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-[#52BAF3] hover:bg-[#52BAF3] border-b-0">
-                    <TableHead className="text-white font-medium py-3 px-6 text-xs">Request Title</TableHead>
-                    <TableHead className="text-white font-medium py-3 px-6 text-xs">Requested By</TableHead>
-                    <TableHead className="text-white font-medium py-3 px-6 text-xs">Date</TableHead>
-                    <TableHead className="text-white font-medium py-3 px-6 text-xs">Status</TableHead>
+          <div className="flex-1 overflow-auto border border-gray-200 rounded-lg">
+            <Table>
+              <TableHeader className="sticky top-0 bg-[#eff6ff] z-10">
+                <TableRow>
+                  <TableHead className="font-medium min-w-[200px] bg-[#eff6ff] text-[#0e4c81]">Request Title</TableHead>
+                  <TableHead className="font-medium w-[140px] bg-[#eff6ff] text-[#0e4c81]">Requested By</TableHead>
+                  <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81]">Date</TableHead>
+                  <TableHead className="font-medium w-[140px] bg-[#eff6ff] text-[#0e4c81]">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {crListModal.changeRequests.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8 text-gray-500">
+                      No change requests found
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {crListModal.changeRequests.map((cr) => (
-                    <TableRow key={cr.id} className="border-b border-gray-200 hover:bg-gray-50" data-testid={`row-cr-modal-${cr.id}`}>
-                      <TableCell className="py-3 px-6">
-                        <div className="font-medium text-gray-900 text-xs">{cr.title}</div>
-                      </TableCell>
-                      <TableCell className="py-3 px-6 text-gray-700 text-xs">
+                ) : (
+                  crListModal.changeRequests.map((cr) => (
+                    <TableRow key={cr.id} className="hover:bg-gray-50" data-testid={`row-cr-modal-${cr.id}`}>
+                      <TableCell className="font-medium text-gray-900">{cr.title}</TableCell>
+                      <TableCell>
                         {cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
                          cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
                          cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
                          cr.requestedByUserId}
                       </TableCell>
-                      <TableCell className="py-3 px-6 text-gray-700 text-xs">
+                      <TableCell>
                         {cr.submittedAt
                           ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')
                           : new Date(cr.createdAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')}
                       </TableCell>
-                      <TableCell className="py-3 px-6">
+                      <TableCell>
                         {(() => {
                           const st = cr.status?.toLowerCase();
-                          if (st === 'submitted' || st === 'pending') return <Badge className="bg-[#52BAF3] text-white px-3 py-1 text-xs rounded-full">Pending Approval</Badge>;
-                          if (st === 'approved') return <Badge className="bg-green-500 text-white px-3 py-1 text-xs rounded-full">Approved</Badge>;
-                          if (st === 'rejected') return <Badge className="bg-red-500 text-white px-3 py-1 text-xs rounded-full">Rejected</Badge>;
-                          if (st === 'draft') return <Badge className="bg-gray-500 text-white px-3 py-1 text-xs rounded-full">Draft</Badge>;
-                          if (st === 'returned') return <Badge className="bg-yellow-500 text-white px-3 py-1 text-xs rounded-full">Returned</Badge>;
-                          return <Badge className="bg-gray-400 text-white px-3 py-1 text-xs rounded-full">{cr.status}</Badge>;
+                          if (st === 'submitted' || st === 'pending') return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white bg-blue-600">Pending Approval</span>;
+                          if (st === 'approved') return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white bg-green-500">Approved</span>;
+                          if (st === 'rejected') return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white bg-red-500">Rejected</span>;
+                          if (st === 'draft') return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white bg-gray-500">Draft</span>;
+                          if (st === 'returned') return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white bg-yellow-500">Returned</span>;
+                          return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white bg-gray-400">{cr.status}</span>;
                         })()}
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
-          <div className="border-t pt-3 text-xs text-gray-500">
-            Total: {crListModal.changeRequests.length} request{crListModal.changeRequests.length !== 1 ? 's' : ''}
+          <div className="border-t pt-3 flex justify-between items-center text-sm text-gray-600">
+            <span>Total: {crListModal.changeRequests.length} request{crListModal.changeRequests.length !== 1 ? 's' : ''}</span>
           </div>
         </DialogContent>
       </Dialog>
