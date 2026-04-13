@@ -793,7 +793,7 @@ const Dashboard = () => {
     ).length;
 
     return [
-      { status: 'Planned', count: planned, color: '#9E9E9E' },
+      { status: 'Scheduled', count: planned, color: '#9E9E9E' },
       { status: 'Due', count: due, color: '#FF964f' },
       { status: 'Overdue', count: overdue, color: '#ff6961' },
       { status: 'Completed', count: completed, color: '#5dc86f' },
@@ -1109,7 +1109,7 @@ const Dashboard = () => {
     return [
       { status: 'Overdue', count: overdue, color: '#ff6961' },
       { status: 'Due', count: due, color: '#FF964f' },
-      { status: 'Planned', count: planned, color: '#9E9E9E' },
+      { status: 'Scheduled', count: planned, color: '#9E9E9E' },
     ].filter(d => d.count > 0);
   }, [workOrdersData]);
 
@@ -1213,14 +1213,14 @@ const Dashboard = () => {
     switch (selectedOpCard) {
       case 'overdue': return 'Overdue Work Orders';
       case 'overdue-critical': return 'Overdue Work Orders – Critical Equipment';
-      case 'planned-today': return 'Work Orders – Planned for Today';
+      case 'planned-today': return 'Work Orders – Scheduled for Today';
       case 'pending-approvals': return 'Pending Approval Work Orders';
       case 'critical-spares': return 'Critical Spares Low';
       case 'anomalies': return 'W.O Anomalies';
       case 'modify-pms': return 'Modify PMS Requests';
       case 'donut-overdue': return 'Overdue Work Orders (from chart)';
       case 'donut-due': return 'Due Work Orders (from chart)';
-      case 'donut-planned': return 'Planned Work Orders (from chart)';
+      case 'donut-planned': return 'Scheduled Work Orders (from chart)';
       default: return 'Work Orders';
     }
   }, [selectedOpCard]);
@@ -1645,7 +1645,7 @@ const Dashboard = () => {
                                   const filterMap: Record<string, OperationCardFilter> = {
                                     'Overdue': 'donut-overdue',
                                     'Due': 'donut-due',
-                                    'Planned': 'donut-planned',
+                                    'Scheduled': 'donut-planned',
                                   };
                                   const newFilter = filterMap[segment.status];
                                   if (newFilter) {
@@ -1675,7 +1675,7 @@ const Dashboard = () => {
                         <div className="flex flex-col gap-0.5">
                           <span className="text-xs font-semibold text-gray-700">Work Orders</span>
                           {[
-                            { status: 'Planned', color: '#9E9E9E' },
+                            { status: 'Scheduled', color: '#9E9E9E' },
                             { status: 'Due', color: '#FF964f' },
                             { status: 'Overdue', color: '#ff6961' },
                           ].map(item => (
@@ -1695,7 +1695,7 @@ const Dashboard = () => {
                     {([
                       { key: 'overdue' as OperationCardFilter, label: 'Overdue WO', value: operationKPIs.overdueCount, borderColor: 'border-l-red-500', textColor: 'text-red-600', testId: 'card-kpi-overdue-wo', valueTestId: 'kpi-overdue-wo' },
                       { key: 'overdue-critical' as OperationCardFilter, label: 'Overdue WO – Critical Eqpt', value: operationKPIs.overdueCriticalCount, borderColor: 'border-l-red-500', textColor: 'text-red-600', testId: 'card-kpi-overdue-wo-critical', valueTestId: 'kpi-overdue-wo-critical' },
-                      { key: 'planned-today' as OperationCardFilter, label: 'WO – Planned for Today', value: operationKPIs.plannedTodayCount, borderColor: 'border-l-green-500', textColor: 'text-green-600', testId: 'card-kpi-planned-today', valueTestId: 'kpi-planned-today' },
+                      { key: 'planned-today' as OperationCardFilter, label: 'WO – Scheduled for Today', value: operationKPIs.plannedTodayCount, borderColor: 'border-l-green-500', textColor: 'text-green-600', testId: 'card-kpi-planned-today', valueTestId: 'kpi-planned-today' },
                       { key: 'critical-spares' as OperationCardFilter, label: 'Critical Spares Low', value: operationKPIs.criticalSparesLowCount, borderColor: 'border-l-orange-500', textColor: 'text-orange-600', testId: 'card-kpi-critical-spares-low', valueTestId: 'kpi-critical-spares-low' },
                       { key: 'pending-approvals' as OperationCardFilter, label: 'Pending Approvals', value: operationKPIs.pendingApprovalCount, borderColor: 'border-l-orange-500', textColor: 'text-orange-600', testId: 'card-kpi-pending-approvals', valueTestId: 'kpi-pending-approvals' },
                       { key: 'anomalies' as OperationCardFilter, label: 'W.O Anomalies', value: operationKPIs.anomalyCount, borderColor: 'border-l-orange-500', textColor: 'text-orange-600', testId: 'card-kpi-wo-anomalies', valueTestId: 'kpi-wo-anomalies' },
