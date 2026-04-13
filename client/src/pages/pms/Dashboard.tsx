@@ -2443,7 +2443,7 @@ const Dashboard = () => {
                                     return (
                                       <div style={{ background: '#FFFFFF', border: '1px solid #E0E0E0', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '8px 12px' }} data-testid="tooltip-trend-line">
                                         <div className="font-semibold text-xs mb-1" style={{ color: '#212121' }}>{d.month}</div>
-                                        <div className="text-xs" style={{ color: '#616161' }}>Total planned: {d.totalPlanned}</div>
+                                        <div className="text-xs" style={{ color: '#616161' }}>Total scheduled: {d.totalPlanned}</div>
                                         <div className="text-xs" style={{ color: '#2ecc71' }}>Completed: {d.completedPercent}% ({d.completed})</div>
                                         <div className="text-xs" style={{ color: '#f39c12' }}>Outstanding: {d.outstandingPercent}% ({d.outstanding})</div>
                                         <div className="text-xs" style={{ color: '#e74c3c' }}>Overdue: {d.overduePercent}% ({d.overdue})</div>
