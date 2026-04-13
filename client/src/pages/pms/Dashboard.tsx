@@ -2902,12 +2902,14 @@ const Dashboard = () => {
               className="text-xs text-[#8798ad] border-[#e1e8ed] mr-8"
               onClick={() => {
                 const columns: TableColumn[] = [
-                  { header: 'Request Title', field: 'title', width: 50 },
+                  { header: 'Vessel', field: 'vessel', width: 20 },
+                  { header: 'Request Title', field: 'title', width: 40 },
                   { header: 'Requested By', field: 'requestedBy', width: 20 },
                   { header: 'Date', field: 'date', width: 18 },
                   { header: 'Status', field: 'status', width: 15 },
                 ];
                 const data = crListModal.changeRequests.map(cr => ({
+                  vessel: (cr.vesselId ? vessels.find(v => v.id === cr.vesselId)?.name : undefined) || '-',
                   title: cr.title || '-',
                   requestedBy: cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
                     cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
@@ -2942,6 +2944,7 @@ const Dashboard = () => {
             <Table>
               <TableHeader className="sticky top-0 bg-[#eff6ff] z-10">
                 <TableRow>
+                  <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81]">Vessel</TableHead>
                   <TableHead className="font-medium min-w-[200px] bg-[#eff6ff] text-[#0e4c81]">Request Title</TableHead>
                   <TableHead className="font-medium w-[140px] bg-[#eff6ff] text-[#0e4c81]">Requested By</TableHead>
                   <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81]">Date</TableHead>
@@ -2951,13 +2954,14 @@ const Dashboard = () => {
               <TableBody>
                 {crListModal.changeRequests.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">
                       No change requests found
                     </TableCell>
                   </TableRow>
                 ) : (
                   crListModal.changeRequests.map((cr) => (
                     <TableRow key={cr.id} className="hover:bg-gray-50" data-testid={`row-cr-modal-${cr.id}`}>
+                      <TableCell>{cr.vesselId ? vessels.find(v => v.id === cr.vesselId)?.name || cr.vesselId : '-'}</TableCell>
                       <TableCell className="font-medium text-gray-900">{cr.title}</TableCell>
                       <TableCell>
                         {cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
