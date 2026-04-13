@@ -429,6 +429,7 @@ const Dashboard = () => {
   const isScopeActive = !!scopeMeta?.hasMapping;
   const toggleDisabled = !!scopeMeta && !scopeMeta.hasMapping;
   const scopeNotConfigured = toggleDisabled;
+  const vesselWideAccessGranted = scopeMeta?.vesselWideAccessGranted ?? false;
 
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
@@ -1129,8 +1130,10 @@ const Dashboard = () => {
     const filterExec = (wos: WorkOrder[]) => wos.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
     if (isAllVessels) return filterExec(workOrdersData);
     if (isScopeActive && scopedResponse) return filterExec(scopedResponse.workOrders);
+    if (scopeNotConfigured && vesselWideAccessGranted) return filterExec(workOrdersData);
+    if (scopeNotConfigured && !vesselWideAccessGranted) return [];
     return filterExec(workOrdersData);
-  }, [isAllVessels, isScopeActive, scopedResponse, workOrdersData]);
+  }, [isAllVessels, isScopeActive, scopedResponse, workOrdersData, scopeNotConfigured, vesselWideAccessGranted]);
 
   const operationDonutData = useMemo(() => {
     const safeWOs = operationWOs;
@@ -1568,9 +1571,11 @@ const Dashboard = () => {
                   </TooltipTrigger>
 
                   <TooltipContent data-testid="tooltip-scope-info">
-                    {toggleDisabled
-                      ? <p>Team scope not configured for this vessel/user; showing standard data</p>
-                      : <p>Filters work-order data by assigned rank hierarchy (Phase 1)</p>
+                    {toggleDisabled && vesselWideAccessGranted
+                      ? <p>Team scope not configured — showing vessel-wide data per your access level</p>
+                      : toggleDisabled && !vesselWideAccessGranted
+                      ? <p>Team scope not configured — vessel-wide access not available for your role</p>
+                      : <p>Filters work-order KPIs by assigned rank (Phase 1). Spares and PMS requests remain vessel-wide.</p>
                     }
                   </TooltipContent>
                 </UITooltip>
@@ -1679,10 +1684,16 @@ const Dashboard = () => {
               </div>
             ) : (
               <>
-                {scopeNotConfigured && !isAllVessels && (
+                {scopeNotConfigured && !isAllVessels && vesselWideAccessGranted && (
                   <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700" data-testid="banner-scope-not-configured">
                     <Info className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span>Team scope not configured for this vessel/user. Showing standard vessel-wide data.</span>
+                    <span>Team scope not configured for this vessel/user. Showing standard vessel-wide data per your existing access level.</span>
+                  </div>
+                )}
+                {scopeNotConfigured && !isAllVessels && !vesselWideAccessGranted && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-red-50 border border-red-200 rounded text-xs text-red-700" data-testid="banner-scope-restricted">
+                    <Info className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span>Team scope not configured and vessel-wide access is not available for your role. Contact your administrator to set up org chart mapping.</span>
                   </div>
                 )}
                 {isScopeActive && (

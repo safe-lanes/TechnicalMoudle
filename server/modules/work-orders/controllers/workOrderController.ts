@@ -481,8 +481,10 @@ export async function getScopedOperationData(req: Request, res: Response) {
   const user = (req as any).user;
   if (!user) return res.status(401).json({ error: 'Authentication required' });
   const userRankId = user.rankId as string | undefined;
+  const userRole = user.role as string | undefined;
+  const userVesselId = user.vesselId as string | undefined;
   const mode = (req.query.mode as string) === 'me' ? 'me' as const : 'myTeam' as const;
   if (!vesselId) return res.status(400).json({ error: 'vesselId required' });
-  const result = await woService.getScopedOperationData(vesselId, userRankId, mode);
+  const result = await woService.getScopedOperationData(vesselId, userRankId, mode, userRole, userVesselId);
   res.json(result);
 }

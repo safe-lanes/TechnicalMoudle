@@ -1638,11 +1638,27 @@ function filterWorkOrdersByRankId(
   });
 }
 
+function hasVesselWideAccess(
+  userRole: string | undefined,
+  userVesselId: string | undefined,
+  targetVesselId: string
+): boolean {
+  if (!userRole) return false;
+  const fleetWideRoles = ['PMS Admin', 'Sail Admin', 'Office'];
+  if (fleetWideRoles.includes(userRole)) return true;
+  if (userRole === 'Ship' && userVesselId === targetVesselId) return true;
+  return false;
+}
+
 export async function getScopedOperationData(
   vesselId: string,
   userRankId: string | undefined,
-  mode: 'me' | 'myTeam'
+  mode: 'me' | 'myTeam',
+  userRole?: string,
+  userVesselId?: string
 ) {
+  const vesselWideAccessGranted = hasVesselWideAccess(userRole, userVesselId, vesselId);
+
   if (!userRankId) {
     return {
       workOrders: [],
@@ -1651,6 +1667,7 @@ export async function getScopedOperationData(
         hasDescendants: false,
         mode,
         appliedRankIds: [] as string[],
+        vesselWideAccessGranted,
       },
     };
   }
@@ -1667,6 +1684,7 @@ export async function getScopedOperationData(
         hasDescendants: false,
         mode,
         appliedRankIds: [] as string[],
+        vesselWideAccessGranted,
       },
     };
   }
@@ -1684,6 +1702,7 @@ export async function getScopedOperationData(
       hasDescendants: scope.hasDescendants,
       mode,
       appliedRankIds: bucket.rankIds,
+      vesselWideAccessGranted,
     },
   };
 }
