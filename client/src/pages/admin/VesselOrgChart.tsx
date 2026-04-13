@@ -222,17 +222,27 @@ export default function VesselOrgChart() {
   };
 
   const assignNodeToDept = (nodeUuid: string, department: string) => {
-    setNodes(prev => prev.map(n => {
-      if (n.nodeUuid !== nodeUuid) return n;
+    setNodes(prev => {
+      const target = prev.find(n => n.nodeUuid === nodeUuid);
+      const oldDept = target?.department;
       const deptNodes = prev.filter(x => x.department === department && x.isAssigned);
-      return {
-        ...n,
-        department,
-        isAssigned: true,
-        parentNodeUuid: null,
-        sortOrder: deptNodes.length + 1,
-      };
-    }));
+      return prev.map(n => {
+        if (n.nodeUuid === nodeUuid) {
+          return {
+            ...n,
+            department,
+            isAssigned: true,
+            parentNodeUuid: null,
+            isHod: false,
+            sortOrder: deptNodes.length + 1,
+          };
+        }
+        if (oldDept && n.department === oldDept && n.parentNodeUuid === nodeUuid) {
+          return { ...n, parentNodeUuid: null };
+        }
+        return n;
+      });
+    });
     if (!activeDept) setActiveDept(department);
     setHasUnsavedChanges(true);
   };

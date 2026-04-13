@@ -236,6 +236,23 @@ export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: any[]
     throw err;
   }
 
+  const nodeMap = new Map<string, any>();
+  for (const n of nodes) {
+    if (n.nodeUuid) nodeMap.set(n.nodeUuid, n);
+  }
+  for (const n of nodes) {
+    if (n.parentNodeUuid && nodeMap.has(n.parentNodeUuid)) {
+      const parent = nodeMap.get(n.parentNodeUuid);
+      if (parent.department !== n.department) {
+        const err: any = new Error(
+          `Cross-department parent reference: node ${n.nodeUuid} (dept: ${n.department}) references parent ${n.parentNodeUuid} (dept: ${parent.department})`
+        );
+        err.statusCode = 400;
+        throw err;
+      }
+    }
+  }
+
   return postgres.db.transaction(async (tx) => {
     let inserted = 0;
     let updated = 0;
