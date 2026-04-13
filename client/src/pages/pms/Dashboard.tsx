@@ -369,6 +369,7 @@ const Dashboard = () => {
   const [selectedOpCard, setSelectedOpCard] = useState<OperationCardFilter>('overdue');
   const [hodScope, setHodScope] = useState<'me' | 'myTeam'>('myTeam');
   const [opViewModal, setOpViewModal] = useState<{ open: boolean; workOrder: EnrichedWorkOrder | null }>({ open: false, workOrder: null });
+  const [opDetailSpare, setOpDetailSpare] = useState<Spare | null>(null);
   const [showBenchmarking, setShowBenchmarking] = useState(false);
   const [selectedCriticality, setSelectedCriticality] = useState("");
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
@@ -1112,13 +1113,14 @@ const Dashboard = () => {
     });
     const plannedTodayCount = plannedTodayWOs.length;
 
-    const criticalSparesLowCount = sparesData.filter(spare => {
+    const criticalSparesLowList = sparesData.filter(spare => {
       const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes';
       if (!isCritical) return false;
       const rob = typeof spare.rob === 'number' ? spare.rob : parseInt(String(spare.rob)) || 0;
       const min = typeof spare.min === 'number' ? spare.min : parseInt(String(spare.min)) || 0;
       return rob < min && min > 0;
-    }).length;
+    });
+    const criticalSparesLowCount = criticalSparesLowList.length;
 
     const pendingApprovalWOs = safeWOs.filter(wo =>
       (wo as EnrichedWorkOrder).computedStatus === 'Pending Approval'
@@ -1146,6 +1148,7 @@ const Dashboard = () => {
       plannedTodayCount,
       plannedTodayWOs: plannedTodayWOs as EnrichedWorkOrder[],
       criticalSparesLowCount,
+      criticalSparesLowList,
       pendingApprovalCount,
       pendingApprovalWOs: pendingApprovalWOs as EnrichedWorkOrder[],
       anomalyCount,
@@ -1190,7 +1193,7 @@ const Dashboard = () => {
   }, [selectedOpCard]);
 
   const isDonutFilter = selectedOpCard?.startsWith('donut-');
-  const isNonWOCard = selectedOpCard === 'critical-spares' || selectedOpCard === 'anomalies' || selectedOpCard === 'modify-pms';
+  const isNonWOCard = selectedOpCard === 'anomalies' || selectedOpCard === 'modify-pms';
 
   const ytdKPIs = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -1681,7 +1684,7 @@ const Dashboard = () => {
                 <div className="flex-1 flex flex-col min-h-0">
                   <div className="flex items-center justify-between mb-2">
                     <h2 className="text-base font-semibold text-gray-800" data-testid="text-operation-table-title">{operationTableTitle}</h2>
-                    {!isNonWOCard && selectedOpCard !== 'pending-approvals' && operationTableData.length > 0 && (
+                    {!isNonWOCard && selectedOpCard !== 'pending-approvals' && selectedOpCard !== 'critical-spares' && operationTableData.length > 0 && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1812,6 +1815,124 @@ const Dashboard = () => {
                         )}
                       </div>
                     </div>
+                  ) : selectedOpCard === 'critical-spares' ? (
+                    <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white" data-testid="section-op-critical-spares">
+                      <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E0E0E0' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 500, color: '#212121' }}>
+                          {operationKPIs.criticalSparesLowCount} critical spare{operationKPIs.criticalSparesLowCount !== 1 ? 's' : ''} with low stock
+                        </span>
+                        {operationKPIs.criticalSparesLowCount > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 gap-1.5 text-xs border-[#e1e8ed] text-[#8798ad]"
+                            onClick={() => {
+                              const columns: TableColumn[] = [
+                                { header: 'Vessel', field: 'vessel', width: 20 },
+                                { header: 'Part Code', field: 'partCode', width: 20 },
+                                { header: 'Part Name', field: 'partName', width: 40 },
+                                { header: 'Component', field: 'component', width: 30 },
+                                { header: 'ROB', field: 'rob', width: 12 },
+                                { header: 'Min', field: 'min', width: 12 },
+                                { header: 'Stock Status', field: 'stockStatus', width: 15 },
+                                { header: 'Criticality', field: 'criticality', width: 15 },
+                              ];
+                              const rows = operationKPIs.criticalSparesLowList.map(spare => ({
+                                vessel: (spare.vesselId ? vessels.find(v => v.id === spare.vesselId)?.name : undefined) || '-',
+                                partCode: spare.partCode || spare.partNumber || '-',
+                                partName: spare.partName || '-',
+                                component: spare.componentName || '-',
+                                rob: spare.rob?.toString() || '0',
+                                min: spare.min?.toString() || '0',
+                                stockStatus: getStockStatus(spare.rob, spare.min).label,
+                                criticality: String(spare.critical ?? '-'),
+                              }));
+                              pdfReportGenerator.generateReport(
+                                { title: 'Critical Spares Low', subtitle: `Total: ${rows.length} spare${rows.length !== 1 ? 's' : ''}`, orientation: 'landscape' },
+                                columns,
+                                rows
+                              );
+                            }}
+                            data-testid="button-op-export-critical-spares"
+                          >
+                            <Download className="h-3 w-3" />
+                            Export
+                          </Button>
+                        )}
+                      </div>
+                      <Table>
+                        <TableHeader className="sticky top-0 bg-[#eff6ff] z-10">
+                          <TableRow>
+                            <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81] text-xs">Vessel</TableHead>
+                            <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81] text-xs">Part Code</TableHead>
+                            <TableHead className="font-medium min-w-[200px] bg-[#eff6ff] text-[#0e4c81] text-xs">Part Name</TableHead>
+                            <TableHead className="font-medium w-[160px] bg-[#eff6ff] text-[#0e4c81] text-xs">Component</TableHead>
+                            <TableHead className="font-medium w-[80px] bg-[#eff6ff] text-[#0e4c81] text-xs">ROB</TableHead>
+                            <TableHead className="font-medium w-[80px] bg-[#eff6ff] text-[#0e4c81] text-xs">Min</TableHead>
+                            <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81] text-xs">Stock Status</TableHead>
+                            <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81] text-xs">Criticality</TableHead>
+                            <TableHead className="font-medium w-[80px] text-center bg-[#eff6ff] text-[#0e4c81] text-xs">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {operationKPIs.criticalSparesLowList.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={9} className="text-center py-8 text-gray-500 text-sm">
+                                No critical spares with low stock
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            operationKPIs.criticalSparesLowList.map((spare) => {
+                              const stockStatus = getStockStatus(spare.rob, spare.min);
+                              const vesselName = vessels.find(v => v.id === spare.vesselId)?.name;
+                              return (
+                                <TableRow key={`${spare.vesselId || 'v'}-${spare.id}`} className="hover:bg-gray-50" data-testid={`row-op-critical-spare-${spare.id}`}>
+                                  <TableCell className="text-xs py-2">{vesselName || '-'}</TableCell>
+                                  <TableCell className="text-xs py-2">{spare.partCode || spare.partNumber || '-'}</TableCell>
+                                  <TableCell className="whitespace-normal break-words max-w-[300px] font-medium text-blue-600 text-xs py-2">{spare.partName || '-'}</TableCell>
+                                  <TableCell className="text-xs py-2">{spare.componentName || '-'}</TableCell>
+                                  <TableCell className="text-xs py-2">{spare.rob}</TableCell>
+                                  <TableCell className="text-xs py-2">{spare.min}</TableCell>
+                                  <TableCell className="py-2">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${stockStatus.label === 'Low' ? 'bg-red-500' : stockStatus.label === 'At Min' ? 'bg-orange-500' : 'bg-green-500'}`}>
+                                      {stockStatus.label}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="py-2">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${(spare.critical?.toLowerCase() === 'critical' || spare.critical?.toLowerCase() === 'yes') ? 'bg-red-500' : 'bg-gray-400'}`}>
+                                      {spare.critical}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="py-2">
+                                    <div className="flex gap-1 justify-center">
+                                      <TooltipProvider>
+                                        <UITooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              size="icon"
+                                              variant="ghost"
+                                              className="h-6 w-6"
+                                              onClick={() => setOpDetailSpare(spare)}
+                                              data-testid={`op-view-spare-${spare.id}`}
+                                            >
+                                              <Eye className="h-3.5 w-3.5 text-gray-500" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>View Details</TooltipContent>
+                                        </UITooltip>
+                                      </TooltipProvider>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                      <div className="border-t px-4 py-2 text-xs text-gray-500">
+                        Total: {operationKPIs.criticalSparesLowCount} spare{operationKPIs.criticalSparesLowCount !== 1 ? 's' : ''}
+                      </div>
+                    </div>
                   ) : (
                     <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white">
                       <Table>
@@ -1930,6 +2051,64 @@ const Dashboard = () => {
                     workOrder={opViewModal.workOrder}
                     mode="template"
                   />
+                )}
+
+                {opDetailSpare && (
+                  <Dialog open={!!opDetailSpare} onOpenChange={(isOpen) => !isOpen && setOpDetailSpare(null)}>
+                    <DialogContent className="max-w-lg">
+                      <DialogHeader>
+                        <DialogTitle className="text-lg font-semibold text-[#0f4c81]">
+                          Spare Part Details
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm mt-2">
+                        <div>
+                          <span className="text-gray-500 text-xs">Vessel</span>
+                          <p className="font-medium" data-testid="text-op-detail-vessel">
+                            {opDetailSpare.vesselId ? (vessels.find(v => v.id === opDetailSpare.vesselId)?.name || opDetailSpare.vesselId) : '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">Part Code</span>
+                          <p className="font-medium" data-testid="text-op-detail-part-code">
+                            {opDetailSpare.partCode || opDetailSpare.partNumber || '-'}
+                          </p>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-gray-500 text-xs">Part Name</span>
+                          <p className="font-medium" data-testid="text-op-detail-part-name">{opDetailSpare.partName || '-'}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-gray-500 text-xs">Component</span>
+                          <p className="font-medium" data-testid="text-op-detail-component">{opDetailSpare.componentName || '-'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">ROB</span>
+                          <p className="font-medium" data-testid="text-op-detail-rob">{opDetailSpare.rob}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">Min</span>
+                          <p className="font-medium" data-testid="text-op-detail-min">{opDetailSpare.min}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">Stock Status</span>
+                          <p data-testid="text-op-detail-stock-status">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white ${getStockStatus(opDetailSpare.rob, opDetailSpare.min).label === 'Low' ? 'bg-red-500' : getStockStatus(opDetailSpare.rob, opDetailSpare.min).label === 'At Min' ? 'bg-orange-500' : 'bg-green-500'}`}>
+                              {getStockStatus(opDetailSpare.rob, opDetailSpare.min).label}
+                            </span>
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">Criticality</span>
+                          <p data-testid="text-op-detail-criticality">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white ${(opDetailSpare.critical?.toLowerCase() === 'critical' || opDetailSpare.critical?.toLowerCase() === 'yes') ? 'bg-red-500' : 'bg-gray-400'}`}>
+                              {opDetailSpare.critical || '-'}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 )}
               </>
             )}
