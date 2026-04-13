@@ -325,6 +325,16 @@ export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: OrgNo
 
     const existingUuids = new Set(existingNodes.map(n => n.nodeUuid));
     const incomingUuids = new Set(nodes.filter(n => n.nodeUuid).map(n => n.nodeUuid!));
+    const allValidUuids = new Set([...existingUuids, ...incomingUuids]);
+
+    for (const n of nodes) {
+      if (n.parentNodeUuid && !allValidUuids.has(n.parentNodeUuid)) {
+        throw createHttpError(
+          `Invalid parent reference: node ${n.nodeUuid} references parent ${n.parentNodeUuid} which does not exist in this vessel`,
+          400
+        );
+      }
+    }
 
     for (const existingNode of existingNodes) {
       if (!incomingUuids.has(existingNode.nodeUuid)) {
