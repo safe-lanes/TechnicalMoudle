@@ -504,7 +504,7 @@ const WorkOrders: React.FC = () => {
           if (!wo) return null;
           const isRejectedWO = wo.wasRejected === true;
           return (
-            <div className="flex items-center gap-1 min-w-0">
+            <div className="flex items-center gap-1 min-w-0 overflow-hidden w-full">
               <span className={`truncate ${isRejectedWO ? 'text-red-600' : ''}`}>{wo.component}</span>
               {isRejectedWO && activeTab === "Due" && (
                 <span className="ml-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded shrink-0">Previously Rejected</span>
@@ -552,7 +552,7 @@ const WorkOrders: React.FC = () => {
           if (!wo) return null;
           const isRejectedWO = wo.wasRejected === true;
           return (
-            <div className={`flex items-center gap-1 min-w-0 ${isRejectedWO ? 'text-red-600' : ''}`}>
+            <div className={`flex items-center gap-1 min-w-0 overflow-hidden w-full ${isRejectedWO ? 'text-red-600' : ''}`}>
               <span className="truncate">{wo.jobTitle}</span>
               {wo.maintenanceBasis === "Running Hours" && (
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap shrink-0" data-testid={`badge-rh-${wo.id}`}>
@@ -721,17 +721,17 @@ const WorkOrders: React.FC = () => {
         if (!wo) return null;
         if (wo.status === 'Rejected') {
           return (
-            <div className="flex flex-row items-center gap-1">
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor('rejected')}`}>Rejected</span>
-              <span className={`px-2 py-0.5 rounded text-xs ${getStatusBadgeColor(wo.computedStatus || 'Active')}`}>
+            <div className="flex flex-row items-center gap-1 overflow-hidden w-full min-w-0">
+              <span className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${getStatusBadgeColor('rejected')}`}>Rejected</span>
+              <span className={`px-2 py-0.5 rounded text-xs shrink-0 ${getStatusBadgeColor(wo.computedStatus || 'Active')}`}>
                 {wo.computedStatus === 'Due (Grace P)' ? 'Grace P' : (wo.computedStatus || 'Active')}
               </span>
             </div>
           );
         }
         return (
-          <div className="flex flex-row items-center gap-1">
-            <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(getEffectiveStatus(wo))}`}>
+          <div className="flex flex-row items-center gap-1 overflow-hidden w-full min-w-0">
+            <span className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${getStatusBadgeColor(getEffectiveStatus(wo))}`}>
               {getEffectiveStatus(wo) === 'Due (Grace P)' ? 'Grace P' : getEffectiveStatus(wo)}
             </span>
             {(wo.missedCycles ?? 0) >= 1 && (

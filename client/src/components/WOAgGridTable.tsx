@@ -97,6 +97,11 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
     wrapText: false,
     autoHeight: false,
     menuTabs: ['generalMenuTab', 'filterMenuTab', 'columnsMenuTab'],
+    cellStyle: {
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+    },
   }), []);
 
   const onGridReady = useCallback((event: GridReadyEvent) => {

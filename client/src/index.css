@@ -330,7 +330,12 @@
 }
 
 .wo-ag-grid.ag-theme-alpine .ag-header-cell-menu-button {
-  display: none !important;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.wo-ag-grid.ag-theme-alpine .ag-header-cell:hover .ag-header-cell-menu-button {
+  opacity: 1;
 }
 
 .wo-ag-grid.ag-theme-alpine .ag-header-cell-resize {
@@ -356,6 +361,24 @@
   align-items: center;
   color: #374151;
   line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wo-ag-grid.ag-theme-alpine .ag-cell-wrapper {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  min-width: 0;
+}
+
+.wo-ag-grid.ag-theme-alpine .ag-cell-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .wo-ag-grid.ag-theme-alpine .ag-root-wrapper {
