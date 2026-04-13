@@ -29,7 +29,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { getComponentCategory } from "@/utils/componentUtils";
 import { useMasterListOptions } from "@/hooks/useDepartments";
 import { useAuth } from "@/contexts/AuthContext";
 import { AdminOnly } from "@/components/RoleGuard";
@@ -469,7 +468,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     const firstChar = codeOrId.includes('.') ? codeOrId.split('.')[0].charAt(0) : codeOrId.charAt(0);
     const mlItem = componentCategoryItems.find(item => item.listKey === firstChar && item.isActive);
     if (mlItem) return mlItem.listValue;
-    return getComponentCategory(codeOrId);
+    return '';
   };
 
   // Populate form in edit mode
@@ -522,19 +521,31 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   }, [existingComponent, isLoadingComponent, isEditMode, parentComponent, vesselId]);
 
   const prevComponentCodeRef = React.useRef<string>('');
+  const masterListLoadedRef = React.useRef<boolean>(false);
 
-  // Auto-update componentCategory when componentCode changes or category is empty
+  // Auto-update componentCategory when componentCode changes, category is empty,
+  // or master list items arrive for the first time (reconciliation)
   useEffect(() => {
     if (!componentData.componentCode || componentCategoryItems.length === 0) return;
     const codeChanged = prevComponentCodeRef.current !== '' && prevComponentCodeRef.current !== componentData.componentCode;
     const categoryEmpty = !componentData.componentCategory;
-    if (codeChanged || categoryEmpty) {
+    const masterListJustLoaded = !masterListLoadedRef.current;
+    if (codeChanged || categoryEmpty || masterListJustLoaded) {
       const derivedCategory = deriveComponentCategory(componentData.componentCode);
-      if (derivedCategory && derivedCategory !== componentData.componentCategory) {
-        setComponentData(prev => ({ ...prev, componentCategory: derivedCategory }));
+      if (derivedCategory) {
+        if (categoryEmpty || codeChanged || masterListJustLoaded) {
+          setComponentData(prev => {
+            if (prev.componentCategory && !categoryEmpty && !codeChanged && masterListJustLoaded) {
+              const currentIsValid = componentCategoryItems.some(item => item.listValue === prev.componentCategory && item.isActive);
+              if (currentIsValid) return prev;
+            }
+            return { ...prev, componentCategory: derivedCategory };
+          });
+        }
       }
     }
     prevComponentCodeRef.current = componentData.componentCode;
+    masterListLoadedRef.current = true;
   }, [componentData.componentCode, componentCategoryItems]);
 
   const PARENT_OPTIONAL_FIELDS = ['eqptSystemDept'];
