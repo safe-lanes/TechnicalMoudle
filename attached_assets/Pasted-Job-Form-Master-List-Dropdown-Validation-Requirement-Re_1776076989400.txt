@@ -1,0 +1,73 @@
+Job Form – Master List Dropdown & Validation Requirement
+Requirement
+
+In the Job Form, the following fields should be converted to dropdowns and populated from the Job Master List section:
+
+Job Form Column Name	Master List Name
+Maintenance Basis	Maintenance Basis
+Frequency	Interval Units
+Task Type	Task Type
+Assigned To	Rank
+Job Priority	Job Priority
+Class Related	Class Related
+Department	Job Department
+Criticality	Job Criticality
+Is Active	Job Is Active
+Detailed Analysis Requirement
+
+A detailed analysis is required to evaluate whether implementing these Master List–driven dropdowns will impact existing functionality. Additionally, compare the current dropdown values with the new Master List data.
+
+Key Analysis Areas
+1. Current Dropdown vs Master List Comparison
+Identify existing dropdown values for each field
+Compare with corresponding Master List values
+Highlight:
+Missing values in Master List
+Extra/unused values
+Naming mismatches (case sensitivity, abbreviations, etc.)
+2. Existing Data Compatibility
+Verify whether current job records align with Master List values
+Identify:
+Free-text entries
+Invalid or legacy values
+Define a mapping or cleanup approach if mismatches exist
+3. Functional Impact Analysis
+
+Check if these fields are used in:
+
+Job scheduling logic (Maintenance Basis, Frequency)
+Workflow/approval logic (Assigned To, Department)
+Filtering and reporting
+Notifications/alerts
+
+Ensure:
+
+No disruption to existing workflows
+No dependency breakage due to value standardization
+4. Bulk Import Impact
+Validate current import templates against Master List values
+Add strict validation:
+Only Master List values should be accepted
+Define error handling for invalid entries during import
+5. UI/UX Impact
+Ensure dropdowns follow existing UI standards
+Validate usability (search, selection, default values)
+Maintain consistency across forms
+6. Backward Compatibility
+Existing records should continue to display correctly
+No data loss or incorrect transformation
+Apply fallback or mapping logic where required
+Implementation Plan (High-Level)
+Map all Job Form fields to corresponding Master List types
+Replace existing inputs/dropdowns with Master List-driven dropdowns
+Implement validation to restrict values to Master List entries
+Align bulk import validation with Master List
+Perform regression testing:
+Job creation/edit
+Scheduling logic
+Filters and reports
+Alerts/notifications
+Summary
+Standardize Job Form fields using Master List values
+Ensure consistency, validation, and centralized control
+Perform detailed comparison and impact analysis before implementation to avoid functional issues
