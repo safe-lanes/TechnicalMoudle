@@ -407,28 +407,32 @@ const Dashboard = () => {
     hasDescendants: boolean;
     mode: 'me' | 'myTeam';
     appliedRankIds: string[];
+    scopedResourceTypes: string[];
+    unscopedResourceTypes: string[];
+    fallback?: string;
   }
 
-  interface ScopedWOResponse {
+  interface ScopedOperationResponse {
     workOrders: WorkOrder[];
     scopeMeta: ScopeMeta;
   }
 
-  const { data: scopedResponse } = useQuery<ScopedWOResponse>({
-    queryKey: ['/technical/api/scoped-work-orders', effectiveVesselId, hodScope, currentUser?.crewDesignation],
+  const { data: scopedResponse } = useQuery<ScopedOperationResponse>({
+    queryKey: ['/technical/api/scoped-operation-data', effectiveVesselId, hodScope, currentUser?.crewDesignation],
     queryFn: async () => {
       const response = await fetch(
-        `/technical/api/scoped-work-orders/${effectiveVesselId}?mode=${hodScope}`,
+        `/technical/api/scoped-operation-data/${effectiveVesselId}?mode=${hodScope}`,
         { headers: { 'X-User-Designation': currentUser?.crewDesignation || '' } }
       );
-      if (!response.ok) throw new Error('Failed to fetch scoped work orders');
+      if (!response.ok) throw new Error('Failed to fetch scoped operation data');
       return response.json();
     },
     enabled: !!effectiveVesselId && !isAllVessels && !!currentUser?.crewDesignation,
   });
 
   const scopeMeta = scopedResponse?.scopeMeta ?? null;
-  const scopeActive = !!scopeMeta?.hasMapping;
+  const hasValidScope = !!scopeMeta;
+  const toggleDisabled = !!scopeMeta && !scopeMeta.hasMapping && !scopeMeta.fallback;
 
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
@@ -1126,14 +1130,11 @@ const Dashboard = () => {
   const completionRate = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.completed / workOrderKPIs.total) * 100) : 0;
 
   const operationWOs = useMemo(() => {
-    if (scopeActive && scopedResponse) {
+    if (hasValidScope && scopedResponse) {
       return scopedResponse.workOrders.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
     }
-    if (scopeMeta && !scopeMeta.hasMapping) {
-      return [];
-    }
     return workOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
-  }, [scopeActive, scopedResponse, scopeMeta, workOrdersData]);
+  }, [hasValidScope, scopedResponse, workOrdersData]);
 
   const operationDonutData = useMemo(() => {
     const safeWOs = operationWOs;
@@ -1183,7 +1184,8 @@ const Dashboard = () => {
     });
     const plannedTodayCount = plannedTodayWOs.length;
 
-    const effectiveSpares = scopeActive ? [] : sparesData;
+    const sparesUnscoped = scopeMeta?.unscopedResourceTypes?.includes('spares') && hasValidScope;
+    const effectiveSpares = sparesUnscoped ? [] : sparesData;
     const criticalSparesLowList = effectiveSpares.filter(spare => {
       const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes';
       if (!isCritical) return false;
@@ -1198,14 +1200,16 @@ const Dashboard = () => {
     );
     const pendingApprovalCount = pendingApprovalWOs.length;
 
-    const anomalyCount = scopeActive ? 0 : (complianceAnomalies ? [
+    const anomaliesUnscoped = scopeMeta?.unscopedResourceTypes?.includes('anomalies') && hasValidScope;
+    const anomalyCount = anomaliesUnscoped ? 0 : (complianceAnomalies ? [
       complianceAnomalies.cycleSkipRate.severity,
       complianceAnomalies.backdatingFrequency.severity,
       complianceAnomalies.bulkCompletions.severity,
       complianceAnomalies.scheduleDrift.severity,
     ].filter(s => s !== 'green').length : 0);
 
-    const effectiveChangeRequests = scopeActive ? [] : changeRequestsData;
+    const crUnscoped = scopeMeta?.unscopedResourceTypes?.includes('changeRequests') && hasValidScope;
+    const effectiveChangeRequests = crUnscoped ? [] : changeRequestsData;
     const openChangeRequestsList = effectiveChangeRequests.filter(cr => {
       const s = cr.status?.toLowerCase();
       return s !== 'approved' && s !== 'rejected';
@@ -1229,7 +1233,7 @@ const Dashboard = () => {
       openChangeRequests,
       openChangeRequestsList,
     };
-  }, [operationWOs, sparesData, changeRequestsData, complianceAnomalies, scopeActive]);
+  }, [operationWOs, sparesData, changeRequestsData, complianceAnomalies, hasValidScope, scopeMeta]);
 
   const operationTableData = useMemo(() => {
     switch (selectedOpCard) {
@@ -1537,19 +1541,19 @@ const Dashboard = () => {
               <TooltipProvider>
                 <UITooltip>
                   <TooltipTrigger asChild>
-                    <div className={`flex items-center gap-2 ${!scopeActive ? 'opacity-50' : ''}`} data-testid="toggle-hod-scope">
+                    <div className={`flex items-center gap-2 ${toggleDisabled ? 'opacity-50' : ''}`} data-testid="toggle-hod-scope">
                       <span
                         className={`text-sm font-medium cursor-pointer transition-colors ${hodScope === 'me' ? 'text-[#1a2b4a]' : 'text-gray-400'}`}
-                        onClick={() => scopeActive && setHodScope('me')}
+                        onClick={() => !toggleDisabled && setHodScope('me')}
                         data-testid="toggle-label-me"
                       >
                         Me
                       </span>
                       <button
-                        onClick={() => scopeActive && setHodScope(hodScope === 'me' ? 'myTeam' : 'me')}
+                        onClick={() => !toggleDisabled && setHodScope(hodScope === 'me' ? 'myTeam' : 'me')}
                         className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none"
                         style={{ backgroundColor: hodScope === 'myTeam' ? '#52baf3' : '#d1d5db' }}
-                        disabled={!scopeActive}
+                        disabled={toggleDisabled}
                         data-testid="toggle-switch-hod-scope"
                       >
                         <span
@@ -1558,14 +1562,14 @@ const Dashboard = () => {
                       </button>
                       <span
                         className={`text-sm font-medium cursor-pointer transition-colors ${hodScope === 'myTeam' ? 'text-[#1a2b4a]' : 'text-gray-400'}`}
-                        onClick={() => scopeActive && setHodScope('myTeam')}
+                        onClick={() => !toggleDisabled && setHodScope('myTeam')}
                         data-testid="toggle-label-myteam"
                       >
                         My Team
                       </span>
                     </div>
                   </TooltipTrigger>
-                  {!scopeActive && (
+                  {toggleDisabled && (
                     <TooltipContent data-testid="tooltip-no-mapping">
                       <p>Your designation is not mapped to this vessel's org chart</p>
                     </TooltipContent>

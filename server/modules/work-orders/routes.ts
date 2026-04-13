@@ -158,4 +158,7 @@ router.get('/work-order-documents/:documentId/download', asyncHandler(woDocCtrl.
 // DELETE /work-order-documents/:documentId — delete a document
 router.delete('/work-order-documents/:documentId', asyncHandler(woDocCtrl.deleteDocument));
 
+// GET /scoped-operation-data/:vesselId?mode=me|myTeam — server-side scoped operation dashboard data
+router.get('/scoped-operation-data/:vesselId', asyncHandler(woCtrl.getScopedOperationData));
+
 export default router;

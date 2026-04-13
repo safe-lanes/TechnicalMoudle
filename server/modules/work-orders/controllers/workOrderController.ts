@@ -475,3 +475,13 @@ export async function saveOverdueReason(req: Request, res: Response) {
   const result = await woService.saveOverdueReason(id, overdueReason.trim(), overdueReasonDetails?.trim() ?? null);
   res.json(result);
 }
+
+export async function getScopedOperationData(req: Request, res: Response) {
+  const { vesselId } = req.params;
+  const crewDesignation = req.headers['x-user-designation'] as string;
+  const mode = (req.query.mode as string) === 'me' ? 'me' as const : 'myTeam' as const;
+  if (!vesselId) return res.status(400).json({ error: 'vesselId required' });
+  if (!crewDesignation) return res.status(400).json({ error: 'X-User-Designation header required' });
+  const result = await woService.getScopedOperationData(vesselId, crewDesignation, mode);
+  res.json(result);
+}

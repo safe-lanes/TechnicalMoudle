@@ -2,7 +2,6 @@ import * as repo from './repository';
 import { getPostgresClient } from '../../postgresClient';
 import { admAvailableRanks, admVesselOrgChart, vesselOrgChartNodes, masterLists } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
-import { listWorkOrders } from '../work-orders/services/workOrderService';
 
 export async function getAllRanks() {
   const ranks = await repo.getAllRanks();
@@ -500,53 +499,3 @@ export async function resolveHierarchyScope(vesselId: string, crewDesignation: s
   };
 }
 
-export async function getScopedWorkOrders(vesselId: string, crewDesignation: string, mode: 'me' | 'myTeam') {
-  if (!vesselId) throw createHttpError("vesselId required", 400);
-  if (!crewDesignation) throw createHttpError("crewDesignation required", 400);
-
-  const scope = await resolveHierarchyScope(vesselId, crewDesignation);
-
-  if (!scope.hasMapping) {
-    return {
-      workOrders: [],
-      scopeMeta: {
-        hasMapping: false,
-        hasDescendants: false,
-        mode,
-        appliedRankIds: [],
-      },
-    };
-  }
-
-  const assignmentKeys = mode === 'me' ? scope.me.assignmentKeys : scope.myTeam.assignmentKeys;
-  const appliedRankIds = mode === 'me' ? scope.me.rankIds : scope.myTeam.rankIds;
-
-  if (assignmentKeys.length === 0) {
-    return {
-      workOrders: [],
-      scopeMeta: {
-        hasMapping: true,
-        hasDescendants: scope.hasDescendants,
-        mode,
-        appliedRankIds,
-      },
-    };
-  }
-
-  const allWOs = await listWorkOrders(vesselId);
-  const scopeSet = new Set(assignmentKeys.map(k => k.toLowerCase().trim()));
-  const filteredWOs = allWOs.filter((wo: any) => {
-    const assigned = (wo.assignedTo || '').toLowerCase().trim();
-    return scopeSet.has(assigned);
-  });
-
-  return {
-    workOrders: filteredWOs,
-    scopeMeta: {
-      hasMapping: true,
-      hasDescendants: scope.hasDescendants,
-      mode,
-      appliedRankIds,
-    },
-  };
-}

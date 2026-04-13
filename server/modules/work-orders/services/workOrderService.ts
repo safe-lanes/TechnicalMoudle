@@ -1601,3 +1601,82 @@ export async function saveOverdueReason(id: string, overdueReason: string, overd
   const updated = await repo.update(id, { overdueReason, overdueReasonDetails });
   return updated;
 }
+
+export async function getScopedOperationData(
+  vesselId: string,
+  crewDesignation: string,
+  mode: 'me' | 'myTeam'
+) {
+  const { resolveHierarchyScope, getAllRanks } = await import('../../ranks/service');
+
+  const allRanks = await getAllRanks();
+  const designationLower = crewDesignation.toLowerCase().trim();
+  const matchingRanks = allRanks.filter(
+    (r: any) =>
+      r.name?.toLowerCase().trim() === designationLower ||
+      r.label?.toLowerCase().trim() === designationLower
+  );
+
+  if (matchingRanks.length === 0) {
+    return {
+      workOrders: [],
+      scopeMeta: {
+        hasMapping: false,
+        hasDescendants: false,
+        mode,
+        appliedRankIds: [] as string[],
+        scopedResourceTypes: ['workOrders'] as string[],
+        unscopedResourceTypes: ['spares', 'anomalies', 'changeRequests'] as string[],
+      },
+    };
+  }
+
+  const scope = await resolveHierarchyScope(vesselId, crewDesignation);
+
+  const allWOs = await listWorkOrders(vesselId);
+
+  if (!scope.hasMapping) {
+    const directMatchSet = new Set(
+      matchingRanks
+        .flatMap((r: any) => [r.name, r.label].filter(Boolean))
+        .map((s: string) => s.toLowerCase().trim())
+    );
+    const meWOs = allWOs.filter((wo: any) => {
+      const assigned = (wo.assignedTo || '').toLowerCase().trim();
+      return directMatchSet.has(assigned);
+    });
+    return {
+      workOrders: meWOs,
+      scopeMeta: {
+        hasMapping: false,
+        hasDescendants: false,
+        mode,
+        appliedRankIds: matchingRanks.map((r: any) => r.rankId),
+        scopedResourceTypes: ['workOrders'] as string[],
+        unscopedResourceTypes: ['spares', 'anomalies', 'changeRequests'] as string[],
+        fallback: 'designation-direct-match',
+      },
+    };
+  }
+
+  const bucket = mode === 'me' ? scope.me : scope.myTeam;
+  const scopeSet = new Set(
+    bucket.assignmentKeys.map((k: string) => k.toLowerCase().trim())
+  );
+  const filteredWOs = allWOs.filter((wo: any) => {
+    const assigned = (wo.assignedTo || '').toLowerCase().trim();
+    return scopeSet.has(assigned);
+  });
+
+  return {
+    workOrders: filteredWOs,
+    scopeMeta: {
+      hasMapping: true,
+      hasDescendants: scope.hasDescendants,
+      mode,
+      appliedRankIds: bucket.rankIds,
+      scopedResourceTypes: ['workOrders'] as string[],
+      unscopedResourceTypes: ['spares', 'anomalies', 'changeRequests'] as string[],
+    },
+  };
+}
