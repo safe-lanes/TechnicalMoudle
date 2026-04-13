@@ -379,7 +379,7 @@ const Dashboard = () => {
   const [showBenchmarking, setShowBenchmarking] = useState(false);
   const [selectedCriticality, setSelectedCriticality] = useState("");
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
-  const { vesselId, setVesselId } = useVessel();
+  const { vesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isHeadOfDept, isVessel } = useUIRole();
   const { toast } = useToast();
@@ -398,7 +398,7 @@ const Dashboard = () => {
   const effectiveVesselId = activeTab === 'overview' ? mgmtVesselId : vesselId;
   const isAllVessels = effectiveVesselId === 'all';
   
-  const currentVessel = vessels.find(v => v.id === vesselId);
+  const currentVessel = vessels.find(v => v.id === effectiveVesselId);
 
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
