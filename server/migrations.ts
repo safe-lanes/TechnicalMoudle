@@ -2840,7 +2840,7 @@ const migrations: Migration[] = [
           END IF;
 
           FOR old_rec IN
-            SELECT rank_id, rank, parent_rank_id, sort_order, rank_view,
+            SELECT rank_id, rank, sort_order, rank_view,
                    created_at, updated_at, created_by_uuid, updated_by_uuid
             FROM adm_vessel_org_chart
             WHERE is_deleted = false
@@ -2849,20 +2849,29 @@ const migrations: Migration[] = [
             new_uuid := gen_random_uuid()::text;
             uuid_map := uuid_map || jsonb_build_object(old_rec.rank_id, new_uuid);
 
-            mapped_parent := NULL;
-            IF old_rec.parent_rank_id IS NOT NULL THEN
-              mapped_parent := uuid_map ->> old_rec.parent_rank_id;
-            END IF;
-
             INSERT INTO vessel_org_chart_nodes (
               node_uuid, vessel_id, rank_id, node_label, department,
               parent_node_uuid, is_hod, is_assigned, view_mode, sort_order,
               created_at, updated_at, created_by_uuid, updated_by_uuid
             ) VALUES (
               new_uuid, default_vessel_id, old_rec.rank_id, old_rec.rank, NULL,
-              mapped_parent, false, true, old_rec.rank_view, old_rec.sort_order,
+              NULL, false, true, old_rec.rank_view, old_rec.sort_order,
               old_rec.created_at, old_rec.updated_at, old_rec.created_by_uuid, old_rec.updated_by_uuid
             );
+          END LOOP;
+
+          FOR old_rec IN
+            SELECT rank_id, parent_rank_id
+            FROM adm_vessel_org_chart
+            WHERE is_deleted = false AND parent_rank_id IS NOT NULL
+          LOOP
+            mapped_parent := uuid_map ->> old_rec.parent_rank_id;
+            IF mapped_parent IS NOT NULL THEN
+              UPDATE vessel_org_chart_nodes
+              SET parent_node_uuid = mapped_parent
+              WHERE node_uuid = (uuid_map ->> old_rec.rank_id)
+                AND vessel_id = default_vessel_id;
+            END IF;
           END LOOP;
         END IF;
       END $$;

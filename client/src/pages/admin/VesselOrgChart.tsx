@@ -684,109 +684,112 @@ export default function VesselOrgChart() {
         </h3>
       </div>
 
-      <div className="flex-shrink-0 border-b">
-        <div className="flex flex-wrap gap-1 p-2">
-          {departments.map(dept => {
-            const count = nodesByDept.get(dept)?.length || 0;
-            const isDragOver = dragOverDept === dept;
-            return (
+      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+        {departments.map(dept => {
+          const deptNodes = nodesByDept.get(dept) || [];
+          const count = deptNodes.length;
+          const isExpanded = activeDept === dept;
+          const isDragOver = dragOverDept === dept;
+          const tree = count > 0 ? buildTree(deptNodes) : [];
+          const hasHod = deptNodes.some(n => n.isHod);
+
+          return (
+            <div
+              key={dept}
+              className={cn(
+                "border rounded-lg transition-colors",
+                isDragOver && "ring-2 ring-blue-400 border-blue-400 bg-blue-50",
+                !isDragOver && "border-gray-200"
+              )}
+              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverDept(dept); }}
+              onDragLeave={() => setDragOverDept(null)}
+              onDrop={(e) => {
+                e.preventDefault();
+                const nodeUuid = e.dataTransfer.getData('text/plain');
+                const rankId = e.dataTransfer.getData('application/rank-id');
+                if (nodeUuid) {
+                  assignNodeToDept(nodeUuid, dept);
+                  setActiveDept(dept);
+                } else if (rankId && selectedVesselId) {
+                  const rank = ranksMap.get(rankId);
+                  const newNode: OrgNode = {
+                    nodeUuid: generateNodeUuid(),
+                    vesselId: selectedVesselId,
+                    rankId,
+                    nodeLabel: "",
+                    department: dept,
+                    parentNodeUuid: null,
+                    isHod: false,
+                    isAssigned: true,
+                    viewMode: rank?.viewMode || null,
+                    sortOrder: count + 1,
+                    isNew: true,
+                  };
+                  setNodes(prev => [...prev, newNode]);
+                  setHasUnsavedChanges(true);
+                  setActiveDept(dept);
+                }
+                setDraggedNodeUuid(null);
+                setDragOverDept(null);
+              }}
+              data-testid={`dept-block-${dept}`}
+            >
               <button
-                key={dept}
-                onClick={() => setActiveDept(dept === activeDept ? null : dept)}
-                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverDept(dept); }}
-                onDragLeave={() => setDragOverDept(null)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const nodeUuid = e.dataTransfer.getData('text/plain');
-                  const rankId = e.dataTransfer.getData('application/rank-id');
-                  if (nodeUuid) {
-                    assignNodeToDept(nodeUuid, dept);
-                    setActiveDept(dept);
-                  } else if (rankId && selectedVesselId) {
-                    const rank = ranksMap.get(rankId);
-                    const newNode: OrgNode = {
-                      nodeUuid: generateNodeUuid(),
-                      vesselId: selectedVesselId,
-                      rankId,
-                      nodeLabel: "",
-                      department: dept,
-                      parentNodeUuid: null,
-                      isHod: false,
-                      isAssigned: true,
-                      viewMode: rank?.viewMode || null,
-                      sortOrder: (nodesByDept.get(dept)?.length || 0) + 1,
-                      isNew: true,
-                    };
-                    setNodes(prev => [...prev, newNode]);
-                    setHasUnsavedChanges(true);
-                    setActiveDept(dept);
-                  }
-                  setDraggedNodeUuid(null);
-                  setDragOverDept(null);
-                }}
+                onClick={() => setActiveDept(isExpanded ? null : dept)}
                 className={cn(
-                  "text-xs px-2.5 py-1 rounded-full border transition-colors",
-                  activeDept === dept
-                    ? "bg-blue-50 border-blue-300 text-blue-700 font-medium"
-                    : "border-gray-200 text-gray-500 hover:border-gray-300",
-                  isDragOver && "ring-2 ring-blue-400 bg-blue-100 border-blue-400 scale-105"
+                  "w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors",
+                  isExpanded ? "bg-blue-50 text-blue-700" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
                 )}
                 data-testid={`dept-tab-${dept}`}
               >
-                {dept} {count > 0 && <span className="text-[10px] ml-0.5 text-gray-400">({count})</span>}
+                <span className="flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5" />
+                  {dept}
+                  {count > 0 && <span className="text-[10px] font-normal text-gray-400">({count})</span>}
+                  {!hasHod && count > 0 && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                </span>
+                {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
               </button>
-            );
-          })}
-        </div>
-      </div>
 
-      <div className="flex-1 overflow-y-auto p-2">
-        {activeDept ? (
-          (() => {
-            const deptNodes = nodesByDept.get(activeDept) || [];
-            if (deptNodes.length === 0) {
-              return (
-                <div className="text-center py-8 text-gray-400 text-xs" data-testid="text-dept-empty">
-                  No ranks assigned to {activeDept}. Assign ranks from the left panel.
+              {isExpanded && (
+                <div className="px-2 pb-2 pt-1">
+                  {count === 0 ? (
+                    <div className="text-center py-4 text-gray-400 text-xs" data-testid="text-dept-empty">
+                      No ranks assigned. Drag ranks here from the left panel.
+                    </div>
+                  ) : (
+                    <>
+                      {!hasHod && (
+                        <div className="flex items-center gap-1.5 px-2 py-1.5 mb-2 bg-amber-50 border border-amber-200 rounded text-amber-700 text-xs" data-testid={`no-hod-warning-${dept}`}>
+                          <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+                          <span>No HOD assigned. Click the star icon on a rank to set Head of Department.</span>
+                        </div>
+                      )}
+                      {tree.map(rootNode => renderDeptNode(rootNode, 0, deptNodes))}
+                      {draggedNodeUuid && (
+                        <div
+                          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const droppedUuid = e.dataTransfer.getData('text/plain');
+                            if (droppedUuid) {
+                              setParentNode(droppedUuid, null);
+                            }
+                            setDraggedNodeUuid(null);
+                          }}
+                          className="mt-2 p-2 border-2 border-dashed border-gray-300 rounded text-center text-xs text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors"
+                          data-testid="drop-zone-root"
+                        >
+                          Drop here to make root level
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
-              );
-            }
-            const tree = buildTree(deptNodes);
-            const hasHod = deptNodes.some(n => n.isHod);
-            return (
-              <div>
-                {!hasHod && (
-                  <div className="flex items-center gap-1.5 px-2 py-1.5 mb-2 bg-amber-50 border border-amber-200 rounded text-amber-700 text-xs" data-testid={`no-hod-warning-${activeDept}`}>
-                    <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span>No HOD assigned for {activeDept}. Click the star icon on a rank to set it as Head of Department.</span>
-                  </div>
-                )}
-                {tree.map(rootNode => renderDeptNode(rootNode, 0, deptNodes))}
-                {draggedNodeUuid && (
-                  <div
-                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const droppedUuid = e.dataTransfer.getData('text/plain');
-                      if (droppedUuid) {
-                        setParentNode(droppedUuid, null);
-                      }
-                      setDraggedNodeUuid(null);
-                    }}
-                    className="mt-2 p-2 border-2 border-dashed border-gray-300 rounded text-center text-xs text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors"
-                    data-testid="drop-zone-root"
-                  >
-                    Drop here to make root level
-                  </div>
-                )}
-              </div>
-            );
-          })()
-        ) : (
-          <div className="text-center py-8 text-gray-400 text-xs">
-            Select a department tab above to manage its hierarchy.
-          </div>
-        )}
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -240,6 +240,7 @@ export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: any[]
   for (const n of nodes) {
     if (n.nodeUuid) nodeMap.set(n.nodeUuid, n);
   }
+  const hodPerDept = new Map<string, number>();
   for (const n of nodes) {
     if (n.parentNodeUuid && nodeMap.has(n.parentNodeUuid)) {
       const parent = nodeMap.get(n.parentNodeUuid);
@@ -250,6 +251,18 @@ export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: any[]
         err.statusCode = 400;
         throw err;
       }
+    }
+    if (n.isHod && n.department) {
+      hodPerDept.set(n.department, (hodPerDept.get(n.department) || 0) + 1);
+    }
+  }
+  for (const [dept, count] of hodPerDept) {
+    if (count > 1) {
+      const err: any = new Error(
+        `Multiple HOD nodes in department "${dept}": only one HOD is allowed per department`
+      );
+      err.statusCode = 400;
+      throw err;
     }
   }
 
