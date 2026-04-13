@@ -521,14 +521,20 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     }
   }, [existingComponent, isLoadingComponent, isEditMode, parentComponent, vesselId]);
 
-  // Auto-update componentCategory when componentCode changes
+  const prevComponentCodeRef = React.useRef<string>('');
+
+  // Auto-update componentCategory when componentCode changes or category is empty
   useEffect(() => {
-    if (componentData.componentCode && componentCategoryItems.length > 0) {
+    if (!componentData.componentCode || componentCategoryItems.length === 0) return;
+    const codeChanged = prevComponentCodeRef.current !== '' && prevComponentCodeRef.current !== componentData.componentCode;
+    const categoryEmpty = !componentData.componentCategory;
+    if (codeChanged || categoryEmpty) {
       const derivedCategory = deriveComponentCategory(componentData.componentCode);
       if (derivedCategory && derivedCategory !== componentData.componentCategory) {
         setComponentData(prev => ({ ...prev, componentCategory: derivedCategory }));
       }
     }
+    prevComponentCodeRef.current = componentData.componentCode;
   }, [componentData.componentCode, componentCategoryItems]);
 
   const PARENT_OPTIONAL_FIELDS = ['eqptSystemDept'];

@@ -342,7 +342,7 @@ export async function validateData(type: string, data: any[], mode: string, vess
         });
         if (!isValid && activeCats.length > 0) {
           const allowedValues = activeCats.join(', ');
-          errors.push({ row: rowNum, field: 'Component Category', message: `Invalid Component Category "${catValue}". Allowed values: ${allowedValues}`, data: row });
+          errors.push(`Row ${rowNum}: Invalid Component Category "${catValue}". Allowed values: ${allowedValues}`);
           continue;
         }
       }

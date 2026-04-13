@@ -208,14 +208,20 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     }
   }, [isChangeMode, isModifyMode, componentData, originalComponentData]);
 
-  // Auto-update componentCategory when componentCode changes or master list loads
+  const prevCompCodeRef = useRef<string>('');
+
+  // Auto-update componentCategory when componentCode changes or category is empty
   useEffect(() => {
-    if (componentData.componentCode && componentCategoryItems.length > 0) {
+    if (!componentData.componentCode || componentCategoryItems.length === 0) return;
+    const codeChanged = prevCompCodeRef.current !== '' && prevCompCodeRef.current !== componentData.componentCode;
+    const categoryEmpty = !componentData.componentCategory;
+    if (codeChanged || categoryEmpty) {
       const derivedCategory = deriveComponentCategory(componentData.componentCode);
       if (derivedCategory && derivedCategory !== componentData.componentCategory) {
         setComponentData(prev => ({ ...prev, componentCategory: derivedCategory }));
       }
     }
+    prevCompCodeRef.current = componentData.componentCode;
   }, [componentData.componentCode, componentCategoryItems]);
   
   // Track which fields have been changed
