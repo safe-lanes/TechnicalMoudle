@@ -370,6 +370,7 @@ const Dashboard = () => {
   const [hodScope, setHodScope] = useState<'me' | 'myTeam'>('myTeam');
   const [opViewModal, setOpViewModal] = useState<{ open: boolean; workOrder: EnrichedWorkOrder | null }>({ open: false, workOrder: null });
   const [opDetailSpare, setOpDetailSpare] = useState<Spare | null>(null);
+  const [opDetailChangeRequest, setOpDetailChangeRequest] = useState<ChangeRequest | null>(null);
   const [showBenchmarking, setShowBenchmarking] = useState(false);
   const [selectedCriticality, setSelectedCriticality] = useState("");
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
@@ -1134,9 +1135,11 @@ const Dashboard = () => {
       complianceAnomalies.scheduleDrift.severity,
     ].filter(s => s !== 'green').length : 0;
 
-    const openChangeRequests = changeRequestsData.filter(cr =>
-      cr.status !== 'approved' && cr.status !== 'rejected'
-    ).length;
+    const openChangeRequestsList = changeRequestsData.filter(cr => {
+      const s = cr.status?.toLowerCase();
+      return s !== 'approved' && s !== 'rejected';
+    });
+    const openChangeRequests = openChangeRequestsList.length;
 
     return {
       overdueCount,
@@ -1153,6 +1156,7 @@ const Dashboard = () => {
       pendingApprovalWOs: pendingApprovalWOs as EnrichedWorkOrder[],
       anomalyCount,
       openChangeRequests,
+      openChangeRequestsList,
     };
   }, [workOrdersData, sparesData, changeRequestsData, complianceAnomalies]);
 
@@ -1193,7 +1197,7 @@ const Dashboard = () => {
   }, [selectedOpCard]);
 
   const isDonutFilter = selectedOpCard?.startsWith('donut-');
-  const isNonWOCard = selectedOpCard === 'anomalies' || selectedOpCard === 'modify-pms';
+  const isNonWOCard = selectedOpCard === 'anomalies';
 
   const ytdKPIs = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -1684,7 +1688,7 @@ const Dashboard = () => {
                 <div className="flex-1 flex flex-col min-h-0">
                   <div className="flex items-center justify-between mb-2">
                     <h2 className="text-base font-semibold text-gray-800" data-testid="text-operation-table-title">{operationTableTitle}</h2>
-                    {!isNonWOCard && selectedOpCard !== 'pending-approvals' && selectedOpCard !== 'critical-spares' && operationTableData.length > 0 && (
+                    {!isNonWOCard && selectedOpCard !== 'pending-approvals' && selectedOpCard !== 'critical-spares' && selectedOpCard !== 'modify-pms' && operationTableData.length > 0 && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1933,6 +1937,112 @@ const Dashboard = () => {
                         Total: {operationKPIs.criticalSparesLowCount} spare{operationKPIs.criticalSparesLowCount !== 1 ? 's' : ''}
                       </div>
                     </div>
+                  ) : selectedOpCard === 'modify-pms' ? (
+                    <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white" data-testid="section-op-modify-pms">
+                      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200">
+                        <span className="text-xs font-medium text-gray-700" data-testid="text-op-modify-pms-count">
+                          {operationKPIs.openChangeRequests} request{operationKPIs.openChangeRequests !== 1 ? 's' : ''}
+                        </span>
+                        {operationKPIs.openChangeRequests > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 gap-1.5 text-xs border-[#e1e8ed] text-[#8798ad]"
+                            onClick={() => {
+                              const columns: TableColumn[] = [
+                                { header: 'Request Title', field: 'title', width: 50 },
+                                { header: 'Category', field: 'category', width: 15 },
+                                { header: 'Requested By', field: 'requestedBy', width: 20 },
+                                { header: 'Date', field: 'date', width: 15 },
+                                { header: 'Status', field: 'status', width: 15 },
+                              ];
+                              const rows = operationKPIs.openChangeRequestsList.map(cr => ({
+                                title: cr.title || '-',
+                                category: cr.category ? cr.category.charAt(0).toUpperCase() + cr.category.slice(1) : '-',
+                                requestedBy: cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
+                                  cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
+                                  cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
+                                  cr.requestedByUserId || '-',
+                                date: cr.submittedAt
+                                  ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')
+                                  : new Date(cr.createdAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' '),
+                                status: (() => {
+                                  const st = cr.status?.toLowerCase();
+                                  if (st === 'submitted' || st === 'pending') return 'Pending Approval';
+                                  if (st === 'returned') return 'Returned';
+                                  if (st === 'draft') return 'Draft';
+                                  return cr.status || '-';
+                                })(),
+                              }));
+                              pdfReportGenerator.generateReport(
+                                { title: 'Modify PMS Requests', subtitle: `Total: ${rows.length} request${rows.length !== 1 ? 's' : ''}`, orientation: 'landscape' },
+                                columns,
+                                rows
+                              );
+                            }}
+                            data-testid="button-op-export-modify-pms"
+                          >
+                            <Download className="h-3 w-3" />
+                            Export
+                          </Button>
+                        )}
+                      </div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-[#52BAF3] hover:bg-[#52BAF3] border-b-0">
+                            <TableHead className="text-white font-medium py-3 px-6 text-xs">Request Title</TableHead>
+                            <TableHead className="text-white font-medium py-3 px-6 text-xs">Requested By</TableHead>
+                            <TableHead className="text-white font-medium py-3 px-6 text-xs">Date</TableHead>
+                            <TableHead className="text-white font-medium py-3 px-6 text-xs">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {operationKPIs.openChangeRequests === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-center py-8 text-gray-500 text-sm">
+                                No open change requests found
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            operationKPIs.openChangeRequestsList.map((cr) => (
+                              <TableRow
+                                key={cr.id}
+                                className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer"
+                                onClick={() => setOpDetailChangeRequest(cr)}
+                                data-testid={`row-op-change-request-${cr.id}`}
+                              >
+                                <TableCell className="py-3 px-6">
+                                  <div className="font-medium text-gray-900 text-xs">{cr.title}</div>
+                                </TableCell>
+                                <TableCell className="py-3 px-6 text-gray-700 text-xs">
+                                  {cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
+                                   cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
+                                   cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
+                                   cr.requestedByUserId}
+                                </TableCell>
+                                <TableCell className="py-3 px-6 text-gray-700 text-xs">
+                                  {cr.submittedAt
+                                    ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')
+                                    : new Date(cr.createdAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')}
+                                </TableCell>
+                                <TableCell className="py-3 px-6">
+                                  {(() => {
+                                    const st = cr.status?.toLowerCase();
+                                    if (st === 'submitted' || st === 'pending') return <Badge className="bg-[#52BAF3] text-white px-3 py-1 text-xs rounded-full">Pending Approval</Badge>;
+                                    if (st === 'draft') return <Badge className="bg-gray-500 text-white px-3 py-1 text-xs rounded-full">Draft</Badge>;
+                                    if (st === 'returned') return <Badge className="bg-yellow-500 text-white px-3 py-1 text-xs rounded-full">Returned</Badge>;
+                                    return <Badge className="bg-gray-400 text-white px-3 py-1 text-xs rounded-full">{cr.status}</Badge>;
+                                  })()}
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                      <div className="border-t px-4 py-2 text-xs text-gray-500">
+                        Total: {operationKPIs.openChangeRequests} request{operationKPIs.openChangeRequests !== 1 ? 's' : ''}
+                      </div>
+                    </div>
                   ) : (
                     <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white">
                       <Table>
@@ -2106,6 +2216,116 @@ const Dashboard = () => {
                             </span>
                           </p>
                         </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+
+                {opDetailChangeRequest && (
+                  <Dialog open={!!opDetailChangeRequest} onOpenChange={(isOpen) => !isOpen && setOpDetailChangeRequest(null)}>
+                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle className="text-lg font-semibold text-[#0f4c81]" data-testid="text-op-cr-detail-title">
+                          Change Request Details
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">Title</span>
+                            <p className="text-gray-900 font-medium" data-testid="text-op-cr-title">{opDetailChangeRequest.title}</p>
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">Category</span>
+                            <p className="text-gray-900 capitalize" data-testid="text-op-cr-category">{opDetailChangeRequest.category}</p>
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">Requested By</span>
+                            <p className="text-gray-900" data-testid="text-op-cr-requested-by">
+                              {opDetailChangeRequest.requestedByUserId === 'current_user' ? 'Chief Engineer' :
+                               opDetailChangeRequest.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
+                               opDetailChangeRequest.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
+                               opDetailChangeRequest.requestedByUserId}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">Status</span>
+                            <div className="mt-1" data-testid="text-op-cr-status">
+                              {(() => {
+                                const st = opDetailChangeRequest.status?.toLowerCase();
+                                if (st === 'submitted' || st === 'pending') return <Badge className="bg-[#52BAF3] text-white">Pending Approval</Badge>;
+                                if (st === 'draft') return <Badge className="bg-gray-500 text-white">Draft</Badge>;
+                                if (st === 'returned') return <Badge className="bg-yellow-500 text-white">Returned</Badge>;
+                                return <Badge className="bg-gray-400 text-white">{opDetailChangeRequest.status}</Badge>;
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Reason</span>
+                          <p className="text-gray-900 mt-1" data-testid="text-op-cr-reason">{opDetailChangeRequest.reason || 'No reason provided'}</p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">Created</span>
+                            <p className="text-gray-900" data-testid="text-op-cr-created">{new Date(opDetailChangeRequest.createdAt).toLocaleDateString()}</p>
+                          </div>
+                          {opDetailChangeRequest.submittedAt && (
+                            <div>
+                              <span className="text-sm font-medium text-gray-500">Submitted</span>
+                              <p className="text-gray-900" data-testid="text-op-cr-submitted">{new Date(opDetailChangeRequest.submittedAt).toLocaleDateString()}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="border-t pt-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Eye className="w-5 h-5 text-red-600" />
+                            <span className="text-base font-semibold text-gray-800">Changes Made</span>
+                          </div>
+                          {opDetailChangeRequest.proposedChangesJson && Array.isArray(opDetailChangeRequest.proposedChangesJson) && (opDetailChangeRequest.proposedChangesJson as Array<Record<string, unknown>>).length > 0 ? (
+                            <div className="space-y-3">
+                              {(opDetailChangeRequest.proposedChangesJson as Array<Record<string, unknown>>).map((change, index) => (
+                                <div key={index} className="bg-red-50 p-4 rounded-lg border border-red-200" data-testid={`op-cr-change-${index}`}>
+                                  <div className="mb-2">
+                                    <span className="font-semibold text-gray-800 text-sm uppercase tracking-wide">
+                                      {String(change.field || change.fieldName || change.label || `Field ${index + 1}`)}
+                                    </span>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                      <span className="text-xs text-gray-500 block mb-1">Previous Value</span>
+                                      <span className="text-gray-700 bg-white px-2 py-1 rounded border inline-block">
+                                        {change.oldValue !== undefined ? String(change.oldValue) :
+                                         change.originalValue !== undefined ? String(change.originalValue) :
+                                         change.previousValue !== undefined ? String(change.previousValue) : '—'}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="text-xs text-gray-500 block mb-1">New Value</span>
+                                      <span className="text-red-600 font-bold bg-red-100 px-2 py-1 rounded border border-red-300 inline-block">
+                                        {change.newValue !== undefined ? String(change.newValue) :
+                                         change.currentValue !== undefined ? String(change.currentValue) :
+                                         change.proposedValue !== undefined ? String(change.proposedValue) : '—'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-gray-500 text-center">
+                              No specific field changes recorded for this request.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex justify-end mt-4">
+                        <Button variant="outline" onClick={() => setOpDetailChangeRequest(null)} data-testid="button-op-cr-close">
+                          Close
+                        </Button>
                       </div>
                     </DialogContent>
                   </Dialog>
