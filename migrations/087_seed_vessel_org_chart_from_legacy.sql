@@ -35,7 +35,7 @@ BEGIN
         created_at, updated_at, created_by_uuid, updated_by_uuid
       ) VALUES (
         new_uuid, default_vessel_id, old_rec.rank_id, old_rec.rank, NULL,
-        NULL, false, true, old_rec.rank_view, old_rec.sort_order,
+        NULL, false, false, old_rec.rank_view, old_rec.sort_order,
         old_rec.created_at, old_rec.updated_at, old_rec.created_by_uuid, old_rec.updated_by_uuid
       );
     END LOOP;

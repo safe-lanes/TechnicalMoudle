@@ -128,14 +128,14 @@ export async function getVesselOrgChartNodeByUuid(nodeUuid: string) {
   return rows[0] || null;
 }
 
-export async function createVesselOrgChartNode(data: any) {
+export async function createVesselOrgChartNode(data: typeof vesselOrgChartNodes.$inferInsert) {
   const db = await getDb();
   if (!db) return null;
   const result = await db.insert(vesselOrgChartNodes).values(data).returning();
   return result[0] || null;
 }
 
-export async function updateVesselOrgChartNode(nodeUuid: string, data: any) {
+export async function updateVesselOrgChartNode(nodeUuid: string, data: Partial<typeof vesselOrgChartNodes.$inferInsert>) {
   const db = await getDb();
   if (!db) return null;
   const result = await db.update(vesselOrgChartNodes)

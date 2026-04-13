@@ -261,28 +261,6 @@ function toNodeData(vesselId: string, node: OrgNodePayload) {
   };
 }
 
-function topologicalSort(items: OrgNodePayload[], withinSet: Set<string>): OrgNodePayload[] {
-  const sorted: OrgNodePayload[] = [];
-  const visited = new Set<string>();
-  const uuidToNode = new Map<string, OrgNodePayload>();
-  for (const n of items) {
-    if (n.nodeUuid) uuidToNode.set(n.nodeUuid, n);
-  }
-
-  function visit(node: OrgNodePayload) {
-    if (!node.nodeUuid || visited.has(node.nodeUuid)) return;
-    visited.add(node.nodeUuid);
-    if (node.parentNodeUuid && withinSet.has(node.parentNodeUuid)) {
-      const parent = uuidToNode.get(node.parentNodeUuid);
-      if (parent) visit(parent);
-    }
-    sorted.push(node);
-  }
-
-  for (const n of items) visit(n);
-  return sorted;
-}
-
 export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: OrgNodePayload[]) {
   const postgres = getPostgresClient();
   if (!postgres) throw createHttpError("Database not available", 503);
@@ -294,6 +272,12 @@ export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: OrgNo
 
   const hodPerDept = new Map<string, number>();
   for (const n of nodes) {
+    if (n.isAssigned && !n.department) {
+      throw createHttpError(
+        `Node ${n.nodeUuid || 'new'} is marked as assigned but has no department`,
+        400
+      );
+    }
     if (n.parentNodeUuid && nodeMap.has(n.parentNodeUuid)) {
       const parent = nodeMap.get(n.parentNodeUuid)!;
       if (parent.department !== n.department) {

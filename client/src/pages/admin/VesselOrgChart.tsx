@@ -97,6 +97,7 @@ export default function VesselOrgChart() {
   const [editingLabelValue, setEditingLabelValue] = useState("");
   const [draggedNodeUuid, setDraggedNodeUuid] = useState<string | null>(null);
   const [dragOverDept, setDragOverDept] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ nodeUuid: string; position: 'before' | 'after' | 'child' } | null>(null);
 
   const { data: savedRanks = [] } = useQuery<RankRow[]>({
     queryKey: ['/technical/api/admin/available-ranks'],
@@ -153,7 +154,13 @@ export default function VesselOrgChart() {
 
   const handleSave = () => {
     if (!selectedVesselId) return;
-    bulkSaveMutation.mutate(nodes);
+    const normalized = nodes.map(n => {
+      if (n.isAssigned && !n.department) {
+        return { ...n, isAssigned: false, parentNodeUuid: null, isHod: false, sortOrder: 0 };
+      }
+      return n;
+    });
+    bulkSaveMutation.mutate(normalized);
   };
 
   const ranksMap = useMemo(() => {
@@ -360,6 +367,53 @@ export default function VesselOrgChart() {
     setHasUnsavedChanges(true);
   };
 
+  const dropNodeAtPosition = (droppedUuid: string, targetUuid: string, position: 'before' | 'after' | 'child', deptNodes: OrgNode[]) => {
+    const droppedDescendants = getDescendants(droppedUuid, deptNodes);
+    if (droppedDescendants.has(targetUuid)) return;
+
+    setNodes(prev => {
+      const dropped = prev.find(n => n.nodeUuid === droppedUuid);
+      const target = prev.find(n => n.nodeUuid === targetUuid);
+      if (!dropped || !target) return prev;
+      if (dropped.isHod && position === 'child') return prev;
+
+      if (position === 'child') {
+        if (target.department !== dropped.department) return prev;
+        const childrenOfTarget = prev
+          .filter(n => n.parentNodeUuid === targetUuid && n.department === target.department)
+          .sort((a, b) => a.sortOrder - b.sortOrder);
+        const newSort = childrenOfTarget.length + 1;
+        return prev.map(n => n.nodeUuid === droppedUuid
+          ? { ...n, parentNodeUuid: targetUuid, sortOrder: newSort }
+          : n
+        );
+      }
+
+      if (target.department !== dropped.department) return prev;
+      const newParent = target.parentNodeUuid;
+      const siblings = prev
+        .filter(n => n.department === target.department && n.parentNodeUuid === newParent && n.nodeUuid !== droppedUuid)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+      const targetIdx = siblings.findIndex(s => s.nodeUuid === targetUuid);
+      const insertIdx = position === 'before' ? targetIdx : targetIdx + 1;
+      const reordered = [...siblings];
+      reordered.splice(insertIdx, 0, dropped);
+
+      const sortMap = new Map<string, number>();
+      reordered.forEach((s, i) => sortMap.set(s.nodeUuid, i + 1));
+      sortMap.set(droppedUuid, insertIdx + 1);
+
+      return prev.map(n => {
+        if (n.nodeUuid === droppedUuid) {
+          return { ...n, parentNodeUuid: newParent, sortOrder: sortMap.get(droppedUuid)! };
+        }
+        const newSort = sortMap.get(n.nodeUuid);
+        return newSort !== undefined ? { ...n, sortOrder: newSort } : n;
+      });
+    });
+    setHasUnsavedChanges(true);
+  };
+
   interface TreeNode {
     node: OrgNode;
     children: TreeNode[];
@@ -557,27 +611,36 @@ export default function VesselOrgChart() {
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/plain', node.nodeUuid);
           }}
-          onDragEnd={() => { setDraggedNodeUuid(null); setDragOverDept(null); }}
+          onDragEnd={() => { setDraggedNodeUuid(null); setDragOverDept(null); setDropTarget(null); }}
           onDragOver={(e) => {
             e.preventDefault();
             e.stopPropagation();
             e.dataTransfer.dropEffect = 'move';
+            const rect = e.currentTarget.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const third = rect.height / 3;
+            let position: 'before' | 'child' | 'after' = 'child';
+            if (y < third) position = 'before';
+            else if (y > third * 2) position = 'after';
+            setDropTarget({ nodeUuid: node.nodeUuid, position });
           }}
+          onDragLeave={() => { if (dropTarget?.nodeUuid === node.nodeUuid) setDropTarget(null); }}
           onDrop={(e) => {
             e.preventDefault();
             e.stopPropagation();
             const droppedUuid = e.dataTransfer.getData('text/plain');
-            if (droppedUuid && droppedUuid !== node.nodeUuid) {
-              const droppedDescendants = getDescendants(droppedUuid, deptNodes);
-              if (!droppedDescendants.has(node.nodeUuid)) {
-                setParentNode(droppedUuid, node.nodeUuid);
-              }
+            if (droppedUuid && droppedUuid !== node.nodeUuid && dropTarget) {
+              dropNodeAtPosition(droppedUuid, node.nodeUuid, dropTarget.position, deptNodes);
             }
             setDraggedNodeUuid(null);
+            setDropTarget(null);
           }}
           className={cn(
-            "flex items-center py-1.5 px-2 hover:bg-gray-50 rounded transition-colors group cursor-grab active:cursor-grabbing",
-            draggedNodeUuid === node.nodeUuid && "opacity-50 bg-blue-50"
+            "flex items-center py-1.5 px-2 hover:bg-gray-50 rounded transition-colors group cursor-grab active:cursor-grabbing relative",
+            draggedNodeUuid === node.nodeUuid && "opacity-50 bg-blue-50",
+            dropTarget?.nodeUuid === node.nodeUuid && dropTarget.position === 'child' && "bg-blue-50 ring-1 ring-blue-300",
+            dropTarget?.nodeUuid === node.nodeUuid && dropTarget.position === 'before' && "border-t-2 border-blue-400",
+            dropTarget?.nodeUuid === node.nodeUuid && dropTarget.position === 'after' && "border-b-2 border-blue-400"
           )}
           style={{ paddingLeft: indent + 8 }}
         >
