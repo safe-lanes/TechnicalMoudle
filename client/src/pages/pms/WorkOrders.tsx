@@ -80,8 +80,79 @@ const generateTemplateCode = (componentCode: string, taskType: string, basis: st
   return `WO-${componentCode}-${taskCode}${freqTag}`.toUpperCase();
 };
 
-// Sample data moved to seed data in storage - now fetched from API
+type WOSortField =
+  | "component" | "workOrderNo" | "jobTitle" | "assignedTo" | "dueDate"
+  | "status" | "dateCompleted" | "plannedDate" | "postponeUntil"
+  | "postponementReason" | "daysLate" | "approvalTier";
+type WOSortDir = "asc" | "desc";
 
+function compareWorkOrders(a: WorkOrderWithHydratedData, b: WorkOrderWithHydratedData, field: WOSortField, dir: WOSortDir, activeTab = ""): number {
+  let cmp = 0;
+  switch (field) {
+    case "component": cmp = (a.component || "").localeCompare(b.component || ""); break;
+    case "workOrderNo": {
+      const getWoNo = (wo: WorkOrderWithHydratedData) =>
+        (activeTab === "Pending Approval" || activeTab === "Completed") && wo.executionId
+          ? wo.executionId
+          : wo.workOrderNo || wo.templateCode || "";
+      cmp = getWoNo(a).localeCompare(getWoNo(b));
+      break;
+    }
+    case "jobTitle": cmp = (a.jobTitle || "").localeCompare(b.jobTitle || ""); break;
+    case "assignedTo": cmp = (a.assignedTo || "").localeCompare(b.assignedTo || ""); break;
+    case "dueDate": {
+      const useSubmitted = activeTab === "Pending Approval" || activeTab === "Completed";
+      const aVal = useSubmitted ? (a.submittedDate || "") : (a.dueDate || "");
+      const bVal = useSubmitted ? (b.submittedDate || "") : (b.dueDate || "");
+      cmp = aVal.localeCompare(bVal);
+      break;
+    }
+    case "status": {
+      const STATUS_ORDER: Record<string, number> = {
+        "Overdue": 0, "Due": 1, "Due (Grace P)": 2, "Active": 3,
+        "Pending Approval": 4, "Postponed": 5, "Draft": 6, "Completed": 7,
+      };
+      const aS = a.computedStatus || a.status || "";
+      const bS = b.computedStatus || b.status || "";
+      cmp = (STATUS_ORDER[aS] ?? 99) - (STATUS_ORDER[bS] ?? 99);
+      break;
+    }
+    case "dateCompleted":
+      cmp = (a.dateCompleted || "9999").localeCompare(b.dateCompleted || "9999");
+      break;
+    case "plannedDate":
+      cmp = (a.plannedDate || "9999").localeCompare(b.plannedDate || "9999");
+      break;
+    case "postponeUntil":
+      cmp = (a.postponementEndDate || "9999").localeCompare(b.postponementEndDate || "9999");
+      break;
+    case "postponementReason":
+      cmp = (a.postponementReason || "").localeCompare(b.postponementReason || "");
+      break;
+    case "daysLate":
+      cmp = (a.daysLate || 0) - (b.daysLate || 0);
+      break;
+    case "approvalTier":
+      cmp = (a.approvalTier || "").localeCompare(b.approvalTier || "");
+      break;
+  }
+  return dir === "desc" ? -cmp : cmp;
+}
+
+const AG_FIELD_TO_SORT_FIELD: Record<string, WOSortField> = {
+  component: "component",
+  workOrderNo: "workOrderNo",
+  jobTitle: "jobTitle",
+  assignedTo: "assignedTo",
+  dueDate: "dueDate",
+  status: "status",
+  dateCompleted: "dateCompleted",
+  plannedDate: "plannedDate",
+  postponementEndDate: "postponeUntil",
+  postponementReason: "postponementReason",
+  daysLate: "daysLate",
+  approvalTier: "approvalTier",
+};
 
 const WorkOrders: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -111,6 +182,9 @@ const WorkOrders: React.FC = () => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  const [woSortField, setWoSortField] = useState<WOSortField | null>(null);
+  const [woSortDir, setWoSortDir] = useState<WOSortDir>("asc");
 
   // Modify mode integration  
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
@@ -787,16 +861,39 @@ const WorkOrders: React.FC = () => {
     return cols;
   }, [activeTab, isVessel]);
 
-  const sortedWorkOrders = filteredWorkOrders;
+  const sortedWorkOrders = useMemo(
+    () => woSortField
+      ? [...filteredWorkOrders].sort((a, b) => compareWorkOrders(a, b, woSortField, woSortDir, activeTab))
+      : filteredWorkOrders,
+    [filteredWorkOrders, woSortField, woSortDir, activeTab]
+  );
+
+  const handleWoSortChanged = (field: string | null, direction: 'asc' | 'desc') => {
+    if (!field) {
+      setWoSortField(null);
+      setWoSortDir("asc");
+    } else {
+      const mapped = AG_FIELD_TO_SORT_FIELD[field];
+      if (mapped) {
+        setWoSortField(mapped);
+        setWoSortDir(direction);
+      }
+    }
+  };
 
   // Pagination calculations
   const totalItems = filteredWorkOrders.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   
-  // Reset to page 1 when filters change
+  // Reset to page 1 when filters or sort change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchTerm, periodFilter, selectedRank, criticalitySelections, selectedPostponementReason, vesselId]);
+  }, [activeTab, searchTerm, periodFilter, selectedRank, criticalitySelections, selectedPostponementReason, vesselId, woSortField, woSortDir]);
+
+  useEffect(() => {
+    setWoSortField(null);
+    setWoSortDir("asc");
+  }, [activeTab]);
   
   // Clamp current page when total pages shrinks (e.g., after deletion or filter change)
   useEffect(() => {
@@ -1435,6 +1532,7 @@ const WorkOrders: React.FC = () => {
           onRowClicked={(event: RowClickedEvent) => {
             if (event.data) handleWorkOrderClick(event.data);
           }}
+          onSortChanged={handleWoSortChanged}
           getRowClass={(params: any) => {
             const isRejected = params.data?.wasRejected === true;
             if (isRejected) return 'wo-rejected-row';

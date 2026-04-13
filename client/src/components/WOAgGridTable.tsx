@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import type { ColDef, GridReadyEvent, GridApi, RowClickedEvent } from 'ag-grid-community';
+import type { ColDef, GridReadyEvent, GridApi, RowClickedEvent, SortChangedEvent } from 'ag-grid-community';
 import { ModuleRegistry } from 'ag-grid-community';
 import {
   MenuModule,
@@ -30,6 +30,7 @@ interface WOAgGridTableProps {
   rowData: any[];
   height?: string;
   onRowClicked?: (event: RowClickedEvent) => void;
+  onSortChanged?: (field: string | null, direction: 'asc' | 'desc') => void;
   getRowStyle?: (params: any) => any;
   getRowClass?: (params: any) => string | string[] | undefined;
   suppressRowClickSelection?: boolean;
@@ -45,6 +46,7 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
   rowData,
   height = '100%',
   onRowClicked,
+  onSortChanged,
   getRowStyle,
   getRowClass,
   suppressRowClickSelection = true,
@@ -55,6 +57,8 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
   testId = 'wo-ag-grid',
 }) => {
   const gridApiRef = useRef<GridApi | null>(null);
+
+  const useExternalSort = !!onSortChanged;
 
   const defaultColDef: ColDef = useMemo(() => ({
     sortable: true,
@@ -69,6 +73,20 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
   const onGridReady = useCallback((event: GridReadyEvent) => {
     gridApiRef.current = event.api;
   }, []);
+
+  const handleSortChanged = useCallback((event: SortChangedEvent) => {
+    if (!onSortChanged) return;
+    const sortModel = event.api.getColumnState()
+      .filter(col => col.sort)
+      .sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
+
+    if (sortModel.length > 0) {
+      const first = sortModel[0];
+      onSortChanged(first.colId, (first.sort as 'asc' | 'desc') || 'asc');
+    } else {
+      onSortChanged(null, 'asc');
+    }
+  }, [onSortChanged]);
 
   const overlayNoRowsTemplate = useMemo(() => {
     return `<div style="padding: 20px; text-align: center; color: #6b7280;">${noRowsMessage}</div>`;
@@ -86,6 +104,16 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
         defaultColDef={defaultColDef}
         onGridReady={onGridReady}
         onRowClicked={onRowClicked}
+        onSortChanged={useExternalSort ? handleSortChanged : undefined}
+        postSortRows={useExternalSort ? (params) => {
+          if (params.nodes) {
+            params.nodes.sort((a: any, b: any) => {
+              const aIdx = a.sourceRowIndex ?? a.rowIndex ?? 0;
+              const bIdx = b.sourceRowIndex ?? b.rowIndex ?? 0;
+              return aIdx - bIdx;
+            });
+          }
+        } : undefined}
         getRowStyle={getRowStyle}
         getRowClass={getRowClass}
         suppressHorizontalScroll={false}

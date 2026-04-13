@@ -78,6 +78,18 @@ const STATUS_PRIORITY: Record<string, number> = {
   "Upcoming": 3,
 };
 
+const AG_FIELD_TO_PLANNER_SORT: Record<string, SortField> = {
+  componentName: "componentName",
+  jobTitle: "jobTitle",
+  maintenanceBasis: "maintenanceBasis",
+  frequency: "frequency",
+  dueInfo: "dueInfo",
+  status: "status",
+  assignedTo: "assignedTo",
+  woNo: "woNo",
+  plannedDate: "plannedDate",
+};
+
 function itemKey(item: PlannerItem): string {
   return `${item.jobId}::${item.componentId}`;
 }
@@ -296,6 +308,18 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
     });
   };
 
+  const handlePlannerSortChanged = (field: string | null, direction: 'asc' | 'desc') => {
+    if (!field) {
+      setSortField(null);
+      setSortDirection("asc");
+    } else {
+      const mapped = AG_FIELD_TO_PLANNER_SORT[field];
+      if (mapped) {
+        setSortField(mapped);
+        setSortDirection(direction);
+      }
+    }
+  };
 
   const toggleRowSelection = useCallback((key: string) => {
     setSelectedKeys(prev => {
@@ -794,6 +818,7 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
             columnDefs={plannerColumnDefs}
             rowData={plannerRowData}
             height="calc(100vh - 340px)"
+            onSortChanged={handlePlannerSortChanged}
             getRowClass={(params: any) => {
               const key = params.data ? itemKey(params.data) : '';
               const isSelected = selectedKeys.has(key);
