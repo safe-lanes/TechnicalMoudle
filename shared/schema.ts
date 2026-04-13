@@ -993,6 +993,7 @@ export const workOrders = pgTable("work_orders", {
   executionId: text("execution_id"),
   jobTitle: text("job_title").notNull(),
   assignedTo: text("assigned_to").notNull(),
+  assignedToRankId: text("assigned_to_rank_id"),
   dueDate: text("due_date"), // ISO date string, nullable for fleet jobs
   status: text("status").notNull().default("Active"), // 'Completed' | 'Due' | 'Due (Grace P)' | 'Overdue' | 'Postponed' | 'Pending Approval' | 'Active'
   dateCompleted: text("date_completed"),

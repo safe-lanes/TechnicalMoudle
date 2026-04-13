@@ -330,6 +330,13 @@
       "when": 1776080625345,
       "tag": "0046_fine_mandroid",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1776082051041,
+      "tag": "0047_lowly_maginty",
+      "breakpoints": true
     }
   ]
 }

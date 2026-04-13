@@ -219,10 +219,18 @@ export async function getHierarchyScope(req: Request, res: Response) {
     const { vesselId } = req.params;
     const user = (req as any).user;
     if (!user) return res.status(401).json({ error: "Authentication required" });
-    const crewDesignation = user.crewDesignation as string | undefined;
+    const userRankId = user.rankId as string | undefined;
     if (!vesselId) return res.status(400).json({ error: "vesselId required" });
-    if (!crewDesignation) return res.status(400).json({ error: "User has no crew designation" });
-    const result = await service.resolveHierarchyScope(vesselId, crewDesignation);
+    if (!userRankId) {
+      return res.json({
+        vesselId,
+        hasMapping: false,
+        hasDescendants: false,
+        me: { nodeUuids: [], rankIds: [] },
+        myTeam: { nodeUuids: [], rankIds: [] },
+      });
+    }
+    const result = await service.resolveHierarchyScopeByRankId(vesselId, userRankId);
     res.json(result);
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
