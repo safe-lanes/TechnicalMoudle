@@ -114,3 +114,70 @@ export async function deleteOrgChartEntry(req: Request, res: Response) {
     res.status(500).json({ error: "Failed to delete org chart entry" });
   }
 }
+
+export async function getVesselOrgChartNodes(req: Request, res: Response) {
+  try {
+    const { vesselId } = req.params;
+    if (!vesselId) return res.status(400).json({ error: "vesselId required" });
+    const nodes = await service.getVesselOrgChartNodes(vesselId);
+    res.json(nodes);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("Error fetching vessel org chart nodes:", error);
+    res.status(500).json({ error: "Failed to fetch vessel org chart nodes" });
+  }
+}
+
+export async function createVesselOrgChartNode(req: Request, res: Response) {
+  try {
+    const { vesselId, rankId, nodeLabel } = req.body;
+    if (!vesselId || !rankId) return res.status(400).json({ error: "vesselId and rankId required" });
+    const node = await service.createVesselOrgChartNode(vesselId, rankId, nodeLabel);
+    res.json(node);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("Error creating vessel org chart node:", error);
+    res.status(500).json({ error: "Failed to create vessel org chart node" });
+  }
+}
+
+export async function bulkSaveVesselOrgChartNodes(req: Request, res: Response) {
+  try {
+    const { vesselId } = req.params;
+    const { nodes } = req.body;
+    if (!vesselId) return res.status(400).json({ error: "vesselId required" });
+    if (!Array.isArray(nodes)) return res.status(400).json({ error: "nodes array required" });
+    const result = await service.bulkSaveVesselOrgChartNodes(vesselId, nodes);
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("Error saving vessel org chart nodes:", error);
+    res.status(500).json({ error: "Failed to save vessel org chart nodes", details: error.message });
+  }
+}
+
+export async function unassignVesselOrgChartNode(req: Request, res: Response) {
+  try {
+    const { nodeUuid } = req.params;
+    if (!nodeUuid) return res.status(400).json({ error: "nodeUuid required" });
+    const result = await service.unassignVesselOrgChartNode(nodeUuid);
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("Error unassigning vessel org chart node:", error);
+    res.status(500).json({ error: "Failed to unassign node" });
+  }
+}
+
+export async function deleteVesselOrgChartNode(req: Request, res: Response) {
+  try {
+    const { nodeUuid } = req.params;
+    if (!nodeUuid) return res.status(400).json({ error: "nodeUuid required" });
+    const result = await service.deleteVesselOrgChartNode(nodeUuid);
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("Error deleting vessel org chart node:", error);
+    res.status(500).json({ error: "Failed to delete node" });
+  }
+}

@@ -1,5 +1,5 @@
 import { getPostgresClient } from '../../postgresClient';
-import { admAvailableRanks, admVesselOrgChart } from '@shared/schema';
+import { admAvailableRanks, admVesselOrgChart, vesselOrgChartNodes } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 
 function getDb() {
@@ -103,4 +103,52 @@ export async function softDeleteOrgChartEntry(id: number) {
   return db.update(admVesselOrgChart)
     .set({ isDeleted: true, updatedAt: new Date() })
     .where(eq(admVesselOrgChart.id, id));
+}
+
+export async function getVesselOrgChartNodes(vesselId: string) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.select().from(vesselOrgChartNodes)
+    .where(and(
+      eq(vesselOrgChartNodes.vesselId, vesselId),
+      eq(vesselOrgChartNodes.isDeleted, false)
+    ))
+    .orderBy(vesselOrgChartNodes.sortOrder);
+}
+
+export async function getVesselOrgChartNodeByUuid(nodeUuid: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(vesselOrgChartNodes)
+    .where(and(
+      eq(vesselOrgChartNodes.nodeUuid, nodeUuid),
+      eq(vesselOrgChartNodes.isDeleted, false)
+    ))
+    .limit(1);
+  return rows[0] || null;
+}
+
+export async function createVesselOrgChartNode(data: any) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.insert(vesselOrgChartNodes).values(data).returning();
+  return result[0] || null;
+}
+
+export async function updateVesselOrgChartNode(nodeUuid: string, data: any) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.update(vesselOrgChartNodes)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(vesselOrgChartNodes.nodeUuid, nodeUuid))
+    .returning();
+  return result[0] || null;
+}
+
+export async function softDeleteVesselOrgChartNode(nodeUuid: string) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.update(vesselOrgChartNodes)
+    .set({ isDeleted: true, updatedAt: new Date() })
+    .where(eq(vesselOrgChartNodes.nodeUuid, nodeUuid));
 }

@@ -32,6 +32,7 @@ import ShipsCertificatesAdmin from "./admin/ShipsCertificatesAdmin";
 import ShipsSurveysAdmin from "./admin/ShipsSurveysAdmin";
 import AccessControl from "./admin/AccessControl";
 import RanksAdmin from "./admin/RanksAdmin";
+import VesselOrgChart from "./admin/VesselOrgChart";
 import AddEditFleetComponent from "./admin/AddEditFleetComponent";
 // ====== NOON REPORT MODULE — START (remove to disable) ======
 import NoonEntryForm from "./noon-report/NoonEntryForm";
@@ -222,6 +223,8 @@ export const TechnicalModule = () => {
             <ShipsSurveysAdmin />
           ) : selectedSubModule === "admin" && selectedMenuItem === "ranks" ? (
             <RanksAdmin />
+          ) : selectedSubModule === "admin" && selectedMenuItem === "vessel-org-chart" ? (
+            <VesselOrgChart />
           ) : selectedSubModule === "admin" && selectedMenuItem === "access-control" && isSailAdmin ? (
             <AccessControl />
           ) : selectedSubModule === "admin" && selectedMenuItem === "access-control" && !isSailAdmin ? (

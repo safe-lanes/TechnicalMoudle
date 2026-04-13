@@ -3459,6 +3459,36 @@ export const insertAdmVesselOrgChartSchema = createInsertSchema(admVesselOrgChar
 export type InsertAdmVesselOrgChart = z.infer<typeof insertAdmVesselOrgChartSchema>;
 export type AdmVesselOrgChart = typeof admVesselOrgChart.$inferSelect;
 
+// ====== VESSEL ORG CHART NODES TABLE (vessel-specific hierarchy) ======
+export const vesselOrgChartNodes = pgTable("vessel_org_chart_nodes", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  nodeUuid: text("node_uuid").unique().notNull().default(sql`gen_random_uuid()::text`),
+  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
+  rankId: text("rank_id").notNull(),
+  nodeLabel: text("node_label"),
+  department: text("department"),
+  parentNodeUuid: text("parent_node_uuid"),
+  isHod: boolean("is_hod").default(false),
+  isAssigned: boolean("is_assigned").default(false),
+  viewMode: text("view_mode"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdateFn(() => new Date()),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+});
+
+export const insertVesselOrgChartNodeSchema = createInsertSchema(vesselOrgChartNodes).omit({
+  id: true,
+  nodeUuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertVesselOrgChartNode = z.infer<typeof insertVesselOrgChartNodeSchema>;
+export type VesselOrgChartNode = typeof vesselOrgChartNodes.$inferSelect;
+
 // ====== MONTHLY MAINTENANCE SNAPSHOTS ======
 export const monthlySnapshots = pgTable("monthly_snapshots", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),

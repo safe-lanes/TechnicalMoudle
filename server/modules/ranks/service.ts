@@ -1,7 +1,7 @@
 import * as repo from './repository';
 import { getPostgresClient } from '../../postgresClient';
-import { admAvailableRanks, admVesselOrgChart } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { admAvailableRanks, admVesselOrgChart, vesselOrgChartNodes } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
 
 export async function getAllRanks() {
   const ranks = await repo.getAllRanks();
@@ -195,4 +195,124 @@ export async function deleteOrgChartEntry(id: number) {
   }
   await repo.softDeleteOrgChartEntry(id);
   return { success: true, message: `Org chart entry ${id} deleted` };
+}
+
+export async function getVesselOrgChartNodes(vesselId: string) {
+  const nodes = await repo.getVesselOrgChartNodes(vesselId);
+  if (!nodes) {
+    const err: any = new Error("Database not available");
+    err.statusCode = 503;
+    throw err;
+  }
+  return nodes;
+}
+
+export async function createVesselOrgChartNode(vesselId: string, rankId: string, nodeLabel?: string) {
+  const node = await repo.createVesselOrgChartNode({
+    vesselId,
+    rankId,
+    nodeLabel: nodeLabel || null,
+    department: null,
+    parentNodeUuid: null,
+    isHod: false,
+    isAssigned: false,
+    viewMode: null,
+    sortOrder: 0,
+    isDeleted: false,
+  });
+  if (!node) {
+    const err: any = new Error("Database not available");
+    err.statusCode = 503;
+    throw err;
+  }
+  return node;
+}
+
+export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: any[]) {
+  const postgres = getPostgresClient();
+  if (!postgres) {
+    const err: any = new Error("Database not available");
+    err.statusCode = 503;
+    throw err;
+  }
+
+  return postgres.db.transaction(async (tx) => {
+    let inserted = 0;
+    let updated = 0;
+
+    const existingNodes = await tx.select().from(vesselOrgChartNodes)
+      .where(and(
+        eq(vesselOrgChartNodes.vesselId, vesselId),
+        eq(vesselOrgChartNodes.isDeleted, false)
+      ));
+
+    const existingUuids = new Set(existingNodes.map(n => n.nodeUuid));
+    const incomingUuids = new Set(nodes.filter(n => n.nodeUuid).map((n: any) => n.nodeUuid));
+
+    for (const existingNode of existingNodes) {
+      if (!incomingUuids.has(existingNode.nodeUuid)) {
+        await tx.update(vesselOrgChartNodes)
+          .set({ isDeleted: true, updatedAt: new Date() })
+          .where(eq(vesselOrgChartNodes.nodeUuid, existingNode.nodeUuid));
+      }
+    }
+
+    for (const node of nodes) {
+      const data = {
+        vesselId,
+        rankId: node.rankId,
+        nodeLabel: node.nodeLabel || null,
+        department: node.department || null,
+        parentNodeUuid: node.parentNodeUuid || null,
+        isHod: node.isHod ?? false,
+        isAssigned: node.isAssigned ?? false,
+        viewMode: node.viewMode || null,
+        sortOrder: node.sortOrder ?? 0,
+        isDeleted: false,
+      };
+
+      if (node.nodeUuid && existingUuids.has(node.nodeUuid)) {
+        await tx.update(vesselOrgChartNodes)
+          .set({ ...data, updatedAt: new Date() })
+          .where(eq(vesselOrgChartNodes.nodeUuid, node.nodeUuid));
+        updated++;
+      } else {
+        const insertData: any = { ...data };
+        if (node.nodeUuid) {
+          insertData.nodeUuid = node.nodeUuid;
+        }
+        await tx.insert(vesselOrgChartNodes).values(insertData);
+        inserted++;
+      }
+    }
+
+    return { success: true, inserted, updated, total: nodes.length };
+  });
+}
+
+export async function unassignVesselOrgChartNode(nodeUuid: string) {
+  const node = await repo.getVesselOrgChartNodeByUuid(nodeUuid);
+  if (!node) {
+    const err: any = new Error("Node not found");
+    err.statusCode = 404;
+    throw err;
+  }
+  const result = await repo.updateVesselOrgChartNode(nodeUuid, {
+    isAssigned: false,
+    department: null,
+    parentNodeUuid: null,
+    isHod: false,
+  });
+  return { success: true, node: result };
+}
+
+export async function deleteVesselOrgChartNode(nodeUuid: string) {
+  const node = await repo.getVesselOrgChartNodeByUuid(nodeUuid);
+  if (!node) {
+    const err: any = new Error("Node not found");
+    err.statusCode = 404;
+    throw err;
+  }
+  await repo.softDeleteVesselOrgChartNode(nodeUuid);
+  return { success: true, message: `Node ${nodeUuid} deleted` };
 }
