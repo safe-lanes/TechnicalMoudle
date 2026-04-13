@@ -3,8 +3,23 @@ import { AgGridReact } from 'ag-grid-react';
 import type { ColDef, GridReadyEvent, GridApi, RowClickedEvent, SortChangedEvent } from 'ag-grid-community';
 import { ModuleRegistry } from 'ag-grid-community';
 import {
+  AllEnterpriseModule,
+  SetFilterModule,
+  MultiFilterModule,
   MenuModule,
   ColumnsToolPanelModule,
+  FiltersToolPanelModule,
+  StatusBarModule,
+  SideBarModule,
+  RangeSelectionModule,
+  RowGroupingModule,
+  AggregationModule,
+  PivotModule,
+  MasterDetailModule,
+  ExcelExportModule,
+  CsvExportModule,
+  ClipboardModule,
+  AdvancedFilterModule,
   LicenseManager,
 } from 'ag-grid-enterprise';
 
@@ -20,8 +35,23 @@ try {
 
 try {
   ModuleRegistry.registerModules([
+    AllEnterpriseModule,
+    SetFilterModule,
+    MultiFilterModule,
     MenuModule,
     ColumnsToolPanelModule,
+    FiltersToolPanelModule,
+    StatusBarModule,
+    SideBarModule,
+    RangeSelectionModule,
+    RowGroupingModule,
+    AggregationModule,
+    PivotModule,
+    MasterDetailModule,
+    ExcelExportModule,
+    CsvExportModule,
+    ClipboardModule,
+    AdvancedFilterModule,
   ]);
 } catch (_) {}
 
@@ -63,11 +93,10 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
   const defaultColDef: ColDef = useMemo(() => ({
     sortable: true,
     resizable: true,
-    filter: false,
-    suppressHeaderFilterButton: true,
+    filter: true,
     wrapText: false,
     autoHeight: false,
-    menuTabs: [],
+    menuTabs: ['generalMenuTab', 'filterMenuTab', 'columnsMenuTab'],
   }), []);
 
   const onGridReady = useCallback((event: GridReadyEvent) => {
