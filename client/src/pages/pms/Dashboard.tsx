@@ -1681,7 +1681,7 @@ const Dashboard = () => {
                 <div className="flex-1 flex flex-col min-h-0">
                   <div className="flex items-center justify-between mb-2">
                     <h2 className="text-base font-semibold text-gray-800" data-testid="text-operation-table-title">{operationTableTitle}</h2>
-                    {!isNonWOCard && operationTableData.length > 0 && (
+                    {!isNonWOCard && selectedOpCard !== 'pending-approvals' && operationTableData.length > 0 && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1730,6 +1730,87 @@ const Dashboard = () => {
                   {isNonWOCard ? (
                     <div className="flex-1 flex items-center justify-center border border-gray-200 rounded-lg bg-white">
                       <p className="text-sm text-gray-400">No work orders for this category — detailed view coming soon.</p>
+                    </div>
+                  ) : selectedOpCard === 'pending-approvals' ? (
+                    <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white" data-testid="section-op-pending-approvals">
+                      <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E0E0E0' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 500, color: '#212121' }}>
+                          {operationKPIs.pendingApprovalCount} work order{operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} require your review
+                        </span>
+                        {operationKPIs.pendingApprovalCount > 0 && (
+                          <Button
+                            onClick={() => setBulkApproveModalOpen(true)}
+                            style={{ background: '#1565C0' }}
+                            className="text-white hover:opacity-90"
+                            size="sm"
+                            data-testid="button-op-bulk-approve-open"
+                          >
+                            <CheckSquare className="w-4 h-4 mr-2" />
+                            Bulk Approve ({operationKPIs.pendingApprovalCount})
+                          </Button>
+                        )}
+                      </div>
+                      <div className="p-4 space-y-2">
+                        {operationKPIs.pendingApprovalWOs.length === 0 ? (
+                          <div className="text-center py-8 text-gray-500 text-sm">No work orders pending approval</div>
+                        ) : (
+                          operationKPIs.pendingApprovalWOs.map((wo: any) => (
+                            <div
+                              key={wo.id}
+                              className="flex items-center justify-between p-3 rounded-lg border transition-colors"
+                              style={{ background: wo.wasRejected ? '#FFEBEE' : '#E3F2FD', borderColor: wo.wasRejected ? '#FFCDD2' : '#BBDEFB' }}
+                              data-testid={`row-op-pending-approval-wo-${wo.id}`}
+                            >
+                              <div className="flex-1 cursor-pointer" onClick={() => navigateToWorkOrder(wo.id)}>
+                                <div className="font-medium text-sm" style={{ color: wo.wasRejected ? '#C62828' : '#212121' }}>
+                                  {wo.workOrderNo || `WO-${wo.id}`}
+                                  {wo.wasRejected && (
+                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ background: '#E53935' }}>Resubmitted</span>
+                                  )}
+                                </div>
+                                <div className="text-xs mt-0.5" style={{ color: wo.wasRejected ? '#E53935' : '#616161' }}>
+                                  {wo.jobTitle || 'No description'} - {wo.component}
+                                </div>
+                                <div className="text-xs mt-1" style={{ color: '#9E9E9E' }}>
+                                  Assigned: {wo.assignedTo} | Submitted: {wo.submittedDate ? new Date(wo.submittedDate).toLocaleDateString() : 'N/A'}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button variant="ghost" size="icon" onClick={() => navigateToWorkOrder(wo.id)} data-testid={`button-op-view-pending-wo-${wo.id}`}>
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const reason = window.prompt("Enter rejection reason:");
+                                    if (reason) {
+                                      rejectMutation.mutate({ workOrderId: wo.id, comments: reason });
+                                    }
+                                  }}
+                                  style={{ borderColor: '#E53935', color: '#E53935' }}
+                                  disabled={rejectMutation.isPending}
+                                  data-testid={`button-op-reject-wo-${wo.id}`}
+                                >
+                                  <XCircle className="w-4 h-4 mr-1" />
+                                  Reject
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => approveMutation.mutate(wo.id)}
+                                  style={{ background: '#2E7D32' }}
+                                  className="text-white hover:opacity-90"
+                                  disabled={approveMutation.isPending}
+                                  data-testid={`button-op-approve-wo-${wo.id}`}
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-1" />
+                                  Approve
+                                </Button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white">
