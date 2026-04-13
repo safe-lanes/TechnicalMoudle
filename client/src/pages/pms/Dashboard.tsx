@@ -2469,7 +2469,7 @@ const Dashboard = () => {
       <BulkApproveModal
         open={bulkApproveModalOpen}
         onOpenChange={setBulkApproveModalOpen}
-        workOrders={activeTab === 'overview' && selectedOpCard === 'pending-approvals' ? (operationKPIs.pendingApprovalWOs as any[]) : (workOrderKPIs.pendingApprovalFull || [])}
+        workOrders={activeTab === 'management' && selectedOpCard === 'pending-approvals' ? (operationKPIs.pendingApprovalWOs as any[]) : (workOrderKPIs.pendingApprovalFull || [])}
         vesselId={vesselId}
         vesselName={currentVessel?.name}
       />
