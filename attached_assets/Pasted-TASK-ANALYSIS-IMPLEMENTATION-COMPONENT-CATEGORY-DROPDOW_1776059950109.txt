@@ -1,0 +1,155 @@
+TASK: ANALYSIS & IMPLEMENTATION – COMPONENT CATEGORY DROPDOWN (MASTER LIST INTEGRATION)
+
+Objective:
+
+Verify whether **Component Category dropdown** in **Add/Edit Component screen** is fetching data from  
+**Master Lists Management → Components Tab → Component Category (Value)**.  
+If not, identify gaps and implement correct dynamic linkage.
+
+--------------------------------------------------
+
+1. Expected Behavior
+
+• In Add/Edit Component screen:
+
+  - Component Category dropdown should  
+    fetch values from Master Lists → Components → Component Category  
+
+• Dropdown should:
+
+  - Display all active values  
+  - Reflect latest updates dynamically  
+
+--------------------------------------------------
+
+2. Analysis Required
+
+--------------------------------------------------
+
+A. Data Source Verification
+
+• Check current dropdown source:
+
+  - Static values?  
+  - Separate table?  
+  - Master List integration?  
+
+--------------------------------------------------
+
+B. API/Data Fetch Check
+
+• Verify:
+
+  - Is API fetching Component Category from Master List?  
+  - Or using hardcoded / alternate source?  
+
+--------------------------------------------------
+
+C. Master List Structure Check
+
+• Validate:
+
+  - Component Category values exist under Components section  
+  - Proper classification under Master Lists  
+
+--------------------------------------------------
+
+D. UI Binding Check
+
+• Verify:
+
+  - Dropdown is bound to correct dataset  
+  - Field mapping is correct  
+
+--------------------------------------------------
+
+E. Filtering Check
+
+• Ensure:
+
+  - Only active values are shown  
+  - No duplicate entries  
+
+--------------------------------------------------
+
+3. Possible Issues
+
+--------------------------------------------------
+
+• Dropdown using static values  
+• Wrong data source used  
+• Master List not connected  
+• API not implemented or incorrect  
+• UI not binding correct field  
+• Missing section-wise filtering  
+
+--------------------------------------------------
+
+4. Corrective Implementation Plan
+
+--------------------------------------------------
+
+A. Data Source Standardization
+
+• Set Master List → Component Category as single source of truth  
+
+--------------------------------------------------
+
+B. API Integration
+
+• Ensure dropdown fetches data from:
+
+  Master Lists → Components → Component Category  
+
+--------------------------------------------------
+
+C. Section-Based Filtering
+
+• Fetch only:
+
+  - Section: Components  
+  - Type: Component Category  - Value
+
+--------------------------------------------------
+
+D. UI Binding Update
+
+• Bind dropdown to dynamic dataset  
+• Replace any static/hardcoded values  
+
+--------------------------------------------------
+
+E. Data Mapping
+
+• On selection:
+
+  - Store correct reference value  
+  - Maintain consistency across system  
+
+--------------------------------------------------
+
+F. Validation Controls
+
+• Show only active entries  
+• Prevent duplicates  
+• Handle empty list scenario  
+
+--------------------------------------------------
+
+5. Validation
+
+--------------------------------------------------
+
+• Dropdown loads values from Master List  
+• Newly added categories appear immediately  
+• Disabled categories are not shown  
+• Selection is saved correctly  
+• No fallback to static values  
+
+--------------------------------------------------
+
+Expected Result:
+
+• Component Category dropdown is fully dynamic  
+• Controlled via Master Lists Management  
+• Consistent and centralized data usage  
