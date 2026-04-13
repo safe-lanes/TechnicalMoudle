@@ -363,6 +363,7 @@ const Dashboard = () => {
   const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
   const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: EnrichedWorkOrder[] }>({ open: false, title: '', workOrders: [] });
   const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
+  const [crListModal, setCrListModal] = useState<{ open: boolean; title: string; changeRequests: ChangeRequest[] }>({ open: false, title: '', changeRequests: [] });
   const [activeTab, setActiveTab] = useState('overview');
   const [showFilters, setShowFilters] = useState(false);
   type OperationCardFilter = 'overdue' | 'overdue-critical' | 'planned-today' | 'pending-approvals' | 'critical-spares' | 'anomalies' | 'modify-pms' | 'donut-overdue' | 'donut-due' | 'donut-planned';
@@ -515,9 +516,9 @@ const Dashboard = () => {
   });
 
   const { data: changeRequestsData = [] } = useQuery<ChangeRequest[]>({
-    queryKey: ['/api/change-requests', vesselId],
+    queryKey: ['/technical/api/change-requests', vesselId],
     queryFn: async () => {
-      const url = `/api/change-requests?vesselId=${vesselId}`;
+      const url = `/technical/api/change-requests?vesselId=${vesselId}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch change requests');
       return response.json();
@@ -1215,10 +1216,11 @@ const Dashboard = () => {
     const unplannedFull = ytdWOs.filter(wo => wo.workOrderType === 'Unplanned');
     const unplanned = unplannedFull.length;
 
-    const changeRequestCountYTD = changeRequestsData.filter(cr => {
+    const changeRequestsFull = changeRequestsData.filter(cr => {
       const created = cr.createdAt ? new Date(cr.createdAt) : null;
       return created !== null && created.getFullYear() === currentYear;
-    }).length;
+    });
+    const changeRequestCountYTD = changeRequestsFull.length;
     const changeRequestPercent = total > 0 ? Math.round((changeRequestCountYTD / total) * 100) : 0;
 
     return {
@@ -1230,6 +1232,7 @@ const Dashboard = () => {
       unplannedFull,
       unplannedPercent: total > 0 ? Math.round((unplanned / total) * 100) : 0,
       changeRequests: changeRequestCountYTD,
+      changeRequestsFull,
       changeRequestPercent,
     };
   }, [workOrdersData, changeRequestsData]);
@@ -2771,6 +2774,8 @@ const Dashboard = () => {
                       color="#e74c3c"
                       displayValue={ytdKPIs.changeRequests.toString()}
                       subtitle={`${ytdKPIs.changeRequestPercent}% of total`}
+                      onClick={() => setCrListModal({ open: true, title: 'Modify PMS Requests YTD', changeRequests: ytdKPIs.changeRequestsFull })}
+                      testId="gauge-modify-pms-ytd"
                     />
                   </div>
                 </div>
@@ -2887,6 +2892,67 @@ const Dashboard = () => {
         vessels={vessels}
         getStockStatus={getStockStatus}
       />
+      <Dialog open={crListModal.open} onOpenChange={(isOpen) => !isOpen && setCrListModal({ open: false, title: '', changeRequests: [] })}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-[#0f4c81]" data-testid="title-cr-list-modal">
+              {crListModal.title}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            {crListModal.changeRequests.length === 0 ? (
+              <div className="flex items-center justify-center py-12 text-gray-400 text-sm">
+                No change requests found
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-[#52BAF3] hover:bg-[#52BAF3] border-b-0">
+                    <TableHead className="text-white font-medium py-3 px-6 text-xs">Request Title</TableHead>
+                    <TableHead className="text-white font-medium py-3 px-6 text-xs">Requested By</TableHead>
+                    <TableHead className="text-white font-medium py-3 px-6 text-xs">Date</TableHead>
+                    <TableHead className="text-white font-medium py-3 px-6 text-xs">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {crListModal.changeRequests.map((cr) => (
+                    <TableRow key={cr.id} className="border-b border-gray-200 hover:bg-gray-50" data-testid={`row-cr-modal-${cr.id}`}>
+                      <TableCell className="py-3 px-6">
+                        <div className="font-medium text-gray-900 text-xs">{cr.title}</div>
+                      </TableCell>
+                      <TableCell className="py-3 px-6 text-gray-700 text-xs">
+                        {cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
+                         cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
+                         cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
+                         cr.requestedByUserId}
+                      </TableCell>
+                      <TableCell className="py-3 px-6 text-gray-700 text-xs">
+                        {cr.submittedAt
+                          ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')
+                          : new Date(cr.createdAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')}
+                      </TableCell>
+                      <TableCell className="py-3 px-6">
+                        {(() => {
+                          const st = cr.status?.toLowerCase();
+                          if (st === 'submitted' || st === 'pending') return <Badge className="bg-[#52BAF3] text-white px-3 py-1 text-xs rounded-full">Pending Approval</Badge>;
+                          if (st === 'approved') return <Badge className="bg-green-500 text-white px-3 py-1 text-xs rounded-full">Approved</Badge>;
+                          if (st === 'rejected') return <Badge className="bg-red-500 text-white px-3 py-1 text-xs rounded-full">Rejected</Badge>;
+                          if (st === 'draft') return <Badge className="bg-gray-500 text-white px-3 py-1 text-xs rounded-full">Draft</Badge>;
+                          if (st === 'returned') return <Badge className="bg-yellow-500 text-white px-3 py-1 text-xs rounded-full">Returned</Badge>;
+                          return <Badge className="bg-gray-400 text-white px-3 py-1 text-xs rounded-full">{cr.status}</Badge>;
+                        })()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+          <div className="border-t pt-3 text-xs text-gray-500">
+            Total: {crListModal.changeRequests.length} request{crListModal.changeRequests.length !== 1 ? 's' : ''}
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={showBenchmarking} onOpenChange={setShowBenchmarking}>
         <DialogContent className="max-w-[95vw] h-[calc(100vh-10vw)] max-h-[90vh] overflow-hidden flex flex-col [&>button.absolute]:top-6 [&>button.absolute]:translate-y-1">
           <DialogHeader className="pb-2">
