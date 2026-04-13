@@ -426,6 +426,7 @@ export default function VesselOrgChart() {
         const targetLayer = target.nodeLayer;
         const parentLayer = parent.nodeLayer;
         if (targetLayer === 'department' && parentLayer === 'department' && parent.department !== target.department) return prev;
+        if (target.isHod && targetLayer === 'department' && parentLayer === 'department') return prev;
       }
       return prev.map(n => n.nodeUuid === nodeUuid ? { ...n, parentNodeUuid } : n);
     });

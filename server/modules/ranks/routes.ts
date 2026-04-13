@@ -24,5 +24,6 @@ router.delete('/admin/vessel-org-chart-nodes/:vesselId/:nodeUuid', asyncHandler(
 
 router.get('/admin/vessel-department-config/:vesselId', asyncHandler(ctrl.getVesselDepartmentConfig));
 router.post('/admin/vessel-department-config/:vesselId', asyncHandler(ctrl.saveVesselDepartmentConfig));
+router.put('/admin/vessel-department-config/:vesselId', asyncHandler(ctrl.saveVesselDepartmentConfig));
 
 export default router;
