@@ -213,3 +213,18 @@ export async function saveVesselDepartmentConfig(req: Request, res: Response) {
     res.status(500).json({ error: "Failed to save vessel department config" });
   }
 }
+
+export async function getHierarchyScope(req: Request, res: Response) {
+  try {
+    const { vesselId } = req.params;
+    const crewDesignation = req.query.crewDesignation as string;
+    if (!vesselId) return res.status(400).json({ error: "vesselId required" });
+    if (!crewDesignation) return res.status(400).json({ error: "crewDesignation query parameter required" });
+    const result = await service.resolveHierarchyScope(vesselId, crewDesignation);
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("Error resolving hierarchy scope:", error);
+    res.status(500).json({ error: "Failed to resolve hierarchy scope" });
+  }
+}

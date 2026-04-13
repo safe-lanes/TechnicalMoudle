@@ -407,3 +407,91 @@ export async function saveVesselDepartmentConfig(vesselId: string, configs: { de
   const result = await repo.upsertVesselDepartmentConfig(vesselId, configs);
   return { success: true, configs: result };
 }
+
+export async function resolveHierarchyScope(vesselId: string, crewDesignation: string) {
+  if (!vesselId) throw createHttpError("vesselId required", 400);
+  if (!crewDesignation) throw createHttpError("crewDesignation required", 400);
+
+  const allRanks = await repo.getAllRanks();
+  if (!allRanks) throw createHttpError("Database not available", 503);
+
+  const nodes = await repo.getVesselOrgChartNodes(vesselId);
+  if (!nodes || nodes.length === 0) {
+    return { vesselId, hasMapping: false, me: { nodeUuids: [], assignmentKeys: [] }, myTeam: { nodeUuids: [], assignmentKeys: [] } };
+  }
+
+  const designationLower = crewDesignation.toLowerCase().trim();
+  const matchingRanks = allRanks.filter(r =>
+    r.name?.toLowerCase().trim() === designationLower ||
+    r.label?.toLowerCase().trim() === designationLower
+  );
+
+  if (matchingRanks.length === 0) {
+    return { vesselId, hasMapping: false, me: { nodeUuids: [], assignmentKeys: [] }, myTeam: { nodeUuids: [], assignmentKeys: [] } };
+  }
+
+  const matchingRankIds = new Set(matchingRanks.map(r => r.rankId));
+
+  const assignedNodes = nodes.filter(n => n.isAssigned);
+  const meNodes = assignedNodes.filter(n => matchingRankIds.has(n.rankId));
+
+  if (meNodes.length === 0) {
+    return { vesselId, hasMapping: false, me: { nodeUuids: [], assignmentKeys: [] }, myTeam: { nodeUuids: [], assignmentKeys: [] } };
+  }
+
+  const rankIdToLabels = new Map<string, string[]>();
+  for (const r of allRanks) {
+    const labels = [r.name, r.label].filter(Boolean) as string[];
+    rankIdToLabels.set(r.rankId, labels);
+  }
+
+  const nodeByUuid = new Map(assignedNodes.map(n => [n.nodeUuid, n]));
+  const childrenMap = new Map<string, typeof assignedNodes>();
+  for (const n of assignedNodes) {
+    if (n.parentNodeUuid) {
+      const list = childrenMap.get(n.parentNodeUuid) || [];
+      list.push(n);
+      childrenMap.set(n.parentNodeUuid, list);
+    }
+  }
+
+  function collectDescendants(rootUuids: string[]): Set<string> {
+    const visited = new Set<string>();
+    const queue = [...rootUuids];
+    while (queue.length > 0) {
+      const uuid = queue.pop()!;
+      if (visited.has(uuid)) continue;
+      visited.add(uuid);
+      const children = childrenMap.get(uuid) || [];
+      for (const child of children) {
+        queue.push(child.nodeUuid);
+      }
+    }
+    return visited;
+  }
+
+  const meUuids = meNodes.map(n => n.nodeUuid);
+  const meRankIds = new Set(meNodes.map(n => n.rankId));
+  const meLabels = new Set<string>();
+  for (const rid of meRankIds) {
+    for (const l of (rankIdToLabels.get(rid) || [])) meLabels.add(l);
+  }
+
+  const teamUuids = collectDescendants(meUuids);
+  const teamRankIds = new Set<string>();
+  for (const uuid of teamUuids) {
+    const node = nodeByUuid.get(uuid);
+    if (node) teamRankIds.add(node.rankId);
+  }
+  const teamLabels = new Set<string>();
+  for (const rid of teamRankIds) {
+    for (const l of (rankIdToLabels.get(rid) || [])) teamLabels.add(l);
+  }
+
+  return {
+    vesselId,
+    hasMapping: true,
+    me: { nodeUuids: meUuids, assignmentKeys: Array.from(meLabels) },
+    myTeam: { nodeUuids: Array.from(teamUuids), assignmentKeys: Array.from(teamLabels) },
+  };
+}

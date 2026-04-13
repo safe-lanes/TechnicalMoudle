@@ -26,4 +26,6 @@ router.get('/admin/vessel-department-config/:vesselId', asyncHandler(ctrl.getVes
 router.post('/admin/vessel-department-config/:vesselId', asyncHandler(ctrl.saveVesselDepartmentConfig));
 router.put('/admin/vessel-department-config/:vesselId', asyncHandler(ctrl.saveVesselDepartmentConfig));
 
+router.get('/hierarchy-scope/:vesselId', asyncHandler(ctrl.getHierarchyScope));
+
 export default router;

@@ -4,6 +4,7 @@ import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/rea
 import { format } from "date-fns";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -383,6 +384,7 @@ const Dashboard = () => {
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isHeadOfDept, isVessel } = useUIRole();
   const { toast } = useToast();
+  const { currentUser } = useAuth();
   const queryClient = useQueryClient();
 
   const [mgmtVesselId, setMgmtVesselId] = useState<string>(vesselId);
@@ -399,6 +401,25 @@ const Dashboard = () => {
   const isAllVessels = effectiveVesselId === 'all';
   
   const currentVessel = vessels.find(v => v.id === effectiveVesselId);
+
+  interface HierarchyScope {
+    vesselId: string;
+    hasMapping: boolean;
+    me: { nodeUuids: string[]; assignmentKeys: string[] };
+    myTeam: { nodeUuids: string[]; assignmentKeys: string[] };
+  }
+
+  const { data: hierarchyScope } = useQuery<HierarchyScope>({
+    queryKey: ['/technical/api/hierarchy-scope', effectiveVesselId, currentUser?.crewDesignation],
+    queryFn: async () => {
+      const response = await fetch(
+        `/technical/api/hierarchy-scope/${effectiveVesselId}?crewDesignation=${encodeURIComponent(currentUser?.crewDesignation || '')}`
+      );
+      if (!response.ok) throw new Error('Failed to fetch hierarchy scope');
+      return response.json();
+    },
+    enabled: !!effectiveVesselId && !isAllVessels && !!currentUser?.crewDesignation,
+  });
 
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
@@ -1113,8 +1134,22 @@ const Dashboard = () => {
     ].filter(d => d.count > 0);
   }, [workOrdersData]);
 
-  const operationKPIs = useMemo(() => {
+  const scopeFilteredWOs = useMemo(() => {
     const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
+    if (!hierarchyScope?.hasMapping) return safeWOs;
+
+    const keys = hodScope === 'me' ? hierarchyScope.me.assignmentKeys : hierarchyScope.myTeam.assignmentKeys;
+    if (keys.length === 0) return safeWOs;
+
+    const keySet = new Set(keys.map(k => k.toLowerCase().trim()));
+    return safeWOs.filter(wo => {
+      const assigned = (wo.assignedTo || '').toLowerCase().trim();
+      return keySet.has(assigned);
+    });
+  }, [workOrdersData, hierarchyScope, hodScope]);
+
+  const operationKPIs = useMemo(() => {
+    const safeWOs = scopeFilteredWOs;
     const overdueWOs = safeWOs.filter(wo => (wo as EnrichedWorkOrder).computedStatus === 'Overdue');
     const overdueCount = overdueWOs.length;
 
@@ -1187,7 +1222,7 @@ const Dashboard = () => {
       openChangeRequests,
       openChangeRequestsList,
     };
-  }, [workOrdersData, sparesData, changeRequestsData, complianceAnomalies]);
+  }, [scopeFilteredWOs, sparesData, changeRequestsData, complianceAnomalies]);
 
   const operationTableData = useMemo(() => {
     switch (selectedOpCard) {
@@ -1492,32 +1527,44 @@ const Dashboard = () => {
 
           <div className="flex items-center gap-3">
             {activeTab === 'management' ? (
-              <div className="flex items-center gap-2" data-testid="toggle-hod-scope">
-                <span
-                  className={`text-sm font-medium cursor-pointer transition-colors ${hodScope === 'me' ? 'text-[#1a2b4a]' : 'text-gray-400'}`}
-                  onClick={() => setHodScope('me')}
-                  data-testid="toggle-label-me"
-                >
-                  Me
-                </span>
-                <button
-                  onClick={() => setHodScope(hodScope === 'me' ? 'myTeam' : 'me')}
-                  className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none"
-                  style={{ backgroundColor: hodScope === 'myTeam' ? '#52baf3' : '#d1d5db' }}
-                  data-testid="toggle-switch-hod-scope"
-                >
-                  <span
-                    className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transform transition-transform ${hodScope === 'myTeam' ? 'translate-x-6' : 'translate-x-1'}`}
-                  />
-                </button>
-                <span
-                  className={`text-sm font-medium cursor-pointer transition-colors ${hodScope === 'myTeam' ? 'text-[#1a2b4a]' : 'text-gray-400'}`}
-                  onClick={() => setHodScope('myTeam')}
-                  data-testid="toggle-label-myteam"
-                >
-                  My Team
-                </span>
-              </div>
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <div className={`flex items-center gap-2 ${!hierarchyScope?.hasMapping ? 'opacity-50' : ''}`} data-testid="toggle-hod-scope">
+                      <span
+                        className={`text-sm font-medium cursor-pointer transition-colors ${hodScope === 'me' ? 'text-[#1a2b4a]' : 'text-gray-400'}`}
+                        onClick={() => hierarchyScope?.hasMapping && setHodScope('me')}
+                        data-testid="toggle-label-me"
+                      >
+                        Me
+                      </span>
+                      <button
+                        onClick={() => hierarchyScope?.hasMapping && setHodScope(hodScope === 'me' ? 'myTeam' : 'me')}
+                        className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none"
+                        style={{ backgroundColor: hodScope === 'myTeam' ? '#52baf3' : '#d1d5db' }}
+                        disabled={!hierarchyScope?.hasMapping}
+                        data-testid="toggle-switch-hod-scope"
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transform transition-transform ${hodScope === 'myTeam' ? 'translate-x-6' : 'translate-x-1'}`}
+                        />
+                      </button>
+                      <span
+                        className={`text-sm font-medium cursor-pointer transition-colors ${hodScope === 'myTeam' ? 'text-[#1a2b4a]' : 'text-gray-400'}`}
+                        onClick={() => hierarchyScope?.hasMapping && setHodScope('myTeam')}
+                        data-testid="toggle-label-myteam"
+                      >
+                        My Team
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  {!hierarchyScope?.hasMapping && (
+                    <TooltipContent data-testid="tooltip-no-mapping">
+                      <p>Your designation is not mapped to this vessel's org chart</p>
+                    </TooltipContent>
+                  )}
+                </UITooltip>
+              </TooltipProvider>
             ) : (
               <>
                 <div style={{ fontSize: '18px', fontWeight: 700, color: '#1a2b4a' }} data-testid="text-current-year">
