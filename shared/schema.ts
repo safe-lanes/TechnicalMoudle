@@ -3464,7 +3464,7 @@ export const vesselOrgChartNodes = pgTable("vessel_org_chart_nodes", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   nodeUuid: text("node_uuid").unique().notNull().default(sql`gen_random_uuid()::text`),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
-  rankId: text("rank_id").notNull(),
+  rankId: text("rank_id").notNull().references(() => admAvailableRanks.rankId),
   nodeLabel: text("node_label"),
   department: text("department"),
   parentNodeUuid: text("parent_node_uuid"),

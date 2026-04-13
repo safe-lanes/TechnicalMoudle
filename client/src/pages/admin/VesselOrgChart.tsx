@@ -282,15 +282,27 @@ export default function VesselOrgChart() {
   };
 
   const toggleHod = (nodeUuid: string, department: string) => {
-    setNodes(prev => prev.map(n => {
-      if (n.department === department && n.nodeUuid !== nodeUuid) {
-        return { ...n, isHod: false };
-      }
-      if (n.nodeUuid === nodeUuid) {
-        return { ...n, isHod: !n.isHod };
-      }
-      return n;
-    }));
+    setNodes(prev => {
+      const target = prev.find(n => n.nodeUuid === nodeUuid);
+      if (!target) return prev;
+      const willBeHod = !target.isHod;
+
+      return prev.map(n => {
+        if (n.department === department && n.nodeUuid !== nodeUuid && n.isHod) {
+          return { ...n, isHod: false };
+        }
+        if (n.nodeUuid === nodeUuid) {
+          if (willBeHod) {
+            return { ...n, isHod: true, parentNodeUuid: null, sortOrder: 0 };
+          }
+          return { ...n, isHod: false };
+        }
+        if (willBeHod && n.department === department && n.parentNodeUuid === null && n.nodeUuid !== nodeUuid) {
+          return { ...n, parentNodeUuid: nodeUuid };
+        }
+        return n;
+      });
+    });
     setHasUnsavedChanges(true);
   };
 
@@ -300,7 +312,11 @@ export default function VesselOrgChart() {
   };
 
   const setParentNode = (nodeUuid: string, parentNodeUuid: string | null) => {
-    setNodes(prev => prev.map(n => n.nodeUuid === nodeUuid ? { ...n, parentNodeUuid } : n));
+    setNodes(prev => {
+      const target = prev.find(n => n.nodeUuid === nodeUuid);
+      if (target?.isHod && parentNodeUuid !== null) return prev;
+      return prev.map(n => n.nodeUuid === nodeUuid ? { ...n, parentNodeUuid } : n);
+    });
     setHasUnsavedChanges(true);
   };
 
@@ -347,7 +363,10 @@ export default function VesselOrgChart() {
       }
     });
     const sortFn = (arr: TreeNode[]) => {
-      arr.sort((a, b) => a.node.sortOrder - b.node.sortOrder);
+      arr.sort((a, b) => {
+        if (a.node.isHod !== b.node.isHod) return a.node.isHod ? -1 : 1;
+        return a.node.sortOrder - b.node.sortOrder;
+      });
       arr.forEach(t => sortFn(t.children));
     };
     sortFn(roots);

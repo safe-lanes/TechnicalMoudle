@@ -257,7 +257,10 @@ export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: any[]
       }
     }
 
-    for (const node of nodes) {
+    const updateNodes = nodes.filter((n: any) => n.nodeUuid && existingUuids.has(n.nodeUuid));
+    const newNodes = nodes.filter((n: any) => !n.nodeUuid || !existingUuids.has(n.nodeUuid));
+
+    for (const node of updateNodes) {
       const data = {
         vesselId,
         rankId: node.rankId,
@@ -270,20 +273,36 @@ export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: any[]
         sortOrder: node.sortOrder ?? 0,
         isDeleted: false,
       };
+      await tx.update(vesselOrgChartNodes)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(vesselOrgChartNodes.nodeUuid, node.nodeUuid));
+      updated++;
+    }
 
-      if (node.nodeUuid && existingUuids.has(node.nodeUuid)) {
-        await tx.update(vesselOrgChartNodes)
-          .set({ ...data, updatedAt: new Date() })
-          .where(eq(vesselOrgChartNodes.nodeUuid, node.nodeUuid));
-        updated++;
-      } else {
-        const insertData: any = { ...data };
-        if (node.nodeUuid) {
-          insertData.nodeUuid = node.nodeUuid;
-        }
-        await tx.insert(vesselOrgChartNodes).values(insertData);
-        inserted++;
+    const newUuids = new Set(newNodes.map((n: any) => n.nodeUuid).filter(Boolean));
+    const roots = newNodes.filter((n: any) => !n.parentNodeUuid || !newUuids.has(n.parentNodeUuid));
+    const children = newNodes.filter((n: any) => n.parentNodeUuid && newUuids.has(n.parentNodeUuid));
+    const orderedNew = [...roots, ...children];
+
+    for (const node of orderedNew) {
+      const data = {
+        vesselId,
+        rankId: node.rankId,
+        nodeLabel: node.nodeLabel || null,
+        department: node.department || null,
+        parentNodeUuid: node.parentNodeUuid || null,
+        isHod: node.isHod ?? false,
+        isAssigned: node.isAssigned ?? false,
+        viewMode: node.viewMode || null,
+        sortOrder: node.sortOrder ?? 0,
+        isDeleted: false,
+      };
+      const insertData: any = { ...data };
+      if (node.nodeUuid) {
+        insertData.nodeUuid = node.nodeUuid;
       }
+      await tx.insert(vesselOrgChartNodes).values(insertData);
+      inserted++;
     }
 
     return { success: true, inserted, updated, total: nodes.length };
