@@ -52,6 +52,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 
 interface Spare {
@@ -377,7 +378,7 @@ const Dashboard = () => {
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
-  const { isSailAdmin, isClientAdmin, isHeadOfDept } = useUIRole();
+  const { isSailAdmin, isClientAdmin, isHeadOfDept, isVessel } = useUIRole();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -2255,6 +2256,8 @@ const Dashboard = () => {
                               {(() => {
                                 const st = opDetailChangeRequest.status?.toLowerCase();
                                 if (st === 'submitted' || st === 'pending') return <Badge className="bg-[#52BAF3] text-white">Pending Approval</Badge>;
+                                if (st === 'approved') return <Badge className="bg-green-500 text-white">Approved</Badge>;
+                                if (st === 'rejected') return <Badge className="bg-red-500 text-white">Rejected</Badge>;
                                 if (st === 'draft') return <Badge className="bg-gray-500 text-white">Draft</Badge>;
                                 if (st === 'returned') return <Badge className="bg-yellow-500 text-white">Returned</Badge>;
                                 return <Badge className="bg-gray-400 text-white">{opDetailChangeRequest.status}</Badge>;
@@ -2323,11 +2326,77 @@ const Dashboard = () => {
                           )}
                         </div>
                       </div>
-                      <div className="flex justify-end mt-4">
+                      <DialogFooter className="flex justify-between mt-4">
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              const changesSection = document.querySelector('[data-testid="op-cr-change-0"]');
+                              if (changesSection) changesSection.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            data-testid="button-op-cr-view-changes"
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View Changes
+                          </Button>
+                          {opDetailChangeRequest.status?.toLowerCase() === 'submitted' && !isVessel && !isHeadOfDept && (
+                            <>
+                              <Button
+                                variant="destructive"
+                                onClick={() => {
+                                  const comment = prompt('Please provide a reason for rejection:');
+                                  if (comment) {
+                                    fetch(`/technical/api/change-requests/${opDetailChangeRequest.id}/reject`, {
+                                      method: 'PUT',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ comment, reviewerId: 'current_user' })
+                                    }).then(() => {
+                                      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
+                                      setOpDetailChangeRequest(null);
+                                      toast({
+                                        title: "Change request rejected",
+                                        description: "The change request has been rejected"
+                                      });
+                                    });
+                                  }
+                                }}
+                                data-testid="button-op-cr-reject"
+                              >
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Reject
+                              </Button>
+                              <Button
+                                variant="default"
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => {
+                                  const comment = prompt('Please provide approval comments:');
+                                  if (comment) {
+                                    fetch(`/technical/api/change-requests/${opDetailChangeRequest.id}/approve`, {
+                                      method: 'PUT',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ comment, reviewerId: 'current_user' })
+                                    }).then(() => {
+                                      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
+                                      setOpDetailChangeRequest(null);
+                                      toast({
+                                        title: "Change request approved",
+                                        description: "The change request has been approved successfully"
+                                      });
+                                    });
+                                  }
+                                }}
+                                data-testid="button-op-cr-approve"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Approve
+                              </Button>
+                            </>
+                          )}
+                        </div>
                         <Button variant="outline" onClick={() => setOpDetailChangeRequest(null)} data-testid="button-op-cr-close">
                           Close
                         </Button>
-                      </div>
+                      </DialogFooter>
                     </DialogContent>
                   </Dialog>
                 )}
@@ -2960,7 +3029,7 @@ const Dashboard = () => {
                   </TableRow>
                 ) : (
                   crListModal.changeRequests.map((cr) => (
-                    <TableRow key={cr.id} className="hover:bg-gray-50" data-testid={`row-cr-modal-${cr.id}`}>
+                    <TableRow key={cr.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setOpDetailChangeRequest(cr)} data-testid={`row-cr-modal-${cr.id}`}>
                       <TableCell>{cr.vesselId ? vessels.find(v => v.id === cr.vesselId)?.name || cr.vesselId : '-'}</TableCell>
                       <TableCell className="font-medium text-gray-900">{cr.title}</TableCell>
                       <TableCell>
