@@ -13,14 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import WOAgGridTable from "@/components/WOAgGridTable";
+import type { ColDef } from 'ag-grid-community';
 import {
   Dialog,
   DialogContent,
@@ -38,9 +32,6 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Loader2,
-  ArrowUp,
-  ArrowDown,
-  ArrowUpDown,
   X,
   CalendarCheck,
   Download,
@@ -305,21 +296,6 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
     });
   };
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
-
-  const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
-    return sortDirection === "asc"
-      ? <ArrowUp className="h-3 w-3 ml-1 text-blue-600" />
-      : <ArrowDown className="h-3 w-3 ml-1 text-blue-600" />;
-  };
 
   const toggleRowSelection = useCallback((key: string) => {
     setSelectedKeys(prev => {
@@ -476,6 +452,146 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
     }
   };
 
+  const plannerRowData = useMemo(() => {
+    return paginatedItems.map((item, idx) => ({
+      ...item,
+      _globalIdx: (currentPage - 1) * itemsPerPage + idx + 1,
+    }));
+  }, [paginatedItems, currentPage, itemsPerPage]);
+
+  const plannerColumnDefs: ColDef[] = useMemo(() => [
+    {
+      headerName: '',
+      field: '_checkbox',
+      width: 50,
+      flex: 0,
+      sortable: false,
+      resizable: false,
+      headerComponent: () => (
+        <Checkbox
+          checked={isAllVisibleSelected ? true : (isSomeVisibleSelected ? "indeterminate" : false)}
+          onCheckedChange={toggleSelectAllVisible}
+          data-testid="checkbox-select-all"
+        />
+      ),
+      cellRenderer: (params: any) => {
+        const item = params.data;
+        if (!item) return null;
+        const key = itemKey(item);
+        return (
+          <Checkbox
+            checked={selectedKeys.has(key)}
+            onCheckedChange={() => toggleRowSelection(key)}
+            disabled={!item.componentId}
+            data-testid={`checkbox-row-${item._globalIdx}`}
+          />
+        );
+      },
+    },
+    {
+      headerName: 'S.No',
+      field: '_globalIdx',
+      width: 70,
+      flex: 0,
+      sortable: false,
+    },
+    {
+      headerName: 'Component',
+      field: 'componentName',
+      minWidth: 150,
+      flex: 1,
+      cellStyle: { fontWeight: 500 },
+    },
+    {
+      headerName: 'Job Title',
+      field: 'jobTitle',
+      minWidth: 180,
+      flex: 2,
+      cellRenderer: (params: any) => {
+        const item = params.data;
+        if (!item) return null;
+        return (
+          <div>
+            <div className="text-sm text-gray-700 dark:text-gray-300">{item.jobTitle}</div>
+            <div className="text-xs text-gray-400">{item.jobCode}</div>
+          </div>
+        );
+      },
+      tooltipValueGetter: (params: any) => params.data?.jobTitle || '',
+    },
+    {
+      headerName: 'Basis',
+      field: 'maintenanceBasis',
+      width: 100,
+      flex: 0,
+    },
+    {
+      headerName: 'Frequency',
+      field: 'frequency',
+      width: 100,
+      flex: 0,
+    },
+    {
+      headerName: 'Due Date / RH',
+      field: 'dueInfo',
+      width: 120,
+      flex: 0,
+      cellStyle: { fontWeight: 500 },
+    },
+    {
+      headerName: 'Status',
+      field: 'status',
+      width: 110,
+      flex: 0,
+      cellRenderer: (params: any) => getStatusBadge(params.value),
+    },
+    {
+      headerName: 'Assigned To',
+      field: 'assignedTo',
+      width: 120,
+      flex: 0,
+    },
+    {
+      headerName: 'W.O No',
+      field: 'woNo',
+      width: 120,
+      flex: 0,
+      cellRenderer: (params: any) => {
+        if (params.value) return <span className="text-blue-600">{params.value}</span>;
+        return <span className="text-gray-400">—</span>;
+      },
+    },
+    {
+      headerName: 'Planned Date',
+      field: 'plannedDate',
+      minWidth: 180,
+      flex: 1,
+      cellRenderer: (params: any) => {
+        const item = params.data;
+        if (!item) return null;
+        const isPlanned = !!item.plannedDate;
+        return (
+          <div className="flex items-center gap-1.5">
+            <input
+              type="date"
+              value={item.plannedDate || ""}
+              onChange={(e) => handlePlannedDateChange(item, e.target.value)}
+              disabled={!item.componentId}
+              className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 flex-1 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={(e) => e.stopPropagation()}
+              data-testid={`input-planned-date-${item._globalIdx}`}
+            />
+            {isPlanned && (
+              <Badge variant="outline" className="text-[10px] px-1 py-0 border-green-400 text-green-700 dark:text-green-400 whitespace-nowrap" data-testid={`badge-planned-${item._globalIdx}`}>
+                Planned
+              </Badge>
+            )}
+          </div>
+        );
+      },
+    },
+  ], [isAllVisibleSelected, isSomeVisibleSelected, selectedKeys, toggleSelectAllVisible, toggleRowSelection]);
+
   const clearFilters = () => {
     setSelectedDays("30");
     setCustomDays("");
@@ -493,21 +609,6 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
       setCurrentPage(page);
     }
   };
-
-  const colSpan = 12;
-
-  const SortableHeader = ({ field, label, className }: { field: SortField; label: string; className?: string }) => (
-    <TableHead
-      className={`text-[#0f172a] dark:text-white font-semibold text-xs cursor-pointer select-none hover:bg-[#d0e8f8] dark:hover:bg-gray-600 transition-colors ${className || ""}`}
-      onClick={() => handleSort(field)}
-      data-testid={`header-sort-${field}`}
-    >
-      <div className="flex items-center">
-        {label}
-        {getSortIcon(field)}
-      </div>
-    </TableHead>
-  );
 
   return (
     <div className="flex flex-col">
@@ -678,165 +779,76 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-[#e8f4fe] dark:bg-gray-700">
-                <TableHead className="text-[#0f172a] dark:text-white font-semibold text-xs w-10">
-                  <Checkbox
-                    checked={isAllVisibleSelected ? true : (isSomeVisibleSelected ? "indeterminate" : false)}
-                    onCheckedChange={toggleSelectAllVisible}
-                    data-testid="checkbox-select-all"
-                  />
-                </TableHead>
-                <TableHead className="text-[#0f172a] dark:text-white font-semibold text-xs w-12">S.No</TableHead>
-                <SortableHeader field="componentName" label="Component" />
-                <SortableHeader field="jobTitle" label="Job Title" />
-                <SortableHeader field="maintenanceBasis" label="Basis" className="w-24" />
-                <SortableHeader field="frequency" label="Frequency" className="w-24" />
-                <SortableHeader field="dueInfo" label="Due Date / RH" className="w-28" />
-                <SortableHeader field="status" label="Status" className="w-24" />
-                <SortableHeader field="assignedTo" label="Assigned To" className="w-28" />
-                <SortableHeader field="woNo" label="W.O No" className="w-28" />
-                <SortableHeader field="plannedDate" label="Planned Date" className="w-40" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {vesselId === 'all' ? (
-                <TableRow>
-                  <TableCell colSpan={colSpan} className="text-center py-12 text-gray-500">
-                    Please select a specific vessel to use the Planner view
-                  </TableCell>
-                </TableRow>
-              ) : isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={colSpan} className="text-center py-12">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-gray-400" />
-                    <p className="text-sm text-gray-500 mt-2">Loading planner data...</p>
-                  </TableCell>
-                </TableRow>
-              ) : paginatedItems.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={colSpan} className="text-center py-12 text-gray-500">
-                    No jobs found for the selected planning horizon
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paginatedItems.map((item, idx) => {
-                  const globalIdx = (currentPage - 1) * itemsPerPage + idx + 1;
-                  const key = itemKey(item);
-                  const isSelected = selectedKeys.has(key);
-                  const isPlanned = !!item.plannedDate;
-
-                  let rowBg = "hover:bg-gray-50 dark:hover:bg-gray-700";
-                  if (isSelected) {
-                    rowBg = "bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30";
-                  } else if (isPlanned) {
-                    rowBg = "bg-green-50/50 dark:bg-green-900/10 hover:bg-green-50 dark:hover:bg-green-900/20";
-                  }
-
-                  return (
-                    <TableRow
-                      key={key}
-                      className={rowBg}
-                      data-testid={`row-planner-${globalIdx}`}
-                    >
-                      <TableCell>
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleRowSelection(key)}
-                          disabled={!item.componentId}
-                          data-testid={`checkbox-row-${globalIdx}`}
-                        />
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-600">{globalIdx}</TableCell>
-                      <TableCell className="text-sm font-medium text-gray-900 dark:text-white" data-testid={`text-component-${globalIdx}`}>
-                        {item.componentName}
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-700 dark:text-gray-300" data-testid={`text-jobtitle-${globalIdx}`}>
-                        <div>{item.jobTitle}</div>
-                        <div className="text-xs text-gray-400">{item.jobCode}</div>
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-600">{item.maintenanceBasis}</TableCell>
-                      <TableCell className="text-sm text-gray-600">{item.frequency}</TableCell>
-                      <TableCell className="text-sm text-gray-600 font-medium" data-testid={`text-due-${globalIdx}`}>
-                        {item.dueInfo}
-                      </TableCell>
-                      <TableCell data-testid={`text-status-${globalIdx}`}>
-                        {getStatusBadge(item.status)}
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-600">{item.assignedTo}</TableCell>
-                      <TableCell className="text-sm text-blue-600">
-                        {item.woNo || <span className="text-gray-400">—</span>}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="date"
-                            value={item.plannedDate || ""}
-                            onChange={(e) => handlePlannedDateChange(item, e.target.value)}
-                            disabled={!item.componentId}
-                            className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 flex-1 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                            data-testid={`input-planned-date-${globalIdx}`}
-                          />
-                          {isPlanned && (
-                            <Badge variant="outline" className="text-[10px] px-1 py-0 border-green-400 text-green-700 dark:text-green-400 whitespace-nowrap" data-testid={`badge-planned-${globalIdx}`}>
-                              Planned
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+      {vesselId === 'all' ? (
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-12 text-center text-gray-500">
+          Please select a specific vessel to use the Planner view
         </div>
+      ) : isLoading ? (
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-12 text-center">
+          <Loader2 className="h-6 w-6 animate-spin mx-auto text-gray-400" />
+          <p className="text-sm text-gray-500 mt-2">Loading planner data...</p>
+        </div>
+      ) : (
+        <>
+          <WOAgGridTable
+            columnDefs={plannerColumnDefs}
+            rowData={plannerRowData}
+            height="calc(100vh - 340px)"
+            getRowClass={(params: any) => {
+              const key = params.data ? itemKey(params.data) : '';
+              const isSelected = selectedKeys.has(key);
+              const isPlanned = !!params.data?.plannedDate;
+              if (isSelected) return 'planner-row-selected';
+              if (isPlanned) return 'planner-row-planned';
+              return undefined;
+            }}
+            noRowsMessage="No jobs found for the selected planning horizon"
+            testId="planner-grid"
+          />
 
-        {totalItems > 0 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <span>Show</span>
-              <Select value={String(itemsPerPage)} onValueChange={(v) => { setItemsPerPage(Number(v)); setCurrentPage(1); }}>
-                <SelectTrigger className="w-16 h-8" data-testid="select-planner-pagesize">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="25">25</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                  <SelectItem value="100">100</SelectItem>
-                </SelectContent>
-              </Select>
-              <span>items per page</span>
-            </div>
+          {totalItems > 0 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span>Show</span>
+                <Select value={String(itemsPerPage)} onValueChange={(v) => { setItemsPerPage(Number(v)); setCurrentPage(1); }}>
+                  <SelectTrigger className="w-16 h-8" data-testid="select-planner-pagesize">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span>items per page</span>
+              </div>
 
-            <div className="text-sm text-gray-600" data-testid="text-planner-showing">
-              Showing {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} jobs
-            </div>
+              <div className="text-sm text-gray-600" data-testid="text-planner-showing">
+                Showing {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} jobs
+              </div>
 
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => goToPage(1)} disabled={currentPage === 1}>
-                <ChevronsLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm text-gray-600 mx-2">
-                Page {currentPage} of {totalPages || 1}
-              </span>
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => goToPage(currentPage + 1)} disabled={currentPage >= totalPages}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => goToPage(totalPages)} disabled={currentPage >= totalPages}>
-                <ChevronsRight className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => goToPage(1)} disabled={currentPage === 1}>
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-gray-600 mx-2">
+                  Page {currentPage} of {totalPages || 1}
+                </span>
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => goToPage(currentPage + 1)} disabled={currentPage >= totalPages}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => goToPage(totalPages)} disabled={currentPage >= totalPages}>
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </>
+      )}
 
       <Dialog open={showOverwriteDialog} onOpenChange={setShowOverwriteDialog}>
         <DialogContent className="sm:max-w-md" data-testid="dialog-overwrite-confirm">

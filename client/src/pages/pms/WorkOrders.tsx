@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar, ChevronDown } from "lucide-react";
+import WOAgGridTable from "@/components/WOAgGridTable";
+import type { ColDef, RowClickedEvent } from 'ag-grid-community';
 import WorkOrderPlanner from "./WorkOrderPlanner";
 import { useLocation } from "wouter";
 import { useVessel } from "@/contexts/VesselContext";
@@ -80,84 +82,6 @@ const generateTemplateCode = (componentCode: string, taskType: string, basis: st
 
 // Sample data moved to seed data in storage - now fetched from API
 
-// ─── Work Orders Table Enhancements ───────────────────────────────────────────
-type WOSortField =
-  | "component" | "workOrderNo" | "jobTitle" | "assignedTo" | "dueDate"
-  | "status" | "dateCompleted" | "plannedDate" | "postponeUntil"
-  | "postponementReason" | "daysLate" | "approvalTier";
-type WOSortDir = "asc" | "desc";
-
-const DEFAULT_WO_COL_WIDTHS: Record<string, number> = {
-  component: 160,
-  workOrderNo: 150,
-  woTemplateCode: 150,
-  jobTitle: 220,
-  assignedTo: 140,
-  dueDate: 160,
-  plannedDate: 130,
-  postponeUntil: 130,
-  postponementReason: 200,
-  daysLate: 110,
-  approvalTier: 130,
-  status: 170,
-  completedApprovalTier: 130,
-  dateCompleted: 140,
-  actions: 110,
-};
-
-function compareWorkOrders(a: WorkOrderWithHydratedData, b: WorkOrderWithHydratedData, field: WOSortField, dir: WOSortDir, activeTab = ""): number {
-  let cmp = 0;
-  switch (field) {
-    case "component": cmp = (a.component || "").localeCompare(b.component || ""); break;
-    case "workOrderNo": {
-      const getWoNo = (wo: WorkOrderWithHydratedData) =>
-        (activeTab === "Pending Approval" || activeTab === "Completed") && wo.executionId
-          ? wo.executionId
-          : wo.workOrderNo || wo.templateCode || "";
-      cmp = getWoNo(a).localeCompare(getWoNo(b));
-      break;
-    }
-    case "jobTitle": cmp = (a.jobTitle || "").localeCompare(b.jobTitle || ""); break;
-    case "assignedTo": cmp = (a.assignedTo || "").localeCompare(b.assignedTo || ""); break;
-    case "dueDate": {
-      const useSubmitted = activeTab === "Pending Approval" || activeTab === "Completed";
-      const aVal = useSubmitted ? (a.submittedDate || "") : (a.dueDate || "");
-      const bVal = useSubmitted ? (b.submittedDate || "") : (b.dueDate || "");
-      cmp = aVal.localeCompare(bVal);
-      break;
-    }
-    case "status": {
-      const STATUS_ORDER: Record<string, number> = {
-        "Overdue": 0, "Due": 1, "Due (Grace P)": 2, "Active": 3,
-        "Pending Approval": 4, "Postponed": 5, "Draft": 6, "Completed": 7,
-      };
-      const aS = a.computedStatus || a.status || "";
-      const bS = b.computedStatus || b.status || "";
-      cmp = (STATUS_ORDER[aS] ?? 99) - (STATUS_ORDER[bS] ?? 99);
-      break;
-    }
-    case "dateCompleted":
-      cmp = (a.dateCompleted || "9999").localeCompare(b.dateCompleted || "9999");
-      break;
-    case "plannedDate":
-      cmp = (a.plannedDate || "9999").localeCompare(b.plannedDate || "9999");
-      break;
-    case "postponeUntil":
-      cmp = (a.postponementEndDate || "9999").localeCompare(b.postponementEndDate || "9999");
-      break;
-    case "postponementReason":
-      cmp = (a.postponementReason || "").localeCompare(b.postponementReason || "");
-      break;
-    case "daysLate":
-      cmp = (a.daysLate || 0) - (b.daysLate || 0);
-      break;
-    case "approvalTier":
-      cmp = (a.approvalTier || "").localeCompare(b.approvalTier || "");
-      break;
-  }
-  return dir === "desc" ? -cmp : cmp;
-}
-// ──────────────────────────────────────────────────────────────────────────────
 
 const WorkOrders: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -188,16 +112,6 @@ const WorkOrders: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // Table enhancements: sorting & column resizing
-  const [woSortField, setWoSortField] = useState<WOSortField | null>(null);
-  const [woSortDir, setWoSortDir] = useState<WOSortDir>("asc");
-  const [colWidths, setColWidths] = useState<Record<string, number>>(DEFAULT_WO_COL_WIDTHS);
-  const colWidthsRef = useRef<Record<string, number>>(DEFAULT_WO_COL_WIDTHS);
-  const [resizingCol, setResizingCol] = useState<string | null>(null);
-  const resizeSnapshotRef = useRef<{ colWidths: Record<string, number>; tableWidth: number; startWidth: number } | null>(null);
-  const tableWrapperRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-  
   // Modify mode integration  
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
   const [location, setLocation] = useLocation();
@@ -504,179 +418,385 @@ const WorkOrders: React.FC = () => {
     return true;
   });
 
-  // ─── Sort helpers ──────────────────────────────────────────────────────────
-  const handleWoSort = (field: WOSortField) => {
-    if (woSortField === field) {
-      setWoSortDir(prev => prev === "asc" ? "desc" : "asc");
-    } else {
-      setWoSortField(field);
-      setWoSortDir("asc");
-    }
-  };
+  const woColumnDefs: ColDef[] = useMemo(() => {
+    const cols: ColDef[] = [
+      {
+        headerName: 'Component',
+        field: 'component',
+        minWidth: 160,
+        flex: 1,
+        cellRenderer: (params: any) => {
+          const wo = params.data;
+          if (!wo) return null;
+          const isRejectedWO = wo.wasRejected === true;
+          return (
+            <div className="flex items-center gap-1 min-w-0">
+              <span className={`truncate ${isRejectedWO ? 'text-red-600' : ''}`}>{wo.component}</span>
+              {isRejectedWO && activeTab === "Due" && (
+                <span className="ml-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded shrink-0">Previously Rejected</span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        headerName: 'Work Order No',
+        field: 'workOrderNo',
+        minWidth: 150,
+        flex: 1,
+        cellRenderer: (params: any) => {
+          const wo = params.data;
+          if (!wo) return null;
+          const isRejectedWO = wo.wasRejected === true;
+          const displayValue = (activeTab === "Pending Approval" || activeTab === "Completed") && wo.executionId
+            ? wo.executionId
+            : wo.workOrderNo || wo.templateCode;
+          return (
+            <span className={isRejectedWO ? 'text-red-600' : 'text-blue-600'}>{displayValue}</span>
+          );
+        },
+      },
+    ];
 
-  const getWoSortIcon = (field: WOSortField) => {
-    if (woSortField !== field) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40 shrink-0" />;
-    return woSortDir === "asc"
-      ? <ArrowUp className="h-3 w-3 ml-1 opacity-90 shrink-0" />
-      : <ArrowDown className="h-3 w-3 ml-1 opacity-90 shrink-0" />;
-  };
-
-  const SortableHeader = ({
-    field,
-    colKey,
-    label,
-    testId,
-    marker,
-    align = "left",
-  }: {
-    field?: WOSortField;
-    colKey: string;
-    label: React.ReactNode;
-    testId?: string;
-    marker?: React.ReactNode;
-    align?: "left" | "center";
-  }) => (
-    <th
-      className={`${align === "center" ? "text-center" : "text-left"} py-3 px-4 font-medium relative select-none`}
-      style={{ width: effectiveColWidths[colKey] ?? colWidths[colKey], minWidth: effectiveColWidths[colKey] ?? colWidths[colKey], maxWidth: effectiveColWidths[colKey] ?? colWidths[colKey], boxSizing: "border-box" }}
-      onClick={field ? () => handleWoSort(field) : undefined}
-      data-testid={testId}
-    >
-      {marker}
-      <div className="flex items-center">{label}{field && getWoSortIcon(field)}</div>
-      <div
-        className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-white/25 z-20"
-        onMouseDown={(e) => { e.stopPropagation(); handleResizeMouseDown(colKey, e); }}
-      />
-    </th>
-  );
-
-  // ─── Column resize handler ──────────────────────────────────────────────────
-  const effectiveColWidthsRef = useRef<Record<string, number>>({});
-  const effectiveTableWidthRef = useRef<number>(0);
-
-  const handleResizeMouseDown = useCallback((colId: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const startX = e.clientX;
-    const snapshotWidths = { ...effectiveColWidthsRef.current };
-    const startWidth = snapshotWidths[colId] ?? colWidthsRef.current[colId] ?? DEFAULT_WO_COL_WIDTHS[colId] ?? 120;
-
-    resizeSnapshotRef.current = {
-      colWidths: snapshotWidths,
-      tableWidth: effectiveTableWidthRef.current,
-      startWidth,
-    };
-    setResizingCol(colId);
-
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      const delta = moveEvent.clientX - startX;
-      const newWidth = Math.max(60, startWidth + delta);
-      setColWidths(prev => {
-        const next = { ...prev, [colId]: newWidth };
-        colWidthsRef.current = next;
-        return next;
+    if (activeTab === "Pending Approval") {
+      cols.push({
+        headerName: 'WO Template Code',
+        field: 'templateCode',
+        minWidth: 150,
+        flex: 1,
       });
-    };
+    }
 
-    const onMouseUp = () => {
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-      resizeSnapshotRef.current = null;
-      setResizingCol(null);
-    };
-
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  }, []);
-
-  // ─── Visible column keys per active tab (for colgroup + table width) ────────
-  const visibleColKeys = useMemo(() => {
-    const keys: string[] = ['component', 'workOrderNo'];
-    if (activeTab === 'Pending Approval') keys.push('woTemplateCode');
-    keys.push('jobTitle', 'assignedTo', 'dueDate');
-    if (activeTab === 'Planned') keys.push('plannedDate');
-    if (activeTab === 'Postponed') keys.push('postponeUntil', 'postponementReason');
-    if (activeTab === 'Pending Approval') keys.push('daysLate', 'approvalTier');
-    keys.push('status');
-    if (activeTab === 'Completed') keys.push('completedApprovalTier', 'dateCompleted');
-    keys.push('actions');
-    return keys;
-  }, [activeTab]);
-
-  const tableWidth = useMemo(() =>
-    visibleColKeys.reduce((sum, key) => sum + (colWidths[key] ?? DEFAULT_WO_COL_WIDTHS[key] ?? 120), 0),
-    [visibleColKeys, colWidths]
-  );
-
-  useEffect(() => {
-    const el = tableWrapperRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
+    cols.push(
+      {
+        headerName: 'Job Title',
+        field: 'jobTitle',
+        minWidth: 220,
+        flex: 2,
+        cellRenderer: (params: any) => {
+          const wo = params.data;
+          if (!wo) return null;
+          const isRejectedWO = wo.wasRejected === true;
+          return (
+            <div className={`flex items-center gap-1 min-w-0 ${isRejectedWO ? 'text-red-600' : ''}`}>
+              <span className="truncate">{wo.jobTitle}</span>
+              {wo.maintenanceBasis === "Running Hours" && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap shrink-0" data-testid={`badge-rh-${wo.id}`}>
+                  RH
+                </span>
+              )}
+            </div>
+          );
+        },
+        tooltipValueGetter: (params: any) => params.data?.jobTitle || '',
+      },
+      {
+        headerName: 'Assigned to',
+        field: 'assignedTo',
+        minWidth: 140,
+        flex: 1,
+      },
+      {
+        headerName: activeTab === "Pending Approval" || activeTab === "Completed" ? "Submitted Date" : activeTab === "Unplanned" ? "Created Date" : "Due Date",
+        field: 'dueDate',
+        minWidth: 160,
+        flex: 1,
+        cellRenderer: (params: any) => {
+          const wo = params.data;
+          if (!wo) return null;
+          if (activeTab === "Pending Approval" || activeTab === "Completed") {
+            return <span>{wo.submittedDate ? formatProfessionalDate(wo.submittedDate) : '—'}</span>;
+          }
+          if (activeTab === "Unplanned") {
+            return <span>{wo.dueDate ? formatProfessionalDate(wo.dueDate) : wo.submittedDate ? formatProfessionalDate(wo.submittedDate) : '—'}</span>;
+          }
+          if (wo.maintenanceBasis === "Running Hours") {
+            const rhTarget = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null);
+            const rhCurrent = wo.currentRH ?? (wo.currentReading != null ? Number(wo.currentReading) : null);
+            const hasTarget = rhTarget != null && !isNaN(rhTarget);
+            const hasCurrent = rhCurrent != null && !isNaN(rhCurrent);
+            return (
+              <div className="relative group">
+                <span className="text-gray-900 font-medium" data-testid={`text-rh-due-${wo.id}`}>
+                  {hasTarget ? `${rhTarget.toLocaleString()} RH` : '—'}
+                </span>
+                {hasTarget && (
+                  <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[9999]">
+                    <div className="flex flex-col gap-1">
+                      <span>Next Due RH: {rhTarget.toLocaleString()}</span>
+                      <span>Current RH: {hasCurrent ? rhCurrent.toLocaleString() : '—'}</span>
+                      {hasCurrent ? (
+                        <span className={rhTarget - rhCurrent <= 0 ? 'text-red-300 font-semibold' : 'text-green-300'}>
+                          Remaining RH: {(rhTarget - rhCurrent).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">Remaining RH: —</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          }
+          return (
+            <div className="flex items-center gap-2">
+              <span>{wo.dueDate ? formatProfessionalDate(wo.dueDate) : '—'}</span>
+              {wo.dueDate && wo.leadTimeValue && wo.leadTimeUnit && (() => {
+                const leadTimeStatus = calculateLeadTimeStatus(wo.dueDate, wo.leadTimeValue, wo.leadTimeUnit);
+                if (leadTimeStatus.isInLeadTimePeriod) {
+                  return (
+                    <div className="relative group">
+                      <AlertTriangle
+                        className={`h-4 w-4 ${
+                          leadTimeStatus.daysUntilDue !== null && leadTimeStatus.daysUntilDue <= 3 ? 'text-red-600' :
+                          leadTimeStatus.daysUntilDue !== null && leadTimeStatus.daysUntilDue <= 7 ? 'text-orange-500' :
+                          'text-yellow-500'
+                        }`}
+                        data-testid={`icon-lead-time-warning-${wo.id}`}
+                      />
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[9999]">
+                        {leadTimeStatus.daysUntilDue} day{leadTimeStatus.daysUntilDue !== 1 ? 's' : ''} until due
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+          );
+        },
+        comparator: (valueA: any, valueB: any, nodeA: any, nodeB: any) => {
+          const woA = nodeA?.data;
+          const woB = nodeB?.data;
+          if (!woA || !woB) return 0;
+          const useSubmitted = activeTab === "Pending Approval" || activeTab === "Completed";
+          const aVal = useSubmitted ? (woA.submittedDate || "") : (woA.dueDate || "");
+          const bVal = useSubmitted ? (woB.submittedDate || "") : (woB.dueDate || "");
+          return aVal.localeCompare(bVal);
+        },
       }
+    );
+
+    if (activeTab === "Planned") {
+      cols.push({
+        headerName: 'Planned Date',
+        field: 'plannedDate',
+        minWidth: 130,
+        flex: 1,
+        valueFormatter: (params: any) => params.value ? formatProfessionalDate(params.value) : '—',
+      });
+    }
+
+    if (activeTab === "Postponed") {
+      cols.push(
+        {
+          headerName: 'Postpone Until',
+          field: 'postponementEndDate',
+          minWidth: 130,
+          flex: 1,
+          valueFormatter: (params: any) => params.value ? formatProfessionalDate(params.value) : '—',
+        },
+        {
+          headerName: 'Postponement Reason',
+          field: 'postponementReason',
+          minWidth: 200,
+          flex: 1,
+          valueFormatter: (params: any) => params.value || '—',
+        }
+      );
+    }
+
+    if (activeTab === "Pending Approval") {
+      cols.push(
+        {
+          headerName: 'Days Late',
+          field: 'daysLate',
+          minWidth: 110,
+          flex: 0,
+          cellRenderer: (params: any) => {
+            const daysLate = params.value;
+            if (daysLate == null || daysLate === 0) return <span className="text-green-600 text-xs font-medium">On Time</span>;
+            if (daysLate >= 1 && daysLate <= 6) return <span className="text-yellow-600 text-xs font-medium">{daysLate} days late</span>;
+            if (daysLate >= 7 && daysLate <= 14) return <span className="text-orange-600 text-xs font-medium">{daysLate} days late</span>;
+            return <span className="text-red-600 text-xs font-bold">{daysLate} days late <AlertTriangle className="inline h-3 w-3" /></span>;
+          },
+        },
+        {
+          headerName: 'Approval Tier',
+          field: 'approvalTier',
+          minWidth: 130,
+          flex: 0,
+          cellRenderer: (params: any) => {
+            const tier = params.value;
+            if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
+            if (tier === "superintendent_notification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Supt. Notified</span>;
+            if (tier === "ce_with_justification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">CE + Remarks</span>;
+            return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Standard</span>;
+          },
+        }
+      );
+    }
+
+    cols.push({
+      headerName: 'Status',
+      field: 'status',
+      minWidth: 170,
+      flex: 1,
+      cellRenderer: (params: any) => {
+        const wo = params.data;
+        if (!wo) return null;
+        if (wo.status === 'Rejected') {
+          return (
+            <div className="flex flex-row items-center gap-1">
+              <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor('rejected')}`}>Rejected</span>
+              <span className={`px-2 py-0.5 rounded text-xs ${getStatusBadgeColor(wo.computedStatus || 'Active')}`}>
+                {wo.computedStatus === 'Due (Grace P)' ? 'Grace P' : (wo.computedStatus || 'Active')}
+              </span>
+            </div>
+          );
+        }
+        return (
+          <div className="flex flex-row items-center gap-1">
+            <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(getEffectiveStatus(wo))}`}>
+              {getEffectiveStatus(wo) === 'Due (Grace P)' ? 'Grace P' : getEffectiveStatus(wo)}
+            </span>
+            {(wo.missedCycles ?? 0) >= 1 && (
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-500 text-white" data-testid={`badge-skipped-cycles-${wo.id}`}>
+                ⚠ {wo.missedCycles} Cycle{(wo.missedCycles ?? 0) > 1 ? 's' : ''} Skipped
+              </span>
+            )}
+            {activeTab === "Overdue" && getEffectiveStatus(wo) === "Overdue" && (
+              wo.overdueReason ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setOverdueReasonWorkOrder(wo); setOverdueReasonDialogOpen(true); }}
+                  className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 text-left"
+                  title={`Reason: ${wo.overdueReason}`}
+                  data-testid={`badge-overdue-reason-set-${wo.id}`}
+                >
+                  ✓ Reason set
+                </button>
+              ) : (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setOverdueReasonWorkOrder(wo); setOverdueReasonDialogOpen(true); }}
+                  className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 border border-dashed border-gray-400 text-left"
+                  data-testid={`button-set-overdue-reason-${wo.id}`}
+                >
+                  + Set Reason
+                </button>
+              )
+            )}
+          </div>
+        );
+      },
+      comparator: (valueA: any, valueB: any, nodeA: any, nodeB: any) => {
+        const STATUS_ORDER: Record<string, number> = {
+          "Overdue": 0, "Due": 1, "Due (Grace P)": 2, "Active": 3,
+          "Pending Approval": 4, "Postponed": 5, "Draft": 6, "Completed": 7,
+        };
+        const aS = nodeA?.data?.computedStatus || nodeA?.data?.status || "";
+        const bS = nodeB?.data?.computedStatus || nodeB?.data?.status || "";
+        return (STATUS_ORDER[aS] ?? 99) - (STATUS_ORDER[bS] ?? 99);
+      },
     });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
-  const effectiveTableWidth = useMemo(() => {
-    const snapshot = resizeSnapshotRef.current;
-    if (resizingCol && snapshot) {
-      const currentResizedWidth = colWidths[resizingCol] ?? DEFAULT_WO_COL_WIDTHS[resizingCol] ?? 120;
-      const delta = currentResizedWidth - snapshot.startWidth;
-      return snapshot.tableWidth + delta;
+    if (activeTab === "Completed") {
+      cols.push(
+        {
+          headerName: 'Approval Tier',
+          field: 'approvalTier',
+          minWidth: 130,
+          flex: 0,
+          cellRenderer: (params: any) => {
+            const tier = params.value;
+            if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
+            if (tier === "superintendent_notification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Supt. Notified</span>;
+            if (tier === "ce_with_justification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">CE + Remarks</span>;
+            return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Standard</span>;
+          },
+        },
+        {
+          headerName: 'Date Completed',
+          field: 'dateCompleted',
+          minWidth: 140,
+          flex: 1,
+          valueFormatter: (params: any) => formatProfessionalDate(params.value),
+        }
+      );
     }
-    return Math.max(containerWidth, tableWidth);
-  }, [resizingCol, colWidths, containerWidth, tableWidth]);
 
-  const effectiveColWidths = useMemo(() => {
-    const snapshot = resizeSnapshotRef.current;
-    if (resizingCol && snapshot) {
-      const result: Record<string, number> = { ...snapshot.colWidths };
-      result[resizingCol] = colWidths[resizingCol] ?? DEFAULT_WO_COL_WIDTHS[resizingCol] ?? 120;
-      return result;
-    }
-    const base: Record<string, number> = {};
-    for (const key of visibleColKeys) {
-      base[key] = colWidths[key] ?? DEFAULT_WO_COL_WIDTHS[key] ?? 120;
-    }
-    const normalTableWidth = Math.max(containerWidth, tableWidth);
-    const extra = normalTableWidth - tableWidth;
-    if (extra > 0) {
-      base['jobTitle'] = (base['jobTitle'] ?? 220) + extra;
-    }
-    return base;
-  }, [visibleColKeys, colWidths, containerWidth, tableWidth, resizingCol]);
+    cols.push({
+      headerName: 'Actions',
+      field: 'id',
+      minWidth: 110,
+      flex: 0,
+      sortable: false,
+      resizable: false,
+      cellRenderer: (params: any) => {
+        const wo = params.data;
+        if (!wo) return null;
+        return (
+          <div className="flex items-center justify-center gap-2">
+            {activeTab === "Pending Approval" && wo.approvalTier === "superintendent_locked" ? (
+              <div className="relative group" data-testid={`locked-action-${wo.id}`}>
+                <Lock className="h-4 w-4 text-gray-400" />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[9999]">
+                  Locked — Awaiting Superintendent acknowledgment
+                </div>
+              </div>
+            ) : (
+              <>
+                {getEffectiveStatus(wo) !== "Completed" && (
+                  <>
+                    <button
+                      className="p-1 hover:bg-gray-200 rounded"
+                      onClick={(e) => { e.stopPropagation(); handlePencilClick(wo); }}
+                      title="Edit Template"
+                      data-testid={`button-edit-wo-${wo.id}`}
+                    >
+                      <Pen className="h-4 w-4 text-gray-600" />
+                    </button>
+                    {!isVessel && getEffectiveStatus(wo) !== "Pending Approval" && (
+                      <button
+                        className="p-1 hover:bg-gray-200 rounded"
+                        onClick={(e) => { e.stopPropagation(); handleTimerClick(wo); }}
+                        title="Postpone Work Order"
+                        data-testid={`button-postpone-wo-${wo.id}`}
+                      >
+                        <Timer className="h-4 w-4 text-gray-600" />
+                      </button>
+                    )}
+                  </>
+                )}
+                {getEffectiveStatus(wo) === "Completed" && (
+                  <button
+                    className="p-1 hover:bg-gray-200 rounded"
+                    onClick={(e) => { e.stopPropagation(); handleWorkOrderClick(wo); }}
+                    title="View Work Order"
+                    data-testid={`button-view-wo-${wo.id}`}
+                  >
+                    <Eye className="h-4 w-4 text-gray-600" />
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        );
+      },
+    });
 
-  useEffect(() => {
-    effectiveColWidthsRef.current = effectiveColWidths;
-    effectiveTableWidthRef.current = effectiveTableWidth;
-  }, [effectiveColWidths, effectiveTableWidth]);
+    return cols;
+  }, [activeTab, isVessel]);
 
-  // ─── Sorted work orders (applied after filter, before pagination) ───────────
-  const sortedWorkOrders = useMemo(
-    () => woSortField
-      ? [...filteredWorkOrders].sort((a, b) => compareWorkOrders(a, b, woSortField, woSortDir, activeTab))
-      : filteredWorkOrders,
-    [filteredWorkOrders, woSortField, woSortDir, activeTab]
-  );
+  const sortedWorkOrders = filteredWorkOrders;
 
   // Pagination calculations
   const totalItems = filteredWorkOrders.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   
-  // Reset to page 1 when filters or sort change
+  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchTerm, periodFilter, selectedRank, criticalitySelections, selectedPostponementReason, vesselId, woSortField, woSortDir]);
-
-  // Reset sort when switching tabs
-  useEffect(() => {
-    setWoSortField(null);
-    setWoSortDir("asc");
-  }, [activeTab]);
+  }, [activeTab, searchTerm, periodFilter, selectedRank, criticalitySelections, selectedPostponementReason, vesselId]);
   
   // Clamp current page when total pages shrinks (e.g., after deletion or filter change)
   useEffect(() => {
@@ -1306,375 +1426,27 @@ const WorkOrders: React.FC = () => {
         );
       })()}
 
-      {/* Work Orders Table */}
-      <div ref={tableWrapperRef} className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
-        <table className="text-sm" style={{ tableLayout: "fixed", width: effectiveTableWidth, minWidth: effectiveTableWidth }}>
-          <colgroup>
-            {visibleColKeys.map(key => {
-              const w = effectiveColWidths[key] ?? colWidths[key] ?? DEFAULT_WO_COL_WIDTHS[key] ?? 120;
-              return <col key={key} style={{ width: w, minWidth: w, maxWidth: w }} />;
-            })}
-          </colgroup>
-          <thead className="bg-[#52baf3] text-white sticky top-0 z-10">
-            <tr>
-              <SortableHeader field="component" colKey="component" label="Component" testId="C16" marker={<Marker id="C16" />} />
-              <SortableHeader field="workOrderNo" colKey="workOrderNo" label="Work Order No" testId="C17" marker={<Marker id="C17" />} />
-              {activeTab === "Pending Approval" && (
-                <SortableHeader colKey="woTemplateCode" label="WO Template Code" />
-              )}
-              <SortableHeader field="jobTitle" colKey="jobTitle" label="Job Title" testId="C18" marker={<Marker id="C18" />} />
-              <SortableHeader field="assignedTo" colKey="assignedTo" label="Assigned to" testId="C19" marker={<Marker id="C19" />} />
-              <SortableHeader
-                field="dueDate"
-                colKey="dueDate"
-                label={activeTab === "Pending Approval" || activeTab === "Completed" ? "Submitted Date" : activeTab === "Unplanned" ? "Created Date" : "Due Date"}
-                testId="C20"
-                marker={<Marker id="C20" />}
-              />
-              {activeTab === "Planned" && (
-                <SortableHeader field="plannedDate" colKey="plannedDate" label="Planned Date" testId="th-planned-date" />
-              )}
-              {activeTab === "Postponed" && (
-                <SortableHeader field="postponeUntil" colKey="postponeUntil" label="Postpone Until" testId="th-postpone-until" />
-              )}
-              {activeTab === "Postponed" && (
-                <SortableHeader field="postponementReason" colKey="postponementReason" label="Postponement Reason" testId="th-postponement-reason" />
-              )}
-              {activeTab === "Pending Approval" && (
-                <SortableHeader field="daysLate" colKey="daysLate" label="Days Late" testId="th-days-late" />
-              )}
-              {activeTab === "Pending Approval" && (
-                <SortableHeader field="approvalTier" colKey="approvalTier" label="Approval Tier" testId="th-approval-tier" />
-              )}
-              <SortableHeader field="status" colKey="status" label="Status" testId="C21" marker={<Marker id="C21" />} />
-              {activeTab === "Completed" && (
-                <SortableHeader field="approvalTier" colKey="completedApprovalTier" label="Approval Tier" testId="th-completed-approval-tier" />
-              )}
-              {activeTab === "Completed" && (
-                <SortableHeader field="dateCompleted" colKey="dateCompleted" label="Date Completed" testId="C22" marker={<Marker id="C22" />} />
-              )}
-              <SortableHeader colKey="actions" label="Actions" testId="C23" marker={<Marker id="C23" />} align="center" />
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedWorkOrders.map((workOrder, index) => {
-              const isRejectedWO = workOrder.wasRejected === true;
-              const textColorClass = isRejectedWO ? 'text-red-600' : 'text-gray-900';
-              
-              return (
-              <tr 
-                key={workOrder.id} 
-                className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} ${isRejectedWO ? "bg-red-50" : ""} cursor-pointer hover:bg-gray-100`}
-                onClick={() => handleWorkOrderClick(workOrder)}
-                data-testid={`row-work-order-${workOrder.id}`}
-              >
-                <td className={`py-3 px-4 whitespace-nowrap overflow-hidden ${textColorClass}`} data-testid={index === 0 ? "C24" : undefined}>
-                  {index === 0 && <Marker id="C24" />}
-                  <div className="flex items-center gap-1 min-w-0">
-                    <span className="truncate">{workOrder.component}</span>
-                    {isRejectedWO && activeTab === "Due" && (
-                      <span className="ml-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded shrink-0">Previously Rejected</span>
-                    )}
-                  </div>
-                </td>
-                {/* Work Order No */}
-                <td className={`py-3 px-4 whitespace-nowrap overflow-hidden text-ellipsis ${isRejectedWO ? 'text-red-600 hover:text-red-800' : 'text-blue-600 hover:text-blue-800'}`} data-testid={index === 0 ? "C25" : undefined}>
-                  {index === 0 && <Marker id="C25" />}
-                  {(activeTab === "Pending Approval" || activeTab === "Completed") && workOrder.executionId 
-                    ? workOrder.executionId 
-                    : workOrder.workOrderNo || workOrder.templateCode}
-                </td>
-                {activeTab === "Pending Approval" && (
-                  <td className={`py-3 px-4 whitespace-nowrap overflow-hidden text-ellipsis ${textColorClass}`}>{workOrder.templateCode}</td>
-                )}
-                <td className={`py-3 px-4 whitespace-nowrap overflow-hidden ${textColorClass}`} data-testid={index === 0 ? "C26" : undefined}>
-                  {index === 0 && <Marker id="C26" />}
-                  <div className="flex items-center gap-1 min-w-0">
-                    <span className="truncate">{workOrder.jobTitle}</span>
-                    {workOrder.maintenanceBasis === "Running Hours" && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap shrink-0" data-testid={`badge-rh-${workOrder.id}`}>
-                        RH
-                      </span>
-                    )}
-                  </div>
-                </td>
-                {/* Assigned To */}
-                <td className={`py-3 px-4 whitespace-nowrap overflow-hidden text-ellipsis ${textColorClass}`} data-testid={index === 0 ? "C27" : undefined}>
-                  {index === 0 && <Marker id="C27" />}
-                  {workOrder.assignedTo}
-                </td>
-                <td className="py-3 px-4 whitespace-nowrap overflow-hidden" data-testid={index === 0 ? "C28" : undefined}>
-                  {index === 0 && <Marker id="C28" />}
-                  <div className="flex items-center gap-2">
-                    {(activeTab === "Pending Approval" || activeTab === "Completed")
-                      ? (
-                        <span className="text-gray-900">
-                          {workOrder.submittedDate 
-                            ? formatProfessionalDate(workOrder.submittedDate)
-                            : '—'}
-                        </span>
-                      )
-                      : activeTab === "Unplanned"
-                      ? (
-                        <span className="text-gray-900">
-                          {workOrder.dueDate
-                            ? formatProfessionalDate(workOrder.dueDate)
-                            : workOrder.submittedDate
-                              ? formatProfessionalDate(workOrder.submittedDate)
-                              : '—'}
-                        </span>
-                      )
-                      : workOrder.maintenanceBasis === "Running Hours"
-                        ? (() => {
-                          const rhTarget = workOrder.dueRH ?? (workOrder.nextDueReading != null ? Number(workOrder.nextDueReading) : null);
-                          const rhCurrent = workOrder.currentRH ?? (workOrder.currentReading != null ? Number(workOrder.currentReading) : null);
-                          const hasTarget = rhTarget != null && !isNaN(rhTarget);
-                          const hasCurrent = rhCurrent != null && !isNaN(rhCurrent);
-                          return (
-                          <div className="relative group">
-                            <span className="text-gray-900 font-medium" data-testid={`text-rh-due-${workOrder.id}`}>
-                              {hasTarget ? `${rhTarget.toLocaleString()} RH` : '—'}
-                            </span>
-                            {hasTarget && (
-                              <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                <div className="flex flex-col gap-1">
-                                  <span>Next Due RH: {rhTarget.toLocaleString()}</span>
-                                  <span>Current RH: {hasCurrent ? rhCurrent.toLocaleString() : '—'}</span>
-                                  {hasCurrent ? (
-                                    <span className={rhTarget - rhCurrent <= 0 ? 'text-red-300 font-semibold' : 'text-green-300'}>
-                                      Remaining RH: {(rhTarget - rhCurrent).toLocaleString()}
-                                    </span>
-                                  ) : (
-                                    <span className="text-gray-400">Remaining RH: —</span>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          );
-                        })()
-                        : (
-                          <>
-                            <span className="text-gray-900">
-                              {workOrder.dueDate 
-                                ? formatProfessionalDate(workOrder.dueDate)
-                                : '—'}
-                            </span>
-                            {workOrder.dueDate && workOrder.leadTimeValue && workOrder.leadTimeUnit && (() => {
-                              const leadTimeStatus = calculateLeadTimeStatus(
-                                workOrder.dueDate,
-                                workOrder.leadTimeValue,
-                                workOrder.leadTimeUnit
-                              );
-                              
-                              if (leadTimeStatus.isInLeadTimePeriod) {
-                                return (
-                                  <div className="relative group">
-                                    <AlertTriangle 
-                                      className={`h-4 w-4 ${
-                                        leadTimeStatus.daysUntilDue !== null && leadTimeStatus.daysUntilDue <= 3 ? 'text-red-600' : 
-                                        leadTimeStatus.daysUntilDue !== null && leadTimeStatus.daysUntilDue <= 7 ? 'text-orange-500' : 
-                                        'text-yellow-500'
-                                      }`}
-                                      data-testid={`icon-lead-time-warning-${workOrder.id}`}
-                                    />
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                      {leadTimeStatus.daysUntilDue} day{leadTimeStatus.daysUntilDue !== 1 ? 's' : ''} until due
-                                    </div>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            })()}
-                          </>
-                        )
-                    }
-                  </div>
-                </td>
-                {activeTab === "Planned" && (
-                  <td className="py-3 px-4 text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis" data-testid={`cell-planned-date-${workOrder.id}`}>
-                    {workOrder.plannedDate
-                      ? formatProfessionalDate(workOrder.plannedDate)
-                      : '—'}
-                  </td>
-                )}
-                {activeTab === "Postponed" && (
-                  <td className="py-3 px-4 text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis" data-testid={`cell-postpone-until-${workOrder.id}`}>
-                    {workOrder.postponementEndDate
-                      ? formatProfessionalDate(workOrder.postponementEndDate)
-                      : '—'}
-                  </td>
-                )}
-                {activeTab === "Postponed" && (
-                  <td className="py-3 px-4 text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis" data-testid={`cell-postponement-reason-${workOrder.id}`}>
-                    {workOrder.postponementReason || '—'}
-                  </td>
-                )}
-                {activeTab === "Pending Approval" && (
-                  <td className="py-3 px-4 whitespace-nowrap overflow-hidden" data-testid={`cell-days-late-${workOrder.id}`}>
-                    {(() => {
-                      const daysLate = workOrder.daysLate;
-                      if (daysLate == null || daysLate === 0) return <span className="text-green-600 text-xs font-medium">On Time</span>;
-                      if (daysLate >= 1 && daysLate <= 6) return <span className="text-yellow-600 text-xs font-medium">{daysLate} days late</span>;
-                      if (daysLate >= 7 && daysLate <= 14) return <span className="text-orange-600 text-xs font-medium">{daysLate} days late</span>;
-                      return <span className="text-red-600 text-xs font-bold">{daysLate} days late <AlertTriangle className="inline h-3 w-3" /></span>;
-                    })()}
-                  </td>
-                )}
-                {activeTab === "Pending Approval" && (
-                  <td className="py-3 px-4 whitespace-nowrap overflow-hidden" data-testid={`cell-approval-tier-${workOrder.id}`}>
-                    {(() => {
-                      const tier = workOrder.approvalTier;
-                      if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
-                      if (tier === "superintendent_notification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Supt. Notified</span>;
-                      if (tier === "ce_with_justification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">CE + Remarks</span>;
-                      return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Standard</span>;
-                    })()}
-                  </td>
-                )}
-                <td className="py-3 px-4 whitespace-nowrap overflow-hidden" data-testid={index === 0 ? "C29" : undefined}>
-                  {index === 0 && <Marker id="C29" />}
-                  {workOrder.status === 'Rejected' ? (
-                    <div className="flex flex-row items-center gap-1">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor('rejected')}`}>
-                        Rejected
-                      </span>
-                      <span className={`px-2 py-0.5 rounded text-xs ${getStatusBadgeColor(workOrder.computedStatus || 'Active')}`}>
-                        {workOrder.computedStatus === 'Due (Grace P)' ? 'Grace P' : (workOrder.computedStatus || 'Active')}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex flex-row items-center gap-1">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(getEffectiveStatus(workOrder))}`}>
-                        {getEffectiveStatus(workOrder) === 'Due (Grace P)' 
-                          ? 'Grace P' 
-                          : getEffectiveStatus(workOrder)}
-                      </span>
-                      {(workOrder.missedCycles ?? 0) >= 1 && (
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-500 text-white" data-testid={`badge-skipped-cycles-${workOrder.id}`}>
-                          ⚠ {workOrder.missedCycles} Cycle{(workOrder.missedCycles ?? 0) > 1 ? 's' : ''} Skipped
-                        </span>
-                      )}
-                      {activeTab === "Overdue" && getEffectiveStatus(workOrder) === "Overdue" && (
-                        workOrder.overdueReason ? (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOverdueReasonWorkOrder(workOrder);
-                              setOverdueReasonDialogOpen(true);
-                            }}
-                            className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 text-left"
-                            title={`Reason: ${workOrder.overdueReason}`}
-                            data-testid={`badge-overdue-reason-set-${workOrder.id}`}
-                          >
-                            ✓ Reason set
-                          </button>
-                        ) : (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOverdueReasonWorkOrder(workOrder);
-                              setOverdueReasonDialogOpen(true);
-                            }}
-                            className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 border border-dashed border-gray-400 text-left"
-                            data-testid={`button-set-overdue-reason-${workOrder.id}`}
-                          >
-                            + Set Reason
-                          </button>
-                        )
-                      )}
-                    </div>
-                  )}
-                </td>
-                {activeTab === "Completed" && (
-                  <td className="py-3 px-4 whitespace-nowrap overflow-hidden" data-testid={`cell-completed-approval-tier-${workOrder.id}`}>
-                    {(() => {
-                      const tier = workOrder.approvalTier;
-                      if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
-                      if (tier === "superintendent_notification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Supt. Notified</span>;
-                      if (tier === "ce_with_justification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">CE + Remarks</span>;
-                      return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Standard</span>;
-                    })()}
-                  </td>
-                )}
-                {activeTab === "Completed" && (
-                  <td className="py-3 px-4 text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis" data-testid={index === 0 ? "C30" : undefined}>
-                    {index === 0 && <Marker id="C30" />}
-                    {formatProfessionalDate(workOrder.dateCompleted)}
-                  </td>
-                )}
-                <td className="py-3 px-4 whitespace-nowrap overflow-hidden">
-                  <div className="flex items-center justify-center gap-2">
-                    {activeTab === "Pending Approval" && workOrder.approvalTier === "superintendent_locked" ? (
-                      <div className="relative group" data-testid={`locked-action-${workOrder.id}`}>
-                        <Lock className="h-4 w-4 text-gray-400" />
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                          Locked — Awaiting Superintendent acknowledgment
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        {getEffectiveStatus(workOrder) !== "Completed" && (
-                          <>
-                            <button 
-                              className="p-1 hover:bg-gray-200 rounded"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePencilClick(workOrder);
-                              }}
-                              title="Edit Template"
-                              data-testid={index === 0 ? "C31" : `button-edit-wo-${workOrder.id}`}
-                            >
-                              {index === 0 && <Marker id="C31" />}
-                              <Pen className="h-4 w-4 text-gray-600" />
-                            </button>
-                            {!isVessel && getEffectiveStatus(workOrder) !== "Pending Approval" && (
-                              <button 
-                                className="p-1 hover:bg-gray-200 rounded"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleTimerClick(workOrder);
-                                }}
-                                title="Postpone Work Order"
-                                data-testid={index === 0 ? "C32" : `button-postpone-wo-${workOrder.id}`}
-                              >
-                                {index === 0 && <Marker id="C32" />}
-                                <Timer className="h-4 w-4 text-gray-600" />
-                              </button>
-                            )}
-                          </>
-                        )}
-                        {getEffectiveStatus(workOrder) === "Completed" && (
-                          <button 
-                            className="p-1 hover:bg-gray-200 rounded"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleWorkOrderClick(workOrder);
-                            }}
-                            title="View Work Order"
-                            data-testid={`button-view-wo-${workOrder.id}`}
-                          >
-                            <Eye className="h-4 w-4 text-gray-600" />
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-              );
-            })}
-            {paginatedWorkOrders.length === 0 && (
-              <tr>
-                <td colSpan={20} className="py-12 text-center text-gray-500" data-testid="empty-state-row">
-                  {activeTab === "Postponed"
-                    ? "No postponed work orders found for the selected filters."
-                    : "No work orders found for the selected filters."}
-                </td>
-              </tr>
-            )}
-            </tbody>
-          </table>
+      {/* Work Orders Table - AG Grid */}
+      <div className="flex-1 overflow-hidden">
+        <WOAgGridTable
+          columnDefs={woColumnDefs}
+          rowData={paginatedWorkOrders}
+          height="100%"
+          onRowClicked={(event: RowClickedEvent) => {
+            if (event.data) handleWorkOrderClick(event.data);
+          }}
+          getRowClass={(params: any) => {
+            const isRejected = params.data?.wasRejected === true;
+            if (isRejected) return 'wo-rejected-row';
+            return undefined;
+          }}
+          noRowsMessage={
+            activeTab === "Postponed"
+              ? "No postponed work orders found for the selected filters."
+              : "No work orders found for the selected filters."
+          }
+          testId="work-orders-grid"
+        />
       </div>
 
       {/* Pagination Footer */}
