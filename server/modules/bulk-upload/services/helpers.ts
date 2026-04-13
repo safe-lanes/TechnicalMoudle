@@ -522,7 +522,7 @@ export function normalizeColumnNames(data: any[], type: string): any[] {
   });
 }
 
-// Component categories from existing system (8 main categories)
+// Component categories fallback (used when master list is not yet loaded)
 export const COMPONENT_CATEGORIES = [
   "1 Ship General",
   "2 Hull",
@@ -534,11 +534,22 @@ export const COMPONENT_CATEGORIES = [
   "8 Ship Common Systems"
 ];
 
-// Helper function to map Main Group Code (1-8) to full category name
+let _dynamicCategories: string[] | null = null;
+
+export function setDynamicComponentCategories(categories: { listKey: string; listValue: string }[]) {
+  _dynamicCategories = categories
+    .sort((a, b) => parseInt(a.listKey) - parseInt(b.listKey))
+    .map(c => `${c.listKey} ${c.listValue}`);
+}
+
+export function getEffectiveComponentCategories(): string[] {
+  return _dynamicCategories || COMPONENT_CATEGORIES;
+}
 
 export function getComponentCategory(mainGroupCode: number): string | null {
-  if (mainGroupCode >= 1 && mainGroupCode <= 8) {
-    return COMPONENT_CATEGORIES[mainGroupCode - 1];
+  const cats = getEffectiveComponentCategories();
+  if (mainGroupCode >= 1 && mainGroupCode <= cats.length) {
+    return cats[mainGroupCode - 1];
   }
   return null;
 }

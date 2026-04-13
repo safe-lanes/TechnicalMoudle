@@ -1,11 +1,18 @@
 import * as repo from '../repositories/componentRepository';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 import type { Component, InsertComponent } from '@shared/schema';
-import { makerList } from '@shared/schema';
+import { makerList, masterLists } from '@shared/schema';
 import { eq, and, ilike } from 'drizzle-orm';
 import { db } from '../../../db';
 
 const ALLOWED_DEPARTMENTS = ['Engine', 'Deck', 'Electrical', 'Galley', 'LSA', 'FFA'];
+
+async function getActiveComponentCategories(): Promise<string[]> {
+  const items = await db.select({ listValue: masterLists.listValue })
+    .from(masterLists)
+    .where(and(eq(masterLists.listType, 'componentCategory'), eq(masterLists.isActive, true)));
+  return items.map(i => i.listValue);
+}
 
 async function validateMaker(makerName?: string, makerCode?: string) {
   const hasName = makerName && makerName.trim();
@@ -78,6 +85,13 @@ export async function create(data: any): Promise<Component> {
 
   if (data.eqptSystemDept && !ALLOWED_DEPARTMENTS.includes(data.eqptSystemDept)) {
     throw new ValidationError(`Invalid Equipment / System Department. Allowed values are: ${ALLOWED_DEPARTMENTS.join(', ')}.`);
+  }
+
+  if (data.componentCategory) {
+    const allowedCategories = await getActiveComponentCategories();
+    if (allowedCategories.length > 0 && !allowedCategories.includes(data.componentCategory)) {
+      throw new ValidationError(`Invalid Component Category. Allowed values are: ${allowedCategories.join(', ')}.`);
+    }
   }
 
   await validateMaker(data.maker, data.makerCode);
@@ -156,6 +170,13 @@ export async function update(id: string, data: any, userId: string): Promise<Com
 
   if (data.eqptSystemDept !== undefined && data.eqptSystemDept !== null && data.eqptSystemDept !== '' && !ALLOWED_DEPARTMENTS.includes(data.eqptSystemDept)) {
     throw new ValidationError(`Invalid Equipment / System Department. Allowed values are: ${ALLOWED_DEPARTMENTS.join(', ')}.`);
+  }
+
+  if (data.componentCategory !== undefined && data.componentCategory !== null && data.componentCategory !== '') {
+    const allowedCategories = await getActiveComponentCategories();
+    if (allowedCategories.length > 0 && !allowedCategories.includes(data.componentCategory)) {
+      throw new ValidationError(`Invalid Component Category. Allowed values are: ${allowedCategories.join(', ')}.`);
+    }
   }
 
   if (data.maker !== undefined || data.makerCode !== undefined) {

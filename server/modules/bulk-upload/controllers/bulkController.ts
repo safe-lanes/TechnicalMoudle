@@ -6,6 +6,9 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { promises as fsPromises } from 'fs';
 import { storage, calculateRecordChecksum, sortObjectKeys } from '../../../storage';
+import { masterLists } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
+import { db } from '../../../db';
 import { ObjectStorageService, ObjectNotFoundError } from '../../../objectStorage';
 import {
   saveImportHistory,
@@ -22,7 +25,9 @@ import {
   UOM_LIST,
   STORES_CATEGORIES,
   COMPONENT_CATEGORIES,
-  RESPONSIBLE_RANKS
+  RESPONSIBLE_RANKS,
+  setDynamicComponentCategories,
+  getEffectiveComponentCategories
 } from '../services/helpers';
 import { generateFleetMasterTemplate, generateWorkOrdersTemplate, generateJobsTemplate, generateSparesTemplate } from '../services/templateService';
 import { validateData } from '../services/validationService';
@@ -689,6 +694,17 @@ export async function dryRun(req: Request, res: Response) {
     
     if (data.length > 0) {
       console.log(`📋 Normalized columns: ${Object.keys(data[0]).join(', ')}`);
+    }
+
+    try {
+      const mlItems = await db.select({ listKey: masterLists.listKey, listValue: masterLists.listValue })
+        .from(masterLists)
+        .where(and(eq(masterLists.listType, 'componentCategory'), eq(masterLists.isActive, true)));
+      if (mlItems.length > 0) {
+        setDynamicComponentCategories(mlItems);
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not load component categories from master list, using fallback');
     }
 
     // Validate data

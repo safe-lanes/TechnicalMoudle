@@ -22,6 +22,7 @@ import { useChangeRequest } from "@/contexts/ChangeRequestContext";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { useLocation } from "wouter";
 import { getComponentCategory } from "@/utils/componentUtils";
+import { useMasterListOptions } from "@/hooks/useDepartments";
 import { useToast } from "@/hooks/use-toast";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { FEATURES } from '@/config/features';
@@ -93,8 +94,17 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     return change ? (change.newValue || change.currentValue) : null;
   };
 
-  // Derive Component Category from the component's tree position
-  const componentCategory = selectedComponent ? getComponentCategory(selectedComponent.id) : '';
+  const { items: componentCategoryItems } = useMasterListOptions('componentCategory');
+
+  const deriveComponentCategory = (codeOrId: string): string => {
+    if (!codeOrId) return '';
+    const firstChar = codeOrId.includes('.') ? codeOrId.split('.')[0].charAt(0) : codeOrId.charAt(0);
+    const mlItem = componentCategoryItems.find(item => item.listKey === firstChar && item.isActive);
+    if (mlItem) return mlItem.listValue;
+    return getComponentCategory(codeOrId);
+  };
+
+  const componentCategory = selectedComponent ? deriveComponentCategory(selectedComponent.id) : '';
 
   // Component data - uses selected component code or defaults (empty until populated from Excel)
   const [componentData, setComponentData] = useState({
@@ -152,8 +162,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         parentComponent: comp.parentId || "",
         componentCode: selectedComponent.code,
         componentName: comp.name || selectedComponent.name || "",
-        // Use stored componentCategory from Excel first, fall back to derived category only if not present
-        componentCategory: comp.componentCategory || comp.category || getComponentCategory(selectedComponent.id),
+        componentCategory: comp.componentCategory || comp.category || deriveComponentCategory(selectedComponent.id),
         maker: comp.maker || "",
         makerCode: comp.makerCode || "",
         model: comp.model || "",
@@ -202,7 +211,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
   // Auto-update componentCategory when componentCode changes (for new components)
   useEffect(() => {
     if (componentData.componentCode) {
-      const derivedCategory = getComponentCategory(componentData.componentCode);
+      const derivedCategory = deriveComponentCategory(componentData.componentCode);
       if (derivedCategory && derivedCategory !== componentData.componentCategory) {
         setComponentData(prev => ({ ...prev, componentCategory: derivedCategory }));
       }
