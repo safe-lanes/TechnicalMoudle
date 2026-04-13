@@ -387,6 +387,10 @@
   background-color: #f0fdf4 !important;
 }
 
+.wo-ag-grid.ag-theme-alpine[data-testid="planner-grid"] .ag-row {
+  cursor: default;
+}
+
 @layer components {
   .all-\[unset\] {
     all: unset;
