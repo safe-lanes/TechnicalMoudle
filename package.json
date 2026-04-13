@@ -11,7 +11,6 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
-    "db:check": "drizzle-kit check",
     "setup-microfrontend": "node scripts/setup-microfrontend.js"
   },
   "dependencies": {

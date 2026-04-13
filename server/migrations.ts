@@ -3040,14 +3040,6 @@ export async function runBackupAndMigrations(): Promise<void> {
   await createDatabaseBackup();
   await runMigrations();
   await cleanupDuplicateFleetComponentMappings();
-  // NOTE: generateDrizzleMigrations() is intentionally NOT called here.
-  // Runtime auto-generation caused race conditions (duplicate-numbered files
-  // when multiple devs generated concurrently) and silently produced migration
-  // files that conflicted with hand-written ones — this was the root cause of
-  // the 085_master_list_types incident. The function is still exported above
-  // for manual/scripted use, but server startup now only APPLIES migrations,
-  // never creates them. Dev workflow: edit shared/schema.ts, run
-  // `npm run db:generate` manually, review + commit the resulting SQL file.
-  // This applies universally — Replit forks, DEV, and PROD alike.
+  await generateDrizzleMigrations();
   await runDrizzleMigrations();
 }

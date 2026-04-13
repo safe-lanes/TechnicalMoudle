@@ -11,8 +11,6 @@ import {
   CheckSquare,
   XCircle,
   Eye,
-  Pencil,
-  Download,
   TrendingUp,
   TrendingDown,
   LayoutGrid,
@@ -28,15 +26,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { WorkOrder, ChangeRequest } from "@shared/schema";
 import { useVessels } from "@/hooks/useVessels";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
@@ -44,9 +33,6 @@ import { SemiCircleGauge } from "@/components/SemiCircleGauge";
 import { ComplianceAnomalyPanel } from "./ComplianceAnomalyPanel";
 import { WorkOrdersListModal } from "./WorkOrdersListModal";
 import { SparesListModal } from "./SparesListModal";
-import WorkOrderForm from "@/components/WorkOrderForm";
-import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
-import type { TableColumn } from "@/lib/pdfReportGenerator";
 import {
   Dialog,
   DialogContent,
@@ -103,7 +89,7 @@ interface SparesHistoryItem {
   partName: string;
 }
 
-type EnrichedWorkOrder = WorkOrder & { computedStatus?: string; criticality?: string; jobPriority?: string };
+type EnrichedWorkOrder = WorkOrder & { computedStatus?: string; criticality?: string };
 
 type SortField = 'vessel' | 'overduePercent' | 'outstandingPercent' | 'compliancePercent' | 'lowStockItems' | 'overdueCount';
 type SortDir = 'asc' | 'desc';
@@ -365,10 +351,6 @@ const Dashboard = () => {
   const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
   const [activeTab, setActiveTab] = useState('overview');
   const [showFilters, setShowFilters] = useState(false);
-  type OperationCardFilter = 'overdue' | 'overdue-critical' | 'planned-today' | 'pending-approvals' | 'critical-spares' | 'anomalies' | 'modify-pms' | 'donut-overdue' | 'donut-due' | 'donut-planned';
-  const [selectedOpCard, setSelectedOpCard] = useState<OperationCardFilter>('overdue');
-  const [hodScope, setHodScope] = useState<'me' | 'myTeam'>('myTeam');
-  const [opViewModal, setOpViewModal] = useState<{ open: boolean; workOrder: EnrichedWorkOrder | null }>({ open: false, workOrder: null });
   const [showBenchmarking, setShowBenchmarking] = useState(false);
   const [selectedCriticality, setSelectedCriticality] = useState("");
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
@@ -1071,14 +1053,11 @@ const Dashboard = () => {
       const s = (wo as EnrichedWorkOrder).computedStatus;
       return s === 'Due' || s === 'Due (Grace P)';
     }).length;
-    const planned = safeWOs.filter(wo => {
-      const s = (wo as EnrichedWorkOrder).computedStatus;
-      return s === 'Active' || s === 'Postponed' || s === 'Completed';
-    }).length;
+    const completed = safeWOs.filter(wo => (wo as EnrichedWorkOrder).computedStatus === 'Completed').length;
     return [
       { status: 'Overdue', count: overdue, color: '#ff6961' },
       { status: 'Due', count: due, color: '#FF964f' },
-      { status: 'Planned', count: planned, color: '#9E9E9E' },
+      { status: 'Completed', count: completed, color: '#5dc86f' },
     ].filter(d => d.count > 0);
   }, [workOrdersData]);
 
@@ -1087,30 +1066,19 @@ const Dashboard = () => {
     const overdueWOs = safeWOs.filter(wo => (wo as EnrichedWorkOrder).computedStatus === 'Overdue');
     const overdueCount = overdueWOs.length;
 
-    const dueWOs = safeWOs.filter(wo => {
-      const s = (wo as EnrichedWorkOrder).computedStatus;
-      return s === 'Due' || s === 'Due (Grace P)';
-    });
-    const plannedStatusWOs = safeWOs.filter(wo => {
-      const s = (wo as EnrichedWorkOrder).computedStatus;
-      return s === 'Active' || s === 'Postponed' || s === 'Completed';
-    });
-
-    const overdueCriticalWOs = overdueWOs.filter(wo =>
+    const overdueCriticalCount = overdueWOs.filter(wo =>
       ((wo as EnrichedWorkOrder).criticality ?? '').toLowerCase() === 'yes'
-    );
-    const overdueCriticalCount = overdueCriticalWOs.length;
+    ).length;
 
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const todayEnd = new Date(todayStart.getTime() + 86400000);
-    const plannedTodayWOs = safeWOs.filter(wo => {
-      if (!wo.plannedDate) return false;
-      const parsed = parseFlexibleDate(wo.plannedDate);
+    const plannedTodayCount = safeWOs.filter(wo => {
+      if (!wo.dueDate) return false;
+      const parsed = parseFlexibleDate(wo.dueDate);
       if (!parsed) return false;
       return parsed >= todayStart && parsed < todayEnd;
-    });
-    const plannedTodayCount = plannedTodayWOs.length;
+    }).length;
 
     const criticalSparesLowCount = sparesData.filter(spare => {
       const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes';
@@ -1120,10 +1088,9 @@ const Dashboard = () => {
       return rob < min && min > 0;
     }).length;
 
-    const pendingApprovalWOs = safeWOs.filter(wo =>
+    const pendingApprovalCount = safeWOs.filter(wo =>
       (wo as EnrichedWorkOrder).computedStatus === 'Pending Approval'
-    );
-    const pendingApprovalCount = pendingApprovalWOs.length;
+    ).length;
 
     const anomalyCount = complianceAnomalies ? [
       complianceAnomalies.cycleSkipRate.severity,
@@ -1138,59 +1105,14 @@ const Dashboard = () => {
 
     return {
       overdueCount,
-      overdueWOs: overdueWOs as EnrichedWorkOrder[],
-      dueWOs: dueWOs as EnrichedWorkOrder[],
-      plannedStatusWOs: plannedStatusWOs as EnrichedWorkOrder[],
       overdueCriticalCount,
-      overdueCriticalWOs: overdueCriticalWOs as EnrichedWorkOrder[],
       plannedTodayCount,
-      plannedTodayWOs: plannedTodayWOs as EnrichedWorkOrder[],
       criticalSparesLowCount,
       pendingApprovalCount,
-      pendingApprovalWOs: pendingApprovalWOs as EnrichedWorkOrder[],
       anomalyCount,
       openChangeRequests,
     };
   }, [workOrdersData, sparesData, changeRequestsData, complianceAnomalies]);
-
-  const operationTableData = useMemo(() => {
-    switch (selectedOpCard) {
-      case 'overdue':
-      case 'donut-overdue':
-        return operationKPIs.overdueWOs;
-      case 'overdue-critical':
-        return operationKPIs.overdueCriticalWOs;
-      case 'planned-today':
-        return operationKPIs.plannedTodayWOs;
-      case 'pending-approvals':
-        return operationKPIs.pendingApprovalWOs;
-      case 'donut-due':
-        return operationKPIs.dueWOs;
-      case 'donut-planned':
-        return operationKPIs.plannedStatusWOs;
-      default:
-        return [];
-    }
-  }, [selectedOpCard, operationKPIs]);
-
-  const operationTableTitle = useMemo(() => {
-    switch (selectedOpCard) {
-      case 'overdue': return 'Overdue Work Orders';
-      case 'overdue-critical': return 'Overdue Work Orders – Critical Equipment';
-      case 'planned-today': return 'Work Orders – Planned for Today';
-      case 'pending-approvals': return 'Pending Approval Work Orders';
-      case 'critical-spares': return 'Critical Spares Low';
-      case 'anomalies': return 'W.O Anomalies';
-      case 'modify-pms': return 'Modify PMS Requests';
-      case 'donut-overdue': return 'Overdue Work Orders (from chart)';
-      case 'donut-due': return 'Due Work Orders (from chart)';
-      case 'donut-planned': return 'Planned Work Orders (from chart)';
-      default: return 'Work Orders';
-    }
-  }, [selectedOpCard]);
-
-  const isDonutFilter = selectedOpCard?.startsWith('donut-');
-  const isNonWOCard = selectedOpCard === 'critical-spares' || selectedOpCard === 'anomalies' || selectedOpCard === 'modify-pms';
 
   const ytdKPIs = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -1453,49 +1375,20 @@ const Dashboard = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {activeTab === 'management' ? (
-              <div className="flex items-center gap-2" data-testid="toggle-hod-scope">
-                <span
-                  className={`text-sm font-medium cursor-pointer transition-colors ${hodScope === 'me' ? 'text-[#1a2b4a]' : 'text-gray-400'}`}
-                  onClick={() => setHodScope('me')}
-                  data-testid="toggle-label-me"
-                >
-                  Me
-                </span>
-                <button
-                  onClick={() => setHodScope(hodScope === 'me' ? 'myTeam' : 'me')}
-                  className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none"
-                  style={{ backgroundColor: hodScope === 'myTeam' ? '#52baf3' : '#d1d5db' }}
-                  data-testid="toggle-switch-hod-scope"
-                >
-                  <span
-                    className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transform transition-transform ${hodScope === 'myTeam' ? 'translate-x-6' : 'translate-x-1'}`}
-                  />
-                </button>
-                <span
-                  className={`text-sm font-medium cursor-pointer transition-colors ${hodScope === 'myTeam' ? 'text-[#1a2b4a]' : 'text-gray-400'}`}
-                  onClick={() => setHodScope('myTeam')}
-                  data-testid="toggle-label-myteam"
-                >
-                  My Team
-                </span>
-              </div>
-            ) : (
-              <>
-                <div style={{ fontSize: '18px', fontWeight: 700, color: '#1a2b4a' }} data-testid="text-current-year">
-                  {new Date().getFullYear()}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
-                  data-testid="button-toggle-dashboard-filters"
-                >
-                  <Filter className="h-4 w-4" />
-                  Filters
-                </Button>
-              </>
+            <div style={{ fontSize: '18px', fontWeight: 700, color: '#1a2b4a' }} data-testid="text-current-year">
+              {new Date().getFullYear()}
+            </div>
+            {activeTab === 'overview' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+                className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
+                data-testid="button-toggle-dashboard-filters"
+              >
+                <Filter className="h-4 w-4" />
+                Filters
+              </Button>
             )}
           </div>
         </div>
@@ -1571,12 +1464,13 @@ const Dashboard = () => {
         </div>
         )}
       </div>
+
       {/* MAIN CONTENT */}
       <div className="flex-1 overflow-y-auto mt-4" style={{ background: '#f8fafc' }}>
 
-        {/* OPERATION TAB */}
+        {/* OPERATION TAB: Placeholder for future role-specific dashboard */}
         {activeTab === 'management' && (
-          <div className="px-4 pt-3 pb-2 flex flex-col" style={{ height: 'calc(100% - 0px)' }} data-testid="section-operation-dashboard">
+          <div className="p-4 space-y-4" data-testid="section-operation-dashboard">
             {(isWorkOrdersLoading || isSparesLoading) ? (
               <div className="flex items-center justify-center" style={{ minHeight: '300px' }}>
                 <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
@@ -1584,272 +1478,122 @@ const Dashboard = () => {
               </div>
             ) : (
               <>
-                <div className="flex items-stretch gap-3 mb-3" data-testid="section-operation-top">
-                  <div className="flex items-center gap-3 flex-shrink-0" data-testid="card-operation-wo-donut">
-                    {operationDonutData.length > 0 ? (
-                      <div className="flex items-center gap-1">
-                        <div style={{ width: 130, height: 120 }}>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie
-                                data={operationDonutData}
-                                dataKey="count"
-                                nameKey="status"
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={35}
-                                outerRadius={58}
-                                paddingAngle={2}
-                                cursor="pointer"
-                                onClick={(_: unknown, index: number) => {
-                                  const segment = operationDonutData[index];
-                                  if (!segment) return;
-                                  const filterMap: Record<string, OperationCardFilter> = {
-                                    'Overdue': 'donut-overdue',
-                                    'Due': 'donut-due',
-                                    'Planned': 'donut-planned',
-                                  };
-                                  const newFilter = filterMap[segment.status];
-                                  if (newFilter) {
-                                    setSelectedOpCard(prev => prev === newFilter ? 'overdue' : newFilter);
-                                  }
-                                }}
-                                label={({ cx, cy, midAngle, innerRadius, outerRadius, payload }: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; payload: { count: number } }) => {
-                                  const RADIAN = Math.PI / 180;
-                                  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-                                  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                                  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                                  return (
-                                    <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={9} fontWeight="bold">
-                                      {payload.count}
-                                    </text>
-                                  );
-                                }}
-                                labelLine={false}
-                              >
-                                {operationDonutData.map((entry, index) => (
-                                  <Cell key={`op-cell-${index}`} fill={entry.color} stroke={entry.color} />
-                                ))}
-                              </Pie>
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-xs font-semibold text-gray-700">Work Orders</span>
-                          {[
-                            { status: 'Planned', color: '#9E9E9E' },
-                            { status: 'Due', color: '#FF964f' },
-                            { status: 'Overdue', color: '#ff6961' },
-                          ].map(item => (
-                            <div key={item.status} className="flex items-center gap-1.5">
-                              <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                              <span className="text-[10px] text-gray-500">{item.status}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center" style={{ width: 120, height: 70, color: '#9E9E9E', fontSize: '11px' }}>No WOs</div>
-                    )}
+                <div className="flex flex-col lg:flex-row gap-4" data-testid="section-operation-top">
+                  <div className="lg:min-w-[260px] lg:max-w-[300px]" style={{ background: '#FFFFFF', borderRadius: '8px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+                    <div className="px-4 py-3" style={{ borderBottom: '1px solid #E0E0E0' }}>
+                      <span style={{ color: '#1565C0', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>W.O Status</span>
+                    </div>
+                    <div className="px-2 py-2" style={{ height: '220px' }} data-testid="card-operation-wo-donut">
+                      {operationDonutData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={210}>
+                          <PieChart>
+                            <Pie
+                              data={operationDonutData}
+                              dataKey="count"
+                              nameKey="status"
+                              cx="50%"
+                              cy="45%"
+                              innerRadius={45}
+                              outerRadius={72}
+                              paddingAngle={2}
+                              label={({ cx, cy, midAngle, innerRadius, outerRadius, payload }: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; payload: { count: number } }) => {
+                                const RADIAN = Math.PI / 180;
+                                const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                                const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                                return (
+                                  <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
+                                    {payload.count}
+                                  </text>
+                                );
+                              }}
+                              labelLine={false}
+                            >
+                              {operationDonutData.map((entry, index) => (
+                                <Cell key={`op-cell-${index}`} fill={entry.color} stroke={entry.color} />
+                              ))}
+                            </Pie>
+                            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px', paddingTop: '4px' }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '12px' }}>No work orders to display</div>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2" data-testid="section-operation-kpi-cards">
-                    {([
-                      { key: 'overdue' as OperationCardFilter, label: 'Overdue WO', value: operationKPIs.overdueCount, borderColor: 'border-l-red-500', textColor: 'text-red-600', testId: 'card-kpi-overdue-wo', valueTestId: 'kpi-overdue-wo' },
-                      { key: 'overdue-critical' as OperationCardFilter, label: 'Overdue WO – Critical Eqpt', value: operationKPIs.overdueCriticalCount, borderColor: 'border-l-red-500', textColor: 'text-red-600', testId: 'card-kpi-overdue-wo-critical', valueTestId: 'kpi-overdue-wo-critical' },
-                      { key: 'planned-today' as OperationCardFilter, label: 'WO – Planned for Today', value: operationKPIs.plannedTodayCount, borderColor: 'border-l-green-500', textColor: 'text-green-600', testId: 'card-kpi-planned-today', valueTestId: 'kpi-planned-today' },
-                      { key: 'critical-spares' as OperationCardFilter, label: 'Critical Spares Low', value: operationKPIs.criticalSparesLowCount, borderColor: 'border-l-orange-500', textColor: 'text-orange-600', testId: 'card-kpi-critical-spares-low', valueTestId: 'kpi-critical-spares-low' },
-                      { key: 'pending-approvals' as OperationCardFilter, label: 'Pending Approvals', value: operationKPIs.pendingApprovalCount, borderColor: 'border-l-orange-500', textColor: 'text-orange-600', testId: 'card-kpi-pending-approvals', valueTestId: 'kpi-pending-approvals' },
-                      { key: 'anomalies' as OperationCardFilter, label: 'W.O Anomalies', value: operationKPIs.anomalyCount, borderColor: 'border-l-orange-500', textColor: 'text-orange-600', testId: 'card-kpi-wo-anomalies', valueTestId: 'kpi-wo-anomalies' },
-                      { key: 'modify-pms' as OperationCardFilter, label: 'Modify PMS Requests', value: operationKPIs.openChangeRequests, borderColor: 'border-l-gray-400', textColor: 'text-gray-600', testId: 'card-kpi-modify-pms-requests', valueTestId: 'kpi-modify-pms-requests' },
-                    ]).map(card => (
-                      <Card
-                        key={card.key}
-                        className={`cursor-pointer transition-shadow bg-white border-0 border-l-4 ${card.borderColor} ${!isDonutFilter && selectedOpCard === card.key ? 'ring-2 ring-blue-400 shadow-md' : 'hover:shadow-lg'} flex min-h-[120px]`}
-                        onClick={() => setSelectedOpCard(card.key)}
-                        data-testid={card.testId}
-                      >
-                        <CardContent className="py-2 px-3 flex flex-col justify-start flex-1">
-                          <p className="font-medium text-gray-600 text-[14px]">{card.label}</p>
-                          <p className={`text-xl font-bold mt-0.5 ${card.textColor}`} data-testid={card.valueTestId}>{card.value}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
+                  <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3" data-testid="section-operation-kpi-cards">
+                    <Card
+                      className="cursor-pointer hover:shadow-lg transition-shadow bg-white border-0 border-l-4 border-l-red-500"
+                      data-testid="card-kpi-overdue-wo"
+                    >
+                      <CardContent className="py-3 px-4">
+                        <p className="text-sm font-medium text-gray-600">Overdue WO</p>
+                        <p className="text-2xl font-bold mt-1 text-red-600" data-testid="kpi-overdue-wo">{operationKPIs.overdueCount}</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className="cursor-pointer hover:shadow-lg transition-shadow bg-white border-0 border-l-4 border-l-red-500"
+                      data-testid="card-kpi-overdue-wo-critical"
+                    >
+                      <CardContent className="py-3 px-4">
+                        <p className="text-sm font-medium text-gray-600">Overdue WO – Critical Eqpt</p>
+                        <p className="text-2xl font-bold mt-1 text-red-600" data-testid="kpi-overdue-wo-critical">{operationKPIs.overdueCriticalCount}</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className="cursor-pointer hover:shadow-lg transition-shadow bg-white border-0 border-l-4 border-l-green-500"
+                      data-testid="card-kpi-planned-today"
+                    >
+                      <CardContent className="py-3 px-4">
+                        <p className="text-sm font-medium text-gray-600">WO – Planned for Today</p>
+                        <p className="text-2xl font-bold mt-1 text-green-600" data-testid="kpi-planned-today">{operationKPIs.plannedTodayCount}</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className="cursor-pointer hover:shadow-lg transition-shadow bg-white border-0 border-l-4 border-l-orange-500"
+                      data-testid="card-kpi-critical-spares-low"
+                    >
+                      <CardContent className="py-3 px-4">
+                        <p className="text-sm font-medium text-gray-600">Critical Spares Low</p>
+                        <p className="text-2xl font-bold mt-1 text-orange-600" data-testid="kpi-critical-spares-low">{operationKPIs.criticalSparesLowCount}</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className="cursor-pointer hover:shadow-lg transition-shadow bg-white border-0 border-l-4 border-l-orange-500"
+                      data-testid="card-kpi-pending-approvals"
+                    >
+                      <CardContent className="py-3 px-4">
+                        <p className="text-sm font-medium text-gray-600">Pending Approvals</p>
+                        <p className="text-2xl font-bold mt-1 text-orange-600" data-testid="kpi-pending-approvals">{operationKPIs.pendingApprovalCount}</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className="cursor-pointer hover:shadow-lg transition-shadow bg-white border-0 border-l-4 border-l-orange-500"
+                      data-testid="card-kpi-wo-anomalies"
+                    >
+                      <CardContent className="py-3 px-4">
+                        <p className="text-sm font-medium text-gray-600">W.O Anomalies</p>
+                        <p className="text-2xl font-bold mt-1 text-orange-600" data-testid="kpi-wo-anomalies">{operationKPIs.anomalyCount}</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card
+                      className="cursor-pointer hover:shadow-lg transition-shadow bg-white border-0 border-l-4 border-l-gray-400"
+                      data-testid="card-kpi-modify-pms-requests"
+                    >
+                      <CardContent className="py-3 px-4">
+                        <p className="text-sm font-medium text-gray-600">Modify PMS Requests</p>
+                        <p className="text-2xl font-bold mt-1 text-gray-600" data-testid="kpi-modify-pms-requests">{operationKPIs.openChangeRequests}</p>
+                      </CardContent>
+                    </Card>
                   </div>
                 </div>
-
-                <div className="flex-1 flex flex-col min-h-0">
-                  <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-base font-semibold text-gray-800" data-testid="text-operation-table-title">{operationTableTitle}</h2>
-                    {!isNonWOCard && operationTableData.length > 0 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 gap-1.5 text-xs border-[#e1e8ed] text-[#8798ad]"
-                        onClick={() => {
-                          const columns: TableColumn[] = [
-                            { header: 'Component', field: 'component', width: 30 },
-                            { header: 'Work Order No', field: 'workOrderNo', width: 30 },
-                            { header: 'Job Title', field: 'jobTitle', width: 40 },
-                            { header: 'Due Date', field: 'dueDate', width: 18 },
-                            { header: 'Status', field: 'status', width: 15 },
-                            { header: 'Criticality', field: 'criticality', width: 15 },
-                          ];
-                          const safeFormatDate = (d: string | null | undefined) => {
-                            if (!d) return '-';
-                            const parsed = parseFlexibleDate(d);
-                            if (!parsed) return d;
-                            try { return format(parsed, 'dd-MMM-yyyy'); } catch { return d; }
-                          };
-                          const rows = operationTableData.map(wo => ({
-                            component: wo.component || '-',
-                            workOrderNo: wo.workOrderNo || '-',
-                            jobTitle: wo.jobTitle || '-',
-                            dueDate: safeFormatDate(wo.dueDate),
-                            status: (wo as EnrichedWorkOrder).computedStatus || wo.status || '-',
-                            criticality: (wo as EnrichedWorkOrder).jobPriority || '-',
-                          }));
-                          pdfReportGenerator.generateReport(
-                            {
-                              title: operationTableTitle,
-                              subtitle: `Total: ${operationTableData.length} work order${operationTableData.length !== 1 ? 's' : ''}`,
-                              orientation: 'landscape',
-                            },
-                            columns,
-                            rows
-                          );
-                        }}
-                        data-testid="button-export-operation-table"
-                      >
-                        <Download className="h-3 w-3" />
-                        Export
-                      </Button>
-                    )}
-                  </div>
-
-                  {isNonWOCard ? (
-                    <div className="flex-1 flex items-center justify-center border border-gray-200 rounded-lg bg-white">
-                      <p className="text-sm text-gray-400">No work orders for this category — detailed view coming soon.</p>
-                    </div>
-                  ) : (
-                    <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white">
-                      <Table>
-                        <TableHeader className="sticky top-0 bg-[#eff6ff] z-10">
-                          <TableRow>
-                            <TableHead className="font-medium w-[160px] bg-[#eff6ff] text-[#0e4c81] text-xs">Component</TableHead>
-                            <TableHead className="font-medium w-[180px] bg-[#eff6ff] text-[#0e4c81] text-xs">Work Order No</TableHead>
-                            <TableHead className="font-medium min-w-[200px] bg-[#eff6ff] text-[#0e4c81] text-xs">Job Title</TableHead>
-                            <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81] text-xs">Due Date</TableHead>
-                            <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81] text-xs">Status</TableHead>
-                            <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81] text-xs">Criticality</TableHead>
-                            <TableHead className="font-medium w-[80px] text-center bg-[#eff6ff] text-[#0e4c81] text-xs">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {operationTableData.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={7} className="text-center py-8 text-gray-500 text-sm">
-                                No work orders found
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            operationTableData.map((wo) => {
-                              const effectiveStatus = (wo as EnrichedWorkOrder).computedStatus || wo.status || 'Active';
-                              const getStatusColor = (s: string) => {
-                                if (s === 'Overdue') return 'bg-red-500';
-                                if (s === 'Due' || s === 'Due (Grace P)') return 'bg-orange-500';
-                                if (s === 'Pending Approval') return 'bg-blue-600';
-                                if (s === 'Completed') return 'bg-green-500';
-                                return 'bg-gray-500';
-                              };
-                              const getCritColor = (c: string) => {
-                                const cl = c.toLowerCase();
-                                if (cl === 'critical' || cl === 'yes') return 'bg-red-500';
-                                if (cl === 'high') return 'bg-orange-500';
-                                if (cl === 'medium') return 'bg-yellow-500';
-                                if (cl === 'low') return 'bg-green-500';
-                                return 'bg-gray-400';
-                              };
-                              const formatWoDate = (d: string | null | undefined) => {
-                                if (!d) return '-';
-                                const parsed = parseFlexibleDate(d);
-                                if (!parsed) return d;
-                                try { return format(parsed, 'dd-MMM-yyyy'); } catch { return d; }
-                              };
-                              return (
-                                <TableRow key={wo.id} className="hover:bg-gray-50">
-                                  <TableCell className="font-medium text-blue-600 text-xs py-2">{wo.component || '-'}</TableCell>
-                                  <TableCell className="text-xs py-2">{wo.workOrderNo || '-'}</TableCell>
-                                  <TableCell className="whitespace-normal break-words max-w-[300px] text-xs py-2">{wo.jobTitle || '-'}</TableCell>
-                                  <TableCell className="text-xs py-2">{formatWoDate(wo.dueDate)}</TableCell>
-                                  <TableCell className="py-2">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${getStatusColor(effectiveStatus)}`}>
-                                      {effectiveStatus}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell className="py-2">
-                                    {(wo as EnrichedWorkOrder).jobPriority ? (
-                                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${getCritColor((wo as EnrichedWorkOrder).jobPriority)}`}>
-                                        {(wo as EnrichedWorkOrder).jobPriority}
-                                      </span>
-                                    ) : (
-                                      <span className="text-gray-400 text-xs">-</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="py-2">
-                                    <div className="flex gap-1 justify-center">
-                                      <TooltipProvider>
-                                        <UITooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              size="icon"
-                                              variant="ghost"
-                                              className="h-6 w-6"
-                                              onClick={() => setOpViewModal({ open: true, workOrder: wo as EnrichedWorkOrder })}
-                                              data-testid={`op-view-wo-${wo.id}`}
-                                            >
-                                              <Eye className="h-3.5 w-3.5 text-gray-500" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>View</TooltipContent>
-                                        </UITooltip>
-                                      </TooltipProvider>
-                                      <TooltipProvider>
-                                        <UITooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              size="icon"
-                                              variant="ghost"
-                                              className="h-6 w-6"
-                                              onClick={() => setOpViewModal({ open: true, workOrder: wo as EnrichedWorkOrder })}
-                                              data-testid={`op-edit-wo-${wo.id}`}
-                                            >
-                                              <Pencil className="h-3.5 w-3.5 text-gray-500" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>Edit</TooltipContent>
-                                        </UITooltip>
-                                      </TooltipProvider>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </div>
-
-                {opViewModal.workOrder && (
-                  <WorkOrderForm
-                    isOpen={opViewModal.open}
-                    onClose={() => setOpViewModal({ open: false, workOrder: null })}
-                    workOrder={opViewModal.workOrder}
-                    mode="template"
-                  />
-                )}
               </>
             )}
           </div>
@@ -2385,6 +2129,7 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+
       <BulkApproveModal
         open={bulkApproveModalOpen}
         onOpenChange={setBulkApproveModalOpen}
@@ -2392,6 +2137,7 @@ const Dashboard = () => {
         vesselId={vesselId}
         vesselName={currentVessel?.name}
       />
+
       <WorkOrdersListModal
         open={woListModal.open}
         onClose={() => setWoListModal({ open: false, title: '', workOrders: [] })}
@@ -2399,6 +2145,7 @@ const Dashboard = () => {
         workOrders={woListModal.workOrders}
         vessels={vessels}
       />
+
       <SparesListModal
         open={sparesListModal.open}
         onClose={() => setSparesListModal({ open: false, title: '', spares: [] })}
@@ -2407,6 +2154,7 @@ const Dashboard = () => {
         vessels={vessels}
         getStockStatus={getStockStatus}
       />
+
       <Dialog open={showBenchmarking} onOpenChange={setShowBenchmarking}>
         <DialogContent className="max-w-[95vw] h-[calc(100vh-10vw)] max-h-[90vh] overflow-hidden flex flex-col [&>button.absolute]:top-6 [&>button.absolute]:translate-y-1">
           <DialogHeader className="pb-2">

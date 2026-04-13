@@ -324,7 +324,7 @@ const WorkOrders: React.FC = () => {
   };
 
   const tabs = [
-    { id: "Planned", label: "Scheduled", count: safeWorkOrdersList.filter(wo => {
+    { id: "Planned", label: "Planned", count: safeWorkOrdersList.filter(wo => {
       if (wo.isExecution) return false;
       const effectiveStatus = getEffectiveStatus(wo);
       return effectiveStatus === "Active";

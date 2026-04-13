@@ -1623,43 +1623,6 @@ export const insertMasterListSchema = createInsertSchema(masterLists).omit({
 export type InsertMasterList = z.infer<typeof insertMasterListSchema>;
 export type MasterList = typeof masterLists.$inferSelect;
 
-// Master List Types Table (DB-backed registry of list types, replaces hardcoded LIST_TYPES constant)
-// Each type is mapped to one of 3 Sections: Components / Jobs/WO / Spares.
-// is_system=true rows (seeded) cannot be deleted and their key/section cannot be changed.
-export const masterListTypes = pgTable("master_list_types", {
-  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  mltuuid: text("mltuuid").notNull().unique().default(sql`gen_random_uuid()::text`),
-  listTypeKey: text("list_type_key").notNull().unique(),
-  label: text("label").notNull(),
-  section: text("section").notNull(), // 'Components' | 'Jobs/WO' | 'Spares'
-  isSystem: boolean("is_system").notNull().default(false),
-  isActive: boolean("is_active").notNull().default(true),
-  displayOrder: integer("display_order").notNull().default(0),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdateFn(() => new Date()),
-  createdByUuid: text("created_by_uuid"),
-  updatedByUuid: text("updated_by_uuid"),
-  isDeleted: boolean("is_deleted").notNull().default(false),
-  isSync: boolean("is_sync").notNull().default(false),
-}, (table) => [
-  index("idx_mlt_section").on(table.section),
-  index("idx_mlt_active").on(table.isActive),
-]);
-
-export const insertMasterListTypeSchema = createInsertSchema(masterListTypes).omit({
-  id: true,
-  mltuuid: true,
-  createdAt: true,
-  updatedAt: true,
-  isDeleted: true,
-  isSync: true,
-}).extend({
-  section: z.enum(["Components", "Jobs/WO", "Spares"]),
-});
-
-export type InsertMasterListType = z.infer<typeof insertMasterListTypeSchema>;
-export type MasterListType = typeof masterListTypes.$inferSelect;
-
 // Component Running Hours Log - Detailed audit trail for all running hours updates
 export const componentRunningHoursLog = pgTable("component_running_hours_log", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -3458,31 +3421,6 @@ export const insertAdmVesselOrgChartSchema = createInsertSchema(admVesselOrgChar
 
 export type InsertAdmVesselOrgChart = z.infer<typeof insertAdmVesselOrgChartSchema>;
 export type AdmVesselOrgChart = typeof admVesselOrgChart.$inferSelect;
-
-// ====== MONTHLY MAINTENANCE SNAPSHOTS ======
-export const monthlySnapshots = pgTable("monthly_snapshots", {
-  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
-  snapshotMonth: text("snapshot_month").notNull(),
-  snapshotType: text("snapshot_type").notNull(),
-  snapshotTimestamp: timestamp("snapshot_timestamp").notNull(),
-  category: text("category").notNull(),
-  count: integer("count").notNull().default(0),
-  workOrderIds: text("work_order_ids").array().notNull().default(sql`'{}'::text[]`),
-  generatedAt: timestamp("generated_at").notNull().defaultNow(),
-}, (table) => ({
-  vesselMonthIdx: index("idx_monthly_snap_vessel_month").on(table.vesselId, table.snapshotMonth),
-  typeIdx: index("idx_monthly_snap_type").on(table.snapshotType),
-  uniqueSnap: unique("unique_monthly_snapshot").on(table.vesselId, table.snapshotMonth, table.snapshotType, table.category),
-}));
-
-export const insertMonthlySnapshotSchema = createInsertSchema(monthlySnapshots).omit({
-  id: true,
-  generatedAt: true,
-});
-
-export type InsertMonthlySnapshot = z.infer<typeof insertMonthlySnapshotSchema>;
-export type MonthlySnapshot = typeof monthlySnapshots.$inferSelect;
 
 // ====== NOON REPORT MODULE SCHEMA — remove this line to disable ======
 export * from './schema-noon-report';

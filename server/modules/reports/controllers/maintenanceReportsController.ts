@@ -1,6 +1,5 @@
 import type { Request, Response } from 'express';
 import * as maintenanceReportService from '../services/maintenanceReportService';
-import * as monthlySnapshotService from '../services/monthlySnapshotService';
 
 // ═══════════════════════════════════════════════════════════════
 // DUE JOBS (7 DAYS) - GET PREVIEW
@@ -27,12 +26,10 @@ export async function getDueJobs7DaysPreview(req: Request, res: Response) {
 export async function getOverdueJobsPreview(req: Request, res: Response) {
   try {
     const vesselId = req.query.vesselId as string;
-    const dateFrom = req.query.dateFrom as string | undefined;
-    const dateTo = req.query.dateTo as string | undefined;
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
-    const result = await maintenanceReportService.getOverdueJobsData(vesselId, dateFrom, dateTo);
+    const result = await maintenanceReportService.getOverdueJobsData(vesselId);
     res.json(result);
   } catch (error: any) {
     console.error("Error fetching Overdue Jobs preview:", error);
@@ -110,13 +107,13 @@ export async function exportDueJobs7Days(req: Request, res: Response) {
 
 export async function exportOverdueJobs(req: Request, res: Response) {
   try {
-    const { vesselId, dateFrom, dateTo } = req.body;
+    const { vesselId } = req.body;
 
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
 
-    const { buffer, filename } = await maintenanceReportService.exportOverdueJobs(vesselId, dateFrom, dateTo);
+    const { buffer, filename } = await maintenanceReportService.exportOverdueJobs(vesselId);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -197,125 +194,27 @@ export async function exportPostponementLog(req: Request, res: Response) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MONTHLY MAINTENANCE SUMMARY - PREVIEW (NEW SNAPSHOT-BASED)
-// ═══════════════════════════════════════════════════════════════
-
-export async function getMonthlySummaryPreview(req: Request, res: Response) {
-  try {
-    const vesselId = req.query.vesselId as string;
-    const year = parseInt(req.query.year as string, 10);
-    const month = parseInt(req.query.month as string, 10);
-
-    if (!vesselId) {
-      return res.status(400).json({ error: "Please select a vessel" });
-    }
-    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
-      return res.status(400).json({ error: "Please provide valid year and month" });
-    }
-
-    const data = await monthlySnapshotService.getMonthlySummaryData(vesselId, year, month);
-    res.json(data);
-  } catch (error: unknown) {
-    console.error("Error fetching Monthly Summary preview:", error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    res.status(500).json({ error: "Failed to fetch report data: " + message });
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// MONTHLY MAINTENANCE SUMMARY - SNAPSHOT DETAIL
-// ═══════════════════════════════════════════════════════════════
-
-export async function getMonthlySummarySnapshotDetail(req: Request, res: Response) {
-  try {
-    const vesselId = req.query.vesselId as string;
-    const year = parseInt(req.query.year as string, 10);
-    const month = parseInt(req.query.month as string, 10);
-    const type = req.query.type as string;
-    const category = req.query.category as string;
-
-    if (!vesselId || !type || !category) {
-      return res.status(400).json({ error: "Missing required parameters" });
-    }
-    if (isNaN(year) || isNaN(month)) {
-      return res.status(400).json({ error: "Invalid year or month" });
-    }
-
-    if (type === 'movement') {
-      const data = await monthlySnapshotService.getMovementDetail(vesselId, year, month, category);
-      return res.json(data);
-    }
-
-    const data = await monthlySnapshotService.getSnapshotDetail(vesselId, year, month, type, category);
-    res.json(data);
-  } catch (error: unknown) {
-    console.error("Error fetching snapshot detail:", error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    res.status(500).json({ error: "Failed to fetch snapshot detail: " + message });
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// MONTHLY MAINTENANCE SUMMARY - REGENERATE SNAPSHOTS
-// ═══════════════════════════════════════════════════════════════
-
-export async function regenerateMonthlySummarySnapshots(req: Request, res: Response) {
-  try {
-    const { vesselId, year, month } = req.body;
-
-    if (!vesselId) {
-      return res.status(400).json({ error: "Please select a vessel" });
-    }
-    if (!year || !month) {
-      return res.status(400).json({ error: "Please provide year and month" });
-    }
-
-    await monthlySnapshotService.regenerateSnapshots(vesselId, year, month);
-    const data = await monthlySnapshotService.getMonthlySummaryData(vesselId, year, month);
-    res.json(data);
-  } catch (error: unknown) {
-    console.error("Error regenerating snapshots:", error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    res.status(500).json({ error: "Failed to regenerate snapshots: " + message });
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
 // MONTHLY MAINTENANCE SUMMARY - EXCEL EXPORT
 // ═══════════════════════════════════════════════════════════════
 
 export async function exportMonthlySummary(req: Request, res: Response) {
   try {
-    const { vesselId, startDate } = req.body;
+    const { vesselId, startDate, endDate } = req.body;
 
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
-
-    let year: number;
-    let month: number;
-
-    if (req.body.year && req.body.month) {
-      year = Number(req.body.year);
-      month = Number(req.body.month);
-    } else if (startDate) {
-      const d = new Date(startDate);
-      year = d.getFullYear();
-      month = d.getMonth() + 1;
-    } else {
-      const now = new Date();
-      year = now.getFullYear();
-      month = now.getMonth() + 1;
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "Please provide start and end dates for the report period" });
     }
 
-    const { buffer, filename } = await maintenanceReportService.exportMonthlySummary(vesselId, year, month);
+    const { buffer, filename } = await maintenanceReportService.exportMonthlySummary(vesselId, startDate, endDate);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error("Error generating Monthly Maintenance Summary report:", error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    res.status(500).json({ error: "Failed to generate report: " + message });
+    res.status(500).json({ error: "Failed to generate report: " + error.message });
   }
 }

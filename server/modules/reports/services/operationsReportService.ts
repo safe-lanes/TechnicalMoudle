@@ -75,13 +75,13 @@ export async function getCrewWorkloadDistribution(
 
   // Filter work orders
   let filteredWOs = workOrders.filter((wo: any) => {
-    // Date range filter: use completion date as primary, fall back to dueDate for non-completed jobs
+    // Date range filter using createdAt
     if (startDateObj || endDateObj) {
-      const completionDate = parseDate(wo.dateCompleted) || parseDate((wo as any).completionDateTime);
-      const relevantDate = completionDate || parseDate(wo.dueDate);
-      if (!relevantDate) return false;
-      if (startDateObj && relevantDate < startDateObj) return false;
-      if (endDateObj && relevantDate > endDateObj) return false;
+      const createdDate = parseDate(wo.createdAt);
+      if (createdDate) {
+        if (startDateObj && createdDate < startDateObj) return false;
+        if (endDateObj && createdDate > endDateObj) return false;
+      }
     }
 
     // Rank filter
@@ -267,13 +267,12 @@ export async function exportCrewWorkloadDistributionExcel(
 
   // Filter work orders
   let filteredWOs = workOrders.filter((wo: any) => {
-    // Date range filter: use completion date as primary, fall back to dueDate for non-completed jobs
     if (startDateObj || endDateObj) {
-      const completionDate = parseDate(wo.dateCompleted) || parseDate((wo as any).completionDateTime);
-      const relevantDate = completionDate || parseDate(wo.dueDate);
-      if (!relevantDate) return false;
-      if (startDateObj && relevantDate < startDateObj) return false;
-      if (endDateObj && relevantDate > endDateObj) return false;
+      const createdDate = parseDate(wo.createdAt);
+      if (createdDate) {
+        if (startDateObj && createdDate < startDateObj) return false;
+        if (endDateObj && createdDate > endDateObj) return false;
+      }
     }
 
     if (rank && rank !== 'All Ranks' && rank !== 'all') {

@@ -15,7 +15,7 @@ export function parseDDMMYYYY(dateStr: string | null | undefined): Date | null {
   
   if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
   
-  return new Date(Date.UTC(year, month, day));
+  return new Date(year, month, day);
 }
 
 /**

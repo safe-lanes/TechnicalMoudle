@@ -133,42 +133,6 @@ export async function deleteMasterList(id: number) {
 }
 
 // ══════════════════════════════════════════════════════════
-// Master List Types (DB-backed registry + Section mapping)
-// ══════════════════════════════════════════════════════════
-
-export async function getMasterListTypes(section?: string) {
-  return storage.getMasterListTypes(section);
-}
-
-export async function getAllMasterListTypesIncludingInactive(section?: string) {
-  return storage.getAllMasterListTypesIncludingInactive(section);
-}
-
-export async function getMasterListTypeById(id: number) {
-  return storage.getMasterListTypeById(id);
-}
-
-export async function getMasterListTypeByKey(key: string) {
-  return storage.getMasterListTypeByKey(key);
-}
-
-export async function createMasterListType(data: any) {
-  return storage.createMasterListType(data);
-}
-
-export async function updateMasterListType(id: number, data: any) {
-  return storage.updateMasterListType(id, data);
-}
-
-export async function softDeleteMasterListType(id: number, userUuid?: string | null) {
-  return storage.softDeleteMasterListType(id, userUuid);
-}
-
-export async function countMasterListItemsByType(listTypeKey: string) {
-  return storage.countMasterListItemsByType(listTypeKey);
-}
-
-// ══════════════════════════════════════════════════════════
 // Fleet Vessel Mappings (from routes.ts — distinct from admin mappings)
 // ══════════════════════════════════════════════════════════
 

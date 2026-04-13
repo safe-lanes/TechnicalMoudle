@@ -3,7 +3,6 @@ import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
-import { usePermissions } from "@/contexts/PermissionsContext";
 import { Marker } from "@/components/Marker";
 import { LocationSearchDropdown } from "@/components/LocationSearchDropdown";
 import { useLocation } from "wouter";
@@ -171,10 +170,6 @@ const Stores: React.FC = () => {
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
-  const { canCreate, canEdit, canDelete } = usePermissions();
-  const canCreateStore = canCreate("pms-stores");
-  const canEditStore = canEdit("pms-stores");
-  const canDeleteStore = canDelete("pms-stores");
   const { isChangeMode } = useChangeMode();
   const { data: vessels = [] } = useVessels();
   const [activeTab, setActiveTab] = useState<"stores" | "lubes" | "chemicals" | "others">(() => {
@@ -289,7 +284,7 @@ const Stores: React.FC = () => {
   }, [allVesselLocationsResponse]);
 
   const handleChangeStoreLocation = async (item: StoreItem, newLocName: string) => {
-    if (!vesselId || !selectedLocationName || isChangingStoreLocation || !canEditStore) return;
+    if (!vesselId || !selectedLocationName || isChangingStoreLocation) return;
     const side = getItemLocationSide(item, selectedLocationName);
     if (!side) return;
     setIsChangingStoreLocation(true);
@@ -310,7 +305,7 @@ const Stores: React.FC = () => {
   };
 
   const handleCreateNewStoreLocation = async () => {
-    if (!newLocationName.trim() || !vesselId || !creatingLocationForStoreItem || !canEditStore) return;
+    if (!newLocationName.trim() || !vesselId || !creatingLocationForStoreItem) return;
     setIsCreatingLocation(true);
     try {
       const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
@@ -1853,7 +1848,6 @@ const Stores: React.FC = () => {
                 <Download className="h-4 w-4" />
                 Export
               </Button>
-              {canCreateStore && (
               <Button 
                 className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
                 size="sm"
@@ -1864,8 +1858,6 @@ const Stores: React.FC = () => {
                 {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.6a")} />}
                 <Plus className="h-4 w-4 mr-1" /> Add Store
               </Button>
-              )}
-              {canEditStore && (
               <Button 
                 className="bg-[#5dc86f] hover:bg-[#4db85f] text-white" 
                 size="sm"
@@ -1876,7 +1868,6 @@ const Stores: React.FC = () => {
                 {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.6")} />}
                 <Plus className="h-4 w-4 mr-1" /> Bulk Update {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
               </Button>
-              )}
             </>
           )}
         </div>
@@ -1998,7 +1989,7 @@ const Stores: React.FC = () => {
           size="sm" 
           className="bg-[#52baf3] hover:bg-[#3da8e0] text-white"
           onClick={handleSaveAllLocRob}
-          disabled={isSavingLocRob || !canEditStore}
+          disabled={isSavingLocRob}
           data-testid="stores-loc-save"
         >
           {isSavingLocRob ? 'Saving...' : 'Save'}
@@ -2307,7 +2298,7 @@ const Stores: React.FC = () => {
                 {!isDeleteSelectionMode && (
                 <div className="flex gap-1 items-center justify-end pr-2 whitespace-nowrap">
                   {item.isActive === false ? (
-                    !isVessel && canEditStore && (
+                    !isVessel && (
                       <Button 
                         variant="ghost" 
                         size="sm" 
@@ -2343,7 +2334,7 @@ const Stores: React.FC = () => {
                         {index === 0 && <Marker id={getMarkerId(activeTab, "30")} />}
                         <Info className="h-4 w-4 text-blue-600" />
                       </Button>
-                      {!isVessel && canEditStore && (
+                      {!isVessel && (
                         <Button 
                           variant="ghost" 
                           size="sm" 
@@ -2357,7 +2348,7 @@ const Stores: React.FC = () => {
                           <Edit2 className="h-4 w-4" />
                         </Button>
                       )}
-                      {!isVessel && canDeleteStore && (
+                      {!isVessel && (
                         <Button 
                           variant="ghost" 
                           size="sm" 
@@ -2503,8 +2494,8 @@ const Stores: React.FC = () => {
                           <Popover>
                             <PopoverTrigger asChild>
                               <button
-                                className={`flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left border border-gray-200 rounded-md px-2 py-1 ${isChangingStoreLocation || !canEditStore ? 'opacity-50 pointer-events-none' : ''}`}
-                                disabled={isChangingStoreLocation || !canEditStore}
+                                className={`flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left border border-gray-200 rounded-md px-2 py-1 ${isChangingStoreLocation ? 'opacity-50 pointer-events-none' : ''}`}
+                                disabled={isChangingStoreLocation}
                                 data-testid={`button-change-store-location-${item.id}`}
                               >
                                 <MapPin className="h-3 w-3 flex-shrink-0 text-gray-500" />
@@ -2537,7 +2528,6 @@ const Stores: React.FC = () => {
                                       ))}
                                     </CommandGroup>
                                   </div>
-                                  {canEditStore && (
                                   <CommandGroup className="border-t" forceMount>
                                     <CommandItem
                                       onSelect={() => setCreatingLocationForStoreItem(item)}
@@ -2548,7 +2538,6 @@ const Stores: React.FC = () => {
                                       <span className="text-green-600 font-medium">Create New Location</span>
                                     </CommandItem>
                                   </CommandGroup>
-                                  )}
                                 </CommandList>
                               </Command>
                             </PopoverContent>
@@ -2563,7 +2552,7 @@ const Stores: React.FC = () => {
                             onChange={(e) => setEditingLocRobValues(prev => ({ ...prev, [editKey]: e.target.value }))}
                             onBlur={() => {
                               const newVal = editingLocRobVal !== undefined ? Number(editingLocRobVal) : locRob;
-                              if (canEditStore && editingLocRobVal !== undefined && newVal !== locRob && !isNaN(newVal) && newVal >= 0) {
+                              if (editingLocRobVal !== undefined && newVal !== locRob && !isNaN(newVal) && newVal >= 0) {
                                 const fieldKey = side === 'A' ? 'robLocationA' : 'robLocationB';
                                 fetch(`/technical/api/stores/${vesselId}/${item.id}`, {
                                   method: 'PATCH',
@@ -2575,7 +2564,6 @@ const Stores: React.FC = () => {
                               }
                               setEditingLocRobValues(prev => { const n = { ...prev }; delete n[editKey]; return n; });
                             }}
-                            disabled={!canEditStore}
                             data-testid={`input-loc-rob-${item.id}`}
                           />
                         </div>
@@ -3181,7 +3169,7 @@ const Stores: React.FC = () => {
                 {isSubmittingChangeRequest ? "Submitting..." : "Save for Approval"}
               </Button>
             ) : (
-              <Button onClick={saveEditItem} disabled={!canEditStore} data-testid="button-edit-save">Save Changes</Button>
+              <Button onClick={saveEditItem} data-testid="button-edit-save">Save Changes</Button>
             )}
           </DialogFooter>
         </DialogContent>
@@ -3933,7 +3921,7 @@ const Stores: React.FC = () => {
             </Button>
             <Button 
               onClick={saveAddStore} 
-              disabled={isAddingStore || !canCreateStore}
+              disabled={isAddingStore}
               className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
               data-testid="button-add-store-save"
             >
@@ -3964,8 +3952,8 @@ const Stores: React.FC = () => {
                 }}
                 variant="destructive"
                 className="flex-1"
-                disabled={!canEditStore || !selectedItem || selectedItem.rob === 0}
-                title={!canEditStore ? "No permission to consume" : selectedItem?.rob === 0 ? "No stock available to consume" : "Consume item"}
+                disabled={!selectedItem || selectedItem.rob === 0}
+                title={selectedItem?.rob === 0 ? "No stock available to consume" : "Consume item"}
               >
                 <MinusCircle className="h-4 w-4 mr-2" />
                 Consume
@@ -3979,7 +3967,6 @@ const Stores: React.FC = () => {
                 }}
                 variant="default"
                 className="flex-1"
-                disabled={!canEditStore}
               >
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Receive
@@ -4097,7 +4084,7 @@ const Stores: React.FC = () => {
             <Button variant="outline" onClick={() => setIsReceiveModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={saveReceive} disabled={!canEditStore}>Receive</Button>
+            <Button onClick={saveReceive}>Receive</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -4199,7 +4186,7 @@ const Stores: React.FC = () => {
             </Button>
             <Button 
               onClick={saveConsume}
-              disabled={!canEditStore || !consumeForm.quantity || parseInt(consumeForm.quantity) > getLocationStock(consumingItem, consumeForm.location)}
+              disabled={!consumeForm.quantity || parseInt(consumeForm.quantity) > getLocationStock(consumingItem, consumeForm.location)}
             >
               Consume
             </Button>
@@ -4304,7 +4291,6 @@ const Stores: React.FC = () => {
                               ))}
                             </CommandGroup>
                           </div>
-                          {canEditStore && (
                           <CommandGroup className="border-t" forceMount>
                             <CommandItem
                               onSelect={async () => {
@@ -4339,7 +4325,6 @@ const Stores: React.FC = () => {
                               <span className="text-green-600 font-medium">Create New Location</span>
                             </CommandItem>
                           </CommandGroup>
-                          )}
                         </CommandList>
                       </Command>
                     </PopoverContent>
@@ -4422,7 +4407,6 @@ const Stores: React.FC = () => {
                               ))}
                             </CommandGroup>
                           </div>
-                          {canEditStore && (
                           <CommandGroup className="border-t" forceMount>
                             <CommandItem
                               onSelect={async () => {
@@ -4457,7 +4441,6 @@ const Stores: React.FC = () => {
                               <span className="text-green-600 font-medium">Create New Location</span>
                             </CommandItem>
                           </CommandGroup>
-                          )}
                         </CommandList>
                       </Command>
                     </PopoverContent>
@@ -4501,7 +4484,6 @@ const Stores: React.FC = () => {
                     handleSaveLocation(locationDialogItem.id);
                     setLocationDialogItem(null);
                   }}
-                  disabled={!canEditStore}
                   data-testid="button-dialog-save"
                 >
                   Save
@@ -4555,7 +4537,7 @@ const Stores: React.FC = () => {
               </Button>
               <Button 
                 onClick={handleCreateNewStoreLocation}
-                disabled={!canEditStore || !newLocationName.trim() || isCreatingLocation}
+                disabled={!newLocationName.trim() || isCreatingLocation}
                 data-testid="button-confirm-create-store-location"
               >
                 {isCreatingLocation ? 'Creating...' : 'Create Location'}

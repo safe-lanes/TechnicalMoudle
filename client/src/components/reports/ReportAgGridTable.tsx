@@ -1,30 +1,10 @@
 import { useMemo, useCallback, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import type { ColDef, GridReadyEvent, GridApi, SortChangedEvent } from 'ag-grid-community';
-import { ModuleRegistry } from 'ag-grid-community';
-import {
-  MenuModule,
-  ColumnsToolPanelModule,
-  LicenseManager,
-} from 'ag-grid-enterprise';
 import type { ReportColumn } from '@/components/reports/ReportPreviewModal';
 
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
-
-try {
-  const licenseKey = import.meta.env.VITE_AG_GRID_LICENSE_KEY || import.meta.env.AG_GRID_LICENSE_KEY;
-  if (licenseKey) {
-    LicenseManager.setLicenseKey(licenseKey);
-  }
-} catch (_) {}
-
-try {
-  ModuleRegistry.registerModules([
-    MenuModule,
-    ColumnsToolPanelModule,
-  ]);
-} catch (_) {}
 
 interface ReportAgGridTableProps {
   columns: ReportColumn[];
@@ -40,8 +20,8 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({ columns, data, he
     return columns.map((col) => ({
       headerName: col.header,
       field: col.field,
-      minWidth: col.width || (col.field === 'sNo' || col.field === 'sno' ? 60 : 80),
-      flex: 1,
+      width: col.width,
+      minWidth: col.field === 'sNo' || col.field === 'sno' ? 60 : 80,
       sortable: true,
       resizable: true,
       filter: false,
@@ -66,7 +46,6 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({ columns, data, he
     sortable: true,
     resizable: true,
     filter: false,
-    flex: 1,
     suppressHeaderFilterButton: true,
     menuTabs: ['generalMenuTab', 'columnsMenuTab'],
     wrapText: false,

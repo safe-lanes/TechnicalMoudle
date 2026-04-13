@@ -342,7 +342,7 @@ export async function getUnplannedBreakdownJobs(
     // Filter by dateCompleted for completed jobs report
     const completedDateStr = wo.dateCompleted ? ((wo.dateCompleted as any) instanceof Date ? (wo.dateCompleted as any).toISOString() : String(wo.dateCompleted)) : null;
     const completedDate = parseDate(completedDateStr);
-    if (!completedDate) return false;
+    if (!completedDate) return true; // Include jobs without completion date
 
     return completedDate >= startDateObj && completedDate <= endDateObj;
   });
@@ -467,7 +467,7 @@ export async function exportUnplannedBreakdownJobsExcel(
     // Filter by dateCompleted for completed jobs report
     const completedDateStr = wo.dateCompleted ? ((wo.dateCompleted as any) instanceof Date ? (wo.dateCompleted as any).toISOString() : String(wo.dateCompleted)) : null;
     const completedDate = parseDate(completedDateStr);
-    if (!completedDate) return false;
+    if (!completedDate) return true; // Include jobs without completion date
 
     return completedDate >= startDateObj && completedDate <= endDateObj;
   });
