@@ -348,20 +348,26 @@ export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: OrgNo
     const newNodes = nodes.filter(n => !n.nodeUuid || !existingUuids.has(n.nodeUuid));
 
     for (const node of updateNodes) {
+      const dataWithoutParent = { ...toNodeData(vesselId, node), parentNodeUuid: null, updatedAt: new Date() };
       await tx.update(vesselOrgChartNodes)
-        .set({ ...toNodeData(vesselId, node), updatedAt: new Date() })
+        .set(dataWithoutParent)
         .where(eq(vesselOrgChartNodes.nodeUuid, node.nodeUuid!));
       updated++;
     }
 
-    const newUuids = new Set(newNodes.map(n => n.nodeUuid).filter((u): u is string => !!u));
-    const orderedNew = topologicalSort(newNodes, newUuids);
-
-    for (const node of orderedNew) {
-      const data = toNodeData(vesselId, node);
+    for (const node of newNodes) {
+      const data = { ...toNodeData(vesselId, node), parentNodeUuid: null };
       const insertData = node.nodeUuid ? { ...data, nodeUuid: node.nodeUuid } : data;
       await tx.insert(vesselOrgChartNodes).values(insertData);
       inserted++;
+    }
+
+    for (const node of nodes) {
+      if (node.parentNodeUuid && node.nodeUuid) {
+        await tx.update(vesselOrgChartNodes)
+          .set({ parentNodeUuid: node.parentNodeUuid })
+          .where(eq(vesselOrgChartNodes.nodeUuid, node.nodeUuid));
+      }
     }
 
     return { success: true, inserted, updated, total: nodes.length };
