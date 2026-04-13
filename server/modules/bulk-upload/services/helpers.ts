@@ -562,6 +562,11 @@ export function setDynamicComponentCategories(categories: { listKey: string; lis
   _dynamicCategoryValues.sort((a, b) => parseInt(a) - parseInt(b));
 }
 
+export function resetDynamicComponentCategories() {
+  _dynamicCategoryMap = null;
+  _dynamicCategoryValues = null;
+}
+
 export function getEffectiveComponentCategories(): string[] {
   return _dynamicCategoryValues || COMPONENT_CATEGORIES;
 }

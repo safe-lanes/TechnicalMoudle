@@ -27,6 +27,7 @@ import {
   COMPONENT_CATEGORIES,
   RESPONSIBLE_RANKS,
   setDynamicComponentCategories,
+  resetDynamicComponentCategories,
   getEffectiveComponentCategories
 } from '../services/helpers';
 import { generateFleetMasterTemplate, generateWorkOrdersTemplate, generateJobsTemplate, generateSparesTemplate } from '../services/templateService';
@@ -704,6 +705,7 @@ export async function dryRun(req: Request, res: Response) {
         setDynamicComponentCategories(mlItems);
       }
     } catch (e) {
+      resetDynamicComponentCategories();
       console.warn('⚠️ Could not load component categories from master list, using fallback');
     }
 
