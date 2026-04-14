@@ -923,10 +923,10 @@ export default function DefectFormWizard({
                       <label className="text-sm text-gray-600 mb-1.5">Component</label>
                       <VesselComponentCombobox
                         vesselId={form.watch('vesselId') || ""}
-                        selectedCode={form.watch('componentHardwareId') || ""}
+                        selectedId={form.watch('componentHardwareId') || ""}
                         displayValue={form.watch('componentHardwareLevel3') || ""}
                         onSelect={(selection: VesselComponentSelection) => {
-                          form.setValue('componentHardwareId', selection.code);
+                          form.setValue('componentHardwareId', selection.id);
                           form.setValue('componentHardwareLevel1', selection.breadcrumb);
                           form.setValue('componentHardwareLevel2', selection.code);
                           form.setValue('componentHardwareLevel3', selection.name);

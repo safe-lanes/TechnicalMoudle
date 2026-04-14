@@ -45,7 +45,7 @@ export interface VesselComponentSelection {
 
 interface VesselComponentComboboxProps {
   vesselId: string;
-  selectedCode: string;
+  selectedId: string;
   displayValue: string;
   onSelect: (selection: VesselComponentSelection) => void;
   disabled?: boolean;
@@ -90,7 +90,7 @@ const ROOT_CATEGORIES: Record<string, string> = {
 
 export function VesselComponentCombobox({
   vesselId,
-  selectedCode,
+  selectedId,
   displayValue,
   onSelect,
   disabled = false,
@@ -263,14 +263,14 @@ export function VesselComponentCombobox({
                     }}
                     className={cn(
                       "flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer hover:bg-accent/50",
-                      selectedCode === item.code && "bg-accent"
+                      (selectedId === (item.cuuid || item.id)) && "bg-accent"
                     )}
                     data-testid={`${testId}-option-${item.code}`}
                   >
                     <Check
                       className={cn(
                         "h-4 w-4 shrink-0",
-                        selectedCode === item.code
+                        (selectedId === (item.cuuid || item.id))
                           ? "opacity-100"
                           : "opacity-0"
                       )}
