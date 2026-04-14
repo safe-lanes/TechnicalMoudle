@@ -1,0 +1,84 @@
+Two tasks:
+
+TASK 1 — Update replit.md Migration System Standards section
+
+Open the existing replit.md file at the root of this workspace. Find the section "Migration System Standards (CRITICAL — READ FIRST)". Keep everything before it and after it unchanged. Within that section, ADD the following new subsection immediately after the "Rules for AI Agents" subsection (before "Database Default Values"):
+
+### Multi-Statement Migration Execution
+
+Drizzle-generated migration files contain multiple SQL statements separated by `--> statement-breakpoint` markers. The migration runner (runDrizzleMigrations in server/migrations.ts) splits on these markers and executes each statement INDIVIDUALLY rather than sending the whole file as one batch.
+
+This prevents a dangerous silent-failure bug where if statement 1 of a multi-statement file failed with "already exists" (for example, because a hand-written migration already created a table the Drizzle file also tries to create), PostgreSQL would abort the entire batch. The old error handler would then mark the whole migration as complete, silently discarding statements 2, 3, 4, etc. This caused the jobs.assigned_to_rank_id column to be lost in production (fixed in commit 71211289).
+
+Current safe behavior:
+- Drizzle-generated files (0XXX_*.sql with --> statement-breakpoint): each statement executes separately; individual statements can be skipped for idempotency errors (42P07 duplicate_table, 42701 duplicate_column, 42704 undefined_object) without affecting subsequent statements
+- Hand-written files (0XX_*.sql without breakpoint markers): still execute as single batch, relying on IF NOT EXISTS / ON CONFLICT / DO $$ blocks for idempotency
+
+For AI agents: If you hand-write a migration file with multiple DDL statements that need independent idempotency handling, add `--> statement-breakpoint` markers between statements to get per-statement error handling. Otherwise, wrap the whole statement in DO $$ BEGIN...EXCEPTION WHEN duplicate_object THEN NULL; END $$ blocks.
+
+After editing replit.md:
+1. Show the first 30 lines of replit.md to confirm edit is in place
+2. Run "git status" — replit.md MUST NOT appear in the list (it must stay gitignored)
+3. Do NOT commit anything to git
+4. Do NOT create files in attached_assets/
+
+TASK 2 — Verification tests after pulling the latest code
+
+After updating replit.md, run these verification tests and report results:
+
+Test 1: Confirm latest code is pulled
+Run: git log --oneline -5
+Top commit should be 71211289 (fix multi-statement execution) or newer
+Share the output
+
+Test 2: Start the server and check migration behavior
+Run: npm install
+Run: npm run dev
+Wait 60 seconds for startup to complete
+Look in the console output for:
+- Migration summary line like "Migrations complete: 0 applied, X skipped"
+- NO "column does not exist" errors
+- NO "already exists" warnings unless expected
+- Server starts on port 5000 successfully
+
+Test 3: Verify critical column exists
+Run this SQL query:
+SELECT column_name FROM information_schema.columns WHERE table_name = 'jobs' AND column_name = 'assigned_to_rank_id';
+Expected: 1 row returned showing the column exists
+If 0 rows: STOP and report — the migration 091 did not apply
+
+Test 4: Verify no rogue files were created
+Run: ls migrations/*.sql | wc -l
+Run: ls migrations/*.sql | grep -c "_auto_"
+Share both counts
+The count should NOT increase between server restarts
+Restart the server once more and compare the counts — they must be identical
+
+Test 5: Functional smoke test via UI
+Open the app in the Replit preview
+Click through these pages and confirm they load without errors:
+- Dashboard 
+- Work Orders
+- Components
+- Spares
+- Master Lists (should show 3 section tabs and 7 list types)
+- Alerts (should show notification bell in top menu)
+- Fleet Vessel Mapping
+Share a brief confirmation: "All pages loaded successfully" or list any that errored
+
+Test 6: TypeScript check
+Run: npx tsc --noEmit 2>&1 | tail -20
+Share the output
+Expected: 0 new errors (pre-existing errors from stock codebase are acceptable — only flag NEW errors that weren't there before)
+
+FINAL REPORT:
+Provide a summary in this format:
+- replit.md update: SUCCESS/FAILED
+- Test 1 (latest code): PASS/FAIL with top commit hash
+- Test 2 (server startup): PASS/FAIL with migration summary
+- Test 3 (column exists): PASS/FAIL
+- Test 4 (no rogue files): PASS/FAIL with counts
+- Test 5 (UI pages): PASS/FAIL with any failing pages listed
+- Test 6 (TypeScript): PASS/FAIL with error count
+
+If ANY test fails, STOP and tell me before proceeding. Do NOT commit, push, or modify code to "fix" issues — only report them.
