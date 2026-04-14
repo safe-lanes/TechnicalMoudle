@@ -337,6 +337,13 @@
       "when": 1776082051041,
       "tag": "0047_lowly_maginty",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1776151768701,
+      "tag": "0048_dark_harpoon",
+      "breakpoints": true
     }
   ]
 }

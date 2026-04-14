@@ -214,6 +214,31 @@ export async function saveVesselDepartmentConfig(req: Request, res: Response) {
   }
 }
 
+export async function getActiveRoles(req: Request, res: Response) {
+  try {
+    const roles = await service.getActiveRoles();
+    res.json(roles);
+  } catch (error: any) {
+    if (error.statusCode === 503) return res.status(503).json({ error: "Database not available" });
+    console.error("Error fetching active roles:", error);
+    res.status(500).json({ error: "Failed to fetch active roles" });
+  }
+}
+
+export async function getNodesByRoleRuid(req: Request, res: Response) {
+  try {
+    const { vesselId, roleRuid } = req.params;
+    if (!vesselId) return res.status(400).json({ error: "vesselId required" });
+    if (!roleRuid) return res.status(400).json({ error: "roleRuid required" });
+    const nodes = await service.getNodesByRoleRuid(vesselId, roleRuid);
+    res.json(nodes);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("Error fetching nodes by role ruid:", error);
+    res.status(500).json({ error: "Failed to fetch nodes by role ruid" });
+  }
+}
+
 export async function getHierarchyScope(req: Request, res: Response) {
   try {
     const { vesselId } = req.params;

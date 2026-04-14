@@ -36,6 +36,14 @@ import { useLocation } from "wouter";
 
 type NodeLayer = 'department' | 'overall-head' | 'supervisory';
 
+interface RoleMasterOption {
+  ruid: string;
+  assignedRole: string;
+  roletype: string;
+  isActive: boolean;
+  sortOrder: number | null;
+}
+
 interface OrgNode {
   nodeUuid: string;
   vesselId: string;
@@ -48,6 +56,7 @@ interface OrgNode {
   viewMode: string | null;
   sortOrder: number;
   nodeLayer: NodeLayer;
+  roleRuid: string | null;
   isNew?: boolean;
 }
 
@@ -121,6 +130,10 @@ export default function VesselOrgChart() {
     queryKey: ['/technical/api/admin/available-ranks'],
   });
 
+  const { data: roleOptions = [] } = useQuery<RoleMasterOption[]>({
+    queryKey: ['/technical/api/admin/role-master/active'],
+  });
+
   const { data: savedNodes, isLoading: isLoadingNodes } = useQuery<OrgNode[]>({
     queryKey: ['/technical/api/admin/vessel-org-chart-nodes', selectedVesselId],
     queryFn: async () => {
@@ -174,6 +187,7 @@ export default function VesselOrgChart() {
           viewMode: n.viewMode,
           sortOrder: n.sortOrder,
           nodeLayer: n.nodeLayer,
+          roleRuid: n.roleRuid,
         })),
       });
       return response.json();
@@ -282,6 +296,7 @@ export default function VesselOrgChart() {
       viewMode: rank?.viewMode || null,
       sortOrder: 0,
       nodeLayer: layer,
+      roleRuid: null,
       isNew: true,
     };
     setNodes(prev => [...prev, newNode]);
@@ -318,7 +333,7 @@ export default function VesselOrgChart() {
   const unassignNode = (nodeUuid: string) => {
     setNodes(prev => prev.map(n => {
       if (n.nodeUuid !== nodeUuid) return n;
-      return { ...n, department: null, parentNodeUuid: null, isAssigned: false, isHod: false, sortOrder: 0, nodeLayer: 'department' as NodeLayer };
+      return { ...n, department: null, parentNodeUuid: null, isAssigned: false, isHod: false, sortOrder: 0, nodeLayer: 'department' as NodeLayer, roleRuid: null };
     }).map(n => {
       if (n.parentNodeUuid === nodeUuid) return { ...n, parentNodeUuid: null };
       return n;
@@ -558,6 +573,18 @@ export default function VesselOrgChart() {
               {UI_ROLE_LABELS[node.viewMode as UIRole] || node.viewMode}
             </span>
           )}
+          {node.roleRuid && (() => {
+            const role = roleOptions.find(r => r.ruid === node.roleRuid);
+            return role ? (
+              <span className="ml-1 text-[10px] text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded" data-testid={`preview-role-${node.nodeUuid}`}>
+                {role.assignedRole}
+              </span>
+            ) : (
+              <span className="ml-1 text-[10px] text-orange-400 bg-orange-50 px-1.5 py-0.5 rounded" data-testid={`preview-role-inactive-${node.nodeUuid}`}>
+                Inactive Role
+              </span>
+            );
+          })()}
         </div>
         {treeNode.children.map(child => renderPreviewNode(child, depth + 1))}
       </div>
@@ -829,6 +856,21 @@ export default function VesselOrgChart() {
             </SelectContent>
           </Select>
 
+          <Select
+            value={node.roleRuid || "__none__"}
+            onValueChange={(v) => updateNodeField(node.nodeUuid, 'roleRuid', v === "__none__" ? null : v)}
+          >
+            <SelectTrigger className="h-6 w-[110px] ml-1 text-[10px]" data-testid={`role-binding-select-${node.nodeUuid}`}>
+              <SelectValue placeholder="Role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">No Role</SelectItem>
+              {roleOptions.map(r => (
+                <SelectItem key={r.ruid} value={r.ruid}>{r.assignedRole} — {r.roletype}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <button
             onClick={() => unassignNode(node.nodeUuid)}
             className="ml-auto text-gray-300 hover:text-red-500 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -926,6 +968,21 @@ export default function VesselOrgChart() {
             <SelectItem value="__none__">None</SelectItem>
             {VISIBLE_UI_ROLES.map(role => (
               <SelectItem key={role} value={role}>{UI_ROLE_LABELS[role]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={node.roleRuid || "__none__"}
+          onValueChange={(v) => updateNodeField(node.nodeUuid, 'roleRuid', v === "__none__" ? null : v)}
+        >
+          <SelectTrigger className="h-6 w-[110px] ml-1 text-[10px]" data-testid={`role-binding-select-${node.nodeUuid}`}>
+            <SelectValue placeholder="Role" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">No Role</SelectItem>
+            {roleOptions.map(r => (
+              <SelectItem key={r.ruid} value={r.ruid}>{r.assignedRole} — {r.roletype}</SelectItem>
             ))}
           </SelectContent>
         </Select>

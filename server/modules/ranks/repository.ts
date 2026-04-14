@@ -1,5 +1,5 @@
 import { getPostgresClient } from '../../postgresClient';
-import { admAvailableRanks, admVesselOrgChart, vesselOrgChartNodes, vesselDepartmentConfig } from '@shared/schema';
+import { admAvailableRanks, admVesselOrgChart, vesselOrgChartNodes, vesselDepartmentConfig, admnRoleMaster } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 
 function getDb() {
@@ -159,6 +159,35 @@ export async function getVesselDepartmentConfig(vesselId: string) {
   return db.select().from(vesselDepartmentConfig)
     .where(eq(vesselDepartmentConfig.vesselId, vesselId))
     .orderBy(vesselDepartmentConfig.sortOrder);
+}
+
+export async function getActiveRoles() {
+  const db = await getDb();
+  if (!db) return null;
+  return db.select({
+    ruid: admnRoleMaster.ruid,
+    assignedRole: admnRoleMaster.assignedRole,
+    roletype: admnRoleMaster.roletype,
+    isActive: admnRoleMaster.isActive,
+    sortOrder: admnRoleMaster.sortOrder,
+  }).from(admnRoleMaster)
+    .where(and(
+      eq(admnRoleMaster.isActive, true),
+      eq(admnRoleMaster.isDeleted, false)
+    ))
+    .orderBy(admnRoleMaster.sortOrder);
+}
+
+export async function getNodesByRoleRuid(vesselId: string, roleRuid: string) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.select().from(vesselOrgChartNodes)
+    .where(and(
+      eq(vesselOrgChartNodes.vesselId, vesselId),
+      eq(vesselOrgChartNodes.roleRuid, roleRuid),
+      eq(vesselOrgChartNodes.isDeleted, false)
+    ))
+    .orderBy(vesselOrgChartNodes.sortOrder);
 }
 
 export async function upsertVesselDepartmentConfig(vesselId: string, configs: { department: string; isEnabled: boolean; sortOrder: number }[]) {

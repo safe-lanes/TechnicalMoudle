@@ -239,6 +239,7 @@ interface OrgNodePayload {
   viewMode?: string | null;
   sortOrder?: number;
   nodeLayer?: string;
+  roleRuid?: string | null;
 }
 
 function createHttpError(message: string, statusCode: number): Error {
@@ -259,6 +260,7 @@ function toNodeData(vesselId: string, node: OrgNodePayload) {
     viewMode: node.viewMode || null,
     sortOrder: node.sortOrder ?? 0,
     nodeLayer: node.nodeLayer || 'department',
+    roleRuid: node.roleRuid || null,
     isDeleted: false,
   };
 }
@@ -406,6 +408,24 @@ export async function saveVesselDepartmentConfig(vesselId: string, configs: { de
   if (!Array.isArray(configs)) throw createHttpError("configs array required", 400);
   const result = await repo.upsertVesselDepartmentConfig(vesselId, configs);
   return { success: true, configs: result };
+}
+
+export async function getActiveRoles() {
+  const roles = await repo.getActiveRoles();
+  if (!roles) {
+    const err: any = new Error("Database not available");
+    err.statusCode = 503;
+    throw err;
+  }
+  return roles;
+}
+
+export async function getNodesByRoleRuid(vesselId: string, roleRuid: string) {
+  if (!vesselId) throw createHttpError("vesselId required", 400);
+  if (!roleRuid) throw createHttpError("roleRuid required", 400);
+  const nodes = await repo.getNodesByRoleRuid(vesselId, roleRuid);
+  if (!nodes) throw createHttpError("Database not available", 503);
+  return nodes;
 }
 
 export async function resolveHierarchyScope(vesselId: string, crewDesignation: string) {

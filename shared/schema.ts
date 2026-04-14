@@ -3481,6 +3481,7 @@ export const vesselOrgChartNodes = pgTable("vessel_org_chart_nodes", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdateFn(() => new Date()),
   createdByUuid: text("created_by_uuid"),
   updatedByUuid: text("updated_by_uuid"),
+  roleRuid: text("role_ruid"),
   isDeleted: boolean("is_deleted").default(false),
 });
 

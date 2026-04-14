@@ -26,6 +26,9 @@ router.get('/admin/vessel-department-config/:vesselId', asyncHandler(ctrl.getVes
 router.post('/admin/vessel-department-config/:vesselId', asyncHandler(ctrl.saveVesselDepartmentConfig));
 router.put('/admin/vessel-department-config/:vesselId', asyncHandler(ctrl.saveVesselDepartmentConfig));
 
+router.get('/admin/role-master/active', asyncHandler(ctrl.getActiveRoles));
+router.get('/admin/vessel-org-chart-nodes/:vesselId/by-role/:roleRuid', asyncHandler(ctrl.getNodesByRoleRuid));
+
 router.get('/hierarchy-scope/:vesselId', asyncHandler(ctrl.getHierarchyScope));
 
 export default router;
