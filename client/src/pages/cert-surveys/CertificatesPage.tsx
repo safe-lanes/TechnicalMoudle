@@ -813,7 +813,55 @@ export default function CertificatesPage() {
     onDateChange: handleDateChange,
   }), [handleOpenAttachments, handleDateChange]);
 
-  const handleExportPdf = useCallback(() => {
+  const fetchAllCertificates = useCallback(async () => {
+    const params = new URLSearchParams();
+    params.set('page', '1');
+    params.set('limit', '100000');
+    if (selectedVesselNames.length === 1) {
+      params.set('vesselName', selectedVesselNames[0]);
+    } else if (selectedVesselNames.length > 1) {
+      params.set('vesselNames', selectedVesselNames.join(','));
+    }
+    if (sortBy) {
+      params.set('sortBy', sortBy);
+      params.set('sortOrder', sortOrder);
+    }
+    const response = await fetch(`/technical/api/certificates?${params.toString()}`);
+    if (!response.ok) throw new Error('Failed to fetch certificates for export');
+    const result = await response.json();
+    let allCerts = result.certificates || [];
+
+    if (selectedVesselNames.length > 1) {
+      const normalizedFilterNames = selectedVesselNames.map(n => n.toLowerCase().trim());
+      allCerts = allCerts.filter((cert: any) => {
+        const certVessel = (cert.vessel || '').toLowerCase().trim();
+        return normalizedFilterNames.some((filterName: string) => filterName === certVessel);
+      });
+    }
+
+    if (dueInFilter !== 'all') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      allCerts = allCerts.filter((cert: any) => {
+        if (!cert.expiryDate) return false;
+        const expiryDateStr = parseDisplayDate(cert.expiryDate);
+        if (!expiryDateStr) return false;
+        const expiryDate = new Date(expiryDateStr);
+        expiryDate.setHours(0, 0, 0, 0);
+        const isOverdue = expiryDate < today;
+        if (dueInFilter === 'overdue') return isOverdue;
+        if (isOverdue) return true;
+        const monthsAhead = dueInFilter === '3months' ? 3 : dueInFilter === '2months' ? 2 : 1;
+        const thresholdDate = new Date(today);
+        thresholdDate.setMonth(thresholdDate.getMonth() + monthsAhead);
+        return expiryDate <= thresholdDate;
+      });
+    }
+
+    return allCerts;
+  }, [selectedVesselNames, sortBy, sortOrder, dueInFilter]);
+
+  const handleExportPdf = useCallback(async () => {
     const columns: TableColumn[] = [
       { header: 'Company ID', field: 'id', width: 18 },
       { header: 'Name of Certificate', field: 'certificateName', width: 35 },
@@ -827,29 +875,76 @@ export default function CertificatesPage() {
       { header: 'Last Edit/ Upload', field: 'lastEditUpload', width: 18 },
     ];
 
-    const data = filteredCertificates.map((cert: any) => ({
-      id: cert.id || '-',
-      certificateName: cert.certificateName || '-',
-      type: cert.type || '-',
-      vessel: cert.vessel || '-',
-      issueDate: cert.issueDate || '-',
-      expiryDate: cert.expiryDate || '-',
-      lastAnnual: cert.lastAnnual || '-',
-      lastInterm: cert.lastInterm || '-',
-      endorsementDate: cert.endorsementDate || '-',
-      lastEditUpload: cert.lastEditUpload || '-',
-    }));
+    try {
+      const allCerts = await fetchAllCertificates();
+      const data = allCerts.map((cert: any) => ({
+        id: cert.id || '-',
+        certificateName: cert.certificateName || '-',
+        type: cert.type || '-',
+        vessel: cert.vessel || '-',
+        issueDate: cert.issueDate || '-',
+        expiryDate: cert.expiryDate || '-',
+        lastAnnual: cert.lastAnnual || '-',
+        lastInterm: cert.lastInterm || '-',
+        endorsementDate: cert.endorsementDate || '-',
+        lastEditUpload: cert.lastEditUpload || '-',
+      }));
 
-    pdfReportGenerator.generateReport(
-      {
-        title: 'Certificates',
-        subtitle: `Total: ${filteredCertificates.length} certificate${filteredCertificates.length !== 1 ? 's' : ''}`,
-        orientation: 'landscape',
-      },
-      columns,
-      data
-    );
-  }, [filteredCertificates]);
+      pdfReportGenerator.generateReport(
+        {
+          title: 'Certificates',
+          subtitle: `Total: ${data.length} certificate${data.length !== 1 ? 's' : ''}`,
+          orientation: 'landscape',
+        },
+        columns,
+        data
+      );
+    } catch (error) {
+      toast({ title: 'Export Failed', description: 'Could not fetch all certificates for export.', variant: 'destructive' });
+    }
+  }, [fetchAllCertificates, toast]);
+
+  const handleExportCsv = useCallback(async () => {
+    try {
+      const allCerts = await fetchAllCertificates();
+      const headers = ['Company ID', 'Name of Certificate', 'Company Group', 'Vessel', 'Issue Date', 'Expiry Date', 'Last Annual', 'Last Interm', 'Endorsement Date', 'Last Edit/ Upload'];
+      const rows = allCerts.map((cert: any) => [
+        cert.id || '', cert.certificateName || '', cert.type || '', cert.vessel || '',
+        cert.issueDate || '', cert.expiryDate || '', cert.lastAnnual || '',
+        cert.lastInterm || '', cert.endorsementDate || '', cert.lastEditUpload || '',
+      ]);
+      const csvContent = [headers, ...rows].map(row => row.map((cell: string) => `"${(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'certificates-export.csv';
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (error) {
+      toast({ title: 'Export Failed', description: 'Could not fetch all certificates for CSV export.', variant: 'destructive' });
+    }
+  }, [fetchAllCertificates, toast]);
+
+  const handleExportExcel = useCallback(async () => {
+    try {
+      const allCerts = await fetchAllCertificates();
+      const headers = ['Company ID', 'Name of Certificate', 'Company Group', 'Vessel', 'Issue Date', 'Expiry Date', 'Last Annual', 'Last Interm', 'Endorsement Date', 'Last Edit/ Upload'];
+      const rows = allCerts.map((cert: any) => [
+        cert.id || '', cert.certificateName || '', cert.type || '', cert.vessel || '',
+        cert.issueDate || '', cert.expiryDate || '', cert.lastAnnual || '',
+        cert.lastInterm || '', cert.endorsementDate || '', cert.lastEditUpload || '',
+      ]);
+      const csvContent = [headers, ...rows].map(row => row.map((cell: string) => `"${(cell || '').replace(/"/g, '""')}"`).join('\t')).join('\n');
+      const blob = new Blob([csvContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'certificates-export.xlsx';
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (error) {
+      toast({ title: 'Export Failed', description: 'Could not fetch all certificates for Excel export.', variant: 'destructive' });
+    }
+  }, [fetchAllCertificates, toast]);
 
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
@@ -984,6 +1079,8 @@ export default function CertificatesPage() {
                   showFilterButtons={true}
                   showGroupButtons={true}
                   showSelectionButtons={false}
+                  onExportCsv={handleExportCsv}
+                  onExportExcel={handleExportExcel}
                 />
               </div>
             </div>

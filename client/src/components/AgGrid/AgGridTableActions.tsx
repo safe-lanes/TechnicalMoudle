@@ -13,6 +13,8 @@ export interface AgGridTableActionsProps {
   showSelectionButtons?: boolean;
   customButtons?: React.ReactNode;
   exportFilename?: string;
+  onExportCsv?: () => void;
+  onExportExcel?: () => void;
 }
 
 export const AgGridTableActions: React.FC<AgGridTableActionsProps> = ({
@@ -23,7 +25,9 @@ export const AgGridTableActions: React.FC<AgGridTableActionsProps> = ({
   showGroupButtons = true,
   showSelectionButtons = false,
   customButtons,
-  exportFilename = 'data'
+  exportFilename = 'data',
+  onExportCsv,
+  onExportExcel,
 }) => {
   const { toast } = useToast();
   
@@ -36,14 +40,14 @@ export const AgGridTableActions: React.FC<AgGridTableActionsProps> = ({
           <Button 
             variant="outline" 
             className="h-8 text-[#8798ad] text-xs border-[#e1e8ed]"
-            onClick={() => agGridUtils.exportToCsv(gridApi, `${exportFilename}.csv`)}
+            onClick={() => onExportCsv ? onExportCsv() : agGridUtils.exportToCsv(gridApi, `${exportFilename}.csv`)}
           >
             Export CSV
           </Button>
           <Button 
             variant="outline" 
             className="h-8 text-[#8798ad] text-xs border-[#e1e8ed]"
-            onClick={() => agGridUtils.exportToExcel(gridApi, `${exportFilename}.xlsx`)}
+            onClick={() => onExportExcel ? onExportExcel() : agGridUtils.exportToExcel(gridApi, `${exportFilename}.xlsx`)}
           >
             Export Excel
           </Button>

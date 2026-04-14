@@ -520,7 +520,53 @@ export default function SurveysPage() {
     };
   }, []);
 
-  const handleExportPdf = useCallback(() => {
+  const fetchAllSurveys = useCallback(async () => {
+    const params = new URLSearchParams();
+    params.set('page', '1');
+    params.set('limit', '100000');
+    if (selectedVesselNames.length === 1) {
+      params.set('vesselName', selectedVesselNames[0]);
+    } else if (selectedVesselNames.length > 1) {
+      params.set('vesselNames', selectedVesselNames.join(','));
+    }
+    const response = await fetch(`/technical/api/surveys?${params.toString()}`);
+    if (!response.ok) throw new Error('Failed to fetch surveys for export');
+    const result = await response.json();
+    let allSurveys = result.surveys || [];
+
+    if (selectedVesselNames.length > 0) {
+      const normalizedFilterNames = selectedVesselNames.map(n => n.toLowerCase().trim());
+      allSurveys = allSurveys.filter((survey: any) => {
+        const surveyVessel = (survey.vessel || '').toLowerCase().trim();
+        return normalizedFilterNames.some((filterName: string) =>
+          filterName === surveyVessel || surveyVessel.includes(filterName) || filterName.includes(surveyVessel)
+        );
+      });
+    }
+
+    if (dueInFilter !== 'all') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      allSurveys = allSurveys.filter((survey: any) => {
+        if (!survey.dueDate) return false;
+        const dueDateStr = parseDisplayDate(survey.dueDate);
+        if (!dueDateStr) return false;
+        const dueDate = new Date(dueDateStr);
+        dueDate.setHours(0, 0, 0, 0);
+        const isOverdue = dueDate < today;
+        if (dueInFilter === 'overdue') return isOverdue;
+        if (isOverdue) return true;
+        const monthsAhead = dueInFilter === '3months' ? 3 : dueInFilter === '2months' ? 2 : 1;
+        const thresholdDate = new Date(today);
+        thresholdDate.setMonth(thresholdDate.getMonth() + monthsAhead);
+        return dueDate <= thresholdDate;
+      });
+    }
+
+    return allSurveys;
+  }, [selectedVesselNames, dueInFilter]);
+
+  const handleExportPdf = useCallback(async () => {
     const columns: TableColumn[] = [
       { header: 'Company ID', field: 'companyId', width: 18 },
       { header: 'Survey', field: 'surveyName', width: 35 },
@@ -534,29 +580,76 @@ export default function SurveysPage() {
       { header: 'Last Edit', field: 'lastEdit', width: 18 },
     ];
 
-    const data = filteredSurveys.map((survey: any) => ({
-      companyId: survey.companyId || '-',
-      surveyName: survey.surveyName || '-',
-      type: survey.type || '-',
-      vessel: survey.vessel || '-',
-      surveyDate: survey.surveyDate || '-',
-      dueDate: survey.dueDate || '-',
-      firstRangeDate: survey.firstRangeDate || '-',
-      secondRangeDate: survey.secondRangeDate || '-',
-      postponed: survey.postponed || '-',
-      lastEdit: survey.lastEdit || '-',
-    }));
+    try {
+      const allSurveys = await fetchAllSurveys();
+      const data = allSurveys.map((survey: any) => ({
+        companyId: survey.companyId || '-',
+        surveyName: survey.surveyName || '-',
+        type: survey.type || '-',
+        vessel: survey.vessel || '-',
+        surveyDate: survey.surveyDate || '-',
+        dueDate: survey.dueDate || '-',
+        firstRangeDate: survey.firstRangeDate || '-',
+        secondRangeDate: survey.secondRangeDate || '-',
+        postponed: survey.postponed || '-',
+        lastEdit: survey.lastEdit || '-',
+      }));
 
-    pdfReportGenerator.generateReport(
-      {
-        title: 'Surveys',
-        subtitle: `Total: ${filteredSurveys.length} survey${filteredSurveys.length !== 1 ? 's' : ''}`,
-        orientation: 'landscape',
-      },
-      columns,
-      data
-    );
-  }, [filteredSurveys]);
+      pdfReportGenerator.generateReport(
+        {
+          title: 'Surveys',
+          subtitle: `Total: ${data.length} survey${data.length !== 1 ? 's' : ''}`,
+          orientation: 'landscape',
+        },
+        columns,
+        data
+      );
+    } catch (error) {
+      toast({ title: 'Export Failed', description: 'Could not fetch all surveys for export.', variant: 'destructive' });
+    }
+  }, [fetchAllSurveys, toast]);
+
+  const handleExportCsv = useCallback(async () => {
+    try {
+      const allSurveys = await fetchAllSurveys();
+      const headers = ['Company ID', 'Survey', 'Company Group', 'Vessel', 'Survey Date', 'Due Date', '1st Range Date', '2nd Range Date', 'Postponed', 'Last Edit'];
+      const rows = allSurveys.map((survey: any) => [
+        survey.companyId || '', survey.surveyName || '', survey.type || '', survey.vessel || '',
+        survey.surveyDate || '', survey.dueDate || '', survey.firstRangeDate || '',
+        survey.secondRangeDate || '', survey.postponed || '', survey.lastEdit || '',
+      ]);
+      const csvContent = [headers, ...rows].map(row => row.map((cell: string) => `"${(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'surveys-export.csv';
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (error) {
+      toast({ title: 'Export Failed', description: 'Could not fetch all surveys for CSV export.', variant: 'destructive' });
+    }
+  }, [fetchAllSurveys, toast]);
+
+  const handleExportExcel = useCallback(async () => {
+    try {
+      const allSurveys = await fetchAllSurveys();
+      const headers = ['Company ID', 'Survey', 'Company Group', 'Vessel', 'Survey Date', 'Due Date', '1st Range Date', '2nd Range Date', 'Postponed', 'Last Edit'];
+      const rows = allSurveys.map((survey: any) => [
+        survey.companyId || '', survey.surveyName || '', survey.type || '', survey.vessel || '',
+        survey.surveyDate || '', survey.dueDate || '', survey.firstRangeDate || '',
+        survey.secondRangeDate || '', survey.postponed || '', survey.lastEdit || '',
+      ]);
+      const csvContent = [headers, ...rows].map(row => row.map((cell: string) => `"${(cell || '').replace(/"/g, '""')}"`).join('\t')).join('\n');
+      const blob = new Blob([csvContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'surveys-export.xlsx';
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (error) {
+      toast({ title: 'Export Failed', description: 'Could not fetch all surveys for Excel export.', variant: 'destructive' });
+    }
+  }, [fetchAllSurveys, toast]);
 
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
@@ -690,6 +783,8 @@ export default function SurveysPage() {
                   showFilterButtons={true}
                   showGroupButtons={true}
                   showSelectionButtons={false}
+                  onExportCsv={handleExportCsv}
+                  onExportExcel={handleExportExcel}
                 />
               </div>
             </div>
