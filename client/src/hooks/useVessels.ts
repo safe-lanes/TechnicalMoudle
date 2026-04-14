@@ -37,27 +37,31 @@ export function useVessels() {
     data: externalVesselEntries = [],
     isLoading: isLoadingExternal,
     error: externalError,
+    isSuccess: externalIsSuccess,
   } = useExternalVessels();
 
   const externalVessels = useMemo(
     () => mapEntriesToVessels(externalVesselEntries),
     [externalVesselEntries]
   );
-  const hasUsableExternalData = externalVessels.length > 0;
+
+  const externalResolved = !isLoadingExternal;
+  const useExternal = externalIsSuccess && externalVessels.length > 0;
+  const externalFailed = externalResolved && !useExternal;
 
   const {
     data: localVesselEntries = [],
     isLoading: isLoadingLocal,
     error: localError,
   } = useLocalVessels({
-    enabled: !hasUsableExternalData && !isLoadingExternal,
+    enabled: externalFailed,
   });
 
-  const isLoading = isLoadingExternal || (!hasUsableExternalData && isLoadingLocal);
-  const error = hasUsableExternalData ? externalError : localError;
+  const isLoading = isLoadingExternal || (externalFailed && isLoadingLocal);
+  const error = useExternal ? externalError : localError;
 
   const vessels: Vessel[] = useMemo(() => {
-    const all = hasUsableExternalData
+    const all = useExternal
       ? externalVessels
       : mapEntriesToVessels(localVesselEntries);
 
@@ -65,7 +69,7 @@ export function useVessels() {
       return all.filter(v => EXTERNAL_ALLOWED_VESSEL_IDS.includes(v.id));
     }
     return all;
-  }, [hasUsableExternalData, externalVessels, localVesselEntries, isExternal]);
+  }, [useExternal, externalVessels, localVesselEntries, isExternal]);
 
   return { data: vessels, isLoading, error };
 }
