@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import type { IStorage } from "../storage";
 import { getDb } from "../db";
 import { vessels as vesselsTable, vesselCertificateData, vesselSurveyData, shipCertificatesMaster, shipSurveysMaster } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 let openaiClient: OpenAI | null = null;
 
@@ -2483,7 +2483,7 @@ async function executeTool(
           }
 
           const surveyData = await db.select().from(vesselSurveyData).where(eq(vesselSurveyData.vesselId, args.vesselId));
-          const surveyMasters = await db.select().from(shipSurveysMaster);
+          const surveyMasters = await db.select().from(shipSurveysMaster).where(and(eq(shipSurveysMaster.isDeleted, false), eq(shipSurveysMaster.isActive, true)));
           const surveyMasterMap = new Map(surveyMasters.map((m) => [m.masterId, m]));
 
           for (const survey of surveyData) {
