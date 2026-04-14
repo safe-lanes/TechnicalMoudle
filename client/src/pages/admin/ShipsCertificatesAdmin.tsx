@@ -1443,7 +1443,18 @@ export default function ShipsCertificatesAdmin() {
                     )}
                     <td className={cn("px-3 py-3 text-sm", isPendingDelete && "line-through")}>{idx + 1}</td>
                     <td className={cn("px-3 py-3 text-sm font-medium text-blue-600", isPendingDelete && "line-through")}>{cert.masterId}</td>
-                    <td className={cn("px-3 py-3 text-sm", isPendingDelete && "line-through")}>{cert.certificateName}</td>
+                    <td className={cn("px-3 py-3 text-sm", isPendingDelete && "line-through")}>
+                      {viewModes.master === "edit" && !cert.isSystemDefined ? (
+                        <Input
+                          defaultValue={cert.certificateName}
+                          className="h-8 text-sm"
+                          onBlur={(e) => updateMasterField(cert.id, 'certificateName', e.target.value)}
+                          data-testid={`input-cert-name-${cert.id}`}
+                        />
+                      ) : (
+                        cert.certificateName
+                      )}
+                    </td>
                     <td className="px-3 py-3 text-sm">
                       {viewModes.master === "edit" ? (
                         <Select defaultValue={cert.category} onValueChange={(value) => updateMasterField(cert.id, 'category', value)}>
