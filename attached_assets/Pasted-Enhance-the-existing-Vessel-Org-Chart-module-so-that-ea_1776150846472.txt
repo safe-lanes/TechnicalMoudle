@@ -1,0 +1,301 @@
+Enhance the existing Vessel Org Chart module so that each org chart node can optionally be bound not only to a rank and view mode, but also to one or more application roles from the role master dataset.
+
+The attached role master reference contains role records with fields such as:
+
+ruid
+
+assignedrole
+
+roletype
+
+ordering / active flags[ file:6]
+It also contains a separate rank-style dataset with vessel ranks like Master, Chief Officer, Chief Engineer, Bosun, Oiler, Chief Cook, etc., which means the system must clearly separate:
+
+application role
+
+operational vessel rank
+
+org chart hierarchy node
+
+view mode
+Objective
+
+Update the Vessel Org Chart so that, for each vessel-specific org chart node, the system can store and later resolve:
+
+rank
+
+label
+
+department
+
+parent hierarchy position
+
+HOD / overall-head status
+
+view mode
+
+bound role(s) from role master using ruid
+
+This is required so that when a user logs in, the system can identify the user from their role binding and derive:
+
+their role,
+
+their mapped rank/node,
+
+their view mode,
+
+and their team scope from the saved org chart hierarchy.
+Important design rule
+
+Do not treat role, rank, and view mode as the same concept.
+
+They are different:
+
+Role = application/user access identity from role master, identified by ruid and assignedrole.
+
+Rank = operational vessel position such as Master, Chief Officer, Chief Engineer, Oiler, etc.
+
+View Mode = how that node behaves in the UI/workflow context, such as Head of Dept, Vessel, Sail Admin, Client Admin, Superintendent, etc.
+
+A single org chart node may need all three dimensions:
+
+rank assigned,
+
+view mode assigned,
+
+role binding assigned.
+UI requirement in Vessel Org Chart
+
+Add one more dropdown / selector on each configurable org chart node for Role Binding.
+
+This dropdown must:
+
+fetch role options from the role master source,
+
+display user-friendly role names such as Admin, User, Sail Admin, Super Admin, Vessel Admin, Vessel User, External 1, External 2, etc.
+
+store the selected role using the stable ruid, not only the display name.
+
+allow empty selection if a node does not need direct role binding,
+
+support future extensibility if more roles are added later.
+Fetching role master data
+
+Replit must create a proper backend source for role master options rather than hardcoding dropdown values.
+
+Implement:
+
+a backend method / repository query to fetch active roles from role master,
+
+include fields at minimum:
+ruid
+
+assignedrole
+
+roletype
+
+active status
+
+sort order where available[ file:6]
+
+
+expose an API endpoint for frontend dropdown consumption,
+
+return only valid active roles by default,
+
+sort roles in a predictable admin-friendly order.
+Org chart node data model changes
+
+Extend the vessel org chart node model so each node can store role binding metadata in addition to current fields.
+
+At minimum each node should support:
+
+nodeId
+
+vesselId
+
+rankId
+
+rankCode
+
+label
+
+departmentId
+
+parentNodeId
+
+isHod
+
+isOverallHead
+
+viewMode
+
+roleRuid (new)
+
+roleName or resolved display role (optional cached field)
+
+assignmentStatus
+
+sortOrder
+
+If multiple roles per node may be required later, keep the structure future-ready. For now, if single-role binding is simpler, implement one selected role per node, but do not design it in a way that blocks future multi-role support.
+Binding logic
+
+The role binding must be explicit and admin-configurable from the Vessel Org Chart page.
+
+Expected behavior:
+
+Admin selects a vessel.
+
+Admin configures hierarchy as usual.
+
+For each node, admin can select:
+rank,
+
+view mode,
+
+role binding from role master.
+
+
+On save, the selected ruid must persist with that vessel node.
+
+On reload, the same role selection must appear again correctly.
+Login and resolution behavior
+
+This role binding is being added so the system can later resolve the logged-in user properly.
+
+The intended flow is:
+
+User logs in.
+
+System knows the user’s application role / role ruid from auth or user master.
+
+For the selected vessel, the system checks the saved vessel org chart nodes.
+
+It matches the user’s role ruid to the bound node(s).
+
+From that node it derives:
+the node’s rank,
+
+the node’s view mode,
+
+the node’s place in the hierarchy,
+
+and the user’s subordinate team scope if needed.
+Important architecture rule
+
+Do not guess user hierarchy only from role name text or rank name text.
+
+The correct resolution path should be:
+
+
+user auth identity
+
+user role / role ruid
+
+vessel org chart role-bound node
+
+node rank + node view mode + hierarchy descendants
+
+This means ruid should be treated as the stable identity key for role binding.
+Separation of concerns
+
+Keep these sources separate and clean:
+
+Role Master = source of application roles and ruid.
+
+Rank Master = source of operational ranks like Master, Chief Officer, Chief Engineer, etc.
+
+Vessel Org Chart = vessel-specific mapping layer connecting rank + hierarchy + department + HOD + overall head + view mode + bound role.
+
+Do not merge role master and rank master into one confused table or one overloaded dropdown.
+UX requirement
+
+The node editor should clearly show three separate fields:
+
+Rank
+
+View Mode
+
+Role Binding
+
+The admin must not be forced to assume that choosing a role automatically means a rank, or that choosing a rank automatically means a role.
+
+If helpful, show role type such as Office or Ship in the dropdown label or as helper text so admins understand what kind of role they are binding.
+
+Example display:
+
+Sail Admin — Office
+
+Vessel Admin — Ship
+
+Vessel User — Ship
+
+Admin — Office[ file:6]
+Validation / behavior expectations
+
+Implement lightweight validation now:
+
+selected role should be from active role master only,
+
+invalid or deleted roles should not appear in new selection lists,
+
+existing nodes with old/inactive role binding should still load visibly but show as inactive / legacy if needed,
+
+saving should persist stable ruid, not just role text.
+
+Do not implement heavy validation yet such as one-role-per-vessel or mandatory role binding for all nodes unless explicitly required later.
+API expectations
+
+Add proper backend support for:
+
+fetch active role master list,
+
+save org chart nodes including bound ruid,
+
+load org chart nodes including resolved role display values,
+
+later lookup of logged-in user’s role-bound node by ruid.
+Future use of this feature
+
+This role binding is being introduced so future features can reliably use the vessel org chart as a business mapping layer for:
+
+login-based node resolution,
+
+view-mode resolution,
+
+Me / My Team dashboard filtering,
+
+approval routing,
+
+HOD-based access,
+
+overall-head access,
+
+and role-aware dashboard behavior.
+Do not do these mistakes
+
+Do not hardcode role dropdown values in the frontend.
+
+Do not store only role name text; store ruid.
+
+Do not assume role name = rank name.
+
+Do not assume view mode = role.
+
+Do not replace hierarchy logic with role logic; role binding is an added identity layer, not a replacement for the org chart.
+Acceptance criteria
+
+The task is complete only if:
+
+org chart node editor shows a working Role Binding dropdown,
+
+dropdown options come from role master source,
+
+selected option saves stable ruid, not only display text,
+
+loading a vessel restores the bound role correctly,
+
+role binding remains separate from rank and view mode,
+
+backend can later use ruid to map logged-in users to vessel org chart nodes.
