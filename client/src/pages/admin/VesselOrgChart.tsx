@@ -333,7 +333,7 @@ export default function VesselOrgChart() {
   const unassignNode = (nodeUuid: string) => {
     setNodes(prev => prev.map(n => {
       if (n.nodeUuid !== nodeUuid) return n;
-      return { ...n, department: null, parentNodeUuid: null, isAssigned: false, isHod: false, sortOrder: 0, nodeLayer: 'department' as NodeLayer, roleRuid: null };
+      return { ...n, department: null, parentNodeUuid: null, isAssigned: false, isHod: false, sortOrder: 0, nodeLayer: 'department' as NodeLayer };
     }).map(n => {
       if (n.parentNodeUuid === nodeUuid) return { ...n, parentNodeUuid: null };
       return n;
@@ -865,6 +865,9 @@ export default function VesselOrgChart() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__">No Role</SelectItem>
+              {node.roleRuid && !roleOptions.find(r => r.ruid === node.roleRuid) && (
+                <SelectItem value={node.roleRuid} disabled>{node.roleName || 'Inactive Role'} (Inactive)</SelectItem>
+              )}
               {roleOptions.map(r => (
                 <SelectItem key={r.ruid} value={r.ruid}>{r.assignedRole} — {r.roletype}</SelectItem>
               ))}
@@ -981,6 +984,9 @@ export default function VesselOrgChart() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__none__">No Role</SelectItem>
+            {node.roleRuid && !roleOptions.find(r => r.ruid === node.roleRuid) && (
+              <SelectItem value={node.roleRuid} disabled>{node.roleName || 'Inactive Role'} (Inactive)</SelectItem>
+            )}
             {roleOptions.map(r => (
               <SelectItem key={r.ruid} value={r.ruid}>{r.assignedRole} — {r.roletype}</SelectItem>
             ))}
