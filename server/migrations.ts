@@ -3140,10 +3140,37 @@ export async function runDrizzleMigrations(): Promise<{ applied: number; skipped
     }
     
     console.log(`  📝 Applying SQL migration: ${migrationId}`);
-    
-    try {
-      await db.execute(sql.raw(sqlContent));
-      
+
+    // Drizzle-generated files use '--> statement-breakpoint' to separate statements.
+    // Split on this marker and execute each statement individually so that an
+    // "already exists" error on one statement (e.g. CREATE TABLE) doesn't abort
+    // subsequent statements (e.g. ALTER TABLE ADD COLUMN) in the same file.
+    // Hand-written files without breakpoints execute as a single batch (unchanged).
+    const usePerStatement = sqlContent.includes('--> statement-breakpoint');
+
+    if (usePerStatement) {
+      const statements = sqlContent.split('--> statement-breakpoint')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+      let appliedStmts = 0;
+      let skippedStmts = 0;
+
+      for (const stmt of statements) {
+        try {
+          await db.execute(sql.raw(stmt));
+          appliedStmts++;
+        } catch (error: any) {
+          if (error.code === '42P07' || error.code === '42701' || error.code === '42704') {
+            console.log(`    ⚠️  Statement skipped (object exists): ${stmt.substring(0, 80).replace(/\n/g, ' ')}...`);
+            skippedStmts++;
+            continue;
+          }
+          console.error(`  ❌ Migration ${migrationId} failed at statement:`, error.message);
+          throw error;
+        }
+      }
+
       const migration: Migration = {
         id: migrationId,
         name: `Drizzle SQL migration: ${sqlFile}`,
@@ -3151,27 +3178,38 @@ export async function runDrizzleMigrations(): Promise<{ applied: number; skipped
         sql: sqlContent
       };
       await markMigrationComplete(db, migration);
-      
       applied++;
-      console.log(`  ✅ Migration ${migrationId} applied successfully`);
-    } catch (error: any) {
-      if (error.message?.includes('already exists') ||
-          error.message?.includes('does not exist') ||
-          error.code === '42P07' ||
-          error.code === '42701' ||
-          error.code === '42704') {
-        console.log(`  ⚠️  Migration ${migrationId} - object already/does not exist, marking as complete`);
+      console.log(`  ✅ Migration ${migrationId}: ${appliedStmts} statements applied, ${skippedStmts} skipped`);
+    } else {
+      // Hand-written file — execute as a single batch
+      try {
+        await db.execute(sql.raw(sqlContent));
+
         const migration: Migration = {
           id: migrationId,
           name: `Drizzle SQL migration: ${sqlFile}`,
-          description: `Auto-applied from migrations/${sqlFile} (already existed)`,
+          description: `Auto-applied from migrations/${sqlFile}`,
           sql: sqlContent
         };
         await markMigrationComplete(db, migration);
-        skipped++;
-      } else {
-        console.error(`  ❌ Migration ${migrationId} failed:`, error.message);
-        throw error;
+
+        applied++;
+        console.log(`  ✅ Migration ${migrationId} applied successfully`);
+      } catch (error: any) {
+        if (error.code === '42P07' || error.code === '42701' || error.code === '42704') {
+          console.log(`  ⚠️  Migration ${migrationId} - object already exists, marking as complete`);
+          const migration: Migration = {
+            id: migrationId,
+            name: `Drizzle SQL migration: ${sqlFile}`,
+            description: `Auto-applied from migrations/${sqlFile} (already existed)`,
+            sql: sqlContent
+          };
+          await markMigrationComplete(db, migration);
+          skipped++;
+        } else {
+          console.error(`  ❌ Migration ${migrationId} failed:`, error.message);
+          throw error;
+        }
       }
     }
   }
