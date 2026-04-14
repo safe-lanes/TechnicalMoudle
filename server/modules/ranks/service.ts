@@ -1,6 +1,6 @@
 import * as repo from './repository';
 import { getPostgresClient } from '../../postgresClient';
-import { admAvailableRanks, admVesselOrgChart, vesselOrgChartNodes, masterLists } from '@shared/schema';
+import { admAvailableRanks, admVesselOrgChart, masterLists } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 
 export async function getAllRanks() {
@@ -207,182 +207,10 @@ export async function getVesselOrgChartNodes(vesselId: string) {
   return nodes;
 }
 
-export async function createVesselOrgChartNode(vesselId: string, rankId: string, nodeLabel?: string) {
-  const node = await repo.createVesselOrgChartNode({
-    vesselId,
-    rankId,
-    nodeLabel: nodeLabel || null,
-    department: null,
-    parentNodeUuid: null,
-    isHod: false,
-    isAssigned: false,
-    viewMode: null,
-    sortOrder: 0,
-    isDeleted: false,
-  });
-  if (!node) {
-    const err: any = new Error("Database not available");
-    err.statusCode = 503;
-    throw err;
-  }
-  return node;
-}
-
-interface OrgNodePayload {
-  nodeUuid?: string;
-  rankId: string;
-  nodeLabel?: string | null;
-  department?: string | null;
-  parentNodeUuid?: string | null;
-  isHod?: boolean;
-  isAssigned?: boolean;
-  viewMode?: string | null;
-  sortOrder?: number;
-  nodeLayer?: string;
-  roleRuid?: string | null;
-}
-
 function createHttpError(message: string, statusCode: number): Error {
   const err = new Error(message) as Error & { statusCode: number };
   err.statusCode = statusCode;
   return err;
-}
-
-function toNodeData(vesselId: string, node: OrgNodePayload) {
-  return {
-    vesselId,
-    rankId: node.rankId,
-    nodeLabel: node.nodeLabel || null,
-    department: node.department || null,
-    parentNodeUuid: node.parentNodeUuid || null,
-    isHod: node.isHod ?? false,
-    isAssigned: node.isAssigned ?? false,
-    viewMode: node.viewMode || null,
-    sortOrder: node.sortOrder ?? 0,
-    nodeLayer: node.nodeLayer || 'department',
-    roleRuid: node.roleRuid || null,
-    isDeleted: false,
-  };
-}
-
-export async function bulkSaveVesselOrgChartNodes(vesselId: string, nodes: OrgNodePayload[]) {
-  const postgres = getPostgresClient();
-  if (!postgres) throw createHttpError("Database not available", 503);
-
-  const nodeMap = new Map<string, OrgNodePayload>();
-  for (const n of nodes) {
-    if (n.nodeUuid) nodeMap.set(n.nodeUuid, n);
-  }
-
-  const hodPerDept = new Map<string, number>();
-  for (const n of nodes) {
-    const layer = n.nodeLayer || 'department';
-    if (n.isAssigned && !n.department && layer === 'department') {
-      throw createHttpError(
-        `Node ${n.nodeUuid || 'new'} is marked as assigned but has no department`,
-        400
-      );
-    }
-    if (n.parentNodeUuid && nodeMap.has(n.parentNodeUuid)) {
-      const parent = nodeMap.get(n.parentNodeUuid)!;
-      const parentLayer = parent.nodeLayer || 'department';
-      if (layer === 'department' && parentLayer === 'department' && parent.department !== n.department) {
-        throw createHttpError(
-          `Cross-department parent reference: node ${n.nodeUuid} (dept: ${n.department}) references parent ${n.parentNodeUuid} (dept: ${parent.department})`,
-          400
-        );
-      }
-    }
-    if (n.isHod && n.department) {
-      hodPerDept.set(n.department, (hodPerDept.get(n.department) || 0) + 1);
-    }
-  }
-  for (const [dept, count] of hodPerDept) {
-    if (count > 1) {
-      throw createHttpError(`Multiple HOD nodes in department "${dept}": only one HOD is allowed per department`, 400);
-    }
-  }
-
-  return postgres.db.transaction(async (tx) => {
-    let inserted = 0;
-    let updated = 0;
-
-    const existingNodes = await tx.select().from(vesselOrgChartNodes)
-      .where(and(
-        eq(vesselOrgChartNodes.vesselId, vesselId),
-        eq(vesselOrgChartNodes.isDeleted, false)
-      ));
-
-    const existingUuids = new Set(existingNodes.map(n => n.nodeUuid));
-    const incomingUuids = new Set(nodes.filter(n => n.nodeUuid).map(n => n.nodeUuid!));
-    const allValidUuids = new Set([...existingUuids, ...incomingUuids]);
-
-    for (const n of nodes) {
-      if (n.parentNodeUuid && !allValidUuids.has(n.parentNodeUuid)) {
-        throw createHttpError(
-          `Invalid parent reference: node ${n.nodeUuid} references parent ${n.parentNodeUuid} which does not exist in this vessel`,
-          400
-        );
-      }
-    }
-
-    for (const existingNode of existingNodes) {
-      if (!incomingUuids.has(existingNode.nodeUuid)) {
-        await tx.update(vesselOrgChartNodes)
-          .set({ isDeleted: true, updatedAt: new Date() })
-          .where(eq(vesselOrgChartNodes.nodeUuid, existingNode.nodeUuid));
-      }
-    }
-
-    const updateNodes = nodes.filter(n => n.nodeUuid && existingUuids.has(n.nodeUuid));
-    const newNodes = nodes.filter(n => !n.nodeUuid || !existingUuids.has(n.nodeUuid));
-
-    for (const node of updateNodes) {
-      const dataWithoutParent = { ...toNodeData(vesselId, node), parentNodeUuid: null, updatedAt: new Date() };
-      await tx.update(vesselOrgChartNodes)
-        .set(dataWithoutParent)
-        .where(eq(vesselOrgChartNodes.nodeUuid, node.nodeUuid!));
-      updated++;
-    }
-
-    for (const node of newNodes) {
-      const data = { ...toNodeData(vesselId, node), parentNodeUuid: null };
-      const insertData = node.nodeUuid ? { ...data, nodeUuid: node.nodeUuid } : data;
-      await tx.insert(vesselOrgChartNodes).values(insertData);
-      inserted++;
-    }
-
-    for (const node of nodes) {
-      if (node.parentNodeUuid && node.nodeUuid) {
-        await tx.update(vesselOrgChartNodes)
-          .set({ parentNodeUuid: node.parentNodeUuid })
-          .where(eq(vesselOrgChartNodes.nodeUuid, node.nodeUuid));
-      }
-    }
-
-    return { success: true, inserted, updated, total: nodes.length };
-  });
-}
-
-export async function unassignVesselOrgChartNode(vesselId: string, nodeUuid: string) {
-  const node = await repo.getVesselOrgChartNodeByUuid(nodeUuid);
-  if (!node) throw createHttpError("Node not found", 404);
-  if (node.vesselId !== vesselId) throw createHttpError("Node does not belong to this vessel", 403);
-  const result = await repo.updateVesselOrgChartNode(nodeUuid, {
-    isAssigned: false,
-    department: null,
-    parentNodeUuid: null,
-    isHod: false,
-  });
-  return { success: true, node: result };
-}
-
-export async function deleteVesselOrgChartNode(vesselId: string, nodeUuid: string) {
-  const node = await repo.getVesselOrgChartNodeByUuid(nodeUuid);
-  if (!node) throw createHttpError("Node not found", 404);
-  if (node.vesselId !== vesselId) throw createHttpError("Node does not belong to this vessel", 403);
-  await repo.softDeleteVesselOrgChartNode(nodeUuid);
-  return { success: true, message: `Node ${nodeUuid} deleted` };
 }
 
 export async function getVesselDepartmentConfig(vesselId: string) {
@@ -401,31 +229,6 @@ export async function getVesselDepartmentConfig(vesselId: string) {
     isEnabled: true,
     sortOrder: d.displayOrder ?? i,
   }));
-}
-
-export async function saveVesselDepartmentConfig(vesselId: string, configs: { department: string; isEnabled: boolean; sortOrder: number }[]) {
-  if (!vesselId) throw createHttpError("vesselId required", 400);
-  if (!Array.isArray(configs)) throw createHttpError("configs array required", 400);
-  const result = await repo.upsertVesselDepartmentConfig(vesselId, configs);
-  return { success: true, configs: result };
-}
-
-export async function getActiveRoles() {
-  const roles = await repo.getActiveRoles();
-  if (!roles) {
-    const err: any = new Error("Database not available");
-    err.statusCode = 503;
-    throw err;
-  }
-  return roles;
-}
-
-export async function getNodesByRoleRuid(vesselId: string, roleRuid: string) {
-  if (!vesselId) throw createHttpError("vesselId required", 400);
-  if (!roleRuid) throw createHttpError("roleRuid required", 400);
-  const nodes = await repo.getNodesByRoleRuid(vesselId, roleRuid);
-  if (!nodes) throw createHttpError("Database not available", 503);
-  return nodes;
 }
 
 export async function resolveHierarchyScope(vesselId: string, crewDesignation: string) {

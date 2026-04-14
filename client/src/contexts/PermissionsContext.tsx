@@ -68,7 +68,6 @@ const MENU_NAME_MAP: Record<string, Record<string, string>> = {
     "ships-certificates": "admin-ships-certificates",
     "ships-surveys": "admin-ships-surveys",
     "ranks": "admin-ranks",
-    "vessel-org-chart": "admin-ranks",
     "access-control": "admin-access-control",
   },
 };
@@ -102,7 +101,6 @@ const ROUTE_TO_MENU_NAME: Record<string, string> = {
   "/admin/ships-certificates": "admin-ships-certificates",
   "/admin/ships-surveys": "admin-ships-surveys",
   "/admin/ranks": "admin-ranks",
-  "/admin/vessel-org-chart": "admin-ranks",
   "/admin/access-control": "admin-access-control",
 };
 
