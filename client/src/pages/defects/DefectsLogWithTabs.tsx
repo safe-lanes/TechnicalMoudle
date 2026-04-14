@@ -14,7 +14,8 @@ import {
   Search, 
   Plus,
   Filter,
-  Download
+  Download,
+  Ship
 } from "lucide-react";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import type { TableColumn } from "@/lib/pdfReportGenerator";
@@ -48,6 +49,7 @@ import AgGridTableActions from "@/components/AgGrid/AgGridTableActions";
 import { ICellRendererParams, GridReadyEvent, GridApi, ColDef } from "ag-grid-community";
 import { VesselFleetGroupFilter, VesselFleetGroupFilterValue, VesselFleetGroupFilterResult, createDefaultFilterValue } from "@/components/filters/VesselFleetGroupFilter";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useVessels } from "@/hooks/useVessels";
 
 interface DefectsFilters {
   periodValue?: PeriodValue | null;
@@ -293,6 +295,8 @@ export default function DefectsLogWithTabs() {
   const [filters, setFilters] = useState<DefectsFilters>({});
   const [vesselFilterValue, setVesselFilterValue] = useState<VesselFleetGroupFilterValue>(createDefaultFilterValue());
   const [selectedVesselNames, setSelectedVesselNames] = useState<string[]>([]);
+  const [selectedVessel, setSelectedVessel] = useState("all");
+  const { data: allVessels = [] } = useVessels();
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
   
   const [linkModal, setLinkModal] = useState<{ open: boolean; defectId: string | null; linkedDefects: string[] }>({ 
@@ -368,6 +372,7 @@ export default function DefectsLogWithTabs() {
     setFilters({});
     setVesselFilterValue(createDefaultFilterValue());
     setSelectedVesselNames([]);
+    setSelectedVessel("all");
   };
 
   const handleExportPdf = () => {
@@ -423,7 +428,19 @@ export default function DefectsLogWithTabs() {
   const filteredDefects = useMemo(() => {
     let result = defects;
     
-    // Vessel filter
+    if (selectedVessel !== 'all') {
+      const selectedVesselObj = allVessels.find(v => v.id === selectedVessel);
+      const selectedVesselName = selectedVesselObj?.name?.toLowerCase().trim() || '';
+      result = result.filter((defect: Defect) => {
+        if (defect.vesselId === selectedVessel) return true;
+        if (selectedVesselName) {
+          const defectVesselName = (defect.vesselName || '').toLowerCase().trim();
+          return defectVesselName === selectedVesselName;
+        }
+        return false;
+      });
+    }
+
     if (selectedVesselNames.length > 0) {
       const normalizedFilterNames = selectedVesselNames.map(n => n.toLowerCase().trim());
       result = result.filter((defect: Defect) => {
@@ -511,7 +528,7 @@ export default function DefectsLogWithTabs() {
     }
     
     return result;
-  }, [defects, selectedVesselNames, filters.periodValue, filters.dueOverdue]);
+  }, [defects, selectedVessel, allVessels, selectedVesselNames, filters.periodValue, filters.dueOverdue]);
 
   const totalDefects = filteredDefects.length;
   const totalPages = Math.max(1, Math.ceil(totalDefects / pageSize));
@@ -832,6 +849,23 @@ export default function DefectsLogWithTabs() {
 
         {showFilters && (
           <div className="flex items-center gap-3 mb-4 bg-transparent">
+            <div className="flex items-center gap-2">
+              <Ship className="h-4 w-4 text-[#8798ad]" />
+              <Select value={selectedVessel} onValueChange={setSelectedVessel}>
+                <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]" data-testid="select-vessel-log">
+                  <SelectValue placeholder="All Vessels" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Vessels</SelectItem>
+                  {allVessels.map(vessel => (
+                    <SelectItem key={vessel.id} value={vessel.id}>
+                      {vessel.name || vessel.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <PeriodPicker
               value={filters.periodValue || null}
               onChange={(val: PeriodValue | null) => handleFilterChange('periodValue', val)}

@@ -17,7 +17,8 @@ import {
   Check, 
   Search, 
   Plus,
-  Filter
+  Filter,
+  Ship
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { 
@@ -37,6 +38,7 @@ import { VesselFleetGroupFilter, VesselFleetGroupFilterValue, createDefaultFilte
 import { PeriodPicker } from "@/components/filters/PeriodPicker";
 import type { PeriodValue } from "@/components/filters/PeriodPicker";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useVessels } from "@/hooks/useVessels";
 import type { Defect } from "@shared/schema";
 
 interface VesselFleetGroupFilterResult {
@@ -70,8 +72,10 @@ export default function DefectsLog() {
   });
   const [vesselFilterValue, setVesselFilterValue] = useState<VesselFleetGroupFilterValue>(createDefaultFilterValue());
   const [selectedVesselNames, setSelectedVesselNames] = useState<string[]>([]);
+  const [selectedVessel, setSelectedVessel] = useState("all");
   const [showFilters, setShowFilters] = useState(true);
   const [showNewDefectForm, setShowNewDefectForm] = useState(false);
+  const { data: allVessels = [] } = useVessels();
 
   const handleVesselFilterChange = useCallback((result: VesselFleetGroupFilterResult) => {
     setVesselFilterValue({
@@ -141,20 +145,29 @@ export default function DefectsLog() {
   const filteredDefects = useMemo(() => {
     let result = defects;
     
-    // Use vesselId matching with fallback to vesselName matching for legacy data
+    if (selectedVessel !== 'all') {
+      const selectedVesselObj = allVessels.find(v => v.id === selectedVessel);
+      const selectedVesselName = selectedVesselObj?.name?.toLowerCase().trim() || '';
+      result = result.filter((defect: Defect) => {
+        if (defect.vesselId === selectedVessel) return true;
+        if (selectedVesselName) {
+          const defectVesselName = (defect.vesselName || '').toLowerCase().trim();
+          return defectVesselName === selectedVesselName;
+        }
+        return false;
+      });
+    }
+
     const selectedVesselIds = vesselFilterValue.selectedVessels;
     const hasVesselFilter = selectedVesselIds.length > 0 || selectedVesselNames.length > 0;
     
     if (hasVesselFilter) {
-      // Normalize vessel names for case-insensitive matching
       const normalizedSelectedNames = selectedVesselNames.map(name => name.toLowerCase().trim());
       
       result = result.filter((defect: Defect) => {
-        // Try ID match first (works for UUID-based vessel IDs)
         if (selectedVesselIds.length > 0 && selectedVesselIds.includes(defect.vesselId)) {
           return true;
         }
-        // Fallback to name match (works for fleet/group modes and legacy data)
         if (normalizedSelectedNames.length > 0) {
           const defectVesselName = (defect.vesselName || '').toLowerCase().trim();
           return normalizedSelectedNames.includes(defectVesselName);
@@ -245,7 +258,7 @@ export default function DefectsLog() {
     });
     
     return result;
-  }, [defects, vesselFilterValue.selectedVessels, selectedVesselNames, filters.periodValue]);
+  }, [defects, selectedVessel, allVessels, vesselFilterValue.selectedVessels, selectedVesselNames, filters.periodValue]);
 
   // Compute defect status based on data (matches DefectsCoC.tsx logic)
   const getComputedStatus = (defect: Defect): { label: string; color: string } => {
@@ -323,6 +336,7 @@ export default function DefectsLog() {
     setFilters({ includeClosedDefects: false });
     setVesselFilterValue(createDefaultFilterValue());
     setSelectedVesselNames([]);
+    setSelectedVessel("all");
   };
 
   const getDisplayActionText = (defect: Defect): string | null => {
@@ -432,6 +446,24 @@ export default function DefectsLog() {
           <div className="pb-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 flex-wrap">
+                {/* Vessel */}
+                <div className="flex items-center gap-2">
+                  <Ship className="h-4 w-4 text-[#8798ad]" />
+                  <Select value={selectedVessel} onValueChange={setSelectedVessel}>
+                    <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]" data-testid="select-vessel-log">
+                      <SelectValue placeholder="All Vessels" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Vessels</SelectItem>
+                      {allVessels.map(vessel => (
+                        <SelectItem key={vessel.id} value={vessel.id}>
+                          {vessel.name || vessel.id}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Period */}
                 <PeriodPicker
                   value={filters.periodValue}

@@ -98,9 +98,14 @@ export default function DefectsDashboard() {
 
   const { data: masterVessels = [], isLoading: isLoadingVessels } = useVessels();
 
+  const selectedVesselObj = selectedVessel !== 'all' ? masterVessels.find(v => v.id === selectedVessel) : null;
+  const selectedVesselNameLower = selectedVesselObj?.name?.toLowerCase().trim() || '';
+
   const filteredDefects = defects.filter(d => {
-    if (selectedVessel !== 'all' && d.vesselId !== selectedVessel) {
-      return false;
+    if (selectedVessel !== 'all') {
+      const matchesId = d.vesselId === selectedVessel;
+      const matchesName = selectedVesselNameLower && (d.vesselName || '').toLowerCase().trim() === selectedVesselNameLower;
+      if (!matchesId && !matchesName) return false;
     }
     
     if (periodValue) {
@@ -176,16 +181,11 @@ export default function DefectsDashboard() {
     computedStatus: getComputedStatus(d)
   }));
 
-  const vesselIdsFromDefects = Array.from(new Set(allDefectsWithComputedStatus.map(d => d.vesselId))).filter(Boolean);
-  const vessels = vesselIdsFromDefects.map(vesselId => {
-    // Normalize lookup - check both id and vesselId fields
-    const masterVessel = masterVessels.find(v => v.id === vesselId || (v as any).vesselId === vesselId);
-    return {
-      id: vesselId,
-      name: masterVessel?.name || vesselId,
-      code: masterVessel?.code || vesselId
-    };
-  });
+  const vessels = masterVessels.map(v => ({
+    id: v.id,
+    name: v.name,
+    code: v.code
+  }));
 
   const statusData = [
     { name: 'Reported', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Reported').length, color: '#6b7280' },
@@ -196,12 +196,16 @@ export default function DefectsDashboard() {
     { name: 'Verified', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Verified').length, color: '#00AF7B' },
   ].filter(s => s.value > 0);
 
-  const vesselData = vessels.map(vessel => ({
-    vessel: vessel.name || vessel.id,
-    vesselId: vessel.id,
-    active: allDefectsWithComputedStatus.filter(d => d.vesselId === vessel.id && isActiveComputedStatus(d.computedStatus.label)).length,
-    closed: allDefectsWithComputedStatus.filter(d => d.vesselId === vessel.id && isResolvedComputedStatus(d.computedStatus.label)).length
-  })).filter(v => v.active > 0 || v.closed > 0);
+  const vesselData = vessels.map(vessel => {
+    const vesselNameLower = (vessel.name || '').toLowerCase().trim();
+    const matchesVessel = (d: any) => d.vesselId === vessel.id || (vesselNameLower && (d.vesselName || '').toLowerCase().trim() === vesselNameLower);
+    return {
+      vessel: vessel.name || vessel.id,
+      vesselId: vessel.id,
+      active: allDefectsWithComputedStatus.filter(d => matchesVessel(d) && isActiveComputedStatus(d.computedStatus.label)).length,
+      closed: allDefectsWithComputedStatus.filter(d => matchesVessel(d) && isResolvedComputedStatus(d.computedStatus.label)).length
+    };
+  }).filter(v => v.active > 0 || v.closed > 0);
 
   const recentDefects = [...activeDefects]
     .sort((a, b) => {
