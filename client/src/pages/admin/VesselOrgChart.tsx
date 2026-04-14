@@ -57,6 +57,9 @@ interface OrgNode {
   sortOrder: number;
   nodeLayer: NodeLayer;
   roleRuid: string | null;
+  roleName?: string | null;
+  roleType?: string | null;
+  roleIsActive?: boolean | null;
   isNew?: boolean;
 }
 
