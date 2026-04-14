@@ -639,11 +639,11 @@ export default function SurveysPage() {
         survey.surveyDate || '', survey.dueDate || '', survey.firstRangeDate || '',
         survey.secondRangeDate || '', survey.postponed || '', survey.lastEdit || '',
       ]);
-      const csvContent = [headers, ...rows].map(row => row.map((cell: string) => `"${(cell || '').replace(/"/g, '""')}"`).join('\t')).join('\n');
-      const blob = new Blob([csvContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const csvContent = [headers, ...rows].map(row => row.map((cell: string) => `"${(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = 'surveys-export.xlsx';
+      link.download = 'surveys-export.xls';
       link.click();
       URL.revokeObjectURL(link.href);
     } catch (error) {
