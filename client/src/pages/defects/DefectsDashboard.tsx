@@ -233,6 +233,15 @@ export default function DefectsDashboard() {
     window.location.href = `/defects/defect-log${queryString ? `?${queryString}` : ''}`;
   };
 
+  const defectMatchesVesselId = (defect: any, vId: string) => {
+    if (defect.vesselId === vId) return true;
+    const vessel = vessels.find(v => v.id === vId);
+    if (vessel?.name) {
+      return (defect.vesselName || '').toLowerCase().trim() === vessel.name.toLowerCase().trim();
+    }
+    return false;
+  };
+
   const getModalDefects = () => {
     if (!activeModal) return [];
     switch (activeModal) {
@@ -255,15 +264,15 @@ export default function DefectsDashboard() {
         }
         if (activeModal.startsWith('vessel_active_')) {
           const vId = activeModal.replace('vessel_active_', '');
-          return allDefectsWithComputedStatus.filter(d => d.vesselId === vId && isActiveComputedStatus(d.computedStatus.label));
+          return allDefectsWithComputedStatus.filter(d => defectMatchesVesselId(d, vId) && isActiveComputedStatus(d.computedStatus.label));
         }
         if (activeModal.startsWith('vessel_closed_')) {
           const vId = activeModal.replace('vessel_closed_', '');
-          return allDefectsWithComputedStatus.filter(d => d.vesselId === vId && isResolvedComputedStatus(d.computedStatus.label));
+          return allDefectsWithComputedStatus.filter(d => defectMatchesVesselId(d, vId) && isResolvedComputedStatus(d.computedStatus.label));
         }
         if (activeModal.startsWith('vessel_')) {
           const vId = activeModal.replace('vessel_', '');
-          return allDefectsWithComputedStatus.filter(d => d.vesselId === vId);
+          return allDefectsWithComputedStatus.filter(d => defectMatchesVesselId(d, vId));
         }
         return [];
     }
