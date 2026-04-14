@@ -114,19 +114,35 @@ export async function exportLowStockAlertExcel(req: Request, res: Response) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// SPARES CONSUMPTION ANALYSIS - COMPONENT NAMES LIST
+// ═══════════════════════════════════════════════════════════════
+
+export async function getSparesComponentNames(req: Request, res: Response) {
+  try {
+    const { vesselId } = req.params;
+    const result = await sparesReportService.getDistinctComponentNames(vesselId);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error fetching spares component names:", error);
+    res.status(500).json({ error: "Failed to fetch component names: " + error.message });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // SPARES CONSUMPTION ANALYSIS - PREVIEW
 // ═══════════════════════════════════════════════════════════════
 
 export async function getSparesConsumptionAnalysis(req: Request, res: Response) {
   try {
     const { vesselId } = req.params;
-    const { startDate, endDate, category } = req.query;
+    const { startDate, endDate, category, componentNames } = req.query;
 
     const result = await sparesReportService.getSparesConsumptionAnalysis(
       vesselId,
       startDate as string | undefined,
       endDate as string | undefined,
       category as string | undefined,
+      componentNames as string | undefined,
     );
     res.json(result);
   } catch (error: any) {
@@ -142,9 +158,9 @@ export async function getSparesConsumptionAnalysis(req: Request, res: Response) 
 export async function exportSparesConsumptionExcel(req: Request, res: Response) {
   try {
     const { vesselId } = req.params;
-    const { startDate, endDate, category } = req.body;
+    const { startDate, endDate, category, componentNames } = req.body;
 
-    const { buffer, filename } = await sparesReportService.exportSparesConsumptionExcel(vesselId, startDate, endDate, category);
+    const { buffer, filename } = await sparesReportService.exportSparesConsumptionExcel(vesselId, startDate, endDate, category, componentNames);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

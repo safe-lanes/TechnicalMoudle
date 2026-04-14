@@ -32,6 +32,7 @@ router.post('/reports/critical-spares', asyncHandler(sparesCtrl.exportCriticalSp
 router.get('/reports/low-stock-alert/:vesselId', asyncHandler(sparesCtrl.getLowStockAlert));
 router.patch('/reports/low-stock-alert/:vesselId/mark-ordered/:spareId', asyncHandler(sparesCtrl.markSpareAsOrdered));
 router.post('/reports/low-stock-alert/:vesselId/excel', asyncHandler(sparesCtrl.exportLowStockAlertExcel));
+router.get('/reports/spares-consumption-analysis/:vesselId/component-names', asyncHandler(sparesCtrl.getSparesComponentNames));
 router.get('/reports/spares-consumption-analysis/:vesselId', asyncHandler(sparesCtrl.getSparesConsumptionAnalysis));
 router.post('/reports/spares-consumption-analysis/:vesselId/excel', asyncHandler(sparesCtrl.exportSparesConsumptionExcel));
 

@@ -23,10 +23,11 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, Package, TrendingDown, Activity, Calendar as CalendarIcon,
   AlertTriangle, FileText, Download, Loader2,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, Search, X,
 } from "lucide-react";
 import ReportAgGridTable from "@/components/reports/ReportAgGridTable";
 
@@ -58,8 +59,10 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
   const [dateTo, setDateTo] = useState<Date | undefined>(initialDateTo ?? undefined);
   const [startDate, setStartDate] = useState(toDateStr(initialDateFrom));
   const [endDate, setEndDate] = useState(toDateStr(initialDateTo));
-  const [category, setCategory] = useState("");
-  const [appliedFilters, setAppliedFilters] = useState({ startDate: toDateStr(initialDateFrom), endDate: toDateStr(initialDateTo), category: "" });
+  const [selectedComponents, setSelectedComponents] = useState<string[]>([]);
+  const [appliedFilters, setAppliedFilters] = useState({ startDate: toDateStr(initialDateFrom), endDate: toDateStr(initialDateTo), componentNames: "" });
+  const [componentSearchTerm, setComponentSearchTerm] = useState("");
+  const [componentDropdownOpen, setComponentDropdownOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("trends");
   const [nonMovingOpen, setNonMovingOpen] = useState(false);
   const [generatingExcel, setGeneratingExcel] = useState(false);
@@ -86,6 +89,29 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
     setAppliedFilters(prev => ({ ...prev, startDate: sf, endDate: ef }));
   }, [initialDateFrom, initialDateTo]);
 
+  useEffect(() => {
+    setSelectedComponents([]);
+    setComponentSearchTerm("");
+    setAppliedFilters(prev => ({ ...prev, componentNames: "" }));
+  }, [vesselId]);
+
+  const { data: componentNamesData } = useQuery<{ components: { componentName: string; componentCode: string }[] }>({
+    queryKey: ["/technical/api/reports/spares-consumption-analysis", vesselId, "component-names"],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/reports/spares-consumption-analysis/${vesselId}/component-names`, { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}`);
+      return res.json();
+    },
+    enabled: !!vesselId,
+  });
+
+  const availableComponents = useMemo(() => {
+    const all = componentNamesData?.components || [];
+    if (!componentSearchTerm.trim()) return all;
+    const term = componentSearchTerm.toLowerCase();
+    return all.filter(c => c.componentName.toLowerCase().includes(term) || c.componentCode.toLowerCase().includes(term));
+  }, [componentNamesData, componentSearchTerm]);
+
   const formatDateRange = () => {
     if (!dateFrom && !dateTo) return "Select date range";
     if (dateFrom && !dateTo) return `From ${format(dateFrom, "MMM dd, yyyy")}`;
@@ -105,7 +131,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
     const params = new URLSearchParams();
     if (appliedFilters.startDate) params.set("startDate", appliedFilters.startDate);
     if (appliedFilters.endDate) params.set("endDate", appliedFilters.endDate);
-    if (appliedFilters.category) params.set("category", appliedFilters.category);
+    if (appliedFilters.componentNames) params.set("componentNames", appliedFilters.componentNames);
     const qs = params.toString();
     return `/technical/api/reports/spares-consumption-analysis/${vesselId}${qs ? `?${qs}` : ""}`;
   }, [vesselId, appliedFilters]);
@@ -135,7 +161,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
 
 
   const handleApplyFilters = () => {
-    setAppliedFilters({ startDate, endDate, category });
+    setAppliedFilters({ startDate, endDate, componentNames: selectedComponents.join(",") });
   };
 
   const filteredItems = useMemo(() => {
@@ -163,7 +189,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
       const params = new URLSearchParams();
       if (appliedFilters.startDate) params.set("startDate", appliedFilters.startDate);
       if (appliedFilters.endDate) params.set("endDate", appliedFilters.endDate);
-      if (appliedFilters.category) params.set("category", appliedFilters.category);
+      if (appliedFilters.componentNames) params.set("componentNames", appliedFilters.componentNames);
       const qs = params.toString();
       const url = `/technical/api/reports/spares-consumption-analysis/${vesselId}${qs ? `?${qs}` : ""}`;
       const res = await fetch(url, { credentials: "include" });
@@ -211,7 +237,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
         body: JSON.stringify({
           startDate: appliedFilters.startDate || undefined,
           endDate: appliedFilters.endDate || undefined,
-          category: appliedFilters.category || undefined,
+          componentNames: appliedFilters.componentNames || undefined,
         }),
       });
       if (!res.ok) throw new Error("Failed to generate Excel");
@@ -371,9 +397,102 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
             </PopoverContent>
           </Popover>
         </div>
-        <div>
-          <Label className="text-xs font-medium text-gray-500 mb-1 block">Category</Label>
-          <input type="text" value={category} onChange={e => setCategory(e.target.value)} placeholder="Filter by category..." className="border border-gray-300 rounded-md px-3 py-2 text-sm w-48 h-9" data-testid="input-category" />
+        <div className="relative min-w-[280px]">
+          <Label className="text-xs font-medium text-gray-500 mb-1 block">Component Name</Label>
+          <Popover open={componentDropdownOpen} onOpenChange={setComponentDropdownOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                className="w-full justify-between text-left font-normal h-9 px-3"
+                data-testid="button-component-select"
+              >
+                <span className={cn("truncate", selectedComponents.length === 0 && "text-muted-foreground")}>
+                  {selectedComponents.length === 0
+                    ? "Select components..."
+                    : `${selectedComponents.length} component${selectedComponents.length > 1 ? "s" : ""} selected`}
+                </span>
+                <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[340px] p-0" align="start">
+              <div className="p-2 border-b">
+                <div className="flex items-center gap-2 px-2 py-1 border rounded-md bg-background">
+                  <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <input
+                    type="text"
+                    value={componentSearchTerm}
+                    onChange={e => setComponentSearchTerm(e.target.value)}
+                    placeholder="Search components..."
+                    className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                    data-testid="input-component-search"
+                  />
+                  {componentSearchTerm && (
+                    <button onClick={() => setComponentSearchTerm("")} className="text-muted-foreground hover:text-foreground">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center justify-between px-3 py-1.5 border-b bg-muted/30">
+                <button
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                  data-testid="button-select-all-components"
+                  onClick={() => {
+                    const visibleNames = availableComponents.map(c => c.componentName);
+                    const allSelected = visibleNames.every(n => selectedComponents.includes(n));
+                    if (allSelected) {
+                      setSelectedComponents(prev => prev.filter(n => !visibleNames.includes(n)));
+                    } else {
+                      setSelectedComponents(prev => [...new Set([...prev, ...visibleNames])]);
+                    }
+                  }}
+                >
+                  {availableComponents.length > 0 && availableComponents.every(c => selectedComponents.includes(c.componentName))
+                    ? "Deselect All"
+                    : "Select All"}
+                </button>
+                {selectedComponents.length > 0 && (
+                  <button
+                    className="text-xs text-red-500 hover:text-red-700 font-medium"
+                    data-testid="button-clear-components"
+                    onClick={() => setSelectedComponents([])}
+                  >
+                    Clear ({selectedComponents.length})
+                  </button>
+                )}
+              </div>
+              <div className="max-h-[240px] overflow-y-auto">
+                {availableComponents.length === 0 ? (
+                  <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+                    {componentSearchTerm ? "No matching components" : "No components available"}
+                  </div>
+                ) : (
+                  availableComponents.map(comp => {
+                    const checked = selectedComponents.includes(comp.componentName);
+                    return (
+                      <label
+                        key={comp.componentName}
+                        className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted/50 cursor-pointer text-sm"
+                        data-testid={`checkbox-component-${comp.componentCode}`}
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={() => {
+                            setSelectedComponents(prev =>
+                              checked ? prev.filter(n => n !== comp.componentName) : [...prev, comp.componentName]
+                            );
+                          }}
+                          className="h-4 w-4"
+                        />
+                        <span className="truncate">{comp.componentName}</span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
         <Button onClick={handleApplyFilters} data-testid="button-apply-filters" className="h-9">Apply Filters</Button>
       </div>

@@ -714,6 +714,33 @@ export async function exportLowStockAlertExcel(
 }
 
 // ═══════════════════════════════════════════════════════════════
+// SPARES CONSUMPTION ANALYSIS - DISTINCT COMPONENT NAMES
+// ═══════════════════════════════════════════════════════════════
+
+export async function getDistinctComponentNames(vesselId: string) {
+  let allItems: any[];
+  if (vesselId === 'all') {
+    const allVessels = await repo.getVessels();
+    allItems = [];
+    for (const vessel of allVessels) {
+      allItems = allItems.concat(await repo.getSpares(vessel.id));
+    }
+  } else {
+    allItems = await repo.getSpares(vesselId);
+  }
+  const nameMap = new Map<string, string>();
+  for (const item of allItems) {
+    if (item.componentName && !nameMap.has(item.componentName)) {
+      nameMap.set(item.componentName, item.componentCode || '');
+    }
+  }
+  const components = Array.from(nameMap.entries())
+    .map(([name, code]) => ({ componentName: name, componentCode: code }))
+    .sort((a, b) => a.componentName.localeCompare(b.componentName));
+  return { components };
+}
+
+// ═══════════════════════════════════════════════════════════════
 // SPARES CONSUMPTION ANALYSIS - PREVIEW
 // ═══════════════════════════════════════════════════════════════
 
@@ -722,6 +749,7 @@ export async function getSparesConsumptionAnalysis(
   startDate: string | undefined,
   endDate: string | undefined,
   category: string | undefined,
+  componentNames: string | undefined,
 ) {
   const allVessels = await repo.getVessels();
   let allHistory: any[];
@@ -754,7 +782,15 @@ export async function getSparesConsumptionAnalysis(
     consumeEvents = consumeEvents.filter((h: any) => new Date(h.timestampUTC) <= ed);
     allLedgerEvents = allLedgerEvents.filter((h: any) => new Date(h.timestampUTC) <= ed);
   }
-  if (category && category !== 'all') {
+  if (componentNames) {
+    const names = componentNames.split(',').map(n => n.trim()).filter(Boolean);
+    if (names.length > 0) {
+      const nameSet = new Set(names);
+      const compItemIds = new Set(allItems.filter((i: any) => nameSet.has(i.componentName)).map((i: any) => i.id));
+      consumeEvents = consumeEvents.filter((h: any) => compItemIds.has(h.spareId));
+      allLedgerEvents = allLedgerEvents.filter((h: any) => compItemIds.has(h.spareId));
+    }
+  } else if (category && category !== 'all') {
     const catItemIds = new Set(allItems.filter((i: any) => i.partCategory === category).map((i: any) => i.id));
     consumeEvents = consumeEvents.filter((h: any) => catItemIds.has(h.spareId));
     allLedgerEvents = allLedgerEvents.filter((h: any) => catItemIds.has(h.spareId));
@@ -1079,6 +1115,7 @@ export async function exportSparesConsumptionExcel(
   startDate: string | undefined,
   endDate: string | undefined,
   category: string | undefined,
+  componentNames: string | undefined,
 ): Promise<{ buffer: Buffer; filename: string }> {
   const allVessels = await repo.getVessels();
   let allHistory: any[];
@@ -1107,7 +1144,14 @@ export async function exportSparesConsumptionExcel(
     ed.setHours(23, 59, 59, 999);
     consumeEvents = consumeEvents.filter((h: any) => new Date(h.timestampUTC) <= ed);
   }
-  if (category && category !== 'all') {
+  if (componentNames) {
+    const names = (typeof componentNames === 'string' ? componentNames : '').split(',').map(n => n.trim()).filter(Boolean);
+    if (names.length > 0) {
+      const nameSet = new Set(names);
+      const compItemIds = new Set(allItems.filter((i: any) => nameSet.has(i.componentName)).map((i: any) => i.id));
+      consumeEvents = consumeEvents.filter((h: any) => compItemIds.has(h.spareId));
+    }
+  } else if (category && category !== 'all') {
     const catItemIds = new Set(allItems.filter((i: any) => i.partCategory === category).map((i: any) => i.id));
     consumeEvents = consumeEvents.filter((h: any) => catItemIds.has(h.spareId));
   }
