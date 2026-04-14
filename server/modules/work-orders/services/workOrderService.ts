@@ -1668,6 +1668,7 @@ export async function getScopedOperationData(
         mode,
         appliedRankIds: [] as string[],
         vesselWideAccessGranted,
+        fallbackMode: vesselWideAccessGranted ? 'vessel-wide' as const : 'none' as const,
       },
     };
   }
@@ -1677,6 +1678,22 @@ export async function getScopedOperationData(
   const scope = await resolveHierarchyScopeByRankId(vesselId, userRankId);
 
   if (!scope.hasMapping) {
+    if (!vesselWideAccessGranted) {
+      const allWOs = await listWorkOrders(vesselId);
+      const ownRankSet = new Set([userRankId]);
+      const ownRankWOs = filterWorkOrdersByRankId(allWOs, ownRankSet);
+      return {
+        workOrders: ownRankWOs,
+        scopeMeta: {
+          hasMapping: false,
+          hasDescendants: false,
+          mode,
+          appliedRankIds: [userRankId],
+          vesselWideAccessGranted,
+          fallbackMode: 'own-rank' as const,
+        },
+      };
+    }
     return {
       workOrders: [],
       scopeMeta: {
@@ -1685,6 +1702,7 @@ export async function getScopedOperationData(
         mode,
         appliedRankIds: [] as string[],
         vesselWideAccessGranted,
+        fallbackMode: 'vessel-wide' as const,
       },
     };
   }
@@ -1703,6 +1721,7 @@ export async function getScopedOperationData(
       mode,
       appliedRankIds: bucket.rankIds,
       vesselWideAccessGranted,
+      fallbackMode: null,
     },
   };
 }
