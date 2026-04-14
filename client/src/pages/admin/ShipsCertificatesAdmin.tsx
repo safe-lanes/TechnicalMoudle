@@ -1445,7 +1445,7 @@ export default function ShipsCertificatesAdmin() {
                     <td className={cn("px-3 py-3 text-sm", isPendingDelete && "line-through")}>{cert.certificateName}</td>
                     <td className="px-3 py-3 text-sm">
                       {viewModes.master === "edit" ? (
-                        <Select defaultValue={cert.category}>
+                        <Select defaultValue={cert.category} onValueChange={(value) => updateMasterField(cert.id, 'category', value)}>
                           <SelectTrigger className="h-8 text-sm" data-testid={`select-category-${cert.id}`}>
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
@@ -1463,7 +1463,7 @@ export default function ShipsCertificatesAdmin() {
                     </td>
                     <td className="px-3 py-3 text-sm">
                       {viewModes.master === "edit" ? (
-                        <Select defaultValue={cert.group}>
+                        <Select defaultValue={cert.group} onValueChange={(value) => updateMasterField(cert.id, 'group', value)}>
                           <SelectTrigger className="h-8 text-sm" data-testid={`select-group-${cert.id}`}>
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
@@ -1484,6 +1484,7 @@ export default function ShipsCertificatesAdmin() {
                         <Input 
                           defaultValue={cert.requirementRef} 
                           className="h-8 text-sm"
+                          onBlur={(e) => updateMasterField(cert.id, 'requirementRef', e.target.value)}
                           data-testid={`input-requirement-${cert.id}`}
                         />
                       ) : (
