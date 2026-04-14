@@ -31,7 +31,11 @@ export async function getMasterSurveysByIds(masterIds: string[]) {
   const db = await getDb();
   if (!db) return null;
   return db.select().from(shipSurveysMaster)
-    .where(inArray(shipSurveysMaster.masterId, masterIds))
+    .where(and(
+      inArray(shipSurveysMaster.masterId, masterIds),
+      eq(shipSurveysMaster.isDeleted, false),
+      eq(shipSurveysMaster.isActive, true)
+    ))
     .orderBy(asc(shipSurveysMaster.companySequence));
 }
 
