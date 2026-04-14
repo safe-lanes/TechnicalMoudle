@@ -1,6 +1,6 @@
 import { getPostgresClient } from '../../postgresClient';
 import { admAvailableRanks, admVesselOrgChart, vesselOrgChartNodes, vesselDepartmentConfig, admnRoleMaster } from '@shared/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 
 function getDb() {
   const postgres = getPostgresClient();
@@ -108,12 +108,35 @@ export async function softDeleteOrgChartEntry(id: number) {
 export async function getVesselOrgChartNodes(vesselId: string) {
   const db = await getDb();
   if (!db) return null;
-  return db.select().from(vesselOrgChartNodes)
+  const rows = await db.select({
+    id: vesselOrgChartNodes.id,
+    nodeUuid: vesselOrgChartNodes.nodeUuid,
+    vesselId: vesselOrgChartNodes.vesselId,
+    rankId: vesselOrgChartNodes.rankId,
+    nodeLabel: vesselOrgChartNodes.nodeLabel,
+    department: vesselOrgChartNodes.department,
+    parentNodeUuid: vesselOrgChartNodes.parentNodeUuid,
+    isHod: vesselOrgChartNodes.isHod,
+    isAssigned: vesselOrgChartNodes.isAssigned,
+    viewMode: vesselOrgChartNodes.viewMode,
+    sortOrder: vesselOrgChartNodes.sortOrder,
+    nodeLayer: vesselOrgChartNodes.nodeLayer,
+    roleRuid: vesselOrgChartNodes.roleRuid,
+    isDeleted: vesselOrgChartNodes.isDeleted,
+    createdAt: vesselOrgChartNodes.createdAt,
+    updatedAt: vesselOrgChartNodes.updatedAt,
+    roleName: admnRoleMaster.assignedRole,
+    roleType: admnRoleMaster.roletype,
+    roleIsActive: admnRoleMaster.isActive,
+  })
+    .from(vesselOrgChartNodes)
+    .leftJoin(admnRoleMaster, sql`${vesselOrgChartNodes.roleRuid}::uuid = ${admnRoleMaster.ruid}`)
     .where(and(
       eq(vesselOrgChartNodes.vesselId, vesselId),
       eq(vesselOrgChartNodes.isDeleted, false)
     ))
     .orderBy(vesselOrgChartNodes.sortOrder);
+  return rows;
 }
 
 export async function getVesselOrgChartNodeByUuid(nodeUuid: string) {

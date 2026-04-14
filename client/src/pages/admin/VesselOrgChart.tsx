@@ -1113,6 +1113,7 @@ export default function VesselOrgChart() {
                     viewMode: rank?.viewMode || null,
                     sortOrder: count + 1,
                     nodeLayer: 'department' as NodeLayer,
+                    roleRuid: null,
                     isNew: true,
                   };
                   setNodes(prev => [...prev, newNode]);
