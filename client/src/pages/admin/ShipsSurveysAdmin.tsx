@@ -1967,7 +1967,7 @@ export default function ShipsSurveysAdmin() {
                             />
                           </td>
                           <td className="px-3 py-3 text-sm">{companySurveys.length + idx + 1}</td>
-                          <td className="px-3 py-3 text-sm font-medium text-gray-400">{survey.masterId}</td>
+                          <td className="px-3 py-3 text-sm font-medium text-gray-400">-</td>
                           <td className="px-3 py-3 text-sm text-gray-400">-</td>
                           <td className="px-3 py-3 text-sm">
                             {viewModes.vessel === "edit" ? (
