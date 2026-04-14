@@ -1084,7 +1084,10 @@ export default function ShipsCertificatesAdmin() {
     if (!newEntryData.category) missingFields.push("Category");
     if (!newEntryData.group) missingFields.push("Group");
     if (missingFields.length > 0) {
-      setNewEntryError(`${missingFields.join(", ")} ${missingFields.length === 1 ? 'is' : 'are'} mandatory`);
+      const fieldList = missingFields.length <= 2
+        ? missingFields.join(" and ")
+        : `${missingFields.slice(0, -1).join(", ")}, and ${missingFields[missingFields.length - 1]}`;
+      setNewEntryError(`${fieldList} ${missingFields.length === 1 ? 'is' : 'are'} mandatory`);
       return;
     }
     
