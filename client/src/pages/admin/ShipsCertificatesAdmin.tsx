@@ -1079,14 +1079,12 @@ export default function ShipsCertificatesAdmin() {
   
   // Save the new certificate entry
   const saveNewEntry = () => {
-    // Validate mandatory fields
-    if (!newEntryData.category || !newEntryData.group) {
-      setNewEntryError("Category and Group are mandatory");
-      return;
-    }
-    
-    if (!newEntryData.certificateName?.trim()) {
-      setNewEntryError("Certificate Name is mandatory");
+    const missingFields: string[] = [];
+    if (!newEntryData.certificateName?.trim()) missingFields.push("Certificate Name");
+    if (!newEntryData.category) missingFields.push("Category");
+    if (!newEntryData.group) missingFields.push("Group");
+    if (missingFields.length > 0) {
+      setNewEntryError(`${missingFields.join(", ")} ${missingFields.length === 1 ? 'is' : 'are'} mandatory`);
       return;
     }
     
