@@ -782,16 +782,19 @@ export async function getSparesConsumptionAnalysis(
     consumeEvents = consumeEvents.filter((h: any) => new Date(h.timestampUTC) <= ed);
     allLedgerEvents = allLedgerEvents.filter((h: any) => new Date(h.timestampUTC) <= ed);
   }
+  let filteredItems = allItems;
   if (componentNames) {
     const names = componentNames.split(',').map(n => n.trim()).filter(Boolean);
     if (names.length > 0) {
       const nameSet = new Set(names);
-      const compItemIds = new Set(allItems.filter((i: any) => nameSet.has(i.componentName)).map((i: any) => i.id));
+      filteredItems = allItems.filter((i: any) => nameSet.has(i.componentName));
+      const compItemIds = new Set(filteredItems.map((i: any) => i.id));
       consumeEvents = consumeEvents.filter((h: any) => compItemIds.has(h.spareId));
       allLedgerEvents = allLedgerEvents.filter((h: any) => compItemIds.has(h.spareId));
     }
   } else if (category && category !== 'all') {
-    const catItemIds = new Set(allItems.filter((i: any) => i.partCategory === category).map((i: any) => i.id));
+    filteredItems = allItems.filter((i: any) => i.partCategory === category);
+    const catItemIds = new Set(filteredItems.map((i: any) => i.id));
     consumeEvents = consumeEvents.filter((h: any) => catItemIds.has(h.spareId));
     allLedgerEvents = allLedgerEvents.filter((h: any) => catItemIds.has(h.spareId));
   }
@@ -924,7 +927,7 @@ export async function getSparesConsumptionAnalysis(
     }))
     .sort((a, b) => b.totalQty - a.totalQty);
 
-  const stockEfficiency = allItems
+  const stockEfficiency = filteredItems
     .filter((item: any) => !item.deleted && item.isActive !== false)
     .map((item: any) => {
       const itemId = item.id;
@@ -1092,7 +1095,7 @@ export async function getSparesConsumptionAnalysis(
             ? `Analysis covers ${daysOfData}-day period with ${totalConsumptionEvents} event${totalConsumptionEvents !== 1 ? 's' : ''} across ${distinctEventDays} day${distinctEventDays !== 1 ? 's' : ''}. Moderate confidence in trend projections.`
             : `Analysis covers ${daysOfData}-day period with ${totalConsumptionEvents} event${totalConsumptionEvents !== 1 ? 's' : ''} across ${distinctEventDays} day${distinctEventDays !== 1 ? 's' : ''}. High confidence in trend projections.`,
       },
-      totalInventoryItems: allItems.filter((i: any) => !i.deleted && i.isActive !== false).length,
+      totalInventoryItems: filteredItems.filter((i: any) => !i.deleted && i.isActive !== false).length,
       dataMonths: Math.max(0.1, Math.round((daysOfData / 30) * 10) / 10),
       vesselName,
     },
@@ -1144,15 +1147,18 @@ export async function exportSparesConsumptionExcel(
     ed.setHours(23, 59, 59, 999);
     consumeEvents = consumeEvents.filter((h: any) => new Date(h.timestampUTC) <= ed);
   }
+  let excelFilteredItems = allItems;
   if (componentNames) {
     const names = (typeof componentNames === 'string' ? componentNames : '').split(',').map(n => n.trim()).filter(Boolean);
     if (names.length > 0) {
       const nameSet = new Set(names);
-      const compItemIds = new Set(allItems.filter((i: any) => nameSet.has(i.componentName)).map((i: any) => i.id));
+      excelFilteredItems = allItems.filter((i: any) => nameSet.has(i.componentName));
+      const compItemIds = new Set(excelFilteredItems.map((i: any) => i.id));
       consumeEvents = consumeEvents.filter((h: any) => compItemIds.has(h.spareId));
     }
   } else if (category && category !== 'all') {
-    const catItemIds = new Set(allItems.filter((i: any) => i.partCategory === category).map((i: any) => i.id));
+    excelFilteredItems = allItems.filter((i: any) => i.partCategory === category);
+    const catItemIds = new Set(excelFilteredItems.map((i: any) => i.id));
     consumeEvents = consumeEvents.filter((h: any) => catItemIds.has(h.spareId));
   }
 
@@ -1308,7 +1314,7 @@ export async function exportSparesConsumptionExcel(
 
   // Stock Efficiency sheet
   const effSheet = workbook.addWorksheet('Stock Efficiency');
-  const effItems = allItems.filter((i: any) => !i.deleted && i.isActive !== false).map((item: any) => {
+  const effItems = excelFilteredItems.filter((i: any) => !i.deleted && i.isActive !== false).map((item: any) => {
     const consumed = itemGrouped[item.id];
     const totalConsumed = consumed?.totalConsumed || 0;
     const currentRob = item.rob || 0;
