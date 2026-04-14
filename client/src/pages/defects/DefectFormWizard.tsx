@@ -28,6 +28,7 @@ import { sireHardwareClasses, findHardwareClassById } from "@/data/sireHardwareC
 import { defectSources, findSourceById } from "@/data/defectSources";
 import { getSireReferencesByVersion } from "@/data/sireReferences";
 import { SireHardwareClassCombobox } from "@/components/SireHardwareClassCombobox";
+import { VesselComponentCombobox, type VesselComponentSelection } from "@/components/VesselComponentCombobox";
 import { useAuth } from "@/contexts/AuthContext";
 
 const defectFormSchema = insertDefectSchema.extend({
@@ -832,6 +833,12 @@ export default function DefectFormWizard({
                               if (selectedVessel) {
                                 form.setValue('vesselName', selectedVessel.name);
                               }
+                              form.setValue('componentHardwareId', '');
+                              form.setValue('componentHardwareLevel1', '');
+                              form.setValue('componentHardwareLevel2', '');
+                              form.setValue('componentHardwareLevel3', '');
+                              form.setValue('equipmentMake', '');
+                              form.setValue('equipmentModel', '');
                             }} 
                             value={field.value || ""} 
                             disabled={isViewMode}
@@ -914,24 +921,21 @@ export default function DefectFormWizard({
 
                     <div className="flex flex-col">
                       <label className="text-sm text-gray-600 mb-1.5">Component</label>
-                      <Controller
-                        name="componentHardwareId"
-                        control={form.control}
-                        render={({ field }) => (
-                          <SireHardwareClassCombobox
-                            selectedId={field.value || ""}
-                            displayValue={form.watch('componentHardwareLevel3') || ""}
-                            onSelect={(id, level1, level2, level3) => {
-                              form.setValue('componentHardwareId', id);
-                              form.setValue('componentHardwareLevel1', level1);
-                              form.setValue('componentHardwareLevel2', level2);
-                              form.setValue('componentHardwareLevel3', level3);
-                            }}
-                            disabled={isViewMode}
-                            placeholder="Select component"
-                            testId="combobox-component"
-                          />
-                        )}
+                      <VesselComponentCombobox
+                        vesselId={form.watch('vesselId') || ""}
+                        selectedCode={form.watch('componentHardwareId') || ""}
+                        displayValue={form.watch('componentHardwareLevel3') || ""}
+                        onSelect={(selection: VesselComponentSelection) => {
+                          form.setValue('componentHardwareId', selection.code);
+                          form.setValue('componentHardwareLevel1', selection.breadcrumb);
+                          form.setValue('componentHardwareLevel2', selection.code);
+                          form.setValue('componentHardwareLevel3', selection.name);
+                          form.setValue('equipmentMake', selection.maker || '');
+                          form.setValue('equipmentModel', selection.model || '');
+                        }}
+                        disabled={isViewMode}
+                        placeholder="Select component"
+                        testId="combobox-component"
                       />
                     </div>
 
@@ -972,24 +976,13 @@ export default function DefectFormWizard({
 
                     <div className="flex flex-col">
                       <label className="text-sm text-gray-600 mb-1.5">Make</label>
-                      <Controller
-                        name="equipmentMake"
-                        control={form.control}
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
-                            <SelectTrigger data-testid="select-make" className="h-10 text-sm border-gray-300">
-                              <SelectValue placeholder="Select make">
-                                {field.value || "Select make"}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Caterpillar">Caterpillar</SelectItem>
-                              <SelectItem value="MAN">MAN</SelectItem>
-                              <SelectItem value="Wartsila">Wartsila</SelectItem>
-                              <SelectItem value="Kongsberg">Kongsberg</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
+                      <Input
+                        value={form.watch('equipmentMake') || ''}
+                        readOnly
+                        data-testid="input-make"
+                        className="h-10 text-sm border-gray-300 bg-gray-50"
+                        placeholder="Auto-filled from component"
+                        tabIndex={-1}
                       />
                     </div>
 
@@ -1030,24 +1023,13 @@ export default function DefectFormWizard({
 
                     <div className="flex flex-col">
                       <label className="text-sm text-gray-600 mb-1.5">Model</label>
-                      <Controller
-                        name="equipmentModel"
-                        control={form.control}
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
-                            <SelectTrigger data-testid="select-model" className="h-10 text-sm border-gray-300">
-                              <SelectValue placeholder="Select model">
-                                {field.value || "Select model"}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="3516">3516</SelectItem>
-                              <SelectItem value="6L32">6L32</SelectItem>
-                              <SelectItem value="W32">W32</SelectItem>
-                              <SelectItem value="K-Chief">K-Chief</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
+                      <Input
+                        value={form.watch('equipmentModel') || ''}
+                        readOnly
+                        data-testid="input-model"
+                        className="h-10 text-sm border-gray-300 bg-gray-50"
+                        placeholder="Auto-filled from component"
+                        tabIndex={-1}
                       />
                     </div>
 
