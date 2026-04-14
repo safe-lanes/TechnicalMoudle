@@ -611,18 +611,42 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
               {categoryBreakdown.length > 0 && (
                 <Card>
                   <CardHeader><CardTitle className="text-lg">Category Distribution</CardTitle></CardHeader>
-                  <div className="px-6 pb-6 flex justify-center">
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie data={categoryBreakdown} dataKey="totalQty" nameKey="category" cx="50%" cy="50%" outerRadius={100} label={({ category, percentage }: any) => `${category} (${Number(percentage).toFixed(1)}%)`}>
-                          {categoryBreakdown.map((_: any, i: number) => (
-                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+                  <div className="px-6 pb-6 flex flex-col md:flex-row gap-4 items-center">
+                    <div className="w-full md:w-[55%]">
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie data={categoryBreakdown} dataKey="totalQty" nameKey="category" cx="50%" cy="50%" outerRadius={110}>
+                            {categoryBreakdown.map((_: any, i: number) => (
+                              <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip content={({ active, payload }: any) => {
+                            if (active && payload && payload.length) {
+                              const d = payload[0].payload;
+                              return (
+                                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg px-3 py-2 text-sm">
+                                  <p className="font-medium text-gray-900 dark:text-gray-100">{d.category}</p>
+                                  <p className="text-gray-600 dark:text-gray-400">Qty: {Number(d.totalQty).toLocaleString()}</p>
+                                  <p className="text-gray-600 dark:text-gray-400">Share: {Number(d.percentage).toFixed(1)}%</p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="w-full md:w-[45%] max-h-[300px] overflow-y-auto pr-2">
+                      <div className="space-y-2">
+                        {categoryBreakdown.map((item: any, i: number) => (
+                          <div key={i} className="flex items-center gap-2 text-sm" data-testid={`legend-item-${i}`}>
+                            <span className="inline-block w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                            <span className="text-gray-700 dark:text-gray-300 truncate">{item.category}</span>
+                            <span className="text-gray-400 dark:text-gray-500 ml-auto flex-shrink-0">({Number(item.percentage).toFixed(1)}%)</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </Card>
               )}
