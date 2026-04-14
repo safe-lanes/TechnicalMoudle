@@ -533,7 +533,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { header: 'Assigned To', field: 'assignedTo', width: 18 },
           { header: 'Start Date', field: 'startDate', width: 16 },
           { header: 'Completion Date', field: 'completionDate', width: 16 },
-          { header: 'Man Hours', field: 'manHours', width: 12 }
+          { header: 'Man Hours', field: 'manHours', width: 12 },
+          { header: 'Skipped Cycles', field: 'skippedCycles', width: 14 }
         ];
 
         const data = completedRaw;

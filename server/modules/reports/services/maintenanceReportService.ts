@@ -642,6 +642,7 @@ export async function getCompletedJobsData(vesselId: string, dateFrom?: string, 
       startDate: formatDateDDMMMYYYY(wo.startDateTime),
       completionDate: formatDateDDMMMYYYY(wo.dateCompleted || (wo as any).completionDateTime),
       manHours: manHours > 0 ? manHours.toFixed(1) : '\u2014',
+      skippedCycles: wo.missedCycles ?? 0,
     };
   });
 
@@ -696,7 +697,8 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
     { header: 'Assigned To', key: 'assignedTo', width: 18 },
     { header: 'Start Date', key: 'startDate', width: 16 },
     { header: 'Completion Date', key: 'completionDate', width: 16 },
-    { header: 'Man Hours', key: 'manHours', width: 12 }
+    { header: 'Man Hours', key: 'manHours', width: 12 },
+    { header: 'Skipped Cycles', key: 'skippedCycles', width: 14 }
   ];
 
   const totalColumns = columns.length;
