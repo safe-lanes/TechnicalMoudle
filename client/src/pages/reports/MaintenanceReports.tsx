@@ -498,13 +498,19 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           };
         });
 
-        const calendarCount = data.filter((d: any) => d.daysRhOverdue && d.daysRhOverdue.includes('days')).length;
-        const rhCount = data.filter((d: any) => d.daysRhOverdue && d.daysRhOverdue.includes('RH')).length;
+        const calendarCount = data.filter((d: any) => d.overdueType === 'Calendar' || d.overdueType === 'Both').length;
+        const rhCount = data.filter((d: any) => d.overdueType === 'Running Hours' || d.overdueType === 'Both').length;
+        const daysValues = data.map((d: any) => {
+          const m = (d.daysRhOverdue || '').match(/(\d+)\s*days/);
+          return m ? parseInt(m[1]) : 0;
+        }).filter((v: number) => v > 0);
+        const avgDays = daysValues.length > 0 ? Math.round(daysValues.reduce((a: number, b: number) => a + b, 0) / daysValues.length) : overdueSummary.avgDaysOverdue;
+        const maxDays = daysValues.length > 0 ? Math.max(...daysValues) : overdueSummary.maxDaysOverdue;
         const summary = [
           { label: 'Total Overdue', value: data.length },
           { label: 'Critical Equip', value: data.filter((d: any) => d.critical === 'YES' || d.critical === 'Yes').length, color: 'highlight' },
-          { label: 'Avg Days Overdue', value: globalComponent ? Math.round(data.reduce((sum: number, d: any) => { const m = d.daysRhOverdue?.match(/(\d+)\s*days/); return sum + (m ? parseInt(m[1]) : 0); }, 0) / (calendarCount || 1)) : overdueSummary.avgDaysOverdue },
-          { label: 'Max Days Overdue', value: globalComponent ? `${Math.max(0, ...data.map((d: any) => { const m = d.daysRhOverdue?.match(/(\d+)\s*days/); return m ? parseInt(m[1]) : 0; }))}d` : `${overdueSummary.maxDaysOverdue}d` },
+          { label: 'Avg Days Overdue', value: avgDays },
+          { label: 'Max Days Overdue', value: `${maxDays}d` },
           { label: 'Calendar/RH', value: `${calendarCount}/${rhCount}` }
         ];
 
