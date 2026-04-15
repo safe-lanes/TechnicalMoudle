@@ -27,6 +27,23 @@ interface OrgChartEntry {
   rankView?: string | null;
 }
 
+interface ApiRankRow {
+  id: number;
+  rankId: string;
+  rank_id?: string;
+  name: string;
+  label: string;
+  category: string;
+  applicableToCompany: boolean;
+  applicable_to_company?: boolean;
+  isSystemRank: boolean;
+  is_system_rank?: boolean;
+  sortOrder: number;
+  sort_order?: number;
+  viewMode: string;
+  view_mode?: string;
+}
+
 interface RankInfo {
   rankId: string;
   name: string;
@@ -36,20 +53,61 @@ interface RankInfo {
 interface TreeNode {
   entry: OrgChartEntry;
   rankName: string;
-  category: string;
+  department: string;
   children: TreeNode[];
 }
 
-const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
-  "Senior Officers": { bg: "bg-blue-500", text: "text-white" },
-  "Junior Officers": { bg: "bg-blue-400", text: "text-white" },
-  "Ratings": { bg: "bg-emerald-500", text: "text-white" },
-  "Catering": { bg: "bg-teal-500", text: "text-white" },
-  "Other": { bg: "bg-amber-500", text: "text-white" },
+interface OrgTreeNodeProps {
+  node: TreeNode;
+  depth: number;
+  isLast: boolean;
+  isEditMode: boolean;
+  onRemove: (rankId: string) => void;
+  onChangeParent: (rankId: string, newParentRankId: string | null) => void;
+  allEntries: OrgChartEntry[];
+  ranksMap: Map<string, RankInfo>;
+}
+
+type Department = "Deck" | "Engine" | "Catering" | "Other";
+
+const DEPARTMENT_COLORS: Record<Department, { bg: string; text: string }> = {
+  Deck: { bg: "bg-blue-500", text: "text-white" },
+  Engine: { bg: "bg-emerald-500", text: "text-white" },
+  Catering: { bg: "bg-teal-500", text: "text-white" },
+  Other: { bg: "bg-amber-500", text: "text-white" },
 };
 
-function getColorForCategory(category: string) {
-  return CATEGORY_COLORS[category] || CATEGORY_COLORS["Other"];
+const DECK_PATTERNS = [
+  "master", "chief officer", "second officer", "2nd officer", "third officer", "3rd officer",
+  "bosun", "boatswain", "pumpman", "ab", "os", "ordinary seaman", "able seaman",
+  "deck cadet", "deck officer",
+];
+
+const ENGINE_PATTERNS = [
+  "chief engineer", "second engineer", "2nd engineer", "third engineer", "3rd engineer",
+  "fourth engineer", "4th engineer", "fifth engineer", "5th engineer",
+  "electrical officer", "electrician", "fitter", "oiler", "wiper",
+  "engine cadet", "gas engineer", "engine",
+];
+
+const CATERING_PATTERNS = [
+  "cook", "chief cook", "messman", "steward", "chief steward", "catering",
+];
+
+function inferDepartment(rankName: string): Department {
+  const lower = rankName.toLowerCase();
+  if (DECK_PATTERNS.some(p => lower.includes(p))) return "Deck";
+  if (ENGINE_PATTERNS.some(p => lower.includes(p))) return "Engine";
+  if (CATERING_PATTERNS.some(p => lower.includes(p))) return "Catering";
+  return "Other";
+}
+
+function getColorForDepartment(department: string): { bg: string; text: string } {
+  return DEPARTMENT_COLORS[department as Department] || DEPARTMENT_COLORS.Other;
+}
+
+function normalizeRankId(row: ApiRankRow): string {
+  return row.rankId || row.rank_id || "";
 }
 
 function wouldCreateCycle(entries: OrgChartEntry[], rankId: string, newParentRankId: string | null): boolean {
@@ -71,10 +129,11 @@ function buildTree(entries: OrgChartEntry[], ranksMap: Map<string, RankInfo>): T
 
   for (const entry of entries) {
     const rankInfo = ranksMap.get(entry.rankId);
+    const rankName = rankInfo?.name || entry.rank || entry.rankId;
     nodeMap.set(entry.rankId, {
       entry,
-      rankName: rankInfo?.name || entry.rank || entry.rankId,
-      category: rankInfo?.category || "Other",
+      rankName,
+      department: inferDepartment(rankName),
       children: [],
     });
   }
@@ -98,17 +157,8 @@ function buildTree(entries: OrgChartEntry[], ranksMap: Map<string, RankInfo>): T
   return roots;
 }
 
-function OrgTreeNode({ node, depth, isLast, isEditMode, onRemove, onChangeParent, allEntries, ranksMap }: {
-  node: TreeNode;
-  depth: number;
-  isLast: boolean;
-  isEditMode: boolean;
-  onRemove: (rankId: string) => void;
-  onChangeParent: (rankId: string, newParentRankId: string | null) => void;
-  allEntries: OrgChartEntry[];
-  ranksMap: Map<string, RankInfo>;
-}) {
-  const colors = getColorForCategory(node.category);
+function OrgTreeNode({ node, depth, isLast, isEditMode, onRemove, onChangeParent, allEntries, ranksMap }: OrgTreeNodeProps) {
+  const colors = getColorForDepartment(node.department);
   const indent = depth * 32;
 
   return (
@@ -175,6 +225,11 @@ interface VesselOrgChartModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface SavePayload {
+  entries: OrgChartEntry[];
+  toDelete: OrgChartEntry[];
+}
+
 export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgChartModalProps) {
   const { toast } = useToast();
   const [isEditMode, setIsEditMode] = useState(false);
@@ -188,7 +243,7 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
     enabled: open,
   });
 
-  const { data: ranksData } = useQuery<RankInfo[]>({
+  const { data: ranksData } = useQuery<ApiRankRow[]>({
     queryKey: ['/technical/api/admin/available-ranks'],
   });
 
@@ -196,7 +251,7 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
     const map = new Map<string, RankInfo>();
     if (ranksData) {
       for (const r of ranksData) {
-        const rankId = (r as any).rankId || (r as any).rank_id;
+        const rankId = normalizeRankId(r);
         map.set(rankId, {
           rankId,
           name: r.name,
@@ -215,18 +270,15 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
   const availableRanksForAdd = useMemo(() => {
     if (!ranksData) return [];
     return ranksData
-      .filter((r: any) => {
-        const rid = r.rankId || r.rank_id;
-        return !usedRankIds.has(rid);
-      })
-      .map((r: any) => ({
-        rankId: r.rankId || r.rank_id,
+      .filter((r) => !usedRankIds.has(normalizeRankId(r)))
+      .map((r) => ({
+        rankId: normalizeRankId(r),
         name: r.name,
       }));
   }, [ranksData, usedRankIds]);
 
   const saveMutation = useMutation({
-    mutationFn: async (payload: { entries: OrgChartEntry[]; toDelete: OrgChartEntry[] }) => {
+    mutationFn: async (payload: SavePayload) => {
       const idsToReallyDelete = payload.toDelete
         .filter(e => e.id && !payload.entries.some(active => active.id === e.id))
         .map(e => e.id!);
@@ -246,7 +298,7 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
       setRemovedEntries([]);
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-org-chart'] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Save failed", description: error.message || "Failed to save org chart", variant: "destructive" });
     },
   });
