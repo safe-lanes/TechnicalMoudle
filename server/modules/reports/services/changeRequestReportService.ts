@@ -188,10 +188,8 @@ export async function exportChangeRequestsExcel(
   if (componentFilter && componentFilter.trim()) {
     const cf = componentFilter.toLowerCase();
     reportData.requests = reportData.requests.filter((r: any) => {
-      const title = (r.title || '').toLowerCase();
-      const desc = (r.description || '').toLowerCase();
-      const comp = (r.componentName || '').toLowerCase();
-      return title.includes(cf) || desc.includes(cf) || comp.includes(cf);
+      const target = (r.targetInfo?.name || '').toLowerCase();
+      return target.includes(cf);
     });
   }
 
