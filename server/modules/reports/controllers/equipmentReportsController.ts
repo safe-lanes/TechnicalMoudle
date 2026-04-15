@@ -45,13 +45,13 @@ export async function getCriticalEquipmentStatus(req: Request, res: Response) {
 
 export async function exportCriticalEquipmentStatusExcel(req: Request, res: Response) {
   try {
-    const { vesselId, startDate, endDate } = req.body;
+    const { vesselId, startDate, endDate, componentFilter } = req.body;
 
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
 
-    const { buffer, filename } = await equipmentReportService.exportCriticalEquipmentStatusExcel(vesselId, startDate, endDate);
+    const { buffer, filename } = await equipmentReportService.exportCriticalEquipmentStatusExcel(vesselId, startDate, endDate, componentFilter);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -99,7 +99,7 @@ export async function getUnplannedBreakdownJobs(req: Request, res: Response) {
 
 export async function exportUnplannedBreakdownJobsExcel(req: Request, res: Response) {
   try {
-    const { vesselId, startDate, endDate } = req.body;
+    const { vesselId, startDate, endDate, componentFilter } = req.body;
 
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
@@ -108,7 +108,7 @@ export async function exportUnplannedBreakdownJobsExcel(req: Request, res: Respo
       return res.status(400).json({ error: "Please select a date range" });
     }
 
-    const { buffer, filename } = await equipmentReportService.exportUnplannedBreakdownJobsExcel(vesselId, startDate, endDate);
+    const { buffer, filename } = await equipmentReportService.exportUnplannedBreakdownJobsExcel(vesselId, startDate, endDate, componentFilter);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

@@ -1002,6 +1002,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     }
 
     let requestBody: any = { vesselId: effectiveVesselId };
+
+    if (globalComponent) {
+      requestBody.componentFilter = globalComponent;
+    }
     
     // Add date range for reports that support it
     if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'postponement-log' || reportId === 'critical-equipment' || reportId === 'overdue-jobs') {

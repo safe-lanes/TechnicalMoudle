@@ -12,6 +12,16 @@ import {
   type ConditionalStyle,
 } from '../../../lib/excelReportStyles';
 
+function filterByComponent<T extends Record<string, any>>(items: T[], componentFilter?: string): T[] {
+  if (!componentFilter) return items;
+  const q = componentFilter.toLowerCase();
+  return items.filter(item => {
+    const compName = (item.componentName || item.component || "").toLowerCase();
+    const compCode = (item.componentCode || "").toLowerCase();
+    return compName.includes(q) || compCode.includes(q);
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════
 // TEMPLATE BUILDER
 // ═══════════════════════════════════════════════════════════════
@@ -170,13 +180,14 @@ export async function exportCriticalEquipmentStatusExcel(
   vesselId: string,
   startDateStr?: string,
   endDateStr?: string,
+  componentFilter?: string,
 ): Promise<{ buffer: Buffer; filename: string }> {
   const result = await getCriticalEquipmentStatus(vesselId, startDateStr, endDateStr);
-  const reportData = result.data.map((item: any) => ({
+  const reportData = filterByComponent(result.data.map((item: any) => ({
     ...item,
     nextDueDate: item.nextDueDate || '-',
     daysUntilDue: item.daysUntilDue !== null ? item.daysUntilDue : '-'
-  }));
+  })), componentFilter);
   const metadata = result.metadata;
 
   const allVessels = await repo.getVessels();
@@ -428,9 +439,10 @@ export async function exportUnplannedBreakdownJobsExcel(
   vesselId: string,
   startDate: string,
   endDate: string,
+  componentFilter?: string,
 ): Promise<{ buffer: Buffer; filename: string }> {
-  // Get all work orders for the vessel
-  const allWorkOrders = await repo.getWorkOrders(vesselId);
+  const allWorkOrdersRaw = await repo.getWorkOrders(vesselId);
+  const allWorkOrders = filterByComponent(allWorkOrdersRaw as any[], componentFilter) as any;
   const allVessels = await repo.getVessels();
   const vessel = allVessels.find(v => v.id === vesselId);
   const vesselName = vessel?.name || vesselId;

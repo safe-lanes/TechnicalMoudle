@@ -117,37 +117,47 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
     },
   });
 
-  const filteredCertificates = useMemo(() => {
+  const vesselFilteredCertificates = useMemo(() => {
     let result = certificates;
     if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
       result = result.filter((c: any) => !c.vesselId || globalVessels.includes(c.vesselId));
     }
+    return result;
+  }, [certificates, globalVessels, vessels.length]);
+
+  const vesselFilteredSurveys = useMemo(() => {
+    let result = surveys;
+    if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
+      result = result.filter((s: any) => !s.vesselId || globalVessels.includes(s.vesselId));
+    }
+    return result;
+  }, [surveys, globalVessels, vessels.length]);
+
+  const filteredCertificates = useMemo(() => {
+    let result = vesselFilteredCertificates;
     if (globalComponent) {
       const q = globalComponent.toLowerCase();
       result = result.filter((c: any) => {
-        const compName = (c.componentName || c.component || c.name || c.certificateName || "").toLowerCase();
+        const compName = (c.componentName || c.component || "").toLowerCase();
         const compCode = (c.componentCode || "").toLowerCase();
         return compName.includes(q) || compCode.includes(q);
       });
     }
     return result;
-  }, [certificates, globalVessels, globalComponent, vessels.length]);
+  }, [vesselFilteredCertificates, globalComponent]);
 
   const filteredSurveys = useMemo(() => {
-    let result = surveys;
-    if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
-      result = result.filter((s: any) => !s.vesselId || globalVessels.includes(s.vesselId));
-    }
+    let result = vesselFilteredSurveys;
     if (globalComponent) {
       const q = globalComponent.toLowerCase();
       result = result.filter((s: any) => {
-        const compName = (s.componentName || s.component || s.name || s.surveyType || "").toLowerCase();
+        const compName = (s.componentName || s.component || "").toLowerCase();
         const compCode = (s.componentCode || "").toLowerCase();
         return compName.includes(q) || compCode.includes(q);
       });
     }
     return result;
-  }, [surveys, globalVessels, globalComponent, vessels.length]);
+  }, [vesselFilteredSurveys, globalComponent]);
 
   const reports: ComplianceReport[] = [
     {
@@ -348,10 +358,10 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
       }
 
       case 'compliance-summary': {
-        const totalCerts = filteredCertificates.length;
-        const totalSurveys = filteredSurveys.length;
-        const expiredCerts = filteredCertificates.filter((c: any) => getDaysToExpiry(c.expiryDate) < 0).length;
-        const expiredSurveys = filteredSurveys.filter((s: any) => getDaysToExpiry(s.dueDate || s.expiryDate) < 0).length;
+        const totalCerts = vesselFilteredCertificates.length;
+        const totalSurveys = vesselFilteredSurveys.length;
+        const expiredCerts = vesselFilteredCertificates.filter((c: any) => getDaysToExpiry(c.expiryDate) < 0).length;
+        const expiredSurveys = vesselFilteredSurveys.filter((s: any) => getDaysToExpiry(s.dueDate || s.expiryDate) < 0).length;
 
         const columns = [
           { header: 'Area', field: 'area', width: 50 },

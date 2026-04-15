@@ -14,6 +14,16 @@ import {
 // SHARED HELPERS
 // ═══════════════════════════════════════════════════════════════
 
+function filterByComponent<T extends Record<string, any>>(items: T[], componentFilter?: string): T[] {
+  if (!componentFilter) return items;
+  const q = componentFilter.toLowerCase();
+  return items.filter(item => {
+    const compName = (item.componentName || item.component || "").toLowerCase();
+    const compCode = (item.componentCode || "").toLowerCase();
+    return compName.includes(q) || compCode.includes(q);
+  });
+}
+
 const MONTH_NAMES_MAP: { [key: string]: number } = {
   'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
   'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
@@ -240,8 +250,9 @@ export async function getDueJobs7DaysData(vesselId: string) {
 // DUE JOBS (7 DAYS) - EXCEL EXPORT
 // ═══════════════════════════════════════════════════════════════
 
-export async function exportDueJobs7Days(vesselId: string): Promise<{ buffer: Buffer; filename: string }> {
-  const { data: dueJobs, vesselName } = await getDueJobs7DaysData(vesselId);
+export async function exportDueJobs7Days(vesselId: string, componentFilter?: string): Promise<{ buffer: Buffer; filename: string }> {
+  const { data: dueJobsRaw, vesselName } = await getDueJobs7DaysData(vesselId);
+  const dueJobs = filterByComponent(dueJobsRaw, componentFilter);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'PMS System';
@@ -473,8 +484,9 @@ export async function getOverdueJobsData(vesselId: string, dateFrom?: string, da
 // OVERDUE JOBS - EXCEL EXPORT
 // ═══════════════════════════════════════════════════════════════
 
-export async function exportOverdueJobs(vesselId: string, dateFrom?: string, dateTo?: string): Promise<{ buffer: Buffer; filename: string }> {
-  const { data: overdueJobs, vesselName } = await getOverdueJobsData(vesselId, dateFrom, dateTo);
+export async function exportOverdueJobs(vesselId: string, dateFrom?: string, dateTo?: string, componentFilter?: string): Promise<{ buffer: Buffer; filename: string }> {
+  const { data: overdueJobsRaw, vesselName } = await getOverdueJobsData(vesselId, dateFrom, dateTo);
+  const overdueJobs = filterByComponent(overdueJobsRaw, componentFilter);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'PMS System';
@@ -665,7 +677,7 @@ export async function getCompletedJobsData(vesselId: string, dateFrom?: string, 
 // COMPLETED JOBS REGISTER - EXCEL EXPORT
 // ═══════════════════════════════════════════════════════════════
 
-export async function exportCompletedJobs(vesselId: string, dateFrom?: string, dateTo?: string): Promise<{ buffer: Buffer; filename: string }> {
+export async function exportCompletedJobs(vesselId: string, dateFrom?: string, dateTo?: string, componentFilter?: string): Promise<{ buffer: Buffer; filename: string }> {
   const formatDateDDMMMYYYY = (dateStr: string | Date | null | undefined): string => {
     if (!dateStr) return '\u2014';
     try {
@@ -679,7 +691,8 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
     } catch { return '\u2014'; }
   };
 
-  const { data: completedJobs, vesselName, summary } = await getCompletedJobsData(vesselId, dateFrom, dateTo);
+  const { data: completedJobsRaw, vesselName, summary } = await getCompletedJobsData(vesselId, dateFrom, dateTo);
+  const completedJobs = filterByComponent(completedJobsRaw, componentFilter);
   const totalManHours = parseFloat(summary.totalManHours);
 
   const workbook = new ExcelJS.Workbook();
@@ -1056,9 +1069,11 @@ export async function exportPostponementLog(
   vesselId: string,
   dateFrom?: string,
   dateTo?: string,
-  status?: string
+  status?: string,
+  componentFilter?: string
 ): Promise<{ buffer: Buffer; filename: string }> {
-  const { data: postponedJobs, vesselName } = await getPostponementLogData(vesselId, dateFrom, dateTo, status);
+  const { data: postponedJobsRaw, vesselName } = await getPostponementLogData(vesselId, dateFrom, dateTo, status);
+  const postponedJobs = filterByComponent(postponedJobsRaw, componentFilter);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'PMS System';
