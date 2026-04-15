@@ -498,7 +498,31 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
     }
   };
 
-  const summary = reportData?.summary;
+  const summary = useMemo(() => {
+    if (!reportData?.summary) return undefined;
+    if (!globalComponent) return reportData.summary;
+    const reqs = filteredRequests;
+    const byStatus: Record<string, number> = { draft: 0, submitted: 0, returned: 0, approved: 0, rejected: 0 };
+    const byCategory: Record<string, number> = { components: 0, work_orders: 0, spares: 0, stores: 0 };
+    let pendingRequests = 0;
+    let totalCycle = 0;
+    let cycleCount = 0;
+    for (const r of reqs) {
+      const st = (r.status || '').toLowerCase();
+      if (byStatus[st] !== undefined) byStatus[st]++;
+      if (st === 'submitted' || st === 'returned') pendingRequests++;
+      const cat = r.category || '';
+      if (byCategory[cat] !== undefined) byCategory[cat]++;
+      if (r.cycleTimeHours && r.cycleTimeHours > 0) { totalCycle += r.cycleTimeHours; cycleCount++; }
+    }
+    return {
+      totalRequests: reqs.length,
+      byStatus,
+      byCategory,
+      pendingRequests,
+      avgApprovalTimeHours: cycleCount > 0 ? Math.round(totalCycle / cycleCount) : 0,
+    };
+  }, [reportData?.summary, globalComponent, filteredRequests]);
 
   return (
     <div className={embedded ? "p-4" : "p-6 bg-white dark:bg-background min-h-screen"}>

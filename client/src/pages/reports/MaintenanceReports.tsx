@@ -682,7 +682,14 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         if (mode === 'preview') return { title: 'CRITICAL EQUIPMENT STATUS REPORT', subtitle: 'SOLAS-critical and class-critical equipment', vessel: vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;
 
-        // Use specialized critical equipment report generator
+        const filteredMetadata = {
+          totalCriticalEquipment: data.length,
+          criticalOnly: data.filter((d: any) => d.isCritical === 'Yes' && d.isClassItem !== 'Yes').length,
+          classItemOnly: data.filter((d: any) => d.isClassItem === 'Yes' && d.isCritical !== 'Yes').length,
+          bothCriticalAndClass: data.filter((d: any) => d.isCritical === 'Yes' && d.isClassItem === 'Yes').length,
+          equipmentWithOverdue: data.filter((d: any) => (d.overdueJobs || 0) > 0).length,
+          equipmentDueSoon: data.filter((d: any) => (d.dueSoonJobs || 0) > 0).length,
+        };
         pdfReportGenerator.generateCriticalEquipmentReport(
           { 
             title: 'CRITICAL EQUIPMENT STATUS REPORT', 
@@ -692,7 +699,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           },
           columns,
           data,
-          metadata
+          filteredMetadata
         );
         break;
       }

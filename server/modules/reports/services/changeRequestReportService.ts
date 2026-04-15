@@ -200,7 +200,7 @@ export async function exportChangeRequestsExcel(
     for (const r of filtered) {
       const st = (r.status || '').toLowerCase();
       if (byStatus[st] !== undefined) byStatus[st]++;
-      if (st === 'submitted') pendingRequests++;
+      if (st === 'submitted' || st === 'returned') pendingRequests++;
       const cat = r.targetInfo?.type || '';
       if (byCategory[cat] !== undefined) byCategory[cat]++;
       if (r.cycleTimeHours && r.cycleTimeHours > 0) { totalCycleHours += r.cycleTimeHours; cycleCount++; }
