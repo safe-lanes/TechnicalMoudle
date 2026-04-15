@@ -423,10 +423,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         }));
 
         const summary = [
-          { label: 'Total Due', value: dueJobsSummary.totalDue },
-          { label: 'Overdue', value: dueJobsSummary.overdue },
-          { label: 'Urgent (≤2d)', value: dueJobsSummary.urgent },
-          { label: 'Critical Priority', value: dueJobsSummary.criticalPriority }
+          { label: 'Total Due', value: data.length },
+          { label: 'Overdue', value: data.filter((d: any) => d.statusIndicator === 'OVERDUE').length },
+          { label: 'Urgent (≤2d)', value: data.filter((d: any) => typeof d.daysRemaining === 'number' && d.daysRemaining <= 2 && d.daysRemaining >= 0).length },
+          { label: 'Critical Priority', value: data.filter((d: any) => d.priority === 'Critical').length }
         ];
 
         if (mode === 'preview') return { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days (including overdue)', vessel: dueVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;
@@ -498,12 +498,14 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           };
         });
 
+        const calendarCount = data.filter((d: any) => d.daysRhOverdue && d.daysRhOverdue.includes('days')).length;
+        const rhCount = data.filter((d: any) => d.daysRhOverdue && d.daysRhOverdue.includes('RH')).length;
         const summary = [
-          { label: 'Total Overdue', value: overdueSummary.totalOverdue },
-          { label: 'Critical Equip', value: overdueSummary.criticalEquipment, color: 'highlight' },
-          { label: 'Avg Days Overdue', value: overdueSummary.avgDaysOverdue },
-          { label: 'Max Days Overdue', value: `${overdueSummary.maxDaysOverdue}d` },
-          { label: 'Calendar/RH', value: `${overdueSummary.calendarOverdue}/${overdueSummary.rhOverdue}` }
+          { label: 'Total Overdue', value: data.length },
+          { label: 'Critical Equip', value: data.filter((d: any) => d.critical === 'YES' || d.critical === 'Yes').length, color: 'highlight' },
+          { label: 'Avg Days Overdue', value: globalComponent ? Math.round(data.reduce((sum: number, d: any) => { const m = d.daysRhOverdue?.match(/(\d+)\s*days/); return sum + (m ? parseInt(m[1]) : 0); }, 0) / (calendarCount || 1)) : overdueSummary.avgDaysOverdue },
+          { label: 'Max Days Overdue', value: globalComponent ? `${Math.max(0, ...data.map((d: any) => { const m = d.daysRhOverdue?.match(/(\d+)\s*days/); return m ? parseInt(m[1]) : 0; }))}d` : `${overdueSummary.maxDaysOverdue}d` },
+          { label: 'Calendar/RH', value: `${calendarCount}/${rhCount}` }
         ];
 
         if (mode === 'preview') return { title: 'OVERDUE JOBS REPORT', subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', vessel: overdueVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;
@@ -553,9 +555,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         const data = completedRaw;
 
         if (mode === 'preview') {
+          const filteredManHours = data.reduce((sum: number, d: any) => sum + (parseFloat(d.manHours) || 0), 0);
           const completedSummary = [
-            { label: 'Total Jobs', value: completedSummaryData.totalJobs },
-            { label: 'Total Man-Hours', value: completedSummaryData.totalManHours }
+            { label: 'Total Jobs', value: data.length },
+            { label: 'Total Man-Hours', value: filteredManHours.toFixed(1) }
           ];
           return { title: 'COMPLETED JOBS REGISTER', subtitle: `Vessel: ${completedVessel || vesselName}`, vessel: completedVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns: completedColumns, data, summary: completedSummary } as ReportPreviewData;
         }
@@ -726,10 +729,12 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         ];
 
         // Build summary matching specification
+        const filteredTotalManhours = unplannedData.reduce((sum: number, d: any) => sum + (parseFloat(d.manhours) || 0), 0);
+        const filteredTotalHours = unplannedData.reduce((sum: number, d: any) => sum + (parseFloat(d.totalHours) || 0), 0);
         const summary = [
-          { label: 'Total Unplanned Jobs', value: metadata.totalUnplannedJobs },
-          { label: 'Total Manhours', value: metadata.totalManhours },
-          { label: 'Avg Time Taken (hrs)', value: metadata.avgTimeTaken },
+          { label: 'Total Unplanned Jobs', value: unplannedData.length },
+          { label: 'Total Manhours', value: filteredTotalManhours.toFixed(1) },
+          { label: 'Avg Time Taken (hrs)', value: unplannedData.length > 0 ? (filteredTotalHours / unplannedData.length).toFixed(1) : '0' },
           { label: 'Date Range', value: `${startDate} to ${endDate}` }
         ];
 
@@ -791,7 +796,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         }));
 
         const summary = [
-          { label: 'Total Postponed Jobs', value: postponeSummary.totalPostponed }
+          { label: 'Total Postponed Jobs', value: data.length }
         ];
 
         if (mode === 'preview') return { title: 'Job Postponement Log Report', subtitle: 'Audit trail of all postponed jobs with approvals and justifications', vessel: postponeVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;

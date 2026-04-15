@@ -442,7 +442,14 @@ export async function exportUnplannedBreakdownJobsExcel(
   componentFilter?: string,
 ): Promise<{ buffer: Buffer; filename: string }> {
   const allWorkOrdersRaw = await repo.getWorkOrders(vesselId);
-  const allWorkOrders = filterByComponent(allWorkOrdersRaw as any[], componentFilter) as any;
+  const allWorkOrders = componentFilter
+    ? allWorkOrdersRaw.filter(wo => {
+        const compName = ((wo as Record<string, any>).componentName || (wo as Record<string, any>).component || "").toLowerCase();
+        const compCode = ((wo as Record<string, any>).componentCode || "").toLowerCase();
+        const q = componentFilter.toLowerCase();
+        return compName.includes(q) || compCode.includes(q);
+      })
+    : allWorkOrdersRaw;
   const allVessels = await repo.getVessels();
   const vessel = allVessels.find(v => v.id === vesselId);
   const vesselName = vessel?.name || vesselId;

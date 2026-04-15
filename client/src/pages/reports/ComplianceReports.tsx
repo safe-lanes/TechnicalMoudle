@@ -435,7 +435,10 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
   };
 
   const handlePreviewReport = async (reportId: string) => {
-    if (filteredCertificates.length === 0 && filteredSurveys.length === 0) {
+    const isAggregate = reportId === 'compliance-summary';
+    const certsToCheck = isAggregate ? vesselFilteredCertificates : filteredCertificates;
+    const surveysToCheck = isAggregate ? vesselFilteredSurveys : filteredSurveys;
+    if (certsToCheck.length === 0 && surveysToCheck.length === 0) {
       toast({ title: "No Data Available", description: "No certificates or surveys data found for the selected vessel.", variant: "destructive" });
       return;
     }
@@ -453,7 +456,10 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
     
     if (generatingReports.has(reportKey)) return;
 
-    if (filteredCertificates.length === 0 && filteredSurveys.length === 0) {
+    const isAggregate = reportId === 'compliance-summary';
+    const certsToCheck = isAggregate ? vesselFilteredCertificates : filteredCertificates;
+    const surveysToCheck = isAggregate ? vesselFilteredSurveys : filteredSurveys;
+    if (certsToCheck.length === 0 && surveysToCheck.length === 0) {
       toast({ title: "No Data Available", description: "No certificates or surveys data found for the selected vessel.", variant: "destructive" });
       return;
     }
