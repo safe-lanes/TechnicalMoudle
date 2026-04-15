@@ -1,6 +1,6 @@
 import { getPostgresClient } from '../../postgresClient';
-import { admAvailableRanks, admVesselOrgChart, vesselOrgChartNodes, vesselDepartmentConfig, admnRoleMaster } from '@shared/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { admAvailableRanks, admVesselOrgChart, vesselOrgChartNodes, vesselDepartmentConfig } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
 
 function getDb() {
   const postgres = getPostgresClient();
@@ -125,55 +125,14 @@ export async function getVesselOrgChartNodes(vesselId: string) {
     isDeleted: vesselOrgChartNodes.isDeleted,
     createdAt: vesselOrgChartNodes.createdAt,
     updatedAt: vesselOrgChartNodes.updatedAt,
-    roleName: admnRoleMaster.assignedRole,
-    roleType: admnRoleMaster.roletype,
-    roleIsActive: admnRoleMaster.isActive,
   })
     .from(vesselOrgChartNodes)
-    .leftJoin(admnRoleMaster, sql`${vesselOrgChartNodes.roleRuid}::uuid = ${admnRoleMaster.ruid}`)
     .where(and(
       eq(vesselOrgChartNodes.vesselId, vesselId),
       eq(vesselOrgChartNodes.isDeleted, false)
     ))
     .orderBy(vesselOrgChartNodes.sortOrder);
   return rows;
-}
-
-export async function getVesselOrgChartNodeByUuid(nodeUuid: string) {
-  const db = await getDb();
-  if (!db) return null;
-  const rows = await db.select().from(vesselOrgChartNodes)
-    .where(and(
-      eq(vesselOrgChartNodes.nodeUuid, nodeUuid),
-      eq(vesselOrgChartNodes.isDeleted, false)
-    ))
-    .limit(1);
-  return rows[0] || null;
-}
-
-export async function createVesselOrgChartNode(data: typeof vesselOrgChartNodes.$inferInsert) {
-  const db = await getDb();
-  if (!db) return null;
-  const result = await db.insert(vesselOrgChartNodes).values(data).returning();
-  return result[0] || null;
-}
-
-export async function updateVesselOrgChartNode(nodeUuid: string, data: Partial<typeof vesselOrgChartNodes.$inferInsert>) {
-  const db = await getDb();
-  if (!db) return null;
-  const result = await db.update(vesselOrgChartNodes)
-    .set({ ...data, updatedAt: new Date() })
-    .where(eq(vesselOrgChartNodes.nodeUuid, nodeUuid))
-    .returning();
-  return result[0] || null;
-}
-
-export async function softDeleteVesselOrgChartNode(nodeUuid: string) {
-  const db = await getDb();
-  if (!db) return null;
-  return db.update(vesselOrgChartNodes)
-    .set({ isDeleted: true, updatedAt: new Date() })
-    .where(eq(vesselOrgChartNodes.nodeUuid, nodeUuid));
 }
 
 export async function getVesselDepartmentConfig(vesselId: string) {
@@ -184,58 +143,3 @@ export async function getVesselDepartmentConfig(vesselId: string) {
     .orderBy(vesselDepartmentConfig.sortOrder);
 }
 
-export async function getActiveRoles() {
-  const db = await getDb();
-  if (!db) return null;
-  return db.select({
-    ruid: admnRoleMaster.ruid,
-    assignedRole: admnRoleMaster.assignedRole,
-    roletype: admnRoleMaster.roletype,
-    isActive: admnRoleMaster.isActive,
-    sortOrder: admnRoleMaster.sortOrder,
-  }).from(admnRoleMaster)
-    .where(and(
-      eq(admnRoleMaster.isActive, true),
-      eq(admnRoleMaster.isDeleted, false)
-    ))
-    .orderBy(admnRoleMaster.sortOrder);
-}
-
-export async function getNodesByRoleRuid(vesselId: string, roleRuid: string) {
-  const db = await getDb();
-  if (!db) return null;
-  return db.select().from(vesselOrgChartNodes)
-    .where(and(
-      eq(vesselOrgChartNodes.vesselId, vesselId),
-      eq(vesselOrgChartNodes.roleRuid, roleRuid),
-      eq(vesselOrgChartNodes.isDeleted, false)
-    ))
-    .orderBy(vesselOrgChartNodes.sortOrder);
-}
-
-export async function upsertVesselDepartmentConfig(vesselId: string, configs: { department: string; isEnabled: boolean; sortOrder: number }[]) {
-  const db = await getDb();
-  if (!db) return null;
-  const results = [];
-  for (const cfg of configs) {
-    const existing = await db.select().from(vesselDepartmentConfig)
-      .where(and(
-        eq(vesselDepartmentConfig.vesselId, vesselId),
-        eq(vesselDepartmentConfig.department, cfg.department)
-      ))
-      .limit(1);
-    if (existing.length > 0) {
-      const updated = await db.update(vesselDepartmentConfig)
-        .set({ isEnabled: cfg.isEnabled, sortOrder: cfg.sortOrder, updatedAt: new Date() })
-        .where(eq(vesselDepartmentConfig.id, existing[0].id))
-        .returning();
-      results.push(updated[0]);
-    } else {
-      const inserted = await db.insert(vesselDepartmentConfig)
-        .values({ vesselId, department: cfg.department, isEnabled: cfg.isEnabled, sortOrder: cfg.sortOrder })
-        .returning();
-      results.push(inserted[0]);
-    }
-  }
-  return results;
-}

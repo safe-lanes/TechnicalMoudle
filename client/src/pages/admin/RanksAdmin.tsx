@@ -8,14 +8,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Search, Save, Loader2, ChevronUp, ChevronDown, Network } from "lucide-react";
+import { Plus, Trash2, Search, Save, Loader2, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { VISIBLE_UI_ROLES, UI_ROLE_LABELS } from "@shared/uiRoles";
 import type { UIRole } from "@shared/uiRoles";
-import { useLocation } from "wouter";
 
 interface RankRow {
   id?: number;
@@ -40,7 +39,6 @@ const RANK_CATEGORIES = [
 
 export default function RanksAdmin() {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
   const [isEditMode, setIsEditMode] = useState(false);
   const [hasSavedInSession, setHasSavedInSession] = useState<Record<string, boolean>>({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -332,16 +330,6 @@ export default function RanksAdmin() {
               ))}
             </SelectContent>
           </Select>
-          <div className="ml-auto">
-            <button
-              onClick={() => setLocation("/admin/vessel-org-chart")}
-              className="flex items-center gap-2 px-5 py-2 rounded-full border border-blue-400 text-blue-600 hover:bg-blue-50 transition-colors text-sm font-medium"
-              data-testid="button-open-org-chart"
-            >
-              <Network className="h-4 w-4" />
-              Vessel Org Chart
-            </button>
-          </div>
         </div>
       </div>
 
