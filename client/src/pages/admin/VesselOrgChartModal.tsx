@@ -246,7 +246,7 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
   const [newRankId, setNewRankId] = useState("");
   const [newParentRankId, setNewParentRankId] = useState("");
 
-  const { data: orgChartData, isLoading: isLoadingChart } = useQuery<OrgChartEntry[]>({
+  const { data: orgChartData, isLoading: isLoadingChart, isError: isChartError } = useQuery<OrgChartEntry[]>({
     queryKey: ['/technical/api/admin/vessel-org-chart'],
     enabled: open,
   });
@@ -382,7 +382,7 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
             <DialogTitle className="text-xl font-semibold" data-testid="text-orgchart-title">Vessel Org Chart</DialogTitle>
             <div className="flex items-center gap-2">
               {!isEditMode ? (
-                <Button variant="outline" size="sm" onClick={enterEditMode} className="gap-1.5" data-testid="button-orgchart-edit">
+                <Button variant="outline" size="sm" onClick={enterEditMode} disabled={isLoadingChart || isChartError} className="gap-1.5" data-testid="button-orgchart-edit">
                   <Pencil className="h-3.5 w-3.5" />
                   Edit
                 </Button>
@@ -405,6 +405,10 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
           {isLoadingChart ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            </div>
+          ) : isChartError ? (
+            <div className="text-center py-12 text-red-500" data-testid="text-orgchart-error">
+              Failed to load org chart data. Please try again.
             </div>
           ) : tree.length === 0 ? (
             <div className="text-center py-12 text-gray-500" data-testid="text-orgchart-empty">
