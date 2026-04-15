@@ -493,6 +493,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             dueDate: formatDate(job.dueDate),
             rhWhenLastDone: job.lastDoneRH ?? '-',
             daysRhOverdue,
+            overdueType,
             assignedTo: job.assignedTo,
             critical: job.critical
           };
