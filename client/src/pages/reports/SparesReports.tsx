@@ -387,11 +387,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
       }
 
       case 'spares-consumption-analysis': {
-        const consumptionParams = new URLSearchParams();
-        if (categoryFilters.dateRange?.from) consumptionParams.set('startDate', categoryFilters.dateRange.from.toISOString());
-        if (categoryFilters.dateRange?.to) consumptionParams.set('endDate', categoryFilters.dateRange.to.toISOString());
-        const consumptionQs = consumptionParams.toString() ? `?${consumptionParams}` : '';
-        const apiRes = await fetch(`/technical/api/reports/consumption-analysis/${effectiveVesselId}${consumptionQs}`, { credentials: 'include' });
+        const apiRes = await fetch(`/technical/api/reports/consumption-analysis/${effectiveVesselId}`, { credentials: 'include' });
         if (!apiRes.ok) throw new Error('Failed to fetch consumption analysis data');
         const apiData = await apiRes.json();
 
@@ -439,10 +435,10 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         ];
 
         if (mode === 'preview') {
-          return { title: 'Consumption Pattern Analysis', subtitle: 'Spare parts consumption patterns and trends', vessel: vesselName, dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to), columns, data, summary };
+          return { title: 'Consumption Pattern Analysis', subtitle: 'Spare parts consumption patterns and trends', vessel: vesselName, columns, data, summary };
         }
         pdfReportGenerator.generateReport(
-          { title: 'Consumption Pattern Analysis', subtitle: 'Spare parts consumption patterns and trends', vessel: vesselName, orientation: 'landscape', dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to) },
+          { title: 'Consumption Pattern Analysis', subtitle: 'Spare parts consumption patterns and trends', vessel: vesselName, orientation: 'landscape' },
           columns,
           data
         );
