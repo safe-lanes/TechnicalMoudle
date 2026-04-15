@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Pencil, X, Save, Loader2, Plus, Trash2 } from "lucide-react";
+import { Pencil, Save, Loader2, Plus, Trash2 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -40,16 +40,30 @@ interface TreeNode {
   children: TreeNode[];
 }
 
-const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  "Senior Officers": { bg: "bg-blue-500", text: "text-white", border: "border-blue-600" },
-  "Junior Officers": { bg: "bg-blue-400", text: "text-white", border: "border-blue-500" },
-  "Ratings": { bg: "bg-emerald-500", text: "text-white", border: "border-emerald-600" },
-  "Catering": { bg: "bg-teal-500", text: "text-white", border: "border-teal-600" },
-  "Other": { bg: "bg-amber-500", text: "text-white", border: "border-amber-600" },
+const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
+  "Senior Officers": { bg: "bg-blue-500", text: "text-white" },
+  "Junior Officers": { bg: "bg-blue-400", text: "text-white" },
+  "Ratings": { bg: "bg-emerald-500", text: "text-white" },
+  "Catering": { bg: "bg-teal-500", text: "text-white" },
+  "Other": { bg: "bg-amber-500", text: "text-white" },
 };
 
 function getColorForCategory(category: string) {
   return CATEGORY_COLORS[category] || CATEGORY_COLORS["Other"];
+}
+
+function wouldCreateCycle(entries: OrgChartEntry[], rankId: string, newParentRankId: string | null): boolean {
+  if (!newParentRankId || newParentRankId === rankId) return newParentRankId === rankId;
+  let current: string | null = newParentRankId;
+  const visited = new Set<string>();
+  while (current) {
+    if (current === rankId) return true;
+    if (visited.has(current)) return false;
+    visited.add(current);
+    const parent = entries.find(e => e.rankId === current);
+    current = parent?.parentRankId || null;
+  }
+  return false;
 }
 
 function buildTree(entries: OrgChartEntry[], ranksMap: Map<string, RankInfo>): TreeNode[] {
@@ -84,12 +98,15 @@ function buildTree(entries: OrgChartEntry[], ranksMap: Map<string, RankInfo>): T
   return roots;
 }
 
-function OrgTreeNode({ node, depth, isLast, isEditMode, onRemove }: {
+function OrgTreeNode({ node, depth, isLast, isEditMode, onRemove, onChangeParent, allEntries, ranksMap }: {
   node: TreeNode;
   depth: number;
   isLast: boolean;
   isEditMode: boolean;
   onRemove: (rankId: string) => void;
+  onChangeParent: (rankId: string, newParentRankId: string | null) => void;
+  allEntries: OrgChartEntry[];
+  ranksMap: Map<string, RankInfo>;
 }) {
   const colors = getColorForCategory(node.category);
   const indent = depth * 32;
@@ -107,13 +124,33 @@ function OrgTreeNode({ node, depth, isLast, isEditMode, onRemove }: {
           {node.rankName}
         </span>
         {isEditMode && (
-          <button
-            onClick={() => onRemove(node.entry.rankId)}
-            className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700"
-            data-testid={`button-remove-orgchart-${node.entry.rankId}`}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          <div className="flex items-center gap-1 ml-2">
+            <Select
+              value={node.entry.parentRankId || "__root__"}
+              onValueChange={(v) => onChangeParent(node.entry.rankId, v === "__root__" ? null : v)}
+            >
+              <SelectTrigger className="h-7 w-36 text-xs" data-testid={`select-parent-${node.entry.rankId}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__root__">Root (no parent)</SelectItem>
+                {allEntries
+                  .filter(e => e.rankId !== node.entry.rankId && !wouldCreateCycle(allEntries, node.entry.rankId, e.rankId))
+                  .map(e => (
+                    <SelectItem key={e.rankId} value={e.rankId}>
+                      {ranksMap.get(e.rankId)?.name || e.rank || e.rankId}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <button
+              onClick={() => onRemove(node.entry.rankId)}
+              className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 p-0.5"
+              data-testid={`button-remove-orgchart-${node.entry.rankId}`}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
         )}
       </div>
       {node.children.map((child, idx) => (
@@ -124,6 +161,9 @@ function OrgTreeNode({ node, depth, isLast, isEditMode, onRemove }: {
           isLast={idx === node.children.length - 1}
           isEditMode={isEditMode}
           onRemove={onRemove}
+          onChangeParent={onChangeParent}
+          allEntries={allEntries}
+          ranksMap={ranksMap}
         />
       ))}
     </>
@@ -139,7 +179,7 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
   const { toast } = useToast();
   const [isEditMode, setIsEditMode] = useState(false);
   const [editEntries, setEditEntries] = useState<OrgChartEntry[]>([]);
-  const [deletedIds, setDeletedIds] = useState<number[]>([]);
+  const [removedEntries, setRemovedEntries] = useState<OrgChartEntry[]>([]);
   const [newRankId, setNewRankId] = useState("");
   const [newParentRankId, setNewParentRankId] = useState("");
 
@@ -186,12 +226,16 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
   }, [ranksData, usedRankIds]);
 
   const saveMutation = useMutation({
-    mutationFn: async (entries: OrgChartEntry[]) => {
-      for (const id of deletedIds) {
+    mutationFn: async (payload: { entries: OrgChartEntry[]; toDelete: OrgChartEntry[] }) => {
+      const idsToReallyDelete = payload.toDelete
+        .filter(e => e.id && !payload.entries.some(active => active.id === e.id))
+        .map(e => e.id!);
+
+      for (const id of idsToReallyDelete) {
         await apiRequest('DELETE', `/technical/api/admin/vessel-org-chart/${id}`);
       }
-      if (entries.length > 0) {
-        const response = await apiRequest('POST', '/technical/api/admin/vessel-org-chart', { entries });
+      if (payload.entries.length > 0) {
+        const response = await apiRequest('POST', '/technical/api/admin/vessel-org-chart', { entries: payload.entries });
         return response.json();
       }
       return { success: true };
@@ -199,7 +243,7 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
     onSuccess: () => {
       toast({ title: "Org chart saved", description: "Vessel org chart updated successfully" });
       setIsEditMode(false);
-      setDeletedIds([]);
+      setRemovedEntries([]);
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-org-chart'] });
     },
     onError: (error: any) => {
@@ -209,28 +253,33 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
 
   const enterEditMode = () => {
     setEditEntries([...(orgChartData || [])]);
-    setDeletedIds([]);
+    setRemovedEntries([]);
     setIsEditMode(true);
   };
 
   const cancelEdit = () => {
     setIsEditMode(false);
     setEditEntries([]);
-    setDeletedIds([]);
+    setRemovedEntries([]);
     setNewRankId("");
     setNewParentRankId("");
   };
 
   const handleSave = () => {
-    saveMutation.mutate(editEntries);
+    saveMutation.mutate({ entries: editEntries, toDelete: removedEntries });
+  };
+
+  const changeParent = (rankId: string, newParentRankId: string | null) => {
+    setEditEntries(prev => prev.map(e =>
+      e.rankId === rankId ? { ...e, parentRankId: newParentRankId } : e
+    ));
   };
 
   const removeEntry = (rankId: string) => {
     const entry = editEntries.find(e => e.rankId === rankId);
-    if (entry?.id) {
-      setDeletedIds(prev => [...prev, entry.id!]);
+    if (entry) {
+      setRemovedEntries(prev => [...prev, entry]);
     }
-    const childrenToOrphan = editEntries.filter(e => e.parentRankId === rankId);
     setEditEntries(prev => prev
       .filter(e => e.rankId !== rankId)
       .map(e => e.parentRankId === rankId ? { ...e, parentRankId: entry?.parentRankId || null } : e)
@@ -239,14 +288,23 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
 
   const addEntry = () => {
     if (!newRankId) return;
-    const rankInfo = ranksMap.get(newRankId);
-    const maxSort = editEntries.reduce((max, e) => Math.max(max, e.sortOrder), 0);
-    setEditEntries(prev => [...prev, {
-      rankId: newRankId,
-      rank: rankInfo?.name || newRankId,
-      parentRankId: newParentRankId || null,
-      sortOrder: maxSort + 1,
-    }]);
+    const previouslyRemoved = removedEntries.find(e => e.rankId === newRankId);
+    if (previouslyRemoved) {
+      setEditEntries(prev => [...prev, {
+        ...previouslyRemoved,
+        parentRankId: newParentRankId || null,
+      }]);
+      setRemovedEntries(prev => prev.filter(e => e.rankId !== newRankId));
+    } else {
+      const rankInfo = ranksMap.get(newRankId);
+      const maxSort = editEntries.reduce((max, e) => Math.max(max, e.sortOrder), 0);
+      setEditEntries(prev => [...prev, {
+        rankId: newRankId,
+        rank: rankInfo?.name || newRankId,
+        parentRankId: newParentRankId || null,
+        sortOrder: maxSort + 1,
+      }]);
+    }
     setNewRankId("");
     setNewParentRankId("");
   };
@@ -301,6 +359,9 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
                 isLast={idx === tree.length - 1}
                 isEditMode={isEditMode}
                 onRemove={removeEntry}
+                onChangeParent={changeParent}
+                allEntries={editEntries}
+                ranksMap={ranksMap}
               />
             ))
           )}
