@@ -377,12 +377,18 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     
     const vesselWorkOrders = filteredWorkOrders;
 
+    const applyComponentFilter = (items: any[]) => {
+      if (!globalComponent) return items;
+      const q = globalComponent.toLowerCase();
+      return items.filter((item: any) => {
+        const compName = (item.componentName || item.component || "").toLowerCase();
+        const compCode = (item.componentCode || "").toLowerCase();
+        return compName.includes(q) || compCode.includes(q);
+      });
+    };
+
     switch (reportId) {
       case 'due-jobs-7': {
-        // Due Jobs (7 Days) is a current-state report showing jobs due within the next 7 days
-        // from today. It intentionally ignores the global period filter because it always
-        // reflects today's upcoming workload — applying a past/future year filter would
-        // produce an empty or misleading result.
         const dueJobsResponse = await fetch(
           `/technical/api/reports/due-jobs-7-days/preview?vesselId=${effectiveVesselId}`
         );
@@ -390,6 +396,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           throw new Error('Failed to fetch due jobs data');
         }
         const { data: dueJobsRaw, vesselName: dueVessel, summary: dueJobsSummary } = await dueJobsResponse.json();
+
+        const filteredDueJobs = applyComponentFilter(dueJobsRaw);
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
@@ -402,7 +410,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { header: 'Assigned To', field: 'assignedTo', width: 35 }
         ];
 
-        const data = dueJobsRaw.map((job: any, index: number) => ({
+        const data = filteredDueJobs.map((job: any, index: number) => ({
           sno: index + 1,
           workOrderNo: job.workOrderNo,
           jobTitle: job.jobTitle,
@@ -445,6 +453,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         }
         const { data: overdueRaw, vesselName: overdueVessel, summary: overdueSummary } = await overdueResponse.json();
 
+        const filteredOverdue = applyComponentFilter(overdueRaw);
+
         const columns = [
           { header: 'S.No', field: 'sNo', width: 8 },
           { header: 'WO Code', field: 'workOrderNo', width: 30 },
@@ -462,7 +472,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { header: 'Critical', field: 'critical', width: 12 }
         ];
 
-        const data = overdueRaw.map((job: any, index: number) => {
+        const data = filteredOverdue.map((job: any, index: number) => {
           const overdueType = job.overdueType || '';
           let daysRhOverdue = '-';
           if (overdueType === 'RH' || overdueType === 'Both') {
@@ -523,7 +533,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         if (!completedResponse.ok) {
           throw new Error('Failed to fetch completed jobs data');
         }
-        const { data: completedRaw, vesselName: completedVessel, summary: completedSummaryData } = await completedResponse.json();
+        const { data: completedRawAll, vesselName: completedVessel, summary: completedSummaryData } = await completedResponse.json();
+        const completedRaw = applyComponentFilter(completedRawAll);
 
         const completedColumns = [
           { header: 'S.No', field: 'sNo', width: 8 },
@@ -631,9 +642,9 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         if (!response.ok) {
           throw new Error('Failed to fetch critical equipment data');
         }
-        const { data: criticalData, metadata } = await response.json();
+        const { data: criticalDataRaw, metadata } = await response.json();
+        const criticalData = applyComponentFilter(criticalDataRaw);
 
-        // Define columns matching specification (12 columns)
         const columns = [
           { header: 'S.No', field: 'sNo', width: 8 },
           { header: 'Comp. Code', field: 'componentCode', width: 18 },
@@ -697,9 +708,9 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         if (!response.ok) {
           throw new Error('Failed to fetch unplanned/breakdown jobs data');
         }
-        const { data: unplannedData, metadata } = await response.json();
+        const { data: unplannedDataRaw, metadata } = await response.json();
+        const unplannedData = applyComponentFilter(unplannedDataRaw);
 
-        // Define columns matching specification (11 columns)
         const columns = [
           { header: 'S.No', field: 'sNo', width: 8 },
           { header: 'WO Number', field: 'workOrderNo', width: 20 },
@@ -750,7 +761,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         if (!postponeResponse.ok) {
           throw new Error('Failed to fetch postponement log data');
         }
-        const { data: postponeRaw, vesselName: postponeVessel, summary: postponeSummary } = await postponeResponse.json();
+        const { data: postponeRawAll, vesselName: postponeVessel, summary: postponeSummary } = await postponeResponse.json();
+        const postponeRaw = applyComponentFilter(postponeRawAll);
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },

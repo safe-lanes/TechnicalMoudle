@@ -143,8 +143,16 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
     if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
       result = result.filter((d: any) => !d.vesselId || globalVessels.includes(d.vesselId));
     }
+    if (globalComponent) {
+      const q = globalComponent.toLowerCase();
+      result = result.filter((d: any) => {
+        const compName = (d.componentName || d.component || "").toLowerCase();
+        const compCode = (d.componentCode || "").toLowerCase();
+        return compName.includes(q) || compCode.includes(q);
+      });
+    }
     return result;
-  }, [defects, globalVessels, vessels.length]);
+  }, [defects, globalVessels, globalComponent, vessels.length]);
 
   const reports: AdminReport[] = [
     {

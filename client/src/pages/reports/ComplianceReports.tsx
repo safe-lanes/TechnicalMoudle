@@ -122,16 +122,32 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
     if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
       result = result.filter((c: any) => !c.vesselId || globalVessels.includes(c.vesselId));
     }
+    if (globalComponent) {
+      const q = globalComponent.toLowerCase();
+      result = result.filter((c: any) => {
+        const compName = (c.componentName || c.component || c.name || c.certificateName || "").toLowerCase();
+        const compCode = (c.componentCode || "").toLowerCase();
+        return compName.includes(q) || compCode.includes(q);
+      });
+    }
     return result;
-  }, [certificates, globalVessels, vessels.length]);
+  }, [certificates, globalVessels, globalComponent, vessels.length]);
 
   const filteredSurveys = useMemo(() => {
     let result = surveys;
     if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
       result = result.filter((s: any) => !s.vesselId || globalVessels.includes(s.vesselId));
     }
+    if (globalComponent) {
+      const q = globalComponent.toLowerCase();
+      result = result.filter((s: any) => {
+        const compName = (s.componentName || s.component || s.name || s.surveyType || "").toLowerCase();
+        const compCode = (s.componentCode || "").toLowerCase();
+        return compName.includes(q) || compCode.includes(q);
+      });
+    }
     return result;
-  }, [surveys, globalVessels, vessels.length]);
+  }, [surveys, globalVessels, globalComponent, vessels.length]);
 
   const reports: ComplianceReport[] = [
     {
