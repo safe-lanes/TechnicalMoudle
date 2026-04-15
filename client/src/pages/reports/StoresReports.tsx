@@ -618,7 +618,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ tab: 'stock-status' }),
+            body: JSON.stringify({ tab: 'stock-status', componentFilter: globalComponent || undefined }),
           });
           if (!res.ok) throw new Error('Failed to generate Excel');
           const blob = await res.blob();
@@ -634,7 +634,9 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         } else if (reportId === 'low-stock-alert') {
           const res = await fetch(`/technical/api/reports/stores-low-stock-alert/${effectiveVesselId}/excel`, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
+            body: JSON.stringify({ componentFilter: globalComponent || undefined }),
           });
           if (!res.ok) throw new Error('Failed to generate Excel');
           const blob = await res.blob();
@@ -652,7 +654,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({}),
+            body: JSON.stringify({ componentFilter: globalComponent || undefined }),
           });
           if (!res.ok) throw new Error('Failed to generate Excel');
           const blob = await res.blob();

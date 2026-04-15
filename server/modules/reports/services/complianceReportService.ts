@@ -763,6 +763,7 @@ export async function exportIhmInventoryStatusExcel(
   ihmStatus?: string,
   itemType?: string,
   search?: string,
+  componentFilter?: string,
 ): Promise<{ buffer: Buffer; filename: string }> {
   const vessels = await repo.getVessels();
   const vessel = vessels.find(v => v.id === vesselId || (v as any).vesselCode === vesselId);
@@ -869,6 +870,15 @@ export async function exportIhmInventoryStatusExcel(
       i.itemCode.toLowerCase().includes(q) ||
       i.itemName.toLowerCase().includes(q) ||
       i.componentOrCategory.toLowerCase().includes(q)
+    );
+  }
+
+  if (componentFilter && componentFilter.trim()) {
+    const cf = componentFilter.toLowerCase();
+    allItems = allItems.filter(i =>
+      (i.itemName || '').toLowerCase().includes(cf) ||
+      (i.itemCode || '').toLowerCase().includes(cf) ||
+      (i.componentOrCategory || '').toLowerCase().includes(cf)
     );
   }
 

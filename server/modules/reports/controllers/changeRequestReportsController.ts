@@ -29,7 +29,7 @@ export async function getChangeRequestsStatusTracking(req: Request, res: Respons
 
 export async function exportChangeRequestsExcel(req: Request, res: Response) {
   try {
-    const { vesselId, startDate, endDate, status, category } = req.query;
+    const { vesselId, startDate, endDate, status, category, componentFilter } = req.query;
 
     const { buffer, filename } = await changeRequestReportService.exportChangeRequestsExcel(
       vesselId as string | undefined,
@@ -37,6 +37,7 @@ export async function exportChangeRequestsExcel(req: Request, res: Response) {
       endDate as string | undefined,
       status as string | undefined,
       category as string | undefined,
+      componentFilter as string | undefined,
     );
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

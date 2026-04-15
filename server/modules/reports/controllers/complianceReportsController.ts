@@ -94,7 +94,7 @@ export async function getIhmInventoryStatus(req: Request, res: Response) {
 
 export async function exportIhmInventoryStatusExcel(req: Request, res: Response) {
   try {
-    const { vesselId, ihmStatus, itemType, search } = req.body;
+    const { vesselId, ihmStatus, itemType, search, componentFilter } = req.body;
 
     if (!vesselId) {
       return res.status(400).json({ error: "vesselId is required" });
@@ -105,6 +105,7 @@ export async function exportIhmInventoryStatusExcel(req: Request, res: Response)
       ihmStatus,
       itemType,
       search,
+      componentFilter,
     );
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

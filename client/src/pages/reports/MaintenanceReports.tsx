@@ -563,10 +563,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           return { title: 'COMPLETED JOBS REGISTER', subtitle: `Vessel: ${completedVessel || vesselName}`, vessel: completedVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns: completedColumns, data, summary: completedSummary } as ReportPreviewData;
         }
 
+        const pdfManHours = data.reduce((sum: number, d: any) => sum + (parseFloat(d.manHours) || 0), 0);
         pdfReportGenerator.generateReport(
           { 
             title: 'COMPLETED JOBS REGISTER', 
-            subtitle: `${completedSummaryData.totalJobs} completed jobs | ${completedSummaryData.totalManHours} total man-hours`,
+            subtitle: `${data.length} completed jobs | ${pdfManHours.toFixed(1)} total man-hours`,
             vessel: completedVessel || vesselName,
             orientation: 'landscape',
             dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to)
@@ -670,14 +671,13 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           daysUntilDue: row.daysUntilDue !== null ? row.daysUntilDue : '-'
         }));
 
-        // Build summary matching specification
         const summary = [
-          { label: 'Total Critical Equipment', value: metadata.totalCriticalEquipment },
-          { label: 'Critical Only', value: metadata.criticalOnly },
-          { label: 'Class Item Only', value: metadata.classItemOnly },
-          { label: 'Both Critical & Class', value: metadata.bothCriticalAndClass },
-          { label: 'With Overdue Jobs', value: metadata.equipmentWithOverdue, color: 'highlight' },
-          { label: (effectiveDateRange?.from || effectiveDateRange?.to) ? 'Due in Period' : 'Due Soon (7 days)', value: metadata.equipmentDueSoon }
+          { label: 'Total Critical Equipment', value: data.length },
+          { label: 'Critical Only', value: data.filter((d: any) => d.isCritical === 'Yes' && d.isClassItem !== 'Yes').length },
+          { label: 'Class Item Only', value: data.filter((d: any) => d.isClassItem === 'Yes' && d.isCritical !== 'Yes').length },
+          { label: 'Both Critical & Class', value: data.filter((d: any) => d.isCritical === 'Yes' && d.isClassItem === 'Yes').length },
+          { label: 'With Overdue Jobs', value: data.filter((d: any) => (d.overdueJobs || 0) > 0).length, color: 'highlight' },
+          { label: (effectiveDateRange?.from || effectiveDateRange?.to) ? 'Due in Period' : 'Due Soon (7 days)', value: data.filter((d: any) => (d.dueSoonJobs || 0) > 0).length }
         ];
 
         if (mode === 'preview') return { title: 'CRITICAL EQUIPMENT STATUS REPORT', subtitle: 'SOLAS-critical and class-critical equipment', vessel: vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;

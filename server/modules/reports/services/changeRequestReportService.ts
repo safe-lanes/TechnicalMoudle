@@ -181,9 +181,19 @@ export async function exportChangeRequestsExcel(
   endDate: string | undefined,
   status: string | undefined,
   category: string | undefined,
+  componentFilter?: string,
 ): Promise<{ buffer: Buffer; filename: string }> {
-  // Get the report data first
   const reportData = await getChangeRequestsStatusTracking(vesselId, startDate, endDate, status, category);
+
+  if (componentFilter && componentFilter.trim()) {
+    const cf = componentFilter.toLowerCase();
+    reportData.requests = reportData.requests.filter((r: any) => {
+      const title = (r.title || '').toLowerCase();
+      const desc = (r.description || '').toLowerCase();
+      const comp = (r.componentName || '').toLowerCase();
+      return title.includes(cf) || desc.includes(cf) || comp.includes(cf);
+    });
+  }
 
   const wb = new ExcelJS.Workbook();
   wb.creator = 'PMS Report Generator';

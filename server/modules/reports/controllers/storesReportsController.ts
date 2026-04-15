@@ -8,10 +8,10 @@ import * as storesReportService from '../services/storesReportService';
 export async function exportStoresInventoryStatusExcel(req: Request, res: Response) {
   try {
     const { vesselId } = req.params;
-    const { tab, categoryFilter, statusFilter } = req.body;
+    const { tab, categoryFilter, statusFilter, componentFilter } = req.body;
 
     const { buffer, filename } = await storesReportService.exportStoresInventoryStatusExcel(
-      vesselId, tab, categoryFilter, statusFilter,
+      vesselId, tab, categoryFilter, statusFilter, componentFilter,
     );
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -53,10 +53,10 @@ export async function getStoresConsumptionAnalysis(req: Request, res: Response) 
 export async function exportStoresConsumptionExcel(req: Request, res: Response) {
   try {
     const { vesselId } = req.params;
-    const { startDate, endDate, itemType, category } = req.body;
+    const { startDate, endDate, itemType, category, componentFilter } = req.body;
 
     const { buffer, filename } = await storesReportService.exportStoresConsumptionExcel(
-      vesselId, startDate, endDate, itemType, category,
+      vesselId, startDate, endDate, itemType, category, componentFilter,
     );
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -153,8 +153,9 @@ export async function getStoresLowStockAlert(req: Request, res: Response) {
 export async function exportStoresLowStockAlertExcel(req: Request, res: Response) {
   try {
     const { vesselId } = req.params;
+    const componentFilter = req.body?.componentFilter;
 
-    const { buffer, filename } = await storesReportService.exportStoresLowStockAlertExcel(vesselId);
+    const { buffer, filename } = await storesReportService.exportStoresLowStockAlertExcel(vesselId, componentFilter);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

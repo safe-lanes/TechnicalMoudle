@@ -21,6 +21,7 @@ export async function exportStoresInventoryStatusExcel(
   tab: string | undefined,
   categoryFilter: string | undefined,
   statusFilter: string | undefined,
+  componentFilter?: string,
 ): Promise<{ buffer: Buffer; filename: string }> {
   const allVessels = await repo.getVessels();
   let allItems: any[];
@@ -55,6 +56,15 @@ export async function exportStoresInventoryStatusExcel(
       if (rob <= min) return statusFilter === 'Low';
       return statusFilter === 'OK';
     });
+  }
+
+  if (componentFilter && componentFilter.trim()) {
+    const cf = componentFilter.toLowerCase();
+    items = items.filter((i: any) =>
+      (i.itemName || '').toLowerCase().includes(cf) ||
+      (i.itemCode || '').toLowerCase().includes(cf) ||
+      (i.componentName || '').toLowerCase().includes(cf)
+    );
   }
 
   const categoryDisplayMap: Record<string, string> = {
@@ -610,6 +620,7 @@ export async function exportStoresConsumptionExcel(
   endDate: string | undefined,
   itemType: string | undefined,
   category: string | undefined,
+  componentFilter?: string,
 ): Promise<{ buffer: Buffer; filename: string }> {
   const allVessels = await repo.getVessels();
   let allHistory: any[];
@@ -644,6 +655,18 @@ export async function exportStoresConsumptionExcel(
   if (category && category !== 'all') {
     const catItemIds = new Set(allItems.filter((i: any) => i.category === category).map((i: any) => i.id));
     consumeEvents = consumeEvents.filter((h: any) => catItemIds.has(h.itemId));
+  }
+
+  if (componentFilter && componentFilter.trim()) {
+    const cf = componentFilter.toLowerCase();
+    const matchingItemIds = new Set(
+      allItems.filter((i: any) =>
+        (i.itemName || '').toLowerCase().includes(cf) ||
+        (i.itemCode || '').toLowerCase().includes(cf) ||
+        (i.componentName || '').toLowerCase().includes(cf)
+      ).map((i: any) => i.id)
+    );
+    consumeEvents = consumeEvents.filter((h: any) => matchingItemIds.has(h.itemId));
   }
 
   const dates = consumeEvents.map((h: any) => new Date(h.timestampUTC)).filter((d: Date) => !isNaN(d.getTime()));
@@ -1351,7 +1374,7 @@ export async function getStoresLowStockAlert(
 // STORES LOW STOCK ALERT - EXCEL EXPORT
 // ═══════════════════════════════════════════════════════════════
 
-export async function exportStoresLowStockAlertExcel(vesselId: string): Promise<{ buffer: Buffer; filename: string }> {
+export async function exportStoresLowStockAlertExcel(vesselId: string, componentFilter?: string): Promise<{ buffer: Buffer; filename: string }> {
   let result: any;
   if (vesselId === 'all') {
     const allVessels = await repo.getVessels();
@@ -1374,7 +1397,16 @@ export async function exportStoresLowStockAlertExcel(vesselId: string): Promise<
   } else {
     result = await lowStockReportService.computeReport(vesselId);
   }
-  const lowStockItems = result.items;
+  let lowStockItems = result.items;
+
+  if (componentFilter && componentFilter.trim()) {
+    const cf = componentFilter.toLowerCase();
+    lowStockItems = lowStockItems.filter((i: any) =>
+      (i.itemName || '').toLowerCase().includes(cf) ||
+      (i.itemCode || '').toLowerCase().includes(cf) ||
+      (i.componentName || '').toLowerCase().includes(cf)
+    );
+  }
 
   lowStockReportService.saveSnapshot(
     vesselId, 'low-stock-alert', 'excel', result.summary, lowStockItems

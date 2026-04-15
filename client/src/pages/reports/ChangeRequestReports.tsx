@@ -447,6 +447,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
       if (categoryFilter !== 'all') params.set('category', categoryFilter);
       if (categoryFilters.dateRange.from) params.set('startDate', categoryFilters.dateRange.from.toISOString());
       if (categoryFilters.dateRange.to) params.set('endDate', categoryFilters.dateRange.to.toISOString());
+      if (globalComponent) params.set('componentFilter', globalComponent);
 
       const response = await fetch(`/technical/api/reports/change-requests-status-tracking/export?${params.toString()}`);
       if (!response.ok) throw new Error('Export failed');
