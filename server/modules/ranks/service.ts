@@ -144,6 +144,7 @@ export async function saveOrgChart(entries: any[]) {
         sortOrder: entry.sortOrder ?? 0,
         isDeleted: false,
         rankView: entry.rankView || null,
+        department: entry.department || null,
       };
 
       if (entry.id) {

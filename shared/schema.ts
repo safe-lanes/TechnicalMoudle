@@ -3451,6 +3451,7 @@ export const admVesselOrgChart = pgTable("adm_vessel_org_chart", {
   isDeleted: boolean("is_deleted").default(false),
   isSync: boolean("is_sync").default(false),
   rankView: text("rank_view"),
+  department: text("department"),
 });
 
 export const insertAdmVesselOrgChartSchema = createInsertSchema(admVesselOrgChart).omit({

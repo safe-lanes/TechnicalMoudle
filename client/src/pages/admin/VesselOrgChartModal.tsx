@@ -18,6 +18,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { VISIBLE_UI_ROLES, UI_ROLE_LABELS } from "@shared/uiRoles";
+import { useDepartmentOptions } from "@/hooks/useDepartments";
 
 interface OrgChartEntry {
   id?: number;
@@ -26,6 +27,7 @@ interface OrgChartEntry {
   parentRankId: string | null;
   sortOrder: number;
   rankView?: string | null;
+  department?: string | null;
 }
 
 interface ApiRankRow {
@@ -66,6 +68,8 @@ interface OrgTreeNodeProps {
   onRemove: (rankId: string) => void;
   onChangeParent: (rankId: string, newParentRankId: string | null) => void;
   onChangeRankView: (rankId: string, rankView: string | null) => void;
+  onChangeDepartment: (rankId: string, department: string | null) => void;
+  departmentOptions: { value: string; label: string }[];
   allEntries: OrgChartEntry[];
   ranksMap: Map<string, RankInfo>;
 }
@@ -167,10 +171,11 @@ function buildTree(entries: OrgChartEntry[], ranksMap: Map<string, RankInfo>): T
   return roots;
 }
 
-function OrgTreeNode({ node, depth, isLast, isEditMode, onRemove, onChangeParent, onChangeRankView, allEntries, ranksMap }: OrgTreeNodeProps) {
+function OrgTreeNode({ node, depth, isLast, isEditMode, onRemove, onChangeParent, onChangeRankView, onChangeDepartment, departmentOptions, allEntries, ranksMap }: OrgTreeNodeProps) {
   const colors = getColorForDepartment(node.department);
   const indent = depth * 32;
   const currentRankView = node.entry.rankView || "";
+  const isHeadOfDept = currentRankView === "Head_of_Dept";
 
   return (
     <>
@@ -204,6 +209,28 @@ function OrgTreeNode({ node, depth, isLast, isEditMode, onRemove, onChangeParent
             ))}
           </SelectContent>
         </Select>
+        {isHeadOfDept && (
+          <Select
+            value={node.entry.department || "__none__"}
+            onValueChange={(v) => onChangeDepartment(node.entry.rankId, v === "__none__" ? null : v)}
+            disabled={!isEditMode}
+          >
+            <SelectTrigger
+              className="h-7 w-36 text-xs ml-1"
+              data-testid={`select-department-${node.entry.rankId}`}
+            >
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">None</SelectItem>
+              {departmentOptions.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         {isEditMode && (
           <div className="flex items-center gap-1 ml-1">
             <Select
@@ -244,6 +271,8 @@ function OrgTreeNode({ node, depth, isLast, isEditMode, onRemove, onChangeParent
           onRemove={onRemove}
           onChangeParent={onChangeParent}
           onChangeRankView={onChangeRankView}
+          onChangeDepartment={onChangeDepartment}
+          departmentOptions={departmentOptions}
           allEntries={allEntries}
           ranksMap={ranksMap}
         />
@@ -278,6 +307,8 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
   const { data: ranksData } = useQuery<ApiRankRow[]>({
     queryKey: ['/technical/api/admin/available-ranks'],
   });
+
+  const { options: departmentOptions } = useDepartmentOptions();
 
   const ranksMap = useMemo(() => {
     const map = new Map<string, RankInfo>();
@@ -361,7 +392,13 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
 
   const changeRankView = (rankId: string, rankView: string | null) => {
     setEditEntries(prev => prev.map(e =>
-      e.rankId === rankId ? { ...e, rankView } : e
+      e.rankId === rankId ? { ...e, rankView, department: rankView === "Head_of_Dept" ? e.department : null } : e
+    ));
+  };
+
+  const changeDepartment = (rankId: string, department: string | null) => {
+    setEditEntries(prev => prev.map(e =>
+      e.rankId === rankId ? { ...e, department } : e
     ));
   };
 
@@ -455,6 +492,8 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
                 onRemove={removeEntry}
                 onChangeParent={changeParent}
                 onChangeRankView={changeRankView}
+                onChangeDepartment={changeDepartment}
+                departmentOptions={departmentOptions}
                 allEntries={editEntries}
                 ranksMap={ranksMap}
               />
