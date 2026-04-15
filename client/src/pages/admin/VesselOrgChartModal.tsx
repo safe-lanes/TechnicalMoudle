@@ -18,7 +18,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { VISIBLE_UI_ROLES, UI_ROLE_LABELS } from "@shared/uiRoles";
-import type { UIRole } from "@shared/uiRoles";
 
 interface OrgChartEntry {
   id?: number;
@@ -191,7 +190,7 @@ function OrgTreeNode({ node, depth, isLast, isEditMode, onRemove, onChangeParent
           disabled={!isEditMode}
         >
           <SelectTrigger
-            className="h-7 w-40 text-xs ml-2 border-red-400"
+            className="h-7 w-40 text-xs ml-2"
             data-testid={`select-viewmode-${node.entry.rankId}`}
           >
             <SelectValue placeholder="View Mode" />
