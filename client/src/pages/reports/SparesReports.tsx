@@ -592,8 +592,6 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
       <SparesConsumptionPatternReport
         onBack={() => setActiveDetailReport(embedded ? selectedReportId : null)}
         vesselId={effectiveVesselId}
-        initialDateFrom={categoryFilters.dateRange.from}
-        initialDateTo={categoryFilters.dateRange.to}
         embedded={embedded}
         globalVessels={globalVessels}
         globalComponent={globalComponent}
