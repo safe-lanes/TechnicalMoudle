@@ -156,13 +156,13 @@ export async function exportCompletedJobs(req: Request, res: Response) {
 
 export async function exportUnplannedJobs(req: Request, res: Response) {
   try {
-    const { vesselId, dateFrom, dateTo } = req.body;
+    const { vesselId, dateFrom, dateTo, componentFilter } = req.body;
 
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
 
-    const { buffer, filename } = await maintenanceReportService.exportUnplannedJobs(vesselId, dateFrom, dateTo);
+    const { buffer, filename } = await maintenanceReportService.exportUnplannedJobs(vesselId, dateFrom, dateTo, componentFilter);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

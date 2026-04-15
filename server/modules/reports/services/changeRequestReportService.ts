@@ -191,6 +191,27 @@ export async function exportChangeRequestsExcel(
       const target = (r.targetInfo?.name || '').toLowerCase();
       return target.includes(cf);
     });
+    const filtered = reportData.requests;
+    const byStatus: Record<string, number> = { draft: 0, submitted: 0, returned: 0, approved: 0, rejected: 0 };
+    const byCategory: Record<string, number> = { components: 0, work_orders: 0, spares: 0, stores: 0 };
+    let pendingRequests = 0;
+    let totalCycleHours = 0;
+    let cycleCount = 0;
+    for (const r of filtered) {
+      const st = (r.status || '').toLowerCase();
+      if (byStatus[st] !== undefined) byStatus[st]++;
+      if (st === 'submitted') pendingRequests++;
+      const cat = r.targetInfo?.type || '';
+      if (byCategory[cat] !== undefined) byCategory[cat]++;
+      if (r.cycleTimeHours && r.cycleTimeHours > 0) { totalCycleHours += r.cycleTimeHours; cycleCount++; }
+    }
+    reportData.summary = {
+      totalRequests: filtered.length,
+      byStatus,
+      byCategory,
+      pendingRequests,
+      avgApprovalTimeHours: cycleCount > 0 ? Math.round(totalCycleHours / cycleCount) : 0,
+    };
   }
 
   const wb = new ExcelJS.Workbook();

@@ -816,7 +816,7 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
 // UNPLANNED/BREAKDOWN JOBS - EXCEL EXPORT
 // ═══════════════════════════════════════════════════════════════
 
-export async function exportUnplannedJobs(vesselId: string, dateFrom?: string, dateTo?: string): Promise<{ buffer: Buffer; filename: string }> {
+export async function exportUnplannedJobs(vesselId: string, dateFrom?: string, dateTo?: string, componentFilter?: string): Promise<{ buffer: Buffer; filename: string }> {
   const workOrders = await repo.getWorkOrders(vesselId);
   const jobs = await repo.getJobs(vesselId);
   const components = await repo.getComponents(vesselId);
@@ -845,6 +845,8 @@ export async function exportUnplannedJobs(vesselId: string, dateFrom?: string, d
       return true;
     });
   }
+
+  filteredJobs = filterByComponent(filteredJobs, componentFilter);
 
   const unplannedJobs = filteredJobs.map(wo => {
     const job = jobsMap.get(wo.jobId || '');
