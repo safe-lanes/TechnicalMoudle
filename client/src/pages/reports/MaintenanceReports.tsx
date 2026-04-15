@@ -500,7 +500,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         });
 
         const calendarCount = data.filter((d: any) => d.overdueType === 'Calendar' || d.overdueType === 'Both').length;
-        const rhCount = data.filter((d: any) => d.overdueType === 'Running Hours' || d.overdueType === 'Both').length;
+        const rhCount = data.filter((d: any) => d.overdueType === 'RH' || d.overdueType === 'Running Hours' || d.overdueType === 'Both').length;
         const daysValues = data.map((d: any) => {
           const m = (d.daysRhOverdue || '').match(/(\d+)\s*days/);
           return m ? parseInt(m[1]) : 0;
