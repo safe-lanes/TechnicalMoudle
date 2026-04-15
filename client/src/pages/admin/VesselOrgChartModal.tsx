@@ -17,6 +17,8 @@ import { Pencil, Save, Loader2, Plus, Trash2 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { VISIBLE_UI_ROLES, UI_ROLE_LABELS } from "@shared/uiRoles";
+import type { UIRole } from "@shared/uiRoles";
 
 interface OrgChartEntry {
   id?: number;
@@ -64,6 +66,7 @@ interface OrgTreeNodeProps {
   isEditMode: boolean;
   onRemove: (rankId: string) => void;
   onChangeParent: (rankId: string, newParentRankId: string | null) => void;
+  onChangeRankView: (rankId: string, rankView: string | null) => void;
   allEntries: OrgChartEntry[];
   ranksMap: Map<string, RankInfo>;
 }
@@ -165,9 +168,10 @@ function buildTree(entries: OrgChartEntry[], ranksMap: Map<string, RankInfo>): T
   return roots;
 }
 
-function OrgTreeNode({ node, depth, isLast, isEditMode, onRemove, onChangeParent, allEntries, ranksMap }: OrgTreeNodeProps) {
+function OrgTreeNode({ node, depth, isLast, isEditMode, onRemove, onChangeParent, onChangeRankView, allEntries, ranksMap }: OrgTreeNodeProps) {
   const colors = getColorForDepartment(node.department);
   const indent = depth * 32;
+  const currentRankView = node.entry.rankView || "";
 
   return (
     <>
@@ -181,8 +185,28 @@ function OrgTreeNode({ node, depth, isLast, isEditMode, onRemove, onChangeParent
         <span className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium ${colors.bg} ${colors.text} my-1 shadow-sm`}>
           {node.rankName}
         </span>
+        <Select
+          value={currentRankView || "__none__"}
+          onValueChange={(v) => onChangeRankView(node.entry.rankId, v === "__none__" ? null : v)}
+          disabled={!isEditMode}
+        >
+          <SelectTrigger
+            className="h-7 w-40 text-xs ml-2 border-red-400"
+            data-testid={`select-viewmode-${node.entry.rankId}`}
+          >
+            <SelectValue placeholder="View Mode" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">None</SelectItem>
+            {VISIBLE_UI_ROLES.map(role => (
+              <SelectItem key={role} value={role}>
+                {UI_ROLE_LABELS[role]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {isEditMode && (
-          <div className="flex items-center gap-1 ml-2">
+          <div className="flex items-center gap-1 ml-1">
             <Select
               value={node.entry.parentRankId || "__root__"}
               onValueChange={(v) => onChangeParent(node.entry.rankId, v === "__root__" ? null : v)}
@@ -220,6 +244,7 @@ function OrgTreeNode({ node, depth, isLast, isEditMode, onRemove, onChangeParent
           isEditMode={isEditMode}
           onRemove={onRemove}
           onChangeParent={onChangeParent}
+          onChangeRankView={onChangeRankView}
           allEntries={allEntries}
           ranksMap={ranksMap}
         />
@@ -335,6 +360,12 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
     ));
   };
 
+  const changeRankView = (rankId: string, rankView: string | null) => {
+    setEditEntries(prev => prev.map(e =>
+      e.rankId === rankId ? { ...e, rankView } : e
+    ));
+  };
+
   const removeEntry = (rankId: string) => {
     const entry = editEntries.find(e => e.rankId === rankId);
     if (entry) {
@@ -376,7 +407,7 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
       }
       onOpenChange(v);
     }}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col" data-testid="dialog-vessel-org-chart">
+      <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col" data-testid="dialog-vessel-org-chart">
         <DialogHeader className="flex-shrink-0">
           <div className="flex items-center justify-between pr-8">
             <DialogTitle className="text-xl font-semibold" data-testid="text-orgchart-title">Vessel Org Chart</DialogTitle>
@@ -424,6 +455,7 @@ export default function VesselOrgChartModal({ open, onOpenChange }: VesselOrgCha
                 isEditMode={isEditMode}
                 onRemove={removeEntry}
                 onChangeParent={changeParent}
+                onChangeRankView={changeRankView}
                 allEntries={editEntries}
                 ranksMap={ranksMap}
               />
