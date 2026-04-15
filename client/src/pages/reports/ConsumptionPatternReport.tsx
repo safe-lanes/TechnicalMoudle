@@ -43,32 +43,19 @@ type ActiveTab = "trends" | "items" | "categories" | "efficiency" | "forecast";
 
 const PIE_COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16"];
 
-const toDateStr = (d: Date | null | undefined) => d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : "";
-
-const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onBack, vesselId, embedded, globalVessels = [], globalComponent = "", globalDateFrom, globalDateTo }) => {
+const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onBack, vesselId, embedded, globalVessels = [], globalComponent = "" }) => {
   const { toast } = useToast();
 
-  const [startDate, setStartDate] = useState(toDateStr(globalDateFrom));
-  const [endDate, setEndDate] = useState(toDateStr(globalDateTo));
   const [itemType, setItemType] = useState("all");
   const [category, setCategory] = useState("");
-  const [appliedFilters, setAppliedFilters] = useState({ startDate: toDateStr(globalDateFrom), endDate: toDateStr(globalDateTo), itemType: "all", category: "" });
+  const [appliedFilters, setAppliedFilters] = useState({ itemType: "all", category: "" });
   const [activeTab, setActiveTab] = useState<ActiveTab>("trends");
   const [nonMovingOpen, setNonMovingOpen] = useState(false);
   const [generatingExcel, setGeneratingExcel] = useState(false);
 
-  useEffect(() => {
-    const sf = toDateStr(globalDateFrom);
-    const ef = toDateStr(globalDateTo);
-    setStartDate(sf);
-    setEndDate(ef);
-    setAppliedFilters(prev => ({ ...prev, startDate: sf, endDate: ef }));
-  }, [globalDateFrom, globalDateTo]);
 
   const queryUrl = useMemo(() => {
     const params = new URLSearchParams();
-    if (appliedFilters.startDate) params.set("startDate", appliedFilters.startDate);
-    if (appliedFilters.endDate) params.set("endDate", appliedFilters.endDate);
     if (appliedFilters.itemType && appliedFilters.itemType !== "all") params.set("itemType", appliedFilters.itemType);
     if (appliedFilters.category) params.set("category", appliedFilters.category);
     const qs = params.toString();
@@ -102,7 +89,7 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
   const nonMovingItems = data?.nonMovingItems || [];
 
   const handleApplyFilters = () => {
-    setAppliedFilters({ startDate, endDate, itemType, category });
+    setAppliedFilters({ itemType, category });
   };
 
   const filteredItems = useMemo(() => {
@@ -128,8 +115,6 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
     setGeneratingPdf(true);
     try {
       const params = new URLSearchParams();
-      if (appliedFilters.startDate) params.set("startDate", appliedFilters.startDate);
-      if (appliedFilters.endDate) params.set("endDate", appliedFilters.endDate);
       if (appliedFilters.itemType && appliedFilters.itemType !== "all") params.set("itemType", appliedFilters.itemType);
       if (appliedFilters.category) params.set("category", appliedFilters.category);
       const qs = params.toString();
@@ -177,8 +162,6 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          startDate: appliedFilters.startDate || undefined,
-          endDate: appliedFilters.endDate || undefined,
           itemType: appliedFilters.itemType !== "all" ? appliedFilters.itemType : undefined,
           category: appliedFilters.category || undefined,
         }),
@@ -428,14 +411,6 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
       )}
 
       <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="border border-gray-300 rounded-md px-3 py-2 text-sm" data-testid="input-start-date" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="border border-gray-300 rounded-md px-3 py-2 text-sm" data-testid="input-end-date" />
-        </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Item Type</label>
           <Select value={itemType} onValueChange={setItemType}>
