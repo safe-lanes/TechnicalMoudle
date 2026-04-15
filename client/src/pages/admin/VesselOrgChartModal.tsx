@@ -77,39 +77,22 @@ const DEPARTMENT_COLORS: Record<Department, { bg: string; text: string }> = {
   Other: { bg: "bg-amber-500", text: "text-white" },
 };
 
-const DECK_KEYWORDS = new Set([
-  "master", "chief officer", "second officer", "2nd officer", "third officer", "3rd officer",
-  "bosun", "boatswain", "pumpman", "ordinary seaman", "able seaman",
-  "deck cadet", "deck officer",
-]);
+const CATEGORY_TO_DEPARTMENT: Record<string, Department> = {
+  "Catering": "Catering",
+  "Other": "Other",
+};
 
-const DECK_EXACT = new Set(["ab", "os"]);
-
-const ENGINE_KEYWORDS = new Set([
-  "chief engineer", "second engineer", "2nd engineer", "third engineer", "3rd engineer",
-  "fourth engineer", "4th engineer", "fifth engineer", "5th engineer",
-  "electrical officer", "electrician", "fitter", "oiler", "wiper",
-  "engine cadet", "gas engineer",
-]);
-
-const CATERING_KEYWORDS = new Set([
-  "cook", "chief cook", "messman", "steward", "chief steward",
-]);
-
-function matchesKeyword(lower: string, keywords: Set<string>): boolean {
-  for (const kw of keywords) {
-    if (lower.includes(kw)) return true;
-  }
-  return false;
+function departmentFromCategory(category: string): Department | null {
+  return CATEGORY_TO_DEPARTMENT[category] || null;
 }
 
-function inferDepartment(rankName: string): Department {
-  const lower = rankName.toLowerCase().trim();
-  if (DECK_EXACT.has(lower)) return "Deck";
-  if (matchesKeyword(lower, DECK_KEYWORDS)) return "Deck";
-  if (matchesKeyword(lower, ENGINE_KEYWORDS)) return "Engine";
-  if (matchesKeyword(lower, CATERING_KEYWORDS)) return "Catering";
-  return "Other";
+function departmentForRootNode(rankName: string, category: string): Department {
+  const mapped = departmentFromCategory(category);
+  if (mapped) return mapped;
+  const lower = rankName.toLowerCase();
+  if (lower.includes("engineer") || lower.includes("electrical") || lower.includes("fitter") || lower.includes("oiler")) return "Engine";
+  if (lower.includes("cook") || lower.includes("steward") || lower.includes("messman")) return "Catering";
+  return "Deck";
 }
 
 function getColorForDepartment(department: string): { bg: string; text: string } {
@@ -143,7 +126,7 @@ function buildTree(entries: OrgChartEntry[], ranksMap: Map<string, RankInfo>): T
     nodeMap.set(entry.rankId, {
       entry,
       rankName,
-      department: inferDepartment(rankName),
+      department: "Other",
       children: [],
     });
   }
@@ -163,6 +146,21 @@ function buildTree(entries: OrgChartEntry[], ranksMap: Map<string, RankInfo>): T
     nodes.forEach(n => sortChildren(n.children));
   };
   sortChildren(roots);
+
+  const assignDepartments = (nodes: TreeNode[], parentDept: Department | null) => {
+    for (const node of nodes) {
+      const rankInfo = ranksMap.get(node.entry.rankId);
+      const category = rankInfo?.category || "Other";
+      if (parentDept) {
+        const catDept = departmentFromCategory(category);
+        node.department = catDept || parentDept;
+      } else {
+        node.department = departmentForRootNode(node.rankName, category);
+      }
+      assignDepartments(node.children, node.department as Department);
+    }
+  };
+  assignDepartments(roots, null);
 
   return roots;
 }
