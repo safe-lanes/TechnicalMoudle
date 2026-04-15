@@ -8,13 +8,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Search, Save, Loader2, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Trash2, Search, Save, Loader2, ChevronUp, ChevronDown, Network } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { VISIBLE_UI_ROLES, UI_ROLE_LABELS } from "@shared/uiRoles";
 import type { UIRole } from "@shared/uiRoles";
+import VesselOrgChartModal from "./VesselOrgChartModal";
 
 interface RankRow {
   id?: number;
@@ -47,6 +48,7 @@ export default function RanksAdmin() {
 
   const [ranksData, setRanksData] = useState<RankRow[]>([]);
   const [deletedRankIds, setDeletedRankIds] = useState<string[]>([]);
+  const [showOrgChart, setShowOrgChart] = useState(false);
 
   const { data: savedRanks } = useQuery<any[]>({
     queryKey: ['/technical/api/admin/available-ranks'],
@@ -281,6 +283,10 @@ export default function RanksAdmin() {
           <h1 className="text-2xl font-semibold text-gray-800" data-testid="text-ranks-admin-title">Ranks Admin</h1>
 
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowOrgChart(true)} className="gap-1.5" data-testid="button-vessel-org-chart">
+              <Network className="h-4 w-4" />
+              Vessel Org Chart
+            </Button>
             {!isEditMode ? (
               <Button variant="outline" size="sm" onClick={toggleViewMode} data-testid="button-edit-mode">Edit</Button>
             ) : (
@@ -336,6 +342,8 @@ export default function RanksAdmin() {
       <div className="flex-1 overflow-y-auto">
         {renderRanksTab()}
       </div>
+
+      <VesselOrgChartModal open={showOrgChart} onOpenChange={setShowOrgChart} />
     </div>
   );
 }
