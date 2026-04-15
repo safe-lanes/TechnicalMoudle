@@ -77,28 +77,38 @@ const DEPARTMENT_COLORS: Record<Department, { bg: string; text: string }> = {
   Other: { bg: "bg-amber-500", text: "text-white" },
 };
 
-const DECK_PATTERNS = [
+const DECK_KEYWORDS = new Set([
   "master", "chief officer", "second officer", "2nd officer", "third officer", "3rd officer",
-  "bosun", "boatswain", "pumpman", "ab", "os", "ordinary seaman", "able seaman",
+  "bosun", "boatswain", "pumpman", "ordinary seaman", "able seaman",
   "deck cadet", "deck officer",
-];
+]);
 
-const ENGINE_PATTERNS = [
+const DECK_EXACT = new Set(["ab", "os"]);
+
+const ENGINE_KEYWORDS = new Set([
   "chief engineer", "second engineer", "2nd engineer", "third engineer", "3rd engineer",
   "fourth engineer", "4th engineer", "fifth engineer", "5th engineer",
   "electrical officer", "electrician", "fitter", "oiler", "wiper",
-  "engine cadet", "gas engineer", "engine",
-];
+  "engine cadet", "gas engineer",
+]);
 
-const CATERING_PATTERNS = [
-  "cook", "chief cook", "messman", "steward", "chief steward", "catering",
-];
+const CATERING_KEYWORDS = new Set([
+  "cook", "chief cook", "messman", "steward", "chief steward",
+]);
+
+function matchesKeyword(lower: string, keywords: Set<string>): boolean {
+  for (const kw of keywords) {
+    if (lower.includes(kw)) return true;
+  }
+  return false;
+}
 
 function inferDepartment(rankName: string): Department {
-  const lower = rankName.toLowerCase();
-  if (DECK_PATTERNS.some(p => lower.includes(p))) return "Deck";
-  if (ENGINE_PATTERNS.some(p => lower.includes(p))) return "Engine";
-  if (CATERING_PATTERNS.some(p => lower.includes(p))) return "Catering";
+  const lower = rankName.toLowerCase().trim();
+  if (DECK_EXACT.has(lower)) return "Deck";
+  if (matchesKeyword(lower, DECK_KEYWORDS)) return "Deck";
+  if (matchesKeyword(lower, ENGINE_KEYWORDS)) return "Engine";
+  if (matchesKeyword(lower, CATERING_KEYWORDS)) return "Catering";
   return "Other";
 }
 
