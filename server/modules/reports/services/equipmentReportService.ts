@@ -646,11 +646,14 @@ export async function getCriticalComponentsList(
   category: string | undefined,
   classItemFilter: string | undefined,
   format: string,
+  vesselIds?: string[],
 ) {
   const allVessels = await repo.getVessels();
+  const vesselMap = new Map(allVessels.map((v: any) => [v.id, v.name || v.id]));
   let allComponents: any[] = [];
   if (vesselId === 'all') {
-    for (const v of allVessels) {
+    const scopedVessels = vesselIds?.length ? allVessels.filter((v: any) => vesselIds.includes(v.id)) : allVessels;
+    for (const v of scopedVessels) {
       allComponents = allComponents.concat(await repo.getComponents(v.id));
     }
   } else {
@@ -673,6 +676,7 @@ export async function getCriticalComponentsList(
     const parent = allComponents.find((p: any) => p.id === c.parentId);
     return {
       sno: i + 1,
+      vesselName: vesselMap.get(c.vesselId || '') || '-',
       componentCode: c.componentCode || '-',
       componentName: c.name || '-',
       parentCode: parent?.componentCode || '-',

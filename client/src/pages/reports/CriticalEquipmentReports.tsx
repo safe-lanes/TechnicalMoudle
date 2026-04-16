@@ -293,6 +293,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 8 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'Component Code', field: 'componentCode', width: 25 },
           { header: 'Component Name', field: 'componentName', width: 40 },
           { header: 'Parent Component', field: 'parentName', width: 30 },
@@ -310,6 +311,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
         const components = filteredComponentsData.components || [];
         const tableData = components.map((comp: any, idx: number) => ({
           sno: String(idx + 1),
+          vesselName: comp.vesselName || '-',
           componentCode: comp.componentCode || '-',
           componentName: comp.componentName || '-',
           parentName: comp.parentName || '-',
@@ -368,6 +370,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 8 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'Comp Code', field: 'componentCode', width: 18 },
           { header: 'Component', field: 'componentName', width: 32 },
           { header: 'Location', field: 'location', width: 18 },

@@ -134,12 +134,14 @@ export async function getCriticalComponentsList(req: Request, res: Response) {
     const category = req.query.category as string | undefined;
     const classItemFilter = req.query.classItem as string | undefined;
     const format = (req.query.format as string) || 'json';
+    const vesselIdsRaw = req.query.vesselIds as string | undefined;
+    const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined;
 
     if (!vesselId) {
       return res.status(400).json({ error: "vesselId is required" });
     }
 
-    const result = await equipmentReportService.getCriticalComponentsList(vesselId, category, classItemFilter, format);
+    const result = await equipmentReportService.getCriticalComponentsList(vesselId, category, classItemFilter, format, vesselIds);
 
     if (result.type === 'excel') {
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

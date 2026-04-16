@@ -120,8 +120,8 @@ export async function getSpareHistory(vesselId: string, vesselIds?: string[]) {
 // }
 
 // ═══ Stores Transaction History ═══
-export async function getStoresTransactionHistory(vesselId: string, vesselIds?: string[]) {
-  return storage.getStoresTransactionHistory(vesselId, vesselIds);
+export async function getStoresTransactionHistory(vesselId: string, itemType?: string, vesselIds?: string[]) {
+  return storage.getStoresTransactionHistory(vesselId, itemType, vesselIds);
 }
 
 // ═══ Stores Items (with optional filter) ═══
