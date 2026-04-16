@@ -704,7 +704,7 @@ const WorkOrders: React.FC = () => {
             const tier = params.value;
             if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
             if (tier === "superintendent_notification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Supt. Notified</span>;
-            if (tier === "ce_with_justification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">CE + Remarks</span>;
+            if (tier === "ce_with_justification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">HOD + Remarks</span>;
             return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Standard</span>;
           },
         }
@@ -784,7 +784,7 @@ const WorkOrders: React.FC = () => {
             const tier = params.value;
             if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
             if (tier === "superintendent_notification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Supt. Notified</span>;
-            if (tier === "ce_with_justification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">CE + Remarks</span>;
+            if (tier === "ce_with_justification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">HOD + Remarks</span>;
             return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Standard</span>;
           },
         },
@@ -1501,7 +1501,7 @@ const WorkOrders: React.FC = () => {
         const statCards = [
           { icon: Lock, label: "Locked (Supt. Required)", count: lockedCount, bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-800 dark:text-red-300", testId: "stat-locked" },
           { icon: AlertTriangle, label: "Supt. Notified", count: notifiedCount, bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-800 dark:text-orange-300", testId: "stat-supt-notified" },
-          { icon: Pen, label: "CE Remarks Required", count: ceRemarksCount, bg: "bg-yellow-100 dark:bg-yellow-900/30", text: "text-yellow-800 dark:text-yellow-300", testId: "stat-ce-remarks" },
+          { icon: Pen, label: "HOD Remarks Required", count: ceRemarksCount, bg: "bg-yellow-100 dark:bg-yellow-900/30", text: "text-yellow-800 dark:text-yellow-300", testId: "stat-ce-remarks" },
           { icon: Eye, label: "Standard Approval", count: standardCount, bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-800 dark:text-green-300", testId: "stat-standard" },
         ];
         return (

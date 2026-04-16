@@ -991,7 +991,7 @@ export async function updateWorkOrder(id: string, body: any) {
       const justification = (updateData.skippedCyclesJustification || '').trim();
       if (!justification || justification.length < 30) {
         throw new ValidationError(
-          `This work order has ${woMissedCycles} skipped maintenance cycle(s). The Chief Engineer must provide a written justification (minimum 30 characters) explaining why these cycles were missed before approval can be granted.`,
+          `This work order has ${woMissedCycles} skipped maintenance cycle(s). The Head of Department must provide a written justification (minimum 30 characters) explaining why these cycles were missed before approval can be granted.`,
           { code: 'JUSTIFICATION_REQUIRED', missedCycles: woMissedCycles }
         );
       }
@@ -1003,7 +1003,7 @@ export async function updateWorkOrder(id: string, body: any) {
 
     if (currentTier === 'superintendent_locked') {
       throw new ValidationError(
-        'This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The CE cannot approve until the Superintendent has acknowledged.',
+        'This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The HOD cannot approve until the Superintendent has acknowledged.',
         { code: 'SUPERINTENDENT_LOCKED' }
       );
     }

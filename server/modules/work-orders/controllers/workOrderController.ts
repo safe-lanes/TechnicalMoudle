@@ -213,7 +213,7 @@ export async function superintendentAcknowledge(req: Request, res: Response) {
 
     res.json({
       success: true,
-      message: 'Superintendent has acknowledged. The Chief Engineer can now approve with mandatory remarks.',
+      message: 'Superintendent has acknowledged. The Head of Department can now approve with mandatory remarks.',
     });
   } catch (error: any) {
     console.error('Superintendent acknowledge error:', error);

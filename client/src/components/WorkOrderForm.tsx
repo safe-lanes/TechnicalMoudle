@@ -1317,12 +1317,10 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         return;
       }
 
-      // Rule 3: Approver ≠ Performer for Head of Department ranks
-      const hodRanks = ["Chief Engineer", "Chief Officer", "Master"];
-      if (hodRanks.includes(executionData.performedBy) && executionData.performedBy === templateData.approver) {
+      if (executionData.performedBy && executionData.performedBy === templateData.approver) {
         toast({
           title: "Validation Error",
-          description: `The same Head of Department rank (${executionData.performedBy}) cannot both perform and approve the work. Please select a different Performed By or Approver rank.`,
+          description: `The same rank (${executionData.performedBy}) cannot both perform and approve the work. Please select a different Performed By or Approver rank.`,
           variant: "destructive"
         });
         return;

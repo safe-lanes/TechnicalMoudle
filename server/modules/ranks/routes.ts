@@ -22,4 +22,6 @@ router.get('/admin/vessel-department-config/:vesselId', asyncHandler(ctrl.getVes
 
 router.get('/hierarchy-scope/:vesselId', asyncHandler(ctrl.getHierarchyScope));
 
+router.get('/hod/:vesselId/:department', asyncHandler(ctrl.resolveHod));
+
 export default router;

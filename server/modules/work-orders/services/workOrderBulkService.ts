@@ -77,7 +77,7 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         status: "Completed",
         approvalAction: "approved",
         approver: approver || "Head of Dept",
-        approverRemarks: approverRemarks,
+        approverRemarks,
         skippedCyclesJustification: (missedCycles >= 1 && skippedCyclesJustification) ? skippedCyclesJustification : null,
         approvalDate: new Date().toISOString(),
         nextDueDate,
@@ -161,7 +161,7 @@ export async function bulkReject(workOrderIds: string[], approver?: string, reje
         status: "Due", // Rejected WOs go back to Due
         approvalAction: "rejected",
         approver: approver || "Head of Dept",
-        rejectionComments: rejectionComments,
+        rejectionComments,
         rejectionDate: new Date().toISOString(),
         wasRejected: true, // Mark for red font display
         // Clear completion data for rework

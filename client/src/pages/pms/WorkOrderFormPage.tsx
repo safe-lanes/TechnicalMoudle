@@ -224,6 +224,34 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   });
   const vesselLocations = locationsResponse?.data || [];
 
+  const woDepartment = (workOrderContext as any)?.templateData?.department ||
+    (workOrderContext as any)?.workOrder?.department ||
+    templateData?.department || '';
+  const { data: hodResolution } = useQuery<{
+    resolved: boolean;
+    rankName: string;
+    rankId: string | null;
+    department: string;
+    source: string;
+    mismatch: boolean;
+  }>({
+    queryKey: ['/technical/api/hod', vesselId, woDepartment],
+    queryFn: async () => {
+      const storedApprover = templateData?.approver || (workOrderContext as any)?.templateData?.approver || '';
+      const url = `/technical/api/hod/${vesselId || 'none'}/${encodeURIComponent(woDepartment)}${storedApprover ? `?storedApprover=${encodeURIComponent(storedApprover)}` : ''}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to resolve HOD');
+      return res.json();
+    },
+    enabled: !!woDepartment,
+    staleTime: 5 * 60 * 1000,
+  });
+  const hodLabel = hodResolution?.rankName || templateData?.approver || 'Head of Dept';
+  const hodShort = hodLabel.includes('Chief Engineer') ? 'CE' :
+    hodLabel.includes('Chief Officer') ? 'CO' :
+    hodLabel.toLowerCase() === 'master' ? 'Master' :
+    hodLabel.split(/\s+/).length >= 2 ? hodLabel.split(/\s+/).map(w => w[0].toUpperCase()).join('') : hodLabel;
+
   // Fetch spares with inventory for stock validation
   const { data: sparesWithInventoryResponse, isLoading: isSparesInventoryLoading, isFetched: isSparesInventoryFetched, isError: isSparesInventoryError } = useQuery<{ success: boolean; data: Array<{
     spare: { id: number; partCode: string; partName: string };
@@ -2188,9 +2216,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      const hodRanks = ["Chief Engineer", "Chief Officer", "Master"];
-      if (executionData.performedBy && hodRanks.includes(executionData.performedBy) && executionData.performedBy === templateData.approver) {
-        hardErrors.push(`The same Head of Department rank (${executionData.performedBy}) cannot both perform and approve the work.`);
+      if (executionData.performedBy && executionData.performedBy === templateData.approver) {
+        hardErrors.push(`The same rank (${executionData.performedBy}) cannot both perform and approve the work.`);
       }
 
       if (noOfPersonsStr && !/^[1-9]\d*$/.test(noOfPersonsStr)) {
@@ -2838,9 +2865,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
     }
 
-    const hodRanks = ['Chief Engineer', 'Chief Officer', 'Master'];
-    if (executionData.performedBy && hodRanks.includes(executionData.performedBy) && executionData.performedBy === templateData.approver) {
-      hardErrors.push(`The same Head of Department rank (${executionData.performedBy}) cannot both perform and approve the work.`);
+    if (executionData.performedBy && executionData.performedBy === templateData.approver) {
+      hardErrors.push(`The same rank (${executionData.performedBy}) cannot both perform and approve the work.`);
     }
 
     if (noOfPersonsStr && !/^[1-9]\d*$/.test(noOfPersonsStr)) hardErrors.push('No. of Persons must be a positive whole number (≥ 1).');
@@ -3272,19 +3298,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         const topBannerMap: Record<string, { bg: string; text: string; message: string }> = {
           superintendent_locked: {
             bg: 'bg-red-600', text: 'text-white',
-            message: `🔒 LOCKED — ${topMissedCycles} missed cycle(s). Awaiting Superintendent acknowledgment before CE can approve.`
+            message: `🔒 LOCKED — ${topMissedCycles} missed cycle(s). Awaiting Superintendent acknowledgment before ${hodShort} can approve.`
           },
           superintendent_notification: {
             bg: 'bg-orange-600', text: 'text-white',
-            message: `⚠️ SUPERINTENDENT NOTIFIED — ${topDaysLate} days late. CE must approve with detailed remarks (min 20 chars).`
+            message: `⚠️ SUPERINTENDENT NOTIFIED — ${topDaysLate} days late. ${hodShort} must approve with detailed remarks (min 20 chars).`
           },
           ce_with_justification: {
             bg: 'bg-yellow-50', text: 'text-yellow-900',
-            message: `⚠️ REMARKS REQUIRED — ${topDaysLate} days late. CE must provide approval remarks.`
+            message: `⚠️ REMARKS REQUIRED — ${topDaysLate} days late. ${hodShort} must provide approval remarks.`
           },
           standard: {
             bg: 'bg-blue-600', text: 'text-white',
-            message: 'ℹ️ PENDING APPROVAL — Awaiting Chief Engineer review.'
+            message: `ℹ️ PENDING APPROVAL — Awaiting ${hodLabel} review.`
           }
         };
         const cfg = topBannerMap[topTier] || topBannerMap.standard;
@@ -5072,7 +5098,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         <p className="text-sm" style={{ color: '#92400E' }}>
                           <strong>WARNING:</strong> {liveMissed} job cycle{liveMissed > 1 ? 's' : ''} will be marked as skipped.
                           The completion date you entered is {liveMissed} cycle{liveMissed > 1 ? 's' : ''} past the scheduled due date.
-                          This will be flagged in the audit trail and visible to the Chief Engineer and Superintendent.
+                          This will be flagged in the audit trail and visible to the {hodLabel} and Superintendent.
                         </p>
                       </div>
                     </div>
@@ -5402,7 +5428,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             {/* CE Approval Remarks (for completed WOs) */}
             {(workOrderContext as any)?.workOrder?.status === 'Completed' && (workOrderContext as any)?.workOrder?.ceApprovalRemarks && (
               <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm" data-testid="ce-approval-remarks-display">
-                <div className="font-medium text-blue-800 mb-1">CE Approval Remarks</div>
+                <div className="font-medium text-blue-800 mb-1">{hodShort} Approval Remarks</div>
                 <p className="text-blue-900 text-xs whitespace-pre-wrap">{(workOrderContext as any).workOrder.ceApprovalRemarks}</p>
               </div>
             )}
@@ -5896,24 +5922,24 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   return {
                     bg: '#dc2626', color: '#ffffff',
                     title: 'HIGH SEVERITY \u2014 APPROVAL LOCKED \u2014 SUPERINTENDENT ACTION REQUIRED',
-                    body: `This work order has high severity issues (${approvalMissedCycles >= 3 ? `${approvalMissedCycles} missed cycles` : ''}${approvalDaysLate >= 21 ? `${approvalMissedCycles >= 3 ? ', ' : ''}${approvalDaysLate} days late` : ''}). It is LOCKED and cannot be approved by the Chief Engineer until the Superintendent has acknowledged it. Once acknowledged, the CE will be required to enter detailed remarks (minimum 20 characters) before approving.`
+                    body: `This work order has high severity issues (${approvalMissedCycles >= 3 ? `${approvalMissedCycles} missed cycles` : ''}${approvalDaysLate >= 21 ? `${approvalMissedCycles >= 3 ? ', ' : ''}${approvalDaysLate} days late` : ''}). It is LOCKED and cannot be approved by the ${hodLabel} until the Superintendent has acknowledged it. Once acknowledged, the ${hodShort} will be required to enter detailed remarks (minimum 20 characters) before approving.`
                   };
                 case 'superintendent_notification':
                   return {
                     bg: '#ea580c', color: '#ffffff',
                     title: 'MEDIUM SEVERITY \u2014 SUPERINTENDENT HAS BEEN NOTIFIED',
-                    body: `This work order has medium severity issues (${approvalMissedCycles === 2 ? `${approvalMissedCycles} missed cycles` : ''}${approvalDaysLate >= 14 ? `${approvalMissedCycles === 2 ? ', ' : ''}${approvalDaysLate} days late` : ''}). The Superintendent has been automatically notified. Chief Engineer approval is permitted but DETAILED REMARKS ARE MANDATORY (minimum 20 characters).`
+                    body: `This work order has medium severity issues (${approvalMissedCycles === 2 ? `${approvalMissedCycles} missed cycles` : ''}${approvalDaysLate >= 14 ? `${approvalMissedCycles === 2 ? ', ' : ''}${approvalDaysLate} days late` : ''}). The Superintendent has been automatically notified. ${hodLabel} approval is permitted but DETAILED REMARKS ARE MANDATORY (minimum 20 characters).`
                   };
                 case 'ce_with_justification':
                   return {
                     bg: '#854d0e', color: '#ffffff',
-                    title: 'LOW SEVERITY \u2014 CE REMARKS REQUIRED',
-                    body: `This work order has low severity issues (${approvalMissedCycles === 1 ? `${approvalMissedCycles} missed cycle` : ''}${approvalDaysLate >= 7 ? `${approvalMissedCycles === 1 ? ', ' : ''}${approvalDaysLate} days late` : ''}). Chief Engineer approval remarks are mandatory (minimum 10 characters).`
+                    title: `LOW SEVERITY \u2014 ${hodShort} REMARKS REQUIRED`,
+                    body: `This work order has low severity issues (${approvalMissedCycles === 1 ? `${approvalMissedCycles} missed cycle` : ''}${approvalDaysLate >= 7 ? `${approvalMissedCycles === 1 ? ', ' : ''}${approvalDaysLate} days late` : ''}). ${hodLabel} approval remarks are mandatory (minimum 10 characters).`
                   };
                 default:
                   return {
                     bg: '#1d4ed8', color: '#ffffff',
-                    title: 'PENDING CHIEF ENGINEER APPROVAL',
+                    title: `PENDING ${hodLabel.toUpperCase()} APPROVAL`,
                     body: approvalDaysLate === 0
                       ? 'This completion was on time. Please review and approve.'
                       : `This completion is ${approvalDaysLate} days late. Please review and approve.`
@@ -5926,9 +5952,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 case 'superintendent_locked':
                   return { bg: '#dc2626', color: '#ffffff', label: '\uD83D\uDD12 Locked \u2014 Superintendent Required' };
                 case 'superintendent_notification':
-                  return { bg: '#ea580c', color: '#ffffff', label: 'CE Approval + Superintendent Notified' };
+                  return { bg: '#ea580c', color: '#ffffff', label: `${hodShort} Approval + Superintendent Notified` };
                 case 'ce_with_justification':
-                  return { bg: '#854d0e', color: '#ffffff', label: 'CE Approval + Remarks' };
+                  return { bg: '#854d0e', color: '#ffffff', label: `${hodShort} Approval + Remarks` };
                 default:
                   return { bg: '#16a34a', color: '#ffffff', label: 'Standard Approval' };
               }
@@ -5974,7 +6000,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         {approvalDateCompleted && <> The work was completed on <strong>{formatDateForDisplay(approvalDateCompleted)}</strong>.</>}
                       </p>
                       <p style={{ color: '#7F1D1D' }} className="text-sm mt-2">
-                        As Chief Engineer, you must provide a written justification explaining why these maintenance cycles were missed before you can approve this work order.
+                        As {hodLabel}, you must provide a written justification explaining why these maintenance cycles were missed before you can approve this work order.
                       </p>
                     </div>
 
@@ -6000,10 +6026,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </>
                 )}
 
-                {/* Layer 5: CE Approval Remarks */}
+                {/* Layer 5: HOD Approval Remarks */}
                 <div className="space-y-2" data-testid="field-ce-approval-remarks">
                   <Label className="text-sm font-semibold">
-                    CE Approval Remarks
+                    {hodShort} Approval Remarks
                     {ceRemarksRequired && <span className="text-red-600 ml-1">*</span>}
                     {!ceRemarksRequired && !isSuptLocked && <span className="text-gray-400 ml-1">(Optional)</span>}
                   </Label>
@@ -6074,7 +6100,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       onClick={handleApprove}
                       disabled={approveDisabled}
                       className={`font-semibold px-8 py-2.5 h-auto text-sm rounded-full shadow-md min-w-[120px] ${approveDisabled && !isProcessingApproval ? 'bg-gray-400 cursor-not-allowed text-white' : 'bg-[#28a745] hover:bg-[#218838] text-white'}`}
-                      title={approvalMissedCycles >= 1 && !justificationValid ? 'Please provide justification for skipped cycles before approving' : !ceRemarksValid ? `Please enter at least ${ceRemarksMinLength} characters in CE Approval Remarks` : undefined}
+                      title={approvalMissedCycles >= 1 && !justificationValid ? 'Please provide justification for skipped cycles before approving' : !ceRemarksValid ? `Please enter at least ${ceRemarksMinLength} characters in ${hodShort} Approval Remarks` : undefined}
                       data-testid="WOF.B5.4"
                     >
                       <Marker id="WOF.B5.4" />

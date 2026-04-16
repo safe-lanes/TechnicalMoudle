@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as service from './service';
+import { resolveHodForDepartment } from './hodResolutionService';
 
 export async function getRanks(req: Request, res: Response) {
   try {
@@ -138,6 +139,19 @@ export async function getVesselDepartmentConfig(req: Request, res: Response) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error("Error fetching vessel department config:", error);
     res.status(500).json({ error: "Failed to fetch vessel department config" });
+  }
+}
+
+export async function resolveHod(req: Request, res: Response) {
+  try {
+    const { vesselId, department } = req.params;
+    if (!department) return res.status(400).json({ error: 'department parameter required' });
+    const storedApprover = req.query.storedApprover as string | undefined;
+    const result = await resolveHodForDepartment(vesselId || null, department, storedApprover);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error resolving HOD:', error);
+    res.status(500).json({ error: 'Failed to resolve HOD' });
   }
 }
 
