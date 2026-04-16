@@ -612,6 +612,8 @@ export async function getIhmInventoryStatus(
 
   interface IhmItem {
     id: number;
+    vesselId: string;
+    vesselName: string;
     itemCode: string;
     itemName: string;
     itemType: 'spare' | 'store';
@@ -628,6 +630,9 @@ export async function getIhmInventoryStatus(
     lastUpdated: string;
   }
 
+  const allVesselsForMap = await repo.getVessels();
+  const vesselNameMap = new Map(allVesselsForMap.map((v: any) => [v.id, v.name || v.id]));
+
   let combinedItems: IhmItem[] = [];
 
   for (const s of sparesData) {
@@ -636,6 +641,8 @@ export async function getIhmInventoryStatus(
     if (ihmStatus !== 'present') continue;
     combinedItems.push({
       id: s.id,
+      vesselId: s.vesselId || '',
+      vesselName: vesselNameMap.get(s.vesselId || '') || '-',
       itemCode: s.partCode || s.componentSpareCode || '',
       itemName: s.partName || '',
       itemType: 'spare',
@@ -659,6 +666,8 @@ export async function getIhmInventoryStatus(
     if (ihmStatus !== 'present') continue;
     combinedItems.push({
       id: st.id + 1000000,
+      vesselId: st.vesselId || '',
+      vesselName: vesselNameMap.get(st.vesselId || '') || '-',
       itemCode: st.itemCode || '',
       itemName: st.itemName || '',
       itemType: 'store',

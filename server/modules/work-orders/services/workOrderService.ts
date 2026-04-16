@@ -107,14 +107,14 @@ export async function createSuperintendentNotificationForWO(wo: any, daysLate: n
 
 // ── List Work Orders with Enrichment ──
 
-export async function listWorkOrders(vesselId?: string) {
-  const workOrders = await repo.findWorkOrders(vesselId);
+export async function listWorkOrders(vesselId?: string, vesselIds?: string[]) {
+  const workOrders = await repo.findWorkOrders(vesselId, vesselIds);
 
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
   const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
 
-  // For "All Vessels" (no vesselId), we need per-vessel components, jobs, and settings
-  const isAllVessels = !vesselId;
+  // For "All Vessels" (no vesselId or vesselId='all'), we need per-vessel components, jobs, and settings
+  const isAllVessels = !vesselId || vesselId === 'all';
   const uniqueVesselIds = isAllVessels
     ? Array.from(new Set(workOrders.map((wo: any) => wo.vesselId).filter(Boolean))) as string[]
     : [vesselId as string];

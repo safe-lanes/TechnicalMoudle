@@ -40,7 +40,9 @@ export async function getDetails(req: Request, res: Response) {
 // GET /components?vesselId= — list all components, optionally filtered
 export async function listAll(req: Request, res: Response) {
   const vesselId = req.query.vesselId as string | undefined;
-  const components = await componentService.listAll(vesselId);
+  const vesselIdsRaw = req.query.vesselIds as string | undefined;
+  const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined;
+  const components = await componentService.listAll(vesselId, vesselIds);
   res.json(components);
 }
 

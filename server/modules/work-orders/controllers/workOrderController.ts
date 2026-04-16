@@ -14,7 +14,9 @@ import { storage } from '../../../storage';
 
 export async function listWorkOrders(req: Request, res: Response) {
   const vesselId = req.query.vesselId as string;
-  const result = await woService.listWorkOrders(vesselId);
+  const vesselIdsRaw = req.query.vesselIds as string | undefined;
+  const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined;
+  const result = await woService.listWorkOrders(vesselId, vesselIds);
   res.json(result);
 }
 

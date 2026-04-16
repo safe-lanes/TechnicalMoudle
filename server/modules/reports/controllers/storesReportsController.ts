@@ -77,7 +77,9 @@ export async function exportStoresConsumptionExcel(req: Request, res: Response) 
 export async function getCombinedConsumptionAnalysis(req: Request, res: Response) {
   try {
     const { vesselId } = req.params;
-    const result = await storesReportService.getCombinedConsumptionAnalysis(vesselId);
+    const vesselIdsRaw = req.query.vesselIds as string | undefined;
+    const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined;
+    const result = await storesReportService.getCombinedConsumptionAnalysis(vesselId, vesselIds);
     res.json(result);
   } catch (error: any) {
     console.error("Error generating Consumption Pattern Analysis:", error);

@@ -5,6 +5,9 @@ import * as defectsService from '../services/defectsService';
 
 export async function getDefects(req: Request, res: Response) {
   try {
+    const vesselIdsRaw = req.query.vesselIds as string | undefined;
+    const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined;
+
     const filters = {
       vesselId: req.query.vesselId as string,
       status: req.query.status as string,
@@ -21,7 +24,10 @@ export async function getDefects(req: Request, res: Response) {
       dueOverdue: req.query.dueOverdue as string,
     };
 
-    const defects = await defectsService.getDefects(filters);
+    let defects = await defectsService.getDefects(filters);
+    if (vesselIds?.length && (!filters.vesselId || filters.vesselId === 'all')) {
+      defects = defects.filter((d: any) => vesselIds.includes(d.vesselId));
+    }
     res.json(defects);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch defects" });

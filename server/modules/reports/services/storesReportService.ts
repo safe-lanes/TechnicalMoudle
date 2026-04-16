@@ -1010,13 +1010,15 @@ export async function exportStoresConsumptionExcel(
 // COMBINED CONSUMPTION ANALYSIS - PREVIEW
 // ═══════════════════════════════════════════════════════════════
 
-export async function getCombinedConsumptionAnalysis(vesselId: string) {
+export async function getCombinedConsumptionAnalysis(vesselId: string, vesselIds?: string[]) {
   let history: any[];
   let allSpares: any[];
+  const allVessels = await repo.getVessels();
+  const vesselNameMap = new Map(allVessels.map((v: any) => [v.id, v.name || v.id]));
   if (vesselId === 'all') {
-    const allVessels = await repo.getVessels();
+    const vessels = vesselIds?.length ? allVessels.filter((v: any) => vesselIds.includes(v.id)) : allVessels;
     history = []; allSpares = [];
-    for (const vessel of allVessels) {
+    for (const vessel of vessels) {
       history = history.concat(await repo.getSpareHistory(vessel.id));
       allSpares = allSpares.concat(await repo.getSpares(vessel.id));
     }
@@ -1059,6 +1061,7 @@ export async function getCombinedConsumptionAnalysis(vesselId: string) {
     const isCritical = crit === 'critical' || crit === 'yes';
     return {
       spareId: Number(spareId),
+      vesselName: vesselNameMap.get(spare?.vesselId || '') || '-',
       partCode: g.partCode,
       partName: g.partName,
       componentName: g.componentName,

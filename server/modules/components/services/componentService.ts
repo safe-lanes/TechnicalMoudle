@@ -47,9 +47,15 @@ export async function listByVessel(vesselId: string): Promise<Component[]> {
   return repo.findByVesselId(vesselId);
 }
 
-export async function listAll(vesselId?: string): Promise<Component[]> {
-  if (vesselId) {
+export async function listAll(vesselId?: string, vesselIds?: string[]): Promise<Component[]> {
+  if (vesselId && vesselId !== 'all') {
     return repo.findByVesselId(vesselId);
+  }
+  if (vesselId === 'all' && vesselIds?.length) {
+    return repo.findByVesselIds(vesselIds);
+  }
+  if (vesselId === 'all') {
+    return repo.findAll();
   }
   return repo.findAll();
 }

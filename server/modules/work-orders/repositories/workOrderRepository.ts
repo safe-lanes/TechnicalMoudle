@@ -2,8 +2,8 @@ import { storage } from '../../../storage';
 
 // ── Core Work Order Methods ──
 
-export async function findWorkOrders(vesselId?: string) {
-  return storage.getWorkOrders(vesselId);
+export async function findWorkOrders(vesselId?: string, vesselIds?: string[]) {
+  return storage.getWorkOrders(vesselId, vesselIds);
 }
 
 export async function findById(id: string) {

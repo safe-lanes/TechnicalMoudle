@@ -778,6 +778,7 @@ export async function getSparesConsumptionAnalysis(
   }
   const vessel = allVessels.find((v: any) => v.id === vesselId);
   const vesselName = vesselId === 'all' ? 'All Vessels' : (vessel?.name || vesselId);
+  const vesselNameMap = new Map(allVessels.map((v: any) => [v.id, v.name || v.id]));
   const itemsMap = new Map(allItems.map((item: any) => [item.id, item]));
 
   let consumeEvents = allHistory.filter((h: any) => h.eventType === 'CONSUME');
@@ -894,6 +895,7 @@ export async function getSparesConsumptionAnalysis(
       const avgMonthlyConsumption = Math.round(rawMonthlyRate * confidenceMultiplier * 100) / 100;
       return {
         itemId,
+        vesselName: vesselNameMap.get(item?.vesselId || '') || '-',
         itemCode: item?.partCode || '',
         itemName: item?.partName || '',
         itemType: item?.critical || 'Spare Part',

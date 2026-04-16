@@ -29,6 +29,11 @@ export async function findByVesselId(vesselId: string): Promise<Component[]> {
   return augmentWithSortOrder(components);
 }
 
+export async function findByVesselIds(vesselIds: string[]): Promise<Component[]> {
+  const components = await storage.getComponents('all', vesselIds);
+  return augmentWithSortOrder(components);
+}
+
 export async function findById(id: string): Promise<Component | undefined> {
   const component = await storage.getComponent(id);
   if (!component) return undefined;

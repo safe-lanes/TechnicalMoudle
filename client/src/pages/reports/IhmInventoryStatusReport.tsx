@@ -93,9 +93,13 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
     setSortDirection(direction);
   }, []);
 
+  const isMultiVessel = effectiveVesselId === 'all' && globalVessels.length > 0;
+  const vesselIdsParam = isMultiVessel ? globalVessels.join(',') : '';
+
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
     params.set('vesselId', effectiveVesselId || '');
+    if (vesselIdsParam) params.set('vesselIds', vesselIdsParam);
     if (itemTypeFilter !== 'all') params.set('itemType', itemTypeFilter);
     if (debouncedSearch) params.set('search', debouncedSearch);
     params.set('sortBy', sortField);
@@ -103,7 +107,7 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
     params.set('page', '1');
     params.set('pageSize', '10000');
     return params.toString();
-  }, [effectiveVesselId, itemTypeFilter, debouncedSearch, sortField, sortDirection]);
+  }, [effectiveVesselId, vesselIdsParam, itemTypeFilter, debouncedSearch, sortField, sortDirection]);
 
   const { data, isLoading, error, refetch } = useQuery<IhmInventoryStatusResponse>({
     queryKey: ['/technical/api/reports/ihm-inventory-status', queryParams],
@@ -159,6 +163,7 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
     try {
       const allParams = new URLSearchParams();
       allParams.set('vesselId', effectiveVesselId || '');
+      if (vesselIdsParam) allParams.set('vesselIds', vesselIdsParam);
       if (itemTypeFilter !== 'all') allParams.set('itemType', itemTypeFilter);
       if (debouncedSearch) allParams.set('search', debouncedSearch);
       allParams.set('sortBy', sortField);
@@ -180,6 +185,7 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
 
       const columns = [
         { header: 'S.No', field: 'sno', width: 12 },
+        ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 25 }] : []),
         { header: 'Item Code', field: 'itemCode', width: 25 },
         { header: 'Item Name', field: 'itemName', width: 45 },
         { header: 'Item Type', field: 'itemType', width: 20 },
@@ -191,8 +197,9 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
         { header: 'UOM', field: 'uom', width: 15 },
       ];
 
-      const exportData = allData.items.map((item, idx) => ({
+      const exportData = allData.items.map((item: any, idx: number) => ({
         sno: idx + 1,
+        vesselName: item.vesselName || '-',
         itemCode: item.itemCode || '-',
         itemName: item.itemName || '-',
         itemType: item.itemType === 'spare' ? 'Spare' : (item.storeCategory || 'Store'),
@@ -234,6 +241,7 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
         credentials: 'include',
         body: JSON.stringify({
           vesselId: effectiveVesselId,
+          vesselIds: vesselIdsParam ? vesselIdsParam.split(',').filter(Boolean) : undefined,
           itemType: itemTypeFilter !== 'all' ? itemTypeFilter : undefined,
           search: debouncedSearch || undefined,
         }),
@@ -416,6 +424,7 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
               <ReportAgGridTable
                 columns={[
                   { header: 'S.No', field: 'sno', width: 70 },
+                  ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 150 }] : []),
                   { header: 'Item Code', field: 'itemCode', width: 120 },
                   { header: 'Item Name', field: 'itemName', width: 200 },
                   { header: 'Item Type', field: 'itemType', width: 100 },
@@ -426,8 +435,9 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
                   { header: 'Location', field: 'location', width: 130 },
                   { header: 'UOM', field: 'uom', width: 80 },
                 ]}
-                data={items.map((item, index) => ({
+                data={items.map((item: any, index: number) => ({
                   sno: index + 1,
+                  vesselName: item.vesselName || '-',
                   itemCode: item.itemCode || '-',
                   itemName: item.itemName || '-',
                   itemType: getItemTypeDisplay(item),
