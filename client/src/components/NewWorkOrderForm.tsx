@@ -42,7 +42,7 @@ const NewWorkOrderForm: React.FC<NewWorkOrderFormProps> = ({
   const availableRanks = (ranksData || []).map((r: any) => r.name || r.rank).filter(Boolean);
   const defaultRanks = ["Master", "Chief Officer", "2nd Officer", "3rd Officer", "Chief Engineer", "2nd Engineer", "3rd Engineer", "4th Engineer", "Deck Cadet", "Engine Cadet", "Bosun", "Electrician"];
   const rankOptions = availableRanks.length > 0 ? availableRanks : defaultRanks;
-  const approverRanks = (ranksData || []).filter((r: any) => r.rankView === 'Head_of_Dept' || r.isHod).map((r: any) => r.name || r.rank).filter(Boolean);
+  const approverRanks = (ranksData || []).filter((r: any) => r.viewMode === 'Head_of_Dept').map((r: any) => r.name || r.rank).filter(Boolean);
   const approverOptions = approverRanks.length > 0 ? approverRanks : ["Master", "Chief Officer", "Chief Engineer"];
 
   const [formData, setFormData] = useState({
