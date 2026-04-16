@@ -1678,8 +1678,8 @@ export async function getScopedOperationData(
   const scope = await resolveHierarchyScopeByRankId(vesselId, userRankId);
 
   if (!scope.hasMapping) {
+    const allWOs = await listWorkOrders(vesselId);
     if (!vesselWideAccessGranted) {
-      const allWOs = await listWorkOrders(vesselId);
       const ownRankSet = new Set([userRankId]);
       const ownRankWOs = filterWorkOrdersByRankId(allWOs, ownRankSet);
       return {
@@ -1695,7 +1695,7 @@ export async function getScopedOperationData(
       };
     }
     return {
-      workOrders: [],
+      workOrders: allWOs,
       scopeMeta: {
         hasMapping: false,
         hasDescendants: false,

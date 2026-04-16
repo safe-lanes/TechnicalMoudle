@@ -1130,12 +1130,9 @@ const Dashboard = () => {
   const operationWOs = useMemo(() => {
     const filterExec = (wos: WorkOrder[]) => wos.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
     if (isAllVessels) return filterExec(workOrdersData);
-    if (isScopeActive && scopedResponse) return filterExec(scopedResponse.workOrders);
-    if (scopeNotConfigured && vesselWideAccessGranted) return filterExec(workOrdersData);
-    if (scopeNotConfigured && fallbackMode === 'own-rank' && scopedResponse) return filterExec(scopedResponse.workOrders);
-    if (scopeNotConfigured && !vesselWideAccessGranted) return [];
+    if (scopedResponse) return filterExec(scopedResponse.workOrders);
     return filterExec(workOrdersData);
-  }, [isAllVessels, isScopeActive, scopedResponse, workOrdersData, scopeNotConfigured, vesselWideAccessGranted, fallbackMode]);
+  }, [isAllVessels, scopedResponse, workOrdersData]);
 
   const operationDonutData = useMemo(() => {
     const safeWOs = operationWOs;
@@ -1235,7 +1232,7 @@ const Dashboard = () => {
       openChangeRequests,
       openChangeRequestsList,
     };
-  }, [operationWOs, sparesData, changeRequestsData, complianceAnomalies, isScopeActive, scopeMeta, scopedResponse]);
+  }, [operationWOs, sparesData, changeRequestsData, complianceAnomalies]);
 
   const operationTableData = useMemo(() => {
     switch (selectedOpCard) {
@@ -1804,11 +1801,11 @@ const Dashboard = () => {
                         <CardContent className="py-2 px-3 flex flex-col justify-start flex-1">
                           <p className="font-medium text-gray-600 text-[14px]">{card.label}</p>
                           <p className={`text-xl font-bold mt-0.5 ${card.textColor}`} data-testid={card.valueTestId}>{card.value}</p>
-                          {isScopeActive && (
-                            <span className={`text-[9px] mt-auto ${card.rankScoped ? 'text-blue-500' : 'text-gray-400'}`} data-testid={`scope-label-${card.key}`}>
-                              {card.rankScoped ? (hodScope === 'me' ? 'Filtered: Me' : 'Filtered: My Team') : 'Vessel-wide'}
-                            </span>
-                          )}
+                          <span className={`text-[9px] mt-auto ${isScopeActive && card.rankScoped ? 'text-blue-500' : 'text-gray-400'}`} data-testid={`scope-label-${card.key}`}>
+                            {isScopeActive && card.rankScoped
+                              ? (hodScope === 'me' ? 'Filtered: Me' : 'Filtered: My Team')
+                              : 'Vessel-wide'}
+                          </span>
                         </CardContent>
                       </Card>
                     ))}
