@@ -500,7 +500,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
 
   const generateRunningHoursExcel = async (reportId: string) => {
     const vesselIds = getVesselIdsForReport();
-    const excelVesselId = vesselIds.length === 1 ? vesselIds[0] : (effectiveVesselId || 'all');
+    const excelVesselId = vesselIds.length === 1 ? vesselIds[0] : 'all';
 
     const reportEndpoints: Record<string, string> = {
       'rh-utilization-summary': '/technical/api/reports/equipment-utilization-summary/excel',

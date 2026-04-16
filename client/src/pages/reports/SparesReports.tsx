@@ -460,7 +460,10 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
 
   const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel') => {
     const reportKey = `${reportId}-${format}`;
-    
+    const activeVesselId = (globalFilters?.vessels !== undefined)
+      ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
+      : effectiveVesselId;
+
     if (generatingReports.has(reportKey)) return;
 
     if (filteredSpares.length === 0) {
@@ -488,7 +491,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         });
       } else if (format === 'Excel' && reportId === 'spares-low-stock') {
         const body: Record<string, string> = {};
-        const response = await fetch(`/technical/api/reports/low-stock-alert/${effectiveVesselId}/excel`, {
+        const response = await fetch(`/technical/api/reports/low-stock-alert/${activeVesselId}/excel`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -509,7 +512,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ vesselId: effectiveVesselId, filters }),
+          body: JSON.stringify({ vesselId: activeVesselId, filters }),
         });
         if (!response.ok) throw new Error('Failed to generate Excel');
         const blob = await response.blob();
@@ -521,7 +524,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         URL.revokeObjectURL(url);
         toast({ title: "Report Generated", description: "Excel report downloaded successfully!" });
       } else if (format === 'Excel' && reportId === 'spares-consumption-analysis') {
-        const response = await fetch(`/technical/api/reports/consumption-analysis/${effectiveVesselId}/excel`, {
+        const response = await fetch(`/technical/api/reports/consumption-analysis/${activeVesselId}/excel`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
