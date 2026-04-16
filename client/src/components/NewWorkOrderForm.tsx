@@ -35,7 +35,7 @@ const NewWorkOrderForm: React.FC<NewWorkOrderFormProps> = ({
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
 
   const { data: ranksData } = useQuery<any[]>({
-    queryKey: ['/technical/api/ranks'],
+    queryKey: ['/technical/api/admin/available-ranks'],
     enabled: isOpen,
     staleTime: 5 * 60 * 1000,
   });

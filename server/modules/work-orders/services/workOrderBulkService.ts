@@ -37,7 +37,12 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         existingWO.department,
         existingWO.approver
       );
-      const resolvedApprover = approver || hodResolution.rankName;
+      let resolvedApprover = hodResolution.rankName;
+      if (approver && approver !== hodResolution.rankName && hodResolution.source !== 'fallback') {
+        console.warn(`[Bulk Approve] Caller approver "${approver}" differs from org chart HOD "${hodResolution.rankName}" for dept "${existingWO.department}". Using org chart value.`);
+      } else if (approver && hodResolution.source === 'fallback') {
+        resolvedApprover = approver;
+      }
 
       // Calculate next due date/reading based on actual completion date
       const actualCompletionDate = existingWO.completionDateTime || existingWO.dateCompleted;
@@ -170,10 +175,16 @@ export async function bulkReject(workOrderIds: string[], approver?: string, reje
         existingWO.department,
         existingWO.approver
       );
+      let rejectApprover = rejectHod.rankName;
+      if (approver && approver !== rejectHod.rankName && rejectHod.source !== 'fallback') {
+        console.warn(`[Bulk Reject] Caller approver "${approver}" differs from org chart HOD "${rejectHod.rankName}" for dept "${existingWO.department}". Using org chart value.`);
+      } else if (approver && rejectHod.source === 'fallback') {
+        rejectApprover = approver;
+      }
       const updateData = {
         status: "Due" as const,
         approvalAction: "rejected",
-        approver: approver || rejectHod.rankName,
+        approver: rejectApprover,
         rejectionComments,
         rejectionDate: new Date().toISOString(),
         wasRejected: true, // Mark for red font display
