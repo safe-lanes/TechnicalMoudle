@@ -364,7 +364,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   };
 
   const generateMaintenancePDF = async (reportId: string, mode: 'download' | 'preview' = 'download'): Promise<ReportPreviewData | void> => {
-    const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
+    const activeVesselId = (globalFilters?.vessels !== undefined)
+      ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
+      : effectiveVesselId;
+    const vesselName = activeVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === activeVesselId)?.name || activeVesselId || 'Unknown Vessel');
     const now = new Date();
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
@@ -402,7 +405,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     switch (reportId) {
       case 'due-jobs-7': {
         const dueJobsResponse = await fetch(
-          `/technical/api/reports/due-jobs-7-days/preview?vesselId=${effectiveVesselId}`
+          `/technical/api/reports/due-jobs-7-days/preview?vesselId=${activeVesselId}`
         );
         if (!dueJobsResponse.ok) {
           throw new Error('Failed to fetch due jobs data');
@@ -452,7 +455,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'overdue-jobs': {
-        let overdueUrl = `/technical/api/reports/overdue-jobs/preview?vesselId=${effectiveVesselId}`;
+        let overdueUrl = `/technical/api/reports/overdue-jobs/preview?vesselId=${activeVesselId}`;
         if (effectiveDateRange?.from) {
           overdueUrl += `&dateFrom=${toLocalDateStr(effectiveDateRange.from)}`;
         }
@@ -543,7 +546,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'completed-jobs': {
-        let completedUrl = `/technical/api/reports/completed-jobs/preview?vesselId=${effectiveVesselId}`;
+        let completedUrl = `/technical/api/reports/completed-jobs/preview?vesselId=${activeVesselId}`;
         if (effectiveDateRange?.from) {
           completedUrl += `&dateFrom=${toLocalDateStr(effectiveDateRange.from)}`;
         }
@@ -612,7 +615,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           'July', 'August', 'September', 'October', 'November', 'December'];
         const periodLabel = `${monthNames[periodMonth - 1]} ${periodYear}`;
 
-        const res = await fetch(`/technical/api/reports/maintenance/monthly-summary/preview?vesselId=${effectiveVesselId}&year=${periodYear}&month=${periodMonth}`);
+        const res = await fetch(`/technical/api/reports/maintenance/monthly-summary/preview?vesselId=${activeVesselId}&year=${periodYear}&month=${periodMonth}`);
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: 'Failed to fetch monthly summary' }));
           throw new Error(err.error || 'Failed to fetch monthly summary');
@@ -620,7 +623,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         const summaryApiData: MonthlySummaryData = await res.json();
 
         if (mode === 'preview') {
-          setMonthlySummaryData({ data: summaryApiData, vesselId: effectiveVesselId, year: periodYear, month: periodMonth });
+          setMonthlySummaryData({ data: summaryApiData, vesselId: activeVesselId, year: periodYear, month: periodMonth });
           return { title: 'Monthly Maintenance Summary', subtitle: `Control report for ${periodLabel}`, vessel: vesselName, dateRange: periodLabel, columns: [], data: [], summary: [] } as ReportPreviewData;
         }
 
@@ -654,7 +657,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'critical-equipment': {
-        let critUrl = `/technical/api/reports/critical-equipment-status?vesselId=${effectiveVesselId}`;
+        let critUrl = `/technical/api/reports/critical-equipment-status?vesselId=${activeVesselId}`;
         if (effectiveDateRange?.from) {
           critUrl += `&startDate=${toLocalDateStr(effectiveDateRange.from)}`;
         }
@@ -732,7 +735,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         // Fetch data from the API endpoint
         const response = await fetch(
-          `/technical/api/reports/unplanned-breakdown-jobs?vesselId=${effectiveVesselId}&startDate=${startDate}&endDate=${endDate}`
+          `/technical/api/reports/unplanned-breakdown-jobs?vesselId=${activeVesselId}&startDate=${startDate}&endDate=${endDate}`
         );
         if (!response.ok) {
           throw new Error('Failed to fetch unplanned/breakdown jobs data');
@@ -781,7 +784,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'postponement-log': {
-        let postponeUrl = `/technical/api/reports/postponement-log/preview?vesselId=${effectiveVesselId}`;
+        let postponeUrl = `/technical/api/reports/postponement-log/preview?vesselId=${activeVesselId}`;
         if (effectiveDateRange?.from) {
           postponeUrl += `&dateFrom=${toLocalDateStr(effectiveDateRange.from)}`;
         }
@@ -936,7 +939,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           wdEndDate = toLocalDateStr(new Date(wdNow.getFullYear(), wdNow.getMonth() + 1, 0));
         }
         const wdResponse = await fetch(
-          `/technical/api/reports/crew-workload-distribution?vesselId=${effectiveVesselId}&startDate=${wdStartDate}&endDate=${wdEndDate}&viewType=summary`
+          `/technical/api/reports/crew-workload-distribution?vesselId=${activeVesselId}&startDate=${wdStartDate}&endDate=${wdEndDate}&viewType=summary`
         );
         if (!wdResponse.ok) {
           throw new Error('Failed to fetch crew workload data');
@@ -1003,7 +1006,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   };
 
   const generateExcelReport = async (reportId: string) => {
-    if (!effectiveVesselId || effectiveVesselId === 'all') {
+    const activeVesselId = (globalFilters?.vessels !== undefined)
+      ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
+      : effectiveVesselId;
+    if (!activeVesselId || activeVesselId === 'all') {
       toast({
         title: "Vessel Required",
         description: "Please select a specific vessel to generate the report.",
@@ -1032,7 +1038,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       return;
     }
 
-    let requestBody: any = { vesselId: effectiveVesselId };
+    let requestBody: any = { vesselId: activeVesselId };
 
     if (globalComponent) {
       requestBody.componentFilter = globalComponent;

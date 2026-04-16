@@ -246,7 +246,8 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
   };
 
   const getVesselIdsForReport = (): string[] => {
-    if (globalVessels.length > 0) return globalVessels;
+    const liveVessels = globalFilters?.vessels;
+    if (liveVessels && liveVessels.length > 0) return liveVessels;
     if (effectiveVesselId && effectiveVesselId !== 'all') return [effectiveVesselId];
     return vessels.map((v: any) => v.id).filter(Boolean);
   };

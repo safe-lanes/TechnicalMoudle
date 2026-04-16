@@ -72,6 +72,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialLoadRef = useRef(false);
   const previewVersionRef = useRef(0);
+  const pendingPreviewRef = useRef(false);
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
@@ -122,20 +123,26 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
     if (!embedded || !selectedReportId || !initialLoadRef.current) return;
     if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
     setIsFilterRefreshing(true);
-    const version = ++previewVersionRef.current;
-    filterTimerRef.current = setTimeout(() => {
-      setPreviewData(null);
-      generateCriticalReport(selectedReportId, 'preview').then((data) => {
-        if (previewVersionRef.current === version) {
-          if (data) setPreviewData(data);
-          setIsFilterRefreshing(false);
-        }
-      }).catch(() => {
-        if (previewVersionRef.current === version) setIsFilterRefreshing(false);
-      });
-    }, 300);
+    setPreviewData(null);
+    ++previewVersionRef.current;
+    pendingPreviewRef.current = true;
     return () => { if (filterTimerRef.current) clearTimeout(filterTimerRef.current); };
   }, [filterFingerprint]);
+
+  useEffect(() => {
+    if (!embedded || !selectedReportId || !initialLoadRef.current || !pendingPreviewRef.current) return;
+    if (isLoading) return;
+    pendingPreviewRef.current = false;
+    const version = ++previewVersionRef.current;
+    generateCriticalReport(selectedReportId, 'preview').then((data) => {
+      if (previewVersionRef.current === version) {
+        if (data) setPreviewData(data);
+        setIsFilterRefreshing(false);
+      }
+    }).catch(() => {
+      if (previewVersionRef.current === version) setIsFilterRefreshing(false);
+    });
+  }, [filteredComponentsData, filteredScheduleData, isLoading]);
 
   useEffect(() => {
     if (!actionTrigger || !embedded || !selectedReportId) return;
@@ -146,9 +153,9 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
     }
   }, [actionTrigger]);
 
-  const effectiveVesselId = categoryFilters.vessel === 'all'
-    ? 'all'
-    : (categoryFilters.vessel || contextVesselId);
+  const effectiveVesselId = (globalFilters?.vessels !== undefined)
+    ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
+    : (categoryFilters.vessel === 'all' ? 'all' : (categoryFilters.vessel || contextVesselId));
 
   const { data: componentsData, isLoading: componentsLoading } = useQuery<any>({
     queryKey: ['/technical/api/reports/critical-components-list', effectiveVesselId, classItemFilter],

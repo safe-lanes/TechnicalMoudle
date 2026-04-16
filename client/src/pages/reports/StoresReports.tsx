@@ -300,7 +300,10 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
   };
 
   const generateStoresReport = async (reportId: string, mode: 'preview' | 'download' = 'download'): Promise<ReportPreviewData | void> => {
-    const vesselName = effectiveVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === effectiveVesselId)?.name || effectiveVesselId || 'Unknown Vessel');
+    const activeVesselId = (globalFilters?.vessels !== undefined)
+      ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
+      : effectiveVesselId;
+    const vesselName = activeVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === activeVesselId)?.name || activeVesselId || 'Unknown Vessel');
 
     switch (reportId) {
       case 'stores-inventory-status': {
@@ -455,7 +458,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
       }
 
       case 'low-stock-alert': {
-        const reportRes = await fetch(`/technical/api/reports/stores-low-stock-alert/${effectiveVesselId}`, {
+        const reportRes = await fetch(`/technical/api/reports/stores-low-stock-alert/${activeVesselId}`, {
           credentials: 'include',
         });
         if (!reportRes.ok) throw new Error('Failed to fetch low stock alert data');
@@ -517,7 +520,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         if (categoryFilters.dateRange?.from) storesConsParams.set('startDate', categoryFilters.dateRange.from.toISOString());
         if (categoryFilters.dateRange?.to) storesConsParams.set('endDate', categoryFilters.dateRange.to.toISOString());
         const storesConsQs = storesConsParams.toString() ? `?${storesConsParams}` : '';
-        const apiRes = await fetch(`/technical/api/reports/stores-consumption-analysis/${effectiveVesselId}${storesConsQs}`, { credentials: 'include' });
+        const apiRes = await fetch(`/technical/api/reports/stores-consumption-analysis/${activeVesselId}${storesConsQs}`, { credentials: 'include' });
         if (!apiRes.ok) throw new Error('Failed to fetch consumption analysis data');
         const freshData = await apiRes.json();
 
@@ -555,7 +558,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         pdfReportGenerator.generateConsumptionAnalysisPDF(
           {
             title: 'Consumption Pattern Analysis',
-            vessel: effectiveVesselId,
+            vessel: activeVesselId,
             vesselName: freshData.summary?.vesselName || vesselName,
             orientation: 'landscape',
             daysOfData,
@@ -597,6 +600,9 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
   };
 
   const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel') => {
+    const activeVesselId = (globalFilters?.vessels !== undefined)
+      ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
+      : effectiveVesselId;
     const reportKey = `${reportId}-${format}`;
     
     if (generatingReports.has(reportKey)) return;
@@ -615,7 +621,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         toast({ title: "Report Generated", description: `${format} report downloaded successfully!` });
       } else {
         if (reportId === 'stores-inventory-status') {
-          const res = await fetch(`/technical/api/reports/stores-inventory-status/${effectiveVesselId}/excel`, {
+          const res = await fetch(`/technical/api/reports/stores-inventory-status/${activeVesselId}/excel`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -633,7 +639,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
           URL.revokeObjectURL(url);
           toast({ title: "Excel Exported", description: "Report downloaded as Excel file." });
         } else if (reportId === 'low-stock-alert') {
-          const res = await fetch(`/technical/api/reports/stores-low-stock-alert/${effectiveVesselId}/excel`, {
+          const res = await fetch(`/technical/api/reports/stores-low-stock-alert/${activeVesselId}/excel`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -651,7 +657,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
           URL.revokeObjectURL(url);
           toast({ title: "Excel Exported", description: "Low stock alert report downloaded as Excel file." });
         } else if (reportId === 'stores-consumption-analysis') {
-          const res = await fetch(`/technical/api/reports/stores-consumption-analysis/${effectiveVesselId}/excel`, {
+          const res = await fetch(`/technical/api/reports/stores-consumption-analysis/${activeVesselId}/excel`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',

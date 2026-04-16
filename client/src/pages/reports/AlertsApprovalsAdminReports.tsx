@@ -90,9 +90,9 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
     }
   }, [globalFilters?.component]);
 
-  const effectiveVesselId = categoryFilters.vessel === 'all' 
-    ? 'all' 
-    : (categoryFilters.vessel || contextVesselId);
+  const effectiveVesselId = (globalFilters?.vessels !== undefined)
+    ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
+    : (categoryFilters.vessel === 'all' ? 'all' : (categoryFilters.vessel || contextVesselId));
 
   const { data: workOrders = [] } = useQuery<any[]>({
     queryKey: ['/technical/api/work-orders', effectiveVesselId],

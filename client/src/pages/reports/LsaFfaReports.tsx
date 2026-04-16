@@ -73,6 +73,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialLoadRef = useRef(false);
   const previewVersionRef = useRef(0);
+  const pendingPreviewRef = useRef(false);
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
@@ -123,20 +124,26 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
     if (!embedded || !selectedReportId || !initialLoadRef.current) return;
     if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
     setIsFilterRefreshing(true);
-    const version = ++previewVersionRef.current;
-    filterTimerRef.current = setTimeout(() => {
-      setPreviewData(null);
-      generateReport(selectedReportId, 'preview').then((data) => {
-        if (previewVersionRef.current === version) {
-          if (data) setPreviewData(data);
-          setIsFilterRefreshing(false);
-        }
-      }).catch(() => {
-        if (previewVersionRef.current === version) setIsFilterRefreshing(false);
-      });
-    }, 300);
+    setPreviewData(null);
+    ++previewVersionRef.current;
+    pendingPreviewRef.current = true;
     return () => { if (filterTimerRef.current) clearTimeout(filterTimerRef.current); };
   }, [filterFingerprint]);
+
+  useEffect(() => {
+    if (!embedded || !selectedReportId || !initialLoadRef.current || !pendingPreviewRef.current) return;
+    if (isLoading || isScheduleLoading) return;
+    pendingPreviewRef.current = false;
+    const version = ++previewVersionRef.current;
+    generateReport(selectedReportId, 'preview').then((data) => {
+      if (previewVersionRef.current === version) {
+        if (data) setPreviewData(data);
+        setIsFilterRefreshing(false);
+      }
+    }).catch(() => {
+      if (previewVersionRef.current === version) setIsFilterRefreshing(false);
+    });
+  }, [filteredMasterList, filteredScheduleData, isLoading, isScheduleLoading]);
 
   useEffect(() => {
     if (!actionTrigger || !embedded || !selectedReportId) return;
@@ -147,9 +154,9 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
     }
   }, [actionTrigger]);
 
-  const effectiveVesselId = categoryFilters.vessel === 'all'
-    ? 'all'
-    : (categoryFilters.vessel || contextVesselId);
+  const effectiveVesselId = (globalFilters?.vessels !== undefined)
+    ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
+    : (categoryFilters.vessel === 'all' ? 'all' : (categoryFilters.vessel || contextVesselId));
 
   const { data: masterListData, isLoading } = useQuery<any>({
     queryKey: ['/technical/api/reports/lsa-ffa-master-list', effectiveVesselId, equipmentTypeFilter],

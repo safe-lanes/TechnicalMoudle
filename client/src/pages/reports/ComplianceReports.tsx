@@ -85,9 +85,9 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
     }
   }, [globalFilters?.component]);
 
-  const effectiveVesselId = categoryFilters.vessel === 'all' 
-    ? 'all' 
-    : (categoryFilters.vessel || contextVesselId);
+  const effectiveVesselId = (globalFilters?.vessels !== undefined)
+    ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
+    : (categoryFilters.vessel === 'all' ? 'all' : (categoryFilters.vessel || contextVesselId));
 
   const { data: certificates = [] } = useQuery<any[]>({
     queryKey: ['/technical/api/certificates', effectiveVesselId],

@@ -96,9 +96,9 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
     }
   }, [actionTrigger]);
 
-  const effectiveVesselId = categoryFilters.vessel === 'all' 
-    ? 'all' 
-    : (categoryFilters.vessel || contextVesselId);
+  const effectiveVesselId = (globalFilters?.vessels !== undefined)
+    ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
+    : (categoryFilters.vessel === 'all' ? 'all' : (categoryFilters.vessel || contextVesselId));
 
   const { data: ihmData } = useQuery<any>({
     queryKey: ['/technical/api/reports/ihm-inventory-status', effectiveVesselId, 'full'],
