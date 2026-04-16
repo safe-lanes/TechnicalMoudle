@@ -27,7 +27,7 @@ function getTierBadge(tier: string | null | undefined) {
     case "superintendent_notification":
       return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800" data-testid="badge-tier-notified">Supt. Notified</span>;
     case "ce_with_justification":
-      return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800" data-testid="badge-tier-ce-remarks">CE + Remarks</span>;
+      return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800" data-testid="badge-tier-ce-remarks">HOD + Remarks</span>;
     case "standard":
       return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800" data-testid="badge-tier-standard">Standard</span>;
     default:
@@ -72,7 +72,7 @@ export default function SuperintendentPage() {
         </Button>
         <div>
           <h1 className="text-2xl font-semibold text-gray-900" data-testid="text-page-title">Superintendent Notifications</h1>
-          <p className="text-sm text-gray-500 mt-1" data-testid="text-page-subtitle">Work orders requiring shore-side acknowledgment before CE can approve</p>
+          <p className="text-sm text-gray-500 mt-1" data-testid="text-page-subtitle">Work orders requiring shore-side acknowledgment before HOD can approve</p>
         </div>
       </div>
 
@@ -194,7 +194,7 @@ export default function SuperintendentPage() {
               {confirmDialog.notification && (
                 <>
                   Are you sure you want to acknowledge WO <strong>{confirmDialog.notification.workOrderCode}</strong>?
-                  This will allow the Chief Engineer to proceed with approval.
+                  This will allow the Head of Department to proceed with approval.
                   The WO had <strong>{confirmDialog.notification.missedCycles || 0}</strong> missed cycle(s)
                   and was <strong>{confirmDialog.notification.daysLate || 0}</strong> day(s) late.
                 </>

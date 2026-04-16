@@ -930,6 +930,21 @@ export async function updateWorkOrder(id: string, body: any) {
       const woForNotification = { ...existingWO, ...updateData };
       await createSuperintendentNotificationForWO(woForNotification, tierResult.daysLate, tierMissedCycles, tierResult.approvalTier, tierBackdatingDays);
     }
+
+    // Resolve and set approver from org chart at submission time
+    const { resolveHodForDepartment: resolveHodAtSubmit } = await import('../../ranks/hodResolutionService');
+    const submissionHod = await resolveHodAtSubmit(
+      existingWO.vesselId,
+      existingWO.department,
+      updateData.approver || existingWO.approver
+    );
+    if (submissionHod.resolved) {
+      if (updateData.approver && updateData.approver !== submissionHod.rankName && submissionHod.source !== 'fallback') {
+        console.warn(`[Submission] Client approver "${updateData.approver}" differs from org chart HOD "${submissionHod.rankName}" for dept "${existingWO.department}". Using org chart value.`);
+      }
+      updateData.approver = submissionHod.rankName;
+      console.log(`📝 Set approver from org chart: ${submissionHod.rankName} (source: ${submissionHod.source})`);
+    }
   }
 
   console.log('📝 Cleaned update data keys:', Object.keys(updateData));

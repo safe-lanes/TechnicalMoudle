@@ -327,13 +327,13 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
   const { vesselId } = useVessel();
 
   const woDepartment = workOrder?.department || '';
-  const hodQuery = useQuery<{ success: boolean; data: { rankName: string; source: string } }>({
+  const hodQuery = useQuery<{ resolved: boolean; rankName: string; source: string }>({
     queryKey: ['/technical/api/hod', vesselId, woDepartment],
     queryFn: () => fetch(`/technical/api/hod/${vesselId || 'default'}/${encodeURIComponent(woDepartment)}`).then(r => r.json()),
     enabled: !!woDepartment,
     staleTime: 5 * 60 * 1000,
   });
-  const resolvedHodRank = hodQuery.data?.data?.rankName || workOrder?.approver || '';
+  const resolvedHodRank = hodQuery.data?.rankName || workOrder?.approver || '';
   
   // Fetch spare BOM for the component (from spare_component_links)
   const componentCode = workOrder?.componentCode || component?.code || templateData?.componentCode;

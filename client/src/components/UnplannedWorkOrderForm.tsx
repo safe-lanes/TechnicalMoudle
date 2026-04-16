@@ -196,7 +196,7 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
           jobTitle: formData.woTitle,
           workOrderType: 'Unplanned',
           maintenanceType: formData.taskType || 'Unplanned Maintenance',
-          assignedTo: formData.assignedTo || 'Chief Engineer',
+          assignedTo: formData.assignedTo || '',
           approver: formData.approver || '',
           jobCategory: formData.jobCategory || '',
           jobPriority: formData.jobPriority || 'Medium',
