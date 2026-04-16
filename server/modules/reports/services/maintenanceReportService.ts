@@ -84,13 +84,17 @@ function formatDateForExcel(dateVal: string | Date | null | undefined): string {
 // DUE JOBS (7 DAYS) - SHARED DATA FUNCTION
 // ═══════════════════════════════════════════════════════════════
 
-export async function getDueJobs7DaysData(vesselId: string) {
-  const workOrders = await repo.getWorkOrders(vesselId);
-  const jobs = await repo.getJobs(vesselId);
-  const components = await repo.getComponents(vesselId);
+export async function getDueJobs7DaysData(vesselId: string, vesselIds?: string[]) {
   const allVessels = await repo.getVessels();
+  const vesselMap = new Map(allVessels.map(v => [v.id, v.name]));
   const vessel = allVessels.find(v => v.id === vesselId);
-  const vesselName = vessel?.name || vesselId;
+  const isMultiVessel = vesselId === 'all';
+  const vesselName = isMultiVessel
+    ? (vesselIds && vesselIds.length > 0 ? vesselIds.map(id => vesselMap.get(id) || id).join(', ') : 'All Vessels')
+    : (vessel?.name || vesselId);
+  const workOrders = await repo.getWorkOrders(vesselId, vesselIds);
+  const jobs = await repo.getJobs(vesselId, undefined, vesselIds);
+  const components = await repo.getComponents(vesselId, vesselIds);
 
   const jobsMap = new Map(jobs.map(job => [job.juuid, job]));
   const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
@@ -207,7 +211,8 @@ export async function getDueJobs7DaysData(vesselId: string) {
         woStatus: wo.status || '-',
         isOverdue,
         statusIndicator,
-        urgencyScore
+        urgencyScore,
+        vesselName: isMultiVessel ? (vesselMap.get((wo as any).vesselId) || (wo as any).vesselId || '-') : vesselName
       });
     }
   }
@@ -324,13 +329,17 @@ export async function exportDueJobs7Days(vesselId: string, componentFilter?: str
 // OVERDUE JOBS - SHARED DATA FUNCTION
 // ═══════════════════════════════════════════════════════════════
 
-export async function getOverdueJobsData(vesselId: string, dateFrom?: string, dateTo?: string) {
-  const workOrders = await repo.getWorkOrders(vesselId);
-  const jobs = await repo.getJobs(vesselId);
-  const components = await repo.getComponents(vesselId);
+export async function getOverdueJobsData(vesselId: string, dateFrom?: string, dateTo?: string, vesselIds?: string[]) {
   const allVessels = await repo.getVessels();
+  const vesselMap = new Map(allVessels.map(v => [v.id, v.name]));
   const vessel = allVessels.find(v => v.id === vesselId);
-  const vesselName = vessel?.name || vesselId;
+  const isMultiVessel = vesselId === 'all';
+  const vesselName = isMultiVessel
+    ? (vesselIds && vesselIds.length > 0 ? vesselIds.map(id => vesselMap.get(id) || id).join(', ') : 'All Vessels')
+    : (vessel?.name || vesselId);
+  const workOrders = await repo.getWorkOrders(vesselId, vesselIds);
+  const jobs = await repo.getJobs(vesselId, undefined, vesselIds);
+  const components = await repo.getComponents(vesselId, vesselIds);
 
   const jobsMap = new Map(jobs.map(job => [job.juuid, job]));
   const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
@@ -441,7 +450,8 @@ export async function getOverdueJobsData(vesselId: string, dateFrom?: string, da
         assignedTo: wo.assignedTo || job?.assignedTo || '-',
         lastDoneDate: wo.lastDoneDateSnapshot || '-',
         lastDoneRH: job?.lastDoneRH ?? '-',
-        critical: isCriticalEquipment ? 'YES' : 'No'
+        critical: isCriticalEquipment ? 'YES' : 'No',
+        vesselName: isMultiVessel ? (vesselMap.get((wo as any).vesselId) || (wo as any).vesselId || '-') : vesselName
       });
     }
   }
@@ -573,7 +583,7 @@ export async function exportOverdueJobs(vesselId: string, dateFrom?: string, dat
 // COMPLETED JOBS REGISTER - SHARED DATA FUNCTION
 // ═══════════════════════════════════════════════════════════════
 
-export async function getCompletedJobsData(vesselId: string, dateFrom?: string, dateTo?: string) {
+export async function getCompletedJobsData(vesselId: string, dateFrom?: string, dateTo?: string, vesselIds?: string[]) {
   const formatDateDDMMMYYYY = (dateStr: string | Date | null | undefined): string => {
     if (!dateStr) return '\u2014';
     try {
@@ -597,12 +607,16 @@ export async function getCompletedJobsData(vesselId: string, dateFrom?: string, 
     } catch { return 0; }
   };
 
-  const workOrders = await repo.getWorkOrders(vesselId);
-  const jobs = await repo.getJobs(vesselId);
-  const components = await repo.getComponents(vesselId);
   const allVessels = await repo.getVessels();
+  const vesselMap = new Map(allVessels.map(v => [v.id, v.name]));
   const vessel = allVessels.find(v => v.id === vesselId);
-  const vesselName = vessel?.name || vesselId;
+  const isMultiVessel = vesselId === 'all';
+  const vesselName = isMultiVessel
+    ? (vesselIds && vesselIds.length > 0 ? vesselIds.map(id => vesselMap.get(id) || id).join(', ') : 'All Vessels')
+    : (vessel?.name || vesselId);
+  const workOrders = await repo.getWorkOrders(vesselId, vesselIds);
+  const jobs = await repo.getJobs(vesselId, undefined, vesselIds);
+  const components = await repo.getComponents(vesselId, vesselIds);
 
   const jobsMap = new Map(jobs.map(job => [job.juuid, job]));
   const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
@@ -664,6 +678,7 @@ export async function getCompletedJobsData(vesselId: string, dateFrom?: string, 
       completionDate: formatDateDDMMMYYYY(wo.dateCompleted || (wo as any).completionDateTime),
       manHours: manHours > 0 ? manHours.toFixed(1) : '\u2014',
       skippedCycles: wo.missedCycles ?? 0,
+      vesselName: isMultiVessel ? (vesselMap.get((wo as any).vesselId) || (wo as any).vesselId || '-') : vesselName
     };
   });
 
@@ -949,7 +964,8 @@ export async function getPostponementLogData(
   vesselId: string,
   dateFrom?: string,
   dateTo?: string,
-  status?: string
+  status?: string,
+  vesselIds?: string[]
 ) {
   const formatDateDisplay = (dateVal: string | Date | null | undefined): string => {
     if (!dateVal) return '-';
@@ -960,11 +976,15 @@ export async function getPostponementLogData(
     } catch { return '-'; }
   };
 
-  const workOrders = await repo.getWorkOrders(vesselId);
-  const components = await repo.getComponents(vesselId);
   const allVessels = await repo.getVessels();
+  const vesselMap = new Map(allVessels.map(v => [v.id, v.name]));
   const vessel = allVessels.find(v => v.id === vesselId);
-  const vesselName = vessel?.name || vesselId;
+  const isMultiVessel = vesselId === 'all';
+  const vesselName = isMultiVessel
+    ? (vesselIds && vesselIds.length > 0 ? vesselIds.map(id => vesselMap.get(id) || id).join(', ') : 'All Vessels')
+    : (vessel?.name || vesselId);
+  const workOrders = await repo.getWorkOrders(vesselId, vesselIds);
+  const components = await repo.getComponents(vesselId, vesselIds);
 
   const workOrdersMap = new Map(workOrders.map(wo => [wo.wouuid, wo]));
   const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
@@ -1049,7 +1069,8 @@ export async function getPostponementLogData(
       approvedBy: p.approvedBy || '-',
       approvalRemarks: p.approvalRemarks || '-',
       informOffice: p.informOffice ? 'Yes' : 'No',
-      critical: isCritical ? 'Yes' : 'No'
+      critical: isCritical ? 'Yes' : 'No',
+      vesselName: isMultiVessel ? (vesselMap.get((p.vesselId || wo?.vesselId) as string) || (wo?.vesselId || '-')) : vesselName
     };
   });
 

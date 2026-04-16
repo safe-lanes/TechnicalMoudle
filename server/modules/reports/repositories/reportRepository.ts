@@ -9,13 +9,13 @@ export async function getVessels() {
 }
 
 // ═══ Components ═══
-export async function getComponents(vesselId: string) {
-  return storage.getComponents(vesselId);
+export async function getComponents(vesselId: string, vesselIds?: string[]) {
+  return storage.getComponents(vesselId, vesselIds);
 }
 
 // ═══ Jobs ═══
-export async function getJobs(vesselId: string) {
-  return storage.getJobs(vesselId);
+export async function getJobs(vesselId: string, componentId?: string, vesselIds?: string[]) {
+  return storage.getJobs(vesselId, componentId, vesselIds);
 }
 
 export async function getJobComponentLinks(vesselId: string) {
@@ -23,13 +23,13 @@ export async function getJobComponentLinks(vesselId: string) {
 }
 
 // ═══ Work Orders ═══
-export async function getWorkOrders(vesselId: string) {
-  return storage.getWorkOrders(vesselId);
+export async function getWorkOrders(vesselId: string, vesselIds?: string[]) {
+  return storage.getWorkOrders(vesselId, vesselIds);
 }
 
 // ═══ Spares ═══
-export async function getSpares(vesselId: string) {
-  return storage.getSpares(vesselId);
+export async function getSpares(vesselId: string, vesselIds?: string[]) {
+  return storage.getSpares(vesselId, vesselIds);
 }
 
 export async function updateSpare(id: string, data: any) {
@@ -37,8 +37,8 @@ export async function updateSpare(id: string, data: any) {
 }
 
 // ═══ Stores ═══
-export async function getStoresItems(vesselId: string) {
-  return storage.getStoresItems(vesselId);
+export async function getStoresItems(vesselId: string, itemType?: string, vesselIds?: string[]) {
+  return storage.getStoresItems(vesselId, itemType, vesselIds);
 }
 
 // ═══ Change Requests ═══
@@ -49,8 +49,8 @@ export async function getChangeRequests(vesselId?: string) {
 }
 
 // ═══ IHM ═══
-export async function getIhmStatusReport(vesselId: string) {
-  return storage.getIhmStatusReport(vesselId);
+export async function getIhmStatusReport(vesselId: string, vesselIds?: string[]) {
+  return storage.getIhmStatusReport(vesselId, vesselIds);
 }
 
 // ═══ Running Hours ═══

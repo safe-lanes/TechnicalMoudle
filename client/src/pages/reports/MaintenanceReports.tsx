@@ -368,6 +368,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
       : effectiveVesselId;
     const vesselName = activeVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === activeVesselId)?.name || activeVesselId || 'Unknown Vessel');
+    const isMultiVessel = activeVesselId === 'all';
+    const vesselIdsParam = isMultiVessel && (globalFilters?.vessels?.length ?? 0) > 0
+      ? `&vesselIds=${globalFilters!.vessels.join(',')}`
+      : '';
     const now = new Date();
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
@@ -405,7 +409,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     switch (reportId) {
       case 'due-jobs-7': {
         const dueJobsResponse = await fetch(
-          `/technical/api/reports/due-jobs-7-days/preview?vesselId=${activeVesselId}`
+          `/technical/api/reports/due-jobs-7-days/preview?vesselId=${activeVesselId}${vesselIdsParam}`
         );
         if (!dueJobsResponse.ok) {
           throw new Error('Failed to fetch due jobs data');
@@ -416,6 +420,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'Status', field: 'statusIndicator', width: 22 },
           { header: 'WO Number', field: 'workOrderNo', width: 45 },
           { header: 'Title', field: 'jobTitle', width: 70 },
@@ -427,6 +432,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         const data = filteredDueJobs.map((job: any, index: number) => ({
           sno: index + 1,
+          vesselName: job.vesselName || '-',
           workOrderNo: job.workOrderNo,
           jobTitle: job.jobTitle,
           componentName: job.componentName,
@@ -455,7 +461,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'overdue-jobs': {
-        let overdueUrl = `/technical/api/reports/overdue-jobs/preview?vesselId=${activeVesselId}`;
+        let overdueUrl = `/technical/api/reports/overdue-jobs/preview?vesselId=${activeVesselId}${vesselIdsParam}`;
         if (effectiveDateRange?.from) {
           overdueUrl += `&dateFrom=${toLocalDateStr(effectiveDateRange.from)}`;
         }
@@ -472,6 +478,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         const columns = [
           { header: 'S.No', field: 'sNo', width: 8 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'WO Code', field: 'workOrderNo', width: 30 },
           { header: 'WO Title', field: 'jobTitle', width: 40 },
           { header: 'Component Code', field: 'componentCode', width: 18 },
@@ -497,6 +504,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           }
           return {
             sNo: index + 1,
+            vesselName: job.vesselName || '-',
             workOrderNo: job.workOrderNo,
             jobTitle: job.jobTitle,
             componentCode: job.componentCode,
@@ -546,7 +554,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'completed-jobs': {
-        let completedUrl = `/technical/api/reports/completed-jobs/preview?vesselId=${activeVesselId}`;
+        let completedUrl = `/technical/api/reports/completed-jobs/preview?vesselId=${activeVesselId}${vesselIdsParam}`;
         if (effectiveDateRange?.from) {
           completedUrl += `&dateFrom=${toLocalDateStr(effectiveDateRange.from)}`;
         }
@@ -562,6 +570,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         const completedColumns = [
           { header: 'S.No', field: 'sNo', width: 8 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'WO No', field: 'workOrderNo', width: 22 },
           { header: 'Component', field: 'componentName', width: 28 },
           { header: 'Job Title', field: 'jobTitle', width: 30 },
@@ -784,7 +793,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'postponement-log': {
-        let postponeUrl = `/technical/api/reports/postponement-log/preview?vesselId=${activeVesselId}`;
+        let postponeUrl = `/technical/api/reports/postponement-log/preview?vesselId=${activeVesselId}${vesselIdsParam}`;
         if (effectiveDateRange?.from) {
           postponeUrl += `&dateFrom=${toLocalDateStr(effectiveDateRange.from)}`;
         }
@@ -800,6 +809,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'WO Number', field: 'workOrderNo', width: 35 },
           { header: 'Job Title', field: 'jobTitle', width: 55 },
           { header: 'Component', field: 'componentName', width: 45 },
@@ -813,6 +823,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         const data = postponeRaw.map((job: any, idx: number) => ({
           sno: idx + 1,
+          vesselName: job.vesselName || '-',
           workOrderNo: job.workOrderNo,
           jobTitle: job.jobTitle,
           componentName: job.componentName,

@@ -1042,8 +1042,19 @@ export class PostgresStorage {
 
   // ============= MODULE 3: COMPONENTS =============
 
-  async getComponents(vesselId: string): Promise<Component[]> {
+  async getComponents(vesselId: string, vesselIds?: string[]): Promise<Component[]> {
     const db = await getDb();
+    if (vesselIds && vesselIds.length > 0) {
+      return await db.select().from(components)
+        .where(and(
+          inArray(components.vesselId, vesselIds),
+          eq(components.dataScope, 'vessel')
+        ));
+    }
+    if (!vesselId || vesselId === 'all') {
+      return await db.select().from(components)
+        .where(eq(components.dataScope, 'vessel'));
+    }
     return await db.select().from(components)
       .where(and(
         eq(components.vesselId, vesselId),
@@ -1995,10 +2006,19 @@ export class PostgresStorage {
 
   // ============= MODULE 4: JOBS =============
 
-  async getJobs(vesselId?: string, componentId?: string): Promise<Job[]> {
+  async getJobs(vesselId?: string, componentId?: string, vesselIds?: string[]): Promise<Job[]> {
     const db = await getDb();
-    
-    if (vesselId && componentId) {
+
+    if (vesselIds && vesselIds.length > 0) {
+      return await db.select().from(jobs)
+        .where(and(
+          inArray(jobs.vesselId, vesselIds),
+          eq(jobs.dataScope, 'vessel')
+        ))
+        .orderBy(asc(jobs.jobNo));
+    }
+
+    if (vesselId && vesselId !== 'all' && componentId) {
       // MANY-TO-MANY SUPPORT: Get jobs directly assigned to component
       // AND jobs linked via job_component_links table
       const directJobs = await db.select().from(jobs)
@@ -2037,7 +2057,7 @@ export class PostgresStorage {
       );
     }
     
-    if (vesselId) {
+    if (vesselId && vesselId !== 'all') {
       return await db.select().from(jobs)
         .where(and(
           eq(jobs.vesselId, vesselId),
@@ -2184,10 +2204,19 @@ export class PostgresStorage {
 
   // ============= MODULE 5: WORK ORDERS =============
 
-  async getWorkOrders(vesselId?: string): Promise<WorkOrder[]> {
+  async getWorkOrders(vesselId?: string, vesselIds?: string[]): Promise<WorkOrder[]> {
     const db = await getDb();
-    
-    if (vesselId) {
+
+    if (vesselIds && vesselIds.length > 0) {
+      return await db.select().from(workOrders)
+        .where(and(
+          inArray(workOrders.vesselId, vesselIds),
+          eq(workOrders.dataScope, 'vessel')
+        ))
+        .orderBy(desc(workOrders.createdAt));
+    }
+
+    if (vesselId && vesselId !== 'all') {
       return await db.select().from(workOrders)
         .where(and(
           eq(workOrders.vesselId, vesselId),
@@ -2195,7 +2224,7 @@ export class PostgresStorage {
         ))
         .orderBy(desc(workOrders.createdAt));
     }
-    
+
     return await db.select().from(workOrders)
       .where(eq(workOrders.dataScope, 'vessel'))
       .orderBy(desc(workOrders.createdAt));
@@ -2404,8 +2433,23 @@ export class PostgresStorage {
       .where(eq(spares.deleted, false));
   }
 
-  async getSpares(vesselId: string): Promise<Spare[]> {
+  async getSpares(vesselId: string, vesselIds?: string[]): Promise<Spare[]> {
     const db = await getDb();
+    if (vesselIds && vesselIds.length > 0) {
+      return await db.select().from(spares)
+        .where(and(
+          inArray(spares.vesselId, vesselIds),
+          eq(spares.dataScope, 'vessel'),
+          eq(spares.deleted, false)
+        ));
+    }
+    if (!vesselId || vesselId === 'all') {
+      return await db.select().from(spares)
+        .where(and(
+          eq(spares.dataScope, 'vessel'),
+          eq(spares.deleted, false)
+        ));
+    }
     return await db.select().from(spares)
       .where(and(
         eq(spares.vesselId, vesselId),
@@ -3506,15 +3550,21 @@ export class PostgresStorage {
 
   // ============= MODULE 7: SPARES HISTORY =============
 
-  async getSpareHistory(vesselId: string): Promise<SpareHistory[]> {
+  async getSpareHistory(vesselId: string, vesselIds?: string[]): Promise<SpareHistory[]> {
     const db = await getDb();
-    const rows = await db.select({
+    let condition: any;
+    if (vesselIds && vesselIds.length > 0) {
+      condition = inArray(sparesHistory.vesselId, vesselIds);
+    } else if (vesselId && vesselId !== 'all') {
+      condition = eq(sparesHistory.vesselId, vesselId);
+    }
+    const query = db.select({
       history: sparesHistory,
       partNumber: spares.partNumber,
     }).from(sparesHistory)
       .leftJoin(spares, eq(sparesHistory.spareUuid, spares.suuid))
-      .where(eq(sparesHistory.vesselId, vesselId))
       .orderBy(desc(sparesHistory.timestampUTC));
+    const rows = condition ? await query.where(condition) : await query;
     return rows.map(r => ({
       ...r.history,
       partNumber: r.partNumber ?? null,
@@ -3546,21 +3596,19 @@ export class PostgresStorage {
 
   // ============= MODULE 8: STORES ITEMS =============
 
-  async getStoresItems(vesselId: string, itemType?: string): Promise<StoresItem[]> {
+  async getStoresItems(vesselId: string, itemType?: string, vesselIds?: string[]): Promise<StoresItem[]> {
     const db = await getDb();
+    const vesselCondition = (vesselIds && vesselIds.length > 0)
+      ? inArray(storesItems.vesselId, vesselIds)
+      : (vesselId && vesselId !== 'all' ? eq(storesItems.vesselId, vesselId) : undefined);
     if (itemType) {
-      return await db.select().from(storesItems)
-        .where(and(
-          eq(storesItems.vesselId, vesselId),
-          eq(storesItems.itemType, itemType),
-          eq(storesItems.deleted, false)
-        ));
+      const conditions: any[] = [eq(storesItems.itemType, itemType), eq(storesItems.deleted, false)];
+      if (vesselCondition) conditions.push(vesselCondition);
+      return await db.select().from(storesItems).where(and(...conditions));
     }
-    return await db.select().from(storesItems)
-      .where(and(
-        eq(storesItems.vesselId, vesselId),
-        eq(storesItems.deleted, false)
-      ));
+    const conditions: any[] = [eq(storesItems.deleted, false)];
+    if (vesselCondition) conditions.push(vesselCondition);
+    return await db.select().from(storesItems).where(and(...conditions));
   }
 
   async inactivateStoresItem(id: string, vesselId?: string): Promise<void> {
@@ -3992,19 +4040,21 @@ export class PostgresStorage {
 
   // ============= MODULE 8: STORES LEDGER =============
 
-  async getStoresTransactionHistory(vesselId: string, itemType?: string): Promise<StoresLedger[]> {
+  async getStoresTransactionHistory(vesselId: string, itemType?: string, vesselIds?: string[]): Promise<StoresLedger[]> {
     const db = await getDb();
+    const vesselCondition = (vesselIds && vesselIds.length > 0)
+      ? inArray(storesLedger.vesselId, vesselIds)
+      : (vesselId && vesselId !== 'all' ? eq(storesLedger.vesselId, vesselId) : undefined);
     if (itemType) {
+      const conditions: any[] = [eq(storesLedger.section, itemType)];
+      if (vesselCondition) conditions.push(vesselCondition);
       return await db.select().from(storesLedger)
-        .where(and(
-          eq(storesLedger.vesselId, vesselId),
-          eq(storesLedger.section, itemType)
-        ))
+        .where(and(...conditions))
         .orderBy(desc(storesLedger.timestampUTC));
     }
-    return await db.select().from(storesLedger)
-      .where(eq(storesLedger.vesselId, vesselId))
-      .orderBy(desc(storesLedger.timestampUTC));
+    return vesselCondition
+      ? await db.select().from(storesLedger).where(vesselCondition).orderBy(desc(storesLedger.timestampUTC))
+      : await db.select().from(storesLedger).orderBy(desc(storesLedger.timestampUTC));
   }
 
   async getStoresItemHistory(itemId: string): Promise<StoresLedger[]> {
@@ -5545,10 +5595,15 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async getIhmStatusReport(vesselId: string): Promise<IhmItem[]> {
+  async getIhmStatusReport(vesselId: string, vesselIds?: string[]): Promise<IhmItem[]> {
     const db = await getDb();
-    return await db.select().from(ihmItems)
-      .where(eq(ihmItems.vesselId, vesselId));
+    if (vesselIds && vesselIds.length > 0) {
+      return await db.select().from(ihmItems).where(inArray(ihmItems.vesselId, vesselIds));
+    }
+    if (!vesselId || vesselId === 'all') {
+      return await db.select().from(ihmItems);
+    }
+    return await db.select().from(ihmItems).where(eq(ihmItems.vesselId, vesselId));
   }
 
   // ============= MODULE 14: FLEET VESSEL MAPPING =============
@@ -6358,7 +6413,9 @@ export class PostgresStorage {
   }): Promise<WorkOrderPostponement[]> {
     const db = await getDb();
     
-    const conditions: any[] = [eq(workOrderPostponements.vesselId, vesselId)];
+    const conditions: any[] = vesselId && vesselId !== 'all'
+      ? [eq(workOrderPostponements.vesselId, vesselId)]
+      : [];
     
     if (filters?.workOrderId) {
       conditions.push(eq(workOrderPostponements.workOrderId, filters.workOrderId));

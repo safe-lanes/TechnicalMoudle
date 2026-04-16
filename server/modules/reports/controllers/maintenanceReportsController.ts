@@ -12,7 +12,8 @@ export async function getDueJobs7DaysPreview(req: Request, res: Response) {
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
-    const result = await maintenanceReportService.getDueJobs7DaysData(vesselId);
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
+    const result = await maintenanceReportService.getDueJobs7DaysData(vesselId, vesselIds);
     res.json(result);
   } catch (error: any) {
     console.error("Error fetching Due Jobs 7 Days preview:", error);
@@ -32,7 +33,8 @@ export async function getOverdueJobsPreview(req: Request, res: Response) {
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
-    const result = await maintenanceReportService.getOverdueJobsData(vesselId, dateFrom, dateTo);
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
+    const result = await maintenanceReportService.getOverdueJobsData(vesselId, dateFrom, dateTo, vesselIds);
     res.json(result);
   } catch (error: any) {
     console.error("Error fetching Overdue Jobs preview:", error);
@@ -52,7 +54,8 @@ export async function getCompletedJobsPreview(req: Request, res: Response) {
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
-    const result = await maintenanceReportService.getCompletedJobsData(vesselId, dateFrom, dateTo);
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
+    const result = await maintenanceReportService.getCompletedJobsData(vesselId, dateFrom, dateTo, vesselIds);
     res.json(result);
   } catch (error: any) {
     console.error("Error fetching Completed Jobs preview:", error);
@@ -73,7 +76,8 @@ export async function getPostponementLogPreview(req: Request, res: Response) {
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
-    const result = await maintenanceReportService.getPostponementLogData(vesselId, dateFrom, dateTo, status);
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
+    const result = await maintenanceReportService.getPostponementLogData(vesselId, dateFrom, dateTo, status, vesselIds);
     res.json(result);
   } catch (error: any) {
     console.error("Error fetching Postponement Log preview:", error);

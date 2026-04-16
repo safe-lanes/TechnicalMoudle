@@ -248,7 +248,7 @@ export interface IStorage {
   getUsers(): Promise<User[]>;
   
   // Running Hours methods
-  getComponents(vesselId: string): Promise<Component[]>;
+  getComponents(vesselId: string, vesselIds?: string[]): Promise<Component[]>;
   getComponent(id: string): Promise<Component | undefined>;
   getComponentByCode(componentCode: string, vesselId: string): Promise<Component | undefined>;
   createComponent(component: InsertComponent): Promise<Component>;
@@ -346,7 +346,7 @@ export interface IStorage {
   
   // Spares methods
   getAllSpares(): Promise<Spare[]>;
-  getSpares(vesselId: string): Promise<Spare[]>;
+  getSpares(vesselId: string, vesselIds?: string[]): Promise<Spare[]>;
   getSpare(id: string): Promise<Spare | undefined>;
   createSpare(spare: InsertSpare, skipSiblingSync?: boolean): Promise<Spare>;
   updateSpare(id: string, data: Partial<Spare>, skipSiblingSync?: boolean): Promise<Spare>;
@@ -408,7 +408,7 @@ export interface IStorage {
   deleteFleetSpare(id: number): Promise<void>;
   
   // Spares History methods
-  getSpareHistory(vesselId: string): Promise<SpareHistory[]>;
+  getSpareHistory(vesselId: string, vesselIds?: string[]): Promise<SpareHistory[]>;
   getSpareHistoryBySpareId(spareId: number): Promise<SpareHistory[]>;
   createSpareHistory(history: InsertSpareHistory): Promise<SpareHistory>;
   
@@ -501,7 +501,7 @@ export interface IStorage {
   upsertIhmItem(item: any): Promise<any>;
   getIhmMaintenanceLog(filters: any): Promise<any[]>;
   createIhmMaintenanceLogEntry(entry: any): Promise<any>;
-  getIhmStatusReport(vesselId: string): Promise<any[]>;
+  getIhmStatusReport(vesselId: string, vesselIds?: string[]): Promise<any[]>;
   
   // Component Documents methods
   getComponentDocuments(componentId: string): Promise<any[]>;
@@ -537,7 +537,7 @@ export interface IStorage {
   deleteComponentRequisition(id: number): Promise<void>;
   
   // Jobs methods (Templates for maintenance jobs linked to components)
-  getJobs(vesselId?: string, componentId?: string): Promise<Job[]>;
+  getJobs(vesselId?: string, componentId?: string, vesselIds?: string[]): Promise<Job[]>;
   getJob(id: string): Promise<Job | undefined>;
   createJob(job: InsertJob): Promise<Job>;
   updateJob(id: string, updates: Partial<InsertJob>): Promise<Job>;
@@ -547,7 +547,7 @@ export interface IStorage {
   bulkUpsertJobs(jobs: InsertJob[]): Promise<{ created: number; updated: number }>;
   
   // Work Order methods
-  getWorkOrders(vesselId?: string): Promise<WorkOrder[]>;
+  getWorkOrders(vesselId?: string, vesselIds?: string[]): Promise<WorkOrder[]>;
   getWorkOrder(id: string): Promise<WorkOrder | undefined>;
   getWorkOrderByCode(code: string): Promise<WorkOrder | undefined>;
   getWorkOrdersByJobId(jobId: string): Promise<WorkOrder[]>;
@@ -701,7 +701,7 @@ export interface IStorage {
   }>;
   
   // Stores methods - ZERO PMS linkages (no componentId, workOrderId, jobId)
-  getStoresItems(vesselId: string, itemType?: string): Promise<StoresItem[]>;
+  getStoresItems(vesselId: string, itemType?: string, vesselIds?: string[]): Promise<StoresItem[]>;
   getStoresItem(id: string): Promise<StoresItem | undefined>;
   createStoresItem(item: InsertStoresItem, userId?: string): Promise<StoresItem>;
   updateStoresItem(id: string, data: Partial<StoresItem>): Promise<StoresItem>;
@@ -711,7 +711,7 @@ export interface IStorage {
   receiveStoresItem(id: string, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, ref?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
   transferStoresItemLocation(id: string, newRobLocationA: string, newRobLocationB: string, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<{ item: StoresItem; isTransfer: boolean }>;
   adjustStoresItem(id: string, newRob: number, location: 'A' | 'B', userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
-  getStoresTransactionHistory(vesselId: string, itemType?: string): Promise<StoresLedger[]>;
+  getStoresTransactionHistory(vesselId: string, itemType?: string, vesselIds?: string[]): Promise<StoresLedger[]>;
   getStoresItemHistory(itemId: string): Promise<StoresLedger[]>;
   
   // Fleet Vessel Mapping methods (Rule #16)
