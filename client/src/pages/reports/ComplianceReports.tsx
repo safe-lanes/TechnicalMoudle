@@ -89,14 +89,16 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
     ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
     : (categoryFilters.vessel === 'all' ? 'all' : (categoryFilters.vessel || contextVesselId));
 
+  const isMultiVessel = globalVessels.length > 1;
+  const vesselIdsParam = isMultiVessel ? globalVessels.join(',') : '';
+
   const { data: certificates = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/certificates', effectiveVesselId],
+    queryKey: ['/technical/api/certificates', effectiveVesselId, vesselIdsParam],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (effectiveVesselId && effectiveVesselId !== 'all') {
-        params.set('vesselId', effectiveVesselId);
-      }
-      const url = `/technical/api/certificates${params.toString() ? `?${params}` : ''}`;
+      params.set('vesselId', effectiveVesselId || 'all');
+      if (vesselIdsParam) params.set('vesselIds', vesselIdsParam);
+      const url = `/technical/api/certificates?${params}`;
       const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch certificates');
       return res.json();
@@ -104,13 +106,12 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
   });
 
   const { data: surveys = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/surveys', effectiveVesselId],
+    queryKey: ['/technical/api/surveys', effectiveVesselId, vesselIdsParam],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (effectiveVesselId && effectiveVesselId !== 'all') {
-        params.set('vesselId', effectiveVesselId);
-      }
-      const url = `/technical/api/surveys${params.toString() ? `?${params}` : ''}`;
+      params.set('vesselId', effectiveVesselId || 'all');
+      if (vesselIdsParam) params.set('vesselIds', vesselIdsParam);
+      const url = `/technical/api/surveys?${params}`;
       const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch surveys');
       return res.json();
@@ -260,6 +261,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
       case 'certificates-status': {
         const columns = [
           { header: 'Certificate', field: 'name', width: 55 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'Issue Date', field: 'issueDate', width: 30 },
           { header: 'Expiry Date', field: 'expiryDate', width: 30 },
           { header: 'Days to Expiry', field: 'daysToExpiry', width: 35 },
@@ -270,6 +272,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           const days = getDaysToExpiry(c.expiryDate);
           return {
             name: c.name || c.certificateName || '-',
+            vesselName: vessels.find((v: any) => v.id === c.vesselId)?.name || '-',
             issueDate: formatDate(c.issueDate),
             expiryDate: formatDate(c.expiryDate),
             daysToExpiry: days,
@@ -295,6 +298,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
       case 'surveys-due': {
         const columns = [
           { header: 'Survey Type', field: 'name', width: 55 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'Due Date', field: 'dueDate', width: 35 },
           { header: 'Days to Due', field: 'daysToDue', width: 30 },
           { header: 'Status', field: 'status', width: 30 }
@@ -304,6 +308,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           const days = getDaysToExpiry(s.dueDate || s.expiryDate);
           return {
             name: s.name || s.surveyType || '-',
+            vesselName: vessels.find((v: any) => v.id === s.vesselId)?.name || '-',
             dueDate: formatDate(s.dueDate || s.expiryDate),
             daysToDue: days,
             status: getExpiryStatus(days)

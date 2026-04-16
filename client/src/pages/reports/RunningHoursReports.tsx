@@ -156,14 +156,16 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
     ? 'all' 
     : (categoryFilters.vessel || contextVesselId);
 
+  const isMultiVessel = globalVessels.length > 1;
+  const vesselIdsParam = isMultiVessel ? globalVessels.join(',') : '';
+
   const { data: components = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/components', effectiveVesselId],
+    queryKey: ['/technical/api/components', effectiveVesselId, vesselIdsParam],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (effectiveVesselId && effectiveVesselId !== 'all') {
-        params.set('vesselId', effectiveVesselId);
-      }
-      const url = `/technical/api/components${params.toString() ? `?${params}` : ''}`;
+      params.set('vesselId', effectiveVesselId || 'all');
+      if (vesselIdsParam) params.set('vesselIds', vesselIdsParam);
+      const url = `/technical/api/components?${params}`;
       const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch components');
       return res.json();
@@ -171,7 +173,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
   });
 
   const { data: runningHours = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/running-hours', effectiveVesselId],
+    queryKey: ['/technical/api/running-hours', effectiveVesselId, vesselIdsParam],
     enabled: !!effectiveVesselId,
   });
 
@@ -276,7 +278,8 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           const result = await response.json();
           
           if (response.ok && result.success && result.data) {
-            allUtilizationData = allUtilizationData.concat(result.data);
+            const vName = vessels.find((v: any) => v.id === vId)?.name || vId;
+            allUtilizationData = allUtilizationData.concat(result.data.map((d: any) => ({ ...d, vesselName: d.vesselName || vName })));
             if (!mergedSummary.periodDays) mergedSummary = { ...result.summary };
             else {
               mergedSummary.totalEquipment = (mergedSummary.totalEquipment || 0) + (result.summary?.totalEquipment || 0);
@@ -305,6 +308,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
 
         const columns = [
           { header: 'S.No', field: 'sNo', width: 12 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'Code', field: 'componentCode', width: 30 },
           { header: 'Component Name', field: 'componentName', width: 55 },
           { header: 'Category', field: 'category', width: 35 },
@@ -369,7 +373,8 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           const result = await response.json();
           
           if (response.ok && result.success) {
-            allAnomalies = allAnomalies.concat(result.data || []);
+            const vName = vessels.find((v: any) => v.id === vId)?.name || vId;
+            allAnomalies = allAnomalies.concat((result.data || []).map((d: any) => ({ ...d, vesselName: d.vesselName || vName })));
             if (!mergedAnomalySummary.periodStart) mergedAnomalySummary = { ...result.summary };
             else {
               mergedAnomalySummary.totalAnomalies = (mergedAnomalySummary.totalAnomalies || 0) + (result.summary?.totalAnomalies || 0);
@@ -386,6 +391,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         
         const columns = [
           { header: 'S.No', field: 'sNo', width: 12 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'Component Code', field: 'componentCode', width: 30 },
           { header: 'Component Name', field: 'componentName', width: 50 },
           { header: 'Prev RH', field: 'previousRh', width: 22 },
@@ -410,6 +416,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         
         const formattedData = anomalies.map((a: any) => ({
           sNo: a.sNo,
+          vesselName: a.vesselName || '-',
           componentCode: a.componentCode,
           componentName: a.componentName,
           previousRh: Number(a.previousRh).toFixed(1),

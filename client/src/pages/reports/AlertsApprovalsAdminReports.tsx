@@ -94,14 +94,16 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
     ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
     : (categoryFilters.vessel === 'all' ? 'all' : (categoryFilters.vessel || contextVesselId));
 
+  const isMultiVessel = globalVessels.length > 1;
+  const vesselIdsParam = isMultiVessel ? globalVessels.join(',') : '';
+
   const { data: workOrders = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/work-orders', effectiveVesselId],
+    queryKey: ['/technical/api/work-orders', effectiveVesselId, vesselIdsParam],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (effectiveVesselId && effectiveVesselId !== 'all') {
-        params.set('vesselId', effectiveVesselId);
-      }
-      const url = `/technical/api/work-orders${params.toString() ? `?${params}` : ''}`;
+      params.set('vesselId', effectiveVesselId || 'all');
+      if (vesselIdsParam) params.set('vesselIds', vesselIdsParam);
+      const url = `/technical/api/work-orders?${params}`;
       const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch work orders');
       return res.json();
@@ -109,13 +111,12 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
   });
 
   const { data: defects = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/defects', effectiveVesselId],
+    queryKey: ['/technical/api/defects', effectiveVesselId, vesselIdsParam],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (effectiveVesselId && effectiveVesselId !== 'all') {
-        params.set('vesselId', effectiveVesselId);
-      }
-      const url = `/technical/api/defects${params.toString() ? `?${params}` : ''}`;
+      params.set('vesselId', effectiveVesselId || 'all');
+      if (vesselIdsParam) params.set('vesselIds', vesselIdsParam);
+      const url = `/technical/api/defects?${params}`;
       const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch defects');
       return res.json();
@@ -260,6 +261,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
       case 'alerts-notifications': {
         const columns = [
           { header: 'Alert Type', field: 'type', width: 35 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'Description', field: 'description', width: 60 },
           { header: 'Status', field: 'status', width: 25 }
         ];
@@ -269,6 +271,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
         filteredWorkOrders.filter((wo: any) => wo.status === 'Overdue' || (wo.dueDate && new Date(wo.dueDate) < now && wo.status !== 'Completed'))
           .forEach((wo: any) => alerts.push({
             type: 'Overdue Work Order',
+            vesselName: vessels.find((v: any) => v.id === wo.vesselId)?.name || '-',
             description: wo.workOrderNumber || wo.title || wo.id,
             priority: 'High',
             status: 'Active'
@@ -277,6 +280,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
         filteredDefects.filter((d: any) => d.status === 'Open')
           .forEach((d: any) => alerts.push({
             type: 'Open Defect',
+            vesselName: vessels.find((v: any) => v.id === d.vesselId)?.name || '-',
             description: d.defectNumber || d.title || d.id,
             priority: d.priority || 'Medium',
             status: 'Active'
@@ -300,6 +304,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
       case 'pending-approvals': {
         const columns = [
           { header: 'Type', field: 'type', width: 35 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'ID', field: 'id', width: 40 },
           { header: 'Description', field: 'description', width: 55 },
           { header: 'Status', field: 'status', width: 30 }
@@ -310,6 +315,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
         filteredWorkOrders.filter((wo: any) => wo.status === 'Pending Approval')
           .forEach((wo: any) => pendingItems.push({
             type: 'Work Order',
+            vesselName: vessels.find((v: any) => v.id === wo.vesselId)?.name || '-',
             id: wo.workOrderNumber || wo.id,
             description: wo.title || wo.jobTitle || '-',
             status: 'Awaiting Approval'
@@ -318,6 +324,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
         filteredDefects.filter((d: any) => d.status === 'Pending Approval')
           .forEach((d: any) => pendingItems.push({
             type: 'Defect',
+            vesselName: vessels.find((v: any) => v.id === d.vesselId)?.name || '-',
             id: d.defectNumber || d.id,
             description: d.title || d.description || '-',
             status: 'Awaiting Approval'
@@ -365,6 +372,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
       case 'overdue-alerts': {
         const columns = [
           { header: 'Type', field: 'type', width: 35 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'ID', field: 'id', width: 40 },
           { header: 'Description', field: 'description', width: 50 },
           { header: 'Days Overdue', field: 'daysOverdue', width: 30 }
@@ -379,6 +387,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
           const daysOverdue = Math.floor((now.getTime() - new Date(wo.dueDate).getTime()) / (1000 * 60 * 60 * 24));
           overdueItems.push({
             type: 'Work Order',
+            vesselName: vessels.find((v: any) => v.id === wo.vesselId)?.name || '-',
             id: wo.workOrderNumber || wo.id,
             description: wo.title || wo.jobTitle || '-',
             daysOverdue,
