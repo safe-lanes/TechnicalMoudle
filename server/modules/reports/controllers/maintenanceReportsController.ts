@@ -204,17 +204,80 @@ export async function exportPostponementLog(req: Request, res: Response) {
 // MONTHLY MAINTENANCE SUMMARY - PREVIEW (NEW SNAPSHOT-BASED)
 // ═══════════════════════════════════════════════════════════════
 
+function mergeMonthlySummaries(results: Awaited<ReturnType<typeof monthlySnapshotService.getMonthlySummaryData>>[]) {
+  if (results.length === 0) throw new Error('No data');
+  if (results.length === 1) return results[0];
+
+  type CategoryBucket = { count: number; woIds: string[] };
+  const mergeRecords = (records: Record<string, CategoryBucket>[]) => {
+    const merged: Record<string, CategoryBucket> = {};
+    for (const rec of records) {
+      for (const [cat, bucket] of Object.entries(rec)) {
+        if (!merged[cat]) merged[cat] = { count: 0, woIds: [] };
+        merged[cat].count += bucket.count;
+        merged[cat].woIds = [...merged[cat].woIds, ...bucket.woIds];
+      }
+    }
+    return merged;
+  };
+
+  const movementKeys = ['newJobsEntered', 'completedInMonth', 'postponedInMonth', 'newlyOverdue', 'unplannedRaised', 'sentToPendingApproval'] as const;
+  type MvKey = typeof movementKeys[number];
+  const mergedMovement = {} as Record<MvKey, { count: number; woIds: string[] }>;
+  for (const key of movementKeys) {
+    mergedMovement[key] = { count: 0, woIds: [] };
+    for (const r of results) {
+      const m = r.movement as Record<MvKey, { count: number; woIds: string[] }>;
+      if (m[key]) {
+        mergedMovement[key].count += m[key].count;
+        mergedMovement[key].woIds = [...mergedMovement[key].woIds, ...(m[key].woIds || [])];
+      }
+    }
+  }
+
+  const opening = mergeRecords(results.map(r => r.opening as Record<string, CategoryBucket>));
+  const closing = mergeRecords(results.map(r => r.closing as Record<string, CategoryBucket>));
+
+  const openingTotal = Object.values(opening).reduce((sum, v) => sum + v.count, 0);
+  const openingOverdue = opening['Overdue']?.count || 0;
+  const closingOverdue = closing['Overdue']?.count || 0;
+  const indicators = {
+    completionRate: mergedMovement.completedInMonth.count > 0 && openingTotal > 0
+      ? Math.round((mergedMovement.completedInMonth.count / openingTotal) * 100) : 0,
+    overdueChange: closingOverdue - openingOverdue,
+    postponementCount: mergedMovement.postponedInMonth.count,
+    unplannedCount: mergedMovement.unplannedRaised.count,
+  };
+
+  return {
+    vesselName: 'Multiple Vessels',
+    month: results[0].month,
+    opening,
+    movement: mergedMovement,
+    closing,
+    indicators,
+    snapshotMeta: results.flatMap(r => r.snapshotMeta),
+  };
+}
+
 export async function getMonthlySummaryPreview(req: Request, res: Response) {
   try {
     const vesselId = req.query.vesselId as string;
     const year = parseInt(req.query.year as string, 10);
     const month = parseInt(req.query.month as string, 10);
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
 
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
     if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
       return res.status(400).json({ error: "Please provide valid year and month" });
+    }
+
+    if (vesselId === 'all' && vesselIds && vesselIds.length > 0) {
+      const results = await Promise.all(vesselIds.map(vid => monthlySnapshotService.getMonthlySummaryData(vid, year, month)));
+      const data = mergeMonthlySummaries(results);
+      return res.json(data);
     }
 
     const data = await monthlySnapshotService.getMonthlySummaryData(vesselId, year, month);

@@ -624,7 +624,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           'July', 'August', 'September', 'October', 'November', 'December'];
         const periodLabel = `${monthNames[periodMonth - 1]} ${periodYear}`;
 
-        const res = await fetch(`/technical/api/reports/maintenance/monthly-summary/preview?vesselId=${activeVesselId}&year=${periodYear}&month=${periodMonth}`);
+        const res = await fetch(`/technical/api/reports/maintenance/monthly-summary/preview?vesselId=${activeVesselId}&year=${periodYear}&month=${periodMonth}${vesselIdsParam}`);
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: 'Failed to fetch monthly summary' }));
           throw new Error(err.error || 'Failed to fetch monthly summary');
