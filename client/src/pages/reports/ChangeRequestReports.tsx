@@ -131,7 +131,6 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
   const [isFilterRefreshing, setIsFilterRefreshing] = useState(false);
-  const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialLoadRef = useRef(false);
   const previewVersionRef = useRef(0);
   const pendingPreviewRef = useRef(false);
@@ -168,7 +167,6 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
 
   useEffect(() => {
     if (embedded && selectedReportId) {
-      if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
       const version = ++previewVersionRef.current;
       setPreviewData(null);
       initialLoadRef.current = false;
@@ -183,12 +181,10 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
 
   useEffect(() => {
     if (!embedded || !selectedReportId || !initialLoadRef.current) return;
-    if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
     setIsFilterRefreshing(true);
     setPreviewData(null);
     ++previewVersionRef.current;
     pendingPreviewRef.current = true;
-    return () => { if (filterTimerRef.current) clearTimeout(filterTimerRef.current); };
   }, [filterFingerprint]);
 
   useEffect(() => {
@@ -203,19 +199,6 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
   const effectiveVesselId = (globalFilters?.vessels !== undefined)
     ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
     : (categoryFilters.vessel === 'all' ? 'all' : (categoryFilters.vessel || contextVesselId));
-
-  const buildQueryString = () => {
-    const params = new URLSearchParams();
-    if (effectiveVesselId) params.set('vesselId', effectiveVesselId);
-    else params.set('vesselId', 'all');
-    if (statusFilter !== 'all') params.set('status', statusFilter);
-    if (categoryFilter !== 'all') params.set('category', categoryFilter);
-    if (categoryFilters.dateRange.from) params.set('startDate', categoryFilters.dateRange.from.toISOString());
-    if (categoryFilters.dateRange.to) params.set('endDate', categoryFilters.dateRange.to.toISOString());
-    return params.toString();
-  };
-
-  const queryString = buildQueryString();
 
   const { data: reportData, isLoading, isFetching, error } = useQuery<ChangeRequestReportData>({
     queryKey: ['/technical/api/reports/change-requests-status-tracking', effectiveVesselId || 'all', statusFilter, categoryFilter, (globalFilters?.dateRange?.from ?? categoryFilters.dateRange.from)?.toISOString(), (globalFilters?.dateRange?.to ?? categoryFilters.dateRange.to)?.toISOString()],

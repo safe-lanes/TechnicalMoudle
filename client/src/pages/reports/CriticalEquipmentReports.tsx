@@ -69,7 +69,6 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
   const [isFilterRefreshing, setIsFilterRefreshing] = useState(false);
-  const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialLoadRef = useRef(false);
   const previewVersionRef = useRef(0);
   const pendingPreviewRef = useRef(false);
@@ -106,7 +105,6 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
 
   useEffect(() => {
     if (embedded && selectedReportId) {
-      if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
       const version = ++previewVersionRef.current;
       setPreviewData(null);
       initialLoadRef.current = false;
@@ -121,12 +119,10 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
 
   useEffect(() => {
     if (!embedded || !selectedReportId || !initialLoadRef.current) return;
-    if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
     setIsFilterRefreshing(true);
     setPreviewData(null);
     ++previewVersionRef.current;
     pendingPreviewRef.current = true;
-    return () => { if (filterTimerRef.current) clearTimeout(filterTimerRef.current); };
   }, [filterFingerprint]);
 
   useEffect(() => {
