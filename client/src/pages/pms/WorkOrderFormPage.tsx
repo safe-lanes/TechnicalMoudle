@@ -224,9 +224,40 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   });
   const vesselLocations = locationsResponse?.data || [];
 
-  const woDepartment = (workOrderContext as any)?.templateData?.department ||
-    (workOrderContext as any)?.workOrder?.department ||
-    templateData?.department || '';
+  const [templateData, setTemplateData] = useState({
+    woTitle: "",
+    component: "",
+    componentName: "",
+    componentCode: "",
+    woTemplateCode: "",
+    maintenanceBasis: "Calendar",
+    frequencyValue: "",
+    frequencyUnit: "Months",
+    taskType: "Inspection",
+    assignedTo: "",
+    approver: "",
+    jobPriority: "Medium",
+    classRelated: "No",
+    department: "",
+    criticality: "",
+    jobCategory: "",
+    isActive: "Yes",
+    briefWorkDescription: "",
+    nextDueDate: "",
+    nextDueReading: "",
+    requiredSpareParts: [] as Array<{partNo: string, partCode?: string, description: string, quantityRequired: string, remarks: string}>,
+    requiredTools: [] as Array<{toolName: string, quantity: string, remarks: string}>,
+    safetyRequirements: {
+      ppeRequirements: [] as string[],
+      permitRequirements: [] as string[],
+      otherRequirements: [] as string[]
+    },
+    workHistory: [] as Array<{woNo: string, assignedTo: string, performedBy: string, workDate: string, runDate: string, completionDate: string, status: string, description: string, remarks: string}>
+  });
+
+  const woDepartment = templateData?.department ||
+    (workOrderContext as any)?.templateData?.department ||
+    (workOrderContext as any)?.workOrder?.department || '';
   const { data: hodResolution } = useQuery<{
     resolved: boolean;
     rankName: string;
@@ -451,6 +482,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Form hydration guard - prevent late async data from overwriting user edits
   const hasUserTouchedForm = useRef(false);
   const contextLoadedOnce = useRef(false);
+  const approverManuallySet = useRef(false);
+  const lastAutoFilledDept = useRef('');
 
   // Approver workflow state
   const [currentWorkOrderStatus, setCurrentWorkOrderStatus] = useState<string>('');
@@ -479,36 +512,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const isPartBReadOnly = isReadOnly || currentWorkOrderStatus === 'Completed' || (currentWorkOrderStatus === 'Pending Approval' && !isRejectedWO);
 
-  const [templateData, setTemplateData] = useState({
-    woTitle: "",
-    component: "",
-    componentName: "",
-    componentCode: "",
-    woTemplateCode: "",
-    maintenanceBasis: "Calendar",
-    frequencyValue: "",
-    frequencyUnit: "Months",
-    taskType: "Inspection",
-    assignedTo: "",
-    approver: "",
-    jobPriority: "Medium",
-    classRelated: "No",
-    department: "",
-    criticality: "",
-    jobCategory: "",
-    isActive: "Yes",
-    briefWorkDescription: "",
-    nextDueDate: "",
-    nextDueReading: "",
-    requiredSpareParts: [] as Array<{partNo: string, partCode?: string, description: string, quantityRequired: string, remarks: string}>,
-    requiredTools: [] as Array<{toolName: string, quantity: string, remarks: string}>,
-    safetyRequirements: {
-      ppeRequirements: [] as string[],
-      permitRequirements: [] as string[],
-      otherRequirements: [] as string[]
-    },
-    workHistory: [] as Array<{woNo: string, assignedTo: string, performedBy: string, workDate: string, runDate: string, completionDate: string, status: string, description: string, remarks: string}>
-  });
+  useEffect(() => {
+    if (
+      hodResolution?.resolved &&
+      hodResolution.rankName &&
+      !approverManuallySet.current &&
+      !isPartAReadOnly &&
+      woDepartment &&
+      lastAutoFilledDept.current !== woDepartment
+    ) {
+      lastAutoFilledDept.current = woDepartment;
+      setTemplateData(prev => ({ ...prev, approver: hodResolution.rankName }));
+    }
+  }, [hodResolution, woDepartment, isPartAReadOnly]);
 
   const [workHistoryExpanded, setWorkHistoryExpanded] = useState(false);
   const [workHistoryPage, setWorkHistoryPage] = useState(0);
@@ -1125,6 +1141,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const handleTemplateChange = (field: string, value: string) => {
     // Mark form as touched by user to prevent late async data from overwriting
     hasUserTouchedForm.current = true;
+
+    if (field === 'department') {
+      approverManuallySet.current = false;
+    }
+    if (field === 'approver') {
+      approverManuallySet.current = true;
+    }
 
     setTemplateData(prev => {
       let finalValue = value;
@@ -3816,6 +3839,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       ))}
                     </SelectContent>
                   </Select>
+                  {hodResolution?.resolved && woDepartment && !approverManuallySet.current && !isPartAReadOnly && (
+                    <p className="text-xs text-[#52baf3]" data-testid="text-approver-auto">
+                      Auto-filled from org chart ({hodResolution.source.replace(/_/g, ' ')})
+                    </p>
+                  )}
                 </div>
 
                 {!isUnplannedCreate && (
@@ -3923,7 +3951,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </div>
                 )}
 
-                {!isUnplannedCreate && (
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.28"><Marker id="WOF.A1.28" />Department</Label>
                   <Input
@@ -3935,7 +3962,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     data-testid="WOF.A1.29"
                   />
                 </div>
-                )}
 
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.30"><Marker id="WOF.A1.30" />Criticality</Label>

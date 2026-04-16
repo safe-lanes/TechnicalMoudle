@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useVessel } from "@/contexts/VesselContext";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,8 @@ interface NewWorkOrderFormProps {
   onSubmit?: (formData: any) => void;
 }
 
+const DEPARTMENT_OPTIONS = ["Engine", "Deck", "Electrical", "Catering", "Navigation", "Safety"];
+
 const NewWorkOrderForm: React.FC<NewWorkOrderFormProps> = ({
   isOpen,
   onClose,
@@ -33,6 +36,8 @@ const NewWorkOrderForm: React.FC<NewWorkOrderFormProps> = ({
 }) => {
   const [activeSection, setActiveSection] = useState<'partA' | 'partB'>('partA');
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
+  const approverManuallySet = useRef(false);
+  const { vesselId } = useVessel();
 
   const { data: ranksData } = useQuery<any[]>({
     queryKey: ['/technical/api/admin/available-ranks'],
@@ -50,6 +55,7 @@ const NewWorkOrderForm: React.FC<NewWorkOrderFormProps> = ({
     jobTitle: "",
     component: "",
     maintenanceType: "Planned Maintenance",
+    department: "",
     assignedTo: "",
     approver: "",
     jobCategory: "",
@@ -61,11 +67,42 @@ const NewWorkOrderForm: React.FC<NewWorkOrderFormProps> = ({
     otherSafetyRequirements: "",
   });
 
+  const { data: hodResolution } = useQuery<{
+    resolved: boolean;
+    rankName: string;
+    rankId: string | null;
+    department: string;
+    source: string;
+    mismatch: boolean;
+  }>({
+    queryKey: ['/technical/api/hod', vesselId, formData.department],
+    queryFn: async () => {
+      const url = `/technical/api/hod/${vesselId || 'none'}/${encodeURIComponent(formData.department)}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to resolve HOD');
+      return res.json();
+    },
+    enabled: !!formData.department && isOpen,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  useEffect(() => {
+    if (hodResolution?.resolved && hodResolution.rankName && !approverManuallySet.current) {
+      setFormData(prev => ({ ...prev, approver: hodResolution.rankName }));
+    }
+  }, [hodResolution]);
+
   const selectSection = (section: 'partA' | 'partB') => {
     setActiveSection(section);
   };
 
   const handleInputChange = (field: string, value: string) => {
+    if (field === 'department') {
+      approverManuallySet.current = false;
+    }
+    if (field === 'approver') {
+      approverManuallySet.current = true;
+    }
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -202,6 +239,19 @@ const NewWorkOrderForm: React.FC<NewWorkOrderFormProps> = ({
                           </Select>
                         </div>
                         <div className="space-y-2">
+                          <Label className="text-sm text-[#8798ad]">Department</Label>
+                          <Select value={formData.department} onValueChange={(value) => handleInputChange('department', value)}>
+                            <SelectTrigger className="text-sm border-[#52baf3] focus:border-[#52baf3] focus:ring-[#52baf3]" data-testid="select-department">
+                              <SelectValue placeholder="Select department" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DEPARTMENT_OPTIONS.map((dept) => (
+                                <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
                           <Label className="text-sm text-[#8798ad]">Assigned To</Label>
                           <Select value={formData.assignedTo} onValueChange={(value) => handleInputChange('assignedTo', value)}>
                             <SelectTrigger className="text-sm border-[#52baf3] focus:border-[#52baf3] focus:ring-[#52baf3]">
@@ -215,9 +265,9 @@ const NewWorkOrderForm: React.FC<NewWorkOrderFormProps> = ({
                           </Select>
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-sm text-[#8798ad]">Approver</Label>
+                          <Label className="text-sm text-[#8798ad]">Approver (Rank)</Label>
                           <Select value={formData.approver} onValueChange={(value) => handleInputChange('approver', value)}>
-                            <SelectTrigger className="text-sm border-[#52baf3] focus:border-[#52baf3] focus:ring-[#52baf3]">
+                            <SelectTrigger className="text-sm border-[#52baf3] focus:border-[#52baf3] focus:ring-[#52baf3]" data-testid="select-approver">
                               <SelectValue placeholder="Select approver" />
                             </SelectTrigger>
                             <SelectContent>
@@ -226,6 +276,11 @@ const NewWorkOrderForm: React.FC<NewWorkOrderFormProps> = ({
                               ))}
                             </SelectContent>
                           </Select>
+                          {hodResolution?.resolved && formData.department && !approverManuallySet.current && (
+                            <p className="text-xs text-[#52baf3]" data-testid="text-approver-auto">
+                              Auto-filled from org chart ({hodResolution.source.replace(/_/g, ' ')})
+                            </p>
+                          )}
                         </div>
 
                         {/* Row 3 */}
