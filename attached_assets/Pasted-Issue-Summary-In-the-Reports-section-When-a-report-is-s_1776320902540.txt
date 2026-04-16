@@ -1,0 +1,84 @@
+Issue Summary
+
+In the Reports section:
+
+When a report is selected for a vessel, it loads correctly.
+If the vessel is changed using the vessel filter, the report displays “No Data Available.”
+However, if the user navigates to another report and comes back, the data loads correctly.
+Detailed Investigation
+1. Behavioral Gap
+Vessel filter change → UI shows No Data Available (incorrect behavior)
+Manual navigation (reselecting report) → Data loads correctly (expected behavior)
+
+This indicates:
+
+Data is available and fetchable
+But the report is not reloading automatically on vessel change
+2. Root Cause Analysis (UI-Level)
+a. Missing Reload Trigger on Vessel Change
+Changing the vessel does not trigger report re-fetch or re-render
+The report remains bound to the previous dataset/state
+b. Report Lifecycle Not Reinitialized
+The report component is not being:
+Re-initialized
+Re-mounted
+Refreshed
+after vessel change
+c. Stale or Cleared Data State
+On vessel change:
+Existing data may be cleared
+New data is not fetched immediately
+Result: UI falls into a “No Data Available” fallback state
+d. Navigation Forces Refresh
+When user switches reports and comes back:
+Full lifecycle triggers (init → fetch → render)
+This is why data appears correctly afterward
+e. Filter-State vs Report-State Desynchronization
+Vessel filter updates globally
+But active report does not subscribe/react to this change
+Why Manual Action Is Required Currently
+The system lacks automatic synchronization between vessel filter and report rendering
+Clicking another report effectively acts as a manual refresh trigger
+Corrective Measures
+1. Bind Vessel Filter to Report Reload
+Ensure that any change in vessel filter:
+Triggers data fetch
+Forces report refresh
+2. Implement Reactive Update Mechanism
+Active report should:
+Listen to vessel filter changes
+Automatically reload data on change
+3. Reinitialize Report on Context Change
+Treat vessel change as a context switch
+Fully reset and reload the report state
+4. Prevent False “No Data Available” State
+Do not show fallback message until:
+Data fetch is completed
+Actual result is empty
+5. Synchronize Filter and Report State
+Ensure:
+Vessel filter state
+Active report data state
+are always aligned
+6. Improve Loading Handling
+On vessel change:
+Show loading indicator instead of “No Data Available”
+Replace with data once loaded
+Task Breakdown for Fix
+Task 1: Vessel Filter Event Handling
+Detect vessel change event reliably
+Task 2: Report Refresh Trigger
+Trigger report reload on vessel change
+Task 3: Data Rebinding
+Ensure fresh dataset is bound to the report view
+Task 4: State Synchronization
+Align vessel filter state with active report state
+Task 5: UI Feedback Handling
+Replace premature “No Data Available” with proper loading state
+Task 6: Lifecycle Correction
+Ensure report reinitialization without requiring navigation
+Expected Outcome
+Reports reload automatically when vessel is changed
+No need for manual navigation to refresh data
+“No Data Available” only appears when there is truly no data
+Consistent and predictable user experience
