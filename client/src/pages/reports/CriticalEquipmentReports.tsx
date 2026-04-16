@@ -180,13 +180,14 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
   const error = !componentsData && !scheduleData && !isLoading;
 
   const filteredComponentsData = useMemo(() => {
+    const activeComponent = globalFilters?.component || "";
     if (!componentsData?.components) return componentsData;
     let result = componentsData.components;
     if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
       result = result.filter((c: any) => !c.vesselId || globalVessels.includes(c.vesselId));
     }
-    if (globalComponent) {
-      const q = globalComponent.toLowerCase();
+    if (activeComponent) {
+      const q = activeComponent.toLowerCase();
       result = result.filter((c: any) => {
         const name = (c.componentName || c.name || "").toLowerCase();
         const code = (c.componentCode || c.code || "").toLowerCase();
@@ -194,16 +195,17 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
       });
     }
     return { ...componentsData, components: result };
-  }, [componentsData, globalVessels, globalComponent, vessels.length]);
+  }, [componentsData, globalVessels, globalFilters?.component, vessels.length]);
 
   const filteredScheduleData = useMemo(() => {
+    const activeComponent = globalFilters?.component || "";
     if (!scheduleData?.scheduleItems) return scheduleData;
     let result = scheduleData.scheduleItems;
     if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
       result = result.filter((item: any) => !item.vesselId || globalVessels.includes(item.vesselId));
     }
-    if (globalComponent) {
-      const q = globalComponent.toLowerCase();
+    if (activeComponent) {
+      const q = activeComponent.toLowerCase();
       result = result.filter((item: any) => {
         const name = (item.componentName || "").toLowerCase();
         const code = (item.componentCode || "").toLowerCase();
@@ -225,7 +227,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
       });
     }
     return { ...scheduleData, scheduleItems: result, summary: { ...scheduleData.summary, total: result.length, onSchedule: result.filter((i: any) => i.status === 'On Schedule' || i.status === 'on-schedule').length, dueSoon: result.filter((i: any) => i.status === 'Due Soon' || i.status === 'due-soon').length, overdue: result.filter((i: any) => i.status === 'Overdue' || i.status === 'overdue').length } };
-  }, [scheduleData, globalVessels, globalComponent, vessels.length, categoryFilters.dateRange]);
+  }, [scheduleData, globalVessels, globalFilters?.component, vessels.length, categoryFilters.dateRange]);
 
   const reports: CriticalEquipmentReport[] = [
     {

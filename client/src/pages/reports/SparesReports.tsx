@@ -282,8 +282,9 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
   };
 
   const applyComponentFilter = (items: any[]) => {
-    if (!globalComponent) return items;
-    const q = globalComponent.toLowerCase();
+    const activeComponent = globalFilters?.component || "";
+    if (!activeComponent) return items;
+    const q = activeComponent.toLowerCase();
     return items.filter((i: any) => {
       const name = (i.componentName || i.partName || i.name || "").toLowerCase();
       const code = (i.componentCode || i.partCode || i.code || "").toLowerCase();

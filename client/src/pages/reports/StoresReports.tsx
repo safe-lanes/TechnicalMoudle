@@ -289,8 +289,9 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
   };
 
   const applyComponentFilter = (items: any[]) => {
-    if (!globalComponent) return items;
-    const q = globalComponent.toLowerCase();
+    const activeComponent = globalFilters?.component || "";
+    if (!activeComponent) return items;
+    const q = activeComponent.toLowerCase();
     return items.filter((i: any) => {
       const name = (i.itemName || i.componentName || i.name || "").toLowerCase();
       const code = (i.itemCode || i.componentCode || i.code || "").toLowerCase();

@@ -179,13 +179,14 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
   });
 
   const filteredMasterList = useMemo(() => {
+    const activeComponent = globalFilters?.component || "";
     if (!masterListData?.equipment) return masterListData;
     let result = masterListData.equipment;
     if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
       result = result.filter((e: any) => !e.vesselId || globalVessels.includes(e.vesselId));
     }
-    if (globalComponent) {
-      const q = globalComponent.toLowerCase();
+    if (activeComponent) {
+      const q = activeComponent.toLowerCase();
       result = result.filter((e: any) => {
         const name = (e.equipmentName || e.name || "").toLowerCase();
         const code = (e.equipmentCode || e.code || "").toLowerCase();
@@ -193,16 +194,17 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
       });
     }
     return { ...masterListData, equipment: result };
-  }, [masterListData, globalVessels, globalComponent, vessels.length]);
+  }, [masterListData, globalVessels, globalFilters?.component, vessels.length]);
 
   const filteredScheduleData = useMemo(() => {
+    const activeComponent = globalFilters?.component || "";
     if (!scheduleData?.scheduleItems) return scheduleData;
     let result = scheduleData.scheduleItems;
     if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
       result = result.filter((item: any) => !item.vesselId || globalVessels.includes(item.vesselId));
     }
-    if (globalComponent) {
-      const q = globalComponent.toLowerCase();
+    if (activeComponent) {
+      const q = activeComponent.toLowerCase();
       result = result.filter((item: any) => {
         const name = (item.componentName || "").toLowerCase();
         const code = (item.componentCode || "").toLowerCase();
@@ -224,7 +226,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
       });
     }
     return { ...scheduleData, scheduleItems: result, summary: { ...scheduleData.summary, total: result.length, onSchedule: result.filter((i: any) => i.status === 'On Schedule' || i.status === 'on-schedule').length, dueSoon: result.filter((i: any) => i.status === 'Due Soon' || i.status === 'due-soon').length, overdue: result.filter((i: any) => i.status === 'Overdue' || i.status === 'overdue').length } };
-  }, [scheduleData, globalVessels, globalComponent, vessels.length, categoryFilters.dateRange]);
+  }, [scheduleData, globalVessels, globalFilters?.component, vessels.length, categoryFilters.dateRange]);
 
   const reports: LsaFfaReport[] = [
     {

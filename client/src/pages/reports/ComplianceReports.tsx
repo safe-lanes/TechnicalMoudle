@@ -134,9 +134,10 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
   }, [surveys, globalVessels, vessels.length]);
 
   const filteredCertificates = useMemo(() => {
+    const activeComponent = globalFilters?.component || "";
     let result = vesselFilteredCertificates;
-    if (globalComponent) {
-      const q = globalComponent.toLowerCase();
+    if (activeComponent) {
+      const q = activeComponent.toLowerCase();
       result = result.filter((c: any) => {
         const compName = (c.componentName || c.component || "").toLowerCase();
         const compCode = (c.componentCode || "").toLowerCase();
@@ -144,12 +145,13 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
       });
     }
     return result;
-  }, [vesselFilteredCertificates, globalComponent]);
+  }, [vesselFilteredCertificates, globalFilters?.component]);
 
   const filteredSurveys = useMemo(() => {
+    const activeComponent = globalFilters?.component || "";
     let result = vesselFilteredSurveys;
-    if (globalComponent) {
-      const q = globalComponent.toLowerCase();
+    if (activeComponent) {
+      const q = activeComponent.toLowerCase();
       result = result.filter((s: any) => {
         const compName = (s.componentName || s.component || "").toLowerCase();
         const compCode = (s.componentCode || "").toLowerCase();
@@ -157,7 +159,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
       });
     }
     return result;
-  }, [vesselFilteredSurveys, globalComponent]);
+  }, [vesselFilteredSurveys, globalFilters?.component]);
 
   const reports: ComplianceReport[] = [
     {

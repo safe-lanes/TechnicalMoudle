@@ -377,9 +377,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     
     const vesselWorkOrders = filteredWorkOrders;
 
+    const activeComponent = globalFilters?.component || "";
     const applyComponentFilter = (items: any[]) => {
-      if (!globalComponent) return items;
-      const q = globalComponent.toLowerCase();
+      if (!activeComponent) return items;
+      const q = activeComponent.toLowerCase();
       return items.filter((item: any) => {
         const compName = (item.componentName || item.component || "").toLowerCase();
         const compCode = (item.componentCode || "").toLowerCase();

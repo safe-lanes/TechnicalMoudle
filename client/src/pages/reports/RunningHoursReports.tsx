@@ -235,8 +235,9 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
   };
 
   const applyComponentFilter = (items: any[]) => {
-    if (!globalComponent) return items;
-    const q = globalComponent.toLowerCase();
+    const activeComponent = globalFilters?.component || "";
+    if (!activeComponent) return items;
+    const q = activeComponent.toLowerCase();
     return items.filter((i: any) => {
       const name = (i.componentName || i.name || "").toLowerCase();
       const code = (i.componentCode || i.code || "").toLowerCase();

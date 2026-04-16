@@ -123,12 +123,13 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
   });
 
   const filteredWorkOrders = useMemo(() => {
+    const activeComponent = globalFilters?.component || "";
     let result = workOrders;
     if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
       result = result.filter((wo: any) => globalVessels.includes(wo.vesselId));
     }
-    if (globalComponent) {
-      const q = globalComponent.toLowerCase();
+    if (activeComponent) {
+      const q = activeComponent.toLowerCase();
       result = result.filter((wo: any) => {
         const compName = (wo.componentName || wo.component || "").toLowerCase();
         const compCode = (wo.componentCode || "").toLowerCase();
@@ -136,15 +137,16 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
       });
     }
     return result;
-  }, [workOrders, globalVessels, globalComponent, vessels.length]);
+  }, [workOrders, globalVessels, globalFilters?.component, vessels.length]);
 
   const filteredDefects = useMemo(() => {
+    const activeComponent = globalFilters?.component || "";
     let result = defects;
     if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
       result = result.filter((d: any) => !d.vesselId || globalVessels.includes(d.vesselId));
     }
-    if (globalComponent) {
-      const q = globalComponent.toLowerCase();
+    if (activeComponent) {
+      const q = activeComponent.toLowerCase();
       result = result.filter((d: any) => {
         const compName = (d.componentName || d.component || "").toLowerCase();
         const compCode = (d.componentCode || "").toLowerCase();
@@ -152,7 +154,7 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
       });
     }
     return result;
-  }, [defects, globalVessels, globalComponent, vessels.length]);
+  }, [defects, globalVessels, globalFilters?.component, vessels.length]);
 
   const reports: AdminReport[] = [
     {

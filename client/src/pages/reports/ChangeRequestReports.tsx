@@ -235,20 +235,21 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
   });
 
   const filteredRequests = useMemo(() => {
+    const activeComponent = globalFilters?.component || "";
     if (!reportData?.requests) return [];
     let result = reportData.requests;
     if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
       result = result.filter(r => !r.vessel?.id || globalVessels.includes(r.vessel.id));
     }
-    if (globalComponent) {
-      const q = globalComponent.toLowerCase();
+    if (activeComponent) {
+      const q = activeComponent.toLowerCase();
       result = result.filter(r => {
         const target = (r.targetInfo?.name || "").toLowerCase();
         return target.includes(q);
       });
     }
     return result;
-  }, [reportData?.requests, globalVessels, globalComponent, vessels.length]);
+  }, [reportData?.requests, globalVessels, globalFilters?.component, vessels.length]);
 
   const reports: ChangeRequestReport[] = [
     {
@@ -500,7 +501,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
 
   const summary = useMemo(() => {
     if (!reportData?.summary) return undefined;
-    if (!globalComponent) return reportData.summary;
+    if (!(globalFilters?.component)) return reportData.summary;
     const reqs = filteredRequests;
     const byStatus: Record<string, number> = { draft: 0, submitted: 0, returned: 0, approved: 0, rejected: 0 };
     const byCategory: Record<string, number> = { components: 0, work_orders: 0, spares: 0, stores: 0 };
@@ -522,7 +523,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
       pendingRequests,
       avgApprovalTimeHours: cycleCount > 0 ? Math.round(totalCycle / cycleCount) : 0,
     };
-  }, [reportData?.summary, globalComponent, filteredRequests]);
+  }, [reportData?.summary, globalFilters?.component, filteredRequests]);
 
   return (
     <div className={embedded ? "p-4" : "p-6 bg-white dark:bg-background min-h-screen"}>

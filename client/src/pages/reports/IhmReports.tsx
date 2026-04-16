@@ -116,13 +116,14 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
   });
 
   const filteredIhmItems = useMemo(() => {
+    const activeComponent = globalFilters?.component || "";
     if (!ihmData?.items) return [];
     let result = ihmData.items;
     if (globalVessels.length > 0 && globalVessels.length < vessels.length) {
       result = result.filter((item: any) => !item.vesselId || globalVessels.includes(item.vesselId));
     }
-    if (globalComponent) {
-      const q = globalComponent.toLowerCase();
+    if (activeComponent) {
+      const q = activeComponent.toLowerCase();
       result = result.filter((item: any) => {
         const name = (item.itemName || item.componentOrCategory || "").toLowerCase();
         const code = (item.itemCode || "").toLowerCase();
@@ -130,19 +131,20 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
       });
     }
     return result;
-  }, [ihmData?.items, globalVessels, globalComponent, vessels.length]);
+  }, [ihmData?.items, globalVessels, globalFilters?.component, vessels.length]);
 
   const ihmSummary = useMemo(() => {
+    const activeComponent = globalFilters?.component || "";
     const items = filteredIhmItems;
     if (items.length === 0 && !ihmData?.summary) return { totalItems: 0, ihmPresent: 0, noIhm: 0, unknown: 0 };
-    if (globalVessels.length === 0 && !globalComponent && ihmData?.summary) return ihmData.summary;
+    if (globalVessels.length === 0 && !activeComponent && ihmData?.summary) return ihmData.summary;
     return {
       totalItems: items.length,
       ihmPresent: items.filter((i: any) => i.ihmStatus === 'present').length,
       noIhm: items.filter((i: any) => i.ihmStatus === 'not_present').length,
       unknown: items.filter((i: any) => i.ihmStatus !== 'present' && i.ihmStatus !== 'not_present').length,
     };
-  }, [filteredIhmItems, globalVessels.length, globalComponent, ihmData?.summary]);
+  }, [filteredIhmItems, globalVessels.length, globalFilters?.component, ihmData?.summary]);
 
   const reports: IhmReport[] = [
     {
