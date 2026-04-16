@@ -4,6 +4,7 @@ import * as surveyRepo from '../repositories/surveyRepository';
 
 interface SurveyFilters {
   vesselId?: string;
+  vesselIds?: string[];
   vesselName?: string;
   vesselNames?: string;
   page?: number;
@@ -117,8 +118,10 @@ export async function getSurveys(filters: SurveyFilters) {
 
   // Filter by vessel if specified
   let filteredApplicability = applicabilityRecords;
-  if (filters.vesselId) {
+  if (filters.vesselId && filters.vesselId !== 'all') {
     filteredApplicability = applicabilityRecords.filter(r => r.vesselId === filters.vesselId);
+  } else if (filters.vesselId === 'all' && filters.vesselIds?.length) {
+    filteredApplicability = applicabilityRecords.filter(r => filters.vesselIds!.includes(r.vesselId));
   } else if (filters.vesselName) {
     const normalizedFilter = filters.vesselName.toLowerCase().trim();
     filteredApplicability = applicabilityRecords.filter(r =>

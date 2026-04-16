@@ -4,6 +4,7 @@ import * as certRepo from '../repositories/certificateRepository';
 
 interface CertificateFilters {
   vesselId?: string;
+  vesselIds?: string[];
   vesselName?: string;
   vesselNames?: string;
   page?: number;
@@ -31,8 +32,10 @@ export async function getCertificates(filters: CertificateFilters) {
   }
 
   let filteredApplicability = applicabilityRecords;
-  if (filters.vesselId) {
+  if (filters.vesselId && filters.vesselId !== 'all') {
     filteredApplicability = applicabilityRecords.filter(r => r.vesselId === filters.vesselId);
+  } else if (filters.vesselId === 'all' && filters.vesselIds?.length) {
+    filteredApplicability = applicabilityRecords.filter(r => filters.vesselIds!.includes(r.vesselId));
   } else if (filters.vesselName) {
     const normalizedFilter = filters.vesselName.toLowerCase().trim();
     filteredApplicability = applicabilityRecords.filter(r =>

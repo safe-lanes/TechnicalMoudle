@@ -5,8 +5,10 @@ import * as surveyService from '../services/surveyService';
 
 export async function getSurveys(req: Request, res: Response) {
   try {
+    const vesselIdsRaw = req.query.vesselIds as string | undefined;
     const filters = {
       vesselId: req.query.vesselId as string | undefined,
+      vesselIds: vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined,
       vesselName: req.query.vesselName as string | undefined,
       vesselNames: req.query.vesselNames as string | undefined,
       page: parseInt(req.query.page as string) || 1,
