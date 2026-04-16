@@ -142,7 +142,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
     ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
     : (categoryFilters.vessel === 'all' ? 'all' : (categoryFilters.vessel || contextVesselId));
 
-  const { data: componentsData, isLoading: componentsLoading } = useQuery<any>({
+  const { data: componentsData, isLoading: componentsLoading, isFetching: componentsFetching } = useQuery<any>({
     queryKey: ['/technical/api/reports/critical-components-list', effectiveVesselId, classItemFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -154,14 +154,15 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
     },
   });
 
-  const { data: scheduleData, isLoading: scheduleLoading } = useQuery<any>({
-    queryKey: ['/technical/api/reports/critical-equipment-schedule', effectiveVesselId, statusFilter, categoryFilters.dateRange?.from?.getTime(), categoryFilters.dateRange?.to?.getTime()],
+  const { data: scheduleData, isLoading: scheduleLoading, isFetching: scheduleFetching } = useQuery<any>({
+    queryKey: ['/technical/api/reports/critical-equipment-schedule', effectiveVesselId, statusFilter, (globalFilters?.dateRange?.from ?? categoryFilters.dateRange?.from)?.getTime(), (globalFilters?.dateRange?.to ?? categoryFilters.dateRange?.to)?.getTime()],
     queryFn: async () => {
+      const effectiveDateRange = globalFilters?.dateRange ?? categoryFilters.dateRange;
       const params = new URLSearchParams();
       params.set('vesselId', effectiveVesselId || 'all');
       if (statusFilter !== 'all') params.set('status', statusFilter);
-      if (categoryFilters.dateRange?.from) params.set('startDate', categoryFilters.dateRange.from.toISOString());
-      if (categoryFilters.dateRange?.to) params.set('endDate', categoryFilters.dateRange.to.toISOString());
+      if (effectiveDateRange?.from) params.set('startDate', effectiveDateRange.from.toISOString());
+      if (effectiveDateRange?.to) params.set('endDate', effectiveDateRange.to.toISOString());
       const res = await fetch(`/technical/api/reports/critical-equipment-schedule?${params}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
@@ -169,6 +170,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
   });
 
   const isLoading = componentsLoading || scheduleLoading;
+  const isFetching = componentsFetching || scheduleFetching;
   const error = !componentsData && !scheduleData && !isLoading;
 
   const filteredComponentsData = useMemo(() => {
@@ -223,7 +225,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
 
   useEffect(() => {
     if (!embedded || !selectedReportId || !initialLoadRef.current || !pendingPreviewRef.current) return;
-    if (isLoading) return;
+    if (isFetching) return;
     pendingPreviewRef.current = false;
     const version = ++previewVersionRef.current;
     generateCriticalReport(selectedReportId, 'preview').then((data) => {
@@ -234,7 +236,7 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
     }).catch(() => {
       if (previewVersionRef.current === version) setIsFilterRefreshing(false);
     });
-  }, [filteredComponentsData, filteredScheduleData, isLoading]);
+  }, [filteredComponentsData, filteredScheduleData, isFetching]);
 
   const reports: CriticalEquipmentReport[] = [
     {

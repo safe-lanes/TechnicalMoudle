@@ -217,10 +217,18 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
 
   const queryString = buildQueryString();
 
-  const { data: reportData, isLoading, error } = useQuery<ChangeRequestReportData>({
-    queryKey: ['/technical/api/reports/change-requests-status-tracking', effectiveVesselId || 'all', statusFilter, categoryFilter, categoryFilters.dateRange.from?.toISOString(), categoryFilters.dateRange.to?.toISOString()],
+  const { data: reportData, isLoading, isFetching, error } = useQuery<ChangeRequestReportData>({
+    queryKey: ['/technical/api/reports/change-requests-status-tracking', effectiveVesselId || 'all', statusFilter, categoryFilter, (globalFilters?.dateRange?.from ?? categoryFilters.dateRange.from)?.toISOString(), (globalFilters?.dateRange?.to ?? categoryFilters.dateRange.to)?.toISOString()],
     queryFn: async () => {
-      const res = await fetch(`/technical/api/reports/change-requests-status-tracking?${queryString}`);
+      const effectiveDateRange = globalFilters?.dateRange ?? categoryFilters.dateRange;
+      const params = new URLSearchParams();
+      if (effectiveVesselId) params.set('vesselId', effectiveVesselId);
+      else params.set('vesselId', 'all');
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+      if (categoryFilter !== 'all') params.set('category', categoryFilter);
+      if (effectiveDateRange?.from) params.set('startDate', effectiveDateRange.from.toISOString());
+      if (effectiveDateRange?.to) params.set('endDate', effectiveDateRange.to.toISOString());
+      const res = await fetch(`/technical/api/reports/change-requests-status-tracking?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch report data');
       return res.json();
     },
@@ -245,7 +253,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
 
   useEffect(() => {
     if (!embedded || !selectedReportId || !initialLoadRef.current || !pendingPreviewRef.current) return;
-    if (isLoading) return;
+    if (isFetching) return;
     pendingPreviewRef.current = false;
     const version = ++previewVersionRef.current;
     generateChangeRequestReport(selectedReportId, 'preview').then((data) => {
@@ -256,7 +264,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
     }).catch(() => {
       if (previewVersionRef.current === version) setIsFilterRefreshing(false);
     });
-  }, [filteredRequests, isLoading]);
+  }, [filteredRequests, isFetching]);
 
   const reports: ChangeRequestReport[] = [
     {
