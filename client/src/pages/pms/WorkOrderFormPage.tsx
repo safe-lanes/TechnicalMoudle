@@ -2216,8 +2216,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      if (executionData.performedBy && executionData.performedBy === templateData.approver) {
-        hardErrors.push(`The same rank (${executionData.performedBy}) cannot both perform and approve the work.`);
+      if (executionData.performedBy && executionData.performedBy === templateData.approver && executionData.performedBy === hodLabel) {
+        hardErrors.push(`The Head of Department (${hodLabel}) cannot both perform and approve the work.`);
       }
 
       if (noOfPersonsStr && !/^[1-9]\d*$/.test(noOfPersonsStr)) {
@@ -2865,8 +2865,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
     }
 
-    if (executionData.performedBy && executionData.performedBy === templateData.approver) {
-      hardErrors.push(`The same rank (${executionData.performedBy}) cannot both perform and approve the work.`);
+    if (executionData.performedBy && executionData.performedBy === templateData.approver && executionData.performedBy === hodLabel) {
+      hardErrors.push(`The Head of Department (${hodLabel}) cannot both perform and approve the work.`);
     }
 
     if (noOfPersonsStr && !/^[1-9]\d*$/.test(noOfPersonsStr)) hardErrors.push('No. of Persons must be a positive whole number (≥ 1).');

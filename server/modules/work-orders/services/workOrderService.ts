@@ -974,6 +974,19 @@ export async function updateWorkOrder(id: string, body: any) {
   const isApprovalTransition = (updateData.approvalAction === 'approved' && updateData.status === 'Completed') ||
     (updateData.status === 'Completed' && existingWO.status === 'Pending Approval');
   if (isApprovalTransition) {
+    const { resolveHodForDepartment, getHodShortLabel } = await import('../../ranks/hodResolutionService');
+    const hodResolution = await resolveHodForDepartment(
+      existingWO.vesselId,
+      existingWO.department,
+      existingWO.approver
+    );
+    const hodName = hodResolution.rankName;
+    const hodShort = getHodShortLabel(hodName);
+
+    if (!updateData.approver && hodResolution.resolved) {
+      updateData.approver = hodName;
+    }
+
     let woMissedCycles = existingWO.missedCycles || 0;
     if (woMissedCycles === 0 && existingWO.maintenanceBasis !== 'Running Hours') {
       const approvalCompDate = existingWO.completionDateTime || existingWO.dateCompleted;
@@ -991,7 +1004,7 @@ export async function updateWorkOrder(id: string, body: any) {
       const justification = (updateData.skippedCyclesJustification || '').trim();
       if (!justification || justification.length < 30) {
         throw new ValidationError(
-          `This work order has ${woMissedCycles} skipped maintenance cycle(s). The Head of Department must provide a written justification (minimum 30 characters) explaining why these cycles were missed before approval can be granted.`,
+          `This work order has ${woMissedCycles} skipped maintenance cycle(s). The ${hodName} must provide a written justification (minimum 30 characters) explaining why these cycles were missed before approval can be granted.`,
           { code: 'JUSTIFICATION_REQUIRED', missedCycles: woMissedCycles }
         );
       }
@@ -1003,7 +1016,7 @@ export async function updateWorkOrder(id: string, body: any) {
 
     if (currentTier === 'superintendent_locked') {
       throw new ValidationError(
-        'This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The HOD cannot approve until the Superintendent has acknowledged.',
+        `This work order has high severity issues (3+ missed cycles, 21+ days late, or 7+ days backdating). It is locked pending Superintendent acknowledgment. The ${hodName} cannot approve until the Superintendent has acknowledged.`,
         { code: 'SUPERINTENDENT_LOCKED' }
       );
     }
@@ -1011,7 +1024,7 @@ export async function updateWorkOrder(id: string, body: any) {
     if (currentTier === 'superintendent_notification') {
       if (!ceRemarks || ceRemarks.length < 20) {
         throw new ValidationError(
-          'This work order has medium severity issues (2 missed cycles, 14–20 days late, or 3–6 days backdating). You must enter detailed remarks (minimum 20 characters) before approving.',
+          `This work order has medium severity issues (2 missed cycles, 14–20 days late, or 3–6 days backdating). The ${hodName} must enter detailed remarks (minimum 20 characters) before approving.`,
           { code: 'CE_REMARKS_REQUIRED', minLength: 20 }
         );
       }
@@ -1020,7 +1033,7 @@ export async function updateWorkOrder(id: string, body: any) {
     if (currentTier === 'ce_with_justification') {
       if (!ceRemarks || ceRemarks.length < 10) {
         throw new ValidationError(
-          'This work order has low severity issues (1 missed cycle, 7–13 days late, or 1–2 days backdating). Approval remarks are mandatory (minimum 10 characters).',
+          `This work order has low severity issues (1 missed cycle, 7–13 days late, or 1–2 days backdating). ${hodShort} approval remarks are mandatory (minimum 10 characters).`,
           { code: 'CE_REMARKS_REQUIRED', minLength: 10 }
         );
       }

@@ -1317,10 +1317,11 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         return;
       }
 
-      if (executionData.performedBy && executionData.performedBy === templateData.approver) {
+      const hodRanks = ["Chief Engineer", "Chief Officer", "Master"];
+      if (hodRanks.includes(executionData.performedBy) && executionData.performedBy === templateData.approver) {
         toast({
           title: "Validation Error",
-          description: `The same rank (${executionData.performedBy}) cannot both perform and approve the work. Please select a different Performed By or Approver rank.`,
+          description: `The Head of Department (${executionData.performedBy}) cannot both perform and approve the work. Please select a different Performed By or Approver rank.`,
           variant: "destructive"
         });
         return;

@@ -702,9 +702,11 @@ const WorkOrders: React.FC = () => {
           flex: 0,
           cellRenderer: (params: any) => {
             const tier = params.value;
+            const wo = params.data;
+            const approverLabel = wo?.approver || 'HOD';
             if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
             if (tier === "superintendent_notification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Supt. Notified</span>;
-            if (tier === "ce_with_justification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">HOD + Remarks</span>;
+            if (tier === "ce_with_justification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">{approverLabel} + Remarks</span>;
             return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Standard</span>;
           },
         }

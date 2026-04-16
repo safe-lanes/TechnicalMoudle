@@ -1,6 +1,7 @@
 import * as repo from '../repositories/workOrderRepository';
 import { ValidationError } from '../../shared/errors';
 import { calculateMissedCycles, calculateNextDueDate } from '@shared/dateUtils';
+import { resolveHodForDepartment } from '../../ranks/hodResolutionService';
 
 // ── Bulk Approve Work Orders ──
 
@@ -30,6 +31,13 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         results.failed.push({ id: workOrderId, error: `Work order is not pending approval (status: ${existingWO.status})` });
         continue;
       }
+
+      const hodResolution = await resolveHodForDepartment(
+        existingWO.vesselId,
+        existingWO.department,
+        existingWO.approver
+      );
+      const resolvedApprover = approver || hodResolution.rankName;
 
       // Calculate next due date/reading based on actual completion date
       const actualCompletionDate = existingWO.completionDateTime || existingWO.dateCompleted;
@@ -76,7 +84,7 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
       const updateData: Record<string, any> = {
         status: "Completed",
         approvalAction: "approved",
-        approver: approver || "Head of Dept",
+        approver: resolvedApprover,
         approverRemarks,
         skippedCyclesJustification: (missedCycles >= 1 && skippedCyclesJustification) ? skippedCyclesJustification : null,
         approvalDate: new Date().toISOString(),
@@ -157,10 +165,15 @@ export async function bulkReject(workOrderIds: string[], approver?: string, reje
         continue;
       }
 
+      const rejectHod = await resolveHodForDepartment(
+        existingWO.vesselId,
+        existingWO.department,
+        existingWO.approver
+      );
       const updateData = {
-        status: "Due", // Rejected WOs go back to Due
+        status: "Due" as const,
         approvalAction: "rejected",
-        approver: approver || "Head of Dept",
+        approver: approver || rejectHod.rankName,
         rejectionComments,
         rejectionDate: new Date().toISOString(),
         wasRejected: true, // Mark for red font display

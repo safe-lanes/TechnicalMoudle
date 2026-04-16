@@ -7,7 +7,7 @@ export interface HodResolution {
   rankName: string;
   rankId: string | null;
   department: string;
-  source: 'org_chart' | 'stored_approver' | 'fallback';
+  source: 'vessel_org_chart' | 'global_org_chart' | 'stored_approver' | 'fallback';
   mismatch: boolean;
   mismatchDetails?: string;
 }
@@ -64,13 +64,13 @@ export async function resolveHodForDepartment(
         rankName,
         rankId: hodNode.rankId,
         department: dept,
-        source: 'org_chart',
+        source: 'vessel_org_chart',
         mismatch: false,
       };
 
       if (storedApprover && storedApprover.toLowerCase() !== rankName.toLowerCase()) {
         result.mismatch = true;
-        result.mismatchDetails = `Stored approver "${storedApprover}" differs from org chart HOD "${rankName}" for ${dept} department`;
+        result.mismatchDetails = `Stored approver "${storedApprover}" differs from org chart HOD "${rankName}" for ${dept} department on vessel ${vesselId}`;
         console.warn(`[HOD Resolution] ${result.mismatchDetails}`);
       }
 
@@ -103,13 +103,13 @@ export async function resolveHodForDepartment(
       rankName,
       rankId: hodEntry.rankId,
       department: dept,
-      source: 'org_chart',
+      source: 'global_org_chart',
       mismatch: false,
     };
 
     if (storedApprover && storedApprover.toLowerCase() !== rankName.toLowerCase()) {
       result.mismatch = true;
-      result.mismatchDetails = `Stored approver "${storedApprover}" differs from org chart HOD "${rankName}" for ${dept} department`;
+      result.mismatchDetails = `Stored approver "${storedApprover}" differs from global org chart HOD "${rankName}" for ${dept} department`;
       console.warn(`[HOD Resolution] ${result.mismatchDetails}`);
     }
 
@@ -138,6 +138,8 @@ function buildFallback(department: string, storedApprover?: string | null): HodR
     fallbackRank = 'Chief Engineer';
   } else if (deptLower === 'deck' || deptLower === 'navigation') {
     fallbackRank = 'Chief Officer';
+  } else if (deptLower === 'catering' || deptLower === 'galley') {
+    fallbackRank = 'Chief Cook';
   }
 
   return {
