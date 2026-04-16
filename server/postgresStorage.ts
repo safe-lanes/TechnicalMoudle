@@ -6410,12 +6410,14 @@ export class PostgresStorage {
     status?: string; 
     dateFrom?: string; 
     dateTo?: string;
-  }): Promise<WorkOrderPostponement[]> {
+  }, vesselIds?: string[]): Promise<WorkOrderPostponement[]> {
     const db = await getDb();
     
     const conditions: any[] = vesselId && vesselId !== 'all'
       ? [eq(workOrderPostponements.vesselId, vesselId)]
-      : [];
+      : vesselIds?.length
+        ? [inArray(workOrderPostponements.vesselId, vesselIds)]
+        : [];
     
     if (filters?.workOrderId) {
       conditions.push(eq(workOrderPostponements.workOrderId, filters.workOrderId));

@@ -49,13 +49,13 @@ export async function getTemplate(templateType: string) {
 // CRITICAL EQUIPMENT STATUS - PREVIEW
 // ═══════════════════════════════════════════════════════════════
 
-export async function getCriticalEquipmentStatus(vesselId: string, startDateStr?: string, endDateStr?: string) {
-  const allComponents = await repo.getComponents(vesselId);
+export async function getCriticalEquipmentStatus(vesselId: string, startDateStr?: string, endDateStr?: string, vesselIds?: string[]) {
+  const allComponents = await repo.getComponents(vesselId, vesselIds);
   const criticalComponents = allComponents.filter(c =>
     c.isActive !== false && (c.critical === true || c.classItem === true)
   );
 
-  const allWorkOrders = await repo.getWorkOrders(vesselId);
+  const allWorkOrders = await repo.getWorkOrders(vesselId, vesselIds);
 
   const parseDate = (dateStr: string | null | undefined): Date | null => {
     if (!dateStr) return null;
@@ -321,9 +321,10 @@ export async function getUnplannedBreakdownJobs(
   vesselId: string,
   startDate: string,
   endDate: string,
+  vesselIds?: string[],
 ) {
   // Get all work orders for the vessel
-  const allWorkOrders = await repo.getWorkOrders(vesselId);
+  const allWorkOrders = await repo.getWorkOrders(vesselId, vesselIds);
 
   // Parse date helper
   const parseDate = (dateStr: string | null | undefined): Date | null => {
@@ -756,11 +757,13 @@ export async function getLsaFfaMasterList(
   vesselId: string,
   equipmentType: string | undefined,
   format: string,
+  vesselIds?: string[],
 ) {
   const allVessels = await repo.getVessels();
   let allComponents: any[] = [];
   if (vesselId === 'all') {
-    for (const v of allVessels) {
+    const vessels = vesselIds?.length ? allVessels.filter(v => vesselIds.includes(v.id)) : allVessels;
+    for (const v of vessels) {
       allComponents = allComponents.concat(await repo.getComponents(v.id));
     }
   } else {
@@ -862,11 +865,15 @@ export async function getLsaFfaMaintenanceSchedule(
   format: string,
   startDate?: string,
   endDate?: string,
+  vesselIds?: string[],
 ) {
   const allVessels = await repo.getVessels();
+  const scopedVessels = vesselId === 'all' && vesselIds?.length
+    ? allVessels.filter(v => vesselIds.includes(v.id))
+    : allVessels;
   let allComponents: any[] = [];
   if (vesselId === 'all') {
-    for (const v of allVessels) {
+    for (const v of scopedVessels) {
       allComponents = allComponents.concat(await repo.getComponents(v.id));
     }
   } else {
@@ -889,7 +896,7 @@ export async function getLsaFfaMaintenanceSchedule(
 
   let allJobs: any[] = [];
   if (vesselId === 'all') {
-    for (const v of allVessels) {
+    for (const v of scopedVessels) {
       const vJobs = await repo.getJobs(v.id);
       allJobs = allJobs.concat(vJobs);
     }
@@ -900,7 +907,7 @@ export async function getLsaFfaMaintenanceSchedule(
 
   let allLinks: any[] = [];
   if (vesselId === 'all') {
-    for (const v of allVessels) {
+    for (const v of scopedVessels) {
       const links = await repo.getJobComponentLinks(v.id);
       allLinks.push(...links);
     }
@@ -910,7 +917,7 @@ export async function getLsaFfaMaintenanceSchedule(
 
   let allWorkOrders: any[] = [];
   if (vesselId === 'all') {
-    for (const v of allVessels) {
+    for (const v of scopedVessels) {
       const wos = await repo.getWorkOrders(v.id);
       allWorkOrders = allWorkOrders.concat(wos);
     }

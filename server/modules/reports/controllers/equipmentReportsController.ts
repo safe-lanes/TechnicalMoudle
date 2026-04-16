@@ -24,11 +24,12 @@ export async function getCriticalEquipmentStatus(req: Request, res: Response) {
     const vesselId = req.query.vesselId as string;
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
     if (!vesselId) {
       return res.status(400).json({ error: "vesselId is required" });
     }
 
-    const result = await equipmentReportService.getCriticalEquipmentStatus(vesselId, startDate, endDate);
+    const result = await equipmentReportService.getCriticalEquipmentStatus(vesselId, startDate, endDate, vesselIds);
     res.json(result);
   } catch (error: any) {
     console.error('Error generating critical equipment report:', error);
@@ -74,6 +75,7 @@ export async function getUnplannedBreakdownJobs(req: Request, res: Response) {
     const vesselId = req.query.vesselId as string;
     const startDate = req.query.startDate as string;
     const endDate = req.query.endDate as string;
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
 
     if (!vesselId) {
       return res.status(400).json({ error: "vesselId is required" });
@@ -82,7 +84,7 @@ export async function getUnplannedBreakdownJobs(req: Request, res: Response) {
       return res.status(400).json({ error: "startDate and endDate are required" });
     }
 
-    const result = await equipmentReportService.getUnplannedBreakdownJobs(vesselId, startDate, endDate);
+    const result = await equipmentReportService.getUnplannedBreakdownJobs(vesselId, startDate, endDate, vesselIds);
     res.json(result);
   } catch (error: any) {
     console.error('Error generating unplanned/breakdown jobs report:', error);
@@ -165,12 +167,13 @@ export async function getLsaFfaMasterList(req: Request, res: Response) {
     const vesselId = req.query.vesselId as string;
     const equipmentType = req.query.equipmentType as string | undefined;
     const format = (req.query.format as string) || 'json';
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
 
     if (!vesselId) {
       return res.status(400).json({ error: "vesselId is required" });
     }
 
-    const result = await equipmentReportService.getLsaFfaMasterList(vesselId, equipmentType, format);
+    const result = await equipmentReportService.getLsaFfaMasterList(vesselId, equipmentType, format, vesselIds);
 
     if (result.type === 'excel') {
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -201,12 +204,13 @@ export async function getLsaFfaMaintenanceSchedule(req: Request, res: Response) 
     const format = (req.query.format as string) || 'json';
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
 
     if (!vesselId) {
       return res.status(400).json({ error: "vesselId is required" });
     }
 
-    const result = await equipmentReportService.getLsaFfaMaintenanceSchedule(vesselId, statusFilter, equipmentType, format, startDate, endDate);
+    const result = await equipmentReportService.getLsaFfaMaintenanceSchedule(vesselId, statusFilter, equipmentType, format, startDate, endDate, vesselIds);
 
     if (result.type === 'excel') {
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

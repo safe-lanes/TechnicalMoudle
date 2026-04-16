@@ -11,6 +11,7 @@ export async function getChangeRequestsStatusTracking(
   endDate: string | undefined,
   status: string | undefined,
   category: string | undefined,
+  vesselIds?: string[],
 ) {
   const allVessels = await repo.getVessels();
   const vesselMap = new Map(allVessels.map(v => [v.id, v]));
@@ -19,7 +20,8 @@ export async function getChangeRequestsStatusTracking(
   if (vesselId && vesselId !== 'all') {
     allRequests = await repo.getChangeRequests(vesselId);
   } else {
-    for (const v of allVessels) {
+    const vessels = vesselIds?.length ? allVessels.filter(v => vesselIds.includes(v.id)) : allVessels;
+    for (const v of vessels) {
       const vReqs = await repo.getChangeRequests(v.id);
       allRequests.push(...vReqs);
     }

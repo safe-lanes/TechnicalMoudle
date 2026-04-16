@@ -666,7 +666,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
 
       case 'critical-equipment': {
-        let critUrl = `/technical/api/reports/critical-equipment-status?vesselId=${activeVesselId}`;
+        let critUrl = `/technical/api/reports/critical-equipment-status?vesselId=${activeVesselId}${vesselIdsParam}`;
         if (effectiveDateRange?.from) {
           critUrl += `&startDate=${toLocalDateStr(effectiveDateRange.from)}`;
         }
@@ -744,7 +744,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         // Fetch data from the API endpoint
         const response = await fetch(
-          `/technical/api/reports/unplanned-breakdown-jobs?vesselId=${activeVesselId}&startDate=${startDate}&endDate=${endDate}`
+          `/technical/api/reports/unplanned-breakdown-jobs?vesselId=${activeVesselId}${vesselIdsParam}&startDate=${startDate}&endDate=${endDate}`
         );
         if (!response.ok) {
           throw new Error('Failed to fetch unplanned/breakdown jobs data');

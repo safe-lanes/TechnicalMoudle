@@ -200,8 +200,10 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
     ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
     : (categoryFilters.vessel === 'all' ? 'all' : (categoryFilters.vessel || contextVesselId));
 
+  const isMultiVessel = effectiveVesselId === 'all';
+
   const { data: reportData, isLoading, isFetching, error } = useQuery<ChangeRequestReportData>({
-    queryKey: ['/technical/api/reports/change-requests-status-tracking', effectiveVesselId || 'all', statusFilter, categoryFilter, (globalFilters?.dateRange?.from ?? categoryFilters.dateRange.from)?.toISOString(), (globalFilters?.dateRange?.to ?? categoryFilters.dateRange.to)?.toISOString()],
+    queryKey: ['/technical/api/reports/change-requests-status-tracking', effectiveVesselId || 'all', statusFilter, categoryFilter, (globalFilters?.dateRange?.from ?? categoryFilters.dateRange.from)?.toISOString(), (globalFilters?.dateRange?.to ?? categoryFilters.dateRange.to)?.toISOString(), globalVessels.join(',')],
     queryFn: async () => {
       const effectiveDateRange = globalFilters?.dateRange ?? categoryFilters.dateRange;
       const params = new URLSearchParams();
@@ -211,6 +213,7 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
       if (categoryFilter !== 'all') params.set('category', categoryFilter);
       if (effectiveDateRange?.from) params.set('startDate', effectiveDateRange.from.toISOString());
       if (effectiveDateRange?.to) params.set('endDate', effectiveDateRange.to.toISOString());
+      if (isMultiVessel && globalVessels.length > 0) params.set('vesselIds', globalVessels.join(','));
       const res = await fetch(`/technical/api/reports/change-requests-status-tracking?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch report data');
       return res.json();

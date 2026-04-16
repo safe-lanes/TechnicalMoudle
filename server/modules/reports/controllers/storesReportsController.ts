@@ -31,6 +31,7 @@ export async function getStoresConsumptionAnalysis(req: Request, res: Response) 
   try {
     const { vesselId } = req.params;
     const { startDate, endDate, itemType, category } = req.query;
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
 
     const result = await storesReportService.getStoresConsumptionAnalysis(
       vesselId,
@@ -38,6 +39,7 @@ export async function getStoresConsumptionAnalysis(req: Request, res: Response) 
       endDate as string | undefined,
       itemType as string | undefined,
       category as string | undefined,
+      vesselIds,
     );
     res.json(result);
   } catch (error: any) {
@@ -132,13 +134,14 @@ export async function getStoresLowStockAlert(req: Request, res: Response) {
   try {
     const { vesselId } = req.params;
     const { category, priority, location } = req.query;
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
     const filters = {
       category: category as string | undefined,
       priority: priority as string | undefined,
       location: location as string | undefined,
     };
 
-    const result = await storesReportService.getStoresLowStockAlert(vesselId, filters);
+    const result = await storesReportService.getStoresLowStockAlert(vesselId, filters, vesselIds);
     res.json(result);
   } catch (error: any) {
     console.error("Error generating low stock alert report:", error);

@@ -275,13 +275,15 @@ export async function getStoresConsumptionAnalysis(
   endDate: string | undefined,
   itemType: string | undefined,
   category: string | undefined,
+  vesselIds?: string[],
 ) {
   const allVessels = await repo.getVessels();
   let allHistory: any[];
   let allItems: any[];
   if (vesselId === 'all') {
+    const vessels = vesselIds?.length ? allVessels.filter((v: any) => vesselIds.includes(v.id)) : allVessels;
     allHistory = []; allItems = [];
-    for (const vessel of allVessels) {
+    for (const vessel of vessels) {
       allHistory = allHistory.concat(await repo.getStoresTransactionHistory(vessel.id));
       allItems = allItems.concat(await repo.getStoresItems(vessel.id));
     }
@@ -1339,13 +1341,15 @@ export async function getChemicalsExpiry(
 export async function getStoresLowStockAlert(
   vesselId: string,
   filters: { category?: string; priority?: string; location?: string },
+  vesselIds?: string[],
 ) {
   let result: any;
   if (vesselId === 'all') {
     const allVessels = await repo.getVessels();
+    const vessels = vesselIds?.length ? allVessels.filter((v: any) => vesselIds.includes(v.id)) : allVessels;
     let mergedItems: any[] = [];
     let mergedSummary: any = { totalItems: 0, criticalCount: 0, highCount: 0, mediumCount: 0, lowCount: 0, totalDeficit: 0, estimatedCost: 0 };
-    for (const vessel of allVessels) {
+    for (const vessel of vessels) {
       const vesselResult = await lowStockReportService.computeReport(vessel.id, filters);
       mergedItems = mergedItems.concat(vesselResult.items);
       if (vesselResult.summary) {

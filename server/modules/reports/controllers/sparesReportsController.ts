@@ -16,8 +16,9 @@ export async function getCriticalSparesPreview(req: Request, res: Response) {
       ? (Array.isArray(req.query.stockStatus) ? req.query.stockStatus as string[] : [req.query.stockStatus as string])
       : null;
     const departmentFilter = req.query.department as string | undefined;
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
 
-    const result = await sparesReportService.getCriticalSparesPreview(vesselId, stockStatusFilter, departmentFilter);
+    const result = await sparesReportService.getCriticalSparesPreview(vesselId, stockStatusFilter, departmentFilter, vesselIds);
     res.json(result);
   } catch (error: any) {
     console.error('Error generating critical spares preview:', error);
@@ -65,12 +66,14 @@ export async function getLowStockAlert(req: Request, res: Response) {
   try {
     const { vesselId } = req.params;
     const { criticality, componentCategory, sortBy } = req.query;
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
 
     const result = await sparesReportService.getLowStockAlert(
       vesselId,
       criticality as string | undefined,
       componentCategory as string | undefined,
       sortBy as string | undefined,
+      vesselIds,
     );
     res.json(result);
   } catch (error: any) {
@@ -136,6 +139,7 @@ export async function getSparesConsumptionAnalysis(req: Request, res: Response) 
   try {
     const { vesselId } = req.params;
     const { startDate, endDate, category, componentNames } = req.query;
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
 
     const result = await sparesReportService.getSparesConsumptionAnalysis(
       vesselId,
@@ -143,6 +147,7 @@ export async function getSparesConsumptionAnalysis(req: Request, res: Response) 
       endDate as string | undefined,
       category as string | undefined,
       componentNames as string | undefined,
+      vesselIds,
     );
     res.json(result);
   } catch (error: any) {

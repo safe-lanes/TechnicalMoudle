@@ -993,7 +993,7 @@ export async function getPostponementLogData(
     status: status || 'All',
     dateFrom: dateFrom,
     dateTo: dateTo
-  });
+  }, vesselIds);
 
   if (postponements.length === 0) {
     const dateFromObj = dateFrom ? new Date(dateFrom) : null;

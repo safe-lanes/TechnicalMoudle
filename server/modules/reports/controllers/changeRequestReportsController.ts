@@ -8,6 +8,7 @@ import * as changeRequestReportService from '../services/changeRequestReportServ
 export async function getChangeRequestsStatusTracking(req: Request, res: Response) {
   try {
     const { vesselId, startDate, endDate, status, category } = req.query;
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
 
     const result = await changeRequestReportService.getChangeRequestsStatusTracking(
       vesselId as string | undefined,
@@ -15,6 +16,7 @@ export async function getChangeRequestsStatusTracking(req: Request, res: Respons
       endDate as string | undefined,
       status as string | undefined,
       category as string | undefined,
+      vesselIds,
     );
     res.json(result);
   } catch (error) {

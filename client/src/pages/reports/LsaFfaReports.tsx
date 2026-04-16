@@ -139,12 +139,15 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
     ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
     : (categoryFilters.vessel === 'all' ? 'all' : (categoryFilters.vessel || contextVesselId));
 
+  const isMultiVessel = effectiveVesselId === 'all';
+
   const { data: masterListData, isLoading, isFetching: masterFetching } = useQuery<any>({
-    queryKey: ['/technical/api/reports/lsa-ffa-master-list', effectiveVesselId, equipmentTypeFilter],
+    queryKey: ['/technical/api/reports/lsa-ffa-master-list', effectiveVesselId, equipmentTypeFilter, globalVessels.join(',')],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.set('vesselId', effectiveVesselId || 'all');
       if (equipmentTypeFilter !== 'all') params.set('equipmentType', equipmentTypeFilter);
+      if (isMultiVessel && globalVessels.length > 0) params.set('vesselIds', globalVessels.join(','));
       const res = await fetch(`/technical/api/reports/lsa-ffa-master-list?${params}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
@@ -152,7 +155,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
   });
 
   const { data: scheduleData, isLoading: isScheduleLoading, isFetching: scheduleFetching } = useQuery<any>({
-    queryKey: ['/technical/api/reports/lsa-ffa-maintenance-schedule', effectiveVesselId, equipmentTypeFilter, statusFilter, (globalFilters?.dateRange?.from ?? categoryFilters.dateRange?.from)?.getTime(), (globalFilters?.dateRange?.to ?? categoryFilters.dateRange?.to)?.getTime()],
+    queryKey: ['/technical/api/reports/lsa-ffa-maintenance-schedule', effectiveVesselId, equipmentTypeFilter, statusFilter, (globalFilters?.dateRange?.from ?? categoryFilters.dateRange?.from)?.getTime(), (globalFilters?.dateRange?.to ?? categoryFilters.dateRange?.to)?.getTime(), globalVessels.join(',')],
     queryFn: async () => {
       const effectiveDateRange = globalFilters?.dateRange ?? categoryFilters.dateRange;
       const params = new URLSearchParams();
@@ -161,6 +164,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
       if (statusFilter !== 'all') params.set('status', statusFilter);
       if (effectiveDateRange?.from) params.set('startDate', effectiveDateRange.from.toISOString());
       if (effectiveDateRange?.to) params.set('endDate', effectiveDateRange.to.toISOString());
+      if (isMultiVessel && globalVessels.length > 0) params.set('vesselIds', globalVessels.join(','));
       const res = await fetch(`/technical/api/reports/lsa-ffa-maintenance-schedule?${params}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();

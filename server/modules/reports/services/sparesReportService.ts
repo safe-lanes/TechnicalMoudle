@@ -26,18 +26,22 @@ export async function getCriticalSparesPreview(
   vesselId: string,
   stockStatusFilter: string[] | null,
   departmentFilter: string | undefined,
+  vesselIds?: string[],
 ) {
   const allVessels = await repo.getVessels();
   const vessel = allVessels.find(v => v.id === vesselId);
-  const vesselName = vesselId === 'all' ? 'All Vessels' : (vessel?.name || vesselId);
+  const vesselName = vesselId === 'all'
+    ? (vesselIds?.length ? vesselIds.map(id => allVessels.find(v => v.id === id)?.name || id).join(', ') : 'All Vessels')
+    : (vessel?.name || vesselId);
 
   let sparesData: any[];
   let jobsData: any[];
   let componentsData: any[];
   let jobComponentLinks: any[];
   if (vesselId === 'all') {
+    const vessels = vesselIds?.length ? allVessels.filter(v => vesselIds.includes(v.id)) : allVessels;
     sparesData = []; jobsData = []; componentsData = []; jobComponentLinks = [];
-    for (const v of allVessels) {
+    for (const v of vessels) {
       sparesData = sparesData.concat(await repo.getSpares(v.id));
       jobsData = jobsData.concat(await repo.getJobs(v.id));
       componentsData = componentsData.concat(await repo.getComponents(v.id));
@@ -478,12 +482,14 @@ export async function getLowStockAlert(
   criticality: string | undefined,
   componentCategory: string | undefined,
   sortBy: string | undefined,
+  vesselIds?: string[],
 ) {
   let allSpares: any[];
   if (vesselId === 'all') {
     const allVessels = await repo.getVessels();
+    const vessels = vesselIds?.length ? allVessels.filter(v => vesselIds.includes(v.id)) : allVessels;
     allSpares = [];
-    for (const vessel of allVessels) {
+    for (const vessel of vessels) {
       const vesselSpares = await repo.getSpares(vessel.id);
       allSpares = allSpares.concat(vesselSpares);
     }
@@ -750,13 +756,15 @@ export async function getSparesConsumptionAnalysis(
   endDate: string | undefined,
   category: string | undefined,
   componentNames: string | undefined,
+  vesselIds?: string[],
 ) {
   const allVessels = await repo.getVessels();
   let allHistory: any[];
   let allItems: any[];
   if (vesselId === 'all') {
+    const vessels = vesselIds?.length ? allVessels.filter((v: any) => vesselIds.includes(v.id)) : allVessels;
     allHistory = []; allItems = [];
-    for (const vessel of allVessels) {
+    for (const vessel of vessels) {
       allHistory = allHistory.concat(await repo.getSpareHistory(vessel.id));
       allItems = allItems.concat(await repo.getSpares(vessel.id));
     }

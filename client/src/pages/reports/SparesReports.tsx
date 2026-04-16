@@ -296,11 +296,15 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
     const activeVesselId = (globalFilters?.vessels !== undefined)
       ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
       : effectiveVesselId;
+    const isMultiVessel = activeVesselId === 'all';
+    const vesselIdsParam = isMultiVessel && globalFilters?.vessels && globalFilters.vessels.length > 0
+      ? `&vesselIds=${globalFilters.vessels.join(',')}`
+      : '';
     const vesselName = activeVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === activeVesselId)?.name || activeVesselId || 'Unknown Vessel');
 
     switch (reportId) {
       case 'spares-low-stock': {
-        const res = await fetch(`/technical/api/reports/low-stock-alert/${activeVesselId}`, { credentials: 'include' });
+        const res = await fetch(`/technical/api/reports/low-stock-alert/${activeVesselId}?_=1${vesselIdsParam}`, { credentials: 'include' });
         if (!res.ok) throw new Error('Failed to fetch low stock alert data');
         const apiData = await res.json();
 
@@ -343,7 +347,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
 
 
       case 'spares-critical-parts': {
-        const previewRes = await fetch(`/technical/api/reports/critical-spares/preview?vesselId=${activeVesselId}`, { credentials: 'include' });
+        const previewRes = await fetch(`/technical/api/reports/critical-spares/preview?vesselId=${activeVesselId}${vesselIdsParam}`, { credentials: 'include' });
         if (!previewRes.ok) throw new Error('Failed to fetch critical spares data');
         const previewData = await previewRes.json();
 
@@ -391,7 +395,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
       }
 
       case 'spares-consumption-analysis': {
-        const apiRes = await fetch(`/technical/api/reports/consumption-analysis/${activeVesselId}`, { credentials: 'include' });
+        const apiRes = await fetch(`/technical/api/reports/consumption-analysis/${activeVesselId}?_=1${vesselIdsParam}`, { credentials: 'include' });
         if (!apiRes.ok) throw new Error('Failed to fetch consumption analysis data');
         const apiData = await apiRes.json();
 

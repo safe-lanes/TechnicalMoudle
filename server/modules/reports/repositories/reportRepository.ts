@@ -108,8 +108,8 @@ export async function getStoresConsumptionData(vesselId: string, ninetyDaysAgo: 
 }
 
 // ═══ Spare History (consumption) ═══
-export async function getSpareHistory(vesselId: string) {
-  return storage.getSpareHistory(vesselId);
+export async function getSpareHistory(vesselId: string, vesselIds?: string[]) {
+  return storage.getSpareHistory(vesselId, vesselIds);
 }
 
 // ═══ Stores Ledger entries ═══
@@ -120,8 +120,8 @@ export async function getSpareHistory(vesselId: string) {
 // }
 
 // ═══ Stores Transaction History ═══
-export async function getStoresTransactionHistory(vesselId: string) {
-  return storage.getStoresTransactionHistory(vesselId);
+export async function getStoresTransactionHistory(vesselId: string, vesselIds?: string[]) {
+  return storage.getStoresTransactionHistory(vesselId, vesselIds);
 }
 
 // ═══ Stores Items (with optional filter) ═══
@@ -156,8 +156,8 @@ export async function getUsers() {
 }
 
 // ═══ Work Order Postponements ═══
-export async function getWorkOrderPostponements(vesselId: string, filters?: any) {
-  return storage.getWorkOrderPostponements(vesselId, filters);
+export async function getWorkOrderPostponements(vesselId: string, filters?: any, vesselIds?: string[]) {
+  return storage.getWorkOrderPostponements(vesselId, filters, vesselIds);
 }
 
 // ═══ PMS Vessel Settings ═══

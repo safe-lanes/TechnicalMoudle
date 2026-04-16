@@ -889,7 +889,7 @@ export interface IStorage {
     status?: string; 
     dateFrom?: string; 
     dateTo?: string;
-  }): Promise<WorkOrderPostponement[]>;
+  }, vesselIds?: string[]): Promise<WorkOrderPostponement[]>;
   getWorkOrderPostponementById(id: string): Promise<WorkOrderPostponement | undefined>;
   getWorkOrderPostponementsByWorkOrderId(workOrderId: string): Promise<WorkOrderPostponement[]>;
   getWorkOrderPostponementCount(workOrderId: string): Promise<number>;

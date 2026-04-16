@@ -303,6 +303,10 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
     const activeVesselId = (globalFilters?.vessels !== undefined)
       ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
       : effectiveVesselId;
+    const isMultiVessel = activeVesselId === 'all';
+    const vesselIdsParam = isMultiVessel && globalFilters?.vessels && globalFilters.vessels.length > 0
+      ? `&vesselIds=${globalFilters.vessels.join(',')}`
+      : '';
     const vesselName = activeVesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === activeVesselId)?.name || activeVesselId || 'Unknown Vessel');
 
     switch (reportId) {
@@ -458,7 +462,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
       }
 
       case 'low-stock-alert': {
-        const reportRes = await fetch(`/technical/api/reports/stores-low-stock-alert/${activeVesselId}`, {
+        const reportRes = await fetch(`/technical/api/reports/stores-low-stock-alert/${activeVesselId}?_=1${vesselIdsParam}`, {
           credentials: 'include',
         });
         if (!reportRes.ok) throw new Error('Failed to fetch low stock alert data');
@@ -519,6 +523,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
         const storesConsParams = new URLSearchParams();
         if (categoryFilters.dateRange?.from) storesConsParams.set('startDate', categoryFilters.dateRange.from.toISOString());
         if (categoryFilters.dateRange?.to) storesConsParams.set('endDate', categoryFilters.dateRange.to.toISOString());
+        if (isMultiVessel && globalFilters?.vessels && globalFilters.vessels.length > 0) storesConsParams.set('vesselIds', globalFilters.vessels.join(','));
         const storesConsQs = storesConsParams.toString() ? `?${storesConsParams}` : '';
         const apiRes = await fetch(`/technical/api/reports/stores-consumption-analysis/${activeVesselId}${storesConsQs}`, { credentials: 'include' });
         if (!apiRes.ok) throw new Error('Failed to fetch consumption analysis data');
