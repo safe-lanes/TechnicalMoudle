@@ -247,7 +247,7 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ vesselId: effectiveVesselId, componentFilter: globalComponent || undefined }),
+      body: JSON.stringify({ vesselId: effectiveVesselId, vesselIds: globalVessels.length > 0 ? globalVessels : undefined, componentFilter: globalComponent || undefined }),
     });
     if (!res.ok) throw new Error('Failed to generate Excel');
     const blob = await res.blob();

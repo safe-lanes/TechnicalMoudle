@@ -138,11 +138,15 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
     ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
     : (categoryFilters.vessel === 'all' ? 'all' : (categoryFilters.vessel || contextVesselId));
 
+  const isMultiVessel = globalVessels.length > 1;
+  const vesselIdsParam = isMultiVessel ? globalVessels.join(',') : '';
+
   const { data: componentsData, isLoading: componentsLoading, isFetching: componentsFetching } = useQuery<any>({
-    queryKey: ['/technical/api/reports/critical-components-list', effectiveVesselId, classItemFilter],
+    queryKey: ['/technical/api/reports/critical-components-list', effectiveVesselId, classItemFilter, vesselIdsParam],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.set('vesselId', effectiveVesselId || 'all');
+      if (vesselIdsParam) params.set('vesselIds', vesselIdsParam);
       if (classItemFilter !== 'all') params.set('classItem', classItemFilter);
       const res = await fetch(`/technical/api/reports/critical-components-list?${params}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch');
@@ -151,11 +155,12 @@ const CriticalEquipmentReports: React.FC<CriticalEquipmentReportsProps> = ({ onB
   });
 
   const { data: scheduleData, isLoading: scheduleLoading, isFetching: scheduleFetching } = useQuery<any>({
-    queryKey: ['/technical/api/reports/critical-equipment-schedule', effectiveVesselId, statusFilter, (globalFilters?.dateRange?.from ?? categoryFilters.dateRange?.from)?.getTime(), (globalFilters?.dateRange?.to ?? categoryFilters.dateRange?.to)?.getTime()],
+    queryKey: ['/technical/api/reports/critical-equipment-schedule', effectiveVesselId, statusFilter, (globalFilters?.dateRange?.from ?? categoryFilters.dateRange?.from)?.getTime(), (globalFilters?.dateRange?.to ?? categoryFilters.dateRange?.to)?.getTime(), vesselIdsParam],
     queryFn: async () => {
       const effectiveDateRange = globalFilters?.dateRange ?? categoryFilters.dateRange;
       const params = new URLSearchParams();
       params.set('vesselId', effectiveVesselId || 'all');
+      if (vesselIdsParam) params.set('vesselIds', vesselIdsParam);
       if (statusFilter !== 'all') params.set('status', statusFilter);
       if (effectiveDateRange?.from) params.set('startDate', effectiveDateRange.from.toISOString());
       if (effectiveDateRange?.to) params.set('endDate', effectiveDateRange.to.toISOString());

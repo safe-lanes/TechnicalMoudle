@@ -280,12 +280,15 @@ export async function getStoresConsumptionAnalysis(
   const allVessels = await repo.getVessels();
   let allHistory: any[];
   let allItems: any[];
+  const vesselNameMap = new Map(allVessels.map((v: any) => [v.id, v.name || v.id]));
   if (vesselId === 'all') {
     const vessels = vesselIds?.length ? allVessels.filter((v: any) => vesselIds.includes(v.id)) : allVessels;
     allHistory = []; allItems = [];
     for (const vessel of vessels) {
-      allHistory = allHistory.concat(await repo.getStoresTransactionHistory(vessel.id));
-      allItems = allItems.concat(await repo.getStoresItems(vessel.id));
+      const vHistory = (await repo.getStoresTransactionHistory(vessel.id)).map((h: any) => ({ ...h, _vesselId: vessel.id, _vesselName: vessel.name || vessel.id }));
+      allHistory = allHistory.concat(vHistory);
+      const vItems = (await repo.getStoresItems(vessel.id)).map((i: any) => ({ ...i, _vesselId: vessel.id, _vesselName: vessel.name || vessel.id }));
+      allItems = allItems.concat(vItems);
     }
   } else {
     allHistory = await repo.getStoresTransactionHistory(vesselId);
@@ -388,6 +391,7 @@ export async function getStoresConsumptionAnalysis(
       const avgMonthlyConsumption = Math.round(rawMonthlyRate * confidenceMultiplier * 100) / 100;
       return {
         itemId,
+        vesselName: item?._vesselName || vesselName,
         itemCode: item?.itemCode || '',
         itemName: item?.itemName || '',
         itemType: item?.itemType || '',
