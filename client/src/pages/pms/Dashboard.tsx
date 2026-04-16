@@ -1801,9 +1801,11 @@ const Dashboard = () => {
                         <CardContent className="py-2 px-3 flex flex-col justify-start flex-1">
                           <p className="font-medium text-gray-600 text-[14px]">{card.label}</p>
                           <p className={`text-xl font-bold mt-0.5 ${card.textColor}`} data-testid={card.valueTestId}>{card.value}</p>
-                          <span className={`text-[9px] mt-auto ${isScopeActive && card.rankScoped ? 'text-blue-500' : 'text-gray-400'}`} data-testid={`scope-label-${card.key}`}>
+                          <span className={`text-[9px] mt-auto ${isScopeActive && card.rankScoped ? 'text-blue-500' : fallbackMode === 'own-rank' && card.rankScoped ? 'text-amber-500' : 'text-gray-400'}`} data-testid={`scope-label-${card.key}`}>
                             {isScopeActive && card.rankScoped
                               ? (hodScope === 'me' ? 'Filtered: Me' : 'Filtered: My Team')
+                              : fallbackMode === 'own-rank' && card.rankScoped
+                              ? 'Own rank'
                               : 'Vessel-wide'}
                           </span>
                         </CardContent>
