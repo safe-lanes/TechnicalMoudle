@@ -1327,15 +1327,12 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
       }
 
       if (resolvedHodRank && executionData.performedBy === resolvedHodRank) {
-        const effectiveApprover = templateData.approver || resolvedHodRank;
-        if (executionData.performedBy === effectiveApprover) {
-          toast({
-            title: "Validation Error",
-            description: `The Head of Department (${resolvedHodRank}) cannot both perform and approve the work. Please select a different Performed By or Approver rank.`,
-            variant: "destructive"
-          });
-          return;
-        }
+        toast({
+          title: "Validation Error",
+          description: `The Head of Department (${resolvedHodRank}) cannot both perform and approve the work. The server assigns ${resolvedHodRank} as approver based on the vessel org chart. Please select a different Performed By rank.`,
+          variant: "destructive"
+        });
+        return;
       }
 
       // No. of Persons is required, must be integer >= 1 and <= 50
