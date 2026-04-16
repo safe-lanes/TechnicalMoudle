@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,17 @@ const NewWorkOrderForm: React.FC<NewWorkOrderFormProps> = ({
 }) => {
   const [activeSection, setActiveSection] = useState<'partA' | 'partB'>('partA');
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
+
+  const { data: ranksData } = useQuery<any[]>({
+    queryKey: ['/technical/api/ranks'],
+    enabled: isOpen,
+    staleTime: 5 * 60 * 1000,
+  });
+  const availableRanks = (ranksData || []).map((r: any) => r.name || r.rank).filter(Boolean);
+  const defaultRanks = ["Master", "Chief Officer", "2nd Officer", "3rd Officer", "Chief Engineer", "2nd Engineer", "3rd Engineer", "4th Engineer", "Deck Cadet", "Engine Cadet", "Bosun", "Electrician"];
+  const rankOptions = availableRanks.length > 0 ? availableRanks : defaultRanks;
+  const approverRanks = (ranksData || []).filter((r: any) => r.rankView === 'Head_of_Dept' || r.isHod).map((r: any) => r.name || r.rank).filter(Boolean);
+  const approverOptions = approverRanks.length > 0 ? approverRanks : ["Master", "Chief Officer", "Chief Engineer"];
 
   const [formData, setFormData] = useState({
     workOrder: "WO-2025-17",
@@ -193,13 +205,12 @@ const NewWorkOrderForm: React.FC<NewWorkOrderFormProps> = ({
                           <Label className="text-sm text-[#8798ad]">Assigned To</Label>
                           <Select value={formData.assignedTo} onValueChange={(value) => handleInputChange('assignedTo', value)}>
                             <SelectTrigger className="text-sm border-[#52baf3] focus:border-[#52baf3] focus:ring-[#52baf3]">
-                              <SelectValue placeholder="Rank" />
+                              <SelectValue placeholder="Select rank" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Chief Engineer">Chief Engineer</SelectItem>
-                              <SelectItem value="2nd Engineer">2nd Engineer</SelectItem>
-                              <SelectItem value="3rd Engineer">3rd Engineer</SelectItem>
-                              <SelectItem value="4th Engineer">4th Engineer</SelectItem>
+                              {rankOptions.map((rank: string) => (
+                                <SelectItem key={rank} value={rank}>{rank}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
@@ -207,11 +218,12 @@ const NewWorkOrderForm: React.FC<NewWorkOrderFormProps> = ({
                           <Label className="text-sm text-[#8798ad]">Approver</Label>
                           <Select value={formData.approver} onValueChange={(value) => handleInputChange('approver', value)}>
                             <SelectTrigger className="text-sm border-[#52baf3] focus:border-[#52baf3] focus:ring-[#52baf3]">
-                              <SelectValue placeholder="Rank" />
+                              <SelectValue placeholder="Select approver" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Chief Engineer">Chief Engineer</SelectItem>
-                              <SelectItem value="Captain">Captain</SelectItem>
+                              {approverOptions.map((rank: string) => (
+                                <SelectItem key={rank} value={rank}>{rank}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
@@ -406,7 +418,7 @@ const NewWorkOrderForm: React.FC<NewWorkOrderFormProps> = ({
                               <Label className="text-sm text-[#8798ad]">Assigned To</Label>
                               <Input 
                                 className="text-sm border-[#52baf3] focus:border-[#52baf3] focus:ring-[#52baf3]"
-                                placeholder="Chief Engineer"
+                                placeholder="Select rank"
                               />
                             </div>
                           </div>
@@ -431,13 +443,12 @@ const NewWorkOrderForm: React.FC<NewWorkOrderFormProps> = ({
                               <Label className="text-sm text-[#8798ad]">Performed by</Label>
                               <Select>
                                 <SelectTrigger className="text-sm border-[#52baf3] focus:border-[#52baf3] focus:ring-[#52baf3]">
-                                  <SelectValue placeholder="Chief Engineer" />
+                                  <SelectValue placeholder="Select rank" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="Chief Engineer">Chief Engineer</SelectItem>
-                                  <SelectItem value="2nd Engineer">2nd Engineer</SelectItem>
-                                  <SelectItem value="3rd Engineer">3rd Engineer</SelectItem>
-                                  <SelectItem value="4th Engineer">4th Engineer</SelectItem>
+                                  {rankOptions.map((rank: string) => (
+                                    <SelectItem key={rank} value={rank}>{rank}</SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                             </div>
