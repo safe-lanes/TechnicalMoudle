@@ -325,6 +325,15 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
 
   // Vessel context for inventory transactions
   const { vesselId } = useVessel();
+
+  const woDepartment = workOrder?.department || '';
+  const hodQuery = useQuery<{ success: boolean; data: { rankName: string; source: string } }>({
+    queryKey: ['/technical/api/hod', vesselId, woDepartment],
+    queryFn: () => fetch(`/technical/api/hod/${vesselId || 'default'}/${encodeURIComponent(woDepartment)}`).then(r => r.json()),
+    enabled: !!woDepartment,
+    staleTime: 5 * 60 * 1000,
+  });
+  const resolvedHodRank = hodQuery.data?.data?.rankName || workOrder?.approver || '';
   
   // Fetch spare BOM for the component (from spare_component_links)
   const componentCode = workOrder?.componentCode || component?.code || templateData?.componentCode;
@@ -1317,11 +1326,10 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         return;
       }
 
-      const hodRanks = ["Chief Engineer", "Chief Officer", "Master"];
-      if (hodRanks.includes(executionData.performedBy) && executionData.performedBy === templateData.approver) {
+      if (resolvedHodRank && executionData.performedBy === resolvedHodRank && executionData.performedBy === templateData.approver) {
         toast({
           title: "Validation Error",
-          description: `The Head of Department (${executionData.performedBy}) cannot both perform and approve the work. Please select a different Performed By or Approver rank.`,
+          description: `The Head of Department (${resolvedHodRank}) cannot both perform and approve the work. Please select a different Performed By or Approver rank.`,
           variant: "destructive"
         });
         return;

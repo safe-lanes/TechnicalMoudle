@@ -983,7 +983,10 @@ export async function updateWorkOrder(id: string, body: any) {
     const hodName = hodResolution.rankName;
     const hodShort = getHodShortLabel(hodName);
 
-    if (!updateData.approver && hodResolution.resolved) {
+    if (hodResolution.resolved) {
+      if (updateData.approver && updateData.approver !== hodName && hodResolution.source !== 'fallback') {
+        console.warn(`[Approval] Client provided approver "${updateData.approver}" differs from org chart HOD "${hodName}" for dept "${existingWO.department}". Using org chart value.`);
+      }
       updateData.approver = hodName;
     }
 

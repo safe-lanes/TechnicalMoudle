@@ -5425,7 +5425,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
             </div>
 
-            {/* CE Approval Remarks (for completed WOs) */}
+            {/* HOD Approval Remarks (for completed WOs) */}
             {(workOrderContext as any)?.workOrder?.status === 'Completed' && (workOrderContext as any)?.workOrder?.ceApprovalRemarks && (
               <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm" data-testid="ce-approval-remarks-display">
                 <div className="font-medium text-blue-800 mb-1">{hodShort} Approval Remarks</div>
@@ -6122,10 +6122,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             );
           })()}
 
-          {/* Read-only CE Justification for completed WOs with skipped cycles */}
+          {/* Read-only HOD Justification for completed WOs with skipped cycles */}
           {currentWorkOrderStatus === 'Completed' && (workOrderContext as any)?.workOrder?.skippedCyclesJustification && (
             <div className="mt-4 rounded-lg p-4" style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA' }} data-testid="display-skipped-cycles-justification">
-              <Label style={{ color: '#991B1B' }} className="text-sm font-semibold block mb-2">CE Justification for Skipped Cycles</Label>
+              <Label style={{ color: '#991B1B' }} className="text-sm font-semibold block mb-2">{hodShort} Justification for Skipped Cycles</Label>
               <p className="text-sm text-gray-800 whitespace-pre-wrap">{(workOrderContext as any).workOrder.skippedCyclesJustification}</p>
             </div>
           )}
