@@ -54,6 +54,7 @@ interface MaintenanceReportsProps {
   globalFilters?: {
     vessels: string[];
     component: string;
+    department: string;
     dateRange: { from: Date | null; to: Date | null };
   };
   embedded?: boolean;
@@ -104,9 +105,10 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   const filterFingerprint = useMemo(() => JSON.stringify({
     v: globalFilters?.vessels,
     c: globalFilters?.component,
+    d: globalFilters?.department,
     df: globalFilters?.dateRange?.from?.getTime(),
     dt: globalFilters?.dateRange?.to?.getTime(),
-  }), [globalFilters?.vessels, globalFilters?.component, globalFilters?.dateRange?.from, globalFilters?.dateRange?.to]);
+  }), [globalFilters?.vessels, globalFilters?.component, globalFilters?.department, globalFilters?.dateRange?.from, globalFilters?.dateRange?.to]);
 
   useEffect(() => {
     if (embedded && selectedReportId) {
@@ -388,6 +390,15 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       });
     };
 
+    const activeDepartment = globalFilters?.department || "";
+    const applyDepartmentFilter = (items: any[]) => {
+      if (!activeDepartment) return items;
+      const q = activeDepartment.toLowerCase();
+      return items.filter((item: any) =>
+        (item.department || "").toLowerCase() === q
+      );
+    };
+
     switch (reportId) {
       case 'due-jobs-7': {
         const dueJobsResponse = await fetch(
@@ -454,7 +465,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         }
         const { data: overdueRaw, vesselName: overdueVessel, summary: overdueSummary } = await overdueResponse.json();
 
-        const filteredOverdue = applyComponentFilter(overdueRaw);
+        const filteredOverdue = applyDepartmentFilter(applyComponentFilter(overdueRaw));
 
         const columns = [
           { header: 'S.No', field: 'sNo', width: 8 },
@@ -544,7 +555,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           throw new Error('Failed to fetch completed jobs data');
         }
         const { data: completedRawAll, vesselName: completedVessel, summary: completedSummaryData } = await completedResponse.json();
-        const completedRaw = applyComponentFilter(completedRawAll);
+        const completedRaw = applyDepartmentFilter(applyComponentFilter(completedRawAll));
 
         const completedColumns = [
           { header: 'S.No', field: 'sNo', width: 8 },
@@ -655,7 +666,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           throw new Error('Failed to fetch critical equipment data');
         }
         const { data: criticalDataRaw, metadata } = await response.json();
-        const criticalData = applyComponentFilter(criticalDataRaw);
+        const criticalData = applyDepartmentFilter(applyComponentFilter(criticalDataRaw));
 
         const columns = [
           { header: 'S.No', field: 'sNo', width: 8 },
@@ -782,7 +793,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           throw new Error('Failed to fetch postponement log data');
         }
         const { data: postponeRawAll, vesselName: postponeVessel, summary: postponeSummary } = await postponeResponse.json();
-        const postponeRaw = applyComponentFilter(postponeRawAll);
+        const postponeRaw = applyDepartmentFilter(applyComponentFilter(postponeRawAll));
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
