@@ -1,11 +1,5 @@
 import { useMemo } from "react";
 import { useLocalVessels, useExternalVessels } from "@/hooks/useExternalMasterData";
-import { useUIRole } from "@/contexts/UIRoleContext";
-
-const EXTERNAL_ALLOWED_VESSEL_IDS = [
-  "744dc41e-841a-11ed-aa7c-7003bca91a86",
-  "4fbd2fab-85d2-11ed-aa7c-7003bca91a86",
-];
 
 interface Vessel {
   id: string;
@@ -31,8 +25,6 @@ function mapEntriesToVessels(entries: any[]): Vessel[] {
 }
 
 export function useVessels() {
-  const { isExternal } = useUIRole();
-
   const {
     data: externalVesselEntries = [],
     isLoading: isLoadingExternal,
@@ -61,15 +53,10 @@ export function useVessels() {
   const error = useExternal ? externalError : localError;
 
   const vessels: Vessel[] = useMemo(() => {
-    const all = useExternal
+    return useExternal
       ? externalVessels
       : mapEntriesToVessels(localVesselEntries);
-
-    if (isExternal) {
-      return all.filter(v => EXTERNAL_ALLOWED_VESSEL_IDS.includes(v.id));
-    }
-    return all;
-  }, [useExternal, externalVessels, localVesselEntries, isExternal]);
+  }, [useExternal, externalVessels, localVesselEntries]);
 
   return { data: vessels, isLoading, error };
 }
