@@ -50,6 +50,8 @@ export async function getTemplate(templateType: string) {
 // ═══════════════════════════════════════════════════════════════
 
 export async function getCriticalEquipmentStatus(vesselId: string, startDateStr?: string, endDateStr?: string, vesselIds?: string[]) {
+  const allVesselsForLookup = await repo.getVessels();
+  const vesselMap = new Map(allVesselsForLookup.map(v => [v.id, v.name || v.id]));
   const allComponents = await repo.getComponents(vesselId, vesselIds);
   const criticalComponents = allComponents.filter(c =>
     c.isActive !== false && (c.critical === true || c.classItem === true)
@@ -137,7 +139,8 @@ export async function getCriticalEquipmentStatus(vesselId: string, startDateStr?
       overdueJobs: overdueCount,
       dueSoonJobs: dueSoonCount,
       nextDueDate: nextDueDate ? nextDueDate.toISOString().split('T')[0] : null,
-      daysUntilDue
+      daysUntilDue,
+      vesselName: vesselMap.get(component.vesselId || '') || '-',
     };
   });
 
@@ -324,6 +327,8 @@ export async function getUnplannedBreakdownJobs(
   vesselIds?: string[],
 ) {
   // Get all work orders for the vessel
+  const allVesselsForLookup = await repo.getVessels();
+  const vesselMap = new Map(allVesselsForLookup.map(v => [v.id, v.name || v.id]));
   const allWorkOrders = await repo.getWorkOrders(vesselId, vesselIds);
 
   // Parse date helper
@@ -392,7 +397,8 @@ export async function getUnplannedBreakdownJobs(
     performedBy: wo.performedBy || wo.assignedTo || '-',
     totalHours: wo.totalTimeHours ? parseFloat(wo.totalTimeHours).toFixed(1) : '0',
     manhours: wo.manhours ? parseFloat(wo.manhours).toFixed(1) : '0',
-    department: wo.department || '-'
+    department: wo.department || '-',
+    vesselName: vesselMap.get((wo as any).vesselId || '') || '-',
   }));
 
   // Calculate metadata
@@ -893,6 +899,7 @@ export async function getLsaFfaMaintenanceSchedule(
 
   const lsaFfaComponentIds = new Set(lsaFfaComponents.map((c: any) => c.cuuid));
   const lsaFfaComponentMap = new Map(lsaFfaComponents.map((c: any) => [c.cuuid, c]));
+  const lsaVesselMap = new Map(allVessels.map(v => [v.id, v.name || v.id]));
 
   let allJobs: any[] = [];
   if (vesselId === 'all') {
@@ -1003,7 +1010,9 @@ export async function getLsaFfaMaintenanceSchedule(
       status,
       lastDoneDate: formatDateStr(lastDoneDateStr),
       lastWONumber: lastWO?.workOrderNo || '-',
-      assignedTo: job.assignedTo || '-'
+      assignedTo: job.assignedTo || '-',
+      vesselId: comp.vesselId,
+      vesselName: lsaVesselMap.get(comp.vesselId || '') || '-',
     });
   }
 

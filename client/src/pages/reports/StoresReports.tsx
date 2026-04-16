@@ -313,6 +313,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
       case 'stores-inventory-status': {
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'Item Code', field: 'itemCode', width: 30 },
           { header: 'Item Name', field: 'itemName', width: 55 },
           { header: 'Category', field: 'category', width: 30 },
@@ -323,11 +324,13 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
           { header: 'Status', field: 'status', width: 25 }
         ];
 
+        const storesVesselMap = new Map(vessels.map((v: any) => [v.id, v.name || v.id]));
         const data = filteredStoresItems.map((s: any, index: number) => {
           const rob = parseFloat(String(s.rob)) || 0;
           const min = parseFloat(String(s.min)) || 0;
           return {
             sno: index + 1,
+            vesselName: storesVesselMap.get(s.vesselId || '') || '-',
             itemCode: s.itemCode || '-',
             itemName: s.itemName || '-',
             category: s.category || s.itemType || '-',
@@ -360,6 +363,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'Item Code', field: 'itemCode', width: 30 },
           { header: 'Item Name', field: 'itemName', width: 60 },
           { header: 'ROB', field: 'rob', width: 25 },
@@ -368,11 +372,13 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
           { header: 'Status', field: 'status', width: 30 }
         ];
 
+        const lubesVesselMap = new Map(vessels.map((v: any) => [v.id, v.name || v.id]));
         const data = lubesItems.map((s: any, index: number) => {
           const rob = parseFloat(String(s.rob)) || 0;
           const min = parseFloat(String(s.min)) || 0;
           return {
             sno: index + 1,
+            vesselName: lubesVesselMap.get(s.vesselId || '') || '-',
             itemCode: s.itemCode || '-',
             itemName: s.itemName || '-',
             rob,
@@ -402,6 +408,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'Item Code', field: 'itemCode', width: 25 },
           { header: 'Item Name', field: 'itemName', width: 45 },
           { header: 'Batch #', field: 'batchNumber', width: 25 },
@@ -426,6 +433,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
           }
           return {
             sno: index + 1,
+            vesselName: (vessels as any[]).find((v: any) => v.id === s.vesselId)?.name || '-',
             itemCode: s.itemCode || '-',
             itemName: s.itemName || '-',
             batchNumber: s.batchNumber || '-',
@@ -472,6 +480,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'Item Code', field: 'itemCode', width: 22 },
           { header: 'Item Name', field: 'itemName', width: 40 },
           { header: 'Type', field: 'itemType', width: 20 },
@@ -487,6 +496,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
 
         const data = items.map((item: any, idx: number) => ({
           sno: idx + 1,
+          vesselName: item.vesselName || '-',
           priority: item.priority || '-',
           itemCode: item.itemCode || '-',
           itemName: item.itemName || '-',
@@ -533,6 +543,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
           const topItems = applyComponentFilter(freshData.topConsumedItems || []);
           const columns = [
             { header: 'S.No', field: 'sno', width: 12 },
+            ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
             { header: 'Item Code', field: 'itemCode', width: 25 },
             { header: 'Item Name', field: 'itemName', width: 45 },
             { header: 'Category', field: 'category', width: 25 },
@@ -619,7 +630,13 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
 
     try {
       setGeneratingReports(prev => new Set(prev).add(reportKey));
-      toast({ title: "Generating Report", description: `Creating ${format} report...` });
+      const isMultiVesselExport = activeVesselId === 'all';
+      toast({
+        title: "Generating Report",
+        description: isMultiVesselExport && format === 'Excel'
+          ? `Exporting ${format} for all selected vessels — data will be combined in one file.`
+          : `Creating ${format} report...`,
+      });
 
       if (format === 'PDF') {
         await generateStoresReport(reportId, 'download');

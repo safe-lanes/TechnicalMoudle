@@ -1351,7 +1351,8 @@ export async function getStoresLowStockAlert(
     let mergedSummary: any = { totalItems: 0, criticalCount: 0, highCount: 0, mediumCount: 0, lowCount: 0, totalDeficit: 0, estimatedCost: 0 };
     for (const vessel of vessels) {
       const vesselResult = await lowStockReportService.computeReport(vessel.id, filters);
-      mergedItems = mergedItems.concat(vesselResult.items);
+      const taggedItems = (vesselResult.items || []).map((item: any) => ({ ...item, vesselName: vessel.name || vessel.id }));
+      mergedItems = mergedItems.concat(taggedItems);
       if (vesselResult.summary) {
         mergedSummary.totalItems += (vesselResult.summary as any).totalItems || 0;
         mergedSummary.criticalCount += (vesselResult.summary as any).criticalCount || 0;

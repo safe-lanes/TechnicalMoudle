@@ -100,12 +100,17 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
     ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
     : (categoryFilters.vessel === 'all' ? 'all' : (categoryFilters.vessel || contextVesselId));
 
+  const isMultiVessel = effectiveVesselId === 'all';
+
   const { data: ihmData } = useQuery<any>({
-    queryKey: ['/technical/api/reports/ihm-inventory-status', effectiveVesselId, 'full'],
+    queryKey: ['/technical/api/reports/ihm-inventory-status', effectiveVesselId, 'full', globalVessels.join(',')],
     queryFn: async () => {
       const params = new URLSearchParams({ page: '1', pageSize: '10000' });
       if (effectiveVesselId && effectiveVesselId !== 'all') {
         params.set('vesselId', effectiveVesselId);
+      } else if (isMultiVessel) {
+        params.set('vesselId', 'all');
+        if (globalVessels.length > 0) params.set('vesselIds', globalVessels.join(','));
       }
       const res = await fetch(`/technical/api/reports/ihm-inventory-status?${params}`, {
         credentials: 'include',

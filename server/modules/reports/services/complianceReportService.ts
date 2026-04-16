@@ -565,6 +565,7 @@ export async function getIhmInventoryStatus(
   sortOrder: string = 'asc',
   page: number = 1,
   pageSize: number = 50,
+  vesselIds?: string[],
 ) {
   const normalizeSpareIhm = (ihm: string | null | undefined, ihmPresence: string | null | undefined): string => {
     if (ihmPresence) {
@@ -600,7 +601,8 @@ export async function getIhmInventoryStatus(
     storesData = await repo.getStoresItems(vesselId);
   } else {
     const allVessels = await repo.getVessels();
-    for (const vessel of allVessels) {
+    const vessels = vesselIds?.length ? allVessels.filter(v => vesselIds.includes(v.id)) : allVessels;
+    for (const vessel of vessels) {
       const vSpares = await repo.getSpares(vessel.id);
       sparesData.push(...vSpares);
       const vStores = await repo.getStoresItems(vessel.id);
@@ -764,6 +766,7 @@ export async function exportIhmInventoryStatusExcel(
   itemType?: string,
   search?: string,
   componentFilter?: string,
+  vesselIds?: string[],
 ): Promise<{ buffer: Buffer; filename: string }> {
   const vessels = await repo.getVessels();
   const vessel = vessels.find(v => v.id === vesselId || (v as any).vesselCode === vesselId);
@@ -772,7 +775,8 @@ export async function exportIhmInventoryStatusExcel(
   let sparesData: any[] = [];
   let storesData: any[] = [];
   if (vesselId === 'all') {
-    for (const v of vessels) {
+    const scopedVessels = vesselIds?.length ? vessels.filter(v => vesselIds.includes(v.id)) : vessels;
+    for (const v of scopedVessels) {
       const vSpares = await repo.getSpares(v.id);
       sparesData.push(...vSpares);
       const vStores = await repo.getStoresItems(v.id);

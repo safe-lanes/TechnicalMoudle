@@ -287,6 +287,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
 
       const columns = [
         { header: 'S.No', field: 'sno', width: 8 },
+        ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
         { header: 'Component Code', field: 'componentCode', width: 22 },
         { header: 'Component Name', field: 'componentName', width: 40 },
         { header: 'Equipment Type', field: 'equipmentType', width: 16 },
@@ -301,8 +302,10 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
       ];
 
       const components = filteredMasterList.equipment || filteredMasterList.components || [];
+      const lsaVesselMap = new Map(vessels.map((v: any) => [v.id, v.name || v.id]));
       const tableData = components.map((comp: any, idx: number) => ({
         sno: String(idx + 1),
+        vesselName: lsaVesselMap.get(comp.vesselId || '') || '-',
         componentCode: comp.componentCode || '-',
         componentName: comp.componentName || '-',
         equipmentType: comp.equipmentType || '-',
@@ -357,6 +360,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
 
       const columns = [
         { header: 'S.No', field: 'sno', width: 6 },
+        ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
         { header: 'Comp Code', field: 'componentCode', width: 16 },
         { header: 'Component Name', field: 'componentName', width: 28 },
         { header: 'Type', field: 'equipmentType', width: 8 },
@@ -377,6 +381,7 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
       const items = filteredScheduleData.scheduleItems || [];
       const tableData = items.map((item: any) => ({
         sno: String(item.sno || ''),
+        vesselName: item.vesselName || '-',
         componentCode: item.componentCode || '-',
         componentName: item.componentName || '-',
         equipmentType: item.equipmentType || '-',

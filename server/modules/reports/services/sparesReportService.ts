@@ -55,6 +55,7 @@ export async function getCriticalSparesPreview(
   }
 
   const componentMap = new Map(componentsData.map(c => [c.cuuid, c]));
+  const vesselMap = new Map(allVessels.map(v => [v.id, v.name || v.id]));
 
   const getStockStatus = (rob: number | null | undefined, min: number | null | undefined): string => {
     const robVal = rob ?? 0;
@@ -153,7 +154,7 @@ export async function getCriticalSparesPreview(
 
     return {
       sNo: 0,
-      vesselName,
+      vesselName: vesselMap.get(spare.vesselId || '') || vesselName,
       partCode: spare.partCode || '-',
       partName: spare.partName || '-',
       rob: robVal,
@@ -265,6 +266,7 @@ export async function exportCriticalSparesExcel(
   }
 
   const componentMap = new Map(componentsData.map(c => [c.cuuid, c]));
+  const vesselMap = new Map(allVessels.map(v => [v.id, v.name || v.id]));
 
   const getStockStatus = (rob: number | null | undefined, min: number | null | undefined): string => {
     const robVal = rob ?? 0;
@@ -485,9 +487,10 @@ export async function getLowStockAlert(
   vesselIds?: string[],
 ) {
   let allSpares: any[];
+  const allVesselsForMap = await repo.getVessels();
+  const vesselMap = new Map(allVesselsForMap.map(v => [v.id, v.name || v.id]));
   if (vesselId === 'all') {
-    const allVessels = await repo.getVessels();
-    const vessels = vesselIds?.length ? allVessels.filter(v => vesselIds.includes(v.id)) : allVessels;
+    const vessels = vesselIds?.length ? allVesselsForMap.filter(v => vesselIds.includes(v.id)) : allVesselsForMap;
     allSpares = [];
     for (const vessel of vessels) {
       const vesselSpares = await repo.getSpares(vessel.id);
@@ -532,6 +535,7 @@ export async function getLowStockAlert(
 
     return {
       id: s.id,
+      vesselName: vesselMap.get(s.vesselId || '') || '-',
       partCode: s.partCode || '-',
       partName: s.partName || '-',
       componentName: s.componentName || '-',

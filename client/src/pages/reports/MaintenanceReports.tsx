@@ -682,6 +682,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         const columns = [
           { header: 'S.No', field: 'sNo', width: 8 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'Comp. Code', field: 'componentCode', width: 18 },
           { header: 'Component Name', field: 'componentName', width: 38 },
           { header: 'Critical', field: 'isCritical', width: 12 },
@@ -754,6 +755,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         const columns = [
           { header: 'S.No', field: 'sNo', width: 8 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'WO Number', field: 'workOrderNo', width: 20 },
           { header: 'Comp. Code', field: 'componentCode', width: 15 },
           { header: 'Component Name', field: 'componentName', width: 30 },

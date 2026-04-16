@@ -310,6 +310,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'Part Code', field: 'partCode', width: 30 },
           { header: 'Part Name', field: 'partName', width: 50 },
           { header: 'Component', field: 'componentName', width: 45 },
@@ -322,6 +323,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         const filteredItems = applyComponentFilter(apiData.items || []);
         const data = filteredItems.map((i: any, idx: number) => ({
           sno: idx + 1,
+          vesselName: i.vesselName || '-',
           partCode: i.partCode,
           partName: i.partName,
           componentName: i.componentName,
@@ -353,6 +355,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
 
         const columns = [
           { header: 'S.No', field: 'sNo', width: 10 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'Part Code', field: 'partCode', width: 28 },
           { header: 'Part Name', field: 'partName', width: 45 },
           { header: 'ROB', field: 'rob', width: 12 },
@@ -367,6 +370,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         const filteredCriticalItems = applyComponentFilter(previewData.data || []);
         const data = filteredCriticalItems.map((i: any, idx: number) => ({
           sNo: idx + 1,
+          vesselName: i.vesselName || '-',
           partCode: i.partCode,
           partName: i.partName,
           rob: i.rob,
@@ -410,6 +414,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
 
         const columns = [
           { header: 'S.No', field: 'sno', width: 12 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
           { header: 'Part Code', field: 'partCode', width: 28 },
           { header: 'Part Name', field: 'partName', width: 45 },
           { header: 'Component', field: 'componentName', width: 40 },
@@ -424,6 +429,7 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         const filteredConsumptionItems = applyComponentFilter(apiData.items || []);
         const data = filteredConsumptionItems.map((i: any, idx: number) => ({
           sno: idx + 1,
+          vesselName: i.vesselName || '-',
           partCode: i.partCode,
           partName: i.partName,
           componentName: i.componentName,
@@ -481,10 +487,13 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
 
     try {
       setGeneratingReports(prev => new Set(prev).add(reportKey));
-      
+
+      const isMultiVesselExport = activeVesselId === 'all';
       toast({
         title: "Generating Report",
-        description: `Creating ${format} report...`,
+        description: isMultiVesselExport && format === 'Excel'
+          ? `Exporting ${format} for all selected vessels — data will be combined in one file.`
+          : `Creating ${format} report...`,
       });
 
       if (format === 'PDF') {

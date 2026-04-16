@@ -8,6 +8,8 @@ import * as complianceReportService from '../services/complianceReportService';
 export async function getRunningHoursAnomalyDetection(req: Request, res: Response) {
   try {
     const { vesselId, startDate, endDate, anomalyType, severity: severityFilter } = req.query;
+    // vesselIds decoded for API consistency; running-hours anomaly is per-vessel so vesselIds is informational only
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
 
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
@@ -70,6 +72,7 @@ export async function getIhmInventoryStatus(req: Request, res: Response) {
     const sortOrder = (req.query.sortOrder as string) || 'asc';
     const page = parseInt(req.query.page as string) || 1;
     const pageSize = parseInt(req.query.pageSize as string) || 50;
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
 
     const result = await complianceReportService.getIhmInventoryStatus(
       vesselId,
@@ -80,6 +83,7 @@ export async function getIhmInventoryStatus(req: Request, res: Response) {
       sortOrder,
       page,
       pageSize,
+      vesselIds,
     );
     res.json(result);
   } catch (error: any) {
@@ -94,7 +98,10 @@ export async function getIhmInventoryStatus(req: Request, res: Response) {
 
 export async function exportIhmInventoryStatusExcel(req: Request, res: Response) {
   try {
-    const { vesselId, ihmStatus, itemType, search, componentFilter } = req.body;
+    const { vesselId, ihmStatus, itemType, search, componentFilter, vesselIds: bodyVesselIds } = req.body;
+    const vesselIds = bodyVesselIds
+      ? (Array.isArray(bodyVesselIds) ? bodyVesselIds : String(bodyVesselIds).split(',').filter(Boolean))
+      : undefined;
 
     if (!vesselId) {
       return res.status(400).json({ error: "vesselId is required" });
@@ -106,6 +113,7 @@ export async function exportIhmInventoryStatusExcel(req: Request, res: Response)
       itemType,
       search,
       componentFilter,
+      vesselIds,
     );
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
