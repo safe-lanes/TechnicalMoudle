@@ -683,6 +683,17 @@ const WorkOrders: React.FC = () => {
     if (activeTab === "Pending Approval") {
       cols.push(
         {
+          headerName: 'Pending From',
+          field: 'approver',
+          minWidth: 130,
+          flex: 0,
+          cellRenderer: (params: any) => {
+            const approver = params.value;
+            if (!approver) return <span className="text-gray-400 text-xs">—</span>;
+            return <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700" data-testid={`text-approver-${params.data?.id}`}>{approver}</span>;
+          },
+        },
+        {
           headerName: 'Days Late',
           field: 'daysLate',
           minWidth: 110,
