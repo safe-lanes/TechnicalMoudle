@@ -131,21 +131,6 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
   }, [filterFingerprint]);
 
   useEffect(() => {
-    if (!embedded || !selectedReportId || !initialLoadRef.current || !pendingPreviewRef.current) return;
-    if (isLoading || isScheduleLoading) return;
-    pendingPreviewRef.current = false;
-    const version = ++previewVersionRef.current;
-    generateReport(selectedReportId, 'preview').then((data) => {
-      if (previewVersionRef.current === version) {
-        if (data) setPreviewData(data);
-        setIsFilterRefreshing(false);
-      }
-    }).catch(() => {
-      if (previewVersionRef.current === version) setIsFilterRefreshing(false);
-    });
-  }, [filteredMasterList, filteredScheduleData, isLoading, isScheduleLoading]);
-
-  useEffect(() => {
     if (!actionTrigger || !embedded || !selectedReportId) return;
     if (actionTrigger.type === 'pdf') {
       handleGenerateReport(selectedReportId, 'PDF');
@@ -234,6 +219,21 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
     }
     return { ...scheduleData, scheduleItems: result, summary: { ...scheduleData.summary, total: result.length, onSchedule: result.filter((i: any) => i.status === 'On Schedule' || i.status === 'on-schedule').length, dueSoon: result.filter((i: any) => i.status === 'Due Soon' || i.status === 'due-soon').length, overdue: result.filter((i: any) => i.status === 'Overdue' || i.status === 'overdue').length } };
   }, [scheduleData, globalVessels, globalFilters?.component, vessels.length, categoryFilters.dateRange]);
+
+  useEffect(() => {
+    if (!embedded || !selectedReportId || !initialLoadRef.current || !pendingPreviewRef.current) return;
+    if (isLoading || isScheduleLoading) return;
+    pendingPreviewRef.current = false;
+    const version = ++previewVersionRef.current;
+    generateReport(selectedReportId, 'preview').then((data) => {
+      if (previewVersionRef.current === version) {
+        if (data) setPreviewData(data);
+        setIsFilterRefreshing(false);
+      }
+    }).catch(() => {
+      if (previewVersionRef.current === version) setIsFilterRefreshing(false);
+    });
+  }, [filteredMasterList, filteredScheduleData, isLoading, isScheduleLoading]);
 
   const reports: LsaFfaReport[] = [
     {

@@ -192,21 +192,6 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
   }, [filterFingerprint]);
 
   useEffect(() => {
-    if (!embedded || !selectedReportId || !initialLoadRef.current || !pendingPreviewRef.current) return;
-    if (isLoading) return;
-    pendingPreviewRef.current = false;
-    const version = ++previewVersionRef.current;
-    generateChangeRequestReport(selectedReportId, 'preview').then((data) => {
-      if (previewVersionRef.current === version) {
-        if (data) setPreviewData(data);
-        setIsFilterRefreshing(false);
-      }
-    }).catch(() => {
-      if (previewVersionRef.current === version) setIsFilterRefreshing(false);
-    });
-  }, [filteredRequests, isLoading]);
-
-  useEffect(() => {
     if (!actionTrigger || !embedded || !selectedReportId) return;
     if (actionTrigger.type === 'pdf') {
       handleGenerateReport(selectedReportId, 'PDF');
@@ -257,6 +242,21 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
     }
     return result;
   }, [reportData?.requests, globalVessels, globalFilters?.component, vessels.length]);
+
+  useEffect(() => {
+    if (!embedded || !selectedReportId || !initialLoadRef.current || !pendingPreviewRef.current) return;
+    if (isLoading) return;
+    pendingPreviewRef.current = false;
+    const version = ++previewVersionRef.current;
+    generateChangeRequestReport(selectedReportId, 'preview').then((data) => {
+      if (previewVersionRef.current === version) {
+        if (data) setPreviewData(data);
+        setIsFilterRefreshing(false);
+      }
+    }).catch(() => {
+      if (previewVersionRef.current === version) setIsFilterRefreshing(false);
+    });
+  }, [filteredRequests, isLoading]);
 
   const reports: ChangeRequestReport[] = [
     {
