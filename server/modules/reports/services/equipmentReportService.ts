@@ -22,6 +22,12 @@ function filterByComponent<T extends Record<string, any>>(items: T[], componentF
   });
 }
 
+function filterByDepartment<T extends Record<string, any>>(items: T[], departmentFilter?: string): T[] {
+  if (!departmentFilter) return items;
+  const q = departmentFilter.toLowerCase();
+  return items.filter(item => (item.department || "").toLowerCase() === q);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // TEMPLATE BUILDER
 // ═══════════════════════════════════════════════════════════════
@@ -181,13 +187,14 @@ export async function exportCriticalEquipmentStatusExcel(
   startDateStr?: string,
   endDateStr?: string,
   componentFilter?: string,
+  departmentFilter?: string,
 ): Promise<{ buffer: Buffer; filename: string }> {
   const result = await getCriticalEquipmentStatus(vesselId, startDateStr, endDateStr);
-  const reportData = filterByComponent(result.data.map((item: any) => ({
+  const reportData = filterByDepartment(filterByComponent(result.data.map((item: any) => ({
     ...item,
     nextDueDate: item.nextDueDate || '-',
     daysUntilDue: item.daysUntilDue !== null ? item.daysUntilDue : '-'
-  })), componentFilter);
+  })), componentFilter), departmentFilter);
   const metadata = result.metadata;
 
   const allVessels = await repo.getVessels();

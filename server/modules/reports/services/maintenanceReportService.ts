@@ -24,6 +24,12 @@ function filterByComponent<T extends Record<string, any>>(items: T[], componentF
   });
 }
 
+function filterByDepartment<T extends Record<string, any>>(items: T[], departmentFilter?: string): T[] {
+  if (!departmentFilter) return items;
+  const q = departmentFilter.toLowerCase();
+  return items.filter(item => (item.department || "").toLowerCase() === q);
+}
+
 const MONTH_NAMES_MAP: { [key: string]: number } = {
   'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
   'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
@@ -484,9 +490,9 @@ export async function getOverdueJobsData(vesselId: string, dateFrom?: string, da
 // OVERDUE JOBS - EXCEL EXPORT
 // ═══════════════════════════════════════════════════════════════
 
-export async function exportOverdueJobs(vesselId: string, dateFrom?: string, dateTo?: string, componentFilter?: string): Promise<{ buffer: Buffer; filename: string }> {
+export async function exportOverdueJobs(vesselId: string, dateFrom?: string, dateTo?: string, componentFilter?: string, departmentFilter?: string): Promise<{ buffer: Buffer; filename: string }> {
   const { data: overdueJobsRaw, vesselName } = await getOverdueJobsData(vesselId, dateFrom, dateTo);
-  const overdueJobs = filterByComponent(overdueJobsRaw, componentFilter);
+  const overdueJobs = filterByDepartment(filterByComponent(overdueJobsRaw, componentFilter), departmentFilter);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'PMS System';
@@ -677,7 +683,7 @@ export async function getCompletedJobsData(vesselId: string, dateFrom?: string, 
 // COMPLETED JOBS REGISTER - EXCEL EXPORT
 // ═══════════════════════════════════════════════════════════════
 
-export async function exportCompletedJobs(vesselId: string, dateFrom?: string, dateTo?: string, componentFilter?: string): Promise<{ buffer: Buffer; filename: string }> {
+export async function exportCompletedJobs(vesselId: string, dateFrom?: string, dateTo?: string, componentFilter?: string, departmentFilter?: string): Promise<{ buffer: Buffer; filename: string }> {
   const formatDateDDMMMYYYY = (dateStr: string | Date | null | undefined): string => {
     if (!dateStr) return '\u2014';
     try {
@@ -692,7 +698,7 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
   };
 
   const { data: completedJobsRaw, vesselName, summary } = await getCompletedJobsData(vesselId, dateFrom, dateTo);
-  const completedJobs = filterByComponent(completedJobsRaw, componentFilter);
+  const completedJobs = filterByDepartment(filterByComponent(completedJobsRaw, componentFilter), departmentFilter);
   const totalManHours = parseFloat(summary.totalManHours);
 
   const workbook = new ExcelJS.Workbook();
@@ -1072,10 +1078,11 @@ export async function exportPostponementLog(
   dateFrom?: string,
   dateTo?: string,
   status?: string,
-  componentFilter?: string
+  componentFilter?: string,
+  departmentFilter?: string
 ): Promise<{ buffer: Buffer; filename: string }> {
   const { data: postponedJobsRaw, vesselName } = await getPostponementLogData(vesselId, dateFrom, dateTo, status);
-  const postponedJobs = filterByComponent(postponedJobsRaw, componentFilter);
+  const postponedJobs = filterByDepartment(filterByComponent(postponedJobsRaw, componentFilter), departmentFilter);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'PMS System';

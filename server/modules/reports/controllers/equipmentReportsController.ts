@@ -45,13 +45,13 @@ export async function getCriticalEquipmentStatus(req: Request, res: Response) {
 
 export async function exportCriticalEquipmentStatusExcel(req: Request, res: Response) {
   try {
-    const { vesselId, startDate, endDate, componentFilter } = req.body;
+    const { vesselId, startDate, endDate, componentFilter, departmentFilter } = req.body;
 
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
 
-    const { buffer, filename } = await equipmentReportService.exportCriticalEquipmentStatusExcel(vesselId, startDate, endDate, componentFilter);
+    const { buffer, filename } = await equipmentReportService.exportCriticalEquipmentStatusExcel(vesselId, startDate, endDate, componentFilter, departmentFilter);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

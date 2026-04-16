@@ -1037,6 +1037,13 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     if (globalComponent) {
       requestBody.componentFilter = globalComponent;
     }
+
+    if (globalFilters?.department) {
+      const deptReports = ['overdue-jobs', 'completed-jobs', 'postponement-log', 'critical-equipment'];
+      if (deptReports.includes(reportId)) {
+        requestBody.departmentFilter = globalFilters.department;
+      }
+    }
     
     // Add date range for reports that support it
     if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'postponement-log' || reportId === 'critical-equipment' || reportId === 'overdue-jobs') {

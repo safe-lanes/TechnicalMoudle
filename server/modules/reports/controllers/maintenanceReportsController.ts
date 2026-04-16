@@ -110,13 +110,13 @@ export async function exportDueJobs7Days(req: Request, res: Response) {
 
 export async function exportOverdueJobs(req: Request, res: Response) {
   try {
-    const { vesselId, dateFrom, dateTo, componentFilter } = req.body;
+    const { vesselId, dateFrom, dateTo, componentFilter, departmentFilter } = req.body;
 
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
 
-    const { buffer, filename } = await maintenanceReportService.exportOverdueJobs(vesselId, dateFrom, dateTo, componentFilter);
+    const { buffer, filename } = await maintenanceReportService.exportOverdueJobs(vesselId, dateFrom, dateTo, componentFilter, departmentFilter);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -133,13 +133,13 @@ export async function exportOverdueJobs(req: Request, res: Response) {
 
 export async function exportCompletedJobs(req: Request, res: Response) {
   try {
-    const { vesselId, dateFrom, dateTo, componentFilter } = req.body;
+    const { vesselId, dateFrom, dateTo, componentFilter, departmentFilter } = req.body;
 
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
 
-    const { buffer, filename } = await maintenanceReportService.exportCompletedJobs(vesselId, dateFrom, dateTo, componentFilter);
+    const { buffer, filename } = await maintenanceReportService.exportCompletedJobs(vesselId, dateFrom, dateTo, componentFilter, departmentFilter);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -179,13 +179,13 @@ export async function exportUnplannedJobs(req: Request, res: Response) {
 
 export async function exportPostponementLog(req: Request, res: Response) {
   try {
-    const { vesselId, dateFrom, dateTo, status, componentFilter } = req.body;
+    const { vesselId, dateFrom, dateTo, status, componentFilter, departmentFilter } = req.body;
 
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
 
-    const { buffer, filename } = await maintenanceReportService.exportPostponementLog(vesselId, dateFrom, dateTo, status, componentFilter);
+    const { buffer, filename } = await maintenanceReportService.exportPostponementLog(vesselId, dateFrom, dateTo, status, componentFilter, departmentFilter);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
