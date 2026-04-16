@@ -1570,13 +1570,13 @@ const Dashboard = () => {
                   </TooltipTrigger>
 
                   <TooltipContent data-testid="tooltip-scope-info">
-                    {toggleDisabled && vesselWideAccessGranted
-                      ? <p>Team scope not configured — showing vessel-wide data per your access level</p>
-                      : toggleDisabled && fallbackMode === 'own-rank'
+                    {toggleDisabled && fallbackMode === 'own-rank'
                       ? <p>Team scope not configured — showing your own rank's work orders only</p>
+                      : toggleDisabled && vesselWideAccessGranted
+                      ? <p>Team scope not configured — showing vessel-wide data per your access level</p>
                       : toggleDisabled
                       ? <p>Team scope not configured — hierarchy mapping required</p>
-                      : <p>Filters work-order KPIs by assigned rank (Phase 1). Spares and PMS requests remain vessel-wide.</p>
+                      : <p>Filters work-order KPIs by assigned rank. Spares, anomalies, and PMS requests remain vessel-wide.</p>
                     }
                   </TooltipContent>
                 </UITooltip>
@@ -1685,19 +1685,19 @@ const Dashboard = () => {
               </div>
             ) : (
               <>
-                {scopeNotConfigured && !isAllVessels && vesselWideAccessGranted && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700" data-testid="banner-scope-not-configured">
-                    <Info className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span>Team scope not configured for this vessel/user. Showing standard vessel-wide data per your existing access level.</span>
-                  </div>
-                )}
-                {scopeNotConfigured && !isAllVessels && !vesselWideAccessGranted && fallbackMode === 'own-rank' && (
+                {scopeNotConfigured && !isAllVessels && fallbackMode === 'own-rank' && (
                   <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700" data-testid="banner-scope-own-rank-fallback">
                     <Info className="h-3.5 w-3.5 flex-shrink-0" />
                     <span>Hierarchy mapping is not configured for this vessel/user. Showing work orders assigned to your own rank only.</span>
                   </div>
                 )}
-                {scopeNotConfigured && !isAllVessels && !vesselWideAccessGranted && fallbackMode !== 'own-rank' && (
+                {scopeNotConfigured && !isAllVessels && fallbackMode !== 'own-rank' && vesselWideAccessGranted && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700" data-testid="banner-scope-not-configured">
+                    <Info className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span>Team scope not configured for this vessel/user. Showing standard vessel-wide data per your existing access level.</span>
+                  </div>
+                )}
+                {scopeNotConfigured && !isAllVessels && fallbackMode !== 'own-rank' && !vesselWideAccessGranted && (
                   <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-red-50 border border-red-200 rounded text-xs text-red-700" data-testid="banner-scope-restricted">
                     <Info className="h-3.5 w-3.5 flex-shrink-0" />
                     <span>Team filtering could not be applied — hierarchy mapping is not configured for this user/vessel and vessel-wide access is not permitted. Contact your administrator to set up org chart mapping.</span>
