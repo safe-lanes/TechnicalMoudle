@@ -83,6 +83,18 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+function invalidateRankScopedQueries() {
+  queryClient.invalidateQueries({
+    predicate: (query) => {
+      const key = query.queryKey?.[0];
+      return (
+        typeof key === "string" &&
+        key.startsWith("/technical/api/scoped-operation-data")
+      );
+    },
+  });
+}
+
 export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<PublicUser | null>(null);
   const [userType, setUserType] = useState<UIRole | null>(null);
@@ -216,7 +228,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setCurrentUser(resolvedUser);
     setUserType(resolvedUserType);
-    setActiveRank(resolvedUser?.rank_name ?? null);
+    const hydratedRankChanged = setActiveRank(resolvedUser?.rank_name ?? null);
+    if (hydratedRankChanged) {
+      invalidateRankScopedQueries();
+    }
 
     try {
       analyzeLocalStorage();
@@ -281,19 +296,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUserType(derivedUIType);
     const rankChanged = setActiveRank(sanitizedUser.rank_name ?? null);
     if (rankChanged) {
-      queryClient.invalidateQueries({
-        predicate: (query) => {
-          const key = query.queryKey?.[0];
-          return typeof key === "string" && key.startsWith("/technical/api/scoped-operation-data");
-        },
-      });
+      invalidateRankScopedQueries();
     }
   };
 
   const logout = () => {
     setCurrentUser(null);
     setUserType(null);
-    setActiveRank(null);
+    const rankChanged = setActiveRank(null);
+    if (rankChanged) {
+      invalidateRankScopedQueries();
+    }
   };
 
   const value: AuthContextType = {
