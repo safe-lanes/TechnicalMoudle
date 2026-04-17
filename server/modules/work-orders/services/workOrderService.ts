@@ -791,15 +791,12 @@ export async function updateWorkOrder(id: string, body: any) {
 
   let updateData = { ...body };
 
-  // Only run the assignment-sync helper when the request actually
-  // touches the assignment fields, so a partial PATCH (e.g. updating
-  // only `remarks`) does not inadvertently clear assignedToRankId.
+  // Run the assignment-sync helper only when the request actually
+  // touches the assignment fields, so a partial PATCH (e.g. remarks
+  // only) does not inadvertently clear assignedToRankId. The helper
+  // is bidirectional: text-only payloads resolve the rank-id, and
+  // rank-id-only payloads resolve the text.
   if ('assignedTo' in updateData || 'assignedToRankId' in updateData) {
-    if (!('assignedTo' in updateData)) {
-      // Caller sent a rank-id without text — pull current text so the
-      // sync helper can canonicalize against the displayed label.
-      updateData.assignedTo = (existingWO as any).assignedTo;
-    }
     await applyAssignmentSync(updateData);
   }
 
