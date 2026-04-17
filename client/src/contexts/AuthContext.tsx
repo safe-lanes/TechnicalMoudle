@@ -10,6 +10,8 @@ import type { UIRole } from "@shared/uiRoles";
 import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { secureGetItem } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
+import { setActiveRank } from "@/lib/activeRank";
+import { queryClient } from "@/lib/queryClient";
 
 function resolveProfileName(profile: Record<string, any>): {
   fullName: string | null;
@@ -214,6 +216,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setCurrentUser(resolvedUser);
     setUserType(resolvedUserType);
+    setActiveRank(resolvedUser?.rank_name ?? null);
 
     try {
       analyzeLocalStorage();
@@ -276,11 +279,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setCurrentUser(sanitizedUser);
     setUserType(derivedUIType);
+    const rankChanged = setActiveRank(sanitizedUser.rank_name ?? null);
+    if (rankChanged) {
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey?.[0];
+          return typeof key === "string" && key.startsWith("/technical/api/scoped-operation-data");
+        },
+      });
+    }
   };
 
   const logout = () => {
     setCurrentUser(null);
     setUserType(null);
+    setActiveRank(null);
   };
 
   const value: AuthContextType = {
