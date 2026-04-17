@@ -3,7 +3,7 @@
 .micro-frontend-isolated {
   /* Reset any inherited styles */
   all: initial;
-  font-family: "Roboto", monospace;
+  font-family: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
   
   /* Ensure the micro frontend doesn't affect parent styles */
   box-sizing: border-box;

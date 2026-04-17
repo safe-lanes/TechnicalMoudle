@@ -55,7 +55,7 @@
   --ag-pinned-row-border-color: #e5e7eb;
   --ag-header-background-color: #52baf3;
   --ag-header-foreground-color: white;
-  --ag-font-family: "Roboto", monospace;
+  --ag-font-family: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
   --ag-font-size: 13px;
   --ag-cell-horizontal-padding: 16px;
   --ag-header-cell-horizontal-padding: 16px;
@@ -106,7 +106,7 @@
 /* AG Grid Tooltip styling - match table text size */
 .ag-tooltip {
   font-size: 13px !important;
-  font-family: "Roboto", monospace !important;
+  font-family: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif !important;
   background-color: #1f2937 !important;
   color: white !important;
   padding: 8px 12px !important;
@@ -557,7 +557,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: "Roboto", monospace;
+    font-family: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }

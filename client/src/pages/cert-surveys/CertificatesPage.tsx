@@ -183,7 +183,7 @@ const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((prop
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
       className="w-full h-full px-2 border-2 border-[#52baf3] rounded bg-white text-[13px]"
-      style={{ fontFamily: '"Roboto", monospace', minWidth: '130px' }}
+      style={{ fontFamily: '"Roboto", system-ui, -apple-system, "Segoe UI", sans-serif', minWidth: '130px' }}
       data-testid={`date-editor-${props.data?.id}-${props.colDef?.field}`}
     />
   );
