@@ -3173,7 +3173,7 @@ const Spares: React.FC = () => {
                             {isFirstRow && <Marker id="E34" />}
                             <Info className="h-4 w-4 text-blue-600" />
                           </Button>
-                          {(isSailAdmin || isClientAdmin || isExternal || isHeadOfDept || isChangeMode) && canEditSpare && (
+                          {(isSailAdmin || isClientAdmin || isExternal || isChangeMode || isModifyMode) && canEditSpare && (
                             <Button 
                               size="sm" 
                               variant="ghost"
