@@ -801,7 +801,6 @@ export default function DefectsDashboard() {
                     ))}
                   </Pie>
                   <Tooltip />
-                  <Legend />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -844,7 +843,6 @@ export default function DefectsDashboard() {
                     ))}
                   </Pie>
                   <Tooltip />
-                  <Legend />
                 </PieChart>
               </ResponsiveContainer>
             )}
