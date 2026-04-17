@@ -70,13 +70,16 @@ export function installRankFetchInterceptor(): void {
     }
 
     if (input instanceof Request) {
-      if (input.headers.has("x-rank")) {
-        return originalFetch(input, init);
+      const merged = new Headers(input.headers);
+      if (init?.headers) {
+        new Headers(init.headers).forEach((value, key) => {
+          merged.set(key, value);
+        });
       }
-      const newHeaders = new Headers(input.headers);
-      newHeaders.set("x-rank", rank);
-      const newRequest = new Request(input, { headers: newHeaders });
-      return originalFetch(newRequest, init);
+      if (!merged.has("x-rank")) {
+        merged.set("x-rank", rank);
+      }
+      return originalFetch(input, { ...init, headers: merged });
     }
 
     const headers = new Headers(init?.headers);
