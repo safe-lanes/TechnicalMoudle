@@ -2915,6 +2915,30 @@ const migrations: Migration[] = [
       WHERE ml.list_type = 'department' AND ml.is_active = true
       ON CONFLICT (vessel_id, department) DO NOTHING;
     `
+  },
+  {
+    id: '088_backfill_defects_component_id',
+    name: 'Backfill defects.component_id from component_hardware_level3 + vessel_id',
+    description: 'One-time idempotent backfill: for defects with NULL/empty component_id, find a unique vessel-scoped component whose name matches component_hardware_level3 (case-insensitive, trimmed) and populate component_id. Defects with zero or multiple matches are left untouched and will fall back to hardware fields in the dashboard.',
+    sql: `
+      WITH candidates AS (
+        SELECT d.id AS defect_id,
+               c.cuuid AS comp_cuuid,
+               COUNT(*) OVER (PARTITION BY d.id) AS match_count
+        FROM defects d
+        JOIN components c
+          ON c.vessel_id = d.vessel_id
+         AND LOWER(TRIM(c.name)) = LOWER(TRIM(d.component_hardware_level3))
+        WHERE (d.component_id IS NULL OR d.component_id = '')
+          AND d.component_hardware_level3 IS NOT NULL
+          AND TRIM(d.component_hardware_level3) <> ''
+      )
+      UPDATE defects d
+      SET component_id = c.comp_cuuid
+      FROM candidates c
+      WHERE d.id = c.defect_id
+        AND c.match_count = 1;
+    `
   }
 ];
 

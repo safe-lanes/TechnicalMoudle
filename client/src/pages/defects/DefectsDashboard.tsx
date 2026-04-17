@@ -300,8 +300,8 @@ export default function DefectsDashboard() {
         code: lookup?.code || '',
       };
     }
-    const hwName = (d as any).componentHardwareLevel3 ? String((d as any).componentHardwareLevel3).trim() : '';
-    const hwCode = (d as any).componentHardwareLevel2 ? String((d as any).componentHardwareLevel2).trim() : '';
+    const hwName = d.componentHardwareLevel3 ? String(d.componentHardwareLevel3).trim() : '';
+    const hwCode = d.componentHardwareLevel2 ? String(d.componentHardwareLevel2).trim() : '';
     if (hwName) {
       return {
         id: `${HW_PREFIX}${hwName}`,
