@@ -3617,7 +3617,7 @@ const Components: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    {canEditComponent && (
+                    {!isVessel && !isHeadOfDept && canEditComponent && (
                     <button
                       onClick={handleEnterEditMode}
                       className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
