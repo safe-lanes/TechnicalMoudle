@@ -17,6 +17,7 @@ import {
 } from './helpers';
 import { createRecordSnapshot } from './undoService';
 import { saveImportHistory } from '../../../services/fileBasedImportHistory';
+import { applyAssignmentSync } from '../../work-orders/services/workOrderService';
 
 
 export async function processSpareInventory(params: {
@@ -2559,6 +2560,7 @@ export async function createWorkOrderFromRow(row: any, templateCode: string, ves
     briefWorkDescription: row['Job_Description'] || null
   };
 
+  await applyAssignmentSync(workOrderData as any);
   return await storage.createWorkOrder(workOrderData);
 }
 
@@ -2576,6 +2578,9 @@ export async function updateWorkOrderFromRow(workOrderId: string, row: any) {
   if (row['Job_Description']) updateData.briefWorkDescription = row['Job_Description'];
   // NOTE: Do NOT update workOrderNo from Job_Code - WO numbers follow spec format and cannot be overwritten
 
+  if ('assignedTo' in updateData) {
+    await applyAssignmentSync(updateData);
+  }
   return await storage.updateWorkOrder(workOrderId, updateData);
 }
 

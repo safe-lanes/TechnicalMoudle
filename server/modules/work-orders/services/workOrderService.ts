@@ -21,6 +21,36 @@ async function resolveRankIdFromLabel(assignedTo: string | null | undefined): Pr
   return match?.rankId ?? null;
 }
 
+/**
+ * Single source of truth for keeping `assignedTo` (rank-name text) and
+ * `assignedToRankId` (rank UUID) in lock-step on every write path
+ * (manual create/update, bulk import, auto-generated WOs).
+ *
+ * Rule: `assignedTo` text is canonical. After this helper:
+ *   - If `assignedTo` resolves to a known rank, `assignedToRankId` is set
+ *     to that rank's id (overwriting any stale/incorrect client value).
+ *   - If `assignedTo` is empty/Unassigned, `assignedToRankId` is cleared
+ *     to null (preventing stale rank-ids from surviving an unassign).
+ *   - If `assignedTo` is non-empty but does NOT resolve (e.g. data-entry
+ *     typos that have no matching rank), `assignedToRankId` is cleared
+ *     to null so it can never silently disagree with the displayed text.
+ *
+ * Mutates and returns the same object for convenience.
+ */
+export async function applyAssignmentSync<T extends { assignedTo?: any; assignedToRankId?: any }>(
+  data: T
+): Promise<T> {
+  const text = typeof data.assignedTo === 'string' ? data.assignedTo : '';
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'unassigned') {
+    (data as any).assignedToRankId = null;
+    return data;
+  }
+  const rankId = await resolveRankIdFromLabel(trimmed);
+  (data as any).assignedToRankId = rankId; // null when unresolvable, by design
+  return data;
+}
+
 // Build a fast in-memory lookup of rank name/label → rankId.
 // Used during listWorkOrders enrichment to backfill missing assignedToRankId.
 async function buildRankLabelMap(): Promise<Map<string, string>> {
@@ -679,16 +709,7 @@ export async function createWorkOrder(body: any) {
     }
   }
 
-  // Keep assignedToRankId in lock-step with assignedTo (text is canonical).
-  // Always re-resolve from text on writes so stale/incorrect rank-ids
-  // sent by clients can never persist a row that disagrees with the
-  // Work Orders Assigned To column.
-  if (workOrderData.assignedTo) {
-    const rankId = await resolveRankIdFromLabel(workOrderData.assignedTo);
-    if (rankId) {
-      workOrderData = { ...workOrderData, assignedToRankId: rankId };
-    }
-  }
+  workOrderData = await applyAssignmentSync({ ...workOrderData });
 
   const workOrder = await repo.create(workOrderData);
   return workOrder;
@@ -741,15 +762,16 @@ export async function updateWorkOrder(id: string, body: any) {
 
   let updateData = { ...body };
 
-  // Keep assignedToRankId in lock-step with assignedTo (text is canonical).
-  // Always re-resolve from text on writes so a stale/incorrect rank-id
-  // sent by clients can never persist a row that disagrees with the
-  // Work Orders Assigned To column.
-  if (updateData.assignedTo) {
-    const rankId = await resolveRankIdFromLabel(updateData.assignedTo);
-    if (rankId) {
-      updateData.assignedToRankId = rankId;
+  // Only run the assignment-sync helper when the request actually
+  // touches the assignment fields, so a partial PATCH (e.g. updating
+  // only `remarks`) does not inadvertently clear assignedToRankId.
+  if ('assignedTo' in updateData || 'assignedToRankId' in updateData) {
+    if (!('assignedTo' in updateData)) {
+      // Caller sent a rank-id without text — pull current text so the
+      // sync helper can canonicalize against the displayed label.
+      updateData.assignedTo = (existingWO as any).assignedTo;
     }
+    await applyAssignmentSync(updateData);
   }
 
   // Remove any undefined values

@@ -2,6 +2,7 @@ import * as repo from '../repositories/workOrderRepository';
 import { ValidationError } from '../../shared/errors';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { shouldGenerateWorkOrder } from '@shared/dateUtils';
+import { applyAssignmentSync } from './workOrderService';
 
 // ── Auto-Generate Work Orders ──
 
@@ -110,6 +111,7 @@ export async function autoGenerate(vesselId: string) {
           safetyRequirements: (job as any).safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] }
         };
 
+        await applyAssignmentSync(workOrderData);
         const createdWO = await repo.create(workOrderData);
         results.generated++;
         results.workOrders.push(createdWO);
@@ -182,6 +184,7 @@ export async function autoGenerate(vesselId: string) {
           safetyRequirements: (job as any).safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] }
         };
 
+        await applyAssignmentSync(workOrderData);
         const createdWO = await repo.create(workOrderData);
         results.generated++;
         results.workOrders.push(createdWO);
