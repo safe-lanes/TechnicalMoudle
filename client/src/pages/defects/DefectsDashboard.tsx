@@ -289,29 +289,43 @@ export default function DefectsDashboard() {
   const defectTypeData = defectTypeAgg.data;
   const equipmentCategoryData = equipmentCategoryAgg.data;
 
+  const HW_PREFIX = 'hw:';
+  const componentBucketFor = (d: typeof defectsWithComputedStatus[number]) => {
+    const cid = d.componentId ? String(d.componentId).trim() : '';
+    if (cid) {
+      const lookup = componentLookup.get(cid);
+      return {
+        id: cid,
+        name: lookup?.name || cid,
+        code: lookup?.code || '',
+      };
+    }
+    const hwName = (d as any).componentHardwareLevel3 ? String((d as any).componentHardwareLevel3).trim() : '';
+    const hwCode = (d as any).componentHardwareLevel2 ? String((d as any).componentHardwareLevel2).trim() : '';
+    if (hwName) {
+      return {
+        id: `${HW_PREFIX}${hwName}`,
+        name: hwName,
+        code: hwCode,
+      };
+    }
+    return {
+      id: UNSPECIFIED_KEY,
+      name: 'Unspecified',
+      code: '',
+    };
+  };
+
   const componentData = (() => {
     const counts = new Map<string, { id: string; count: number; name: string; code: string }>();
     for (const d of defectsWithComputedStatus) {
-      const cid = d.componentId ? String(d.componentId).trim() : '';
-      if (!cid) {
-        const existing = counts.get(UNSPECIFIED_KEY);
-        counts.set(UNSPECIFIED_KEY, {
-          id: UNSPECIFIED_KEY,
-          count: (existing?.count || 0) + 1,
-          name: 'Unspecified',
-          code: '',
-        });
-        continue;
-      }
-      const lookup = componentLookup.get(cid);
-      const name = lookup?.name || cid;
-      const code = lookup?.code || '';
-      const existing = counts.get(cid);
-      counts.set(cid, {
-        id: cid,
+      const bucket = componentBucketFor(d);
+      const existing = counts.get(bucket.id);
+      counts.set(bucket.id, {
+        id: bucket.id,
         count: (existing?.count || 0) + 1,
-        name,
-        code,
+        name: bucket.name,
+        code: bucket.code,
       });
     }
     const sorted = Array.from(counts.values()).sort((a, b) => b.count - a.count);
@@ -464,16 +478,9 @@ export default function DefectsDashboard() {
         if (activeModal.startsWith('component_')) {
           const sfx = activeModal.replace('component_', '');
           if (sfx === OTHER_KEY) {
-            return defectsWithComputedStatus.filter(d => {
-              const raw = d.componentId ? String(d.componentId).trim() : '';
-              const key = raw || UNSPECIFIED_KEY;
-              return !topComponentIds.has(key);
-            });
+            return defectsWithComputedStatus.filter(d => !topComponentIds.has(componentBucketFor(d).id));
           }
-          if (sfx === UNSPECIFIED_KEY) {
-            return defectsWithComputedStatus.filter(d => !d.componentId || String(d.componentId).trim() === '');
-          }
-          return defectsWithComputedStatus.filter(d => (d.componentId ? String(d.componentId).trim() : '') === sfx);
+          return defectsWithComputedStatus.filter(d => componentBucketFor(d).id === sfx);
         }
         return [];
     }

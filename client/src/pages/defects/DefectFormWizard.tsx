@@ -833,6 +833,7 @@ export default function DefectFormWizard({
                               if (selectedVessel) {
                                 form.setValue('vesselName', selectedVessel.name);
                               }
+                              form.setValue('componentId', '');
                               form.setValue('componentHardwareId', '');
                               form.setValue('componentHardwareLevel1', '');
                               form.setValue('componentHardwareLevel2', '');
@@ -926,6 +927,7 @@ export default function DefectFormWizard({
                         selectedId={form.watch('componentHardwareId') || ""}
                         displayValue={form.watch('componentHardwareLevel3') || ""}
                         onSelect={(selection: VesselComponentSelection) => {
+                          form.setValue('componentId', selection.id);
                           form.setValue('componentHardwareId', selection.id);
                           form.setValue('componentHardwareLevel1', selection.breadcrumb);
                           form.setValue('componentHardwareLevel2', selection.code);
