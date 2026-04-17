@@ -222,17 +222,39 @@ export function ModifyPMS() {
   return (
     <>
     <div className="space-y-4">
-      {/* Header with Title and Button */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-black dark:text-white">Modify PMS - Change Requests</h1>
-        <Button 
-          className="bg-[#5dc86f] hover:bg-[#4db85f] text-white"
-          size="sm"
-          onClick={() => setIsNewRequestModalOpen(true)}
-        >
-          <Plus className="h-4 w-4 mr-1" />
-          New Change Request
-        </Button>
+      {/* Header with Title, Centered Tabs, and Button */}
+      <div className="flex items-center justify-between relative">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Modify PMS - Change Requests</h1>
+        <div className="absolute left-1/2 -translate-x-1/2 bg-gray-100 rounded-md p-1 flex items-center gap-1" data-testid="status-filter-tabs">
+          {[
+            { label: 'All', value: 'all' },
+            { label: 'Pending Approval', value: 'submitted' },
+            { label: 'Approved', value: 'approved' },
+            { label: 'Rejected', value: 'rejected' },
+          ].map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setStatusFilter(tab.value)}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                statusFilter === tab.value
+                  ? 'bg-[#52baf3] text-white'
+                  : 'text-gray-700 hover:bg-gray-200'
+              }`}
+              data-testid={`btn-filter-${tab.value}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        {!isVessel && (
+          <Button 
+            className="bg-[#5dc86f] hover:bg-[#4db85f] text-white px-6"
+            onClick={() => setIsNewRequestModalOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Change Request
+          </Button>
+        )}
       </div>
 
       {/* Filters - Single Row */}
@@ -254,35 +276,17 @@ export function ModifyPMS() {
             </Select>
           </div>
         )}
-        <div className="relative w-80">
+        <div className="relative w-72">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search change requests..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 border-gray-300 bg-white"
+            className="pl-10"
             data-testid="input-search-status"
           />
         </div>
         <PeriodFilter value={periodFilter} onChange={setPeriodFilter} className="w-[200px]" />
-        <div className="flex items-center gap-1" data-testid="status-filter-tabs">
-          {[
-            { label: 'All', value: 'all' },
-            { label: 'Pending Approval', value: 'submitted' },
-            { label: 'Approved', value: 'approved' },
-            { label: 'Rejected', value: 'rejected' },
-          ].map((tab) => (
-            <Button
-              key={tab.value}
-              variant={statusFilter === tab.value ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setStatusFilter(tab.value)}
-              data-testid={`btn-filter-${tab.value}`}
-            >
-              {tab.label}
-            </Button>
-          ))}
-        </div>
         <Button
           variant="outline"
           className="text-gray-600"
@@ -298,7 +302,7 @@ export function ModifyPMS() {
       </div>
 
       {/* Main Content - Two Column Layout */}
-      <div className="flex gap-6" style={{ height: 'calc(100vh - 220px)' }}>
+      <div className="flex gap-6" style={{ height: 'calc(100vh - 180px)' }}>
         {/* Left Panel - Category List */}
         <div className="w-[200px] flex-shrink-0">
           <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
@@ -364,10 +368,10 @@ export function ModifyPMS() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-[#52BAF3] hover:bg-[#52BAF3] border-b-0">
-                      <TableHead className="text-white font-medium py-4 px-6">Request Title</TableHead>
-                      <TableHead className="text-white font-medium py-4 px-6">Requested By</TableHead>
-                      <TableHead className="text-white font-medium py-4 px-6">Date</TableHead>
-                      <TableHead className="text-white font-medium py-4 px-6">Status</TableHead>
+                      <TableHead className="text-white font-medium py-3 px-4">Request Title</TableHead>
+                      <TableHead className="text-white font-medium py-3 px-4">Requested By</TableHead>
+                      <TableHead className="text-white font-medium py-3 px-4">Date</TableHead>
+                      <TableHead className="text-white font-medium py-3 px-4">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -377,16 +381,16 @@ export function ModifyPMS() {
                         className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer"
                         onClick={() => handleRowClick(request)}
                       >
-                        <TableCell className="py-4 px-6">
+                        <TableCell className="py-3 px-4">
                           <div className="font-medium text-gray-900">{request.title}</div>
                         </TableCell>
-                        <TableCell className="py-4 px-6 text-gray-700">
+                        <TableCell className="py-3 px-4 text-gray-700">
                           {request.requestedByUserId === 'current_user' ? 'Chief Engineer' : 
                            request.requestedByUserId === '2nd_engineer' ? '2nd Engineer' : 
                            request.requestedByUserId === '3rd_engineer' ? '3rd Engineer' : 
                            request.requestedByUserId}
                         </TableCell>
-                        <TableCell className="py-4 px-6 text-gray-700">
+                        <TableCell className="py-3 px-4 text-gray-700">
                           {request.submittedAt 
                             ? new Date(request.submittedAt).toLocaleDateString('en-GB', { 
                                 year: 'numeric', 
@@ -399,7 +403,7 @@ export function ModifyPMS() {
                                 day: '2-digit' 
                               }).replace(/\//g, ' ')}
                         </TableCell>
-                        <TableCell className="py-4 px-6">
+                        <TableCell className="py-3 px-4">
                           {request.status === 'submitted' && (
                             <Badge className="bg-[#52BAF3] text-white px-3 py-1 text-xs rounded-full">
                               Pending Approval
