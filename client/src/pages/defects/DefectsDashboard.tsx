@@ -720,7 +720,7 @@ export default function DefectsDashboard() {
                     ))}
                   </Pie>
                   <Tooltip />
-                  <Legend />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '2px' }} />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -747,7 +747,7 @@ export default function DefectsDashboard() {
                   <XAxis dataKey="vessel" angle={-45} textAnchor="end" height={80} />
                   <YAxis allowDecimals={false} />
                   <Tooltip />
-                  <Legend />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '2px' }} />
                   <Bar
                     dataKey="active"
                     fill="#ff6961"
