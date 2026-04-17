@@ -264,6 +264,7 @@ export default function DefectsDashboard() {
 
   const defectCategoryData = buildTop10(d => d.defectCategory);
   const defectTypeData = buildTop10(d => d.defectType);
+  const equipmentCategoryData = buildTop10(d => d.equipmentCategory);
 
   const navigateToDefectLog = (filter?: string) => {
     const params = new URLSearchParams();
@@ -655,6 +656,39 @@ export default function DefectsDashboard() {
                   <Tooltip />
                   <Legend />
                 </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6">
+        <Card className="bg-white" data-testid="card-top-equipment-categories">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Top 10 Equipment Categories</span>
+              <Activity className="h-5 w-5 text-gray-400" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {equipmentCategoryData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-[300px] text-gray-400">
+                <CheckCircle className="h-12 w-12 mb-2" />
+                <p>No defects to display</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={equipmentCategoryData} margin={{ top: 10, right: 20, left: 0, bottom: 60 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={80} />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="value" name="Defects" fill="#52baf3">
+                    {equipmentCategoryData.map((entry, index) => (
+                      <Cell key={`eqcat-cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
             )}
           </CardContent>
