@@ -1686,11 +1686,12 @@ export async function getScopedOperationData(
   userRankId: string | undefined,
   mode: 'me' | 'myTeam',
   userRole?: string,
-  userVesselId?: string
+  userVesselId?: string,
+  userRankName?: string
 ) {
   const vesselWideAccessGranted = hasVesselWideAccess(userRole, userVesselId, vesselId);
 
-  if (!userRankId) {
+  if (!userRankName) {
     return {
       workOrders: [],
       scopeMeta: {
@@ -1704,9 +1705,9 @@ export async function getScopedOperationData(
     };
   }
 
-  const { resolveHierarchyScopeByRankId } = await import('../../ranks/service');
+  const { resolveHierarchyScopeByRankName } = await import('../../ranks/service');
 
-  const scope = await resolveHierarchyScopeByRankId(vesselId, userRankId);
+  const scope = await resolveHierarchyScopeByRankName(vesselId, userRankName);
 
   if (!scope.hasMapping) {
     const allWOs = await listWorkOrders(vesselId);
@@ -1714,7 +1715,8 @@ export async function getScopedOperationData(
     const isShipRole = userRole === 'Ship';
 
     if (!vesselWideAccessGranted || isShipRole) {
-      const ownRankSet = new Set([userRankId]);
+      const ownRankIds: string[] = userRankId ? [userRankId] : [];
+      const ownRankSet = new Set<string>(ownRankIds);
       const ownRankWOs = filterWorkOrdersByRankId(allWOs, ownRankSet);
       return {
         workOrders: ownRankWOs,
@@ -1722,7 +1724,7 @@ export async function getScopedOperationData(
           hasMapping: false,
           hasDescendants: false,
           mode,
-          appliedRankIds: [userRankId],
+          appliedRankIds: ownRankIds,
           vesselWideAccessGranted,
           fallbackMode: 'own-rank' as const,
         },

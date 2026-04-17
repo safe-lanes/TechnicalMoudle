@@ -4,6 +4,7 @@ import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/rea
 import { format } from "date-fns";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -413,11 +414,16 @@ const Dashboard = () => {
     scopeMeta: ScopeMeta;
   }
 
+  const { currentUser } = useAuth();
+  const userRankName = currentUser?.rankName ?? '';
+
   const { data: scopedResponse } = useQuery<ScopedOperationResponse>({
-    queryKey: ['/technical/api/scoped-operation-data', effectiveVesselId, hodScope],
+    queryKey: ['/technical/api/scoped-operation-data', effectiveVesselId, hodScope, userRankName],
     queryFn: async () => {
+      const params = new URLSearchParams({ mode: hodScope });
+      if (userRankName) params.set('rankName', userRankName);
       const response = await fetch(
-        `/technical/api/scoped-operation-data/${effectiveVesselId}?mode=${hodScope}`
+        `/technical/api/scoped-operation-data/${effectiveVesselId}?${params.toString()}`
       );
       if (!response.ok) throw new Error('Failed to fetch scoped operation data');
       return response.json();

@@ -253,6 +253,52 @@ export async function resolveHierarchyScope(vesselId: string, crewDesignation: s
   return resolveHierarchyScopeByRankId(vesselId, matchingRankIds[0]);
 }
 
+export async function resolveHierarchyScopeByRankName(vesselId: string, rankName: string) {
+  if (!vesselId) throw createHttpError("vesselId required", 400);
+  if (!rankName) throw createHttpError("rankName required", 400);
+
+  const rows = await repo.getAllOrgChart();
+  if (!rows || rows.length === 0) {
+    return { vesselId, hasMapping: false, hasDescendants: false, me: { nodeUuids: [] as string[], rankIds: [] as string[] }, myTeam: { nodeUuids: [] as string[], rankIds: [] as string[] } };
+  }
+
+  const target = rankName.toLowerCase().trim();
+  const meRow = rows.find((r: any) => (r.rank ?? '').toString().toLowerCase().trim() === target);
+
+  if (!meRow || !meRow.rankId) {
+    return { vesselId, hasMapping: false, hasDescendants: false, me: { nodeUuids: [] as string[], rankIds: [] as string[] }, myTeam: { nodeUuids: [] as string[], rankIds: [] as string[] } };
+  }
+
+  const childrenByParent = new Map<string, string[]>();
+  for (const r of rows as any[]) {
+    if (r.parentRankId && r.rankId) {
+      const list = childrenByParent.get(r.parentRankId) || [];
+      list.push(r.rankId);
+      childrenByParent.set(r.parentRankId, list);
+    }
+  }
+
+  const teamRankIds = new Set<string>();
+  const queue: string[] = [meRow.rankId];
+  while (queue.length > 0) {
+    const id = queue.pop()!;
+    if (teamRankIds.has(id)) continue;
+    teamRankIds.add(id);
+    const children = childrenByParent.get(id) || [];
+    for (const c of children) queue.push(c);
+  }
+
+  const hasDescendants = teamRankIds.size > 1;
+
+  return {
+    vesselId,
+    hasMapping: true,
+    hasDescendants,
+    me: { nodeUuids: [] as string[], rankIds: [meRow.rankId] },
+    myTeam: { nodeUuids: [] as string[], rankIds: Array.from(teamRankIds) },
+  };
+}
+
 export async function resolveHierarchyScopeByRankId(vesselId: string, userRankId: string) {
   if (!vesselId) throw createHttpError("vesselId required", 400);
   if (!userRankId) throw createHttpError("rankId required", 400);
