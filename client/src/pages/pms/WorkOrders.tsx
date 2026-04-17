@@ -1321,7 +1321,7 @@ const WorkOrders: React.FC = () => {
             <Calendar className="h-4 w-4" />
             Planner
           </Button>
-          {isSailAdmin && (
+          {(isSailAdmin || isClientAdmin || isHeadOfDept || isVessel) && (
           <Button 
             variant="outline" 
             size="sm"
