@@ -1543,6 +1543,8 @@ const WorkOrders: React.FC = () => {
           rowData={paginatedWorkOrders}
           height="100%"
           onRowClicked={(event: RowClickedEvent) => {
+            const target = event.event?.target as HTMLElement;
+            if (target?.closest('button')) return;
             if (event.data) handleWorkOrderClick(event.data);
           }}
           onSortChanged={handleWoSortChanged}
