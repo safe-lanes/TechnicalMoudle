@@ -73,7 +73,7 @@ const KPICard = ({ title, value, borderColor, textColor, onClick }: KPICardProps
   );
 };
 
-type ModalType = 'active' | 'resolved' | 'coc' | 'overdue' | 'criticalEquipment' | 'highPriority' | `status_${string}` | `vessel_${string}` | `vessel_status_${string}` | `defectCategory_${string}` | `defectType_${string}` | `equipmentCategory_${string}` | `component_${string}` | null;
+type ModalType = 'active' | 'resolved' | 'coc' | 'overdue' | 'criticalEquipment' | 'highPriority' | `status_${string}` | `vessel_${string}` | `vessel_status_${string}::${string}` | `defectCategory_${string}` | `defectType_${string}` | `equipmentCategory_${string}` | `component_${string}` | null;
 
 const UNSPECIFIED_KEY = '__UNSPECIFIED__';
 const OTHER_KEY = '__OTHER__';
@@ -246,6 +246,10 @@ export default function DefectsDashboard() {
     }
     return row;
   }).filter(v => VESSEL_STATUS_SERIES.some(s => (v[s.key] as number) > 0));
+
+  const presentVesselStatusSeries = VESSEL_STATUS_SERIES.filter(s =>
+    vesselData.some(v => (v[s.key] as number) > 0)
+  );
 
   const recentDefects = [...activeDefects]
     .sort((a, b) => {
@@ -768,7 +772,7 @@ export default function DefectsDashboard() {
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#6b7280' }} />
                   <Tooltip />
                   <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '2px' }} />
-                  {VESSEL_STATUS_SERIES.map((s) => (
+                  {presentVesselStatusSeries.map((s) => (
                     <Bar
                       key={s.key}
                       dataKey={s.key}
