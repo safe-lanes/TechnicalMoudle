@@ -4,29 +4,31 @@ import { queryClient } from "@/lib/queryClient";
 import { PageMarkers } from "./BulkDataImport";
 
 const FIELD_MAPPINGS = [
-  { field: "Vessel Code", required: true, description: "Vessel code (e.g., V001)" },
-  { field: "Component Code", required: true, description: "Must match existing component SFI code" },
-  { field: "Component Name", required: false, description: "Component name (auto-populated from component code)" },
-  { field: "Job Code", required: false, description: "Auto-generated as JOB-XXXXXXX" },
-  { field: "Job Category", required: false, description: "Category of the job" },
-  { field: "Maintenance Task", required: true, description: "Job title/maintenance task description" },
-  { field: "Maintenance Basis", required: true, description: "Calendar, Running Hours, or Condition Based" },
-  { field: "Frequency Value", required: false, description: "Required for Calendar/Running Hours (e.g., 6, 500)" },
-  { field: "Frequency Unit", required: false, description: "Required for Calendar only (Days, Weeks, Months, Years)" },
-  { field: "Task Type", required: true, description: "Inspection, Overhaul, Service, Testing, etc." },
-  { field: "Brief Job Description", required: false, description: "Detailed description of work to be done" },
-  { field: "Required Spare Parts", required: false, description: "Comma-separated list of spare part codes" },
-  { field: "Required Tools", required: false, description: "Comma-separated list of tool names" },
-  { field: "Required Safety Items", required: false, description: "Comma-separated list of safety requirements" },
-  { field: "Job Priority", required: false, description: "Low, Medium, High, or Critical" },
-  { field: "Planned Duration", required: false, description: "Estimated duration in hours" },
-  { field: "Last Done Date", required: false, description: "Date last completed (DD/MM/YYYY)" },
-  { field: "Initial Next Due", required: false, description: "Next due date (DD/MM/YYYY)" },
-  { field: "Person In Charge", required: false, description: "Person responsible for the job" },
-  { field: "Responsible Department", required: false, description: "Department responsible" },
-  { field: "Dept Code", required: false, description: "Department code" },
-  { field: "Class Related", required: false, description: "Yes or No" },
-  { field: "Critical", required: false, description: "Yes or No" },
+  { field: "Job Code",                   required: false, description: "Auto-generated if not provided" },
+  { field: "Fleet Equipment Code",       required: false, description: "Reference to fleet master equipment" },
+  { field: "Fleet Equipment Name",       required: false, description: "Fleet equipment description" },
+  { field: "WO Title",                   required: true,  description: "Work order title / maintenance task description" },
+  { field: "Component Code",             required: true,  description: "Must match existing component SFI code" },
+  { field: "Component Name",             required: false, description: "Auto-populated from component code" },
+  { field: "Maintenance Basis",          required: true,  description: "Calendar / Running Hours / Condition Based" },
+  { field: "Interval Value",             required: false, description: "Numeric interval (e.g., 6, 500) — required when Maintenance Basis is Calendar or Running Hours" },
+  { field: "Unit",                       required: false, description: "Days / Weeks / Months / Years / Hours — required when Maintenance Basis is Calendar or Running Hours" },
+  { field: "Task Type",                  required: true,  description: "Inspection, Overhaul, Service, Testing, etc." },
+  { field: "Assigned To",               required: true,  description: "Person or rank responsible for the job" },
+  { field: "Approver",                   required: true,  description: "Approval authority" },
+  { field: "Job Priority",               required: true,  description: "Low, Medium, High, or Critical" },
+  { field: "Class Related",              required: true,  description: "Yes or No" },
+  { field: "Last Done Date",             required: false, description: "Date last completed (DD-MMM-YYYY)" },
+  { field: "Brief Work Description",     required: true,  description: "Detailed description of work to be done" },
+  { field: "Department",                 required: true,  description: "Engine / Deck / Electrical" },
+  { field: "Criticality",               required: true,  description: "Yes or No" },
+  { field: "Is Active",                  required: false, description: "Yes or No — defaults to Yes" },
+  { field: "Vessel Code",                required: true,  description: "Vessel identification code (e.g., V001)" },
+  { field: "Required Spare Parts",       required: false, description: "Format: PartCode1:Qty1, PartCode2:Qty2" },
+  { field: "Required Tools",             required: false, description: "Semicolon-separated list of tools" },
+  { field: "PPE Requirements",           required: false, description: "Personal protective equipment required" },
+  { field: "Permit Requirements",        required: false, description: "Permits required (e.g., Hot Work, Enclosed Space Entry)" },
+  { field: "Other Safety Requirements",  required: false, description: "Additional safety requirements" },
 ];
 
 interface JobUploadProps {
@@ -51,7 +53,7 @@ export default function JobUpload({ vesselId, markers }: JobUploadProps) {
       templateFileName="jobs_template.xlsx"
       fieldMappings={FIELD_MAPPINGS}
       vesselId={vesselId}
-      previewColumns={["Vessel Code", "Component Code", "Maintenance Task"]}
+      previewColumns={["Component Code", "WO Title", "Maintenance Basis"]}
       onRefreshData={handleRefreshData}
       markers={markers ? {
         header: markers.uploadHeader,

@@ -3,13 +3,17 @@ import { Factory } from "lucide-react";
 import { useVessel } from "@/contexts/VesselContext";
 
 const FIELD_MAPPINGS = [
-  { field: "Maker Code", required: true, description: "Unique identifier for the maker (e.g., MAN, CAT, ABB)" },
-  { field: "Maker Name", required: true, description: "Full name of the manufacturer" },
-  { field: "Address", required: false, description: "Manufacturer address" },
-  { field: "Is Active", required: false, description: "Yes/No - defaults to Yes" },
+  { field: "Maker Code",      required: true,  description: "Unique identifier (e.g., MKR-000001)" },
+  { field: "Maker Name",      required: true,  description: "Full name of the manufacturer" },
+  { field: "Address",         required: false, description: "Manufacturer address" },
+  { field: "Address ID",      required: false, description: "Address reference ID" },
+  { field: "Contact Person",  required: false, description: "Contact person name" },
+  { field: "Email",           required: false, description: "Contact email address" },
+  { field: "Phone",           required: false, description: "Contact phone number" },
+  { field: "IS Active",       required: false, description: "Yes or No — defaults to Yes" },
 ];
 
-const PREVIEW_COLUMNS = ["Maker Code", "Maker Name", "Address", "Is Active"];
+const PREVIEW_COLUMNS = ["Maker Code", "Maker Name", "Address", "IS Active"];
 
 export default function MakerListUpload() {
   const { vesselId } = useVessel();
