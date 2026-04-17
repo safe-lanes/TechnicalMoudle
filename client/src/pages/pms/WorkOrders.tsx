@@ -1687,7 +1687,7 @@ const WorkOrders: React.FC = () => {
         }}
       />
 
-      {isSailAdmin && (
+      {(isSailAdmin || isClientAdmin || isHeadOfDept || isVessel) && (
       <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
         <DialogContent className="sm:max-w-md" data-testid="dialog-export-wo">
           <DialogHeader>
