@@ -707,7 +707,7 @@ export default function DefectsDashboard() {
                     paddingAngle={5}
                     dataKey="value"
                     labelLine={false}
-                    label={({ x, y, textAnchor, name, value }: any) => (
+                    label={({ x, y, textAnchor, name, value }: { x: number; y: number; textAnchor: string; name: string; value: number }) => (
                       <text x={x} y={y} textAnchor={textAnchor} dominantBaseline="central" fontSize={11} fill="#6b7280">
                         {`${name}: ${value}`}
                       </text>
@@ -808,7 +808,7 @@ export default function DefectsDashboard() {
                     paddingAngle={3}
                     dataKey="value"
                     labelLine={false}
-                    label={({ x, y, textAnchor, name, value }: any) => (
+                    label={({ x, y, textAnchor, name, value }: { x: number; y: number; textAnchor: string; name: string; value: number }) => (
                       <text x={x} y={y} textAnchor={textAnchor} dominantBaseline="central" fontSize={11} fill="#6b7280">
                         {`${name}: ${value}`}
                       </text>
@@ -855,7 +855,7 @@ export default function DefectsDashboard() {
                     paddingAngle={3}
                     dataKey="value"
                     labelLine={false}
-                    label={({ x, y, textAnchor, name, value }: any) => (
+                    label={({ x, y, textAnchor, name, value }: { x: number; y: number; textAnchor: string; name: string; value: number }) => (
                       <text x={x} y={y} textAnchor={textAnchor} dominantBaseline="central" fontSize={11} fill="#6b7280">
                         {`${name}: ${value}`}
                       </text>
