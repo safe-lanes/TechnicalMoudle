@@ -16,6 +16,7 @@ import {
   ChevronsUpDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
 import { useQuery } from "@tanstack/react-query";
 import { PeriodFilter, PeriodFilterValue, periodFilterToDateRange, getPeriodLabel } from "@/components/filters/PeriodFilter";
@@ -67,6 +68,7 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
   onReset,
   className,
 }) => {
+  const { isVessel, isHeadOfDept } = useUIRole();
   const { data: vessels = [] } = useVessels();
   const { options: departmentOptions } = useDepartmentOptions();
   const [vesselPopoverOpen, setVesselPopoverOpen] = useState(false);
@@ -257,79 +259,81 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
 
   return (
     <div className={cn("flex items-center gap-3 flex-wrap", className)} data-testid="global-filter-bar">
-      <Popover open={vesselPopoverOpen} onOpenChange={setVesselPopoverOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={vesselPopoverOpen}
-            className="w-[220px] justify-between h-9 text-sm font-normal"
-            data-testid="select-vessel-multi"
-          >
-            <div className="flex items-center gap-2 truncate">
-              <Ship className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-              <span className="truncate">{getVesselSummary()}</span>
+      {!isVessel && !isHeadOfDept && (
+        <Popover open={vesselPopoverOpen} onOpenChange={setVesselPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={vesselPopoverOpen}
+              className="w-[220px] justify-between h-9 text-sm font-normal"
+              data-testid="select-vessel-multi"
+            >
+              <div className="flex items-center gap-2 truncate">
+                <Ship className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <span className="truncate">{getVesselSummary()}</span>
+              </div>
+              <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[260px] p-0" align="start">
+            <div className="p-2 border-b">
+              <Input
+                placeholder="Search vessels..."
+                value={vesselSearch}
+                onChange={(e) => setVesselSearch(e.target.value)}
+                className="h-8 text-sm"
+                data-testid="input-vessel-search"
+              />
             </div>
-            <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[260px] p-0" align="start">
-          <div className="p-2 border-b">
-            <Input
-              placeholder="Search vessels..."
-              value={vesselSearch}
-              onChange={(e) => setVesselSearch(e.target.value)}
-              className="h-8 text-sm"
-              data-testid="input-vessel-search"
-            />
-          </div>
-          <div className="flex items-center justify-between px-2 py-1.5 border-b">
-            <button
-              type="button"
-              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
-              onClick={handleSelectAllVessels}
-              data-testid="button-select-all-vessels"
-            >
-              Select All
-            </button>
-            <button
-              type="button"
-              className="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
-              onClick={handleClearAllVessels}
-              data-testid="button-clear-all-vessels"
-            >
-              Clear All
-            </button>
-          </div>
-          <div className="max-h-[240px] overflow-y-auto p-1">
-            {filteredVessels.map((vessel) => {
-              const isChecked = filters.vessels.includes(vessel.id);
-              return (
-                <button
-                  key={vessel.id}
-                  type="button"
-                  className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors"
-                  onClick={() => handleVesselToggle(vessel.id)}
-                  data-testid={`checkbox-vessel-${vessel.id}`}
-                >
-                  <div className={cn(
-                    "h-4 w-4 rounded border flex items-center justify-center flex-shrink-0",
-                    isChecked
-                      ? "bg-primary border-primary"
-                      : "border-gray-300 dark:border-gray-600"
-                  )}>
-                    {isChecked && <Check className="h-3 w-3 text-primary-foreground" />}
-                  </div>
-                  <span className="truncate">{vessel.name}</span>
-                </button>
-              );
-            })}
-            {filteredVessels.length === 0 && (
-              <div className="px-3 py-4 text-center text-sm text-muted-foreground">No vessels found</div>
-            )}
-          </div>
-        </PopoverContent>
-      </Popover>
+            <div className="flex items-center justify-between px-2 py-1.5 border-b">
+              <button
+                type="button"
+                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                onClick={handleSelectAllVessels}
+                data-testid="button-select-all-vessels"
+              >
+                Select All
+              </button>
+              <button
+                type="button"
+                className="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
+                onClick={handleClearAllVessels}
+                data-testid="button-clear-all-vessels"
+              >
+                Clear All
+              </button>
+            </div>
+            <div className="max-h-[240px] overflow-y-auto p-1">
+              {filteredVessels.map((vessel) => {
+                const isChecked = filters.vessels.includes(vessel.id);
+                return (
+                  <button
+                    key={vessel.id}
+                    type="button"
+                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors"
+                    onClick={() => handleVesselToggle(vessel.id)}
+                    data-testid={`checkbox-vessel-${vessel.id}`}
+                  >
+                    <div className={cn(
+                      "h-4 w-4 rounded border flex items-center justify-center flex-shrink-0",
+                      isChecked
+                        ? "bg-primary border-primary"
+                        : "border-gray-300 dark:border-gray-600"
+                    )}>
+                      {isChecked && <Check className="h-3 w-3 text-primary-foreground" />}
+                    </div>
+                    <span className="truncate">{vessel.name}</span>
+                  </button>
+                );
+              })}
+              {filteredVessels.length === 0 && (
+                <div className="px-3 py-4 text-center text-sm text-muted-foreground">No vessels found</div>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
 
       <div className="relative w-[240px]" data-testid="component-search-wrapper">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
