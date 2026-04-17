@@ -73,7 +73,7 @@ const KPICard = ({ title, value, borderColor, textColor, onClick }: KPICardProps
   );
 };
 
-type ModalType = 'active' | 'resolved' | 'coc' | 'overdue' | 'criticalEquipment' | 'highPriority' | `status_${string}` | `vessel_${string}` | `vessel_active_${string}` | `vessel_closed_${string}` | `defectCategory_${string}` | `defectType_${string}` | `equipmentCategory_${string}` | `component_${string}` | null;
+type ModalType = 'active' | 'resolved' | 'coc' | 'overdue' | 'criticalEquipment' | 'highPriority' | `status_${string}` | `vessel_${string}` | `vessel_status_${string}` | `defectCategory_${string}` | `defectType_${string}` | `equipmentCategory_${string}` | `component_${string}` | null;
 
 const UNSPECIFIED_KEY = '__UNSPECIFIED__';
 const OTHER_KEY = '__OTHER__';
@@ -224,16 +224,28 @@ export default function DefectsDashboard() {
     { name: 'Verified', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Verified').length, color: '#00AF7B' },
   ].filter(s => s.value > 0);
 
+  const VESSEL_STATUS_SERIES: Array<{ key: string; color: string }> = [
+    { key: 'Reported', color: '#6b7280' },
+    { key: 'In Progress', color: '#3b82f6' },
+    { key: 'Extended', color: '#f97316' },
+    { key: 'Overdue', color: '#ff6961' },
+    { key: 'Closed', color: '#5dc86f' },
+    { key: 'Verified', color: '#00AF7B' },
+  ];
+
   const vesselData = vessels.map(vessel => {
     const vesselNameLower = (vessel.name || '').toLowerCase().trim();
     const matchesVessel = (d: any) => d.vesselId === vessel.id || (vesselNameLower && (d.vesselName || '').toLowerCase().trim() === vesselNameLower);
-    return {
+    const vesselDefects = defectsWithComputedStatus.filter(matchesVessel);
+    const row: Record<string, string | number> = {
       vessel: vessel.name || vessel.id,
       vesselId: vessel.id,
-      active: defectsWithComputedStatus.filter(d => matchesVessel(d) && isActiveComputedStatus(d.computedStatus.label)).length,
-      closed: defectsWithComputedStatus.filter(d => matchesVessel(d) && isResolvedComputedStatus(d.computedStatus.label)).length
     };
-  }).filter(v => v.active > 0 || v.closed > 0);
+    for (const s of VESSEL_STATUS_SERIES) {
+      row[s.key] = vesselDefects.filter(d => d.computedStatus.label === s.key).length;
+    }
+    return row;
+  }).filter(v => VESSEL_STATUS_SERIES.some(s => (v[s.key] as number) > 0));
 
   const recentDefects = [...activeDefects]
     .sort((a, b) => {
@@ -436,13 +448,15 @@ export default function DefectsDashboard() {
           const statusName = activeModal.replace('status_', '');
           return defectsWithComputedStatus.filter(d => d.computedStatus.label === statusName);
         }
-        if (activeModal.startsWith('vessel_active_')) {
-          const vId = activeModal.replace('vessel_active_', '');
-          return defectsWithComputedStatus.filter(d => defectMatchesVesselId(d, vId) && isActiveComputedStatus(d.computedStatus.label));
-        }
-        if (activeModal.startsWith('vessel_closed_')) {
-          const vId = activeModal.replace('vessel_closed_', '');
-          return defectsWithComputedStatus.filter(d => defectMatchesVesselId(d, vId) && isResolvedComputedStatus(d.computedStatus.label));
+        if (activeModal.startsWith('vessel_status_')) {
+          const rest = activeModal.replace('vessel_status_', '');
+          const sepIdx = rest.indexOf('::');
+          if (sepIdx > -1) {
+            const status = rest.slice(0, sepIdx);
+            const vId = rest.slice(sepIdx + 2);
+            return defectsWithComputedStatus.filter(d => defectMatchesVesselId(d, vId) && d.computedStatus.label === status);
+          }
+          return [];
         }
         if (activeModal.startsWith('vessel_')) {
           const vId = activeModal.replace('vessel_', '');
@@ -509,15 +523,16 @@ export default function DefectsDashboard() {
           const statusName = activeModal.replace('status_', '');
           return `${statusName} Defects`;
         }
-        if (activeModal.startsWith('vessel_active_')) {
-          const vId = activeModal.replace('vessel_active_', '');
-          const vName = vessels.find(v => v.id === vId)?.name || vId;
-          return `Active Defects - ${vName}`;
-        }
-        if (activeModal.startsWith('vessel_closed_')) {
-          const vId = activeModal.replace('vessel_closed_', '');
-          const vName = vessels.find(v => v.id === vId)?.name || vId;
-          return `Closed Defects - ${vName}`;
+        if (activeModal.startsWith('vessel_status_')) {
+          const rest = activeModal.replace('vessel_status_', '');
+          const sepIdx = rest.indexOf('::');
+          if (sepIdx > -1) {
+            const status = rest.slice(0, sepIdx);
+            const vId = rest.slice(sepIdx + 2);
+            const vName = vessels.find(v => v.id === vId)?.name || vId;
+            return `${status} Defects - ${vName}`;
+          }
+          return 'Defects';
         }
         if (activeModal.startsWith('vessel_')) {
           const vId = activeModal.replace('vessel_', '');
@@ -753,28 +768,21 @@ export default function DefectsDashboard() {
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#6b7280' }} />
                   <Tooltip />
                   <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '2px' }} />
-                  <Bar
-                    dataKey="active"
-                    fill="#ff6961"
-                    name="Active"
-                    style={{ cursor: 'pointer' }}
-                    onClick={(data: any) => {
-                      if (data && data.vesselId && data.active > 0) {
-                        setActiveModal(`vessel_active_${data.vesselId}` as ModalType);
-                      }
-                    }}
-                  />
-                  <Bar
-                    dataKey="closed"
-                    fill="#5dc86f"
-                    name="Closed"
-                    style={{ cursor: 'pointer' }}
-                    onClick={(data: any) => {
-                      if (data && data.vesselId && data.closed > 0) {
-                        setActiveModal(`vessel_closed_${data.vesselId}` as ModalType);
-                      }
-                    }}
-                  />
+                  {VESSEL_STATUS_SERIES.map((s) => (
+                    <Bar
+                      key={s.key}
+                      dataKey={s.key}
+                      stackId="status"
+                      fill={s.color}
+                      name={s.key}
+                      style={{ cursor: 'pointer' }}
+                      onClick={(data: any) => {
+                        if (data && data.vesselId && (data[s.key] as number) > 0) {
+                          setActiveModal(`vessel_status_${s.key}::${data.vesselId}` as ModalType);
+                        }
+                      }}
+                    />
+                  ))}
                 </BarChart>
               </ResponsiveContainer>
             )}
