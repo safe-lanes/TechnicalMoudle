@@ -22,7 +22,7 @@ export function Marker({ id }: { id: string }) {
     whiteSpace: 'nowrap' as const,
     lineHeight: 1.2,
     letterSpacing: '0.5px',
-    fontFamily: 'Inter, system-ui, sans-serif',
+    fontFamily: '"Roboto", monospace',
     textShadow: '0 1px 1px rgba(0,0,0,0.3)',
   };
   

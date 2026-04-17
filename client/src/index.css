@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -55,7 +55,7 @@
   --ag-pinned-row-border-color: #e5e7eb;
   --ag-header-background-color: #52baf3;
   --ag-header-foreground-color: white;
-  --ag-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ag-font-family: "Roboto", monospace;
   --ag-font-size: 13px;
   --ag-cell-horizontal-padding: 16px;
   --ag-header-cell-horizontal-padding: 16px;
@@ -106,7 +106,7 @@
 /* AG Grid Tooltip styling - match table text size */
 .ag-tooltip {
   font-size: 13px !important;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  font-family: "Roboto", monospace !important;
   background-color: #1f2937 !important;
   color: white !important;
   padding: 8px 12px !important;
@@ -557,7 +557,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: "Roboto", monospace;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }

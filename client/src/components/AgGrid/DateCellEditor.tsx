@@ -148,7 +148,7 @@ const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((prop
       onKeyDown={handleKeyDown}
       className="w-full h-full px-2 py-1 border-2 border-[#52baf3] rounded outline-none bg-white text-[13px] text-[#4f5863]"
       style={{ 
-        fontFamily: 'Inter, sans-serif',
+        fontFamily: '"Roboto", monospace',
         minWidth: '140px'
       }}
       data-testid={`date-editor-${props.data?.id}-${props.colDef?.field}`}
