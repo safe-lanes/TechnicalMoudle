@@ -485,8 +485,16 @@ export async function getScopedOperationData(req: Request, res: Response) {
   const userRankId = user.rankId as string | undefined;
   const userRole = user.role as string | undefined;
   const userVesselId = user.vesselId as string | undefined;
+  const authRankName = (user.rankName as string | undefined)?.trim() || undefined;
   const queryRankName = typeof req.query.rankName === 'string' ? req.query.rankName.trim() : '';
-  const userRankName = queryRankName || (user.rankName as string | undefined);
+  // Accept rankName from query for cache-key consistency, but only honor it
+  // when it matches the authenticated user's rank (case-insensitive). This
+  // prevents privilege escalation via tampered query params while still
+  // satisfying the "query param, fallback to req.user.rankName" contract.
+  const userRankName =
+    queryRankName && authRankName && queryRankName.toLowerCase() === authRankName.toLowerCase()
+      ? queryRankName
+      : authRankName;
   const mode = (req.query.mode as string) === 'me' ? 'me' as const : 'myTeam' as const;
   if (!vesselId) return res.status(400).json({ error: 'vesselId required' });
   const result = await woService.getScopedOperationData(vesselId, userRankId, mode, userRole, userVesselId, userRankName);
