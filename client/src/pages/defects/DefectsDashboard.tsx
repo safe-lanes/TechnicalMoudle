@@ -706,7 +706,12 @@ export default function DefectsDashboard() {
                     outerRadius={80}
                     paddingAngle={5}
                     dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
+                    labelLine={false}
+                    label={({ x, y, textAnchor, name, value }: any) => (
+                      <text x={x} y={y} textAnchor={textAnchor} dominantBaseline="central" fontSize={11} fill="#6b7280">
+                        {`${name}: ${value}`}
+                      </text>
+                    )}
                     style={{ cursor: 'pointer' }}
                     onClick={(_data: any, index: number) => {
                       const clicked = statusData[index];
@@ -744,8 +749,8 @@ export default function DefectsDashboard() {
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={vesselData} style={{ cursor: 'pointer' }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="vessel" angle={-45} textAnchor="end" height={80} />
-                  <YAxis allowDecimals={false} />
+                  <XAxis dataKey="vessel" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 11, fill: '#6b7280' }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#6b7280' }} />
                   <Tooltip />
                   <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '2px' }} />
                   <Bar
@@ -802,7 +807,12 @@ export default function DefectsDashboard() {
                     outerRadius={80}
                     paddingAngle={3}
                     dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
+                    labelLine={false}
+                    label={({ x, y, textAnchor, name, value }: any) => (
+                      <text x={x} y={y} textAnchor={textAnchor} dominantBaseline="central" fontSize={11} fill="#6b7280">
+                        {`${name}: ${value}`}
+                      </text>
+                    )}
                     style={{ cursor: 'pointer' }}
                     onClick={(_data: any, index: number) => {
                       const clicked = defectCategoryData[index];
@@ -844,7 +854,12 @@ export default function DefectsDashboard() {
                     outerRadius={80}
                     paddingAngle={3}
                     dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
+                    labelLine={false}
+                    label={({ x, y, textAnchor, name, value }: any) => (
+                      <text x={x} y={y} textAnchor={textAnchor} dominantBaseline="central" fontSize={11} fill="#6b7280">
+                        {`${name}: ${value}`}
+                      </text>
+                    )}
                     style={{ cursor: 'pointer' }}
                     onClick={(_data: any, index: number) => {
                       const clicked = defectTypeData[index];
@@ -881,8 +896,8 @@ export default function DefectsDashboard() {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={equipmentCategoryData} margin={{ top: 10, right: 20, left: 0, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={80} />
-                  <YAxis allowDecimals={false} />
+                  <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={80} tick={{ fontSize: 11, fill: '#6b7280' }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#6b7280' }} />
                   <Tooltip />
                   <Bar
                     dataKey="value"
@@ -920,8 +935,8 @@ export default function DefectsDashboard() {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={componentData} margin={{ top: 10, right: 20, left: 0, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={80} tickFormatter={(v: string) => (v && v.length > 18 ? `${v.slice(0, 18)}…` : v)} />
-                  <YAxis allowDecimals={false} />
+                  <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={80} tick={{ fontSize: 11, fill: '#6b7280' }} tickFormatter={(v: string) => (v && v.length > 18 ? `${v.slice(0, 18)}…` : v)} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#6b7280' }} />
                   <Tooltip content={<ComponentTooltip />} />
                   <Bar
                     dataKey="value"
