@@ -231,16 +231,17 @@ export default function DefectsDashboard() {
     setPeriodValue(getYtdPeriod());
   };
 
-  const DEFECT_CATEGORY_COLORS = [
+  const DEFECT_CHART_COLORS = [
     '#52baf3', '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b',
     '#10b981', '#06b6d4', '#ef4444', '#84cc16', '#f97316', '#6b7280',
   ];
 
-  const defectCategoryData = (() => {
+  const buildTop10 = (getValue: (d: typeof defectsWithComputedStatus[number]) => string | null | undefined) => {
     const counts = new Map<string, number>();
     for (const d of defectsWithComputedStatus) {
-      const raw = d.defectCategory ? String(d.defectCategory).trim() : '';
-      const key = raw || 'Unspecified';
+      const raw = getValue(d);
+      const trimmed = raw ? String(raw).trim() : '';
+      const key = trimmed || 'Unspecified';
       counts.set(key, (counts.get(key) || 0) + 1);
     }
     const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
@@ -249,17 +250,20 @@ export default function DefectsDashboard() {
     const data = top10.map(([name, value], i) => ({
       name,
       value,
-      color: DEFECT_CATEGORY_COLORS[i % DEFECT_CATEGORY_COLORS.length],
+      color: DEFECT_CHART_COLORS[i % DEFECT_CHART_COLORS.length],
     }));
     if (rest.length > 0) {
       data.push({
         name: 'Other',
         value: rest.reduce((sum, [, v]) => sum + v, 0),
-        color: DEFECT_CATEGORY_COLORS[DEFECT_CATEGORY_COLORS.length - 1],
+        color: DEFECT_CHART_COLORS[DEFECT_CHART_COLORS.length - 1],
       });
     }
     return data;
-  })();
+  };
+
+  const defectCategoryData = buildTop10(d => d.defectCategory);
+  const defectTypeData = buildTop10(d => d.defectType);
 
   const navigateToDefectLog = (filter?: string) => {
     const params = new URLSearchParams();
@@ -608,6 +612,44 @@ export default function DefectsDashboard() {
                   >
                     {defectCategoryData.map((entry, index) => (
                       <Cell key={`cat-cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white" data-testid="card-top-defect-types">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Top 10 Defect Types</span>
+              <Activity className="h-5 w-5 text-gray-400" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {defectTypeData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-[250px] text-gray-400">
+                <CheckCircle className="h-12 w-12 mb-2" />
+                <p>No defects to display</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={defectTypeData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={3}
+                    dataKey="value"
+                    label={({ name, value }) => `${name}: ${value}`}
+                  >
+                    {defectTypeData.map((entry, index) => (
+                      <Cell key={`type-cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip />
