@@ -2343,7 +2343,7 @@ const Stores: React.FC = () => {
                         {index === 0 && <Marker id={getMarkerId(activeTab, "30")} />}
                         <Info className="h-4 w-4 text-blue-600" />
                       </Button>
-                      {!isVessel && canEditStore && (
+                      {(!isVessel && !isHeadOfDept || isModifyMode) && canEditStore && (
                         <Button 
                           variant="ghost" 
                           size="sm" 
