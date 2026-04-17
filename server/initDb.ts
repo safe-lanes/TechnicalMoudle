@@ -257,6 +257,24 @@ async function runIndexMigrations(db: any): Promise<void> {
             LOWER(BTRIM(r.label)) = LOWER(BTRIM(wo.assigned_to))
           )
       `);
+      // Reverse direction: where the rank-id is valid but the text is
+      // missing/blank, populate the text from the rank dictionary so
+      // the Work Orders Assigned To column shows a label rather than
+      // appearing unassigned.
+      const fillMissingText = await db.execute(sql`
+        UPDATE work_orders wo
+        SET assigned_to = COALESCE(NULLIF(BTRIM(r.label), ''), r.name)
+        FROM adm_available_ranks r
+        WHERE wo.assigned_to_rank_id IS NOT NULL
+          AND wo.assigned_to_rank_id <> ''
+          AND wo.assigned_to_rank_id = r.rank_id
+          AND r.is_deleted = false
+          AND (
+            wo.assigned_to IS NULL
+            OR BTRIM(wo.assigned_to) = ''
+            OR LOWER(BTRIM(wo.assigned_to)) = 'unassigned'
+          )
+      `);
       const clearOnUnassign = await db.execute(sql`
         UPDATE work_orders
         SET assigned_to_rank_id = NULL
@@ -270,10 +288,11 @@ async function runIndexMigrations(db: any): Promise<void> {
       `);
       const filled = (fillMissing as any).rowCount ?? 0;
       const corrected = (fixStale as any).rowCount ?? 0;
+      const filledText = (fillMissingText as any).rowCount ?? 0;
       const cleared = (clearOnUnassign as any).rowCount ?? 0;
-      if (filled || corrected || cleared) {
+      if (filled || corrected || filledText || cleared) {
         console.log(
-          `✅ Work-order assignment backfill: filled=${filled}, corrected=${corrected}, cleared=${cleared}`
+          `✅ Work-order assignment backfill: filled=${filled}, corrected=${corrected}, filledText=${filledText}, cleared=${cleared}`
         );
       } else {
         console.log('✅ Work-order assignment backfill: already aligned');

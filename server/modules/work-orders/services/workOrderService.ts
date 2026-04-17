@@ -49,8 +49,16 @@ export interface AssignmentFields {
  * Mutates and returns the same object for convenience.
  */
 export async function applyAssignmentSync<T extends AssignmentFields>(data: T): Promise<T> {
+  const textKeyPresent = Object.prototype.hasOwnProperty.call(data, 'assignedTo');
+  const isExplicitNullText = textKeyPresent && data.assignedTo === null;
   const hasText = typeof data.assignedTo === 'string';
   const hasRankId = typeof data.assignedToRankId === 'string' && data.assignedToRankId.length > 0;
+
+  // Explicit null text means "unassign" — clear the rank-id too.
+  if (isExplicitNullText) {
+    data.assignedToRankId = null;
+    return data;
+  }
 
   if (hasText) {
     const trimmed = (data.assignedTo as string).trim();
