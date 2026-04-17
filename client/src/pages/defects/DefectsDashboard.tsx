@@ -76,8 +76,17 @@ const KPICard = ({ title, value, borderColor, textColor, onClick }: KPICardProps
 type ModalType = 'active' | 'resolved' | 'coc' | 'overdue' | 'criticalEquipment' | 'highPriority' | `status_${string}` | `vessel_${string}` | `vessel_active_${string}` | `vessel_closed_${string}` | null;
 
 export default function DefectsDashboard() {
+  const getYtdPeriod = (): PeriodValue => {
+    const now = new Date();
+    return {
+      mode: 'dateRange',
+      dateFrom: new Date(now.getFullYear(), 0, 1),
+      dateTo: now,
+    };
+  };
+
   const [selectedVessel, setSelectedVessel] = useState("all");
-  const [periodValue, setPeriodValue] = useState<PeriodValue | null>(null);
+  const [periodValue, setPeriodValue] = useState<PeriodValue | null>(() => getYtdPeriod());
   const [showFilters, setShowFilters] = useState(true);
   const [activeTab, setActiveTab] = useState<'management' | 'operation'>('management');
   const [activeModal, setActiveModal] = useState<ModalType>(null);
@@ -219,8 +228,38 @@ export default function DefectsDashboard() {
 
   const handleClearFilters = () => {
     setSelectedVessel('all');
-    setPeriodValue(null);
+    setPeriodValue(getYtdPeriod());
   };
+
+  const DEFECT_CATEGORY_COLORS = [
+    '#52baf3', '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b',
+    '#10b981', '#06b6d4', '#ef4444', '#84cc16', '#f97316', '#6b7280',
+  ];
+
+  const defectCategoryData = (() => {
+    const counts = new Map<string, number>();
+    for (const d of defectsWithComputedStatus) {
+      const raw = d.defectCategory ? String(d.defectCategory).trim() : '';
+      const key = raw || 'Unspecified';
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+    const top10 = sorted.slice(0, 10);
+    const rest = sorted.slice(10);
+    const data = top10.map(([name, value], i) => ({
+      name,
+      value,
+      color: DEFECT_CATEGORY_COLORS[i % DEFECT_CATEGORY_COLORS.length],
+    }));
+    if (rest.length > 0) {
+      data.push({
+        name: 'Other',
+        value: rest.reduce((sum, [, v]) => sum + v, 0),
+        color: DEFECT_CATEGORY_COLORS[DEFECT_CATEGORY_COLORS.length - 1],
+      });
+    }
+    return data;
+  })();
 
   const navigateToDefectLog = (filter?: string) => {
     const params = new URLSearchParams();
@@ -534,6 +573,46 @@ export default function DefectsDashboard() {
                     }}
                   />
                 </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="bg-white" data-testid="card-top-defect-categories">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Top 10 Defect Categories</span>
+              <Activity className="h-5 w-5 text-gray-400" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {defectCategoryData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-[250px] text-gray-400">
+                <CheckCircle className="h-12 w-12 mb-2" />
+                <p>No defects to display</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={defectCategoryData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={3}
+                    dataKey="value"
+                    label={({ name, value }) => `${name}: ${value}`}
+                  >
+                    {defectCategoryData.map((entry, index) => (
+                      <Cell key={`cat-cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
               </ResponsiveContainer>
             )}
           </CardContent>
