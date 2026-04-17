@@ -465,8 +465,9 @@ export default function DefectsDashboard() {
           const sfx = activeModal.replace('component_', '');
           if (sfx === OTHER_KEY) {
             return defectsWithComputedStatus.filter(d => {
-              const cid = d.componentId ? String(d.componentId).trim() : '';
-              return cid !== '' && !topComponentIds.has(cid);
+              const raw = d.componentId ? String(d.componentId).trim() : '';
+              const key = raw || UNSPECIFIED_KEY;
+              return !topComponentIds.has(key);
             });
           }
           if (sfx === UNSPECIFIED_KEY) {
