@@ -108,6 +108,21 @@ export default function DefectsDashboard() {
 
   const { data: masterVessels = [], isLoading: isLoadingVessels } = useVessels();
 
+  const { data: allComponents = [] } = useQuery<Array<{ cuuid: string; id: string; componentCode?: string; name?: string }>>({
+    queryKey: ['/technical/api/components'],
+  });
+
+  const componentLookup = (() => {
+    const map = new Map<string, { name: string; code: string }>();
+    for (const c of allComponents) {
+      const code = (c.componentCode || c.id || '').toString();
+      const name = (c.name || code || 'Unnamed').toString();
+      if (c.cuuid) map.set(c.cuuid, { name, code });
+      if (c.id) map.set(c.id, { name, code });
+    }
+    return map;
+  })();
+
   const selectedVesselObj = selectedVessel !== 'all' ? masterVessels.find(v => v.id === selectedVessel) : null;
   const selectedVesselNameLower = selectedVesselObj?.name?.toLowerCase().trim() || '';
 
@@ -265,6 +280,61 @@ export default function DefectsDashboard() {
   const defectCategoryData = buildTop10(d => d.defectCategory);
   const defectTypeData = buildTop10(d => d.defectType);
   const equipmentCategoryData = buildTop10(d => d.equipmentCategory);
+
+  const componentData = (() => {
+    const counts = new Map<string, { count: number; name: string; code: string }>();
+    for (const d of defectsWithComputedStatus) {
+      const cid = d.componentId ? String(d.componentId).trim() : '';
+      if (!cid) {
+        const existing = counts.get('__unspecified__');
+        counts.set('__unspecified__', {
+          count: (existing?.count || 0) + 1,
+          name: 'Unspecified',
+          code: '',
+        });
+        continue;
+      }
+      const lookup = componentLookup.get(cid);
+      const name = lookup?.name || cid;
+      const code = lookup?.code || '';
+      const existing = counts.get(cid);
+      counts.set(cid, {
+        count: (existing?.count || 0) + 1,
+        name,
+        code,
+      });
+    }
+    const sorted = Array.from(counts.values()).sort((a, b) => b.count - a.count);
+    const top10 = sorted.slice(0, 10);
+    const rest = sorted.slice(10);
+    const data = top10.map((entry, i) => ({
+      name: entry.name,
+      code: entry.code,
+      value: entry.count,
+      color: DEFECT_CHART_COLORS[i % DEFECT_CHART_COLORS.length],
+    }));
+    if (rest.length > 0) {
+      data.push({
+        name: 'Other',
+        code: '',
+        value: rest.reduce((sum, e) => sum + e.count, 0),
+        color: DEFECT_CHART_COLORS[DEFECT_CHART_COLORS.length - 1],
+      });
+    }
+    return data;
+  })();
+
+  const ComponentTooltip = ({ active, payload }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const item = payload[0].payload;
+    return (
+      <div className="bg-white border border-gray-200 rounded-md shadow-md px-3 py-2 text-xs">
+        <div className="font-medium text-gray-900">{item.name}</div>
+        {item.code && <div className="text-gray-500">Code: {item.code}</div>}
+        <div className="text-gray-700 mt-1">Defects: {item.value}</div>
+      </div>
+    );
+  };
 
   const navigateToDefectLog = (filter?: string) => {
     const params = new URLSearchParams();
@@ -662,7 +732,7 @@ export default function DefectsDashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-white" data-testid="card-top-equipment-categories">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -686,6 +756,37 @@ export default function DefectsDashboard() {
                   <Bar dataKey="value" name="Defects" fill="#52baf3">
                     {equipmentCategoryData.map((entry, index) => (
                       <Cell key={`eqcat-cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white" data-testid="card-top-components">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Top 10 Components</span>
+              <Activity className="h-5 w-5 text-gray-400" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {componentData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-[300px] text-gray-400">
+                <CheckCircle className="h-12 w-12 mb-2" />
+                <p>No defects to display</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={componentData} margin={{ top: 10, right: 20, left: 0, bottom: 60 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={80} tickFormatter={(v: string) => (v && v.length > 18 ? `${v.slice(0, 18)}…` : v)} />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip content={<ComponentTooltip />} />
+                  <Bar dataKey="value" name="Defects" fill="#52baf3">
+                    {componentData.map((entry, index) => (
+                      <Cell key={`comp-cell-${index}`} fill={entry.color} />
                     ))}
                   </Bar>
                 </BarChart>
