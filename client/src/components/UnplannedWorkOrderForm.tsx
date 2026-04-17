@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SectionBlock } from '@/components/SectionBlock';
 import { PartHeader } from '@/components/PartHeader';
 import type { Component } from "@shared/schema";
+import { useRanks, ensureRankInOptions } from "@/hooks/useRanks";
 
 interface UnplannedWorkOrderFormProps {
   isOpen: boolean;
@@ -53,28 +54,7 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
     enabled: isOpen && !!vesselId,
   });
 
-  const ranks = [
-    "Master",
-    "Chief Officer",
-    "2nd Officer",
-    "3rd Officer",
-    "Chief Engineer",
-    "2nd Engineer",
-    "3rd Engineer",
-    "4th Engineer",
-    "Deck Cadet",
-    "Engine Cadet",
-    "Bosun",
-    "Pumpman",
-    "Electrician",
-    "Fitter",
-    "Able Seaman",
-    "Ordinary Seaman",
-    "Oiler",
-    "Wiper",
-    "Cook",
-    "Steward"
-  ];
+  const { ranks: rankOptions } = useRanks();
 
   const departments = [
     "Deck",
@@ -340,8 +320,8 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
                           <SelectValue placeholder="Select rank" />
                         </SelectTrigger>
                         <SelectContent>
-                          {ranks.map((rank) => (
-                            <SelectItem key={rank} value={rank}>{rank}</SelectItem>
+                          {ensureRankInOptions(rankOptions, formData.assignedTo).map((r) => (
+                            <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -357,8 +337,8 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
                           <SelectValue placeholder="Select rank" />
                         </SelectTrigger>
                         <SelectContent>
-                          {ranks.map((rank) => (
-                            <SelectItem key={rank} value={rank}>{rank}</SelectItem>
+                          {ensureRankInOptions(rankOptions, formData.approver).map((r) => (
+                            <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

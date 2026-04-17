@@ -24,6 +24,7 @@ import { SectionBlock } from "@/components/SectionBlock";
 import { PartHeader } from "@/components/PartHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { useToast } from "@/hooks/use-toast";
+import { useRanks, ensureRankInOptions, getRankLabel } from "@/hooks/useRanks";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -31,7 +32,7 @@ import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
 
-const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string; type?: "text" | "textarea" }> = ({ label, value, labelMarker, valueMarker, type = "text" }) => (
+const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string; type?: "text" | "textarea"; displayValue?: string }> = ({ label, value, labelMarker, valueMarker, type = "text", displayValue }) => (
   <div className="space-y-2">
     <Label className="text-sm text-[#8798ad]" data-testid={labelMarker}>
       {labelMarker && <Marker id={labelMarker} />}
@@ -40,12 +41,12 @@ const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelM
     {type === "textarea" ? (
       <div className="relative" data-testid={valueMarker}>
         {valueMarker && <Marker id={valueMarker} />}
-        <Textarea disabled value={value || '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default min-h-[80px]" rows={3} />
+        <Textarea disabled value={displayValue ?? value ?? '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default min-h-[80px]" rows={3} />
       </div>
     ) : (
       <div className="relative" data-testid={valueMarker}>
         {valueMarker && <Marker id={valueMarker} />}
-        <Input disabled value={value || '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default" />
+        <Input disabled value={displayValue ?? value ?? '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default" />
       </div>
     )}
   </div>
@@ -60,9 +61,10 @@ interface EditableFieldProps {
   isModifyMode: boolean;
   isEditMode?: boolean;
   type?: "text" | "select" | "textarea";
-  options?: string[];
+  options?: Array<string | { value: string; label: string }>;
   labelMarker?: string;
   valueMarker?: string;
+  displayValue?: string;
 }
 
 const EditableField: React.FC<EditableFieldProps> = ({ 
@@ -76,13 +78,14 @@ const EditableField: React.FC<EditableFieldProps> = ({
   type = "text",
   options = [],
   labelMarker,
-  valueMarker
+  valueMarker,
+  displayValue
 }) => {
   const isChanged = value !== originalValue;
   const canEdit = isModifyMode || isEditMode;
   
   if (!canEdit) {
-    return <ReadOnlyField label={label} value={value} labelMarker={labelMarker} valueMarker={valueMarker} type={type} />;
+    return <ReadOnlyField label={label} value={value} labelMarker={labelMarker} valueMarker={valueMarker} type={type} displayValue={displayValue} />;
   }
   
   return (
@@ -97,9 +100,10 @@ const EditableField: React.FC<EditableFieldProps> = ({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {options.map(opt => (
-              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-            ))}
+            {options.map(opt => {
+              const o = typeof opt === 'string' ? { value: opt, label: opt } : opt;
+              return <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>;
+            })}
           </SelectContent>
         </Select>
       ) : type === "textarea" ? (
@@ -132,6 +136,7 @@ const JobsFormPage: React.FC = () => {
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
   const { vessels } = useVessels();
   
+  const { ranks: rankOptions } = useRanks();
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -1055,7 +1060,8 @@ const JobsFormPage: React.FC = () => {
                     isModifyMode={isModifyMode}
                     isEditMode={isEditMode}
                     type="select"
-                    options={['Master', 'Chief Officer', '2nd Officer', '3rd Officer', 'Chief Engineer', '2nd Engineer', '3rd Engineer', '4th Engineer', 'Deck Cadet', 'Engine Cadet', 'Bosun', 'Pumpman', 'Electrician', 'Fitter', 'Able Seaman', 'Ordinary Seaman', 'Oiler', 'Wiper', 'Cook', 'Steward']}
+                    options={ensureRankInOptions(rankOptions, templateData.assignedTo)}
+                    displayValue={getRankLabel(rankOptions, templateData.assignedTo)}
                     labelMarker="JF.A1.17"
                     valueMarker="JF.A1.18"
                   />
@@ -1068,7 +1074,8 @@ const JobsFormPage: React.FC = () => {
                     isModifyMode={isModifyMode}
                     isEditMode={isEditMode}
                     type="select"
-                    options={['Master', 'Chief Officer', '2nd Officer', '3rd Officer', 'Chief Engineer', '2nd Engineer', '3rd Engineer', '4th Engineer', 'Deck Cadet', 'Engine Cadet', 'Bosun', 'Pumpman', 'Electrician', 'Fitter', 'Able Seaman', 'Ordinary Seaman', 'Oiler', 'Wiper', 'Cook', 'Steward']}
+                    options={ensureRankInOptions(rankOptions, templateData.approver)}
+                    displayValue={getRankLabel(rankOptions, templateData.approver)}
                     labelMarker="JF.A1.19"
                     valueMarker="JF.A1.20"
                   />

@@ -44,6 +44,7 @@ import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import WorkInstructionsDialog from "@/components/WorkInstructionsDialog";
 import { useToast } from "@/hooks/use-toast";
+import { useRanks, ensureRankInOptions } from "@/hooks/useRanks";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -883,31 +884,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   });
 
-  const baseRanks = [
-    "Master",
-    "Chief Officer",
-    "2nd Officer",
-    "3rd Officer",
-    "Chief Engineer",
-    "2nd Engineer",
-    "3rd Engineer",
-    "4th Engineer",
-    "Deck Cadet",
-    "Engine Cadet",
-    "Bosun",
-    "Pumpman",
-    "Electrician",
-    "Fitter",
-    "Able Seaman",
-    "Ordinary Seaman",
-    "Oiler",
-    "Wiper",
-    "Cook",
-    "Steward"
-  ];
-  const ranks = templateData.assignedTo && !baseRanks.includes(templateData.assignedTo)
-    ? [...baseRanks, templateData.assignedTo]
-    : baseRanks;
+  const { ranks: rankOptions } = useRanks();
+  const ranksForAssignedTo = ensureRankInOptions(rankOptions, templateData.assignedTo);
+  const ranksForApprover = ensureRankInOptions(rankOptions, templateData.approver);
+  const ranksForPerformedBy = ensureRankInOptions(rankOptions, executionData.performedBy);
 
   const generateWOExecutionId = () => {
     const uniqueId = Math.floor(Math.random() * 9000000) + 1000000;
@@ -3816,8 +3796,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <SelectValue placeholder="Select rank" />
                     </SelectTrigger>
                     <SelectContent>
-                      {ranks.map((rank) => (
-                        <SelectItem key={rank} value={rank}>{rank}</SelectItem>
+                      {ranksForAssignedTo.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -3834,8 +3814,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <SelectValue placeholder="Select rank" />
                     </SelectTrigger>
                     <SelectContent>
-                      {ranks.map((rank) => (
-                        <SelectItem key={rank} value={rank}>{rank}</SelectItem>
+                      {ranksForApprover.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -5057,8 +5037,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         <SelectValue placeholder="Select rank" />
                       </SelectTrigger>
                       <SelectContent>
-                        {ranks.map((rank) => (
-                          <SelectItem key={rank} value={rank}>{rank}</SelectItem>
+                        {ranksForPerformedBy.map((r) => (
+                          <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

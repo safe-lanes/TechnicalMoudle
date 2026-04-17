@@ -18,6 +18,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Marker } from "@/components/Marker";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRanks } from "@/hooks/useRanks";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Master Lists Management
@@ -483,6 +484,8 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
               </Button>
             )}
           </div>
+        ) : selectedListType === 'rank' ? (
+          <RankReadOnlyView />
         ) : isLoading ? (
           <div className="space-y-3">
             {[...Array(5)].map((_, i) => (
@@ -956,6 +959,54 @@ export default function MasterListsManagement({ onBack }: { onBack?: () => void 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+function RankReadOnlyView() {
+  const { ranks, isLoading, isError } = useRanks();
+  return (
+    <div className="space-y-3">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 flex items-center gap-2" data-testid="banner-rank-readonly">
+        <Lock className="h-4 w-4" />
+        <span>Ranks are managed centrally in <strong>Admin &rsaquo; Ranks</strong>. This is a read-only mirror &mdash; add, edit or reorder ranks from the Ranks Admin screen.</span>
+      </div>
+      {isLoading ? (
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-12 bg-gray-100 animate-pulse rounded"></div>
+          ))}
+        </div>
+      ) : isError ? (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+          <p className="text-red-700">Failed to load ranks</p>
+        </div>
+      ) : ranks.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-gray-500">No ranks defined yet. Add ranks from Ranks Admin.</p>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-auto bg-white rounded-lg border border-gray-200">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-[#52baf3]">
+                <th className="text-left text-white py-3 px-4 font-medium">Order</th>
+                <th className="text-left text-white py-3 px-4 font-medium">Name (stored)</th>
+                <th className="text-left text-white py-3 px-4 font-medium">Label (displayed)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ranks.map((r, index) => (
+                <tr key={r.value} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} data-testid={`row-rank-readonly-${r.value}`}>
+                  <td className="py-3 px-4 text-gray-600">{index + 1}</td>
+                  <td className="py-3 px-4 font-mono text-blue-600">{r.value}</td>
+                  <td className="py-3 px-4 font-medium">{r.label}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
