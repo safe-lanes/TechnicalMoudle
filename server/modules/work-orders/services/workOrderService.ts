@@ -323,15 +323,20 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[]) {
       ? wo.assignedTo
       : (job?.assignedTo || 'Unassigned');
 
-    // Backfill assignedToRankId from the resolved rank-name text when missing.
-    // Old rows + the unassigned→job-rank fallback above can leave the
-    // rank-id column null even though the rank-name column is valid; that
-    // gap is what made Dashboard Me/My Team counts diverge from the
-    // Work Orders module's Assigned To filter.
-    let resolvedAssignedToRankId: string | null = wo.assignedToRankId ?? null;
-    if (!resolvedAssignedToRankId && resolvedAssignedTo && resolvedAssignedTo !== 'Unassigned') {
+    // Canonical rule: assignedTo (the rank-name text shown by the Work
+    // Orders module) is the source of truth. Always re-resolve
+    // assignedToRankId from that text so a stale OR missing rank-id can
+    // never make a row disagree with what the Work Orders "Assigned To"
+    // column shows. Only fall back to the stored rank-id when the text
+    // does not resolve to any known rank (e.g. unassigned, or data-entry
+    // typos that have no matching rank in adm_available_ranks).
+    let resolvedAssignedToRankId: string | null = null;
+    if (resolvedAssignedTo && resolvedAssignedTo !== 'Unassigned') {
       const key = resolvedAssignedTo.toLowerCase().trim();
       resolvedAssignedToRankId = rankLabelMap.get(key) ?? null;
+    }
+    if (!resolvedAssignedToRankId) {
+      resolvedAssignedToRankId = wo.assignedToRankId ?? null;
     }
 
     return {
@@ -674,7 +679,11 @@ export async function createWorkOrder(body: any) {
     }
   }
 
-  if (workOrderData.assignedTo && !workOrderData.assignedToRankId) {
+  // Keep assignedToRankId in lock-step with assignedTo (text is canonical).
+  // Always re-resolve from text on writes so stale/incorrect rank-ids
+  // sent by clients can never persist a row that disagrees with the
+  // Work Orders Assigned To column.
+  if (workOrderData.assignedTo) {
     const rankId = await resolveRankIdFromLabel(workOrderData.assignedTo);
     if (rankId) {
       workOrderData = { ...workOrderData, assignedToRankId: rankId };
@@ -732,7 +741,11 @@ export async function updateWorkOrder(id: string, body: any) {
 
   let updateData = { ...body };
 
-  if (updateData.assignedTo && !updateData.assignedToRankId) {
+  // Keep assignedToRankId in lock-step with assignedTo (text is canonical).
+  // Always re-resolve from text on writes so a stale/incorrect rank-id
+  // sent by clients can never persist a row that disagrees with the
+  // Work Orders Assigned To column.
+  if (updateData.assignedTo) {
     const rankId = await resolveRankIdFromLabel(updateData.assignedTo);
     if (rankId) {
       updateData.assignedToRankId = rankId;
