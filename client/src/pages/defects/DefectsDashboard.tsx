@@ -300,8 +300,11 @@ export default function DefectsDashboard() {
         code: lookup?.code || '',
       };
     }
-    const hwName = d.componentHardwareLevel3 ? String(d.componentHardwareLevel3).trim() : '';
-    const hwCode = d.componentHardwareLevel2 ? String(d.componentHardwareLevel2).trim() : '';
+    const hwL3 = d.componentHardwareLevel3 ? String(d.componentHardwareLevel3).trim() : '';
+    const hwL2 = d.componentHardwareLevel2 ? String(d.componentHardwareLevel2).trim() : '';
+    const hwL1 = d.componentHardwareLevel1 ? String(d.componentHardwareLevel1).trim() : '';
+    const hwName = hwL3 || hwL2 || hwL1;
+    const hwCode = hwL3 ? hwL2 : '';
     if (hwName) {
       return {
         id: `${HW_PREFIX}${hwName}`,
@@ -539,6 +542,9 @@ export default function DefectsDashboard() {
           const sfx = activeModal.replace('component_', '');
           if (sfx === OTHER_KEY) return 'Defects - Component: Other';
           if (sfx === UNSPECIFIED_KEY) return 'Defects - Component: Unspecified';
+          if (sfx.startsWith(HW_PREFIX)) {
+            return `Defects - Component: ${sfx.slice(HW_PREFIX.length)}`;
+          }
           const lookup = componentLookup.get(sfx);
           if (lookup) {
             return `Defects - Component: ${lookup.name}${lookup.code ? ` (${lookup.code})` : ''}`;
