@@ -415,13 +415,13 @@ const Dashboard = () => {
   }
 
   const { currentUser } = useAuth();
-  const userRankName = currentUser?.rankName ?? '';
+  const userRankName = currentUser?.rank_name ?? '';
 
   const { data: scopedResponse } = useQuery<ScopedOperationResponse>({
     queryKey: ['/technical/api/scoped-operation-data', effectiveVesselId, hodScope, userRankName],
     queryFn: async () => {
       const params = new URLSearchParams({ mode: hodScope });
-      if (userRankName) params.set('rankName', userRankName);
+      if (userRankName) params.set('rank_name', userRankName);
       const response = await fetch(
         `/technical/api/scoped-operation-data/${effectiveVesselId}?${params.toString()}`
       );

@@ -35,7 +35,7 @@ export type PublicUser = Omit<User, "password" | "role"> & {
   role: UserRole;
   crewDesignation?: string;
   rankId?: string;
-  rankName?: string;
+  rank_name?: string;
   userType?: "Office" | "Ship";
   userUuid?: string;
   firstname?: string;

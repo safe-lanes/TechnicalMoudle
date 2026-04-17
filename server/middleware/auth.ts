@@ -67,7 +67,7 @@ export const requireVesselAccess = (req: AuthenticatedRequest, res: Response, ne
 };
 
 export async function initMockAuthRankId() {
-  console.log(`✅ Mock auth using rankName: "${MOCK_RANK_NAME}"`);
+  console.log(`✅ Mock auth using rank_name: "${MOCK_RANK_NAME}"`);
 }
 
 export const mockAuthMiddleware = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -83,7 +83,7 @@ export const mockAuthMiddleware = (req: AuthenticatedRequest, res: Response, nex
     isActive: true,
     userUuid: "00000000-0000-0000-0000-000000000001",
     crewDesignation: "Marine Manager",
-    rankName: MOCK_RANK_NAME,
+    rank_name: MOCK_RANK_NAME,
     userType: "Office",
     createdAt: new Date(),
     updatedAt: new Date(),

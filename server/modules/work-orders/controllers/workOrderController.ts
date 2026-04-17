@@ -485,12 +485,13 @@ export async function getScopedOperationData(req: Request, res: Response) {
   const userRankId = user.rankId as string | undefined;
   const userRole = user.role as string | undefined;
   const userVesselId = user.vesselId as string | undefined;
-  const authRankName = (user.rankName as string | undefined)?.trim() || undefined;
-  const queryRankName = typeof req.query.rankName === 'string' ? req.query.rankName.trim() : '';
-  // Accept rankName from query for cache-key consistency, but only honor it
+  const authRankName = (user.rank_name as string | undefined)?.trim() || undefined;
+  const rawQueryRankName = req.query.rank_name ?? req.query.rankName;
+  const queryRankName = typeof rawQueryRankName === 'string' ? rawQueryRankName.trim() : '';
+  // Accept rank_name from query for cache-key consistency, but only honor it
   // when it matches the authenticated user's rank (case-insensitive). This
   // prevents privilege escalation via tampered query params while still
-  // satisfying the "query param, fallback to req.user.rankName" contract.
+  // satisfying the "query param, fallback to req.user.rank_name" contract.
   const userRankName =
     queryRankName && authRankName && queryRankName.toLowerCase() === authRankName.toLowerCase()
       ? queryRankName
