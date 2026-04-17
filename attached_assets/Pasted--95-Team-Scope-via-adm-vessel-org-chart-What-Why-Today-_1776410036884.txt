@@ -1,0 +1,20 @@
+#95 - Team Scope via adm_vessel_org_chart
+What & Why
+Today the dashboard's Me / My Team toggle relies on vessel_org_chart_nodes, which requires per-vessel org-chart setup with is_assigned = true. None of the current nodes are assigned, so every user lands on the amber "Team scope not configured" banner. Switch the team-scoping logic to use the already-populated adm_vessel_org_chart table, matched by rank name (which the logged-in user always carries), so the toggle works out of the box.
+Done looks like
+Logging in as a user whose rankName exists in adm_vessel_org_chart (e.g. the default "Master" user) shows the blue "Showing Me/My Team scope" banner instead of the amber fallback banner.
+The Me / My Team toggle is enabled and switches the dashboard work-order KPIs between own-rank-only and own-rank + all descendants in the rank tree.
+For a "Master" user the team includes Master plus its parent_rank_id children (Chief Cook, Tester, plus any deeper descendants). Verified by Overdue WO / Planned for Today / Pending Approvals counts changing between Me and My Team.
+The amber "Team scope not configured" banner appears only when the user's rankName truly does not exist in adm_vessel_org_chart (genuine misconfiguration).
+The Replit mock-auth fallback uses rankName: "Master" consistently with the frontend default user — no more "no rank found for Marine Manager" warning at startup.
+Out of scope
+Spares, anomalies, and PMS-request KPIs stay vessel-wide (no team filter on those).
+Restricting the toggle to only userType === 'Ship' users — the toggle remains visible for all users for now; rank-based scoping just works for whoever has a valid rank.
+Any UI for editing adm_vessel_org_chart (already exists separately).
+Migrations or schema changes to adm_vessel_org_chart itself — table structure is already correct.
+Tasks
+Expose rankName end-to-end on the client. Make the dashboard send the logged-in user's rank name to the scoped-operation-data endpoint as a query parameter, and include it in the React Query cache key so the data refreshes when the user changes.
+Add a rank-name-based hierarchy resolver on the server. Implement a new resolver in the ranks module that loads adm_vessel_org_chart (rows where is_deleted = false), finds the matching row by case-insensitive rank-name match, builds a parent_rank_id → children map, and walks descendants to produce me (just the user's rank_id) and myTeam (user's rank_id plus all descendant rank_ids). Return the same { hasMapping, hasDescendants, me, myTeam } shape the work-order service already consumes.
+Switch the work-order scoped service to the new resolver. Replace the current call to the node-based resolver with the new rank-name-based one. Accept rankName from the request (query param, falling back to req.user.rankName). Keep the existing fallback behaviour: when no mapping is found, fall back to vessel-wide for users with vessel-wide access and own-rank for Ship users without it. Keep the work-order filter by assignedToRankId unchanged.
+Fix Replit mock auth to use rankName. Drop the failing "Marine Manager" rank-id resolution at startup. Set req.user.rankName = "Master" directly so the mock user matches the frontend's DEFAULT_USER and resolves cleanly against adm_vessel_org_chart.
+Verify behaviour. With the default "Master" user on the existing vessel, confirm the toggle is enabled, the blue active banner shows, and Me vs My Team produces different work-order counts (Master alone vs Master + Chief Cook + Tester).
