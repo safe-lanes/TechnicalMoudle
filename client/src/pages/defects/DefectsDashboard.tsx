@@ -79,6 +79,7 @@ export default function DefectsDashboard() {
   const [selectedVessel, setSelectedVessel] = useState("all");
   const [periodValue, setPeriodValue] = useState<PeriodValue | null>(null);
   const [showFilters, setShowFilters] = useState(true);
+  const [activeTab, setActiveTab] = useState<'management' | 'operation'>('management');
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [viewModal, setViewModal] = useState<{ open: boolean; defectId: string | null }>({ 
     open: false, 
@@ -321,8 +322,30 @@ export default function DefectsDashboard() {
     <div className="flex flex-col bg-gray-50 dark:bg-gray-900" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Header */}
       <div className="flex-shrink-0">
-        <div className="flex items-center justify-between mb-4 gap-4">
+        <div className="flex items-center justify-between mb-4 gap-4 relative">
           <h1 className="text-2xl font-bold text-black dark:text-white">Defects Dashboard</h1>
+
+          <div className="absolute left-1/2 -translate-x-1/2 bg-gray-100 rounded-md p-1 flex items-center gap-1">
+            <button
+              onClick={() => setActiveTab('management')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'management' ? 'bg-[#52baf3] text-white' : 'text-gray-700 hover:bg-gray-200'
+              }`}
+              data-testid="tab-management"
+            >
+              Management
+            </button>
+            <button
+              onClick={() => setActiveTab('operation')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'operation' ? 'bg-[#52baf3] text-white' : 'text-gray-700 hover:bg-gray-200'
+              }`}
+              data-testid="tab-operation"
+            >
+              Operation
+            </button>
+          </div>
+
           <div className="flex items-center gap-3">
             <Button
               variant="outline"
@@ -377,6 +400,8 @@ export default function DefectsDashboard() {
       {/* Dashboard Content */}
       <div className="flex-1 overflow-y-auto space-y-6">
 
+      {activeTab === 'management' && (
+      <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <KPICard
           title="Overdue Defects"
@@ -514,8 +539,11 @@ export default function DefectsDashboard() {
           </CardContent>
         </Card>
       </div>
+      </>
+      )}
 
-      <Card className="bg-white">
+      {activeTab === 'operation' && (
+      <Card className="bg-white" data-testid="card-recent-active-defects">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center space-x-2">
@@ -610,6 +638,7 @@ export default function DefectsDashboard() {
           )}
         </CardContent>
       </Card>
+      )}
       </div>
 
       <DefectsListModal
