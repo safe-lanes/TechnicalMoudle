@@ -5,7 +5,7 @@ export interface AuthenticatedRequest extends Request {
   user?: PublicUser;
 }
 
-const MOCK_RANK_NAME = "Master";
+const DEFAULT_MOCK_RANK_NAME = "Chief Engineer";
 
 export const requireAuth = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   if (!req.user) {
@@ -67,10 +67,24 @@ export const requireVesselAccess = (req: AuthenticatedRequest, res: Response, ne
 };
 
 export async function initMockAuthRankId() {
-  console.log(`✅ Mock auth using rank_name: "${MOCK_RANK_NAME}"`);
+  console.log(
+    `✅ Mock auth resolves rank_name per-request (x-rank header → body.rank → "${DEFAULT_MOCK_RANK_NAME}")`,
+  );
 }
 
 export const mockAuthMiddleware = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const headerRankRaw = req.headers["x-rank"];
+  const headerRank = Array.isArray(headerRankRaw) ? headerRankRaw[0] : headerRankRaw;
+  const bodyRank =
+    req.body && typeof req.body === "object" && typeof (req.body as any).rank === "string"
+      ? ((req.body as any).rank as string)
+      : undefined;
+
+  const resolvedRank =
+    (typeof headerRank === "string" && headerRank.trim()) ||
+    (bodyRank && bodyRank.trim()) ||
+    DEFAULT_MOCK_RANK_NAME;
+
   req.user = {
     id: 1,
     username: "sail_admin",
@@ -83,7 +97,7 @@ export const mockAuthMiddleware = (req: AuthenticatedRequest, res: Response, nex
     isActive: true,
     userUuid: "00000000-0000-0000-0000-000000000001",
     crewDesignation: "Marine Manager",
-    rank_name: MOCK_RANK_NAME,
+    rank_name: resolvedRank,
     userType: "Office",
     createdAt: new Date(),
     updatedAt: new Date(),
