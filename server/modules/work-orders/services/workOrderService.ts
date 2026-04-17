@@ -14,10 +14,27 @@ async function resolveRankIdFromLabel(assignedTo: string | null | undefined): Pr
   const { getAllRanks } = await import('../../ranks/service');
   const allRanks = await getAllRanks();
   const label = assignedTo.toLowerCase().trim();
+  if (!label || label === 'unassigned') return null;
   const match = allRanks.find(
     (r: any) => r.name?.toLowerCase().trim() === label || r.label?.toLowerCase().trim() === label
   );
   return match?.rankId ?? null;
+}
+
+// Build a fast in-memory lookup of rank name/label → rankId.
+// Used during listWorkOrders enrichment to backfill missing assignedToRankId.
+async function buildRankLabelMap(): Promise<Map<string, string>> {
+  const { getAllRanks } = await import('../../ranks/service');
+  const allRanks = await getAllRanks();
+  const map = new Map<string, string>();
+  for (const r of allRanks as any[]) {
+    if (!r?.rankId) continue;
+    const name = r.name?.toLowerCase().trim();
+    const label = r.label?.toLowerCase().trim();
+    if (name && !map.has(name)) map.set(name, r.rankId);
+    if (label && !map.has(label)) map.set(label, r.rankId);
+  }
+  return map;
 }
 
 function calculateBackdatingDaysForApproval(completionDate: string | null | undefined, submittedDate: string | null | undefined): number {
@@ -177,6 +194,12 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[]) {
     }
   }
 
+  // Build rank-name → rankId lookup once per call so we can backfill any
+  // work orders whose assignedToRankId is missing or out of sync with assignedTo.
+  // This is what keeps Dashboard Me/My Team scoping aligned with the
+  // Work Orders module's "Assigned To" column.
+  const rankLabelMap = await buildRankLabelMap();
+
   const database = await getDb();
   const plannerDateMap = new Map<string, string>();
   if (vesselId) {
@@ -296,11 +319,25 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[]) {
     const plannerKey = (wo.jobId && componentId) ? `${wo.jobId}::${componentId}` : null;
     const plannedDate = plannerKey ? (plannerDateMap.get(plannerKey) || null) : null;
 
+    const resolvedAssignedTo = (wo.assignedTo && wo.assignedTo !== 'Unassigned')
+      ? wo.assignedTo
+      : (job?.assignedTo || 'Unassigned');
+
+    // Backfill assignedToRankId from the resolved rank-name text when missing.
+    // Old rows + the unassigned→job-rank fallback above can leave the
+    // rank-id column null even though the rank-name column is valid; that
+    // gap is what made Dashboard Me/My Team counts diverge from the
+    // Work Orders module's Assigned To filter.
+    let resolvedAssignedToRankId: string | null = wo.assignedToRankId ?? null;
+    if (!resolvedAssignedToRankId && resolvedAssignedTo && resolvedAssignedTo !== 'Unassigned') {
+      const key = resolvedAssignedTo.toLowerCase().trim();
+      resolvedAssignedToRankId = rankLabelMap.get(key) ?? null;
+    }
+
     return {
       ...wo,
-      assignedTo: (wo.assignedTo && wo.assignedTo !== 'Unassigned')
-        ? wo.assignedTo
-        : (job?.assignedTo || 'Unassigned'),
+      assignedTo: resolvedAssignedTo,
+      assignedToRankId: resolvedAssignedToRankId,
       criticality: wo.criticality || job?.criticality || null,
       computedStatus: woComputedStatus,
       missedCycles: liveMissedCycles,
@@ -1660,13 +1697,34 @@ export async function saveOverdueReason(id: string, overdueReason: string, overd
 
 function filterWorkOrdersByRankId(
   workOrders: any[],
-  scopeRankIds: Set<string>
+  scopeRankIds: Set<string>,
+  scopeRankNames?: Set<string>
 ): any[] {
   return workOrders.filter((wo: any) => {
     const rankId = wo.assignedToRankId;
-    if (!rankId) return false;
-    return scopeRankIds.has(rankId);
+    if (rankId && scopeRankIds.has(rankId)) return true;
+    // Fallback: match by rank-name text so a row whose rank-id column is
+    // still null is not silently excluded from the dashboard's scoped counts.
+    if (scopeRankNames && wo.assignedTo) {
+      const key = String(wo.assignedTo).toLowerCase().trim();
+      if (key && key !== 'unassigned' && scopeRankNames.has(key)) return true;
+    }
+    return false;
   });
+}
+
+async function buildScopeRankNameSet(rankIds: string[]): Promise<Set<string>> {
+  if (!rankIds.length) return new Set();
+  const { getAllRanks } = await import('../../ranks/service');
+  const allRanks = await getAllRanks();
+  const idSet = new Set(rankIds);
+  const names = new Set<string>();
+  for (const r of allRanks as any[]) {
+    if (!idSet.has(r.rankId)) continue;
+    if (r.name) names.add(String(r.name).toLowerCase().trim());
+    if (r.label) names.add(String(r.label).toLowerCase().trim());
+  }
+  return names;
 }
 
 function hasVesselWideAccess(
@@ -1717,7 +1775,9 @@ export async function getScopedOperationData(
     if (!vesselWideAccessGranted || isShipRole) {
       const ownRankIds: string[] = userRankId ? [userRankId] : [];
       const ownRankSet = new Set<string>(ownRankIds);
-      const ownRankWOs = filterWorkOrdersByRankId(allWOs, ownRankSet);
+      const ownRankNameSet = new Set<string>();
+      if (userRankName) ownRankNameSet.add(userRankName.toLowerCase().trim());
+      const ownRankWOs = filterWorkOrdersByRankId(allWOs, ownRankSet, ownRankNameSet);
       return {
         workOrders: ownRankWOs,
         scopeMeta: {
@@ -1746,9 +1806,10 @@ export async function getScopedOperationData(
 
   const bucket = mode === 'me' ? scope.me : scope.myTeam;
   const scopeRankIdSet = new Set(bucket.rankIds);
+  const scopeRankNameSet = await buildScopeRankNameSet(bucket.rankIds);
 
   const allWOs = await listWorkOrders(vesselId);
-  const filteredWOs = filterWorkOrdersByRankId(allWOs, scopeRankIdSet);
+  const filteredWOs = filterWorkOrdersByRankId(allWOs, scopeRankIdSet, scopeRankNameSet);
 
   return {
     workOrders: filteredWOs,
