@@ -907,11 +907,7 @@ export default function DefectsDashboard() {
                     onClick={(data: any) => {
                       if (data) openChartModal('equipmentCategory', data.name, undefined, data.value, !!data.isOther);
                     }}
-                  >
-                    {equipmentCategoryData.map((entry, index) => (
-                      <Cell key={`eqcat-cell-${index}`} fill={entry.color} style={{ cursor: 'pointer' }} />
-                    ))}
-                  </Bar>
+                  />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -946,11 +942,7 @@ export default function DefectsDashboard() {
                     onClick={(data: any) => {
                       if (data) openChartModal('component', data.name, data.id, data.value, data.id === OTHER_KEY);
                     }}
-                  >
-                    {componentData.map((entry, index) => (
-                      <Cell key={`comp-cell-${index}`} fill={entry.color} style={{ cursor: 'pointer' }} />
-                    ))}
-                  </Bar>
+                  />
                 </BarChart>
               </ResponsiveContainer>
             )}
