@@ -2560,7 +2560,7 @@ export async function createWorkOrderFromRow(row: any, templateCode: string, ves
     briefWorkDescription: row['Job_Description'] || null
   };
 
-  await applyAssignmentSync(workOrderData as any);
+  await applyAssignmentSync(workOrderData);
   return await storage.createWorkOrder(workOrderData);
 }
 

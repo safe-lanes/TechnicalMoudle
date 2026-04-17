@@ -22,32 +22,61 @@ async function resolveRankIdFromLabel(assignedTo: string | null | undefined): Pr
 }
 
 /**
+ * Typed contract for any record that carries the work-order assignment
+ * pair. Both fields are optional/nullable so this works for create
+ * payloads, partial PATCH updates, and import rows alike.
+ */
+export interface AssignmentFields {
+  assignedTo?: string | null;
+  assignedToRankId?: string | null;
+}
+
+/**
  * Single source of truth for keeping `assignedTo` (rank-name text) and
  * `assignedToRankId` (rank UUID) in lock-step on every write path
  * (manual create/update, bulk import, auto-generated WOs).
  *
- * Rule: `assignedTo` text is canonical. After this helper:
- *   - If `assignedTo` resolves to a known rank, `assignedToRankId` is set
- *     to that rank's id (overwriting any stale/incorrect client value).
- *   - If `assignedTo` is empty/Unassigned, `assignedToRankId` is cleared
- *     to null (preventing stale rank-ids from surviving an unassign).
- *   - If `assignedTo` is non-empty but does NOT resolve (e.g. data-entry
- *     typos that have no matching rank), `assignedToRankId` is cleared
- *     to null so it can never silently disagree with the displayed text.
+ * Bidirectional rule:
+ *   - If `assignedTo` text is provided and resolves, `assignedToRankId`
+ *     is set to that rank's id (overwriting any stale client value).
+ *   - If `assignedTo` text is provided but is empty/Unassigned/
+ *     unresolvable, `assignedToRankId` is cleared to null (so unassign
+ *     transitions and typos can never leave a stale rank-id behind).
+ *   - If only `assignedToRankId` is provided (no text), the rank is
+ *     looked up and `assignedTo` is populated from its label (or name
+ *     as fallback). This covers callers that only know the rank id.
  *
  * Mutates and returns the same object for convenience.
  */
-export async function applyAssignmentSync<T extends { assignedTo?: any; assignedToRankId?: any }>(
-  data: T
-): Promise<T> {
-  const text = typeof data.assignedTo === 'string' ? data.assignedTo : '';
-  const trimmed = text.trim();
-  if (!trimmed || trimmed.toLowerCase() === 'unassigned') {
-    (data as any).assignedToRankId = null;
+export async function applyAssignmentSync<T extends AssignmentFields>(data: T): Promise<T> {
+  const hasText = typeof data.assignedTo === 'string';
+  const hasRankId = typeof data.assignedToRankId === 'string' && data.assignedToRankId.length > 0;
+
+  if (hasText) {
+    const trimmed = (data.assignedTo as string).trim();
+    if (!trimmed || trimmed.toLowerCase() === 'unassigned') {
+      data.assignedToRankId = null;
+      return data;
+    }
+    const rankId = await resolveRankIdFromLabel(trimmed);
+    data.assignedToRankId = rankId; // null when unresolvable, by design
     return data;
   }
-  const rankId = await resolveRankIdFromLabel(trimmed);
-  (data as any).assignedToRankId = rankId; // null when unresolvable, by design
+
+  if (hasRankId) {
+    const { getAllRanks } = await import('../../ranks/service');
+    const allRanks = (await getAllRanks()) as Array<{ rankId: string; name?: string; label?: string }>;
+    const match = allRanks.find((r) => r.rankId === data.assignedToRankId);
+    if (match) {
+      data.assignedTo = match.label || match.name || null;
+    } else {
+      // Rank id does not resolve to any known rank — clear both so the
+      // record cannot drift from the rank dictionary.
+      data.assignedTo = null;
+      data.assignedToRankId = null;
+    }
+  }
+
   return data;
 }
 

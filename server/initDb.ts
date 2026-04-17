@@ -220,6 +220,67 @@ async function runIndexMigrations(db: any): Promise<void> {
     }
     
     console.log('✅ Index migrations completed - unique constraints now include vessel_id');
+
+    // Persistent backfill: keep work_orders.assigned_to_rank_id in lock-step
+    // with work_orders.assigned_to (rank-name text) for legacy rows where
+    // the rank-id column drifted (was empty, or pointed at a different
+    // rank than what the text resolves to). Run on every boot — the WHERE
+    // clauses make it a no-op once rows are aligned, so it self-quiesces.
+    try {
+      const fillMissing = await db.execute(sql`
+        UPDATE work_orders wo
+        SET assigned_to_rank_id = r.rank_id
+        FROM adm_available_ranks r
+        WHERE (wo.assigned_to_rank_id IS NULL OR wo.assigned_to_rank_id = '')
+          AND wo.assigned_to IS NOT NULL
+          AND BTRIM(wo.assigned_to) <> ''
+          AND LOWER(BTRIM(wo.assigned_to)) <> 'unassigned'
+          AND r.is_deleted = false
+          AND (
+            LOWER(BTRIM(r.name))  = LOWER(BTRIM(wo.assigned_to)) OR
+            LOWER(BTRIM(r.label)) = LOWER(BTRIM(wo.assigned_to))
+          )
+      `);
+      const fixStale = await db.execute(sql`
+        UPDATE work_orders wo
+        SET assigned_to_rank_id = r.rank_id
+        FROM adm_available_ranks r
+        WHERE wo.assigned_to_rank_id IS NOT NULL
+          AND wo.assigned_to_rank_id <> ''
+          AND wo.assigned_to_rank_id <> r.rank_id
+          AND wo.assigned_to IS NOT NULL
+          AND BTRIM(wo.assigned_to) <> ''
+          AND LOWER(BTRIM(wo.assigned_to)) <> 'unassigned'
+          AND r.is_deleted = false
+          AND (
+            LOWER(BTRIM(r.name))  = LOWER(BTRIM(wo.assigned_to)) OR
+            LOWER(BTRIM(r.label)) = LOWER(BTRIM(wo.assigned_to))
+          )
+      `);
+      const clearOnUnassign = await db.execute(sql`
+        UPDATE work_orders
+        SET assigned_to_rank_id = NULL
+        WHERE assigned_to_rank_id IS NOT NULL
+          AND assigned_to_rank_id <> ''
+          AND (
+            assigned_to IS NULL
+            OR BTRIM(assigned_to) = ''
+            OR LOWER(BTRIM(assigned_to)) = 'unassigned'
+          )
+      `);
+      const filled = (fillMissing as any).rowCount ?? 0;
+      const corrected = (fixStale as any).rowCount ?? 0;
+      const cleared = (clearOnUnassign as any).rowCount ?? 0;
+      if (filled || corrected || cleared) {
+        console.log(
+          `✅ Work-order assignment backfill: filled=${filled}, corrected=${corrected}, cleared=${cleared}`
+        );
+      } else {
+        console.log('✅ Work-order assignment backfill: already aligned');
+      }
+    } catch (e: any) {
+      console.error('⚠️ Work-order assignment backfill warning:', e?.message);
+    }
   } catch (error: any) {
     console.error('⚠️ Index migration warning:', error.message);
     // Don't throw - these are non-critical migrations that might already be applied
