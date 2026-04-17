@@ -238,15 +238,16 @@ export default function BulkUpdateSpares() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button 
-              variant="ghost" 
-              size="sm" 
+              variant="outline"
+              size="sm"
+              className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
               onClick={() => window.history.back()}
               data-testid="button-back"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-            <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100">Bulk Update Spares</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Bulk Update Spares</h1>
           </div>
           <div className="text-sm text-gray-500">
             Updating {filteredSpares.length} spare(s) {bulkSearchQuery && `(filtered)`}
@@ -519,16 +520,19 @@ export default function BulkUpdateSpares() {
             <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50 dark:bg-gray-700">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-600 dark:text-gray-300">Show</span>
-                <select
-                  value={itemsPerPage}
-                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                  className="border rounded px-2 py-1 text-sm"
-                  data-testid="select-items-per-page"
+                <Select
+                  value={String(itemsPerPage)}
+                  onValueChange={(val) => setItemsPerPage(Number(val))}
                 >
-                  {ITEMS_PER_PAGE_OPTIONS.map(option => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-16 h-8 text-sm" data-testid="select-items-per-page">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ITEMS_PER_PAGE_OPTIONS.map(option => (
+                      <SelectItem key={option} value={String(option)}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <span className="text-sm text-gray-600 dark:text-gray-300">per page</span>
               </div>
               
@@ -592,13 +596,17 @@ export default function BulkUpdateSpares() {
       <div className="bg-white dark:bg-gray-800 border-t px-6 py-4">
         <div className="w-full flex justify-end gap-3">
           <Button 
-            variant="outline" 
+            variant="outline"
+            size="sm"
+            className="h-8 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
             onClick={() => window.history.back()}
             data-testid="button-cancel"
           >
             Cancel
           </Button>
           <Button 
+            size="sm"
+            className="h-8 bg-[#5dc86f] hover:bg-[#4db85f] text-white"
             onClick={() => setShowConfirmDialog(true)}
             disabled={!canEditSpare || !transactionMode || !hasAnyChanges || bulkUpdateMutation.isPending}
             data-testid="button-save-updates"
