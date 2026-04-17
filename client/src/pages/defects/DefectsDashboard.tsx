@@ -73,7 +73,10 @@ const KPICard = ({ title, value, borderColor, textColor, onClick }: KPICardProps
   );
 };
 
-type ModalType = 'active' | 'resolved' | 'coc' | 'overdue' | 'criticalEquipment' | 'highPriority' | `status_${string}` | `vessel_${string}` | `vessel_active_${string}` | `vessel_closed_${string}` | null;
+type ModalType = 'active' | 'resolved' | 'coc' | 'overdue' | 'criticalEquipment' | 'highPriority' | `status_${string}` | `vessel_${string}` | `vessel_active_${string}` | `vessel_closed_${string}` | `defectCategory_${string}` | `defectType_${string}` | `equipmentCategory_${string}` | `component_${string}` | null;
+
+const UNSPECIFIED_KEY = '__UNSPECIFIED__';
+const OTHER_KEY = '__OTHER__';
 
 export default function DefectsDashboard() {
   const getYtdPeriod = (): PeriodValue => {
@@ -262,7 +265,7 @@ export default function DefectsDashboard() {
     const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
     const top10 = sorted.slice(0, 10);
     const rest = sorted.slice(10);
-    const data = top10.map(([name, value], i) => ({
+    const data: Array<{ name: string; value: number; color: string; isOther?: boolean }> = top10.map(([name, value], i) => ({
       name,
       value,
       color: DEFECT_CHART_COLORS[i % DEFECT_CHART_COLORS.length],
@@ -272,22 +275,28 @@ export default function DefectsDashboard() {
         name: 'Other',
         value: rest.reduce((sum, [, v]) => sum + v, 0),
         color: DEFECT_CHART_COLORS[DEFECT_CHART_COLORS.length - 1],
+        isOther: true,
       });
     }
-    return data;
+    const topKeys = new Set(top10.map(([name]) => name));
+    return { data, topKeys };
   };
 
-  const defectCategoryData = buildTop10(d => d.defectCategory);
-  const defectTypeData = buildTop10(d => d.defectType);
-  const equipmentCategoryData = buildTop10(d => d.equipmentCategory);
+  const defectCategoryAgg = buildTop10(d => d.defectCategory);
+  const defectTypeAgg = buildTop10(d => d.defectType);
+  const equipmentCategoryAgg = buildTop10(d => d.equipmentCategory);
+  const defectCategoryData = defectCategoryAgg.data;
+  const defectTypeData = defectTypeAgg.data;
+  const equipmentCategoryData = equipmentCategoryAgg.data;
 
   const componentData = (() => {
-    const counts = new Map<string, { count: number; name: string; code: string }>();
+    const counts = new Map<string, { id: string; count: number; name: string; code: string }>();
     for (const d of defectsWithComputedStatus) {
       const cid = d.componentId ? String(d.componentId).trim() : '';
       if (!cid) {
-        const existing = counts.get('__unspecified__');
-        counts.set('__unspecified__', {
+        const existing = counts.get(UNSPECIFIED_KEY);
+        counts.set(UNSPECIFIED_KEY, {
+          id: UNSPECIFIED_KEY,
           count: (existing?.count || 0) + 1,
           name: 'Unspecified',
           code: '',
@@ -299,6 +308,7 @@ export default function DefectsDashboard() {
       const code = lookup?.code || '';
       const existing = counts.get(cid);
       counts.set(cid, {
+        id: cid,
         count: (existing?.count || 0) + 1,
         name,
         code,
@@ -308,6 +318,7 @@ export default function DefectsDashboard() {
     const top10 = sorted.slice(0, 10);
     const rest = sorted.slice(10);
     const data = top10.map((entry, i) => ({
+      id: entry.id,
       name: entry.name,
       code: entry.code,
       value: entry.count,
@@ -315,6 +326,7 @@ export default function DefectsDashboard() {
     }));
     if (rest.length > 0) {
       data.push({
+        id: OTHER_KEY,
         name: 'Other',
         code: '',
         value: rest.reduce((sum, e) => sum + e.count, 0),
@@ -323,6 +335,36 @@ export default function DefectsDashboard() {
     }
     return data;
   })();
+
+  const topDefectCategoryNames = defectCategoryAgg.topKeys;
+  const topDefectTypeNames = defectTypeAgg.topKeys;
+  const topEquipmentCategoryNames = equipmentCategoryAgg.topKeys;
+  const topComponentIds = new Set(componentData.filter(d => d.id !== OTHER_KEY).map(d => d.id));
+
+  const normalizeFieldKey = (raw: string | null | undefined) => {
+    const trimmed = raw ? String(raw).trim() : '';
+    return trimmed || 'Unspecified';
+  };
+
+  const openChartModal = (
+    prefix: 'defectCategory' | 'defectType' | 'equipmentCategory' | 'component',
+    payloadName: string,
+    payloadId: string | undefined,
+    value: number | undefined,
+    isOtherBucket: boolean,
+  ) => {
+    if (!value || value <= 0) return;
+    if (prefix === 'component') {
+      const key = isOtherBucket ? OTHER_KEY : (payloadId ?? payloadName);
+      setActiveModal(`component_${key}` as ModalType);
+      return;
+    }
+    let suffix: string;
+    if (isOtherBucket) suffix = OTHER_KEY;
+    else if (payloadName === 'Unspecified') suffix = UNSPECIFIED_KEY;
+    else suffix = payloadName;
+    setActiveModal(`${prefix}_${suffix}` as ModalType);
+  };
 
   const ComponentTooltip = ({ active, payload }: any) => {
     if (!active || !payload || !payload.length) return null;
@@ -389,6 +431,49 @@ export default function DefectsDashboard() {
           const vId = activeModal.replace('vessel_', '');
           return defectsWithComputedStatus.filter(d => defectMatchesVesselId(d, vId));
         }
+        if (activeModal.startsWith('defectCategory_')) {
+          const sfx = activeModal.replace('defectCategory_', '');
+          if (sfx === OTHER_KEY) {
+            return defectsWithComputedStatus.filter(d => !topDefectCategoryNames.has(normalizeFieldKey(d.defectCategory)));
+          }
+          if (sfx === UNSPECIFIED_KEY) {
+            return defectsWithComputedStatus.filter(d => normalizeFieldKey(d.defectCategory) === 'Unspecified');
+          }
+          return defectsWithComputedStatus.filter(d => normalizeFieldKey(d.defectCategory) === sfx);
+        }
+        if (activeModal.startsWith('defectType_')) {
+          const sfx = activeModal.replace('defectType_', '');
+          if (sfx === OTHER_KEY) {
+            return defectsWithComputedStatus.filter(d => !topDefectTypeNames.has(normalizeFieldKey(d.defectType)));
+          }
+          if (sfx === UNSPECIFIED_KEY) {
+            return defectsWithComputedStatus.filter(d => normalizeFieldKey(d.defectType) === 'Unspecified');
+          }
+          return defectsWithComputedStatus.filter(d => normalizeFieldKey(d.defectType) === sfx);
+        }
+        if (activeModal.startsWith('equipmentCategory_')) {
+          const sfx = activeModal.replace('equipmentCategory_', '');
+          if (sfx === OTHER_KEY) {
+            return defectsWithComputedStatus.filter(d => !topEquipmentCategoryNames.has(normalizeFieldKey(d.equipmentCategory)));
+          }
+          if (sfx === UNSPECIFIED_KEY) {
+            return defectsWithComputedStatus.filter(d => normalizeFieldKey(d.equipmentCategory) === 'Unspecified');
+          }
+          return defectsWithComputedStatus.filter(d => normalizeFieldKey(d.equipmentCategory) === sfx);
+        }
+        if (activeModal.startsWith('component_')) {
+          const sfx = activeModal.replace('component_', '');
+          if (sfx === OTHER_KEY) {
+            return defectsWithComputedStatus.filter(d => {
+              const cid = d.componentId ? String(d.componentId).trim() : '';
+              return cid !== '' && !topComponentIds.has(cid);
+            });
+          }
+          if (sfx === UNSPECIFIED_KEY) {
+            return defectsWithComputedStatus.filter(d => !d.componentId || String(d.componentId).trim() === '');
+          }
+          return defectsWithComputedStatus.filter(d => (d.componentId ? String(d.componentId).trim() : '') === sfx);
+        }
         return [];
     }
   };
@@ -427,6 +512,30 @@ export default function DefectsDashboard() {
           const vId = activeModal.replace('vessel_', '');
           const vName = vessels.find(v => v.id === vId)?.name || vId;
           return `Defects - ${vName}`;
+        }
+        const labelFor = (sfx: string, fallback: string) => {
+          if (sfx === OTHER_KEY) return 'Other';
+          if (sfx === UNSPECIFIED_KEY) return 'Unspecified';
+          return sfx || fallback;
+        };
+        if (activeModal.startsWith('defectCategory_')) {
+          return `Defects - Category: ${labelFor(activeModal.replace('defectCategory_', ''), 'Unspecified')}`;
+        }
+        if (activeModal.startsWith('defectType_')) {
+          return `Defects - Defect Type: ${labelFor(activeModal.replace('defectType_', ''), 'Unspecified')}`;
+        }
+        if (activeModal.startsWith('equipmentCategory_')) {
+          return `Defects - Equipment Category: ${labelFor(activeModal.replace('equipmentCategory_', ''), 'Unspecified')}`;
+        }
+        if (activeModal.startsWith('component_')) {
+          const sfx = activeModal.replace('component_', '');
+          if (sfx === OTHER_KEY) return 'Defects - Component: Other';
+          if (sfx === UNSPECIFIED_KEY) return 'Defects - Component: Unspecified';
+          const lookup = componentLookup.get(sfx);
+          if (lookup) {
+            return `Defects - Component: ${lookup.name}${lookup.code ? ` (${lookup.code})` : ''}`;
+          }
+          return `Defects - Component: ${sfx}`;
         }
         return 'Defects';
     }
@@ -680,9 +789,14 @@ export default function DefectsDashboard() {
                     paddingAngle={3}
                     dataKey="value"
                     label={({ name, value }) => `${name}: ${value}`}
+                    style={{ cursor: 'pointer' }}
+                    onClick={(_data: any, index: number) => {
+                      const clicked = defectCategoryData[index];
+                      if (clicked) openChartModal('defectCategory', clicked.name, undefined, clicked.value, !!clicked.isOther);
+                    }}
                   >
                     {defectCategoryData.map((entry, index) => (
-                      <Cell key={`cat-cell-${index}`} fill={entry.color} />
+                      <Cell key={`cat-cell-${index}`} fill={entry.color} style={{ cursor: 'pointer' }} />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -718,9 +832,14 @@ export default function DefectsDashboard() {
                     paddingAngle={3}
                     dataKey="value"
                     label={({ name, value }) => `${name}: ${value}`}
+                    style={{ cursor: 'pointer' }}
+                    onClick={(_data: any, index: number) => {
+                      const clicked = defectTypeData[index];
+                      if (clicked) openChartModal('defectType', clicked.name, undefined, clicked.value, !!clicked.isOther);
+                    }}
                   >
                     {defectTypeData.map((entry, index) => (
-                      <Cell key={`type-cell-${index}`} fill={entry.color} />
+                      <Cell key={`type-cell-${index}`} fill={entry.color} style={{ cursor: 'pointer' }} />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -753,9 +872,17 @@ export default function DefectsDashboard() {
                   <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={80} />
                   <YAxis allowDecimals={false} />
                   <Tooltip />
-                  <Bar dataKey="value" name="Defects" fill="#52baf3">
+                  <Bar
+                    dataKey="value"
+                    name="Defects"
+                    fill="#52baf3"
+                    style={{ cursor: 'pointer' }}
+                    onClick={(data: any) => {
+                      if (data) openChartModal('equipmentCategory', data.name, undefined, data.value, !!data.isOther);
+                    }}
+                  >
                     {equipmentCategoryData.map((entry, index) => (
-                      <Cell key={`eqcat-cell-${index}`} fill={entry.color} />
+                      <Cell key={`eqcat-cell-${index}`} fill={entry.color} style={{ cursor: 'pointer' }} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -784,9 +911,17 @@ export default function DefectsDashboard() {
                   <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={80} tickFormatter={(v: string) => (v && v.length > 18 ? `${v.slice(0, 18)}…` : v)} />
                   <YAxis allowDecimals={false} />
                   <Tooltip content={<ComponentTooltip />} />
-                  <Bar dataKey="value" name="Defects" fill="#52baf3">
+                  <Bar
+                    dataKey="value"
+                    name="Defects"
+                    fill="#52baf3"
+                    style={{ cursor: 'pointer' }}
+                    onClick={(data: any) => {
+                      if (data) openChartModal('component', data.name, data.id, data.value, data.id === OTHER_KEY);
+                    }}
+                  >
                     {componentData.map((entry, index) => (
-                      <Cell key={`comp-cell-${index}`} fill={entry.color} />
+                      <Cell key={`comp-cell-${index}`} fill={entry.color} style={{ cursor: 'pointer' }} />
                     ))}
                   </Bar>
                 </BarChart>
