@@ -1,6 +1,6 @@
 import * as repo from './repository';
 import { getPostgresClient } from '../../postgresClient';
-import { admAvailableRanks, admVesselOrgChart, masterLists } from '@shared/schema';
+import { admAvailableRanks, admVesselOrgChart, masterLists, type AdmVesselOrgChart } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 
 export async function getAllRanks() {
@@ -257,20 +257,20 @@ export async function resolveHierarchyScopeByRankName(vesselId: string, rankName
   if (!vesselId) throw createHttpError("vesselId required", 400);
   if (!rankName) throw createHttpError("rankName required", 400);
 
-  const rows = await repo.getAllOrgChart();
+  const rows: AdmVesselOrgChart[] | null = await repo.getAllOrgChart();
   if (!rows || rows.length === 0) {
     return { vesselId, hasMapping: false, hasDescendants: false, me: { nodeUuids: [] as string[], rankIds: [] as string[] }, myTeam: { nodeUuids: [] as string[], rankIds: [] as string[] } };
   }
 
   const target = rankName.toLowerCase().trim();
-  const meRow = rows.find((r: any) => (r.rank ?? '').toString().toLowerCase().trim() === target);
+  const meRow = rows.find(r => (r.rank ?? '').toLowerCase().trim() === target);
 
   if (!meRow || !meRow.rankId) {
     return { vesselId, hasMapping: false, hasDescendants: false, me: { nodeUuids: [] as string[], rankIds: [] as string[] }, myTeam: { nodeUuids: [] as string[], rankIds: [] as string[] } };
   }
 
   const childrenByParent = new Map<string, string[]>();
-  for (const r of rows as any[]) {
+  for (const r of rows) {
     if (r.parentRankId && r.rankId) {
       const list = childrenByParent.get(r.parentRankId) || [];
       list.push(r.rankId);
