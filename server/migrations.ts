@@ -2939,6 +2939,30 @@ const migrations: Migration[] = [
       WHERE d.id = c.defect_id
         AND c.match_count = 1;
     `
+  },
+  {
+    id: '089_backfill_defects_component_id_by_code',
+    name: 'Backfill defects.component_id from component_hardware_level2 (code) + vessel_id',
+    description: 'Second pass of one-time idempotent backfill: for any defect still lacking a component_id, match component_hardware_level2 against components.component_code (case-insensitive, trimmed) within the same vessel. Only apply when the match is unique. Defects with zero or multiple matches are left untouched and continue to render via the dashboard hardware-name fallback.',
+    sql: `
+      WITH candidates AS (
+        SELECT d.id AS defect_id,
+               c.cuuid AS comp_cuuid,
+               COUNT(*) OVER (PARTITION BY d.id) AS match_count
+        FROM defects d
+        JOIN components c
+          ON c.vessel_id = d.vessel_id
+         AND LOWER(TRIM(c.component_code)) = LOWER(TRIM(d.component_hardware_level2))
+        WHERE (d.component_id IS NULL OR d.component_id = '')
+          AND d.component_hardware_level2 IS NOT NULL
+          AND TRIM(d.component_hardware_level2) <> ''
+      )
+      UPDATE defects d
+      SET component_id = c.comp_cuuid
+      FROM candidates c
+      WHERE d.id = c.defect_id
+        AND c.match_count = 1;
+    `
   }
 ];
 
