@@ -779,6 +779,7 @@ export default function DefectsDashboard() {
                       stackId="status"
                       fill={s.color}
                       name={s.key}
+                      maxBarSize={20}
                       style={{ cursor: 'pointer' }}
                       onClick={(data: any) => {
                         if (data && data.vesselId && (data[s.key] as number) > 0) {
@@ -915,6 +916,7 @@ export default function DefectsDashboard() {
                     dataKey="value"
                     name="Defects"
                     fill="#52baf3"
+                    maxBarSize={20}
                     style={{ cursor: 'pointer' }}
                     onClick={(data: any) => {
                       if (data) openChartModal('equipmentCategory', data.name, undefined, data.value, !!data.isOther);
@@ -950,6 +952,7 @@ export default function DefectsDashboard() {
                     dataKey="value"
                     name="Defects"
                     fill="#52baf3"
+                    maxBarSize={20}
                     style={{ cursor: 'pointer' }}
                     onClick={(data: any) => {
                       if (data) openChartModal('component', data.name, data.id, data.value, data.id === OTHER_KEY);
