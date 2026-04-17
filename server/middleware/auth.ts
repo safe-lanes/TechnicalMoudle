@@ -75,10 +75,10 @@ export async function initMockAuthRankId() {
 export const mockAuthMiddleware = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   const headerRankRaw = req.headers["x-rank"];
   const headerRank = Array.isArray(headerRankRaw) ? headerRankRaw[0] : headerRankRaw;
-  const bodyRank =
-    req.body && typeof req.body === "object" && typeof (req.body as any).rank === "string"
-      ? ((req.body as any).rank as string)
-      : undefined;
+
+  const body: { rank?: unknown } | null =
+    req.body && typeof req.body === "object" ? (req.body as { rank?: unknown }) : null;
+  const bodyRank = body && typeof body.rank === "string" ? body.rank : undefined;
 
   const resolvedRank =
     (typeof headerRank === "string" && headerRank.trim()) ||
