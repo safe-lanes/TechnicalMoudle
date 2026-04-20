@@ -194,8 +194,14 @@ export default function SuperintendentPage() {
       field: "action",
       minWidth: 150,
       flex: 0.8,
-      sortable: false,
-      filter: false,
+      filter: "agSetColumnFilter",
+      valueGetter: (p: any) => {
+        const n = p.data;
+        if (!n) return "";
+        if (n.isAcknowledged) return "Acknowledged";
+        if (n.approvalTier === "superintendent_locked") return "Acknowledge";
+        return "Info Only";
+      },
       cellStyle: { justifyContent: "center" },
       headerClass: "ag-header-center",
       cellRenderer: (params: any) => {
@@ -266,6 +272,7 @@ export default function SuperintendentPage() {
               suppressRowClickSelection
               noRowsMessage="No superintendent notifications found."
               testId="ag-grid-superintendent-notifications"
+              getRowClass={(params) => params.data?.id ? `row-notification-${params.data.id}` : undefined}
             />
           </div>
         )}
