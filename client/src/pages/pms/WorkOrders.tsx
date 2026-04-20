@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar, ChevronDown } from "lucide-react";
 import WOAgGridTable from "@/components/WOAgGridTable";
+import { getWoStatusBadgeColor } from "@/components/wo/woCellRenderers";
 import type { ColDef, RowClickedEvent } from 'ag-grid-community';
 import WorkOrderPlanner from "./WorkOrderPlanner";
 import { useLocation } from "wouter";
@@ -340,35 +341,7 @@ const WorkOrders: React.FC = () => {
     { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => getEffectiveStatus(wo) === "Completed").length }
   ];
 
-  const getStatusBadgeColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "completed":
-        return "bg-green-100 text-green-800";
-      case "approved":
-        return "bg-green-100 text-green-800";
-      case "due":
-        return "bg-yellow-100 text-yellow-800";
-      case "due soon":
-        return "bg-amber-100 text-amber-800";
-      case "due (grace p)":
-      case "grace p":
-        return "bg-orange-100 text-orange-800";
-      case "overdue":
-        return "bg-red-100 text-red-800";
-      case "planned":
-        return "bg-sky-100 text-sky-800";
-      case "postponed":
-        return "bg-blue-100 text-blue-800";
-      case "pending approval":
-        return "bg-purple-100 text-purple-800";
-      case "rejected":
-        return "bg-red-100 text-red-800";
-      case "draft":
-        return "bg-gray-100 text-gray-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
+  const getStatusBadgeColor = getWoStatusBadgeColor;
 
   const filteredWorkOrders = safeWorkOrdersList.filter(wo => {
     const effectiveStatus = getEffectiveStatus(wo);

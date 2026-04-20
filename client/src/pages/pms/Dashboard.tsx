@@ -42,6 +42,11 @@ import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger }
 import { WorkOrder, ChangeRequest } from "@shared/schema";
 import WOAgGridTable from "@/components/WOAgGridTable";
 import type { ColDef } from "ag-grid-community";
+import {
+  WoStatusBadgeCell,
+  WoCriticalityBadgeCell,
+  WoActionButton,
+} from "@/components/wo/woCellRenderers";
 import { useVessels } from "@/hooks/useVessels";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
@@ -1264,29 +1269,14 @@ const Dashboard = () => {
 
   const dashboardOpColumnDefs: ColDef[] = useMemo(() => {
     const formatWoDate = (d: string | null | undefined) => {
-      if (!d) return '-';
+      if (!d) return '—';
       try {
         const parsed = new Date(d);
-        if (isNaN(parsed.getTime())) return d || '-';
+        if (isNaN(parsed.getTime())) return d || '—';
         return format(parsed, 'dd-MMM-yyyy');
       } catch {
-        return d || '-';
+        return d || '—';
       }
-    };
-    const getStatusColor = (s: string) => {
-      if (s === 'Overdue') return 'bg-red-500';
-      if (s === 'Due' || s === 'Due (Grace P)') return 'bg-orange-500';
-      if (s === 'Pending Approval') return 'bg-blue-600';
-      if (s === 'Completed') return 'bg-green-500';
-      return 'bg-gray-500';
-    };
-    const getCritColor = (c: string) => {
-      const cl = (c || '').toLowerCase();
-      if (cl === 'critical' || cl === 'yes') return 'bg-red-500';
-      if (cl === 'high') return 'bg-orange-500';
-      if (cl === 'medium') return 'bg-yellow-500';
-      if (cl === 'low') return 'bg-green-500';
-      return 'bg-gray-400';
     };
     return [
       {
@@ -1295,7 +1285,7 @@ const Dashboard = () => {
         minWidth: 160,
         flex: 1,
         cellRenderer: (params: any) => (
-          <span className="text-blue-600 font-medium">{params.value || '-'}</span>
+          <span className="truncate">{params.value || '—'}</span>
         ),
       },
       {
@@ -1304,7 +1294,7 @@ const Dashboard = () => {
         minWidth: 150,
         flex: 1,
         cellRenderer: (params: any) => (
-          <span className="text-blue-600">{params.value || '-'}</span>
+          <span className="text-blue-600">{params.value || '—'}</span>
         ),
       },
       {
@@ -1313,13 +1303,14 @@ const Dashboard = () => {
         minWidth: 220,
         flex: 2,
         tooltipValueGetter: (params: any) => params.data?.jobTitle || '',
+        valueFormatter: (params: any) => params.value || '—',
       },
       {
         headerName: 'Assigned to',
         field: 'assignedTo',
         minWidth: 140,
         flex: 1,
-        valueFormatter: (params: any) => params.value || '-',
+        valueFormatter: (params: any) => params.value || '—',
       },
       {
         headerName: 'Due Date',
@@ -1335,29 +1326,18 @@ const Dashboard = () => {
         flex: 1,
         valueGetter: (params: any) =>
           (params.data as EnrichedWorkOrder)?.computedStatus || params.data?.status || 'Active',
-        cellRenderer: (params: any) => {
-          const s = params.value || 'Active';
-          return (
-            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${getStatusColor(s)}`}>
-              {s}
-            </span>
-          );
-        },
+        cellRenderer: (params: any) => (
+          <WoStatusBadgeCell status={params.value || 'Active'} />
+        ),
       },
       {
         headerName: 'Criticality',
         field: 'jobPriority',
         minWidth: 120,
         flex: 1,
-        cellRenderer: (params: any) => {
-          const v = params.value;
-          if (!v) return <span className="text-gray-400 text-xs">-</span>;
-          return (
-            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${getCritColor(v)}`}>
-              {v}
-            </span>
-          );
-        },
+        cellRenderer: (params: any) => (
+          <WoCriticalityBadgeCell value={params.value} />
+        ),
       },
       {
         headerName: 'Actions',
@@ -1372,22 +1352,18 @@ const Dashboard = () => {
           if (!wo) return null;
           return (
             <div className="flex items-center justify-center gap-2 h-full">
-              <button
-                className="p-1 hover:bg-gray-200 rounded"
-                onClick={(e) => { e.stopPropagation(); setOpViewModal({ open: true, workOrder: wo as EnrichedWorkOrder }); }}
+              <WoActionButton
+                icon="view"
                 title="View"
-                data-testid={`op-view-wo-${wo.id}`}
-              >
-                <Eye className="h-3.5 w-3.5 text-gray-500" />
-              </button>
-              <button
-                className="p-1 hover:bg-gray-200 rounded"
                 onClick={(e) => { e.stopPropagation(); setOpViewModal({ open: true, workOrder: wo as EnrichedWorkOrder }); }}
+                testId={`op-view-wo-${wo.id}`}
+              />
+              <WoActionButton
+                icon="edit"
                 title="Edit"
-                data-testid={`op-edit-wo-${wo.id}`}
-              >
-                <Pencil className="h-3.5 w-3.5 text-gray-500" />
-              </button>
+                onClick={(e) => { e.stopPropagation(); setOpViewModal({ open: true, workOrder: wo as EnrichedWorkOrder }); }}
+                testId={`op-edit-wo-${wo.id}`}
+              />
             </div>
           );
         },
