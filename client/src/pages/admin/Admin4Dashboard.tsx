@@ -4,7 +4,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Building2, List, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, Database, AlertTriangle, CheckCircle2, X, Bell, MapPin } from "lucide-react";
+import { Building2, List, Box, Wrench, Package, Ship, Clock, FileCode2, Anchor, Database, MapPin } from "lucide-react";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
 import MasterDataManagement from "./MasterDataManagement";
@@ -24,7 +24,6 @@ type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'master-data' | 'maste
 
 export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?: (isSubView: boolean) => void }) {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
-  const [showNotification, setShowNotification] = useState(true);
 
   useEffect(() => {
     onSubViewChange?.(currentView !== 'dashboard');
@@ -138,65 +137,15 @@ export default function Admin4Dashboard({ onSubViewChange }: { onSubViewChange?:
     );
   };
 
-  const notificationItems: string[] = [];
-  if (stats?.dataQuality) {
-    if (stats.dataQuality.componentsWithoutMaker > 0) notificationItems.push(`${stats.dataQuality.componentsWithoutMaker} components without maker`);
-    if (stats.dataQuality.jobsWithInvalidComponent > 0) notificationItems.push(`${stats.dataQuality.jobsWithInvalidComponent} jobs with unlinked components`);
-    if (stats.dataQuality.sparesWithInvalidComponent > 0) notificationItems.push(`${stats.dataQuality.sparesWithInvalidComponent} spares with unlinked components`);
-    if (stats.dataQuality.unlinkedMakers > 0) notificationItems.push(`${stats.dataQuality.unlinkedMakers} unused makers`);
-  }
-
   return (
     <div className="p-6 space-y-6">
       <div className="bg-white rounded-lg shadow-sm">
-        <div className="px-6 py-4 border-b flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold" data-testid="text-master-data-title">Master Data</h1>
-            <p className="text-sm text-gray-600 mt-1">Manage fleet-level master data including makers, components, jobs, spares, and configurations</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {stats?.dataQuality && stats.dataQuality.totalIssues > 0 && (
-              <button
-                onClick={() => setShowNotification(!showNotification)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
-                data-testid="button-notifications"
-              >
-                <Bell className="h-5 w-5 text-gray-500" />
-                <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
-                  {stats.dataQuality.totalIssues}
-                </span>
-              </button>
-            )}
-            {stats?.dataQuality && stats.dataQuality.totalIssues === 0 && (
-              <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                <span className="text-xs text-green-700 font-medium">All checks passed</span>
-              </div>
-            )}
-          </div>
+        <div className="px-6 py-4 border-b">
+          <h1 className="text-2xl font-semibold" data-testid="text-master-data-title">Master Data</h1>
+          <p className="text-sm text-gray-600 mt-1">Manage fleet-level master data including makers, components, jobs, spares, and configurations</p>
         </div>
 
         <div className="p-6 space-y-6">
-          {showNotification && stats?.dataQuality && stats.dataQuality.totalIssues > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3" data-testid="data-quality-banner">
-              <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium text-amber-800">
-                    {stats.dataQuality.totalIssues} data quality {stats.dataQuality.totalIssues === 1 ? 'issue' : 'issues'} detected
-                  </span>
-                  <span className="text-xs text-amber-600">{notificationItems.join(' | ')}</span>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowNotification(false)}
-                className="text-amber-400 hover:text-amber-600 transition-colors flex-shrink-0"
-                data-testid="button-dismiss-notification"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          )}
 
           <Card>
             <CardHeader>
