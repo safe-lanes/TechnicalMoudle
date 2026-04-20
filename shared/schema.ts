@@ -3004,6 +3004,9 @@ export const vesselSurveyApplicability = pgTable("vessel_survey_applicability", 
   vesselMasterIdx: index("idx_vessel_survey_vessel_master").on(table.vesselId, table.masterId),
   vesselIdx: index("idx_vessel_survey_vessel").on(table.vesselId),
   masterIdx: index("idx_vessel_survey_master").on(table.masterId),
+  uniqueLiveVesselMaster: uniqueIndex("uniq_vessel_survey_applicability_live")
+    .on(table.vesselId, table.masterId)
+    .where(sql`${table.isDeleted} = false`),
 }));
 
 export const insertVesselSurveyApplicabilitySchema = createInsertSchema(vesselSurveyApplicability).omit({

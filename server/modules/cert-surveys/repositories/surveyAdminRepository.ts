@@ -133,10 +133,20 @@ export async function insertApplicabilityBulk(data: Array<{
   vesselName: string;
   masterId: string;
   isApplicable: boolean;
+  isDeleted?: boolean;
 }>) {
   const db = await getDb();
   if (!db) return null;
-  return db.insert(vesselSurveyApplicability).values(data).returning();
+  // Make insert idempotent against the partial unique index
+  // uniq_vessel_survey_applicability_live so concurrent initialize/bulk-update
+  // calls cannot 23505 each other.
+  return db.insert(vesselSurveyApplicability)
+    .values(data)
+    .onConflictDoNothing({
+      target: [vesselSurveyApplicability.vesselId, vesselSurveyApplicability.masterId],
+      targetWhere: sql`${vesselSurveyApplicability.isDeleted} = false`,
+    })
+    .returning();
 }
 
 export async function bulkUpdateApplicability(vesselIds: string[], masterId: string, isApplicable: boolean) {
@@ -146,7 +156,8 @@ export async function bulkUpdateApplicability(vesselIds: string[], masterId: str
     .set({ isApplicable, updatedAt: new Date() })
     .where(and(
       inArray(vesselSurveyApplicability.vesselId, vesselIds),
-      eq(vesselSurveyApplicability.masterId, masterId)
+      eq(vesselSurveyApplicability.masterId, masterId),
+      or(eq(vesselSurveyApplicability.isDeleted, false), sql`${vesselSurveyApplicability.isDeleted} IS NULL`)
     ))
     .returning();
 }

@@ -405,6 +405,7 @@ export async function bulkUpdateApplicability(body: any) {
         vesselName: v.name,
         masterId,
         isApplicable,
+        isDeleted: false,
       }))
     );
     if (newRecords) {
