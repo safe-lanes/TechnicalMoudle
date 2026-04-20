@@ -2029,7 +2029,7 @@ const Dashboard = () => {
                           <div className="text-center py-8 text-gray-500 text-sm">No work orders pending approval</div>
                         ) : (
                           operationKPIs.pendingApprovalWOs.map((wo) => {
-                            const woVesselName = vessels.find(v => v.id === (wo as any).vesselId)?.name;
+                            const woVesselName = vessels.find(v => v.id === wo.vesselId)?.name;
                             return (
                             <div
                               key={wo.id}
@@ -2037,14 +2037,19 @@ const Dashboard = () => {
                               style={{ background: wo.wasRejected ? '#FFEBEE' : '#E3F2FD', borderColor: wo.wasRejected ? '#FFCDD2' : '#BBDEFB' }}
                               data-testid={`row-op-pending-approval-wo-${wo.id}`}
                             >
+                              {isAllVessels && (
+                                <div
+                                  className="w-[140px] flex-shrink-0 pr-3 mr-3 border-r"
+                                  style={{ borderColor: wo.wasRejected ? '#FFCDD2' : '#BBDEFB' }}
+                                  data-testid={`cell-pending-approval-vessel-${wo.id}`}
+                                >
+                                  <div className="text-[10px] uppercase tracking-wide" style={{ color: '#9E9E9E' }}>Vessel</div>
+                                  <div className="text-sm font-semibold truncate" style={{ color: '#1565C0' }}>{woVesselName || '—'}</div>
+                                </div>
+                              )}
                               <div className="flex-1 cursor-pointer" onClick={() => navigateToWorkOrder(wo.id)}>
-                                <div className="font-medium text-sm flex items-center gap-2" style={{ color: wo.wasRejected ? '#C62828' : '#212121' }}>
-                                  {isAllVessels && woVesselName && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold text-white" style={{ background: '#1565C0' }} data-testid={`badge-pending-approval-vessel-${wo.id}`}>
-                                      {woVesselName}
-                                    </span>
-                                  )}
-                                  <span>{wo.workOrderNo || `WO-${wo.id}`}</span>
+                                <div className="font-medium text-sm" style={{ color: wo.wasRejected ? '#C62828' : '#212121' }}>
+                                  {wo.workOrderNo || `WO-${wo.id}`}
                                   {wo.wasRejected && (
                                     <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ background: '#E53935' }}>Resubmitted</span>
                                   )}
@@ -2287,7 +2292,7 @@ const Dashboard = () => {
                             </TableRow>
                           ) : (
                             operationKPIs.openChangeRequestsList.map((cr) => {
-                              const crVesselName = vessels.find(v => v.id === (cr as any).vesselId)?.name;
+                              const crVesselName = vessels.find(v => v.id === cr.vesselId)?.name;
                               return (
                               <TableRow
                                 key={cr.id}
