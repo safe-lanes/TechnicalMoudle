@@ -1278,7 +1278,22 @@ const Dashboard = () => {
         return d || '—';
       }
     };
+    const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
+    const vesselCol: ColDef = {
+      headerName: 'Vessel',
+      field: 'vesselId',
+      minWidth: 140,
+      flex: 1,
+      valueGetter: (params: any) => {
+        const vid = params.data?.vesselId;
+        return (vid && vesselNameById.get(String(vid))) || '—';
+      },
+      cellRenderer: (params: any) => (
+        <span className="truncate font-medium" data-testid={`cell-op-vessel-${params.data?.id ?? ''}`}>{params.value || '—'}</span>
+      ),
+    };
     return [
+      ...(isAllVessels ? [vesselCol] : []),
       {
         headerName: 'Component',
         field: 'component',
@@ -1371,7 +1386,7 @@ const Dashboard = () => {
         },
       },
     ];
-  }, []);
+  }, [isAllVessels, vessels]);
 
   const operationTableTitle = useMemo(() => {
     switch (selectedOpCard) {
@@ -2013,7 +2028,9 @@ const Dashboard = () => {
                         {operationKPIs.pendingApprovalWOs.length === 0 ? (
                           <div className="text-center py-8 text-gray-500 text-sm">No work orders pending approval</div>
                         ) : (
-                          operationKPIs.pendingApprovalWOs.map((wo) => (
+                          operationKPIs.pendingApprovalWOs.map((wo) => {
+                            const woVesselName = vessels.find(v => v.id === (wo as any).vesselId)?.name;
+                            return (
                             <div
                               key={wo.id}
                               className="flex items-center justify-between p-3 rounded-lg border transition-colors"
@@ -2021,8 +2038,13 @@ const Dashboard = () => {
                               data-testid={`row-op-pending-approval-wo-${wo.id}`}
                             >
                               <div className="flex-1 cursor-pointer" onClick={() => navigateToWorkOrder(wo.id)}>
-                                <div className="font-medium text-sm" style={{ color: wo.wasRejected ? '#C62828' : '#212121' }}>
-                                  {wo.workOrderNo || `WO-${wo.id}`}
+                                <div className="font-medium text-sm flex items-center gap-2" style={{ color: wo.wasRejected ? '#C62828' : '#212121' }}>
+                                  {isAllVessels && woVesselName && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold text-white" style={{ background: '#1565C0' }} data-testid={`badge-pending-approval-vessel-${wo.id}`}>
+                                      {woVesselName}
+                                    </span>
+                                  )}
+                                  <span>{wo.workOrderNo || `WO-${wo.id}`}</span>
                                   {wo.wasRejected && (
                                     <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ background: '#E53935' }}>Resubmitted</span>
                                   )}
@@ -2067,7 +2089,8 @@ const Dashboard = () => {
                                 </Button>
                               </div>
                             </div>
-                          ))
+                            );
+                          })
                         )}
                       </div>
                     </div>
@@ -2119,7 +2142,9 @@ const Dashboard = () => {
                       <Table>
                         <TableHeader className="sticky top-0 bg-[#eff6ff] z-10">
                           <TableRow>
-                            <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81] text-xs">Vessel</TableHead>
+                            {isAllVessels && (
+                              <TableHead className="font-medium w-[140px] bg-[#eff6ff] text-[#0e4c81] text-xs">Vessel</TableHead>
+                            )}
                             <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81] text-xs">Part Code</TableHead>
                             <TableHead className="font-medium min-w-[200px] bg-[#eff6ff] text-[#0e4c81] text-xs">Part Name</TableHead>
                             <TableHead className="font-medium w-[160px] bg-[#eff6ff] text-[#0e4c81] text-xs">Component</TableHead>
@@ -2133,7 +2158,7 @@ const Dashboard = () => {
                         <TableBody>
                           {operationKPIs.criticalSparesLowList.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={9} className="text-center py-8 text-gray-500 text-sm">
+                              <TableCell colSpan={isAllVessels ? 9 : 8} className="text-center py-8 text-gray-500 text-sm">
                                 No critical spares with low stock
                               </TableCell>
                             </TableRow>
@@ -2143,7 +2168,9 @@ const Dashboard = () => {
                               const vesselName = vessels.find(v => v.id === spare.vesselId)?.name;
                               return (
                                 <TableRow key={`${spare.vesselId || 'v'}-${spare.id}`} className="hover:bg-gray-50" data-testid={`row-op-critical-spare-${spare.id}`}>
-                                  <TableCell className="text-xs py-2">{vesselName || '-'}</TableCell>
+                                  {isAllVessels && (
+                                    <TableCell className="text-xs py-2 font-medium">{vesselName || '-'}</TableCell>
+                                  )}
                                   <TableCell className="text-xs py-2">{spare.partCode || spare.partNumber || '-'}</TableCell>
                                   <TableCell className="whitespace-normal break-words max-w-[300px] font-medium text-blue-600 text-xs py-2">{spare.partName || '-'}</TableCell>
                                   <TableCell className="text-xs py-2">{spare.componentName || '-'}</TableCell>
@@ -2242,6 +2269,9 @@ const Dashboard = () => {
                       <Table>
                         <TableHeader className="sticky top-0 bg-[#eff6ff] z-10">
                           <TableRow>
+                            {isAllVessels && (
+                              <TableHead className="font-medium w-[140px] bg-[#eff6ff] text-[#0e4c81] text-xs">Vessel</TableHead>
+                            )}
                             <TableHead className="font-medium min-w-[200px] bg-[#eff6ff] text-[#0e4c81] text-xs">Request Title</TableHead>
                             <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81] text-xs">Requested By</TableHead>
                             <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81] text-xs">Date</TableHead>
@@ -2251,18 +2281,23 @@ const Dashboard = () => {
                         <TableBody>
                           {operationKPIs.openChangeRequests === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={4} className="text-center py-8 text-gray-500 text-sm">
+                              <TableCell colSpan={isAllVessels ? 5 : 4} className="text-center py-8 text-gray-500 text-sm">
                                 No open change requests found
                               </TableCell>
                             </TableRow>
                           ) : (
-                            operationKPIs.openChangeRequestsList.map((cr) => (
+                            operationKPIs.openChangeRequestsList.map((cr) => {
+                              const crVesselName = vessels.find(v => v.id === (cr as any).vesselId)?.name;
+                              return (
                               <TableRow
                                 key={cr.id}
                                 className="hover:bg-gray-50 cursor-pointer"
                                 onClick={() => setOpDetailChangeRequest(cr)}
                                 data-testid={`row-op-change-request-${cr.id}`}
                               >
+                                {isAllVessels && (
+                                  <TableCell className="text-xs py-2 font-medium">{crVesselName || '-'}</TableCell>
+                                )}
                                 <TableCell className="font-medium text-gray-900 text-xs py-2">{cr.title}</TableCell>
                                 <TableCell className="text-xs py-2">
                                   {cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
@@ -2285,7 +2320,8 @@ const Dashboard = () => {
                                   })()}
                                 </TableCell>
                               </TableRow>
-                            ))
+                              );
+                            })
                           )}
                         </TableBody>
                       </Table>
