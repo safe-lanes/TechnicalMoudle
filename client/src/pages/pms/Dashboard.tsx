@@ -1271,8 +1271,8 @@ const Dashboard = () => {
     const formatWoDate = (d: string | null | undefined) => {
       if (!d) return '—';
       try {
-        const parsed = new Date(d);
-        if (isNaN(parsed.getTime())) return d || '—';
+        const parsed = parseFlexibleDate(d);
+        if (!parsed || isNaN(parsed.getTime())) return d || '—';
         return format(parsed, 'dd-MMM-yyyy');
       } catch {
         return d || '—';
@@ -1310,6 +1310,8 @@ const Dashboard = () => {
         field: 'assignedTo',
         minWidth: 140,
         flex: 1,
+        valueGetter: (params: any) =>
+          params.data?.assignedTo || params.data?.assignedRank || '',
         valueFormatter: (params: any) => params.value || '—',
       },
       {
