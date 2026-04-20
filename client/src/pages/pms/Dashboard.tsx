@@ -381,7 +381,7 @@ const Dashboard = () => {
   const [showFilters, setShowFilters] = useState(false);
   type OperationCardFilter = 'overdue' | 'overdue-critical' | 'planned-today' | 'pending-approvals' | 'critical-spares' | 'anomalies' | 'modify-pms' | 'donut-overdue' | 'donut-due' | 'donut-planned';
   const [selectedOpCard, setSelectedOpCard] = useState<OperationCardFilter>('overdue');
-  const [hodScope, setHodScope] = useState<'me' | 'myTeam'>('myTeam');
+  const [hodScope, setHodScope] = useState<'me' | 'myTeam'>('me');
   const [opViewModal, setOpViewModal] = useState<{ open: boolean; workOrder: EnrichedWorkOrder | null }>({ open: false, workOrder: null });
   const [opDetailSpare, setOpDetailSpare] = useState<Spare | null>(null);
   const [opDetailChangeRequest, setOpDetailChangeRequest] = useState<ChangeRequest | null>(null);
@@ -1680,7 +1680,7 @@ const Dashboard = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {activeTab === 'management' && !isVessel ? (
+            {activeTab === 'management' ? (
               <TooltipProvider>
                 <UITooltip>
                   <TooltipTrigger asChild>
