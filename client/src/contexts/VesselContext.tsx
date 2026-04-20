@@ -18,9 +18,7 @@ interface VesselContextType {
 export const VesselContext = createContext<VesselContextType | undefined>(undefined);
 
 export const VesselProvider = ({ children }: { children: ReactNode }) => {
-  const [vesselId, setVesselIdState] = useState<string>(() => {
-    return localStorage.getItem('selectedVesselId') || '';
-  });
+  const [vesselId, setVesselIdState] = useState<string>('');
 
   const { data: vesselData = [], isLoading } = useVessels();
   const { uiRole, isSailAdmin, isClientAdmin } = useUIRole();
@@ -62,9 +60,17 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
     const vesselExists = isAllVessels || vessels.some(v => v.id === vesselId);
 
     if (!vesselId || !vesselExists || (isAllVessels && roleChanged)) {
-      const firstVessel = vessels[0];
-      console.log(`🚢 Auto-selecting first vessel: ${firstVessel.id} (${firstVessel.name}) for role ${uiRole}`);
-      setVesselIdState(firstVessel.id);
+      const stored = localStorage.getItem('selectedVesselId');
+      let target: string;
+      if (stored && stored !== 'all' && vessels.some(v => v.id === stored)) {
+        target = stored;
+        console.log(`🚢 Restoring stored vessel: ${stored} for role ${uiRole}`);
+      } else {
+        const firstVessel = vessels[0];
+        target = firstVessel.id;
+        console.log(`🚢 Auto-selecting first vessel: ${firstVessel.id} (${firstVessel.name}) for role ${uiRole}`);
+      }
+      setVesselIdState(target);
       if (roleChanged) {
         userTouchedRef.current = false;
       }
@@ -75,7 +81,6 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!vesselId) return;
     if (isSailAdmin || isClientAdmin) {
-      localStorage.removeItem('selectedVesselId');
       return;
     }
     localStorage.setItem('selectedVesselId', vesselId);

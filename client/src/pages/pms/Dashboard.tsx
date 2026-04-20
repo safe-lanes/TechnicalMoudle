@@ -395,9 +395,7 @@ const Dashboard = () => {
   const queryClient = useQueryClient();
 
   const adminDefaultsToAll = isSailAdmin || isClientAdmin;
-  const [mgmtVesselId, setMgmtVesselId] = useState<string>(
-    adminDefaultsToAll ? 'all' : vesselId
-  );
+  const [mgmtVesselId, setMgmtVesselId] = useState<string>('');
   useEffect(() => {
     if (adminDefaultsToAll && vesselId === 'all' && mgmtVesselId !== 'all') {
       setMgmtVesselId('all');
