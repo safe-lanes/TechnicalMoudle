@@ -46,17 +46,29 @@ export function useVessels() {
     isLoading: isLoadingLocal,
     error: localError,
   } = useLocalVessels({
-    enabled: externalFailed,
+    enabled: true,
   });
+
+  const localVessels = useMemo(
+    () => mapEntriesToVessels(localVesselEntries),
+    [localVesselEntries]
+  );
 
   const isLoading = isLoadingExternal || (externalFailed && isLoadingLocal);
   const error = useExternal ? externalError : localError;
 
   const vessels: Vessel[] = useMemo(() => {
-    return useExternal
-      ? externalVessels
-      : mapEntriesToVessels(localVesselEntries);
-  }, [useExternal, externalVessels, localVesselEntries]);
+    if (!useExternal) return localVessels;
+    // Merge: external is authoritative; include any local-only vessels so
+    // work orders / records referencing vessels not yet synced to the
+    // external master list still resolve to a name.
+    const externalIds = new Set(externalVessels.map(v => v.id));
+    const localOnly = localVessels.filter(v => !externalIds.has(v.id));
+    if (localOnly.length === 0) return externalVessels;
+    return [...externalVessels, ...localOnly].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+    );
+  }, [useExternal, externalVessels, localVessels]);
 
   return { data: vessels, isLoading, error };
 }
