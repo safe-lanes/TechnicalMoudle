@@ -40,6 +40,8 @@ import {
 } from "@/components/ui/table";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { WorkOrder, ChangeRequest } from "@shared/schema";
+import WOAgGridTable from "@/components/WOAgGridTable";
+import type { ColDef } from "ag-grid-community";
 import { useVessels } from "@/hooks/useVessels";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
@@ -1260,6 +1262,139 @@ const Dashboard = () => {
     }
   }, [selectedOpCard, operationKPIs]);
 
+  const dashboardOpColumnDefs: ColDef[] = useMemo(() => {
+    const formatWoDate = (d: string | null | undefined) => {
+      if (!d) return '-';
+      try {
+        const parsed = new Date(d);
+        if (isNaN(parsed.getTime())) return d || '-';
+        return format(parsed, 'dd-MMM-yyyy');
+      } catch {
+        return d || '-';
+      }
+    };
+    const getStatusColor = (s: string) => {
+      if (s === 'Overdue') return 'bg-red-500';
+      if (s === 'Due' || s === 'Due (Grace P)') return 'bg-orange-500';
+      if (s === 'Pending Approval') return 'bg-blue-600';
+      if (s === 'Completed') return 'bg-green-500';
+      return 'bg-gray-500';
+    };
+    const getCritColor = (c: string) => {
+      const cl = (c || '').toLowerCase();
+      if (cl === 'critical' || cl === 'yes') return 'bg-red-500';
+      if (cl === 'high') return 'bg-orange-500';
+      if (cl === 'medium') return 'bg-yellow-500';
+      if (cl === 'low') return 'bg-green-500';
+      return 'bg-gray-400';
+    };
+    return [
+      {
+        headerName: 'Component',
+        field: 'component',
+        minWidth: 160,
+        flex: 1,
+        cellRenderer: (params: any) => (
+          <span className="text-blue-600 font-medium">{params.value || '-'}</span>
+        ),
+      },
+      {
+        headerName: 'Work Order No',
+        field: 'workOrderNo',
+        minWidth: 150,
+        flex: 1,
+        cellRenderer: (params: any) => (
+          <span className="text-blue-600">{params.value || '-'}</span>
+        ),
+      },
+      {
+        headerName: 'Job Title',
+        field: 'jobTitle',
+        minWidth: 220,
+        flex: 2,
+        tooltipValueGetter: (params: any) => params.data?.jobTitle || '',
+      },
+      {
+        headerName: 'Assigned to',
+        field: 'assignedTo',
+        minWidth: 140,
+        flex: 1,
+        valueFormatter: (params: any) => params.value || '-',
+      },
+      {
+        headerName: 'Due Date',
+        field: 'dueDate',
+        minWidth: 130,
+        flex: 1,
+        valueFormatter: (params: any) => formatWoDate(params.value),
+      },
+      {
+        headerName: 'Status',
+        field: 'computedStatus',
+        minWidth: 140,
+        flex: 1,
+        valueGetter: (params: any) =>
+          (params.data as EnrichedWorkOrder)?.computedStatus || params.data?.status || 'Active',
+        cellRenderer: (params: any) => {
+          const s = params.value || 'Active';
+          return (
+            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${getStatusColor(s)}`}>
+              {s}
+            </span>
+          );
+        },
+      },
+      {
+        headerName: 'Criticality',
+        field: 'jobPriority',
+        minWidth: 120,
+        flex: 1,
+        cellRenderer: (params: any) => {
+          const v = params.value;
+          if (!v) return <span className="text-gray-400 text-xs">-</span>;
+          return (
+            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${getCritColor(v)}`}>
+              {v}
+            </span>
+          );
+        },
+      },
+      {
+        headerName: 'Actions',
+        field: 'id',
+        minWidth: 100,
+        flex: 0,
+        sortable: false,
+        filter: false,
+        resizable: false,
+        cellRenderer: (params: any) => {
+          const wo = params.data;
+          if (!wo) return null;
+          return (
+            <div className="flex items-center justify-center gap-2 h-full">
+              <button
+                className="p-1 hover:bg-gray-200 rounded"
+                onClick={(e) => { e.stopPropagation(); setOpViewModal({ open: true, workOrder: wo as EnrichedWorkOrder }); }}
+                title="View"
+                data-testid={`op-view-wo-${wo.id}`}
+              >
+                <Eye className="h-3.5 w-3.5 text-gray-500" />
+              </button>
+              <button
+                className="p-1 hover:bg-gray-200 rounded"
+                onClick={(e) => { e.stopPropagation(); setOpViewModal({ open: true, workOrder: wo as EnrichedWorkOrder }); }}
+                title="Edit"
+                data-testid={`op-edit-wo-${wo.id}`}
+              >
+                <Pencil className="h-3.5 w-3.5 text-gray-500" />
+              </button>
+            </div>
+          );
+        },
+      },
+    ];
+  }, []);
+
   const operationTableTitle = useMemo(() => {
     switch (selectedOpCard) {
       case 'overdue': return 'Overdue Work Orders';
@@ -2181,112 +2316,14 @@ const Dashboard = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white">
-                      <Table>
-                        <TableHeader className="sticky top-0 bg-[#eff6ff] z-10">
-                          <TableRow>
-                            <TableHead className="font-medium w-[160px] bg-[#eff6ff] text-[#0e4c81] text-xs">Component</TableHead>
-                            <TableHead className="font-medium w-[180px] bg-[#eff6ff] text-[#0e4c81] text-xs">Work Order No</TableHead>
-                            <TableHead className="font-medium min-w-[200px] bg-[#eff6ff] text-[#0e4c81] text-xs">Job Title</TableHead>
-                            <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81] text-xs">Due Date</TableHead>
-                            <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81] text-xs">Status</TableHead>
-                            <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81] text-xs">Criticality</TableHead>
-                            <TableHead className="font-medium w-[80px] text-center bg-[#eff6ff] text-[#0e4c81] text-xs">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {operationTableData.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={7} className="text-center py-8 text-gray-500 text-sm">
-                                No work orders found
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            operationTableData.map((wo) => {
-                              const effectiveStatus = (wo as EnrichedWorkOrder).computedStatus || wo.status || 'Active';
-                              const getStatusColor = (s: string) => {
-                                if (s === 'Overdue') return 'bg-red-500';
-                                if (s === 'Due' || s === 'Due (Grace P)') return 'bg-orange-500';
-                                if (s === 'Pending Approval') return 'bg-blue-600';
-                                if (s === 'Completed') return 'bg-green-500';
-                                return 'bg-gray-500';
-                              };
-                              const getCritColor = (c: string) => {
-                                const cl = c.toLowerCase();
-                                if (cl === 'critical' || cl === 'yes') return 'bg-red-500';
-                                if (cl === 'high') return 'bg-orange-500';
-                                if (cl === 'medium') return 'bg-yellow-500';
-                                if (cl === 'low') return 'bg-green-500';
-                                return 'bg-gray-400';
-                              };
-                              const formatWoDate = (d: string | null | undefined) => {
-                                if (!d) return '-';
-                                const parsed = parseFlexibleDate(d);
-                                if (!parsed) return d;
-                                try { return format(parsed, 'dd-MMM-yyyy'); } catch { return d; }
-                              };
-                              return (
-                                <TableRow key={wo.id} className="hover:bg-gray-50">
-                                  <TableCell className="font-medium text-blue-600 text-xs py-2">{wo.component || '-'}</TableCell>
-                                  <TableCell className="text-xs py-2">{wo.workOrderNo || '-'}</TableCell>
-                                  <TableCell className="whitespace-normal break-words max-w-[300px] text-xs py-2">{wo.jobTitle || '-'}</TableCell>
-                                  <TableCell className="text-xs py-2">{formatWoDate(wo.dueDate)}</TableCell>
-                                  <TableCell className="py-2">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${getStatusColor(effectiveStatus)}`}>
-                                      {effectiveStatus}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell className="py-2">
-                                    {(wo as EnrichedWorkOrder).jobPriority ? (
-                                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${getCritColor((wo as EnrichedWorkOrder).jobPriority)}`}>
-                                        {(wo as EnrichedWorkOrder).jobPriority}
-                                      </span>
-                                    ) : (
-                                      <span className="text-gray-400 text-xs">-</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="py-2">
-                                    <div className="flex gap-1 justify-center">
-                                      <TooltipProvider>
-                                        <UITooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              size="icon"
-                                              variant="ghost"
-                                              className="h-6 w-6"
-                                              onClick={() => setOpViewModal({ open: true, workOrder: wo as EnrichedWorkOrder })}
-                                              data-testid={`op-view-wo-${wo.id}`}
-                                            >
-                                              <Eye className="h-3.5 w-3.5 text-gray-500" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>View</TooltipContent>
-                                        </UITooltip>
-                                      </TooltipProvider>
-                                      <TooltipProvider>
-                                        <UITooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              size="icon"
-                                              variant="ghost"
-                                              className="h-6 w-6"
-                                              onClick={() => setOpViewModal({ open: true, workOrder: wo as EnrichedWorkOrder })}
-                                              data-testid={`op-edit-wo-${wo.id}`}
-                                            >
-                                              <Pencil className="h-3.5 w-3.5 text-gray-500" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>Edit</TooltipContent>
-                                        </UITooltip>
-                                      </TooltipProvider>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })
-                          )}
-                        </TableBody>
-                      </Table>
+                    <div className="flex-1 min-h-[300px] border border-gray-200 rounded-lg bg-white overflow-hidden">
+                      <WOAgGridTable
+                        columnDefs={dashboardOpColumnDefs}
+                        rowData={operationTableData}
+                        height="100%"
+                        noRowsMessage="No work orders found"
+                        testId="dashboard-op-grid"
+                      />
                     </div>
                   )}
                 </div>
