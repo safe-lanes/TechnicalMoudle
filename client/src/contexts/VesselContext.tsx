@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useVessels } from '@/hooks/useVessels';
 import { useUIRole } from '@/contexts/UIRoleContext';
 
@@ -25,6 +25,9 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
   const { data: vesselData = [], isLoading } = useVessels();
   const { uiRole, isSailAdmin, isClientAdmin } = useUIRole();
 
+  const userTouchedRef = useRef(false);
+  const lastAppliedRoleRef = useRef<string | null>(null);
+
   const vessels: Vessel[] = vesselData
     .filter((entry: any) => entry.id)
     .map((entry: any) => ({
@@ -34,30 +37,52 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
     }));
 
   useEffect(() => {
-    if (vessels.length > 0 && uiRole !== null) {
-      const isAllVessels = vesselId === 'all';
-      const vesselExists = isAllVessels || vessels.some(v => v.id === vesselId);
-      if (!vesselId || !vesselExists) {
-        const adminDefaultsToAll = isSailAdmin || isClientAdmin;
-        if (adminDefaultsToAll) {
-          console.log(`🚢 Auto-selecting "All Vessels" for admin role${!vesselExists && vesselId ? ` (stored '${vesselId}' not found)` : ''}`);
+    if (uiRole === null) return;
+
+    const adminDefaultsToAll = isSailAdmin || isClientAdmin;
+    const roleChanged = lastAppliedRoleRef.current !== uiRole;
+
+    if (adminDefaultsToAll) {
+      if (roleChanged || !userTouchedRef.current) {
+        if (vesselId !== 'all') {
+          console.log(`🚢 Forcing "All Vessels" default for admin role (${uiRole})`);
           setVesselIdState('all');
-        } else {
-          const firstVessel = vessels[0];
-          console.log(`🚢 Auto-selecting first vessel: ${firstVessel.id} (${firstVessel.name})${!vesselExists && vesselId ? ` (stored '${vesselId}' not found)` : ''}`);
-          setVesselIdState(firstVessel.id);
         }
+        if (roleChanged) {
+          userTouchedRef.current = false;
+        }
+        lastAppliedRoleRef.current = uiRole;
+      }
+      return;
+    }
+
+    if (vessels.length === 0) return;
+
+    const isAllVessels = vesselId === 'all';
+    const vesselExists = isAllVessels || vessels.some(v => v.id === vesselId);
+
+    if (!vesselId || !vesselExists || (isAllVessels && roleChanged)) {
+      const firstVessel = vessels[0];
+      console.log(`🚢 Auto-selecting first vessel: ${firstVessel.id} (${firstVessel.name}) for role ${uiRole}`);
+      setVesselIdState(firstVessel.id);
+      if (roleChanged) {
+        userTouchedRef.current = false;
       }
     }
+    lastAppliedRoleRef.current = uiRole;
   }, [vessels, vesselId, uiRole, isSailAdmin, isClientAdmin]);
 
   useEffect(() => {
-    if (vesselId) {
-      localStorage.setItem('selectedVesselId', vesselId);
+    if (!vesselId) return;
+    if (isSailAdmin || isClientAdmin) {
+      localStorage.removeItem('selectedVesselId');
+      return;
     }
-  }, [vesselId]);
+    localStorage.setItem('selectedVesselId', vesselId);
+  }, [vesselId, isSailAdmin, isClientAdmin]);
 
   const setVesselId = (id: string) => {
+    userTouchedRef.current = true;
     setVesselIdState(id);
   };
 

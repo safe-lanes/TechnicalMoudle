@@ -394,16 +394,24 @@ const Dashboard = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [mgmtVesselId, setMgmtVesselId] = useState<string>(vesselId);
+  const adminDefaultsToAll = isSailAdmin || isClientAdmin;
+  const [mgmtVesselId, setMgmtVesselId] = useState<string>(
+    adminDefaultsToAll ? 'all' : vesselId
+  );
   useEffect(() => {
+    if (adminDefaultsToAll && vesselId === 'all' && mgmtVesselId !== 'all') {
+      setMgmtVesselId('all');
+      return;
+    }
     if (!mgmtVesselId && vesselId) {
       setMgmtVesselId(vesselId);
       return;
     }
     if (mgmtVesselId && mgmtVesselId !== 'all' && vessels.length > 0 && !vessels.some(v => v.id === mgmtVesselId)) {
-      setMgmtVesselId(vesselId || vessels[0].id);
+      const fallback = vesselId || (adminDefaultsToAll ? 'all' : vessels[0].id);
+      setMgmtVesselId(fallback);
     }
-  }, [vesselId, mgmtVesselId, vessels]);
+  }, [vesselId, mgmtVesselId, vessels, adminDefaultsToAll]);
   const effectiveVesselId = activeTab === 'overview' ? mgmtVesselId : vesselId;
   const isAllVessels = effectiveVesselId === 'all';
   
