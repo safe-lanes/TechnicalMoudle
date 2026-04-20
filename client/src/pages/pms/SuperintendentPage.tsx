@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Shield, ExternalLink, Check, ArrowLeft } from "lucide-react";
+import { ExternalLink, Check, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,6 +12,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
+import type { ColDef } from "ag-grid-community";
+import WOAgGridTable from "@/components/WOAgGridTable";
 
 function formatDate(dateStr: string | null | undefined) {
   if (!dateStr) return "—";
@@ -65,6 +67,170 @@ export default function SuperintendentPage() {
     (n: any) => n.isAcknowledged && n.acknowledgedAt && new Date(n.acknowledgedAt) >= startOfMonth
   ).length;
 
+  const columnDefs: ColDef[] = useMemo(() => [
+    {
+      headerName: "Work Order Code",
+      field: "workOrderCode",
+      minWidth: 200,
+      flex: 1.2,
+      filter: "agTextColumnFilter",
+      cellRenderer: (params: any) => {
+        const n = params.data;
+        if (!n) return null;
+        return (
+          <button
+            className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+            onClick={() => setLocation(`/pms/work-order/${n.workOrderId}`)}
+            data-testid={`link-wo-${n.id}`}
+          >
+            {n.workOrderCode || n.workOrderId}
+            <ExternalLink className="h-3 w-3" />
+          </button>
+        );
+      },
+    },
+    {
+      headerName: "Job Title",
+      field: "jobTitle",
+      minWidth: 200,
+      flex: 1.5,
+      filter: "agTextColumnFilter",
+      valueGetter: (p: any) => p.data?.jobTitle || "—",
+      tooltipValueGetter: (p: any) => p.data?.jobTitle || "",
+    },
+    {
+      headerName: "Component",
+      field: "componentName",
+      minWidth: 160,
+      flex: 1,
+      filter: "agTextColumnFilter",
+      valueGetter: (p: any) => p.data?.componentName || "—",
+    },
+    {
+      headerName: "Days Late",
+      field: "daysLate",
+      minWidth: 110,
+      flex: 0.6,
+      filter: "agNumberColumnFilter",
+      cellStyle: { justifyContent: "center" },
+      headerClass: "ag-header-center",
+      cellRenderer: (params: any) => {
+        const n = params.data;
+        if (!n) return null;
+        const v = n.daysLate || 0;
+        const cls = v > 14 ? "text-red-600 font-bold" : v >= 7 ? "text-orange-600 font-medium" : "text-gray-900";
+        return <span className={cls} data-testid={`text-days-late-${n.id}`}>{v}</span>;
+      },
+    },
+    {
+      headerName: "Missed Cycles",
+      field: "missedCycles",
+      minWidth: 130,
+      flex: 0.7,
+      filter: "agNumberColumnFilter",
+      cellStyle: { justifyContent: "center" },
+      headerClass: "ag-header-center",
+      cellRenderer: (params: any) => {
+        const n = params.data;
+        if (!n) return null;
+        const v = n.missedCycles || 0;
+        if (v >= 1) {
+          return (
+            <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-500 text-white" data-testid={`badge-missed-cycles-${n.id}`}>
+              {v}
+            </span>
+          );
+        }
+        return <span className="text-gray-500">0</span>;
+      },
+    },
+    {
+      headerName: "Tier",
+      field: "approvalTier",
+      minWidth: 140,
+      flex: 0.8,
+      filter: "agSetColumnFilter",
+      cellStyle: { justifyContent: "center" },
+      headerClass: "ag-header-center",
+      cellRenderer: (params: any) => getTierBadge(params.data?.approvalTier, params.data?.approver),
+    },
+    {
+      headerName: "Notified At",
+      field: "createdAt",
+      minWidth: 160,
+      flex: 1,
+      filter: "agDateColumnFilter",
+      valueFormatter: (p: any) => formatDate(p.value),
+      cellRenderer: (params: any) => <span className="text-gray-700">{formatDate(params.value)}</span>,
+    },
+    {
+      headerName: "Status",
+      field: "isAcknowledged",
+      minWidth: 200,
+      flex: 1.2,
+      filter: "agSetColumnFilter",
+      valueGetter: (p: any) => (p.data?.isAcknowledged ? "Acknowledged" : "Awaiting Acknowledgment"),
+      cellStyle: { justifyContent: "center" },
+      headerClass: "ag-header-center",
+      cellRenderer: (params: any) => {
+        const n = params.data;
+        if (!n) return null;
+        if (n.isAcknowledged) {
+          return (
+            <span className="text-green-600 text-xs font-medium" data-testid={`status-acknowledged-${n.id}`}>
+              Acknowledged ({formatDate(n.acknowledgedAt)})
+            </span>
+          );
+        }
+        return (
+          <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700" data-testid={`status-awaiting-${n.id}`}>
+            Awaiting Acknowledgment
+          </span>
+        );
+      },
+    },
+    {
+      headerName: "Action",
+      field: "action",
+      minWidth: 150,
+      flex: 0.8,
+      sortable: false,
+      filter: false,
+      cellStyle: { justifyContent: "center" },
+      headerClass: "ag-header-center",
+      cellRenderer: (params: any) => {
+        const n = params.data;
+        if (!n) return null;
+        if (n.isAcknowledged) {
+          return (
+            <Button variant="outline" size="sm" disabled className="text-xs" data-testid={`button-acknowledged-${n.id}`}>
+              <Check className="h-3 w-3 mr-1" />
+              Acknowledged
+            </Button>
+          );
+        }
+        if (n.approvalTier === 'superintendent_locked') {
+          return (
+            <Button
+              size="sm"
+              className="text-xs bg-blue-600 hover:bg-blue-700"
+              onClick={() => setConfirmDialog({ open: true, notification: n })}
+              disabled={acknowledgeMutation.isPending}
+              data-testid={`button-acknowledge-${n.id}`}
+            >
+              Acknowledge
+            </Button>
+          );
+        }
+        return (
+          <span className="text-xs text-gray-500 italic" data-testid={`status-info-only-${n.id}`}>
+            Info Only
+          </span>
+        );
+      },
+    },
+  ], [acknowledgeMutation.isPending, setLocation]);
+
   return (
     <div className="space-y-6" data-testid="superintendent-page">
       <div className="flex items-center gap-4">
@@ -91,99 +257,17 @@ export default function SuperintendentPage() {
       <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center text-gray-500">Loading notifications...</div>
-        ) : allNotifications.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No superintendent notifications found.</div>
         ) : (
-          <table className="w-full text-sm" data-testid="table-notifications">
-            <thead className="bg-[#52baf3] text-white">
-              <tr>
-                <th className="text-left py-3 px-4 font-medium">Work Order Code</th>
-                <th className="text-left py-3 px-4 font-medium">Job Title</th>
-                <th className="text-left py-3 px-4 font-medium">Component</th>
-                <th className="text-center py-3 px-4 font-medium">Days Late</th>
-                <th className="text-center py-3 px-4 font-medium">Missed Cycles</th>
-                <th className="text-center py-3 px-4 font-medium">Tier</th>
-                <th className="text-left py-3 px-4 font-medium">Notified At</th>
-                <th className="text-center py-3 px-4 font-medium">Status</th>
-                <th className="text-center py-3 px-4 font-medium">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allNotifications.map((notification: any, idx: number) => (
-                <tr
-                  key={notification.id}
-                  className={idx % 2 === 0 ? "bg-gray-50" : "bg-white"}
-                  data-testid={`row-notification-${notification.id}`}
-                >
-                  <td className="py-3 px-4">
-                    <button
-                      className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
-                      onClick={() => setLocation(`/pms/work-order/${notification.workOrderId}`)}
-                      data-testid={`link-wo-${notification.id}`}
-                    >
-                      {notification.workOrderCode || notification.workOrderId}
-                      <ExternalLink className="h-3 w-3" />
-                    </button>
-                  </td>
-                  <td className="py-3 px-4 text-gray-900">{notification.jobTitle || "—"}</td>
-                  <td className="py-3 px-4 text-gray-900">{notification.componentName || "—"}</td>
-                  <td className="py-3 px-4 text-center">
-                    <span className={
-                      (notification.daysLate || 0) > 14 ? "text-red-600 font-bold" :
-                      (notification.daysLate || 0) >= 7 ? "text-orange-600 font-medium" :
-                      "text-gray-900"
-                    } data-testid={`text-days-late-${notification.id}`}>
-                      {notification.daysLate || 0}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    {(notification.missedCycles || 0) >= 1 ? (
-                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-500 text-white" data-testid={`badge-missed-cycles-${notification.id}`}>
-                        {notification.missedCycles}
-                      </span>
-                    ) : (
-                      <span className="text-gray-500">0</span>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 text-center">{getTierBadge(notification.approvalTier, notification.approver)}</td>
-                  <td className="py-3 px-4 text-gray-700">{formatDate(notification.createdAt)}</td>
-                  <td className="py-3 px-4 text-center">
-                    {notification.isAcknowledged ? (
-                      <span className="text-green-600 text-xs font-medium" data-testid={`status-acknowledged-${notification.id}`}>
-                        Acknowledged ({formatDate(notification.acknowledgedAt)})
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700" data-testid={`status-awaiting-${notification.id}`}>
-                        Awaiting Acknowledgment
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    {notification.isAcknowledged ? (
-                      <Button variant="outline" size="sm" disabled className="text-xs" data-testid={`button-acknowledged-${notification.id}`}>
-                        <Check className="h-3 w-3 mr-1" />
-                        Acknowledged
-                      </Button>
-                    ) : notification.approvalTier === 'superintendent_locked' ? (
-                      <Button
-                        size="sm"
-                        className="text-xs bg-blue-600 hover:bg-blue-700"
-                        onClick={() => setConfirmDialog({ open: true, notification })}
-                        disabled={acknowledgeMutation.isPending}
-                        data-testid={`button-acknowledge-${notification.id}`}
-                      >
-                        Acknowledge
-                      </Button>
-                    ) : (
-                      <span className="text-xs text-gray-500 italic" data-testid={`status-info-only-${notification.id}`}>
-                        Info Only
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div style={{ height: 'calc(100vh - 320px)', minHeight: '420px' }} data-testid="table-notifications">
+            <WOAgGridTable
+              columnDefs={columnDefs}
+              rowData={allNotifications}
+              height="100%"
+              suppressRowClickSelection
+              noRowsMessage="No superintendent notifications found."
+              testId="ag-grid-superintendent-notifications"
+            />
+          </div>
         )}
       </div>
 
