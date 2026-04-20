@@ -183,7 +183,7 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
           classRelated: formData.classRelated || 'No',
           department: formData.department || '',
           criticality: formData.criticality || '',
-          status: 'Active',
+          status: 'Draft',
           briefWorkDescription: formData.briefWorkDescription,
           dataScope: 'vessel',
           maintenanceBasis: 'Calendar',

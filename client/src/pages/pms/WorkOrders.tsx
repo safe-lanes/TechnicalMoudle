@@ -305,16 +305,32 @@ const WorkOrders: React.FC = () => {
   
   const FINALIZED_STATUSES = new Set(['completed', 'approved', 'closed', 'cancelled', 'canceled']);
   const isStoredCompleted = (wo: any) => wo.status && FINALIZED_STATUSES.has(wo.status.toLowerCase().trim());
+
+  // Used for TAB ROUTING only — returns 'Unplanned' for all Unplanned WOs so they
+  // never bleed into Scheduled or Completed tabs regardless of their stored status.
   const getEffectiveStatus = (wo: any) => {
+    if (wo.workOrderType === 'Unplanned') return 'Unplanned';
     if (isStoredCompleted(wo)) return 'Completed';
-    // Unplanned Draft WOs are excluded from all tabs until resumed and submitted
-    if (wo.status === 'Draft' && wo.workOrderType === 'Unplanned') return 'Draft';
     return wo.computedStatus || wo.status || 'Active';
+  };
+
+  // Used for BADGE DISPLAY — shows the real status for Unplanned WOs (Active, Draft, Completed…)
+  // so users can see the actual state while in the Unplanned tab.
+  const getDisplayStatus = (wo: any) => {
+    if (wo.workOrderType === 'Unplanned') {
+      if (isStoredCompleted(wo)) return 'Completed';
+      if (wo.status === 'Pending Approval') return 'Pending Approval';
+      if (wo.status === 'Draft') return 'Draft';
+      return wo.status || 'Active';
+    }
+    return getEffectiveStatus(wo);
   };
 
   const tabs = [
     { id: "Planned", label: "Scheduled", count: safeWorkOrdersList.filter(wo => {
       if (wo.isExecution) return false;
+      // Unplanned WOs never appear in the Scheduled tab regardless of their stored status
+      if (wo.workOrderType === 'Unplanned') return false;
       const effectiveStatus = getEffectiveStatus(wo);
       return effectiveStatus === "Active";
     }).length },
@@ -335,10 +351,18 @@ const WorkOrders: React.FC = () => {
       return getEffectiveStatus(wo) === "Postponed";
     }).length },
     { id: "Unplanned", label: "Unplanned", count: safeWorkOrdersList.filter(wo => {
-      return wo.status === 'Draft' && wo.workOrderType === 'Unplanned';
+      // All Unplanned WOs belong here — Draft, Active, Completed, etc.
+      return wo.workOrderType === 'Unplanned';
     }).length },
-    { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => getEffectiveStatus(wo) === "Pending Approval").length },
-    { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => getEffectiveStatus(wo) === "Completed").length }
+    { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => {
+      if (wo.workOrderType === 'Unplanned') return false;
+      return getEffectiveStatus(wo) === "Pending Approval";
+    }).length },
+    { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => {
+      // Completed Unplanned WOs stay in the Unplanned tab, not here
+      if (wo.workOrderType === 'Unplanned') return false;
+      return getEffectiveStatus(wo) === "Completed";
+    }).length }
   ];
 
   const getStatusBadgeColor = getWoStatusBadgeColor;
@@ -348,7 +372,8 @@ const WorkOrders: React.FC = () => {
     
     if (activeTab === "Planned") {
       if (wo.isExecution) return false;
-      if (wo.status === 'Draft' && wo.workOrderType === 'Unplanned') return false;
+      // All Unplanned WOs are excluded from Scheduled regardless of status
+      if (wo.workOrderType === 'Unplanned') return false;
       if (effectiveStatus !== "Active") return false;
     } else if (activeTab === "Due") {
       const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
@@ -359,14 +384,18 @@ const WorkOrders: React.FC = () => {
       if (wo.isExecution && !isRejectedExecution) return false;
       if (effectiveStatus !== "Overdue") return false;
     } else if (activeTab === "Completed") {
+      // Completed Unplanned WOs stay in the Unplanned tab only
+      if (wo.workOrderType === 'Unplanned') return false;
       if (effectiveStatus !== "Completed") return false;
     } else if (activeTab === "Pending Approval") {
+      if (wo.workOrderType === 'Unplanned') return false;
       if (effectiveStatus !== "Pending Approval") return false;
     } else if (activeTab === "Postponed") {
       if (wo.isExecution) return false;
       if (effectiveStatus !== "Postponed") return false;
     } else if (activeTab === "Unplanned") {
-      if (wo.status !== 'Draft' || wo.workOrderType !== 'Unplanned') return false;
+      // All Unplanned WOs belong here regardless of their stored status
+      if (wo.workOrderType !== 'Unplanned') return false;
     }
     
     if (searchTerm && !wo.jobTitle.toLowerCase().includes(searchTerm.toLowerCase()) && 
@@ -717,8 +746,8 @@ const WorkOrders: React.FC = () => {
         }
         return (
           <div className="flex flex-row items-center gap-1 overflow-hidden w-full min-w-0">
-            <span className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${getStatusBadgeColor(getEffectiveStatus(wo))}`}>
-              {getEffectiveStatus(wo) === 'Due (Grace P)' ? 'Grace P' : getEffectiveStatus(wo)}
+            <span className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${getStatusBadgeColor(getDisplayStatus(wo))}`}>
+              {getDisplayStatus(wo) === 'Due (Grace P)' ? 'Grace P' : getDisplayStatus(wo)}
             </span>
             {(wo.missedCycles ?? 0) >= 1 && (
               <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-500 text-white" data-testid={`badge-skipped-cycles-${wo.id}`}>
@@ -805,7 +834,7 @@ const WorkOrders: React.FC = () => {
               </div>
             ) : (
               <>
-                {getEffectiveStatus(wo) !== "Completed" && (
+                {getDisplayStatus(wo) !== "Completed" && (
                   <>
                     <button
                       className="p-1 hover:bg-gray-200 rounded"
@@ -815,7 +844,7 @@ const WorkOrders: React.FC = () => {
                     >
                       <Pen className="h-4 w-4 text-gray-600" />
                     </button>
-                    {!isVessel && getEffectiveStatus(wo) !== "Pending Approval" && (
+                    {!isVessel && getDisplayStatus(wo) !== "Pending Approval" && (
                       <button
                         className="p-1 hover:bg-gray-200 rounded"
                         onClick={(e) => { e.stopPropagation(); handleTimerClick(wo); }}
@@ -827,7 +856,7 @@ const WorkOrders: React.FC = () => {
                     )}
                   </>
                 )}
-                {getEffectiveStatus(wo) === "Completed" && (
+                {getDisplayStatus(wo) === "Completed" && (
                   <button
                     className="p-1 hover:bg-gray-200 rounded"
                     onClick={(e) => { e.stopPropagation(); handleWorkOrderClick(wo); }}
@@ -1051,7 +1080,7 @@ const WorkOrders: React.FC = () => {
           'Job Title': wo.jobTitle || '-',
           'Assigned To': wo.assignedTo || '-',
           'Due Date': dueDateStr,
-          'Status': getEffectiveStatus(wo),
+          'Status': getDisplayStatus(wo),
           'Criticality': wo.criticality || '-',
           'Maintenance Basis': wo.maintenanceBasis || '-',
           'Frequency': wo.frequencyValue ? `${wo.frequencyValue} ${wo.frequencyUnit || ''}`.trim() : '-',
@@ -1138,7 +1167,7 @@ const WorkOrders: React.FC = () => {
           jobTitle: wo.jobTitle || '-',
           assignedTo: wo.assignedTo || '-',
           dueDate: dueDateStr,
-          status: getEffectiveStatus(wo),
+          status: getDisplayStatus(wo),
           criticality: wo.criticality || '-',
           postponementReason: wo.postponementReason || '-',
           postponementRemarks: wo.postponementRemarks || '-',
