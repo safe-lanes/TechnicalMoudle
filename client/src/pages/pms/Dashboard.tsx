@@ -1542,7 +1542,7 @@ const Dashboard = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {activeTab === 'management' ? (
+            {activeTab === 'management' && !isVessel ? (
               <TooltipProvider>
                 <UITooltip>
                   <TooltipTrigger asChild>
@@ -1797,7 +1797,7 @@ const Dashboard = () => {
                       { key: 'pending-approvals' as OperationCardFilter, label: 'Pending Approvals', value: operationKPIs.pendingApprovalCount, borderColor: 'border-l-orange-500', textColor: 'text-orange-600', testId: 'card-kpi-pending-approvals', valueTestId: 'kpi-pending-approvals', rankScoped: true },
                       { key: 'anomalies' as OperationCardFilter, label: 'W.O Anomalies', value: operationKPIs.anomalyCount, borderColor: 'border-l-orange-500', textColor: 'text-orange-600', testId: 'card-kpi-wo-anomalies', valueTestId: 'kpi-wo-anomalies', rankScoped: false },
                       { key: 'modify-pms' as OperationCardFilter, label: 'Modify PMS Requests', value: operationKPIs.openChangeRequests, borderColor: 'border-l-gray-400', textColor: 'text-gray-600', testId: 'card-kpi-modify-pms-requests', valueTestId: 'kpi-modify-pms-requests', rankScoped: false },
-                    ]).map(card => (
+                    ]).filter(card => !isVessel || (card.key !== 'pending-approvals' && card.key !== 'anomalies' && card.key !== 'modify-pms')).map(card => (
                       <Card
                         key={card.key}
                         className={`cursor-pointer transition-shadow bg-white border-0 border-l-4 ${card.borderColor} ${!isDonutFilter && selectedOpCard === card.key ? 'ring-2 ring-blue-400 shadow-md' : 'hover:shadow-lg'} flex min-h-[120px]`}
