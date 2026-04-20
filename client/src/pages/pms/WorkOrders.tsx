@@ -355,8 +355,9 @@ const WorkOrders: React.FC = () => {
       return wo.workOrderType === 'Unplanned';
     }).length },
     { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => {
-      if (wo.workOrderType === 'Unplanned') return false;
-      return getEffectiveStatus(wo) === "Pending Approval";
+      // Unplanned WOs in Pending Approval state appear in both the Unplanned tab and this tab
+      const displayStatus = getDisplayStatus(wo);
+      return displayStatus === "Pending Approval";
     }).length },
     { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => {
       // Completed Unplanned WOs stay in the Unplanned tab, not here
@@ -388,8 +389,8 @@ const WorkOrders: React.FC = () => {
       if (wo.workOrderType === 'Unplanned') return false;
       if (effectiveStatus !== "Completed") return false;
     } else if (activeTab === "Pending Approval") {
-      if (wo.workOrderType === 'Unplanned') return false;
-      if (effectiveStatus !== "Pending Approval") return false;
+      // Unplanned WOs in Pending Approval appear here AND in the Unplanned tab
+      if (getDisplayStatus(wo) !== "Pending Approval") return false;
     } else if (activeTab === "Postponed") {
       if (wo.isExecution) return false;
       if (effectiveStatus !== "Postponed") return false;
