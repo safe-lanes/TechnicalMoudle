@@ -388,7 +388,7 @@ const Dashboard = () => {
   const [showBenchmarking, setShowBenchmarking] = useState(false);
   const [selectedCriticality, setSelectedCriticality] = useState("");
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
-  const { vesselId } = useVessel();
+  const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isHeadOfDept, isVessel } = useUIRole();
   const { toast } = useToast();
@@ -1056,20 +1056,24 @@ const Dashboard = () => {
 
   const handleVesselChange = (newVesselId: string) => {
     setMgmtVesselId(newVesselId);
+    setVesselId(newVesselId);
   };
 
   const handleAllVesselsChange = (isAll: boolean) => {
     if (isAll) {
       setMgmtVesselId('all');
+      setVesselId('all');
     } else {
       if (mgmtVesselId === 'all' && vessels.length > 0) {
         setMgmtVesselId(vessels[0].id);
+        setVesselId(vessels[0].id);
       }
     }
   };
 
   const handleFleetVesselSelect = (selectedVesselId: string) => {
     setMgmtVesselId(selectedVesselId);
+    setVesselId(selectedVesselId);
   };
 
   const handleRefresh = () => {
