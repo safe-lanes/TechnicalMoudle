@@ -23,7 +23,7 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
   });
 
   const { data: vesselData = [], isLoading } = useVessels();
-  const { isSailAdmin, isClientAdmin } = useUIRole();
+  const { uiRole, isSailAdmin, isClientAdmin } = useUIRole();
 
   const vessels: Vessel[] = vesselData
     .filter((entry: any) => entry.id)
@@ -34,7 +34,7 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
     }));
 
   useEffect(() => {
-    if (vessels.length > 0) {
+    if (vessels.length > 0 && uiRole !== null) {
       const isAllVessels = vesselId === 'all';
       const vesselExists = isAllVessels || vessels.some(v => v.id === vesselId);
       if (!vesselId || !vesselExists) {
@@ -49,7 +49,7 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     }
-  }, [vessels, vesselId, isSailAdmin, isClientAdmin]);
+  }, [vessels, vesselId, uiRole, isSailAdmin, isClientAdmin]);
 
   useEffect(() => {
     if (vesselId) {
