@@ -1378,7 +1378,7 @@ const Dashboard = () => {
               <WoActionButton
                 icon="edit"
                 title="Edit"
-                onClick={(e) => { e.stopPropagation(); setOpViewModal({ open: true, workOrder: wo as EnrichedWorkOrder }); }}
+                onClick={(e) => { e.stopPropagation(); setLocation(`/pms/work-order/${wo.id}`); }}
                 testId={`op-edit-wo-${wo.id}`}
               />
             </div>

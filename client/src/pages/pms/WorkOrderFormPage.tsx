@@ -2443,6 +2443,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           }
 
           await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+          await queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
           await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
           if (hasConsumedSparesData && vesselId) {
             await queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/${vesselId}`] });
@@ -2612,6 +2613,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       // Invalidate all work orders-related caches so the updated status is reflected
       // This includes the list (with any vesselId variants) and the specific work order context
       await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+      await queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
       await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
       if (hasConsumedSparesData && vesselId) {
         await queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/${vesselId}`] });
@@ -2794,6 +2796,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       if (isExistingDraftUnplanned && workOrderId) {
         await apiRequest('PATCH', `/technical/api/work-orders/${workOrderId}`, woPayload);
         queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+        queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
         queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
         toast({ title: 'Draft Updated', description: 'Unplanned work order draft updated successfully.' });
       } else {
@@ -2802,6 +2805,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         const newWoId = createdWO?.id || createdWO?.workOrderId;
         if (!newWoId) throw new Error('Failed to create work order — no ID returned.');
         queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+        queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
         toast({ title: 'Draft Saved', description: 'Unplanned work order saved as draft. You can resume editing from the Unplanned tab.' });
       }
       sessionStorage.setItem('workOrdersActiveTab', 'Unplanned');
@@ -3136,6 +3140,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
 
       queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
 
       if (isReadyForSubmission) {
         toast({ title: 'Work Order Created', description: 'Unplanned work order submitted for approval.' });
@@ -3250,6 +3255,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       setCurrentWorkOrderStatus('Rejected');
       // Invalidate work orders cache so the list shows updated data
       queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
       toast({
         title: "Rejected",
         description: "Work order has been rejected",
