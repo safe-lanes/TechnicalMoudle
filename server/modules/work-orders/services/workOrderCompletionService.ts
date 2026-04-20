@@ -2,6 +2,7 @@ import * as repo from '../repositories/workOrderRepository';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 import { calculateMissedCycles as calcMissedCyclesShared, calculateMissedCyclesRH } from '@shared/dateUtils';
 import { detectAndLogAnomalies } from './anomalyDetectionService';
+import { invalidateComplianceCache } from './complianceAnomalyService';
 import { validateRHEntry } from '../../running-hours/services/rhTimelineValidationService';
 
 // ── Complete Work Order ──
@@ -581,6 +582,8 @@ export async function completeWorkOrder(
   } catch (anomalyError) {
     console.error('[WorkOrderCompletion] Anomaly detection failed (non-blocking):', anomalyError);
   }
+
+  invalidateComplianceCache();
 
   return {
     success: true,

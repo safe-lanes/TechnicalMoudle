@@ -52,7 +52,14 @@ interface ComplianceAnomalies {
 }
 
 const cache = new Map<string, { result: ComplianceAnomalies; timestamp: number }>();
-const CACHE_TTL_MS = 60 * 60 * 1000;
+const CACHE_TTL_MS = 30 * 1000;
+
+const COMPLETED_STATUSES = new Set([
+  'Completed',
+  'Approved',
+  'Closed',
+  'Done',
+]);
 
 export function invalidateComplianceCache() {
   cache.clear();
@@ -84,7 +91,7 @@ export async function getComplianceAnomalies(vesselId?: string): Promise<Complia
 
   const allWOs = await storage.getWorkOrders(vesselId);
   const completedWOs = allWOs.filter((wo: any) =>
-    wo.status === 'Completed' && wo.dataScope !== 'fleet'
+    COMPLETED_STATUSES.has(wo.status) && wo.dataScope !== 'fleet'
   );
 
   const cycleSkipRate = calculateCycleSkipRate(completedWOs);

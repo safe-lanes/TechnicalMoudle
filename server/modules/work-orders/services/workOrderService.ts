@@ -4,6 +4,7 @@ import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrd
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { computeSpareConsumptionDelta, ConsumedSpareEntry } from '../utils/spareConsumptionDelta';
 import { calculateMissedCycles, calculateMissedCyclesRH } from '@shared/dateUtils';
+import { invalidateComplianceCache } from './complianceAnomalyService';
 import { storage } from '../../../storage';
 import { getDb } from '../../../db';
 import { plannerDates } from '@shared/schema';
@@ -1742,6 +1743,8 @@ export async function updateWorkOrder(id: string, body: any) {
     }
   }
   // ========== END SPARE CONSUMPTION ON APPROVAL ==========
+
+  invalidateComplianceCache();
 
   return workOrder;
 }

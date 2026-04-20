@@ -2,6 +2,7 @@ import * as repo from '../repositories/workOrderRepository';
 import { ValidationError } from '../../shared/errors';
 import { calculateMissedCycles, calculateNextDueDate } from '@shared/dateUtils';
 import { resolveHodForDepartment } from '../../ranks/hodResolutionService';
+import { invalidateComplianceCache } from './complianceAnomalyService';
 
 // ── Bulk Approve Work Orders ──
 
@@ -135,6 +136,10 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
     }
   }
 
+  if (results.success.length > 0) {
+    invalidateComplianceCache();
+  }
+
   return {
     message: `Bulk approval completed: ${results.success.length} approved, ${results.failed.length} failed`,
     results
@@ -200,6 +205,10 @@ export async function bulkReject(workOrderIds: string[], approver?: string, reje
       console.error(`❌ Failed to reject work order ${workOrderId}:`, err.message);
       results.failed.push({ id: workOrderId, error: err.message });
     }
+  }
+
+  if (results.success.length > 0) {
+    invalidateComplianceCache();
   }
 
   return {
