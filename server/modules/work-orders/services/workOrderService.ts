@@ -1844,7 +1844,10 @@ export async function getScopedOperationData(
 
     const isShipRole = userRole === 'Ship';
 
-    if (!vesselWideAccessGranted || isShipRole) {
+    // For "Me" mode, always restrict to the user's own rank — even when the
+    // user has vessel-wide access. Vessel-wide fallback only applies to
+    // "My Team" mode when no hierarchy mapping is configured.
+    if (mode === 'me' || !vesselWideAccessGranted || isShipRole) {
       const ownRankIds: string[] = userRankId ? [userRankId] : [];
       const ownRankSet = new Set<string>(ownRankIds);
       const ownRankNameSet = new Set<string>();
