@@ -151,7 +151,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isActive: true,
         crewDesignation: encryptedProfile.crewDesignation || null,
 
-        rank_name: encryptedProfile.rank_name || encryptedProfile.rankName || null,
+        rank_name:
+          encryptedProfile.rank_name || encryptedProfile.rankName || null,
         userUuid: resolved.userUuid || undefined,
         createdAt: new Date(),
         updatedAt: new Date(),
