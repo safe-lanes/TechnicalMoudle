@@ -4,7 +4,7 @@ import {
   shipCertificatesMaster,
   vesselCertificateData,
 } from '@shared/schema';
-import { eq, and, asc, inArray, or, isNull } from 'drizzle-orm';
+import { eq, and, asc, inArray, or, isNull, sql } from 'drizzle-orm';
 
 // ── Helpers ──
 
@@ -117,7 +117,28 @@ export async function insertCertificateData(data: {
 }) {
   const db = await getDb();
   if (!db) return null;
-  return db.insert(vesselCertificateData)
+  // Make insert idempotent against the partial unique index
+  // uniq_vessel_certificate_data_live so the read-then-insert pattern in
+  // certificateService.updateCertificate cannot race itself and 23505. If a
+  // concurrent insert won the race, fall back to updating that live row with
+  // the same payload.
+  const inserted = await db.insert(vesselCertificateData)
     .values(data)
+    .onConflictDoNothing({
+      target: [vesselCertificateData.vesselId, vesselCertificateData.masterId],
+      targetWhere: sql`${vesselCertificateData.isDeleted} = false`,
+    })
+    .returning();
+  if (inserted.length > 0) return inserted;
+  const { vesselId, masterId, vesselName: _ignored, ...updateData } = data;
+  return db.update(vesselCertificateData)
+    .set({ ...updateData, updatedAt: new Date() })
+    .where(
+      and(
+        eq(vesselCertificateData.vesselId, vesselId),
+        eq(vesselCertificateData.masterId, masterId),
+        or(eq(vesselCertificateData.isDeleted, false), isNull(vesselCertificateData.isDeleted))
+      )
+    )
     .returning();
 }

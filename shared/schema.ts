@@ -2859,7 +2859,7 @@ export const vesselCertificateApplicability = pgTable("vessel_certificate_applic
   sortOrder: integer("sort_order").default(0),
   createdByUuid: text("created_by_uuid"),
   updatedByUuid: text("updated_by_uuid"),
-  isDeleted: boolean("is_deleted").default(false),
+  isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -2867,6 +2867,9 @@ export const vesselCertificateApplicability = pgTable("vessel_certificate_applic
   vesselMasterIdx: index("idx_vessel_cert_vessel_master").on(table.vesselId, table.masterId),
   vesselIdx: index("idx_vessel_cert_vessel").on(table.vesselId),
   masterIdx: index("idx_vessel_cert_master").on(table.masterId),
+  uniqueLiveVesselMaster: uniqueIndex("uniq_vessel_certificate_applicability_live")
+    .on(table.vesselId, table.masterId)
+    .where(sql`${table.isDeleted} = false`),
 }));
 
 export const insertVesselCertificateApplicabilitySchema = createInsertSchema(vesselCertificateApplicability).omit({
@@ -2899,7 +2902,7 @@ export const vesselCertificateData = pgTable("vessel_certificate_data", {
   sortOrder: integer("sort_order").default(0),
   createdByUuid: text("created_by_uuid"),
   updatedByUuid: text("updated_by_uuid"),
-  isDeleted: boolean("is_deleted").default(false),
+  isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -2907,6 +2910,9 @@ export const vesselCertificateData = pgTable("vessel_certificate_data", {
   vesselMasterIdx: index("idx_vessel_cert_data_vessel_master").on(table.vesselId, table.masterId),
   vesselIdx: index("idx_vessel_cert_data_vessel").on(table.vesselId),
   masterIdx: index("idx_vessel_cert_data_master").on(table.masterId),
+  uniqueLiveVesselMaster: uniqueIndex("uniq_vessel_certificate_data_live")
+    .on(table.vesselId, table.masterId)
+    .where(sql`${table.isDeleted} = false`),
 }));
 
 export const insertVesselCertificateDataSchema = createInsertSchema(vesselCertificateData).omit({
@@ -3037,6 +3043,8 @@ export const vesselSurveyData = pgTable("vessel_survey_data", {
   vesselMasterIdx: index("idx_vessel_survey_data_vessel_master").on(table.vesselId, table.masterId),
   vesselIdx: index("idx_vessel_survey_data_vessel").on(table.vesselId),
   masterIdx: index("idx_vessel_survey_data_master").on(table.masterId),
+  uniqueVesselMaster: uniqueIndex("uniq_vessel_survey_data_vessel_master")
+    .on(table.vesselId, table.masterId),
 }));
 
 export const insertVesselSurveyDataSchema = createInsertSchema(vesselSurveyData).omit({

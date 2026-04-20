@@ -98,7 +98,10 @@ export async function getApplicabilityByVesselIds(vesselIdList: string[]) {
   if (!db) return null;
   return db.select()
     .from(vesselCertificateApplicability)
-    .where(inArray(vesselCertificateApplicability.vesselId, vesselIdList));
+    .where(and(
+      inArray(vesselCertificateApplicability.vesselId, vesselIdList),
+      or(eq(vesselCertificateApplicability.isDeleted, false), sql`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    ));
 }
 
 export async function getApplicabilityByVesselId(vesselId: string) {
@@ -106,7 +109,10 @@ export async function getApplicabilityByVesselId(vesselId: string) {
   if (!db) return null;
   return db.select()
     .from(vesselCertificateApplicability)
-    .where(eq(vesselCertificateApplicability.vesselId, vesselId));
+    .where(and(
+      eq(vesselCertificateApplicability.vesselId, vesselId),
+      or(eq(vesselCertificateApplicability.isDeleted, false), sql`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    ));
 }
 
 export async function getApplicabilityByVesselAndMaster(vesselId: string, masterId: string) {
@@ -116,15 +122,23 @@ export async function getApplicabilityByVesselAndMaster(vesselId: string, master
     .from(vesselCertificateApplicability)
     .where(and(
       eq(vesselCertificateApplicability.vesselId, vesselId),
-      eq(vesselCertificateApplicability.masterId, masterId)
+      eq(vesselCertificateApplicability.masterId, masterId),
+      or(eq(vesselCertificateApplicability.isDeleted, false), sql`${vesselCertificateApplicability.isDeleted} IS NULL`)
     ));
 }
 
 export async function insertApplicability(data: any) {
   const db = await getDb();
   if (!db) return null;
+  // Make insert idempotent against the partial unique index
+  // uniq_vessel_certificate_applicability_live so concurrent initialize/update
+  // calls cannot 23505 each other.
   return db.insert(vesselCertificateApplicability)
     .values(data)
+    .onConflictDoNothing({
+      target: [vesselCertificateApplicability.vesselId, vesselCertificateApplicability.masterId],
+      targetWhere: sql`${vesselCertificateApplicability.isDeleted} = false`,
+    })
     .returning();
 }
 
@@ -133,10 +147,21 @@ export async function insertApplicabilityBulk(data: Array<{
   vesselName: string;
   masterId: string;
   isApplicable: boolean;
+  isDeleted?: boolean;
 }>) {
   const db = await getDb();
   if (!db) return null;
-  return db.insert(vesselCertificateApplicability).values(data);
+  // Make insert idempotent against the partial unique index
+  // uniq_vessel_certificate_applicability_live so concurrent initialize/bulk-update
+  // calls cannot 23505 each other and cannot silently overwrite an explicit
+  // unchecked row.
+  return db.insert(vesselCertificateApplicability)
+    .values(data)
+    .onConflictDoNothing({
+      target: [vesselCertificateApplicability.vesselId, vesselCertificateApplicability.masterId],
+      targetWhere: sql`${vesselCertificateApplicability.isDeleted} = false`,
+    })
+    .returning();
 }
 
 export async function updateApplicability(vesselId: string, masterId: string, isApplicable: boolean) {
@@ -146,7 +171,8 @@ export async function updateApplicability(vesselId: string, masterId: string, is
     .set({ isApplicable, updatedAt: new Date() })
     .where(and(
       eq(vesselCertificateApplicability.vesselId, vesselId),
-      eq(vesselCertificateApplicability.masterId, masterId)
+      eq(vesselCertificateApplicability.masterId, masterId),
+      or(eq(vesselCertificateApplicability.isDeleted, false), sql`${vesselCertificateApplicability.isDeleted} IS NULL`)
     ))
     .returning();
 }
@@ -158,7 +184,8 @@ export async function bulkUpdateApplicability(vesselIds: string[], masterId: str
     .set({ isApplicable, updatedAt: new Date() })
     .where(and(
       inArray(vesselCertificateApplicability.vesselId, vesselIds),
-      eq(vesselCertificateApplicability.masterId, masterId)
+      eq(vesselCertificateApplicability.masterId, masterId),
+      or(eq(vesselCertificateApplicability.isDeleted, false), sql`${vesselCertificateApplicability.isDeleted} IS NULL`)
     ))
     .returning();
 }
@@ -179,7 +206,10 @@ export async function getApplicabilityByMasterIds(masterIds: string[]) {
     vesselId: vesselCertificateApplicability.vesselId,
     masterId: vesselCertificateApplicability.masterId,
   }).from(vesselCertificateApplicability)
-    .where(inArray(vesselCertificateApplicability.masterId, masterIds));
+    .where(and(
+      inArray(vesselCertificateApplicability.masterId, masterIds),
+      or(eq(vesselCertificateApplicability.isDeleted, false), sql`${vesselCertificateApplicability.isDeleted} IS NULL`)
+    ));
 }
 
 export async function getAllVessels() {

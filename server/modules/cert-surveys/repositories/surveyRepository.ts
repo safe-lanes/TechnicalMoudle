@@ -93,8 +93,26 @@ export async function insertSurveyData(data: {
 }) {
   const db = await getDb();
   if (!db) return null;
-  return db.insert(vesselSurveyData)
+  // Make insert idempotent against the unique index
+  // uniq_vessel_survey_data_vessel_master so the read-then-insert pattern in
+  // surveyService.updateSurvey cannot race itself and 23505. If a concurrent
+  // insert won the race, fall back to updating that row with the same payload.
+  const inserted = await db.insert(vesselSurveyData)
     .values(data)
+    .onConflictDoNothing({
+      target: [vesselSurveyData.vesselId, vesselSurveyData.masterId],
+    })
+    .returning();
+  if (inserted.length > 0) return inserted;
+  const { vesselId, masterId, vesselName: _ignored, ...updateData } = data;
+  return db.update(vesselSurveyData)
+    .set({ ...updateData, updatedAt: new Date() })
+    .where(
+      and(
+        eq(vesselSurveyData.vesselId, vesselId),
+        eq(vesselSurveyData.masterId, masterId)
+      )
+    )
     .returning();
 }
 
