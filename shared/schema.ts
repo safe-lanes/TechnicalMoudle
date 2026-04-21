@@ -2711,7 +2711,7 @@ export const jobComponentLinks = pgTable("job_component_links", {
   nextDueDate: text("next_due_date"), // Calculated next due date for THIS component
   lastDoneRH: text("last_done_rh"), // Last completion running hours for THIS component
   nextDueRH: text("next_due_rh"), // Calculated next due RH for THIS component
-  updatedAt: timestamp("updated_at"),
+  updatedAt: updatedAtColumn(),
 }, (table) => ({
   jobIdIdx: index("idx_job_component_link_job").on(table.jobId),
   componentIdIdx: index("idx_job_component_link_component").on(table.componentId),

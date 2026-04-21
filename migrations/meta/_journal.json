@@ -351,6 +351,13 @@
       "when": 1776765502217,
       "tag": "0049_simple_whirlwind",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1776765884317,
+      "tag": "0050_jazzy_doctor_spectrum",
+      "breakpoints": true
     }
   ]
 }
