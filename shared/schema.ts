@@ -20,6 +20,7 @@ export const users = pgTable("users", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({
@@ -53,6 +54,7 @@ export const fleets = pgTable("fleets", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 });
 
 export const insertFleetSchema = createInsertSchema(fleets).omit({
@@ -78,6 +80,7 @@ export const vessels = pgTable("vessels", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 });
 
 export const insertVesselSchema = createInsertSchema(vessels).omit({
@@ -119,7 +122,8 @@ export const defectSequences = pgTable("defect_sequences", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   year: integer("year").notNull(), // 2-digit year stored as 4-digit (e.g., 2026)
-  lastSequence: integer("last_sequence").notNull().default(0), // Last used sequence number
+  lastSequence: integer("last_sequence").notNull().default(0), // Last used sequence number,
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   uniqueVesselYear: unique("unique_defect_seq_vessel_year").on(table.vesselId, table.year),
 }));
@@ -158,6 +162,7 @@ export const runningHoursAudit = pgTable("running_hours_audit", {
   componentCode: text("component_code"),
   componentName: text("component_name"),
   updatedByUuid: text("updated_by_uuid"),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   componentIdIdx: index("idx_component_entered").on(table.componentId, table.enteredAtUTC),
   componentDateIdx: index("idx_component_date").on(table.componentId, table.dateUpdatedLocal),
@@ -347,6 +352,7 @@ export const components = pgTable("components", {
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   dataScopeIdx: index("idx_comp_data_scope").on(table.dataScope),
   fleetTreeIdx: index("idx_comp_fleet_tree").on(table.dataScope, table.parentFleetEquipmentCode),
@@ -372,6 +378,7 @@ export const formDefinitions = pgTable("form_definitions", {
   fduuid: text("fduuid").notNull().unique(), // Canonical UUID identity — FK target for form_versions
   name: text("name").notNull().unique(), // ADD_COMPONENT, WO_PLANNED, WO_UNPLANNED
   subgroup: text("subgroup"),
+  isSync: boolean("is_sync").default(false),
 });
 
 export const insertFormDefinitionSchema = createInsertSchema(formDefinitions).omit({
@@ -394,7 +401,8 @@ export const formVersions = pgTable("form_versions", {
   status: text("status").notNull(), // DRAFT, PUBLISHED, ARCHIVED
   authorUserId: text("author_user_id").notNull(),
   changelog: text("changelog"),
-  schemaJson: text("schema_json").notNull(), // JSON string
+  schemaJson: text("schema_json").notNull(), // JSON string,
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   formIdIdx: index("idx_form_id").on(table.formId),
   statusIdx: index("idx_form_version_status").on(table.status),
@@ -416,6 +424,7 @@ export const formVersionUsage = pgTable("form_version_usage", {
     .references(() => formVersions.fvuuid), // FK → form_versions.fvuuid
   usedInModule: text("used_in_module").notNull(),
   usedAt: timestamp("used_at").notNull(),
+  isSync: boolean("is_sync").default(false),
 });
 
 export const insertFormVersionUsageSchema = createInsertSchema(formVersionUsage).omit({
@@ -440,6 +449,7 @@ export const ihmItems = pgTable("ihm_items", {
   vesselId: text("vessel_id").notNull().default("V001").references(() => vessels.vuuid),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   componentIdIdx: index("idx_ihm_component_id").on(table.componentId),
   spareIdIdx: index("idx_ihm_spare_id").on(table.spareId),
@@ -468,6 +478,7 @@ export const ihmMaintenanceLog = pgTable("ihm_maintenance_log", {
   vesselId: text("vessel_id").notNull().default("V001").references(() => vessels.vuuid),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   userId: text("user_id").notNull(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   workOrderIdIdx: index("idx_ihm_log_wo_id").on(table.workOrderId),
   createdAtIdx: index("idx_ihm_log_created").on(table.createdAt),
@@ -536,7 +547,8 @@ export const spares = pgTable("spares", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   createdBy: text("created_by"), // User who created the spare
   updatedAt: updatedAtColumn(),
-  updatedBy: text("updated_by"), // User who last updated the spare
+  updatedBy: text("updated_by"), // User who last updated the spare,
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   componentIdIdx: index("idx_spare_component").on(table.componentId),
   vesselIdIdx: index("idx_spare_vessel").on(table.vesselId),
@@ -578,7 +590,8 @@ export const sparesHistory = pgTable("spares_history", {
   reference: text("reference"), // Work Order or PO reference
   dateLocal: text("date_local"), // Local date of transaction
   tz: text("tz"), // Timezone
-  place: text("place"), // Port/Location for receive/consume
+  place: text("place"), // Port/Location for receive/consume,
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   timestampIdx: index("idx_history_timestamp").on(table.timestampUTC),
   spareIdIdx: index("idx_history_spare").on(table.spareId),
@@ -616,6 +629,7 @@ export const storesLedger = pgTable("stores_ledger", {
   ref: text("ref"), // PO/WO reference
   userId: text("user_id").notNull(),
   remarks: text("remarks"),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   vesselSectionDateIdx: index("idx_vessel_section_date").on(table.vesselId, table.section, table.dateLocal),
   itemDateIdx: index("idx_item_date").on(table.itemId, table.dateLocal),
@@ -677,6 +691,7 @@ export const storesItems = pgTable("stores_items", {
   isActive: boolean("is_active").notNull().default(true), // Active status
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   vesselIdIdx: index("idx_stores_vessel").on(table.vesselId),
   itemTypeIdx: index("idx_stores_item_type").on(table.itemType),
@@ -732,6 +747,7 @@ export const changeRequest = pgTable("change_request", {
   }>>().default([]), // History of all revisions
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   vesselCategoryIdx: index("idx_vessel_category").on(table.vesselId, table.category),
   statusIdx: index("idx_change_request_status").on(table.status),
@@ -754,6 +770,7 @@ export const changeRequestAttachment = pgTable("change_request_attachment", {
   url: text("url").notNull(),
   uploadedByUserId: text("uploaded_by_user_id").notNull(),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   changeRequestIdx: index("idx_change_request").on(table.changeRequestId),
 }));
@@ -773,6 +790,7 @@ export const changeRequestComment = pgTable("change_request_comment", {
   userId: text("user_id").notNull(),
   message: text("message").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   changeRequestIdx: index("idx_change_request_comment").on(table.changeRequestId),
 }));
@@ -801,6 +819,7 @@ export const alertPolicies = pgTable("alert_policies", {
   updatedAt: updatedAtColumn(),
   createdBy: text("created_by").notNull(),
   updatedBy: text("updated_by").notNull(),
+  isSync: boolean("is_sync").default(false),
 });
 
 export const insertAlertPolicySchema = createInsertSchema(alertPolicies).omit({
@@ -830,6 +849,7 @@ export const alertEvents = pgTable("alert_events", {
   ackBy: text("ack_by"),
   ackAt: timestamp("ack_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   dedupeKeyIdx: index("idx_dedupe_key").on(table.dedupeKey, table.createdAt),
   policyIdx: index("idx_policy_events").on(table.policyId, table.createdAt),
@@ -856,6 +876,7 @@ export const alertDeliveries = pgTable("alert_deliveries", {
   sentAt: timestamp("sent_at"),
   acknowledgedAt: timestamp("acknowledged_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   eventIdx: index("idx_event_deliveries").on(table.eventId, table.channel),
   recipientIdx: index("idx_recipient_deliveries").on(table.recipient, table.status),
@@ -882,6 +903,7 @@ export const alertConfig = pgTable("alert_config", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
   updatedBy: text("updated_by").notNull(),
+  isSync: boolean("is_sync").default(false),
 });
 
 export const insertAlertConfigSchema = createInsertSchema(alertConfig).omit({
@@ -964,6 +986,7 @@ export const jobs = pgTable("jobs", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedBy: text("updated_by"), // User who last updated the job
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   vesselIdIdx: index("idx_job_vessel").on(table.vesselId),
   componentIdIdx: index("idx_job_component").on(table.componentId),
@@ -1118,6 +1141,7 @@ export const workOrders = pgTable("work_orders", {
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   vesselIdIdx: index("idx_wo_vessel").on(table.vesselId),
   statusIdx: index("idx_wo_status").on(table.status),
@@ -1202,6 +1226,7 @@ export const workOrderExecutions = pgTable("work_order_executions", {
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   templateIdIdx: index("idx_exec_template").on(table.templateId),
   componentIdIdx: index("idx_exec_component").on(table.componentId),
@@ -1410,6 +1435,7 @@ export const defects = pgTable("defects", {
   }>>().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   vesselIdIdx: index("idx_defect_vessel").on(table.vesselId),
   statusIdx: index("idx_defect_status").on(table.status),
@@ -1444,6 +1470,7 @@ export const defectActions = pgTable("defect_actions", {
   attachmentUrls: text("attachment_urls").array(), // Evidence attachments
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   defectIdIdx: index("idx_action_defect").on(table.defectId),
   statusIdx: index("idx_action_status").on(table.status),
@@ -1469,6 +1496,7 @@ export const defectAttachments = pgTable("defect_attachments", {
   attachmentType: text("attachment_type").notNull(), // 'photo' | 'document' | 'evidence'
   uploadedBy: text("uploaded_by").notNull(),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   defectIdIdx: index("idx_attachment_defect").on(table.defectId),
   typeIdx: index("idx_attachment_type").on(table.attachmentType),
@@ -1494,6 +1522,7 @@ export const recurringDefects = pgTable("recurring_defects", {
   hasCoc: boolean("has_coc").notNull().default(false),
   mtbfDays: numeric("mtbf_days"), // Average days between occurrences
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   equipmentKeyWindowIdx: index("idx_recurring_key_window").on(table.equipmentKey, table.windowMonths),
   updatedAtIdx: index("idx_recurring_updated").on(table.updatedAt),
@@ -1511,6 +1540,7 @@ export type RecurringDefect = typeof recurringDefects.$inferSelect;
 export const recurringDefectLinks = pgTable("recurring_defect_links", {
   recurringId: integer("recurring_id").notNull().references(() => recurringDefects.id, { onDelete: "cascade" }),
   defectId: text("defect_id").notNull().references(() => defects.duuid, { onDelete: "cascade" }),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   pk: primaryKey({ columns: [table.recurringId, table.defectId] }),
   recurringIdx: index("idx_link_recurring").on(table.recurringId),
@@ -1541,7 +1571,8 @@ export const importHistory = pgTable("import_history", {
   fileSize: integer("file_size"), // File size in bytes
   storedFilePath: text("stored_file_path"), // Object storage path to the uploaded file
   undoneAt: timestamp("undone_at"), // Timestamp when import was undone
-  errorMessage: text("error_message"), // Error message if import or undo failed
+  errorMessage: text("error_message"), // Error message if import or undo failed,
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   typeIdx: index("idx_import_history_type").on(table.type),
   startedAtIdx: index("idx_import_history_started").on(table.startedAt),
@@ -1559,6 +1590,7 @@ export const importChangeLog = pgTable("import_change_log", {
   newData: json("new_data"), // Minimal snapshot after change
   checksum: text("checksum").notNull(), // Hash of the record at time of change for conflict detection
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   importHistoryIdx: index("idx_change_log_import").on(table.importHistoryId),
   entityIdx: index("idx_change_log_entity").on(table.entityType, table.entityId),
@@ -1590,6 +1622,7 @@ export const makers = pgTable("makers", {
   phone: text("phone"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   makerCodeIdx: index("idx_maker_code").on(table.makerCode),
   makerNameIdx: index("idx_maker_name").on(table.makerName),
@@ -1615,6 +1648,7 @@ export const masterLists = pgTable("master_lists", {
   displayOrder: integer("display_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => [
   index("idx_master_list_type").on(table.listType),
   unique("unique_list_type_key").on(table.listType, table.listKey),
@@ -1679,6 +1713,7 @@ export const componentRunningHoursLog = pgTable("component_running_hours_log", {
   updateSource: text("update_source").notNull(), // 'manual' | 'cascade' | 'bulk_import' | 'work_order'
   notes: text("notes"), // Optional notes for the update
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   componentCodeIdx: index("idx_rh_log_component_code").on(table.componentCode),
   vesselCodeIdx: index("idx_rh_log_vessel_code").on(table.vesselCode),
@@ -1709,7 +1744,8 @@ export const auditLog = pgTable("audit_log", {
   oldValue: text("old_value"), // Previous value (JSON string for complex objects)
   newValue: text("new_value"), // New value (JSON string for complex objects)
   source: text("source").notNull(), // 'web_ui' | 'api' | 'bulk_import' | 'system' | 'modify_pms'
-  payload: json("payload"), // Additional context (e.g., full snapshot, metadata)
+  payload: json("payload"), // Additional context (e.g., full snapshot, metadata),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   timestampIdx: index("idx_audit_timestamp").on(table.timestamp),
   userIdIdx: index("idx_audit_user_id").on(table.userId),
@@ -1745,7 +1781,8 @@ export const componentDocuments = pgTable("component_documents", {
   canShipDownload: boolean("can_ship_download").notNull().default(false), // Ship users can download
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"), // Additional notes about the document
-  storageBackend: text("storage_backend").default("object"), // 'object' for cloud storage, 'local' for filesystem
+  storageBackend: text("storage_backend").default("object"), // 'object' for cloud storage, 'local' for filesystem,
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   componentIdIdx: index("idx_doc_component_id").on(table.componentId),
   componentCodeIdx: index("idx_doc_component_code").on(table.componentCode),
@@ -1782,6 +1819,7 @@ export const componentClassRegulatory = pgTable("component_class_regulatory", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedBy: text("updated_by"),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   componentIdIdx: index("idx_class_component_id").on(table.componentId),
   componentCodeIdx: index("idx_class_component_code").on(table.componentCode),
@@ -1826,7 +1864,8 @@ export const componentMaintenanceHistory = pgTable("component_maintenance_histor
   isSkipped: boolean("is_skipped").default(false),
   skippedCycleDate: text("skipped_cycle_date"),
   sourceWorkOrderId: text("source_work_order_id"),
-  createdAt: timestamp("created_at").notNull().defaultNow(), // IMMUTABLE - no updates/deletes allowed
+  createdAt: timestamp("created_at").notNull().defaultNow(), // IMMUTABLE - no updates/deletes allowed,
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   componentIdIdx: index("idx_history_component_id").on(table.componentId),
   componentCodeIdx: index("idx_history_component_code").on(table.componentCode),
@@ -1872,6 +1911,7 @@ export const componentRequisitions = pgTable("component_requisitions", {
   remarks: text("remarks"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   componentIdIdx: index("idx_req_component_id").on(table.componentId),
   componentCodeIdx: index("idx_req_component_code").on(table.componentCode),
@@ -1922,6 +1962,7 @@ export const pmsVesselSettings = pgTable("pms_vessel_settings", {
   updatedBy: text("updated_by").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   vesselIdIdx: index("idx_pms_settings_vessel_id").on(table.vesselId),
 }));
@@ -2182,6 +2223,7 @@ export const sfiDetails = pgTable("sfi_details", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   sfiCodeIdx: index("idx_sfi_component_code").on(table.componentCode),
 }));
@@ -2217,6 +2259,7 @@ export const masterData = pgTable("master_data", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   fleetEquipmentCodeIdx: index("idx_master_data_fleet_code").on(table.fleetEquipmentCode),
   sfiCodeIdx: index("idx_master_data_sfi").on(table.sfiCode),
@@ -2246,6 +2289,7 @@ export const fleetVesselMapping = pgTable("fleet_vessel_mapping", {
   mappedBy: text("mapped_by").notNull(), // User who created mapping
   mappedAt: timestamp("mapped_at").notNull().defaultNow(),
   isActive: boolean("is_active").notNull().default(true),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   fleetCodeIdx: index("idx_fleet_vessel_mapping_fleet").on(table.fleetEquipmentCode),
   vesselCodeIdx: index("idx_fleet_vessel_mapping_vessel").on(table.vesselCode),
@@ -2274,6 +2318,7 @@ export const fleetComponentMapping = pgTable("fleet_component_mapping", {
   mappedBy: text("mapped_by").notNull(), // User who created mapping
   mappedAt: timestamp("mapped_at").notNull().defaultNow(),
   isActive: boolean("is_active").notNull().default(true),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   fleetCodeIdx: index("idx_fleet_comp_mapping_fleet").on(table.fleetEquipmentCode),
   vesselCodeIdx: index("idx_fleet_comp_mapping_vessel").on(table.vesselCode),
@@ -2303,6 +2348,7 @@ export const fleetJobVesselMapping = pgTable("fleet_job_vessel_mapping", {
   mappedBy: text("mapped_by").notNull(), // User who created mapping
   mappedAt: timestamp("mapped_at").notNull().defaultNow(),
   isActive: boolean("is_active").notNull().default(true),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   fleetCodeIdx: index("idx_fleet_job_mapping_fleet").on(table.fleetEquipmentCode),
   jobCodeIdx: index("idx_fleet_job_mapping_job").on(table.jobCode),
@@ -2331,6 +2377,7 @@ export const fleetSpareVesselMapping = pgTable("fleet_spare_vessel_mapping", {
   mappedBy: text("mapped_by").notNull(), // User who created mapping
   mappedAt: timestamp("mapped_at").notNull().defaultNow(),
   isActive: boolean("is_active").notNull().default(true),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   fleetCodeIdx: index("idx_fleet_spare_mapping_fleet").on(table.fleetEquipmentCode),
   partCodeIdx: index("idx_fleet_spare_mapping_part").on(table.partCode),
@@ -2369,7 +2416,8 @@ export const bulkImportHistory = pgTable("bulk_import_history", {
   errorSummary: text("error_summary"), // Brief summary of errors
   isFleetImport: boolean("is_fleet_import").notNull().default(false), // True if Fleet Data Import mode
   templateVersion: text("template_version"), // Version of template used
-  processingTimeMs: integer("processing_time_ms"), // How long import took
+  processingTimeMs: integer("processing_time_ms"), // How long import took,
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   vesselCodeIdx: index("idx_bulk_import_vessel").on(table.vesselCode),
   moduleTypeIdx: index("idx_bulk_import_module").on(table.moduleType),
@@ -2404,6 +2452,7 @@ export const bulkImportErrors = pgTable("bulk_import_errors", {
   severity: text("severity").notNull().default("Error"), // 'Error' | 'Warning' | 'Info'
   rawRowData: json("raw_row_data"), // Original row data for debugging
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   importIdIdx: index("idx_bulk_error_import").on(table.importId),
   rowNumberIdx: index("idx_bulk_error_row").on(table.importId, table.rowNumber),
@@ -2439,6 +2488,7 @@ export const certificates = pgTable("certificates", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   vesselIdx: index("idx_certificates_vessel").on(table.vessel),
   typeIdx: index("idx_certificates_type").on(table.type),
@@ -2474,6 +2524,7 @@ export const surveys = pgTable("surveys", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   vesselIdx: index("idx_surveys_vessel").on(table.vessel),
   typeIdx: index("idx_surveys_type").on(table.type),
@@ -2510,6 +2561,7 @@ export const workOrderExecutionDetails = pgTable("work_order_execution_details",
   attachments: json("attachments").$type<any[]>().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   workOrderIdx: index("idx_exec_details_wo").on(table.workOrderId),
   vesselIdx: index("idx_exec_details_vessel").on(table.vesselId),
@@ -2558,6 +2610,7 @@ export const locations = pgTable("locations", {
   locationType: text("location_type"), // STORE/LOCKER/BOX/etc.
   createdAt: timestamp("created_at").notNull().defaultNow(),
   createdBy: text("created_by").notNull(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   vesselLocationIdx: index("idx_location_vessel").on(table.vesselId),
   uniqueVesselLocation: unique("unique_vessel_location").on(table.vesselId, table.locationName),
@@ -2580,6 +2633,7 @@ export const spareComponentLinks = pgTable("spare_component_links", {
   componentId: text("component_id").notNull().references(() => components.cuuid), // FK → components.cuuid
   linkedBy: text("linked_by").notNull(),
   linkedAt: timestamp("linked_at").notNull().defaultNow(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   spareIdIdx: index("idx_spare_component_link_spare").on(table.spareId),
   componentIdIdx: index("idx_spare_component_link_component").on(table.componentId),
@@ -2602,7 +2656,8 @@ export const spareLocationStock = pgTable("spare_location_stock", {
   spareId: integer("spare_id").notNull(), // Legacy integer FK — kept during transition
   spareUuid: text("spare_uuid").notNull().references(() => spares.suuid), // FK → spares.suuid
   locationId: integer("location_id").notNull(), // FK → locations.id
-  qty: integer("qty").notNull().default(0), // Must never go negative
+  qty: integer("qty").notNull().default(0), // Must never go negative,
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   spareIdIdx: index("idx_spare_location_stock_spare").on(table.spareId),
   locationIdIdx: index("idx_spare_location_stock_location").on(table.locationId),
@@ -2635,6 +2690,7 @@ export const inventoryTransactions = pgTable("inventory_transactions", {
   referenceId: text("reference_id"), // WO number, import batch id, etc.
   referenceNote: text("reference_note"), // Free text
   userId: text("user_id").notNull(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   vesselIdIdx: index("idx_inventory_txn_vessel").on(table.vesselId),
   spareIdIdx: index("idx_inventory_txn_spare").on(table.spareId),
@@ -2712,6 +2768,7 @@ export const jobComponentLinks = pgTable("job_component_links", {
   lastDoneRH: text("last_done_rh"), // Last completion running hours for THIS component
   nextDueRH: text("next_due_rh"), // Calculated next due RH for THIS component
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   jobIdIdx: index("idx_job_component_link_job").on(table.jobId),
   componentIdIdx: index("idx_job_component_link_component").on(table.componentId),
@@ -2736,6 +2793,7 @@ export const equipmentCategories = pgTable("equipment_categories", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 });
 
 export const insertEquipmentCategorySchema = createInsertSchema(equipmentCategories).omit({
@@ -2755,6 +2813,7 @@ export const defectCategories = pgTable("defect_categories", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 });
 
 export const insertDefectCategorySchema = createInsertSchema(defectCategories).omit({
@@ -2774,6 +2833,7 @@ export const defectTypes = pgTable("defect_types", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 });
 
 export const insertDefectTypeSchema = createInsertSchema(defectTypes).omit({
@@ -2839,6 +2899,7 @@ export const shipCertificatesLabelsConfig = pgTable("ship_certificates_labels_co
   label: text("label").notNull().default(""),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 });
 
 export const insertShipCertificatesLabelsConfigSchema = createInsertSchema(shipCertificatesLabelsConfig).omit({
@@ -2986,6 +3047,7 @@ export const shipSurveysLabelsConfig = pgTable("ship_surveys_labels_config", {
   label: text("label").notNull().default(""),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 });
 
 export const insertShipSurveysLabelsConfigSchema = createInsertSchema(shipSurveysLabelsConfig).omit({
@@ -3007,6 +3069,7 @@ export const vesselSurveyApplicability = pgTable("vessel_survey_applicability", 
   isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   vesselMasterIdx: index("idx_vessel_survey_vessel_master").on(table.vesselId, table.masterId),
   vesselIdx: index("idx_vessel_survey_vessel").on(table.vesselId),
@@ -3040,6 +3103,7 @@ export const vesselSurveyData = pgTable("vessel_survey_data", {
   attachments: jsonb("attachments").$type<Array<{ name: string; size: number; key: string; uploadedAt: string }>>().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   vesselMasterIdx: index("idx_vessel_survey_data_vessel_master").on(table.vesselId, table.masterId),
   vesselIdx: index("idx_vessel_survey_data_vessel").on(table.vesselId),
@@ -3078,6 +3142,7 @@ export const workOrderPostponements = pgTable("work_order_postponements", {
   attachmentPath: text("attachment_path"), // Path to any attached documents
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   workOrderIdx: index("idx_postponement_work_order").on(table.workOrderId),
   vesselIdx: index("idx_postponement_vessel").on(table.vesselId),
@@ -3103,6 +3168,7 @@ export const reportSnapshots = pgTable("report_snapshots", {
   filtersApplied: jsonb("filters_applied"),
   summaryData: jsonb("summary_data").notNull(),
   itemsData: jsonb("items_data").notNull(),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   vesselIdx: index("idx_report_snapshots_vessel").on(table.vesselId),
   reportTypeIdx: index("idx_report_snapshots_type").on(table.reportType),
