@@ -344,6 +344,13 @@
       "when": 1776151768701,
       "tag": "0048_dark_harpoon",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1776765502217,
+      "tag": "0049_simple_whirlwind",
+      "breakpoints": true
     }
   ]
 }
