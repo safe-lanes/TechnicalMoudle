@@ -193,7 +193,7 @@ export async function updateSortOrder(updates: { id: string; sortOrder: number }
   const { pool } = getPostgresClient();
   for (const update of updates) {
     await pool.query(
-      `UPDATE components SET sort_order = $1 WHERE id = $2`,
+      `UPDATE components SET sort_order = $1, updated_at = NOW() WHERE id = $2`,
       [update.sortOrder, update.id]
     );
   }
@@ -235,14 +235,14 @@ export async function updateHierarchyAndSortOrder(
       }
 
       await client.query(
-        `UPDATE components SET parent_id = $1, parent_component = $1 WHERE id = $2`,
+        `UPDATE components SET parent_id = $1, parent_component = $1, updated_at = NOW() WHERE id = $2`,
         [rp.newParentCode, rp.id]
       );
     }
 
     for (const update of sortUpdates) {
       await client.query(
-        `UPDATE components SET sort_order = $1 WHERE id = $2`,
+        `UPDATE components SET sort_order = $1, updated_at = NOW() WHERE id = $2`,
         [update.sortOrder, update.id]
       );
     }
