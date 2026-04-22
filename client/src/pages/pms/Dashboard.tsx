@@ -61,8 +61,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 interface Spare {
   id: number;
@@ -386,6 +389,24 @@ const Dashboard = () => {
   const [opDetailSpare, setOpDetailSpare] = useState<Spare | null>(null);
   const [opDetailChangeRequest, setOpDetailChangeRequest] = useState<ChangeRequest | null>(null);
   const [showBenchmarking, setShowBenchmarking] = useState(false);
+  const [rejectDialog, setRejectDialog] = useState<{ open: boolean; type: 'wo' | 'cr'; id: string | null; label: string }>({ open: false, type: 'wo', id: null, label: '' });
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectError, setRejectError] = useState('');
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
+
+  const openRejectDialog = (type: 'wo' | 'cr', id: string, label: string) => {
+    setRejectReason('');
+    setRejectError('');
+    setRejectSubmitting(false);
+    setRejectDialog({ open: true, type, id, label });
+  };
+
+  const closeRejectDialog = () => {
+    setRejectDialog({ open: false, type: 'wo', id: null, label: '' });
+    setRejectReason('');
+    setRejectError('');
+    setRejectSubmitting(false);
+  };
   const [selectedCriticality, setSelectedCriticality] = useState("");
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
   const { vesselId, setVesselId } = useVessel();
@@ -1528,10 +1549,7 @@ const Dashboard = () => {
                 size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  const reason = window.prompt("Enter rejection reason:");
-                  if (reason) {
-                    rejectMutation.mutate({ workOrderId: wo.id, comments: reason });
-                  }
+                  openRejectDialog('wo', String(wo.id), wo.jobTitle ? `WO-${wo.id} • ${wo.jobTitle}` : `WO-${wo.id}`);
                 }}
                 style={{ borderColor: '#E53935', color: '#E53935' }}
                 disabled={rejectMutation.isPending}
@@ -3318,23 +3336,10 @@ const Dashboard = () => {
                   <>
                     <Button
                       variant="destructive"
-                      onClick={async () => {
-                        const comment = prompt('Please provide a reason for rejection:');
-                        if (comment) {
-                          try {
-                            const response = await fetch(`/technical/api/change-requests/${opDetailChangeRequest.id}/reject`, {
-                              method: 'PUT',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ comment, reviewerId: 'current_user' })
-                            });
-                            if (!response.ok) throw new Error('Failed to reject');
-                            queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
-                            setOpDetailChangeRequest(null);
-                            toast({ title: "Change request rejected", description: "The change request has been rejected" });
-                          } catch {
-                            toast({ title: "Error", description: "Failed to reject the change request", variant: "destructive" });
-                          }
-                        }
+                      onClick={() => {
+                        const cr = opDetailChangeRequest;
+                        const label = cr.title ? `Change Request • ${cr.title}` : `Change Request #${cr.id}`;
+                        openRejectDialog('cr', String(cr.id), label);
                       }}
                       data-testid="button-op-cr-reject"
                     >
@@ -3377,6 +3382,113 @@ const Dashboard = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      <Dialog
+        open={rejectDialog.open}
+        onOpenChange={(open) => {
+          if (!open && !rejectSubmitting) closeRejectDialog();
+        }}
+      >
+        <DialogContent className="max-w-lg" data-testid="dialog-reject-reason">
+          <DialogHeader>
+            <DialogTitle>
+              {rejectDialog.type === 'wo' ? 'Reject Work Order' : 'Reject Change Request'}
+            </DialogTitle>
+            <DialogDescription>
+              {rejectDialog.label
+                ? `Provide a reason for rejecting ${rejectDialog.label}. This will be visible to the requester.`
+                : 'Provide a reason for rejection. This will be visible to the requester.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="reject-reason-textarea">
+              Rejection reason <span className="text-red-600">*</span>
+            </Label>
+            <Textarea
+              id="reject-reason-textarea"
+              value={rejectReason}
+              onChange={(e) => {
+                setRejectReason(e.target.value);
+                if (rejectError) setRejectError('');
+              }}
+              placeholder="Explain why this is being rejected (minimum 10 characters)"
+              rows={5}
+              maxLength={1000}
+              disabled={rejectSubmitting}
+              data-testid="textarea-reject-reason"
+            />
+            <div className="flex items-center justify-between text-xs">
+              <span className={rejectError ? 'text-red-600' : 'text-gray-500'} data-testid="text-reject-error">
+                {rejectError || 'Minimum 10 characters required.'}
+              </span>
+              <span className="text-gray-400" data-testid="text-reject-count">
+                {rejectReason.length}/1000
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={closeRejectDialog}
+              disabled={rejectSubmitting}
+              data-testid="button-reject-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={rejectSubmitting}
+              onClick={async () => {
+                const reason = rejectReason.trim();
+                if (reason.length < 10) {
+                  setRejectError('Please provide at least 10 characters explaining the rejection.');
+                  return;
+                }
+                if (!rejectDialog.id) return;
+                if (rejectDialog.type === 'wo') {
+                  setRejectSubmitting(true);
+                  try {
+                    await rejectMutation.mutateAsync({ workOrderId: rejectDialog.id, comments: reason });
+                    closeRejectDialog();
+                  } catch {
+                    setRejectSubmitting(false);
+                  }
+                } else {
+                  setRejectSubmitting(true);
+                  try {
+                    const response = await fetch(`/technical/api/change-requests/${rejectDialog.id}/reject`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ comment: reason, reviewerId: 'current_user' }),
+                    });
+                    if (!response.ok) throw new Error('Failed to reject');
+                    queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
+                    setOpDetailChangeRequest(null);
+                    toast({ title: 'Change request rejected', description: 'The change request has been rejected' });
+                    closeRejectDialog();
+                  } catch {
+                    toast({ title: 'Error', description: 'Failed to reject the change request', variant: 'destructive' });
+                    setRejectSubmitting(false);
+                  }
+                }
+              }}
+              data-testid="button-reject-confirm"
+            >
+              {rejectSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                  Rejecting...
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-4 h-4 mr-1" />
+                  Confirm Rejection
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
