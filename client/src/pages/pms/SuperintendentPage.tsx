@@ -90,6 +90,24 @@ export default function SuperintendentPage() {
       },
     },
     {
+      headerName: "Vessel",
+      field: "vesselName",
+      minWidth: 140,
+      flex: 0.9,
+      filter: "agTextColumnFilter",
+      valueGetter: (p: any) => p.data?.vesselName || "—",
+      tooltipValueGetter: (p: any) => p.data?.vesselName || "",
+      cellRenderer: (params: any) => {
+        const n = params.data;
+        if (!n) return null;
+        return (
+          <span className="text-gray-800" data-testid={`text-vessel-${n.id}`}>
+            {n.vesselName || "—"}
+          </span>
+        );
+      },
+    },
+    {
       headerName: "Job Title",
       field: "jobTitle",
       minWidth: 200,
