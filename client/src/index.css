@@ -432,6 +432,16 @@
   cursor: default;
 }
 
+.wo-ag-grid.ag-theme-alpine .spare-row-inactive {
+  opacity: 0.5;
+  background-color: #f9fafb !important;
+}
+
+.wo-ag-grid.ag-theme-alpine .spare-row-bulk-selected,
+.wo-ag-grid.ag-theme-alpine .spare-row-bulk-selected:hover {
+  background-color: #fef2f2 !important;
+}
+
 @layer components {
   .all-\[unset\] {
     all: unset;

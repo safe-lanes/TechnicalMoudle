@@ -75,6 +75,16 @@ interface Spare {
   linkedComponents?: Array<{ componentId: string; componentCode: string; componentName: string }>;
 }
 
+interface VesselLocation {
+  id: number;
+  locationName: string;
+  [key: string]: any;
+}
+
+interface LocationSpare extends Spare {
+  locationQty?: number;
+}
+
 interface SpareHistory {
   id: number;
   timestampUTC: string;
@@ -3058,7 +3068,7 @@ const Spares: React.FC = () => {
   // AG Grid: By-Location column definitions
   // ============================================================
   const byLocationColumnDefs: ColDef[] = useMemo(() => {
-    const selectedLoc = allLocations.find((l: any) => l.id === selectedLocationId);
+    const selectedLoc = allLocations.find((l: VesselLocation) => l.id === selectedLocationId);
     const selectedLocName = selectedLoc?.locationName || 'Unknown';
 
     const cols: ColDef[] = [
@@ -3107,7 +3117,7 @@ const Spares: React.FC = () => {
         width: 110,
         minWidth: 90,
         cellRenderer: (params: ICellRendererParams) => {
-          const spare = params.data as any;
+          const spare = params.data as LocationSpare;
           return (
             <span className={`px-2 py-1 rounded text-xs ${
               spare.critical === 'Critical' || spare.critical === 'Yes'
@@ -3143,7 +3153,7 @@ const Spares: React.FC = () => {
         sortable: false,
         cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
         cellRenderer: (params: ICellRendererParams) => {
-          const spare = params.data as any;
+          const spare = params.data as LocationSpare;
           const stockStatus = getStockStatus(spare.rob, spare.min);
           return (
             <span className={`px-2 py-1 rounded text-xs ${stockStatus.color}`}>
@@ -3160,7 +3170,7 @@ const Spares: React.FC = () => {
         sortable: false,
         cellStyle: { overflow: 'visible' },
         cellRenderer: (params: ICellRendererParams) => {
-          const spare = params.data as any;
+          const spare = params.data as LocationSpare;
           return (
             <div onClick={(e) => e.stopPropagation()} className="w-full">
               <Popover>
@@ -3182,7 +3192,7 @@ const Spares: React.FC = () => {
                       <CommandEmpty>No locations found.</CommandEmpty>
                       <div className="max-h-[144px] overflow-y-auto">
                         <CommandGroup heading="Locations">
-                          {allVesselLocations.map((loc: any) => (
+                          {allVesselLocations.map((loc: VesselLocation) => (
                             <CommandItem
                               key={loc.id}
                               value={loc.locationName}
@@ -3226,7 +3236,7 @@ const Spares: React.FC = () => {
         sortable: false,
         cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
         cellRenderer: (params: ICellRendererParams) => {
-          const spare = params.data as any;
+          const spare = params.data as LocationSpare;
           const locRobValue = editingLocRob[spare.id] ?? String(spare.locationQty ?? 0);
           return (
             <Input
@@ -3258,7 +3268,7 @@ const Spares: React.FC = () => {
         minWidth: 60,
         cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
         cellRenderer: (params: ICellRendererParams) => {
-          const spare = params.data as any;
+          const spare = params.data as LocationSpare;
           return (
             <>
               {spare.ihm?.toLowerCase() === 'yes' ? (
@@ -3774,193 +3784,7 @@ const Spares: React.FC = () => {
                     />
                   )}
                 </div>
-              {false && (
-              <div className="hidden">
-                <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: isBulkDeleteMode ? (FEATURES.IHM ? '40px 110px 180px 220px 120px 80px 80px 60px 60px 80px 100px 40px' : '40px 110px 180px 220px 120px 80px 80px 60px 60px 80px 100px') : (FEATURES.IHM ? '110px 180px 220px 120px 80px 80px 60px 60px 80px 100px 40px 130px' : '110px 180px 220px 120px 80px 80px 60px 60px 80px 100px 130px'), minWidth: 'max-content', gap: '12px' }}>
-                  {isBulkDeleteMode && (
-                    <div className="px-2 flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        checked={(() => { const selectableOnPage = paginatedSpares.filter((s: Spare) => s.isActive !== false); return selectableOnPage.length > 0 && selectableOnPage.every((s: Spare) => selectedSpareIds.has(s.id)); })()}
-                        onChange={toggleSelectAll}
-                        className="h-4 w-4 rounded border-white accent-white cursor-pointer"
-                        data-testid="checkbox-select-all"
-                      />
-                    </div>
-                  )}
-                  <div className="px-2 text-[#ffffff]" data-testid="E13"><Marker id="E13" />Part Code</div>
-                  <div className="px-2" data-testid="E14"><Marker id="E14" />Part Name</div>
-                  <div className="px-2" data-testid="E15"><Marker id="E15" />Component</div>
-                  <div className="px-2" data-testid="E16"><Marker id="E16" />Part Number</div>
-                  <div className="px-2" data-testid="E17"><Marker id="E17" />Criticality</div>
-                  <div className="px-2 text-center" data-testid="col-rotation-item">Rotation</div>
-                  <div className="px-2 text-center" data-testid="E18"><Marker id="E18" />ROB</div>
-                  <div className="px-2 text-center" data-testid="E19"><Marker id="E19" />Min</div>
-                  <div className="px-2 text-center" data-testid="E20"><Marker id="E20" />Stock</div>
-                  <div className="px-2" data-testid="E21"><Marker id="E21" />Location</div>
-                  {FEATURES.IHM && <div className="px-2 text-center" data-testid="E22"><Marker id="E22" />IHM</div>}
-                  {!isBulkDeleteMode && <div className="px-2 text-center" data-testid="E23"><Marker id="E23" />Actions</div>}
-                </div>
-              </div>
-              )}
 
-              {false && (
-              /* Inventory Table Body */
-              <div className="flex flex-col">
-                {isLoading ? (
-                  <div className="p-8 text-center text-gray-500">Loading...</div>
-                ) : filteredSpares.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">
-                    No spares found. Try adjusting your filters.
-                  </div>
-                ) : (
-                  paginatedSpares.map((spare: Spare, rowIndex: number) => {
-                    const stockStatus = getStockStatus(spare.rob, spare.min);
-                    const robA = spare.robLocationA ?? 0;
-                    const robB = spare.robLocationB ?? 0;
-                    const locationDisplay = `${robA} / ${robB}`;
-                    const isFirstRow = rowIndex === 0;
-                    const isInactive = spare.isActive === false;
-                    return (
-                    <div key={spare.id} className={`px-4 py-3 border-b border-gray-100 ${isInactive ? 'opacity-50 bg-gray-50' : 'hover:bg-gray-50'} ${isBulkDeleteMode && selectedSpareIds.has(spare.id) ? 'bg-red-50' : ''}`}>
-                      <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: isBulkDeleteMode ? (FEATURES.IHM ? '40px 110px 180px 220px 120px 80px 80px 60px 60px 80px 100px 40px' : '40px 110px 180px 220px 120px 80px 80px 60px 60px 80px 100px') : (FEATURES.IHM ? '110px 180px 220px 120px 80px 80px 60px 60px 80px 100px 40px 130px' : '110px 180px 220px 120px 80px 80px 60px 60px 80px 100px 130px'), minWidth: 'max-content', gap: '12px' }}>
-                        {isBulkDeleteMode && (
-                          <div className="px-2 flex items-center justify-center">
-                            {!isInactive ? (
-                              <input
-                                type="checkbox"
-                                checked={selectedSpareIds.has(spare.id)}
-                                onChange={() => toggleSpareSelection(spare.id)}
-                                className="h-4 w-4 rounded border-gray-300 cursor-pointer"
-                                data-testid={`checkbox-spare-${spare.id}`}
-                              />
-                            ) : (
-                              <span className="h-4 w-4" />
-                            )}
-                          </div>
-                        )}
-                        <div className={`px-2 ${isInactive ? 'text-gray-400' : 'text-gray-900'}`} data-testid={isFirstRow ? "E24" : undefined}>{isFirstRow && <Marker id="E24" />}{spare.partCode}{isInactive && <span className="ml-1 text-xs text-gray-400">(Inactive)</span>}</div>
-                        <div className="px-2 text-gray-700" data-testid={isFirstRow ? "E25" : undefined}>{isFirstRow && <Marker id="E25" />}{spare.partName}</div>
-                        <div className="px-2 text-gray-700" data-testid={isFirstRow ? "E26" : undefined}>{isFirstRow && <Marker id="E26" />}{spare.componentName}</div>
-                        <div className="px-2 text-blue-600 font-medium" data-testid={isFirstRow ? "E27" : undefined}>{isFirstRow && <Marker id="E27" />}{spare.partNumber || '-'}</div>
-                        <div className="px-2" data-testid={isFirstRow ? "E28" : undefined}>
-                          {isFirstRow && <Marker id="E28" />}
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            spare.critical === 'Critical' || spare.critical === 'Yes' 
-                              ? 'bg-red-100 text-red-800' 
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {spare.critical}
-                          </span>
-                        </div>
-                        <div className="px-2 text-center" data-testid={isFirstRow ? "cell-rotation-item" : undefined}>
-                          <span className={`px-2 py-1 rounded text-xs ${spare.isRotationItem ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}`}>
-                            {spare.isRotationItem ? 'Yes' : 'No'}
-                          </span>
-                        </div>
-                        <div className="px-2 text-center" data-testid={isFirstRow ? "E29" : undefined}>{isFirstRow && <Marker id="E29" />}{spare.rob}</div>
-                        <div className="px-2 text-center" data-testid={isFirstRow ? "E30" : undefined}>{isFirstRow && <Marker id="E30" />}{spare.min}</div>
-                        <div className="px-2 text-center" data-testid={isFirstRow ? "E31" : undefined}>
-                          {isFirstRow && <Marker id="E31" />}
-                          <span className={`px-2 py-1 rounded text-xs ${stockStatus.color}`}>
-                            {stockStatus.label}
-                          </span>
-                        </div>
-                        {/* Location Dropdown */}
-                        <div className="px-2 relative" data-testid={isFirstRow ? "E32" : undefined}>
-                          {isFirstRow && <Marker id="E32" />}
-                          <button
-                            onClick={() => handleOpenLocationDialog(spare)}
-                            className="flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left"
-                            data-testid={`button-location-${spare.id}`}
-                          >
-                            <MapPin className="h-3 w-3 flex-shrink-0" />
-                            <span className="truncate text-sm">{locationDisplay}</span>
-                            <ChevronDown className="h-3 w-3 flex-shrink-0" />
-                          </button>
-                          
-                        </div>
-                        {FEATURES.IHM && (
-                          <div className="px-2 flex justify-center" data-testid={isFirstRow ? "E33" : undefined}>
-                            {isFirstRow && <Marker id="E33" />}
-                            {/* IHM status from spare.ihm field: Yes=Red (hazardous), No=Green (compliant), Empty=Gray (unknown) */}
-                            {spare.ihm?.toLowerCase() === 'yes' ? (
-                              <span title="IHM Present - Hazardous Materials"><AlertCircle className="h-4 w-4 text-red-500" /></span>
-                            ) : spare.ihm?.toLowerCase() === 'no' ? (
-                              <span title="No IHM - Compliant"><CheckCircle className="h-4 w-4 text-green-500" /></span>
-                            ) : (
-                              <span title="IHM Status Unknown"><HelpCircle className="h-4 w-4 text-gray-400" /></span>
-                            )}
-                          </div>
-                        )}
-                        {!isBulkDeleteMode && (
-                        <div className="px-2 flex gap-0.5 justify-center">
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={() => openInfoModal(spare)}
-                            title="View Details"
-                            data-testid={isFirstRow ? "E34" : `button-info-${spare.id}`}
-                          >
-                            {isFirstRow && <Marker id="E34" />}
-                            <Info className="h-4 w-4 text-blue-600" />
-                          </Button>
-                          {(isSailAdmin || isClientAdmin || isExternal || isChangeMode || isModifyMode) && canEditSpare && (
-                            <Button 
-                              size="sm" 
-                              variant="ghost"
-                              onClick={() => openEditModal(spare)}
-                              title="Edit"
-                              data-testid={isFirstRow ? "E35" : `button-edit-${spare.id}`}
-                            >
-                              {isFirstRow && <Marker id="E35" />}
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {canEditSpare && (
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={() => openAdjustModal(spare)}
-                            title="Adjust ROB"
-                            data-testid={`button-adjust-${spare.id}`}
-                          >
-                            <Settings2 className="h-4 w-4 text-orange-500" />
-                          </Button>
-                          )}
-                          {(isSailAdmin || isClientAdmin || isExternal || isChangeMode) && !isInactive && canDeleteSpare && (
-                            <Button 
-                              size="sm" 
-                              variant="ghost"
-                              onClick={() => handleDeleteSpare(spare)}
-                              title="Deactivate"
-                              data-testid={isFirstRow ? "E36" : `button-delete-${spare.id}`}
-                            >
-                              {isFirstRow && <Marker id="E36" />}
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          )}
-                          {(isSailAdmin || isClientAdmin || isExternal) && isInactive && canEditSpare && (
-                            <Button 
-                              size="sm" 
-                              variant="ghost"
-                              onClick={() => handleReactivateSpare(spare)}
-                              title="Reactivate"
-                              disabled={reactivateSpareMutation.isPending}
-                              data-testid={`button-reactivate-${spare.id}`}
-                            >
-                              <RotateCcw className="h-4 w-4 text-green-600" />
-                            </Button>
-                          )}
-                        </div>
-                        )}
-                      </div>
-                    </div>
-                    );
-                  })
-                )}
-              </div>
-              )}
               
               {/* Pagination Footer */}
               {filteredSpares.length > 0 && (
@@ -4049,200 +3873,6 @@ const Spares: React.FC = () => {
                     />
                   )}
                 </div>
-              {false && (
-              <div className="overflow-x-auto flex-1 flex flex-col">
-                <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3] min-w-max">
-                  <div className="grid text-sm font-semibold text-[#ffffff] min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px 40px' : '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px', minWidth: 'max-content', gap: '12px' }}>
-                    <div className="px-2 text-[#ffffff]" data-testid="loc-col-part-code">Part Code</div>
-                    <div className="px-2" data-testid="loc-col-part-name">Part Name</div>
-                    <div className="px-2" data-testid="loc-col-component">Component</div>
-                    <div className="px-2" data-testid="loc-col-part-number">Part Number</div>
-                    <div className="px-2" data-testid="loc-col-criticality">Criticality</div>
-                    <div className="px-2 text-center" data-testid="loc-col-rob">ROB</div>
-                    <div className="px-2 text-center" data-testid="loc-col-min">Min</div>
-                    <div className="px-2 text-center" data-testid="loc-col-stock">Stock</div>
-                    <div className="px-2" data-testid="loc-col-location">Location</div>
-                    <div className="px-2 text-center" data-testid="loc-col-loc-rob">Loc ROB</div>
-                    {FEATURES.IHM && <div className="px-2 text-center" data-testid="loc-col-ihm">IHM</div>}
-                  </div>
-                </div>
-                <div className="flex flex-col">
-                  {!selectedLocationId ? (
-                    <div className="p-8 text-center text-gray-500">Select a location from the left panel to view spares.</div>
-                  ) : isLocationSparesLoading ? (
-                    <div className="p-8 text-center text-gray-500">Loading...</div>
-                  ) : filteredLocationSpares.length === 0 ? (
-                    <div className="p-8 text-center text-gray-500">No spares found at this location.</div>
-                  ) : (
-                    paginatedLocationSpares.map((spare: any, rowIndex: number) => {
-                      const stockStatus = getStockStatus(spare.rob, spare.min);
-                      const selectedLoc = allLocations.find((l: any) => l.id === selectedLocationId);
-                      const selectedLocName = selectedLoc?.locationName || 'Unknown';
-                      const locRobValue = editingLocRob[spare.id] ?? String(spare.locationQty ?? 0);
-                      return (
-                        <div key={spare.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
-                          <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px 40px' : '110px 180px 220px 120px 80px 60px 60px 80px 160px 100px', minWidth: 'max-content', gap: '12px' }}>
-                            <div className="px-2 text-gray-900">{spare.partCode}</div>
-                            <div className="px-2 text-gray-700">{spare.partName}</div>
-                            <div className="px-2 text-gray-700">{spare.componentName || '-'}</div>
-                            <div className="px-2 text-blue-600 font-medium">{spare.partNumber || '-'}</div>
-                            <div className="px-2">
-                              <span className={`px-2 py-1 rounded text-xs ${
-                                spare.critical === 'Critical' || spare.critical === 'Yes' 
-                                  ? 'bg-red-100 text-red-800' 
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {spare.critical || 'No'}
-                              </span>
-                            </div>
-                            <div className="px-2 text-center">{spare.rob}</div>
-                            <div className="px-2 text-center">{spare.min}</div>
-                            <div className="px-2 text-center">
-                              <span className={`px-2 py-1 rounded text-xs ${stockStatus.color}`}>
-                                {stockStatus.label}
-                              </span>
-                            </div>
-                            <div className="px-2">
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <button
-                                    className={`flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left border border-gray-200 rounded-md px-2 py-1 ${isChangingLocation || !canEditSpare ? 'opacity-50 pointer-events-none' : ''}`}
-                                    disabled={isChangingLocation || !canEditSpare}
-                                    data-testid={`button-change-location-${spare.id}`}
-                                  >
-                                    <MapPin className="h-3 w-3 flex-shrink-0 text-gray-500" />
-                                    <span className="truncate text-xs flex-1">{selectedLocName}</span>
-                                    <ChevronsUpDown className="h-3 w-3 flex-shrink-0 text-gray-400" />
-                                  </button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-56 p-0" align="start">
-                                  <Command>
-                                    <CommandInput placeholder="Search locations..." data-testid={`input-search-location-${spare.id}`} />
-                                    <CommandList className="max-h-none">
-                                      <CommandEmpty>No locations found.</CommandEmpty>
-                                      <div className="max-h-[144px] overflow-y-auto">
-                                        <CommandGroup heading="Locations">
-                                          {allVesselLocations.map((loc: any) => (
-                                            <CommandItem
-                                              key={loc.id}
-                                              value={loc.locationName}
-                                              onSelect={() => {
-                                                if (loc.id !== selectedLocationId) {
-                                                  handleChangeSpareLocation(spare, loc.id, loc.locationName);
-                                                }
-                                              }}
-                                              data-testid={`option-location-${loc.id}-${spare.id}`}
-                                            >
-                                              <MapPin className="h-3 w-3 mr-2 flex-shrink-0" />
-                                              <span className="truncate">{loc.locationName}</span>
-                                              {loc.id === selectedLocationId && <Check className="h-3 w-3 ml-auto text-blue-600" />}
-                                            </CommandItem>
-                                          ))}
-                                        </CommandGroup>
-                                      </div>
-                                      <CommandGroup className="border-t" forceMount>
-                                        <CommandItem
-                                          onSelect={() => setCreatingLocationForSpare(spare)}
-                                          data-testid={`button-create-location-${spare.id}`}
-                                          forceMount
-                                        >
-                                          <Plus className="h-3 w-3 mr-2 text-green-600" />
-                                          <span className="text-green-600 font-medium">Create New Location</span>
-                                        </CommandItem>
-                                      </CommandGroup>
-                                    </CommandList>
-                                  </Command>
-                                </PopoverContent>
-                              </Popover>
-                            </div>
-                            <div className="px-2">
-                              <Input
-                                type="number"
-                                min="0"
-                                value={locRobValue}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (val === '' || (/^\d+$/.test(val) && parseInt(val) >= 0)) {
-                                    setEditingLocRob(prev => ({ ...prev, [spare.id]: val }));
-                                  }
-                                }}
-                                className="h-7 text-sm text-center w-full"
-                                placeholder="0"
-                                disabled={!canEditSpare}
-                                data-testid={`input-loc-rob-${spare.id}`}
-                              />
-                            </div>
-                            {FEATURES.IHM && (
-                              <div className="px-2 flex justify-center">
-                                {spare.ihm?.toLowerCase() === 'yes' ? (
-                                  <span title="IHM Present - Hazardous Materials"><AlertCircle className="h-4 w-4 text-red-500" /></span>
-                                ) : spare.ihm?.toLowerCase() === 'no' ? (
-                                  <span title="No IHM - Compliant"><CheckCircle className="h-4 w-4 text-green-500" /></span>
-                                ) : (
-                                  <span title="IHM Status Unknown"><HelpCircle className="h-4 w-4 text-gray-400" /></span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-                {filteredLocationSpares.length > 0 && (
-                  <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between" data-testid="location-pagination-footer">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <span>Show</span>
-                      <Select value={String(locationItemsPerPage)} onValueChange={(val) => { setLocationItemsPerPage(Number(val)); setLocationPage(1); }}>
-                        <SelectTrigger className="w-20 h-8" data-testid="select-location-items-per-page">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="5">5</SelectItem>
-                          <SelectItem value="10">10</SelectItem>
-                          <SelectItem value="20">20</SelectItem>
-                          <SelectItem value="50">50</SelectItem>
-                          <SelectItem value="100">100</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <span>items per page</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600" data-testid="location-pagination-info">
-                      <span>
-                        Showing {((locationPage - 1) * locationItemsPerPage) + 1} - {Math.min(locationPage * locationItemsPerPage, filteredLocationSpares.length)} of {filteredLocationSpares.length} spares
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button variant="outline" size="sm" onClick={() => goToLocationPage(1)} disabled={locationPage === 1} className="h-8 w-8 p-0" data-testid="location-pagination-first">
-                        <ChevronsLeft className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => goToLocationPage(locationPage - 1)} disabled={locationPage === 1} className="h-8 w-8 p-0" data-testid="location-pagination-prev">
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <div className="flex items-center gap-1 px-2">
-                        <span className="text-sm text-gray-600">Page</span>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={locationTotalPages || 1}
-                          value={locationPage}
-                          onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) goToLocationPage(v); }}
-                          className="w-14 h-8 text-center"
-                          data-testid="input-location-page-number"
-                        />
-                        <span className="text-sm text-gray-600">of {locationTotalPages || 1}</span>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => goToLocationPage(locationPage + 1)} disabled={locationPage >= locationTotalPages} className="h-8 w-8 p-0" data-testid="location-pagination-next">
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => goToLocationPage(locationTotalPages)} disabled={locationPage >= locationTotalPages} className="h-8 w-8 p-0" data-testid="location-pagination-last">
-                        <ChevronsRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              )}
               {/* Pagination Footer */}
               {filteredLocationSpares.length > 0 && (
                 <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between" data-testid="location-pagination-footer">
@@ -4309,69 +3939,6 @@ const Spares: React.FC = () => {
                   testId="spares-history-grid"
                 />
               </div>
-              {false && (
-              <div className="overflow-y-auto flex-1">
-                {filteredHistoryData.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">
-                    No history records found.
-                  </div>
-                ) : (
-                  paginatedHistory.map((history: SpareHistory) => (
-                    <div key={history.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
-                      <div className="grid grid-cols-9 gap-4 text-sm items-center">
-                        <div className="text-gray-900">
-                          {(() => {
-                            try {
-                              const isDateOnly = history.dateLocal && /^\d{4}-\d{2}-\d{2}$/.test(history.dateLocal.trim());
-                              if (history.dateLocal) {
-                                const dateStr = isDateOnly ? `${history.dateLocal.trim()}T00:00:00` : history.dateLocal;
-                                const date = new Date(dateStr);
-                                if (!isNaN(date.getTime())) {
-                                  return format(date, 'dd-MMM-yyyy');
-                                }
-                              }
-                              if (history.timestampUTC) {
-                                const date = new Date(history.timestampUTC);
-                                if (!isNaN(date.getTime())) {
-                                  return format(date, 'dd-MMM-yyyy');
-                                }
-                              }
-                              return '-';
-                            } catch {
-                              return '-';
-                            }
-                          })()}
-                        </div>
-                        <div className="text-gray-700">{history.partCode}</div>
-                        <div className="text-gray-700">{history.partName}</div>
-                        <div className="text-gray-700">{history.componentName}</div>
-                        <div className="text-blue-600 font-medium">{history.partNumber || '-'}</div>
-                        <div>
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            history.eventType === 'CONSUME' 
-                              ? 'bg-red-100 text-red-800' 
-                              : history.eventType === 'RECEIVE'
-                              ? 'bg-green-100 text-green-800'
-                              : history.eventType === 'ADJUST'
-                              ? 'bg-orange-100 text-orange-800'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {history.eventType}
-                          </span>
-                        </div>
-                        <div className={`text-center font-semibold ${
-                          history.qtyChange < 0 ? 'text-red-600' : 'text-green-600'
-                        }`}>
-                          {history.qtyChange > 0 ? '+' : ''}{history.qtyChange}
-                        </div>
-                        <div className="text-center">{history.robAfter}</div>
-                        <div className="text-gray-700">{history.reference || '-'}</div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-              )}
 
               {/* History Pagination Footer */}
               {filteredHistoryData.length > 0 && (
