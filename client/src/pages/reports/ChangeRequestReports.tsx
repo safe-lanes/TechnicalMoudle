@@ -33,6 +33,8 @@ import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
 import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
+import ReportAgGridTable from "@/components/reports/ReportAgGridTable";
+import { ReportColumn } from "@/components/reports/ReportPreviewModal";
 
 interface ChangeRequestReportData {
   summary: {
@@ -657,82 +659,18 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
             </div>
           )}
 
-          <div className="rounded-lg border border-gray-200 dark:border-border overflow-hidden bg-white dark:bg-card">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-muted/50 border-b border-gray-200 dark:border-border">
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Report Name</th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Frequency</th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Priority</th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Est. Time</th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700 dark:text-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-border">
-                {filteredReports.map((report) => (
-                  <tr
-                    key={report.id}
-                    className="hover-elevate cursor-pointer"
-                    data-testid={`change-report-row-${report.id}`}
-                  >
-                    <td className="py-3 px-4">
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-foreground">{report.name}</div>
-                        <div className="text-sm text-gray-500 dark:text-muted-foreground">{report.description}</div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge variant="outline">{report.frequency}</Badge>
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge className={getPriorityColor(report.priority)}>
-                        {report.priority.toUpperCase()}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="text-xs text-gray-500 dark:text-muted-foreground">{report.estimatedTime}</span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          title="Preview"
-                          onClick={() => handlePreviewReport(report.id)}
-                          disabled={isLoading}
-                          data-testid={`button-preview-${report.id}`}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          title="Download PDF"
-                          onClick={() => handleGenerateReport(report.id, 'PDF')}
-                          disabled={generatingReports.has(`${report.id}-PDF`) || isLoading}
-                          data-testid={`button-pdf-${report.id}`}
-                        >
-                          <FileText className="h-4 w-4" />
-                        </Button>
-                        {report.outputs.includes('Excel') && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            title="Download Excel"
-                            onClick={() => handleGenerateReport(report.id, 'Excel')}
-                            disabled={generatingReports.has(`${report.id}-Excel`) || isLoading}
-                            data-testid={`button-excel-${report.id}`}
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {filteredReports.length > 0 && (
+            <div className="rounded-lg border border-gray-200 dark:border-border overflow-hidden bg-white dark:bg-card">
+              <ChangeRequestReportListGrid
+                reports={filteredReports}
+                generatingReports={generatingReports}
+                isLoading={isLoading}
+                getPriorityColor={getPriorityColor}
+                onPreview={(id) => handlePreviewReport(id)}
+                onGenerate={(id, fmt) => handleGenerateReport(id, fmt)}
+              />
+            </div>
+          )}
 
           {filteredReports.length === 0 && (
             <div className="text-center py-12">
@@ -761,6 +699,95 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
         />
       )}
     </div>
+  );
+};
+
+interface ChangeRequestReportListGridProps {
+  reports: ChangeRequestReport[];
+  generatingReports: Set<string>;
+  isLoading: boolean;
+  getPriorityColor: (p: string) => string;
+  onPreview: (id: string) => void;
+  onGenerate: (id: string, fmt: 'PDF' | 'Excel') => void;
+}
+
+const ChangeRequestReportListGrid: React.FC<ChangeRequestReportListGridProps> = ({
+  reports, generatingReports, isLoading, getPriorityColor, onPreview, onGenerate,
+}) => {
+  const columns: ReportColumn[] = useMemo(() => [
+    {
+      header: 'Report Name', field: 'name', flex: 2, minWidth: 280,
+      autoHeight: true, wrapText: true,
+      cellStyle: { whiteSpace: 'normal', lineHeight: '1.3', paddingTop: 8, paddingBottom: 8 },
+      cellRenderer: (p: any) => (
+        <div data-testid={`change-report-row-${p.data.id}`}>
+          <div className="font-medium text-gray-900 dark:text-foreground">{p.data.name}</div>
+          <div className="text-sm text-gray-500 dark:text-muted-foreground">{p.data.description}</div>
+        </div>
+      ),
+    },
+    {
+      header: 'Frequency', field: 'frequency', flex: 1, minWidth: 120,
+      cellRenderer: (p: any) => <Badge variant="outline">{p.value}</Badge>,
+    },
+    {
+      header: 'Priority', field: 'priority', flex: 1, minWidth: 110,
+      cellRenderer: (p: any) => (
+        <Badge className={getPriorityColor(p.value)}>{String(p.value).toUpperCase()}</Badge>
+      ),
+    },
+    {
+      header: 'Est. Time', field: 'estimatedTime', flex: 1, minWidth: 110,
+      cellRenderer: (p: any) => <span className="text-xs text-gray-500 dark:text-muted-foreground">{p.value}</span>,
+    },
+    {
+      header: 'Actions', field: 'actions', flex: 1, minWidth: 140, sortable: false, filter: false,
+      cellRenderer: (p: any) => {
+        const r: ChangeRequestReport = p.data;
+        return (
+          <div className="flex items-center gap-1">
+            <Button
+              size="icon" variant="ghost" title="Preview"
+              onClick={(e) => { e.stopPropagation(); onPreview(r.id); }}
+              disabled={isLoading}
+              data-testid={`button-preview-${r.id}`}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon" variant="ghost" title="Download PDF"
+              onClick={(e) => { e.stopPropagation(); onGenerate(r.id, 'PDF'); }}
+              disabled={generatingReports.has(`${r.id}-PDF`) || isLoading}
+              data-testid={`button-pdf-${r.id}`}
+            >
+              <FileText className="h-4 w-4" />
+            </Button>
+            {r.outputs.includes('Excel') && (
+              <Button
+                size="icon" variant="ghost" title="Download Excel"
+                onClick={(e) => { e.stopPropagation(); onGenerate(r.id, 'Excel'); }}
+                disabled={generatingReports.has(`${r.id}-Excel`) || isLoading}
+                data-testid={`button-excel-${r.id}`}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        );
+      },
+    },
+  ], [generatingReports, isLoading, getPriorityColor, onPreview, onGenerate]);
+
+  return (
+    <ReportAgGridTable
+      columns={columns}
+      data={reports}
+      domLayout="autoHeight"
+      headerHeight={42}
+      rowHeight={64}
+      testId="grid-change-reports-list"
+      noRowsMessage="No reports found"
+    />
   );
 };
 
