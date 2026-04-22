@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import type { ColDef, GridReadyEvent, GridApi, RowClickedEvent, SortChangedEvent } from 'ag-grid-community';
+import type { ColDef, GridReadyEvent, GridApi, RowClickedEvent, SortChangedEvent, SelectionChangedEvent, GetRowIdFunc } from 'ag-grid-community';
 import { ModuleRegistry } from 'ag-grid-community';
 import {
   AllEnterpriseModule,
@@ -69,6 +69,9 @@ interface WOAgGridTableProps {
   domLayout?: 'normal' | 'autoHeight' | 'print';
   noRowsMessage?: string;
   testId?: string;
+  rowSelection?: 'single' | 'multiple';
+  onSelectionChanged?: (event: SelectionChangedEvent) => void;
+  getRowId?: GetRowIdFunc;
 }
 
 const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
@@ -85,6 +88,9 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
   domLayout = 'normal',
   noRowsMessage = 'No data available',
   testId = 'wo-ag-grid',
+  rowSelection,
+  onSelectionChanged,
+  getRowId,
 }) => {
   const gridApiRef = useRef<GridApi | null>(null);
 
@@ -163,6 +169,9 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
         suppressCellFocus={true}
         enableCellTextSelection={true}
         suppressRowClickSelection={suppressRowClickSelection}
+        rowSelection={rowSelection}
+        onSelectionChanged={onSelectionChanged}
+        getRowId={getRowId}
         domLayout={domLayout}
         reactiveCustomComponents={true}
         overlayNoRowsTemplate={overlayNoRowsTemplate}
