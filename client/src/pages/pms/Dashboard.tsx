@@ -1398,6 +1398,192 @@ const Dashboard = () => {
     ];
   }, [isAllVessels, vessels]);
 
+  const criticalSparesColumnDefs: ColDef[] = useMemo(() => {
+    const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
+    const vesselCol: ColDef = {
+      headerName: 'Vessel',
+      field: 'vesselId',
+      minWidth: 140,
+      flex: 1,
+      filter: 'agTextColumnFilter',
+      valueGetter: (p: any) => (p.data?.vesselId && vesselNameById.get(String(p.data.vesselId))) || '—',
+      cellRenderer: (p: any) => <span className="font-medium">{p.value || '—'}</span>,
+    };
+    return [
+      ...(isAllVessels ? [vesselCol] : []),
+      {
+        headerName: 'Part Code',
+        field: 'partCode',
+        minWidth: 120,
+        flex: 0.8,
+        filter: 'agTextColumnFilter',
+        valueGetter: (p: any) => p.data?.partCode || p.data?.partNumber || '—',
+      },
+      {
+        headerName: 'Part Name',
+        field: 'partName',
+        minWidth: 200,
+        flex: 1.6,
+        filter: 'agTextColumnFilter',
+        tooltipValueGetter: (p: any) => p.data?.partName || '',
+        cellRenderer: (p: any) => (
+          <span className="font-medium text-blue-600" data-testid={`text-op-spare-name-${p.data?.id}`}>{p.data?.partName || '—'}</span>
+        ),
+      },
+      {
+        headerName: 'Component',
+        field: 'componentName',
+        minWidth: 160,
+        flex: 1.2,
+        filter: 'agTextColumnFilter',
+        valueGetter: (p: any) => p.data?.componentName || '—',
+      },
+      {
+        headerName: 'ROB',
+        field: 'rob',
+        minWidth: 80,
+        flex: 0.5,
+        filter: 'agNumberColumnFilter',
+      },
+      {
+        headerName: 'Min',
+        field: 'min',
+        minWidth: 80,
+        flex: 0.5,
+        filter: 'agNumberColumnFilter',
+      },
+      {
+        headerName: 'Stock Status',
+        field: 'stockStatus',
+        minWidth: 110,
+        flex: 0.7,
+        filter: 'agSetColumnFilter',
+        valueGetter: (p: any) => p.data ? getStockStatus(p.data.rob, p.data.min).label : '',
+        cellRenderer: (p: any) => {
+          const label = p.value;
+          const cls = label === 'Low' ? 'bg-red-500' : label === 'At Min' ? 'bg-orange-500' : 'bg-green-500';
+          return <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${cls}`}>{label}</span>;
+        },
+      },
+      {
+        headerName: 'Criticality',
+        field: 'critical',
+        minWidth: 110,
+        flex: 0.7,
+        filter: 'agSetColumnFilter',
+        valueGetter: (p: any) => p.data?.critical || '—',
+        cellRenderer: (p: any) => {
+          const v = p.data?.critical;
+          const isCrit = v?.toLowerCase() === 'critical' || v?.toLowerCase() === 'yes';
+          return <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${isCrit ? 'bg-red-500' : 'bg-gray-400'}`}>{v || '—'}</span>;
+        },
+      },
+      {
+        headerName: 'Actions',
+        field: 'id',
+        minWidth: 90,
+        flex: 0,
+        sortable: false,
+        filter: false,
+        resizable: false,
+        cellRenderer: (p: any) => {
+          const spare = p.data;
+          if (!spare) return null;
+          return (
+            <div className="flex items-center justify-center gap-1 h-full">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                onClick={(e) => { e.stopPropagation(); setOpDetailSpare(spare); }}
+                data-testid={`op-view-spare-${spare.id}`}
+              >
+                <Eye className="h-3.5 w-3.5 text-gray-500" />
+              </Button>
+            </div>
+          );
+        },
+      },
+    ];
+  }, [isAllVessels, vessels]);
+
+  const modifyPmsColumnDefs: ColDef[] = useMemo(() => {
+    const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
+    const formatRequestedBy = (uid: string | undefined | null) => {
+      if (uid === 'current_user') return 'Chief Engineer';
+      if (uid === '2nd_engineer') return '2nd Engineer';
+      if (uid === '3rd_engineer') return '3rd Engineer';
+      return uid || '—';
+    };
+    const formatDate = (cr: any) => {
+      const d = cr?.submittedAt || cr?.createdAt;
+      if (!d) return '—';
+      try {
+        return new Date(d).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ');
+      } catch { return '—'; }
+    };
+    const vesselCol: ColDef = {
+      headerName: 'Vessel',
+      field: 'vesselId',
+      minWidth: 140,
+      flex: 1,
+      filter: 'agTextColumnFilter',
+      valueGetter: (p: any) => (p.data?.vesselId && vesselNameById.get(String(p.data.vesselId))) || '—',
+      cellRenderer: (p: any) => <span className="font-medium">{p.value || '—'}</span>,
+    };
+    return [
+      ...(isAllVessels ? [vesselCol] : []),
+      {
+        headerName: 'Request Title',
+        field: 'title',
+        minWidth: 220,
+        flex: 2,
+        filter: 'agTextColumnFilter',
+        tooltipValueGetter: (p: any) => p.data?.title || '',
+        cellRenderer: (p: any) => (
+          <span className="font-medium text-gray-900">{p.data?.title || '—'}</span>
+        ),
+      },
+      {
+        headerName: 'Requested By',
+        field: 'requestedByUserId',
+        minWidth: 140,
+        flex: 1,
+        filter: 'agTextColumnFilter',
+        valueGetter: (p: any) => formatRequestedBy(p.data?.requestedByUserId),
+      },
+      {
+        headerName: 'Date',
+        field: 'submittedAt',
+        minWidth: 120,
+        flex: 0.8,
+        filter: 'agDateColumnFilter',
+        valueGetter: (p: any) => formatDate(p.data),
+      },
+      {
+        headerName: 'Status',
+        field: 'status',
+        minWidth: 140,
+        flex: 1,
+        filter: 'agSetColumnFilter',
+        valueGetter: (p: any) => {
+          const st = p.data?.status?.toLowerCase();
+          if (st === 'submitted' || st === 'pending') return 'Pending Approval';
+          if (st === 'returned') return 'Returned';
+          if (st === 'draft') return 'Draft';
+          return p.data?.status || '—';
+        },
+        cellRenderer: (p: any) => {
+          const st = p.data?.status?.toLowerCase();
+          if (st === 'submitted' || st === 'pending') return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-blue-600">Pending Approval</span>;
+          if (st === 'draft') return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-gray-500">Draft</span>;
+          if (st === 'returned') return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-yellow-500">Returned</span>;
+          return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-gray-400">{p.data?.status || '—'}</span>;
+        },
+      },
+    ];
+  }, [isAllVessels, vessels]);
+
   const operationTableTitle = useMemo(() => {
     switch (selectedOpCard) {
       case 'overdue': return 'Overdue Work Orders';
@@ -2154,79 +2340,16 @@ const Dashboard = () => {
                           </Button>
                         )}
                       </div>
-                      <Table>
-                        <TableHeader className="sticky top-0 bg-[#eff6ff] z-10">
-                          <TableRow>
-                            {isAllVessels && (
-                              <TableHead className="font-medium w-[140px] bg-[#eff6ff] text-[#0e4c81] text-xs">Vessel</TableHead>
-                            )}
-                            <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81] text-xs">Part Code</TableHead>
-                            <TableHead className="font-medium min-w-[200px] bg-[#eff6ff] text-[#0e4c81] text-xs">Part Name</TableHead>
-                            <TableHead className="font-medium w-[160px] bg-[#eff6ff] text-[#0e4c81] text-xs">Component</TableHead>
-                            <TableHead className="font-medium w-[80px] bg-[#eff6ff] text-[#0e4c81] text-xs">ROB</TableHead>
-                            <TableHead className="font-medium w-[80px] bg-[#eff6ff] text-[#0e4c81] text-xs">Min</TableHead>
-                            <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81] text-xs">Stock Status</TableHead>
-                            <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81] text-xs">Criticality</TableHead>
-                            <TableHead className="font-medium w-[80px] text-center bg-[#eff6ff] text-[#0e4c81] text-xs">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {operationKPIs.criticalSparesLowList.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={isAllVessels ? 9 : 8} className="text-center py-8 text-gray-500 text-sm">
-                                No critical spares with low stock
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            operationKPIs.criticalSparesLowList.map((spare) => {
-                              const stockStatus = getStockStatus(spare.rob, spare.min);
-                              const vesselName = vessels.find(v => v.id === spare.vesselId)?.name;
-                              return (
-                                <TableRow key={`${spare.vesselId || 'v'}-${spare.id}`} className="hover:bg-gray-50" data-testid={`row-op-critical-spare-${spare.id}`}>
-                                  {isAllVessels && (
-                                    <TableCell className="text-xs py-2 font-medium">{vesselName || '-'}</TableCell>
-                                  )}
-                                  <TableCell className="text-xs py-2">{spare.partCode || spare.partNumber || '-'}</TableCell>
-                                  <TableCell className="whitespace-normal break-words max-w-[300px] font-medium text-blue-600 text-xs py-2">{spare.partName || '-'}</TableCell>
-                                  <TableCell className="text-xs py-2">{spare.componentName || '-'}</TableCell>
-                                  <TableCell className="text-xs py-2">{spare.rob}</TableCell>
-                                  <TableCell className="text-xs py-2">{spare.min}</TableCell>
-                                  <TableCell className="py-2">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${stockStatus.label === 'Low' ? 'bg-red-500' : stockStatus.label === 'At Min' ? 'bg-orange-500' : 'bg-green-500'}`}>
-                                      {stockStatus.label}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell className="py-2">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white ${(spare.critical?.toLowerCase() === 'critical' || spare.critical?.toLowerCase() === 'yes') ? 'bg-red-500' : 'bg-gray-400'}`}>
-                                      {spare.critical}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell className="py-2">
-                                    <div className="flex gap-1 justify-center">
-                                      <TooltipProvider>
-                                        <UITooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              size="icon"
-                                              variant="ghost"
-                                              className="h-6 w-6"
-                                              onClick={() => setOpDetailSpare(spare)}
-                                              data-testid={`op-view-spare-${spare.id}`}
-                                            >
-                                              <Eye className="h-3.5 w-3.5 text-gray-500" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>View Details</TooltipContent>
-                                        </UITooltip>
-                                      </TooltipProvider>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })
-                          )}
-                        </TableBody>
-                      </Table>
+                      <div style={{ height: 'calc(100vh - 360px)', minHeight: '360px' }} data-testid="ag-grid-op-critical-spares-wrap">
+                        <WOAgGridTable
+                          columnDefs={criticalSparesColumnDefs}
+                          rowData={operationKPIs.criticalSparesLowList}
+                          height="100%"
+                          noRowsMessage="No critical spares with low stock"
+                          testId="ag-grid-op-critical-spares"
+                          getRowClass={(params) => params.data?.id ? `row-op-critical-spare-${params.data.id}` : undefined}
+                        />
+                      </div>
                       <div className="border-t px-4 py-2 text-xs text-gray-500">
                         Total: {operationKPIs.criticalSparesLowCount} spare{operationKPIs.criticalSparesLowCount !== 1 ? 's' : ''}
                       </div>
@@ -2281,65 +2404,17 @@ const Dashboard = () => {
                           </Button>
                         )}
                       </div>
-                      <Table>
-                        <TableHeader className="sticky top-0 bg-[#eff6ff] z-10">
-                          <TableRow>
-                            {isAllVessels && (
-                              <TableHead className="font-medium w-[140px] bg-[#eff6ff] text-[#0e4c81] text-xs">Vessel</TableHead>
-                            )}
-                            <TableHead className="font-medium min-w-[200px] bg-[#eff6ff] text-[#0e4c81] text-xs">Request Title</TableHead>
-                            <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81] text-xs">Requested By</TableHead>
-                            <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81] text-xs">Date</TableHead>
-                            <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81] text-xs">Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {operationKPIs.openChangeRequests === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={isAllVessels ? 5 : 4} className="text-center py-8 text-gray-500 text-sm">
-                                No open change requests found
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            operationKPIs.openChangeRequestsList.map((cr) => {
-                              const crVesselName = vessels.find(v => v.id === cr.vesselId)?.name;
-                              return (
-                              <TableRow
-                                key={cr.id}
-                                className="hover:bg-gray-50 cursor-pointer"
-                                onClick={() => setOpDetailChangeRequest(cr)}
-                                data-testid={`row-op-change-request-${cr.id}`}
-                              >
-                                {isAllVessels && (
-                                  <TableCell className="text-xs py-2 font-medium">{crVesselName || '-'}</TableCell>
-                                )}
-                                <TableCell className="font-medium text-gray-900 text-xs py-2">{cr.title}</TableCell>
-                                <TableCell className="text-xs py-2">
-                                  {cr.requestedByUserId === 'current_user' ? 'Chief Engineer' :
-                                   cr.requestedByUserId === '2nd_engineer' ? '2nd Engineer' :
-                                   cr.requestedByUserId === '3rd_engineer' ? '3rd Engineer' :
-                                   cr.requestedByUserId}
-                                </TableCell>
-                                <TableCell className="text-xs py-2">
-                                  {cr.submittedAt
-                                    ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')
-                                    : new Date(cr.createdAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, ' ')}
-                                </TableCell>
-                                <TableCell className="py-2">
-                                  {(() => {
-                                    const st = cr.status?.toLowerCase();
-                                    if (st === 'submitted' || st === 'pending') return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-blue-600">Pending Approval</span>;
-                                    if (st === 'draft') return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-gray-500">Draft</span>;
-                                    if (st === 'returned') return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-yellow-500">Returned</span>;
-                                    return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-gray-400">{cr.status}</span>;
-                                  })()}
-                                </TableCell>
-                              </TableRow>
-                              );
-                            })
-                          )}
-                        </TableBody>
-                      </Table>
+                      <div style={{ height: 'calc(100vh - 360px)', minHeight: '360px' }} data-testid="ag-grid-op-modify-pms-wrap">
+                        <WOAgGridTable
+                          columnDefs={modifyPmsColumnDefs}
+                          rowData={operationKPIs.openChangeRequestsList}
+                          height="100%"
+                          noRowsMessage="No open change requests found"
+                          testId="ag-grid-op-modify-pms"
+                          onRowClicked={(event) => { if (event.data) setOpDetailChangeRequest(event.data); }}
+                          getRowClass={(params) => params.data?.id ? `row-op-change-request-${params.data.id} cursor-pointer` : 'cursor-pointer'}
+                        />
+                      </div>
                       <div className="border-t px-4 py-2 text-xs text-gray-500">
                         Total: {operationKPIs.openChangeRequests} request{operationKPIs.openChangeRequests !== 1 ? 's' : ''}
                       </div>
