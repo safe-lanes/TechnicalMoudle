@@ -1398,6 +1398,160 @@ const Dashboard = () => {
     ];
   }, [isAllVessels, vessels]);
 
+  const pendingApprovalsColumnDefs: ColDef[] = useMemo(() => {
+    const formatWoDate = (d: string | null | undefined) => {
+      if (!d) return '—';
+      try {
+        const parsed = parseFlexibleDate(d);
+        if (!parsed || isNaN(parsed.getTime())) {
+          const fallback = new Date(d);
+          if (!isNaN(fallback.getTime())) return format(fallback, 'dd-MMM-yyyy');
+          return d || '—';
+        }
+        return format(parsed, 'dd-MMM-yyyy');
+      } catch {
+        return d || '—';
+      }
+    };
+    const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
+    const vesselCol: ColDef = {
+      headerName: 'Vessel',
+      field: 'vesselId',
+      minWidth: 140,
+      flex: 1,
+      valueGetter: (params: any) => {
+        const vid = params.data?.vesselId;
+        return (vid && vesselNameById.get(String(vid))) || '—';
+      },
+      cellRenderer: (params: any) => (
+        <span className="truncate font-medium" data-testid={`cell-pending-approval-vessel-${params.data?.id ?? ''}`}>{params.value || '—'}</span>
+      ),
+    };
+    return [
+      ...(isAllVessels ? [vesselCol] : []),
+      {
+        headerName: 'Component',
+        field: 'component',
+        minWidth: 160,
+        flex: 1,
+        cellRenderer: (params: any) => (
+          <span className="truncate">{params.value || '—'}</span>
+        ),
+      },
+      {
+        headerName: 'Work Order No',
+        field: 'workOrderNo',
+        minWidth: 170,
+        flex: 1,
+        cellRenderer: (params: any) => {
+          const wo = params.data;
+          const text = params.value || (wo?.id ? `WO-${wo.id}` : '—');
+          return (
+            <span className="flex items-center gap-2">
+              <span className="text-blue-600">{text}</span>
+              {wo?.wasRejected && (
+                <span
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
+                  style={{ background: '#E53935' }}
+                >
+                  Resubmitted
+                </span>
+              )}
+            </span>
+          );
+        },
+      },
+      {
+        headerName: 'Job Title',
+        field: 'jobTitle',
+        minWidth: 220,
+        flex: 2,
+        tooltipValueGetter: (params: any) => params.data?.jobTitle || '',
+        valueFormatter: (params: any) => params.value || '—',
+      },
+      {
+        headerName: 'Assigned to',
+        field: 'assignedTo',
+        minWidth: 140,
+        flex: 1,
+        valueGetter: (params: any) =>
+          params.data?.assignedTo || params.data?.assignedRank || '',
+        valueFormatter: (params: any) => params.value || '—',
+      },
+      {
+        headerName: 'Submitted Date',
+        field: 'submittedDate',
+        minWidth: 140,
+        flex: 1,
+        valueFormatter: (params: any) => formatWoDate(params.value),
+      },
+      {
+        headerName: 'Status',
+        field: 'computedStatus',
+        minWidth: 150,
+        flex: 1,
+        valueGetter: (params: any) =>
+          (params.data as EnrichedWorkOrder)?.computedStatus || params.data?.status || 'Pending Approval',
+        cellRenderer: (params: any) => (
+          <WoStatusBadgeCell status={params.value || 'Pending Approval'} />
+        ),
+      },
+      {
+        headerName: 'Actions',
+        field: 'id',
+        minWidth: 220,
+        flex: 0,
+        sortable: false,
+        filter: false,
+        resizable: false,
+        cellRenderer: (params: any) => {
+          const wo = params.data;
+          if (!wo) return null;
+          return (
+            <div className="flex items-center justify-center gap-2 h-full">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => { e.stopPropagation(); navigateToWorkOrder(wo.id); }}
+                data-testid={`button-op-view-pending-wo-${wo.id}`}
+              >
+                <Eye className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const reason = window.prompt("Enter rejection reason:");
+                  if (reason) {
+                    rejectMutation.mutate({ workOrderId: wo.id, comments: reason });
+                  }
+                }}
+                style={{ borderColor: '#E53935', color: '#E53935' }}
+                disabled={rejectMutation.isPending}
+                data-testid={`button-op-reject-wo-${wo.id}`}
+              >
+                <XCircle className="w-4 h-4 mr-1" />
+                Reject
+              </Button>
+              <Button
+                size="sm"
+                onClick={(e) => { e.stopPropagation(); approveMutation.mutate(wo.id); }}
+                style={{ background: '#2E7D32' }}
+                className="text-white hover:opacity-90"
+                disabled={approveMutation.isPending}
+                data-testid={`button-op-approve-wo-${wo.id}`}
+              >
+                <CheckCircle className="w-4 h-4 mr-1" />
+                Approve
+              </Button>
+            </div>
+          );
+        },
+      },
+    ];
+  }, [isAllVessels, vessels, navigateToWorkOrder, rejectMutation, approveMutation]);
+
   const criticalSparesColumnDefs: ColDef[] = useMemo(() => {
     const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
     const vesselCol: ColDef = {
@@ -2220,79 +2374,21 @@ const Dashboard = () => {
                           </Button>
                         )}
                       </div>
-                      <div className="p-4 space-y-2">
-                        {operationKPIs.pendingApprovalWOs.length === 0 ? (
-                          <div className="text-center py-8 text-gray-500 text-sm">No work orders pending approval</div>
-                        ) : (
-                          operationKPIs.pendingApprovalWOs.map((wo) => {
-                            const woVesselName = vessels.find(v => v.id === wo.vesselId)?.name;
-                            return (
-                            <div
-                              key={wo.id}
-                              className="flex items-center justify-between p-3 rounded-lg border transition-colors"
-                              style={{ background: wo.wasRejected ? '#FFEBEE' : '#E3F2FD', borderColor: wo.wasRejected ? '#FFCDD2' : '#BBDEFB' }}
-                              data-testid={`row-op-pending-approval-wo-${wo.id}`}
-                            >
-                              {isAllVessels && (
-                                <div
-                                  className="w-[140px] flex-shrink-0 pr-3 mr-3 border-r"
-                                  style={{ borderColor: wo.wasRejected ? '#FFCDD2' : '#BBDEFB' }}
-                                  data-testid={`cell-pending-approval-vessel-${wo.id}`}
-                                >
-                                  <div className="text-[10px] uppercase tracking-wide" style={{ color: '#9E9E9E' }}>Vessel</div>
-                                  <div className="text-sm font-semibold truncate" style={{ color: '#1565C0' }}>{woVesselName || '—'}</div>
-                                </div>
-                              )}
-                              <div className="flex-1 cursor-pointer" onClick={() => navigateToWorkOrder(wo.id)}>
-                                <div className="font-medium text-sm" style={{ color: wo.wasRejected ? '#C62828' : '#212121' }}>
-                                  {wo.workOrderNo || `WO-${wo.id}`}
-                                  {wo.wasRejected && (
-                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ background: '#E53935' }}>Resubmitted</span>
-                                  )}
-                                </div>
-                                <div className="text-xs mt-0.5" style={{ color: wo.wasRejected ? '#E53935' : '#616161' }}>
-                                  {wo.jobTitle || 'No description'} - {wo.component}
-                                </div>
-                                <div className="text-xs mt-1" style={{ color: '#9E9E9E' }}>
-                                  Assigned: {wo.assignedTo} | Submitted: {wo.submittedDate ? new Date(wo.submittedDate).toLocaleDateString() : 'N/A'}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Button variant="ghost" size="icon" onClick={() => navigateToWorkOrder(wo.id)} data-testid={`button-op-view-pending-wo-${wo.id}`}>
-                                  <Eye className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    const reason = window.prompt("Enter rejection reason:");
-                                    if (reason) {
-                                      rejectMutation.mutate({ workOrderId: wo.id, comments: reason });
-                                    }
-                                  }}
-                                  style={{ borderColor: '#E53935', color: '#E53935' }}
-                                  disabled={rejectMutation.isPending}
-                                  data-testid={`button-op-reject-wo-${wo.id}`}
-                                >
-                                  <XCircle className="w-4 h-4 mr-1" />
-                                  Reject
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  onClick={() => approveMutation.mutate(wo.id)}
-                                  style={{ background: '#2E7D32' }}
-                                  className="text-white hover:opacity-90"
-                                  disabled={approveMutation.isPending}
-                                  data-testid={`button-op-approve-wo-${wo.id}`}
-                                >
-                                  <CheckCircle className="w-4 h-4 mr-1" />
-                                  Approve
-                                </Button>
-                              </div>
-                            </div>
-                            );
-                          })
-                        )}
+                      <div style={{ height: 'calc(100vh - 360px)', minHeight: '360px' }} data-testid="ag-grid-op-pending-approvals-wrap">
+                        <WOAgGridTable
+                          columnDefs={pendingApprovalsColumnDefs}
+                          rowData={operationKPIs.pendingApprovalWOs}
+                          height="100%"
+                          rowHeight={52}
+                          noRowsMessage="No work orders pending approval"
+                          testId="ag-grid-op-pending-approvals"
+                          getRowClass={(params) => {
+                            const id = params.data?.id;
+                            const base = id ? `row-op-pending-approval-wo-${id}` : '';
+                            return params.data?.wasRejected ? `${base} row-pending-resubmitted`.trim() : base || undefined;
+                          }}
+                          getRowStyle={(params) => params.data?.wasRejected ? { background: '#FFEBEE' } : undefined}
+                        />
                       </div>
                     </div>
                   ) : selectedOpCard === 'critical-spares' ? (
