@@ -24,6 +24,8 @@ import { format } from "date-fns";
 import { pdfReportGenerator, formatDate, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import InlineReportPreview from "@/components/reports/InlineReportPreview";
+import WOAgGridTable from "@/components/WOAgGridTable";
+import type { ColDef } from 'ag-grid-community';
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
@@ -697,98 +699,14 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
           </div>
 
           <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Report Name</th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Frequency</th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Priority</th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Est. Time</th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredReports.map((report) => (
-                  <tr 
-                    key={report.id} 
-                    className="hover:bg-gray-50 cursor-pointer"
-                    data-testid={`spares-report-row-${report.id}`}
-                    onClick={() => {
-                      if (report.id === 'spares-low-stock' || report.id === 'spares-critical-parts' || report.id === 'spares-consumption-analysis') {
-                        setActiveDetailReport(report.id);
-                      }
-                    }}
-                  >
-                    <td className="py-3 px-4">
-                      <div>
-                        <div className="font-medium text-gray-900">{report.name}</div>
-                        <div className="text-sm text-gray-500">{report.description}</div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge variant="outline">{report.frequency}</Badge>
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge className={getPriorityColor(report.priority)}>
-                        {report.priority.toUpperCase()}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="text-xs text-gray-500">{report.estimatedTime}</span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1">
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          title="Preview"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (report.id === 'spares-low-stock' || report.id === 'spares-critical-parts' || report.id === 'spares-consumption-analysis') {
-                              setActiveDetailReport(report.id);
-                            } else {
-                              handlePreviewReport(report.id);
-                            }
-                          }}
-                          disabled={generatingReports.has(`${report.id}-PDF`)}
-                          data-testid={`button-preview-${report.id}`}
-                        >
-                          {generatingReports.has(`${report.id}-PDF`) ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </Button>
-                        {report.outputs.includes('PDF') && (
-                          <Button 
-                            size="icon" 
-                            variant="ghost" 
-                            title="Download PDF"
-                            onClick={() => handleGenerateReport(report.id, 'PDF')}
-                            disabled={generatingReports.has(`${report.id}-PDF`)}
-                            data-testid={`button-pdf-${report.id}`}
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {report.outputs.includes('Excel') && (
-                          <Button 
-                            size="icon" 
-                            variant="ghost" 
-                            title="Download Excel"
-                            onClick={() => handleGenerateReport(report.id, 'Excel')}
-                            disabled={generatingReports.has(`${report.id}-Excel`)}
-                            data-testid={`button-excel-${report.id}`}
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <SparesReportListGrid
+              reports={filteredReports}
+              generatingReports={generatingReports}
+              getPriorityColor={getPriorityColor}
+              onSelectDetail={(id) => setActiveDetailReport(id)}
+              onPreview={(id) => handlePreviewReport(id)}
+              onGenerate={(id, fmt) => handleGenerateReport(id, fmt)}
+            />
           </div>
 
           {filteredReports.length === 0 && (
@@ -818,6 +736,111 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
         />
       )}
     </div>
+  );
+};
+
+interface SparesReportListGridProps {
+  reports: SparesReport[];
+  generatingReports: Set<string>;
+  getPriorityColor: (p: string) => string;
+  onSelectDetail: (id: string) => void;
+  onPreview: (id: string) => void;
+  onGenerate: (id: string, fmt: 'PDF' | 'Excel') => void;
+}
+
+const DETAIL_REPORT_IDS = new Set(['spares-low-stock', 'spares-critical-parts', 'spares-consumption-analysis']);
+
+const SparesReportListGrid: React.FC<SparesReportListGridProps> = ({
+  reports, generatingReports, getPriorityColor, onSelectDetail, onPreview, onGenerate,
+}) => {
+  const columnDefs: ColDef[] = useMemo(() => [
+    {
+      headerName: 'Report Name',
+      field: 'name',
+      flex: 2,
+      minWidth: 280,
+      autoHeight: true,
+      wrapText: true,
+      cellStyle: { whiteSpace: 'normal', lineHeight: '1.3', paddingTop: 8, paddingBottom: 8 },
+      cellRenderer: (p: any) => (
+        <div>
+          <div className="font-medium text-gray-900">{p.data.name}</div>
+          <div className="text-sm text-gray-500">{p.data.description}</div>
+        </div>
+      ),
+    },
+    {
+      headerName: 'Frequency', field: 'frequency', flex: 1, minWidth: 120,
+      cellRenderer: (p: any) => <Badge variant="outline">{p.value}</Badge>,
+    },
+    {
+      headerName: 'Priority', field: 'priority', flex: 1, minWidth: 110,
+      cellRenderer: (p: any) => (
+        <Badge className={getPriorityColor(p.value)}>{String(p.value).toUpperCase()}</Badge>
+      ),
+    },
+    {
+      headerName: 'Est. Time', field: 'estimatedTime', flex: 1, minWidth: 110,
+      cellRenderer: (p: any) => <span className="text-xs text-gray-500">{p.value}</span>,
+    },
+    {
+      headerName: 'Actions', field: 'actions', flex: 1, minWidth: 140, sortable: false, filter: false,
+      cellRenderer: (p: any) => {
+        const r: SparesReport = p.data;
+        const isDetail = DETAIL_REPORT_IDS.has(r.id);
+        return (
+          <div className="flex items-center gap-1">
+            <Button
+              size="icon" variant="ghost" title="Preview"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isDetail) onSelectDetail(r.id); else onPreview(r.id);
+              }}
+              disabled={generatingReports.has(`${r.id}-PDF`)}
+              data-testid={`button-preview-${r.id}`}
+            >
+              {generatingReports.has(`${r.id}-PDF`) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+            </Button>
+            {r.outputs.includes('PDF') && (
+              <Button
+                size="icon" variant="ghost" title="Download PDF"
+                onClick={(e) => { e.stopPropagation(); onGenerate(r.id, 'PDF'); }}
+                disabled={generatingReports.has(`${r.id}-PDF`)}
+                data-testid={`button-pdf-${r.id}`}
+              >
+                <FileText className="h-4 w-4" />
+              </Button>
+            )}
+            {r.outputs.includes('Excel') && (
+              <Button
+                size="icon" variant="ghost" title="Download Excel"
+                onClick={(e) => { e.stopPropagation(); onGenerate(r.id, 'Excel'); }}
+                disabled={generatingReports.has(`${r.id}-Excel`)}
+                data-testid={`button-excel-${r.id}`}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        );
+      },
+    },
+  ], [generatingReports, getPriorityColor, onSelectDetail, onPreview, onGenerate]);
+
+  return (
+    <WOAgGridTable
+      columnDefs={columnDefs}
+      rowData={reports}
+      domLayout="autoHeight"
+      headerHeight={42}
+      rowHeight={64}
+      testId="grid-spares-reports-list"
+      noRowsMessage="No reports found"
+      onRowClicked={(e) => {
+        const r: SparesReport = e.data;
+        if (DETAIL_REPORT_IDS.has(r.id)) onSelectDetail(r.id);
+      }}
+    />
   );
 };
 

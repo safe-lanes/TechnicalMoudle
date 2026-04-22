@@ -26,6 +26,8 @@ import { format } from "date-fns";
 import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import InlineReportPreview from "@/components/reports/InlineReportPreview";
+import WOAgGridTable from "@/components/WOAgGridTable";
+import type { ColDef } from 'ag-grid-community';
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
@@ -639,79 +641,13 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           </div>
 
           <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Report Name</th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Frequency</th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Priority</th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Est. Time</th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredReports.map((report) => (
-                  <tr 
-                    key={report.id} 
-                    className="hover:bg-gray-50 cursor-pointer"
-                    data-testid={`rh-report-row-${report.id}`}
-                  >
-                    <td className="py-3 px-4">
-                      <div>
-                        <div className="font-medium text-gray-900">{report.name}</div>
-                        <div className="text-sm text-gray-500">{report.description}</div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge variant="outline">{report.frequency}</Badge>
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge className={getPriorityColor(report.priority)}>
-                        {report.priority.toUpperCase()}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="text-xs text-gray-500">{report.estimatedTime}</span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1">
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          title="Preview"
-                          onClick={() => handlePreviewReport(report.id)}
-                          data-testid={`button-preview-${report.id}`}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          title="Download PDF"
-                          onClick={() => handleGenerateReport(report.id, 'PDF')}
-                          disabled={generatingReports.has(`${report.id}-PDF`)}
-                          data-testid={`button-pdf-${report.id}`}
-                        >
-                          <FileText className="h-4 w-4" />
-                        </Button>
-                        {report.outputs.includes('Excel') && (
-                          <Button 
-                            size="icon" 
-                            variant="ghost" 
-                            title="Download Excel"
-                            onClick={() => handleGenerateReport(report.id, 'Excel')}
-                            disabled={generatingReports.has(`${report.id}-Excel`)}
-                            data-testid={`button-excel-${report.id}`}
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <RunningHoursReportListGrid
+              reports={filteredReports}
+              generatingReports={generatingReports}
+              getPriorityColor={getPriorityColor}
+              onPreview={(id) => handlePreviewReport(id)}
+              onGenerate={(id, fmt) => handleGenerateReport(id, fmt)}
+            />
           </div>
 
           {filteredReports.length === 0 && (
@@ -741,6 +677,93 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         />
       )}
     </div>
+  );
+};
+
+interface RunningHoursReportListGridProps {
+  reports: RunningHoursReport[];
+  generatingReports: Set<string>;
+  getPriorityColor: (p: string) => string;
+  onPreview: (id: string) => void;
+  onGenerate: (id: string, fmt: 'PDF' | 'Excel') => void;
+}
+
+const RunningHoursReportListGrid: React.FC<RunningHoursReportListGridProps> = ({
+  reports, generatingReports, getPriorityColor, onPreview, onGenerate,
+}) => {
+  const columnDefs: ColDef[] = useMemo(() => [
+    {
+      headerName: 'Report Name', field: 'name', flex: 2, minWidth: 280,
+      autoHeight: true, wrapText: true,
+      cellStyle: { whiteSpace: 'normal', lineHeight: '1.3', paddingTop: 8, paddingBottom: 8 },
+      cellRenderer: (p: any) => (
+        <div>
+          <div className="font-medium text-gray-900">{p.data.name}</div>
+          <div className="text-sm text-gray-500">{p.data.description}</div>
+        </div>
+      ),
+    },
+    {
+      headerName: 'Frequency', field: 'frequency', flex: 1, minWidth: 120,
+      cellRenderer: (p: any) => <Badge variant="outline">{p.value}</Badge>,
+    },
+    {
+      headerName: 'Priority', field: 'priority', flex: 1, minWidth: 110,
+      cellRenderer: (p: any) => (
+        <Badge className={getPriorityColor(p.value)}>{String(p.value).toUpperCase()}</Badge>
+      ),
+    },
+    {
+      headerName: 'Est. Time', field: 'estimatedTime', flex: 1, minWidth: 110,
+      cellRenderer: (p: any) => <span className="text-xs text-gray-500">{p.value}</span>,
+    },
+    {
+      headerName: 'Actions', field: 'actions', flex: 1, minWidth: 140, sortable: false, filter: false,
+      cellRenderer: (p: any) => {
+        const r: RunningHoursReport = p.data;
+        return (
+          <div className="flex items-center gap-1">
+            <Button
+              size="icon" variant="ghost" title="Preview"
+              onClick={(e) => { e.stopPropagation(); onPreview(r.id); }}
+              data-testid={`button-preview-${r.id}`}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon" variant="ghost" title="Download PDF"
+              onClick={(e) => { e.stopPropagation(); onGenerate(r.id, 'PDF'); }}
+              disabled={generatingReports.has(`${r.id}-PDF`)}
+              data-testid={`button-pdf-${r.id}`}
+            >
+              <FileText className="h-4 w-4" />
+            </Button>
+            {r.outputs.includes('Excel') && (
+              <Button
+                size="icon" variant="ghost" title="Download Excel"
+                onClick={(e) => { e.stopPropagation(); onGenerate(r.id, 'Excel'); }}
+                disabled={generatingReports.has(`${r.id}-Excel`)}
+                data-testid={`button-excel-${r.id}`}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        );
+      },
+    },
+  ], [generatingReports, getPriorityColor, onPreview, onGenerate]);
+
+  return (
+    <WOAgGridTable
+      columnDefs={columnDefs}
+      rowData={reports}
+      domLayout="autoHeight"
+      headerHeight={42}
+      rowHeight={64}
+      testId="grid-running-hours-reports-list"
+      noRowsMessage="No reports found"
+    />
   );
 };
 
