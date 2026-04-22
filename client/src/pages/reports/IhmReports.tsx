@@ -20,6 +20,8 @@ import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery } from "@tanstack/react-query";
 import CategoryFilters, { CategoryFilterValues } from "@/components/reports/CategoryFilters";
+import ReportAgGridTable from "@/components/reports/ReportAgGridTable";
+import { ReportColumn } from "@/components/reports/ReportPreviewModal";
 import IhmInventoryStatusReport from "./IhmInventoryStatusReport";
 
 interface IhmReport {
@@ -388,106 +390,17 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
             </Card>
           </div>
 
-          <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Report Name</th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Frequency</th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Priority</th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Est. Time</th>
-                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredReports.map((report) => (
-                  <tr 
-                    key={report.id} 
-                    className="hover:bg-gray-50 cursor-pointer"
-                    data-testid={`ihm-report-row-${report.id}`}
-                  >
-                    <td className="py-3 px-4">
-                      <div>
-                        <div className="font-medium text-gray-900">{report.name}</div>
-                        <div className="text-sm text-gray-500">{report.description}</div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge variant="outline">{report.frequency}</Badge>
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge className={getPriorityColor(report.priority)}>
-                        {report.priority.toUpperCase()}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="text-xs text-gray-500">{report.estimatedTime}</span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1">
-                        {report.id === 'ihm-inventory-status' ? (
-                          <Button 
-                            size="icon" 
-                            variant="ghost" 
-                            title="View Interactive Report"
-                            onClick={() => setViewingReport(report.id)}
-                            data-testid={`button-preview-${report.id}`}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        ) : (
-                          <Button 
-                            size="icon" 
-                            variant="ghost" 
-                            title="Preview"
-                            onClick={() => handleGenerateReport(report.id, 'PDF')}
-                            disabled={generatingReports.has(`${report.id}-PDF`)}
-                            data-testid={`button-preview-${report.id}`}
-                          >
-                            {generatingReports.has(`${report.id}-PDF`) ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </Button>
-                        )}
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          title="Download PDF"
-                          onClick={() => handleGenerateReport(report.id, 'PDF')}
-                          disabled={generatingReports.has(`${report.id}-PDF`)}
-                          data-testid={`button-pdf-${report.id}`}
-                        >
-                          {generatingReports.has(`${report.id}-PDF`) ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <FileText className="h-4 w-4" />
-                          )}
-                        </Button>
-                        {report.outputs.includes('Excel') && (
-                          <Button 
-                            size="icon" 
-                            variant="ghost" 
-                            title="Download Excel"
-                            onClick={() => handleGenerateReport(report.id, 'Excel')}
-                            disabled={generatingReports.has(`${report.id}-Excel`)}
-                            data-testid={`button-excel-${report.id}`}
-                          >
-                            {generatingReports.has(`${report.id}-Excel`) ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Download className="h-4 w-4" />
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {filteredReports.length > 0 && (
+            <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
+              <IhmReportListGrid
+                reports={filteredReports}
+                generatingReports={generatingReports}
+                getPriorityColor={getPriorityColor}
+                onView={(id) => setViewingReport(id)}
+                onGenerate={(id, fmt) => handleGenerateReport(id, fmt)}
+              />
+            </div>
+          )}
 
           {filteredReports.length === 0 && (
             <div className="text-center py-12">
@@ -499,6 +412,107 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack, globalFilters, embedded
         </>
       )}
     </div>
+  );
+};
+
+interface IhmReportListGridProps {
+  reports: IhmReport[];
+  generatingReports: Set<string>;
+  getPriorityColor: (p: string) => string;
+  onView: (id: string) => void;
+  onGenerate: (id: string, fmt: 'PDF' | 'Excel') => void;
+}
+
+const IhmReportListGrid: React.FC<IhmReportListGridProps> = ({
+  reports, generatingReports, getPriorityColor, onView, onGenerate,
+}) => {
+  const columns: ReportColumn[] = useMemo(() => [
+    {
+      header: 'Report Name', field: 'name', flex: 2, minWidth: 280,
+      autoHeight: true, wrapText: true,
+      cellStyle: { whiteSpace: 'normal', lineHeight: '1.3', paddingTop: 8, paddingBottom: 8 },
+      cellRenderer: (p: any) => (
+        <div data-testid={`ihm-report-row-${p.data.id}`}>
+          <div className="font-medium text-gray-900">{p.data.name}</div>
+          <div className="text-sm text-gray-500">{p.data.description}</div>
+        </div>
+      ),
+    },
+    {
+      header: 'Frequency', field: 'frequency', flex: 1, minWidth: 120,
+      cellRenderer: (p: any) => <Badge variant="outline">{p.value}</Badge>,
+    },
+    {
+      header: 'Priority', field: 'priority', flex: 1, minWidth: 110,
+      cellRenderer: (p: any) => (
+        <Badge className={getPriorityColor(p.value)}>{String(p.value).toUpperCase()}</Badge>
+      ),
+    },
+    {
+      header: 'Est. Time', field: 'estimatedTime', flex: 1, minWidth: 110,
+      cellRenderer: (p: any) => <span className="text-xs text-gray-500">{p.value}</span>,
+    },
+    {
+      header: 'Actions', field: 'actions', flex: 1, minWidth: 140, sortable: false, filter: false,
+      cellRenderer: (p: any) => {
+        const r: IhmReport = p.data;
+        const isInteractive = r.id === 'ihm-inventory-status';
+        const pdfBusy = generatingReports.has(`${r.id}-PDF`);
+        const excelBusy = generatingReports.has(`${r.id}-Excel`);
+        return (
+          <div className="flex items-center gap-1">
+            {isInteractive ? (
+              <Button
+                size="icon" variant="ghost" title="View Interactive Report"
+                onClick={(e) => { e.stopPropagation(); onView(r.id); }}
+                data-testid={`button-preview-${r.id}`}
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                size="icon" variant="ghost" title="Preview"
+                onClick={(e) => { e.stopPropagation(); onGenerate(r.id, 'PDF'); }}
+                disabled={pdfBusy}
+                data-testid={`button-preview-${r.id}`}
+              >
+                {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+              </Button>
+            )}
+            <Button
+              size="icon" variant="ghost" title="Download PDF"
+              onClick={(e) => { e.stopPropagation(); onGenerate(r.id, 'PDF'); }}
+              disabled={pdfBusy}
+              data-testid={`button-pdf-${r.id}`}
+            >
+              {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+            </Button>
+            {r.outputs.includes('Excel') && (
+              <Button
+                size="icon" variant="ghost" title="Download Excel"
+                onClick={(e) => { e.stopPropagation(); onGenerate(r.id, 'Excel'); }}
+                disabled={excelBusy}
+                data-testid={`button-excel-${r.id}`}
+              >
+                {excelBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              </Button>
+            )}
+          </div>
+        );
+      },
+    },
+  ], [generatingReports, getPriorityColor, onView, onGenerate]);
+
+  return (
+    <ReportAgGridTable
+      columns={columns}
+      data={reports}
+      domLayout="autoHeight"
+      headerHeight={42}
+      rowHeight={64}
+      testId="grid-ihm-reports-list"
+      noRowsMessage="No reports found"
+    />
   );
 };
 
