@@ -62,6 +62,7 @@ import { WorkOrderDataTable } from '@/components/WorkOrderDataTable';
 import { StatusPill } from '@/components/StatusPill';
 import { Marker } from "@/components/Marker";
 import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
+import { RejectionHistorySection } from "@/components/wo/RejectionHistorySection";
 
 export interface HistoryWorkOrderPayload {
   template: WorkOrder;
@@ -5975,6 +5976,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             return (
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 mt-4" data-testid="WOF.B5.1"><Marker id="WOF.B5.1" />
               <div className="space-y-4">
+
+                {/* Rejection History (only shown if at least one prior rejection exists) */}
+                {workOrderId && (
+                  <RejectionHistorySection workOrderId={workOrderId} />
+                )}
 
                 {/* Layer 5: Approval Tier Banner */}
                 <div
