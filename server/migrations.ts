@@ -3014,6 +3014,89 @@ const migrations: Migration[] = [
       ALTER TABLE vessel_org_chart_nodes ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
       ALTER TABLE vessel_org_chart_nodes ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
     `
+  },
+  {
+    id: '091_audit_columns_backfill_remaining_11',
+    name: 'Backfill standard audit columns on remaining 11 tables',
+    description: 'Adds the full set of 5 standard audit columns (is_sync, created_by_uuid, updated_by_uuid, is_deleted, sort_order) on the 11 tables that previously had none of them. Idempotent via IF NOT EXISTS. Mirrors the pattern from 090_audit_columns_backfill_v2: BOOLEAN DEFAULT FALSE for flags, TEXT for *_by_uuid, INTEGER DEFAULT 0 for sort_order. Columns kept nullable for safety and reversibility.',
+    sql: `
+      -- additional_groups (5 cols)
+      ALTER TABLE additional_groups ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+      ALTER TABLE additional_groups ADD COLUMN IF NOT EXISTS created_by_uuid TEXT;
+      ALTER TABLE additional_groups ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT;
+      ALTER TABLE additional_groups ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+      ALTER TABLE additional_groups ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- alert_acknowledgements (5 cols)
+      ALTER TABLE alert_acknowledgements ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+      ALTER TABLE alert_acknowledgements ADD COLUMN IF NOT EXISTS created_by_uuid TEXT;
+      ALTER TABLE alert_acknowledgements ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT;
+      ALTER TABLE alert_acknowledgements ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+      ALTER TABLE alert_acknowledgements ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- company_standard_grace_settings (5 cols)
+      ALTER TABLE company_standard_grace_settings ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+      ALTER TABLE company_standard_grace_settings ADD COLUMN IF NOT EXISTS created_by_uuid TEXT;
+      ALTER TABLE company_standard_grace_settings ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT;
+      ALTER TABLE company_standard_grace_settings ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+      ALTER TABLE company_standard_grace_settings ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- fleet_groups (5 cols)
+      ALTER TABLE fleet_groups ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+      ALTER TABLE fleet_groups ADD COLUMN IF NOT EXISTS created_by_uuid TEXT;
+      ALTER TABLE fleet_groups ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT;
+      ALTER TABLE fleet_groups ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+      ALTER TABLE fleet_groups ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- master_users (5 cols)
+      ALTER TABLE master_users ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+      ALTER TABLE master_users ADD COLUMN IF NOT EXISTS created_by_uuid TEXT;
+      ALTER TABLE master_users ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT;
+      ALTER TABLE master_users ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+      ALTER TABLE master_users ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- monthly_snapshots (5 cols)
+      ALTER TABLE monthly_snapshots ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+      ALTER TABLE monthly_snapshots ADD COLUMN IF NOT EXISTS created_by_uuid TEXT;
+      ALTER TABLE monthly_snapshots ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT;
+      ALTER TABLE monthly_snapshots ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+      ALTER TABLE monthly_snapshots ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- ports (5 cols)
+      ALTER TABLE ports ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+      ALTER TABLE ports ADD COLUMN IF NOT EXISTS created_by_uuid TEXT;
+      ALTER TABLE ports ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT;
+      ALTER TABLE ports ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+      ALTER TABLE ports ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- superintendent_notifications (5 cols)
+      ALTER TABLE superintendent_notifications ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+      ALTER TABLE superintendent_notifications ADD COLUMN IF NOT EXISTS created_by_uuid TEXT;
+      ALTER TABLE superintendent_notifications ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT;
+      ALTER TABLE superintendent_notifications ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+      ALTER TABLE superintendent_notifications ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- vessel_types (5 cols)
+      ALTER TABLE vessel_types ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+      ALTER TABLE vessel_types ADD COLUMN IF NOT EXISTS created_by_uuid TEXT;
+      ALTER TABLE vessel_types ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT;
+      ALTER TABLE vessel_types ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+      ALTER TABLE vessel_types ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- work_order_anomalies (5 cols)
+      ALTER TABLE work_order_anomalies ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+      ALTER TABLE work_order_anomalies ADD COLUMN IF NOT EXISTS created_by_uuid TEXT;
+      ALTER TABLE work_order_anomalies ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT;
+      ALTER TABLE work_order_anomalies ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+      ALTER TABLE work_order_anomalies ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- work_order_documents (5 cols)
+      ALTER TABLE work_order_documents ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+      ALTER TABLE work_order_documents ADD COLUMN IF NOT EXISTS created_by_uuid TEXT;
+      ALTER TABLE work_order_documents ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT;
+      ALTER TABLE work_order_documents ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+      ALTER TABLE work_order_documents ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+    `
   }
 ];
 

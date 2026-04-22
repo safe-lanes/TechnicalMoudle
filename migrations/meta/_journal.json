@@ -379,6 +379,13 @@
       "when": 1776826569339,
       "tag": "0053_open_vulcan",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1776828811968,
+      "tag": "0054_careless_wendell_rand",
+      "breakpoints": true
     }
   ]
 }

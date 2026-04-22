@@ -1012,6 +1012,11 @@ export const alertAcknowledgements = pgTable("alert_acknowledgements", {
   userRole: text("user_role").notNull(),
   comments: text("comments").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  isSync: boolean("is_sync").default(false),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  sortOrder: integer("sort_order").default(0),
 });
 
 export const insertAlertAcknowledgementSchema = createInsertSchema(alertAcknowledgements).omit({
@@ -1287,6 +1292,11 @@ export const superintendentNotifications = pgTable("superintendent_notifications
   createdAt: timestamp("created_at").notNull().defaultNow(),
   acknowledgedAt: timestamp("acknowledged_at"),
   isAcknowledged: boolean("is_acknowledged").default(false),
+  isSync: boolean("is_sync").default(false),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  sortOrder: integer("sort_order").default(0),
 });
 
 export const insertSuperintendentNotificationSchema = createInsertSchema(superintendentNotifications).omit({
@@ -2171,6 +2181,11 @@ export const companyStandardGraceSettings = pgTable("company_standard_grace_sett
   updatedBy: text("updated_by").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  sortOrder: integer("sort_order").default(0),
 });
 
 export const insertCompanyStandardGraceSettingsSchema = createInsertSchema(companyStandardGraceSettings).omit({
@@ -3457,6 +3472,11 @@ export const workOrderDocuments = pgTable("work_order_documents", {
   storageBackend: text("storage_backend").notNull().default("object"),
   uploadedBy: text("uploaded_by").notNull(),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  isSync: boolean("is_sync").default(false),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  sortOrder: integer("sort_order").default(0),
 }, (table) => ({
   workOrderIdx: index("idx_wo_docs_work_order").on(table.workOrderId),
   vesselIdx: index("idx_wo_docs_vessel").on(table.vesselId),
@@ -3485,6 +3505,11 @@ export const vesselTypes = pgTable("vessel_types", {
   syncedAt: timestamp("synced_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  sortOrder: integer("sort_order").default(0),
 }, (table) => ({
   nameIdx: index("idx_vessel_types_name").on(table.name),
 }));
@@ -3505,6 +3530,11 @@ export const additionalGroups = pgTable("additional_groups", {
   syncedAt: timestamp("synced_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  sortOrder: integer("sort_order").default(0),
 }, (table) => ({
   nameIdx: index("idx_additional_groups_name").on(table.name),
 }));
@@ -3525,6 +3555,11 @@ export const ports = pgTable("ports", {
   syncedAt: timestamp("synced_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  sortOrder: integer("sort_order").default(0),
 }, (table) => ({
   nameIdx: index("idx_ports_name").on(table.name),
 }));
@@ -3545,6 +3580,11 @@ export const fleetGroups = pgTable("fleet_groups", {
   syncedAt: timestamp("synced_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  sortOrder: integer("sort_order").default(0),
 }, (table) => ({
   nameIdx: index("idx_fleet_groups_name").on(table.name),
 }));
@@ -3569,6 +3609,11 @@ export const masterUsers = pgTable("master_users", {
   syncedAt: timestamp("synced_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  sortOrder: integer("sort_order").default(0),
 }, (table) => ({
   fullNameIdx: index("idx_master_users_full_name").on(table.fullName),
   emailIdx: index("idx_master_users_email").on(table.email),
@@ -3607,6 +3652,11 @@ export const workOrderAnomalies = pgTable("work_order_anomalies", {
   isResolved: boolean("is_resolved").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
+  isSync: boolean("is_sync").default(false),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  sortOrder: integer("sort_order").default(0),
 });
 
 export const insertWorkOrderAnomalySchema = createInsertSchema(workOrderAnomalies).omit({
@@ -3877,6 +3927,11 @@ export const monthlySnapshots = pgTable("monthly_snapshots", {
   count: integer("count").notNull().default(0),
   workOrderIds: text("work_order_ids").array().notNull().default(sql`'{}'::text[]`),
   generatedAt: timestamp("generated_at").notNull().defaultNow(),
+  isSync: boolean("is_sync").default(false),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  sortOrder: integer("sort_order").default(0),
 }, (table) => ({
   vesselMonthIdx: index("idx_monthly_snap_vessel_month").on(table.vesselId, table.snapshotMonth),
   typeIdx: index("idx_monthly_snap_type").on(table.snapshotType),
