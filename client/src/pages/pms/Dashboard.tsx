@@ -1435,30 +1435,23 @@ const Dashboard = () => {
         minWidth: 160,
         flex: 1,
         cellRenderer: (params: any) => (
-          <span className="truncate">{params.value || '—'}</span>
+          <span
+            className="truncate"
+            data-testid={params.data?.id ? `row-op-pending-approval-wo-${params.data.id}` : undefined}
+          >
+            {params.value || '—'}
+          </span>
         ),
       },
       {
         headerName: 'Work Order No',
         field: 'workOrderNo',
-        minWidth: 170,
+        minWidth: 150,
         flex: 1,
         cellRenderer: (params: any) => {
           const wo = params.data;
           const text = params.value || (wo?.id ? `WO-${wo.id}` : '—');
-          return (
-            <span className="flex items-center gap-2">
-              <span className="text-blue-600">{text}</span>
-              {wo?.wasRejected && (
-                <span
-                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
-                  style={{ background: '#E53935' }}
-                >
-                  Resubmitted
-                </span>
-              )}
-            </span>
-          );
+          return <span className="text-blue-600">{text}</span>;
         },
       },
       {
@@ -1488,13 +1481,26 @@ const Dashboard = () => {
       {
         headerName: 'Status',
         field: 'computedStatus',
-        minWidth: 150,
+        minWidth: 180,
         flex: 1,
         valueGetter: (params: any) =>
           (params.data as EnrichedWorkOrder)?.computedStatus || params.data?.status || 'Pending Approval',
-        cellRenderer: (params: any) => (
-          <WoStatusBadgeCell status={params.value || 'Pending Approval'} />
-        ),
+        cellRenderer: (params: any) => {
+          const wo = params.data;
+          return (
+            <span className="flex items-center gap-2">
+              <WoStatusBadgeCell status={params.value || 'Pending Approval'} />
+              {wo?.wasRejected && (
+                <span
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
+                  style={{ background: '#E53935' }}
+                >
+                  Resubmitted
+                </span>
+              )}
+            </span>
+          );
+        },
       },
       {
         headerName: 'Actions',
