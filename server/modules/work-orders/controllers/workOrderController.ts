@@ -9,6 +9,26 @@ import * as complianceAnomalyService from '../services/complianceAnomalyService'
 import * as plannerService from '../services/workOrderPlannerService';
 import { ValidationError } from '../../shared/errors';
 import { storage } from '../../../storage';
+import type { AuthenticatedRequest } from '../../../middleware/auth';
+
+// Resolve a human-readable identity for the authenticated user so that audit
+// logs (e.g. rejection history) can show a real approver instead of "system".
+function resolveActorIdentity(req: Request): string | undefined {
+  const { user } = req as AuthenticatedRequest;
+  if (!user) return undefined;
+  const firstLast = [user.firstname, user.lastname].filter(Boolean).join(' ').trim();
+  const candidates: Array<string | undefined | null> = [
+    user.rank_name,
+    user.fullName,
+    firstLast || undefined,
+    user.username,
+    user.email,
+  ];
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
 
 // ── Core Work Order CRUD ──
 
@@ -56,7 +76,15 @@ export async function createWorkOrder(req: Request, res: Response) {
 
 export async function updateWorkOrder(req: Request, res: Response) {
   try {
-    const workOrder = await woService.updateWorkOrder(req.params.id, req.body);
+    const actor = resolveActorIdentity(req);
+    const body = { ...req.body };
+    if (actor) {
+      // Prefer caller-supplied userId, but fall back to the authenticated user
+      // so audit entries (e.g. rejections) capture a real identity.
+      if (!body.userId || body.userId === 'system') body.userId = actor;
+      if (!body.performedBy || body.performedBy === 'system') body.performedBy = actor;
+    }
+    const workOrder = await woService.updateWorkOrder(req.params.id, body);
     res.json(workOrder);
   } catch (error: any) {
     console.error('❌ Work order update error:', error);
@@ -128,7 +156,8 @@ export async function bulkApprove(req: Request, res: Response) {
 
 export async function bulkReject(req: Request, res: Response) {
   const { workOrderIds, approver, rejectionComments } = req.body;
-  const result = await woBulkService.bulkReject(workOrderIds, approver, rejectionComments);
+  const actor = resolveActorIdentity(req);
+  const result = await woBulkService.bulkReject(workOrderIds, approver, rejectionComments, actor);
   res.json(result);
 }
 

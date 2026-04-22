@@ -148,7 +148,7 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
 
 // ── Bulk Reject Work Orders ──
 
-export async function bulkReject(workOrderIds: string[], approver?: string, rejectionComments?: string) {
+export async function bulkReject(workOrderIds: string[], approver?: string, rejectionComments?: string, actor?: string) {
   if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
     throw new ValidationError('workOrderIds array is required');
   }
@@ -199,6 +199,33 @@ export async function bulkReject(workOrderIds: string[], approver?: string, reje
       };
 
       await repo.update(workOrderId, updateData);
+
+      // Audit Trail: capture the actual approver who rejected the work order so
+      // rejection-history UIs do not fall back to "system".
+      try {
+        await repo.createAuditLog({
+          entityType: 'work_order',
+          entityId: existingWO.wouuid || workOrderId,
+          actionType: 'reject',
+          userId: actor || rejectApprover || approver || 'system',
+          source: 'web_ui',
+          vesselCode: existingWO.vesselId || null,
+          componentCode: existingWO.componentCode || null,
+          fieldName: null,
+          oldValue: null,
+          newValue: null,
+          payload: {
+            workOrderNo: existingWO.workOrderNo,
+            status: 'Due',
+            rejectedAt: updateData.rejectionDate,
+            rejectionComments: rejectionComments || null,
+            bulk: true,
+          },
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log entry for bulk reject:', auditError);
+      }
+
       results.success.push(workOrderId);
       console.log(`❌ Rejected work order: ${workOrderId}`);
     } catch (err: any) {
