@@ -372,6 +372,13 @@
       "when": 1776772153627,
       "tag": "0052_bright_slayback",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1776826569339,
+      "tag": "0053_open_vulcan",
+      "breakpoints": true
     }
   ]
 }

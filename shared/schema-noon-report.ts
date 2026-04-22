@@ -125,6 +125,7 @@ export const nrNoonReports = pgTable("nr_noon_reports", {
   // Soft-delete / sync flags (established pattern)
   isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").notNull().default(false),
+  sortOrder: integer("sort_order").default(0),
   nruuid: text("nruuid").notNull().default(sql`gen_random_uuid()`),
 }, (table) => [
   index("idx_nr_reports_vessel_date").on(table.vesselId, table.reportDate),
@@ -161,6 +162,7 @@ export const nrFuelRob = pgTable("nr_fuel_rob", {
   // Soft-delete / sync flags (established pattern)
   isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").notNull().default(false),
+  sortOrder: integer("sort_order").default(0),
   nfruuid: text("nfruuid").notNull().default(sql`gen_random_uuid()`),
 }, (table) => [
   index("idx_nr_rob_vessel_fuel").on(table.vesselId, table.fuelType),
@@ -194,6 +196,7 @@ export const nrVoyageLegs = pgTable("nr_voyage_legs", {
   // Soft-delete / sync flags (established pattern)
   isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").notNull().default(false),
+  sortOrder: integer("sort_order").default(0),
   nvluuid: text("nvluuid").notNull().default(sql`gen_random_uuid()`),
 }, (table) => [
   index("idx_nr_voyage_vessel").on(table.vesselId),
@@ -228,6 +231,7 @@ export const nrCiiTracking = pgTable("nr_cii_tracking", {
   // Soft-delete / sync flags (established pattern)
   isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").notNull().default(false),
+  sortOrder: integer("sort_order").default(0),
   nctuuid: text("nctuuid").notNull().default(sql`gen_random_uuid()`),
 }, (table) => [
   uniqueIndex("idx_nr_cii_vessel_year").on(table.vesselId, table.year),
@@ -273,6 +277,7 @@ export const nrAlerts = pgTable("nr_alerts", {
   // Soft-delete / sync flags (established pattern)
   isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").notNull().default(false),
+  sortOrder: integer("sort_order").default(0),
   nauuid: text("nauuid").notNull().default(sql`gen_random_uuid()`),
 }, (table) => [
   index("idx_nr_alerts_vessel").on(table.vesselId),
@@ -314,6 +319,7 @@ export const nrBunkerRecords = pgTable("nr_bunker_records", {
   // Soft-delete / sync flags (established pattern)
   isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").notNull().default(false),
+  sortOrder: integer("sort_order").default(0),
   nbruuid: text("nbruuid").notNull().default(sql`gen_random_uuid()`),
 }, (table) => [
   index("idx_nr_bunker_vessel").on(table.vesselId),

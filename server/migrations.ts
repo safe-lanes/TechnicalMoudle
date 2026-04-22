@@ -2963,6 +2963,57 @@ const migrations: Migration[] = [
       WHERE d.id = c.defect_id
         AND c.match_count = 1;
     `
+  },
+  {
+    id: '090_audit_columns_backfill_v2',
+    name: 'Backfill remaining standard audit columns on 13 tables',
+    description: 'Adds the missing audit columns (is_sync, created_by_uuid, updated_by_uuid, is_deleted, sort_order) on 13 tables that were missed by prior migrations. Idempotent via IF NOT EXISTS. Follows migration 052 pattern: BOOLEAN DEFAULT FALSE for flags, TEXT for *_by_uuid, INTEGER DEFAULT 0 for sort_order. Does not enforce NOT NULL to keep the change safe and reversible.',
+    sql: `
+      -- adm_role_menu_access (3 cols)
+      ALTER TABLE adm_role_menu_access ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+      ALTER TABLE adm_role_menu_access ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+      ALTER TABLE adm_role_menu_access ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- fleet_classes (1 col)
+      ALTER TABLE fleet_classes ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- master_list_types (1 col)
+      ALTER TABLE master_list_types ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- nr_alerts (1 col)
+      ALTER TABLE nr_alerts ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- nr_bunker_records (1 col)
+      ALTER TABLE nr_bunker_records ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- nr_cii_tracking (1 col)
+      ALTER TABLE nr_cii_tracking ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- nr_fuel_rob (1 col)
+      ALTER TABLE nr_fuel_rob ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- nr_noon_reports (1 col)
+      ALTER TABLE nr_noon_reports ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- nr_voyage_legs (1 col)
+      ALTER TABLE nr_voyage_legs ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- planner_dates (1 col)
+      ALTER TABLE planner_dates ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- report_favorites (1 col)
+      ALTER TABLE report_favorites ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      -- vessel_department_config (4 cols)
+      ALTER TABLE vessel_department_config ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+      ALTER TABLE vessel_department_config ADD COLUMN IF NOT EXISTS created_by_uuid TEXT;
+      ALTER TABLE vessel_department_config ADD COLUMN IF NOT EXISTS updated_by_uuid TEXT;
+      ALTER TABLE vessel_department_config ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+
+      -- vessel_org_chart_nodes (2 cols; sort_order already declared in schema but missing in DB)
+      ALTER TABLE vessel_org_chart_nodes ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
+      ALTER TABLE vessel_org_chart_nodes ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+    `
   }
 ];
 

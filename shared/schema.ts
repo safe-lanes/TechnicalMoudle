@@ -114,6 +114,7 @@ export const fleetClasses = pgTable("fleet_classes", {
   updatedByUuid: text("updated_by_uuid"),
   isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").notNull().default(false),
+  sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
 }, (table) => ({
@@ -1815,6 +1816,7 @@ export const masterListTypes = pgTable("master_list_types", {
   updatedByUuid: text("updated_by_uuid"),
   isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").notNull().default(false),
+  sortOrder: integer("sort_order").default(0),
 }, (table) => [
   index("idx_mlt_section").on(table.section),
   index("idx_mlt_active").on(table.isActive),
@@ -3679,6 +3681,9 @@ export const admRoleMenuAccess = pgTable("adm_role_menu_access", {
   updatedAt: updatedAtColumnTz(),
   createdByUuid: text("created_by_uuid"),
   updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  isSync: boolean("is_sync").default(false),
+  sortOrder: integer("sort_order").default(0),
 }, (table) => [
   unique().on(table.roleRuid, table.menuMuid),
 ]);
@@ -3704,6 +3709,7 @@ export const plannerDates = pgTable("planner_dates", {
   updatedByUuid: text("updated_by_uuid"),
   isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").notNull().default(false),
+  sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
 }, (table) => ({
@@ -3728,6 +3734,7 @@ export const reportFavorites = pgTable("report_favorites", {
   updatedByUuid: text("updated_by_uuid"),
   isDeleted: boolean("is_deleted").notNull().default(false),
   isSync: boolean("is_sync").notNull().default(false),
+  sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
 }, (table) => ({
@@ -3821,6 +3828,7 @@ export const vesselOrgChartNodes = pgTable("vessel_org_chart_nodes", {
   updatedByUuid: text("updated_by_uuid"),
   roleRuid: text("role_ruid"),
   isDeleted: boolean("is_deleted").default(false),
+  isSync: boolean("is_sync").default(false),
 });
 
 export const insertVesselOrgChartNodeSchema = createInsertSchema(vesselOrgChartNodes).omit({
@@ -3841,6 +3849,10 @@ export const vesselDepartmentConfig = pgTable("vessel_department_config", {
   sortOrder: integer("sort_order").default(0).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: updatedAtColumnTz(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false),
+  isSync: boolean("is_sync").default(false),
 }, (table) => ({
   vesselDeptUnique: unique("vessel_dept_config_unique").on(table.vesselId, table.department),
 }));
