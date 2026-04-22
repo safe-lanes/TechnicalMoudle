@@ -455,6 +455,43 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[]) {
   return sortedWorkOrders;
 }
 
+// ── Rejection History ──
+
+export async function getRejectionHistory(id: string) {
+  let workOrder = await repo.findById(id);
+  if (!workOrder) {
+    workOrder = await repo.findByCode(id);
+  }
+  if (!workOrder) {
+    throw new NotFoundError('Work order not found');
+  }
+
+  const entityIds = Array.from(new Set([workOrder.wouuid, workOrder.id].filter(Boolean))) as string[];
+  const logs: any[] = [];
+  for (const eid of entityIds) {
+    const entries = await repo.getAuditLogsByEntity('work_order', eid);
+    logs.push(...entries);
+  }
+
+  const rejections = logs
+    .filter((entry: any) => entry.actionType === 'reject')
+    .map((entry: any) => {
+      const payload = entry.payload || {};
+      return {
+        rejectedAt: payload.rejectedAt || entry.timestamp,
+        rejectedBy: entry.userId,
+        rejectionComments: payload.rejectionComments ?? null,
+      };
+    })
+    .sort((a, b) => {
+      const ta = new Date(a.rejectedAt).getTime();
+      const tb = new Date(b.rejectedAt).getTime();
+      return tb - ta;
+    });
+
+  return rejections;
+}
+
 // ── Get Single Work Order with Enrichment ──
 
 export async function getWorkOrder(id: string) {

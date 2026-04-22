@@ -195,6 +195,10 @@ export async function createAuditLog(data: any) {
   return storage.createAuditLog(data);
 }
 
+export async function getAuditLogsByEntity(entityType: string, entityId: string) {
+  return storage.getAuditLogsByEntity(entityType, entityId);
+}
+
 // ── Storage reference (for WO numbering utilities) ──
 
 export function getStorage() {

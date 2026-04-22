@@ -30,6 +30,18 @@ export async function getWorkOrderContext(req: Request, res: Response) {
   res.json(result);
 }
 
+export async function getRejectionHistory(req: Request, res: Response) {
+  try {
+    const result = await woService.getRejectionHistory(req.params.id);
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message });
+    }
+    throw error;
+  }
+}
+
 export async function createWorkOrder(req: Request, res: Response) {
   try {
     const workOrder = await woService.createWorkOrder(req.body);

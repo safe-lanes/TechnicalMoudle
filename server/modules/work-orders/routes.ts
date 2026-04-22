@@ -73,6 +73,9 @@ router.get('/work-orders/:id', asyncHandler(woCtrl.getWorkOrder));
 // GET  /work-orders/:id/context — get work order context (template data, execution data, component, RH)
 router.get('/work-orders/:id/context', asyncHandler(woCtrl.getWorkOrderContext));
 
+// GET  /work-orders/:id/rejection-history — get prior rejection audit entries
+router.get('/work-orders/:id/rejection-history', asyncHandler(woCtrl.getRejectionHistory));
+
 // POST /work-orders — create work order
 router.post('/work-orders', asyncHandler(woCtrl.createWorkOrder));
 

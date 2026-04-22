@@ -47,6 +47,7 @@ import {
   WoCriticalityBadgeCell,
   WoActionButton,
 } from "@/components/wo/woCellRenderers";
+import { RejectionHistoryBadge } from "@/components/wo/RejectionHistoryBadge";
 import { useVessels } from "@/hooks/useVessels";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
@@ -1511,13 +1512,8 @@ const Dashboard = () => {
           return (
             <span className="flex items-center gap-2">
               <WoStatusBadgeCell status={params.value || 'Pending Approval'} />
-              {wo?.wasRejected && (
-                <span
-                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
-                  style={{ background: '#E53935' }}
-                >
-                  Resubmitted
-                </span>
+              {wo?.wasRejected && wo?.id && (
+                <RejectionHistoryBadge workOrderId={wo.id} />
               )}
             </span>
           );
