@@ -26,8 +26,8 @@ import { format } from "date-fns";
 import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import ReportPreviewModal, { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import InlineReportPreview from "@/components/reports/InlineReportPreview";
-import WOAgGridTable from "@/components/WOAgGridTable";
-import type { ColDef } from 'ag-grid-community';
+import ReportAgGridTable from "@/components/reports/ReportAgGridTable";
+import type { ReportColumn } from "@/components/reports/ReportPreviewModal";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { useVessel } from "@/contexts/VesselContext";
@@ -691,34 +691,34 @@ interface RunningHoursReportListGridProps {
 const RunningHoursReportListGrid: React.FC<RunningHoursReportListGridProps> = ({
   reports, generatingReports, getPriorityColor, onPreview, onGenerate,
 }) => {
-  const columnDefs: ColDef[] = useMemo(() => [
+  const columns: ReportColumn[] = useMemo(() => [
     {
-      headerName: 'Report Name', field: 'name', flex: 2, minWidth: 280,
+      header: 'Report Name', field: 'name', flex: 2, minWidth: 280,
       autoHeight: true, wrapText: true,
       cellStyle: { whiteSpace: 'normal', lineHeight: '1.3', paddingTop: 8, paddingBottom: 8 },
       cellRenderer: (p: any) => (
-        <div>
+        <div data-testid={`rh-report-row-${p.data.id}`}>
           <div className="font-medium text-gray-900">{p.data.name}</div>
           <div className="text-sm text-gray-500">{p.data.description}</div>
         </div>
       ),
     },
     {
-      headerName: 'Frequency', field: 'frequency', flex: 1, minWidth: 120,
+      header: 'Frequency', field: 'frequency', flex: 1, minWidth: 120,
       cellRenderer: (p: any) => <Badge variant="outline">{p.value}</Badge>,
     },
     {
-      headerName: 'Priority', field: 'priority', flex: 1, minWidth: 110,
+      header: 'Priority', field: 'priority', flex: 1, minWidth: 110,
       cellRenderer: (p: any) => (
         <Badge className={getPriorityColor(p.value)}>{String(p.value).toUpperCase()}</Badge>
       ),
     },
     {
-      headerName: 'Est. Time', field: 'estimatedTime', flex: 1, minWidth: 110,
+      header: 'Est. Time', field: 'estimatedTime', flex: 1, minWidth: 110,
       cellRenderer: (p: any) => <span className="text-xs text-gray-500">{p.value}</span>,
     },
     {
-      headerName: 'Actions', field: 'actions', flex: 1, minWidth: 140, sortable: false, filter: false,
+      header: 'Actions', field: 'actions', flex: 1, minWidth: 140, sortable: false, filter: false,
       cellRenderer: (p: any) => {
         const r: RunningHoursReport = p.data;
         return (
@@ -755,9 +755,9 @@ const RunningHoursReportListGrid: React.FC<RunningHoursReportListGridProps> = ({
   ], [generatingReports, getPriorityColor, onPreview, onGenerate]);
 
   return (
-    <WOAgGridTable
-      columnDefs={columnDefs}
-      rowData={reports}
+    <ReportAgGridTable
+      columns={columns}
+      data={reports}
       domLayout="autoHeight"
       headerHeight={42}
       rowHeight={64}

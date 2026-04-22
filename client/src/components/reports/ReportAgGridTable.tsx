@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import type { ColDef, GridReadyEvent, GridApi, SortChangedEvent } from 'ag-grid-community';
+import type { ColDef, GridReadyEvent, GridApi, SortChangedEvent, RowClickedEvent } from 'ag-grid-community';
 import { ModuleRegistry } from 'ag-grid-community';
 import {
   MenuModule,
@@ -31,35 +31,60 @@ interface ReportAgGridTableProps {
   data: Record<string, any>[];
   height?: string;
   onSortChanged?: (field: string, direction: 'asc' | 'desc') => void;
+  onRowClicked?: (event: RowClickedEvent) => void;
+  rowHeight?: number;
+  headerHeight?: number;
+  domLayout?: 'normal' | 'autoHeight' | 'print';
+  testId?: string;
+  noRowsMessage?: string;
 }
 
-const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({ columns, data, height = '60vh', onSortChanged }) => {
+const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({
+  columns,
+  data,
+  height = '60vh',
+  onSortChanged,
+  onRowClicked,
+  rowHeight = 36,
+  headerHeight = 38,
+  domLayout = 'normal',
+  testId = 'report-ag-grid',
+  noRowsMessage = 'No data available',
+}) => {
   const gridApiRef = useRef<GridApi | null>(null);
 
   const columnDefs: ColDef[] = useMemo(() => {
-    return columns.map((col) => ({
-      headerName: col.header,
-      field: col.field,
-      minWidth: col.width || (col.field === 'sNo' || col.field === 'sno' ? 60 : 80),
-      flex: 1,
-      sortable: true,
-      resizable: true,
-      filter: false,
-      suppressHeaderFilterButton: true,
-      wrapText: false,
-      autoHeight: false,
-      cellStyle: {
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-      },
-      tooltipField: col.field,
-      valueFormatter: (params: any) => {
-        const val = params.value;
-        if (val === null || val === undefined) return '-';
-        return String(val);
-      },
-    }));
+    return columns.map((col) => {
+      const hasRenderer = typeof col.cellRenderer === 'function';
+      const def: ColDef = {
+        headerName: col.header,
+        field: col.field,
+        minWidth: col.minWidth ?? col.width ?? (col.field === 'sNo' || col.field === 'sno' ? 60 : 80),
+        flex: col.flex ?? 1,
+        sortable: col.sortable ?? true,
+        resizable: true,
+        filter: col.filter ?? false,
+        suppressHeaderFilterButton: true,
+        wrapText: col.wrapText ?? false,
+        autoHeight: col.autoHeight ?? false,
+        cellStyle: col.cellStyle ?? {
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        },
+      };
+      if (hasRenderer) {
+        def.cellRenderer = col.cellRenderer;
+      } else {
+        def.tooltipField = col.field;
+        def.valueFormatter = (params: any) => {
+          const val = params.value;
+          if (val === null || val === undefined) return '-';
+          return String(val);
+        };
+      }
+      return def;
+    });
   }, [columns]);
 
   const defaultColDef: ColDef = useMemo(() => ({
@@ -90,8 +115,8 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({ columns, data, he
 
   if (data.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500 dark:text-muted-foreground">
-        <p className="text-base font-medium mb-1">No data available</p>
+      <div className="text-center py-12 text-gray-500 dark:text-muted-foreground" data-testid={`${testId}-empty`}>
+        <p className="text-base font-medium mb-1">{noRowsMessage}</p>
         <p className="text-sm">No records match the current filters.</p>
       </div>
     );
@@ -101,7 +126,7 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({ columns, data, he
     <div
       className="ag-theme-alpine report-ag-grid"
       style={{ height, width: '100%' }}
-      data-testid="report-ag-grid"
+      data-testid={testId}
     >
       <AgGridReact
         rowData={data}
@@ -109,19 +134,20 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({ columns, data, he
         defaultColDef={defaultColDef}
         onGridReady={onGridReady}
         onSortChanged={onSortChanged ? handleSortChanged : undefined}
+        onRowClicked={onRowClicked}
         suppressHorizontalScroll={false}
         alwaysShowHorizontalScroll={false}
         alwaysShowVerticalScroll={false}
         animateRows={false}
-        rowHeight={36}
-        headerHeight={38}
+        rowHeight={rowHeight}
+        headerHeight={headerHeight}
         enableBrowserTooltips={true}
         tooltipShowDelay={500}
         suppressMenuHide={false}
         suppressMovableColumns={false}
         suppressCellFocus={true}
         enableCellTextSelection={true}
-        domLayout="normal"
+        domLayout={domLayout}
         reactiveCustomComponents={true}
         theme="legacy"
       />

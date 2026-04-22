@@ -13,6 +13,14 @@ export interface ReportColumn {
   header: string;
   field: string;
   width?: number;
+  flex?: number;
+  minWidth?: number;
+  sortable?: boolean;
+  filter?: boolean;
+  wrapText?: boolean;
+  autoHeight?: boolean;
+  cellStyle?: Record<string, any>;
+  cellRenderer?: (params: any) => React.ReactNode;
 }
 
 export interface ReportSummaryItem {
