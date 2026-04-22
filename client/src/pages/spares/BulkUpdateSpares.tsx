@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import WOAgGridTable from "@/components/WOAgGridTable";
+import type { ColDef, ICellRendererParams } from "ag-grid-community";
 
 interface Spare {
   id: number;
@@ -224,6 +226,251 @@ export default function BulkUpdateSpares() {
 
   const transactionLabel = transactionMode === "consume" ? "Consumed" : "Received";
 
+  // ============================================================
+  // AG Grid: Bulk Update Spares column definitions
+  // ============================================================
+  const bulkGetRowClass = (params: any): string | undefined => {
+    const spare = params.data as Spare | undefined;
+    if (!spare) return undefined;
+    const consumedA = bulkUpdateData[spare.id]?.consumedA || 0;
+    const consumedB = bulkUpdateData[spare.id]?.consumedB || 0;
+    const receivedA = bulkUpdateData[spare.id]?.receivedA || 0;
+    const receivedB = bulkUpdateData[spare.id]?.receivedB || 0;
+    const robA = spare.robLocationA ?? 0;
+    const robB = spare.robLocationB ?? 0;
+    const hasInsufficientStockA = transactionMode === "consume" && consumedA > robA;
+    const hasInsufficientStockB = transactionMode === "consume" && consumedB > robB;
+    const transactionQtyA = transactionMode === "consume" ? consumedA : receivedA;
+    const transactionQtyB = transactionMode === "consume" ? consumedB : receivedB;
+    const hasAnyTransaction = transactionQtyA > 0 || transactionQtyB > 0;
+    const needsTransactionDate = hasAnyTransaction && !bulkUpdateData[spare.id]?.receivedDate;
+    if (hasInsufficientStockA || hasInsufficientStockB || needsTransactionDate) return 'bulk-row-error';
+    return undefined;
+  };
+
+  const bulkColumnDefs: ColDef[] = useMemo(() => {
+    const cols: ColDef[] = [
+      {
+        field: 'partCode',
+        headerName: 'Part Code',
+        flex: 0.8,
+        minWidth: 110,
+        cellRenderer: (params: ICellRendererParams) => <span className="text-sm">{params.value}</span>,
+      },
+      {
+        field: 'partName',
+        headerName: 'Part Name',
+        flex: 1.2,
+        minWidth: 150,
+        tooltipField: 'partName',
+        cellRenderer: (params: ICellRendererParams) => <span className="text-sm truncate">{params.value}</span>,
+      },
+      {
+        field: 'partNumber',
+        headerName: 'Part Number',
+        flex: 0.9,
+        minWidth: 120,
+        tooltipField: 'partNumber',
+        cellRenderer: (params: ICellRendererParams) => (
+          <span className="text-sm text-gray-500">{params.value || '-'}</span>
+        ),
+      },
+      {
+        headerName: `Current Stock (${locationNames.locationA})`,
+        colId: 'currentRobA',
+        flex: 0.9,
+        minWidth: 120,
+        sortable: false,
+        filter: false,
+        cellRenderer: (params: ICellRendererParams) => {
+          const spare = params.data as Spare;
+          const locNameA = spare.location || locationNames.locationA;
+          const robA = spare.robLocationA ?? 0;
+          return (
+            <div className="text-center">
+              <div className="text-[11px] italic text-blue-600 whitespace-normal leading-tight" data-testid={`text-location-a-${spare.id}`}>{locNameA}</div>
+              <div className="text-sm text-gray-800 dark:text-gray-200 font-medium">{robA}</div>
+            </div>
+          );
+        },
+        cellStyle: { borderLeft: '1px solid #e5e7eb' },
+      },
+      {
+        headerName: `Current Stock (${locationNames.locationB})`,
+        colId: 'currentRobB',
+        flex: 0.9,
+        minWidth: 120,
+        sortable: false,
+        filter: false,
+        cellRenderer: (params: ICellRendererParams) => {
+          const spare = params.data as Spare;
+          const locNameB = spare.location2 || locationNames.locationB;
+          const robB = spare.robLocationB ?? 0;
+          return (
+            <div className="text-center">
+              <div className="text-[11px] italic text-blue-600 whitespace-normal leading-tight" data-testid={`text-location-b-${spare.id}`}>{locNameB}</div>
+              <div className="text-sm text-gray-800 dark:text-gray-200 font-medium">{robB}</div>
+            </div>
+          );
+        },
+      },
+    ];
+
+    if (transactionMode === "consume") {
+      cols.push(
+        {
+          headerName: `Consumed (${locationNames.locationA})`,
+          colId: 'consumeA',
+          flex: 0.7,
+          minWidth: 95,
+          sortable: false,
+          filter: false,
+          cellRenderer: (params: ICellRendererParams) => {
+            const spare = params.data as Spare;
+            const robA = spare.robLocationA ?? 0;
+            const consumedA = bulkUpdateData[spare.id]?.consumedA || 0;
+            const insufficient = consumedA > robA;
+            return (
+              <Input
+                type="number"
+                min="0"
+                max={robA}
+                value={bulkUpdateData[spare.id]?.consumedA || ""}
+                onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedA', e.target.value)}
+                className={`w-16 h-7 text-sm text-center mx-auto ${insufficient ? 'border-red-500' : ''}`}
+                tabIndex={(params.node.rowIndex ?? 0) + 1}
+                data-testid={`input-consume-a-${spare.id}`}
+              />
+            );
+          },
+          cellStyle: { borderLeft: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+        },
+        {
+          headerName: `Consumed (${locationNames.locationB})`,
+          colId: 'consumeB',
+          flex: 0.7,
+          minWidth: 95,
+          sortable: false,
+          filter: false,
+          cellRenderer: (params: ICellRendererParams) => {
+            const spare = params.data as Spare;
+            const robB = spare.robLocationB ?? 0;
+            const consumedB = bulkUpdateData[spare.id]?.consumedB || 0;
+            const insufficient = consumedB > robB;
+            return (
+              <Input
+                type="number"
+                min="0"
+                max={robB}
+                value={bulkUpdateData[spare.id]?.consumedB || ""}
+                onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedB', e.target.value)}
+                className={`w-16 h-7 text-sm text-center mx-auto ${insufficient ? 'border-red-500' : ''}`}
+                tabIndex={paginatedSpares.length + (params.node.rowIndex ?? 0) + 1}
+                data-testid={`input-consume-b-${spare.id}`}
+              />
+            );
+          },
+          cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+        },
+      );
+    } else if (transactionMode === "receive") {
+      cols.push(
+        {
+          headerName: `Received (${locationNames.locationA})`,
+          colId: 'receiveA',
+          flex: 0.7,
+          minWidth: 95,
+          sortable: false,
+          filter: false,
+          cellRenderer: (params: ICellRendererParams) => {
+            const spare = params.data as Spare;
+            return (
+              <Input
+                type="number"
+                min="0"
+                value={bulkUpdateData[spare.id]?.receivedA || ""}
+                onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedA', e.target.value)}
+                className="w-16 h-7 text-sm text-center mx-auto"
+                tabIndex={(params.node.rowIndex ?? 0) + 1}
+                data-testid={`input-receive-a-${spare.id}`}
+              />
+            );
+          },
+          cellStyle: { borderLeft: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+        },
+        {
+          headerName: `Received (${locationNames.locationB})`,
+          colId: 'receiveB',
+          flex: 0.7,
+          minWidth: 95,
+          sortable: false,
+          filter: false,
+          cellRenderer: (params: ICellRendererParams) => {
+            const spare = params.data as Spare;
+            return (
+              <Input
+                type="number"
+                min="0"
+                value={bulkUpdateData[spare.id]?.receivedB || ""}
+                onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedB', e.target.value)}
+                className="w-16 h-7 text-sm text-center mx-auto"
+                tabIndex={paginatedSpares.length + (params.node.rowIndex ?? 0) + 1}
+                data-testid={`input-receive-b-${spare.id}`}
+              />
+            );
+          },
+          cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+        },
+      );
+    }
+
+    cols.push({
+      headerName: 'New ROB',
+      colId: 'newRob',
+      flex: 0.7,
+      minWidth: 95,
+      sortable: false,
+      filter: false,
+      cellRenderer: (params: ICellRendererParams) => {
+        const spare = params.data as Spare;
+        const consumedA = bulkUpdateData[spare.id]?.consumedA || 0;
+        const consumedB = bulkUpdateData[spare.id]?.consumedB || 0;
+        const receivedA = bulkUpdateData[spare.id]?.receivedA || 0;
+        const receivedB = bulkUpdateData[spare.id]?.receivedB || 0;
+        const robA = spare.robLocationA ?? 0;
+        const robB = spare.robLocationB ?? 0;
+        const effectiveConsumedA = transactionMode === "consume" ? consumedA : 0;
+        const effectiveConsumedB = transactionMode === "consume" ? consumedB : 0;
+        const effectiveReceivedA = transactionMode === "receive" ? receivedA : 0;
+        const effectiveReceivedB = transactionMode === "receive" ? receivedB : 0;
+        const newRobA = robA - effectiveConsumedA + effectiveReceivedA;
+        const newRobB = robB - effectiveConsumedB + effectiveReceivedB;
+        const newROB = newRobA + newRobB;
+        const hasInsufficientStockA = transactionMode === "consume" && consumedA > robA;
+        const hasInsufficientStockB = transactionMode === "consume" && consumedB > robB;
+        const transactionQtyA = transactionMode === "consume" ? consumedA : receivedA;
+        const transactionQtyB = transactionMode === "consume" ? consumedB : receivedB;
+        const hasAnyTransaction = transactionQtyA > 0 || transactionQtyB > 0;
+        const needsTransactionDate = hasAnyTransaction && !bulkUpdateData[spare.id]?.receivedDate;
+        const hasError = hasInsufficientStockA || hasInsufficientStockB || needsTransactionDate;
+        return (
+          <div className={`text-sm font-medium text-center ${hasError ? 'text-red-600' : ''}`}>
+            {newROB}
+            {(hasInsufficientStockA || hasInsufficientStockB) && (
+              <div className="text-[10px] text-red-600">Insufficient</div>
+            )}
+            {needsTransactionDate && (
+              <div className="text-[10px] text-red-600">Date required</div>
+            )}
+          </div>
+        );
+      },
+      cellStyle: { borderLeft: '1px solid #e5e7eb' },
+    });
+
+    return cols;
+  }, [transactionMode, locationNames.locationA, locationNames.locationB, bulkUpdateData, paginatedSpares.length]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -385,136 +632,20 @@ export default function BulkUpdateSpares() {
             </div>
           ) : (
           <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800 flex flex-col flex-1 min-h-0">
-            <div className="overflow-auto flex-1">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium bg-gray-50 dark:bg-gray-700">Part Code</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium bg-gray-50 dark:bg-gray-700">Part Name</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium bg-gray-50 dark:bg-gray-700">Part Number</th>
-                    <th className="px-2 py-2 text-center text-xs font-medium border-l bg-gray-50 dark:bg-gray-700" colSpan={2}>
-                      <div className="text-center font-semibold">Current Stock (ROB)</div>
-                    </th>
-                    <th className="px-2 py-2 text-center text-xs font-medium border-l bg-gray-50 dark:bg-gray-700" colSpan={2}>
-                      <div className={`text-center font-semibold ${transactionMode === "consume" ? "text-orange-600" : "text-green-600"}`} data-testid="label-transaction-header">
-                        {transactionLabel}
-                      </div>
-                    </th>
-                    <th className="px-2 py-2 text-center text-xs font-medium border-l bg-gray-50 dark:bg-gray-700">New ROB</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedSpares.map((spare: Spare, index: number) => {
-                    const consumedA = bulkUpdateData[spare.id]?.consumedA || 0;
-                    const consumedB = bulkUpdateData[spare.id]?.consumedB || 0;
-                    const receivedA = bulkUpdateData[spare.id]?.receivedA || 0;
-                    const receivedB = bulkUpdateData[spare.id]?.receivedB || 0;
-                    const robA = spare.robLocationA ?? 0;
-                    const robB = spare.robLocationB ?? 0;
-                    
-                    const effectiveConsumedA = transactionMode === "consume" ? consumedA : 0;
-                    const effectiveConsumedB = transactionMode === "consume" ? consumedB : 0;
-                    const effectiveReceivedA = transactionMode === "receive" ? receivedA : 0;
-                    const effectiveReceivedB = transactionMode === "receive" ? receivedB : 0;
-                    
-                    const newRobA = robA - effectiveConsumedA + effectiveReceivedA;
-                    const newRobB = robB - effectiveConsumedB + effectiveReceivedB;
-                    const newROB = newRobA + newRobB;
-                    
-                    const hasInsufficientStockA = transactionMode === "consume" && consumedA > robA;
-                    const hasInsufficientStockB = transactionMode === "consume" && consumedB > robB;
-                    
-                    const transactionQtyA = transactionMode === "consume" ? consumedA : receivedA;
-                    const transactionQtyB = transactionMode === "consume" ? consumedB : receivedB;
-                    const hasAnyTransaction = transactionQtyA > 0 || transactionQtyB > 0;
-                    const needsTransactionDate = hasAnyTransaction && !bulkUpdateData[spare.id]?.receivedDate;
-                    const hasError = hasInsufficientStockA || hasInsufficientStockB || needsTransactionDate;
-                    
-                    const locNameA = spare.location || locationNames.locationA;
-                    const locNameB = spare.location2 || locationNames.locationB;
-
-                    return (
-                      <tr key={spare.id} className={`border-t transition-colors ${hasError ? 'bg-red-50 dark:bg-red-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                        <td className="px-3 py-2 text-sm">{spare.partCode}</td>
-                        <td className="px-3 py-2 text-sm max-w-[150px] truncate" title={spare.partName}>{spare.partName}</td>
-                        <td className="px-3 py-2 text-sm text-gray-500 max-w-[120px] truncate" title={spare.partNumber || ''}>{spare.partNumber || '-'}</td>
-                        <td className="px-2 py-2 border-l">
-                          <div className="text-[11px] italic text-blue-600 whitespace-normal leading-tight" data-testid={`text-location-a-${spare.id}`}>{locNameA}</div>
-                          <div className="text-sm text-gray-800 dark:text-gray-200 font-medium text-center">{robA}</div>
-                        </td>
-                        <td className="px-2 py-2">
-                          <div className="text-[11px] italic text-blue-600 whitespace-normal leading-tight" data-testid={`text-location-b-${spare.id}`}>{locNameB}</div>
-                          <div className="text-sm text-gray-800 dark:text-gray-200 font-medium text-center">{robB}</div>
-                        </td>
-                        {transactionMode === "consume" ? (
-                          <>
-                            <td className="px-1 py-2 border-l text-center">
-                              <Input
-                                type="number"
-                                min="0"
-                                max={robA}
-                                value={bulkUpdateData[spare.id]?.consumedA || ""}
-                                onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedA', e.target.value)}
-                                className={`w-16 h-7 text-sm text-center mx-auto ${hasInsufficientStockA ? 'border-red-500' : ''}`}
-                                tabIndex={index + 1}
-                                data-testid={`input-consume-a-${spare.id}`}
-                              />
-                            </td>
-                            <td className="px-1 py-2 text-center">
-                              <Input
-                                type="number"
-                                min="0"
-                                max={robB}
-                                value={bulkUpdateData[spare.id]?.consumedB || ""}
-                                onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedB', e.target.value)}
-                                className={`w-16 h-7 text-sm text-center mx-auto ${hasInsufficientStockB ? 'border-red-500' : ''}`}
-                                tabIndex={paginatedSpares.length + index + 1}
-                                data-testid={`input-consume-b-${spare.id}`}
-                              />
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            <td className="px-1 py-2 border-l text-center">
-                              <Input
-                                type="number"
-                                min="0"
-                                value={bulkUpdateData[spare.id]?.receivedA || ""}
-                                onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedA', e.target.value)}
-                                className="w-16 h-7 text-sm text-center mx-auto"
-                                tabIndex={index + 1}
-                                data-testid={`input-receive-a-${spare.id}`}
-                              />
-                            </td>
-                            <td className="px-1 py-2 text-center">
-                              <Input
-                                type="number"
-                                min="0"
-                                value={bulkUpdateData[spare.id]?.receivedB || ""}
-                                onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedB', e.target.value)}
-                                className="w-16 h-7 text-sm text-center mx-auto"
-                                tabIndex={paginatedSpares.length + index + 1}
-                                data-testid={`input-receive-b-${spare.id}`}
-                              />
-                            </td>
-                          </>
-                        )}
-                        <td className="px-2 py-2 text-center border-l">
-                          <div className={`text-sm font-medium ${hasError ? 'text-red-600' : ''}`}>
-                            {newROB}
-                            {(hasInsufficientStockA || hasInsufficientStockB) && (
-                              <div className="text-[10px] text-red-600">Insufficient</div>
-                            )}
-                            {needsTransactionDate && (
-                              <div className="text-[10px] text-red-600">Date required</div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <span
+              className={`sr-only ${transactionMode === "consume" ? "text-orange-600" : "text-green-600"}`}
+              data-testid="label-transaction-header"
+            >
+              {transactionLabel}
+            </span>
+            <div className="flex-1 min-h-0">
+              <WOAgGridTable
+                columnDefs={bulkColumnDefs}
+                rowData={paginatedSpares}
+                getRowClass={bulkGetRowClass}
+                noRowsMessage="No spares match your filters."
+                testId="bulk-update-spares-grid"
+              />
             </div>
 
             <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50 dark:bg-gray-700">
