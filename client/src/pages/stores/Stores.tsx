@@ -2234,12 +2234,13 @@ const Stores: React.FC = () => {
         cellRenderer: (params: ICellRendererParams) => {
           const item = params.data as StoreItem & { _locName: string };
           const locName = item._locName;
+          const inactive = item.isActive === false;
           return (
             <Popover>
               <PopoverTrigger asChild>
                 <button
-                  className={`flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left border border-gray-200 rounded-md px-2 py-1 ${isChangingStoreLocation || !canEditStore ? 'opacity-50 pointer-events-none' : ''}`}
-                  disabled={isChangingStoreLocation || !canEditStore}
+                  className={`flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left border border-gray-200 rounded-md px-2 py-1 ${isChangingStoreLocation || !canEditStore || inactive ? 'opacity-50 pointer-events-none' : ''}`}
+                  disabled={isChangingStoreLocation || !canEditStore || inactive}
                   data-testid={`button-change-store-location-${item.id}`}
                 >
                   <MapPin className="h-3 w-3 flex-shrink-0 text-gray-500" />
@@ -2323,7 +2324,7 @@ const Stores: React.FC = () => {
                 }
                 setEditingLocRobValues(prev => { const n = { ...prev }; delete n[item._editKey]; return n; });
               }}
-              disabled={!canEditStore}
+              disabled={!canEditStore || item.isActive === false}
               data-testid={`input-loc-rob-${item.id}`}
             />
           );

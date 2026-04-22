@@ -862,6 +862,12 @@ export default function BulkUpdateStores() {
             </div>
           ) : (
           <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800 flex flex-col flex-1 min-h-0">
+            <span
+              className={`sr-only ${transactionMode === "consume" ? "text-orange-600" : "text-green-600"}`}
+              data-testid="label-transaction-header"
+            >
+              {transactionLabel}
+            </span>
             <div className="flex-1 min-h-0">
                 <WOAgGridTable
                   columnDefs={bulkColumnDefs}

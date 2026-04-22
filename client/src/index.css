@@ -442,6 +442,15 @@
   background-color: #fef2f2 !important;
 }
 
+.wo-ag-grid.ag-theme-alpine .bulk-row-error,
+.wo-ag-grid.ag-theme-alpine .bulk-row-error:hover {
+  background-color: #fef2f2 !important;
+}
+.dark .wo-ag-grid.ag-theme-alpine .bulk-row-error,
+.dark .wo-ag-grid.ag-theme-alpine .bulk-row-error:hover {
+  background-color: rgba(127, 29, 29, 0.2) !important;
+}
+
 @layer components {
   .all-\[unset\] {
     all: unset;
