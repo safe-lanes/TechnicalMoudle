@@ -67,6 +67,8 @@ import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import ReportAgGridTable from "@/components/reports/ReportAgGridTable";
+import type { ReportColumn } from "@/components/reports/ReportPreviewModal";
 
 interface PlannerJob {
   jobId: string;
@@ -729,165 +731,14 @@ export default function MaintenancePlanner({ onBack, globalFilters }: Maintenanc
               </div>
             ) : (
               <>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[80px]" data-testid="G21.27"><Marker id="G21.27" />Status</TableHead>
-                      <TableHead data-testid="G21.28"><Marker id="G21.28" />Job Code</TableHead>
-                      <TableHead className="max-w-[200px]" data-testid="G21.29"><Marker id="G21.29" />Job Title</TableHead>
-                      <TableHead data-testid="G21.30"><Marker id="G21.30" />Component</TableHead>
-                      <TableHead data-testid="G21.31"><Marker id="G21.31" />Dept</TableHead>
-                      <TableHead data-testid="G21.32"><Marker id="G21.32" />Assigned</TableHead>
-                      <TableHead data-testid="G21.33"><Marker id="G21.33" />Type</TableHead>
-                      <TableHead data-testid="G21.34"><Marker id="G21.34" />Due Date / RH</TableHead>
-                      <TableHead className="text-center" data-testid="G21.35"><Marker id="G21.35" />Hours</TableHead>
-                      <TableHead className="text-center" data-testid="G21.36"><Marker id="G21.36" />Spares</TableHead>
-                      <TableHead data-testid="G21.37"><Marker id="G21.37" />WO Status</TableHead>
-                      <TableHead className="w-[80px]" data-testid="G21.38"><Marker id="G21.38" />Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedJobs.map((job, index) => (
-                      <TableRow
-                        key={`${job.jobId}-${job.componentId}`}
-                        className={
-                          job.status === "OVERDUE"
-                            ? "bg-red-50"
-                            : job.status === "DUE_GRACE"
-                            ? "bg-amber-50"
-                            : job.status === "DUE_SOON"
-                            ? "bg-orange-50"
-                            : ""
-                        }
-                        data-testid={`row-job-${job.jobId}`}
-                      >
-                        <TableCell data-testid={index === 0 ? "G21.39" : undefined}>
-                          {index === 0 && <Marker id="G21.39" />}
-                          {getStatusBadge(job.status)}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm" data-testid={index === 0 ? "G21.40" : undefined}>
-                          {index === 0 && <Marker id="G21.40" />}
-                          {job.jobCode}
-                        </TableCell>
-                        <TableCell className="max-w-[200px] truncate" title={job.jobTitle} data-testid={index === 0 ? "G21.41" : undefined}>
-                          {index === 0 && <Marker id="G21.41" />}
-                          <div className="flex items-center gap-1">
-                            {job.criticalFlag && (
-                              <AlertTriangle className="h-3 w-3 text-red-500 flex-shrink-0" />
-                            )}
-                            <span className="truncate">{job.jobTitle}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell data-testid={index === 0 ? "G21.42" : undefined}>
-                          {index === 0 && <Marker id="G21.42" />}
-                          <div className="text-sm">
-                            <div className="font-medium">{job.componentCode}</div>
-                            <div className="text-gray-500 text-xs truncate max-w-[150px]" title={job.componentName}>
-                              {job.componentName}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm" data-testid={index === 0 ? "G21.43" : undefined}>
-                          {index === 0 && <Marker id="G21.43" />}
-                          {job.department}
-                        </TableCell>
-                        <TableCell className="text-sm" data-testid={index === 0 ? "G21.44" : undefined}>
-                          {index === 0 && <Marker id="G21.44" />}
-                          {job.assignedRank}
-                        </TableCell>
-                        <TableCell data-testid={index === 0 ? "G21.45" : undefined}>
-                          {index === 0 && <Marker id="G21.45" />}
-                          <Badge variant="outline" className="text-xs">
-                            {job.jobType === "CALENDAR" ? (
-                              <><Calendar className="h-3 w-3 mr-1" /> Cal</>
-                            ) : (
-                              <><Clock className="h-3 w-3 mr-1" /> RH</>
-                            )}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm" data-testid={index === 0 ? "G21.46" : undefined}>
-                          {index === 0 && <Marker id="G21.46" />}
-                          {job.jobType === "CALENDAR" ? (
-                            job.nextDueDate ? formatDate(new Date(job.nextDueDate), "dd MMM yyyy") : "-"
-                          ) : (
-                            <span>
-                              {job.remainingHours !== null ? `${Math.round(job.remainingHours)} hrs` : "-"}
-                              {job.parentRH !== null && (
-                                <span className="text-xs text-gray-400 block">
-                                  @ {Math.round(job.parentRH)} RH
-                                </span>
-                              )}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center text-sm" data-testid={index === 0 ? "G21.47" : undefined}>
-                          {index === 0 && <Marker id="G21.47" />}
-                          {job.estimatedManHours > 0 ? job.estimatedManHours : "-"}
-                        </TableCell>
-                        <TableCell className="text-center" data-testid={index === 0 ? "G21.48" : undefined}>
-                          {index === 0 && <Marker id="G21.48" />}
-                          <Tooltip>
-                            <TooltipTrigger>
-                              {getSpareStatusIcon(job.spareStatus)}
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              Spare Status: {job.spareStatus}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell className="text-sm" data-testid={index === 0 ? "G21.49" : undefined}>
-                          {index === 0 && <Marker id="G21.49" />}
-                          {job.woNo ? (
-                            <div>
-                              <div className="font-mono text-xs">{job.woNo}</div>
-                              {getWOStatusBadge(job.woStatus)}
-                            </div>
-                          ) : (
-                            <Badge variant="outline" className="text-xs text-gray-400">Not Generated</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0"
-                                  onClick={() => setLocation(`/pms/components?id=${job.componentId}`)}
-                                  data-testid={index === 0 ? "G21.50" : `button-view-component-${job.jobId}`}
-                                >
-                                  {index === 0 && <Marker id="G21.50" />}
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>View Component</TooltipContent>
-                            </Tooltip>
-                            {job.woId && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 w-7 p-0"
-                                    onClick={() => setLocation(`/pms/work-order/${job.woId}`)}
-                                    data-testid={index === 0 ? "G21.51" : `button-view-wo-${job.jobId}`}
-                                  >
-                                    {index === 0 && <Marker id="G21.51" />}
-                                    <Wrench className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>View Work Order</TooltipContent>
-                              </Tooltip>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <PlannerJobsGrid
+                jobs={paginatedJobs}
+                getStatusBadge={getStatusBadge}
+                getSpareStatusIcon={getSpareStatusIcon}
+                getWOStatusBadge={getWOStatusBadge}
+                onViewComponent={(componentId) => setLocation(`/pms/components?id=${componentId}`)}
+                onViewWorkOrder={(woId) => setLocation(`/pms/work-order/${woId}`)}
+              />
 
               {/* Pagination Controls */}
               {totalPages > 0 && (
@@ -981,3 +832,228 @@ export default function MaintenancePlanner({ onBack, globalFilters }: Maintenanc
     </div>
   );
 }
+
+interface PlannerJobsGridProps {
+  jobs: PlannerJob[];
+  getStatusBadge: (status: PlannerJob["status"]) => React.ReactNode;
+  getSpareStatusIcon: (status: PlannerJob["spareStatus"]) => React.ReactNode;
+  getWOStatusBadge: (status: string | null) => React.ReactNode;
+  onViewComponent: (componentId: string) => void;
+  onViewWorkOrder: (woId: string) => void;
+}
+
+const renderHeaderWithMarker = (id: string, label: string, extraClass?: string) => () => (
+  <span data-testid={id} className={extraClass}><Marker id={id} />{label}</span>
+);
+
+const PlannerJobsGrid: React.FC<PlannerJobsGridProps> = ({
+  jobs, getStatusBadge, getSpareStatusIcon, getWOStatusBadge, onViewComponent, onViewWorkOrder,
+}) => {
+  const columns: ReportColumn[] = useMemo(() => [
+    {
+      header: 'Status', field: 'status', width: 110, sortable: true,
+      headerComponent: renderHeaderWithMarker('G21.27', 'Status'),
+      cellRenderer: (p: any) => (
+        <span data-testid={p.node?.rowIndex === 0 ? 'G21.39' : `row-job-${p.data.jobId}`}>
+          {p.node?.rowIndex === 0 && <Marker id="G21.39" />}
+          {getStatusBadge(p.data.status)}
+        </span>
+      ),
+    },
+    {
+      header: 'Job Code', field: 'jobCode', width: 130, sortable: true,
+      headerComponent: renderHeaderWithMarker('G21.28', 'Job Code'),
+      cellClass: 'font-mono text-sm',
+      cellRenderer: (p: any) => (
+        <span data-testid={p.node?.rowIndex === 0 ? 'G21.40' : undefined}>
+          {p.node?.rowIndex === 0 && <Marker id="G21.40" />}
+          {p.data.jobCode}
+        </span>
+      ),
+    },
+    {
+      header: 'Job Title', field: 'jobTitle', flex: 2, minWidth: 200, sortable: true,
+      headerComponent: renderHeaderWithMarker('G21.29', 'Job Title'),
+      cellRenderer: (p: any) => (
+        <div className="flex items-center gap-1" title={p.data.jobTitle} data-testid={p.node?.rowIndex === 0 ? 'G21.41' : undefined}>
+          {p.node?.rowIndex === 0 && <Marker id="G21.41" />}
+          {p.data.criticalFlag && <AlertTriangle className="h-3 w-3 text-red-500 flex-shrink-0" />}
+          <span className="truncate">{p.data.jobTitle}</span>
+        </div>
+      ),
+    },
+    {
+      header: 'Component', field: 'componentCode', flex: 1, minWidth: 160, sortable: true,
+      headerComponent: renderHeaderWithMarker('G21.30', 'Component'),
+      cellRenderer: (p: any) => (
+        <div className="text-sm" data-testid={p.node?.rowIndex === 0 ? 'G21.42' : undefined}>
+          {p.node?.rowIndex === 0 && <Marker id="G21.42" />}
+          <div className="font-medium">{p.data.componentCode}</div>
+          <div className="text-gray-500 text-xs truncate" title={p.data.componentName}>{p.data.componentName}</div>
+        </div>
+      ),
+    },
+    {
+      header: 'Dept', field: 'department', width: 110, sortable: true,
+      headerComponent: renderHeaderWithMarker('G21.31', 'Dept'),
+      cellClass: 'text-sm',
+      cellRenderer: (p: any) => (
+        <span data-testid={p.node?.rowIndex === 0 ? 'G21.43' : undefined}>
+          {p.node?.rowIndex === 0 && <Marker id="G21.43" />}{p.data.department}
+        </span>
+      ),
+    },
+    {
+      header: 'Assigned', field: 'assignedRank', width: 130, sortable: true,
+      headerComponent: renderHeaderWithMarker('G21.32', 'Assigned'),
+      cellClass: 'text-sm',
+      cellRenderer: (p: any) => (
+        <span data-testid={p.node?.rowIndex === 0 ? 'G21.44' : undefined}>
+          {p.node?.rowIndex === 0 && <Marker id="G21.44" />}{p.data.assignedRank}
+        </span>
+      ),
+    },
+    {
+      header: 'Type', field: 'jobType', width: 90, sortable: true,
+      headerComponent: renderHeaderWithMarker('G21.33', 'Type'),
+      cellRenderer: (p: any) => (
+        <span data-testid={p.node?.rowIndex === 0 ? 'G21.45' : undefined}>
+          {p.node?.rowIndex === 0 && <Marker id="G21.45" />}
+          <Badge variant="outline" className="text-xs">
+            {p.data.jobType === 'CALENDAR'
+              ? <><Calendar className="h-3 w-3 mr-1" /> Cal</>
+              : <><Clock className="h-3 w-3 mr-1" /> RH</>}
+          </Badge>
+        </span>
+      ),
+    },
+    {
+      header: 'Due Date / RH', field: 'nextDueDate', width: 140, sortable: true,
+      headerComponent: renderHeaderWithMarker('G21.34', 'Due Date / RH'),
+      cellClass: 'text-sm',
+      cellRenderer: (p: any) => (
+        <span data-testid={p.node?.rowIndex === 0 ? 'G21.46' : undefined}>
+          {p.node?.rowIndex === 0 && <Marker id="G21.46" />}
+          {p.data.jobType === 'CALENDAR'
+            ? (p.data.nextDueDate ? formatDate(new Date(p.data.nextDueDate), 'dd MMM yyyy') : '-')
+            : (
+              <span>
+                {p.data.remainingHours !== null ? `${Math.round(p.data.remainingHours)} hrs` : '-'}
+                {p.data.parentRH !== null && (
+                  <span className="text-xs text-gray-400 block">@ {Math.round(p.data.parentRH)} RH</span>
+                )}
+              </span>
+            )}
+        </span>
+      ),
+    },
+    {
+      header: 'Hours', field: 'estimatedManHours', width: 90, sortable: true,
+      headerComponent: renderHeaderWithMarker('G21.35', 'Hours', 'text-center'),
+      cellClass: 'text-center text-sm',
+      cellRenderer: (p: any) => (
+        <span data-testid={p.node?.rowIndex === 0 ? 'G21.47' : undefined}>
+          {p.node?.rowIndex === 0 && <Marker id="G21.47" />}
+          {p.data.estimatedManHours > 0 ? p.data.estimatedManHours : '-'}
+        </span>
+      ),
+    },
+    {
+      header: 'Spares', field: 'spareStatus', width: 90, sortable: true,
+      headerComponent: renderHeaderWithMarker('G21.36', 'Spares', 'text-center'),
+      cellClass: 'text-center',
+      cellRenderer: (p: any) => (
+        <span data-testid={p.node?.rowIndex === 0 ? 'G21.48' : undefined}>
+          {p.node?.rowIndex === 0 && <Marker id="G21.48" />}
+          <Tooltip>
+            <TooltipTrigger>{getSpareStatusIcon(p.data.spareStatus)}</TooltipTrigger>
+            <TooltipContent>Spare Status: {p.data.spareStatus}</TooltipContent>
+          </Tooltip>
+        </span>
+      ),
+    },
+    {
+      header: 'WO Status', field: 'woStatus', width: 130, sortable: true,
+      headerComponent: renderHeaderWithMarker('G21.37', 'WO Status'),
+      cellClass: 'text-sm',
+      cellRenderer: (p: any) => (
+        <span data-testid={p.node?.rowIndex === 0 ? 'G21.49' : undefined}>
+          {p.node?.rowIndex === 0 && <Marker id="G21.49" />}
+          {p.data.woNo ? (
+            <div>
+              <div className="font-mono text-xs">{p.data.woNo}</div>
+              {getWOStatusBadge(p.data.woStatus)}
+            </div>
+          ) : (
+            <Badge variant="outline" className="text-xs text-gray-400">Not Generated</Badge>
+          )}
+        </span>
+      ),
+    },
+    {
+      header: 'Actions', field: 'actions', width: 100, sortable: false, filter: false,
+      headerComponent: renderHeaderWithMarker('G21.38', 'Actions'),
+      cellRenderer: (p: any) => {
+        const job: PlannerJob = p.data;
+        const isFirst = p.node?.rowIndex === 0;
+        return (
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost" size="sm" className="h-7 w-7 p-0"
+                  onClick={(e) => { e.stopPropagation(); onViewComponent(job.componentId); }}
+                  data-testid={isFirst ? 'G21.50' : `button-view-component-${job.jobId}`}
+                >
+                  {isFirst && <Marker id="G21.50" />}
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>View Component</TooltipContent>
+            </Tooltip>
+            {job.woId && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost" size="sm" className="h-7 w-7 p-0"
+                    onClick={(e) => { e.stopPropagation(); onViewWorkOrder(job.woId!); }}
+                    data-testid={isFirst ? 'G21.51' : `button-view-wo-${job.jobId}`}
+                  >
+                    {isFirst && <Marker id="G21.51" />}
+                    <Wrench className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>View Work Order</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        );
+      },
+    },
+  ], [getStatusBadge, getSpareStatusIcon, getWOStatusBadge, onViewComponent, onViewWorkOrder]);
+
+  const getRowClass = (params: any): string | undefined => {
+    const s = params?.data?.status;
+    if (s === 'OVERDUE') return 'ag-row-status-overdue';
+    if (s === 'DUE_GRACE') return 'ag-row-status-due-grace';
+    if (s === 'DUE_SOON') return 'ag-row-status-due-soon';
+    return undefined;
+  };
+
+  return (
+    <div className="overflow-x-auto">
+      <ReportAgGridTable
+        columns={columns}
+        data={jobs}
+        domLayout="autoHeight"
+        headerHeight={42}
+        rowHeight={56}
+        testId="grid-maintenance-planner-jobs"
+        getRowClass={getRowClass}
+        getRowId={(p: any) => `${p.data.jobId}-${p.data.componentId}`}
+        noRowsMessage="No maintenance jobs found"
+      />
+    </div>
+  );
+};
+

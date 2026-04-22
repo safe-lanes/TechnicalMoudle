@@ -93,6 +93,23 @@
   background-color: #ffffff;
 }
 
+/* Status-based row tinting for Maintenance Planner jobs (overrides odd/even) */
+.ag-theme-alpine .ag-row.ag-row-status-overdue,
+.ag-theme-alpine .ag-row.ag-row-status-overdue.ag-row-odd,
+.ag-theme-alpine .ag-row.ag-row-status-overdue.ag-row-even {
+  background-color: #fef2f2;
+}
+.ag-theme-alpine .ag-row.ag-row-status-due-grace,
+.ag-theme-alpine .ag-row.ag-row-status-due-grace.ag-row-odd,
+.ag-theme-alpine .ag-row.ag-row-status-due-grace.ag-row-even {
+  background-color: #fffbeb;
+}
+.ag-theme-alpine .ag-row.ag-row-status-due-soon,
+.ag-theme-alpine .ag-row.ag-row-status-due-soon.ag-row-odd,
+.ag-theme-alpine .ag-row.ag-row-status-due-soon.ag-row-even {
+  background-color: #fff7ed;
+}
+
 /* Cell text styling with compact line-height for wrapped text */
 .ag-theme-alpine .ag-cell {
   display: flex;

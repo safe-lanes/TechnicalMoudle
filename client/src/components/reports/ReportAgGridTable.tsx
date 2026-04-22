@@ -37,7 +37,13 @@ interface ReportAgGridTableProps {
   domLayout?: 'normal' | 'autoHeight' | 'print';
   testId?: string;
   noRowsMessage?: string;
+  getRowClass?: (params: any) => string | string[] | undefined;
+  getRowId?: (params: any) => string;
 }
+
+const HeaderRendererWrapper: React.FC<{ render: () => React.ReactNode }> = ({ render }) => {
+  return <>{render()}</>;
+};
 
 const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({
   columns,
@@ -50,6 +56,8 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({
   domLayout = 'normal',
   testId = 'report-ag-grid',
   noRowsMessage = 'No data available',
+  getRowClass,
+  getRowId,
 }) => {
   const gridApiRef = useRef<GridApi | null>(null);
 
@@ -73,6 +81,12 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({
           textOverflow: 'ellipsis',
         },
       };
+      if (col.headerClass) def.headerClass = col.headerClass;
+      if (col.cellClass) def.cellClass = col.cellClass as any;
+      if (col.headerComponent) {
+        const renderHeader = col.headerComponent;
+        def.headerComponent = (params: any) => <HeaderRendererWrapper render={renderHeader} />;
+      }
       if (hasRenderer) {
         def.cellRenderer = col.cellRenderer;
       } else {
@@ -135,6 +149,8 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({
         onGridReady={onGridReady}
         onSortChanged={onSortChanged ? handleSortChanged : undefined}
         onRowClicked={onRowClicked}
+        getRowClass={getRowClass}
+        getRowId={getRowId}
         suppressHorizontalScroll={false}
         alwaysShowHorizontalScroll={false}
         alwaysShowVerticalScroll={false}

@@ -21,6 +21,9 @@ export interface ReportColumn {
   autoHeight?: boolean;
   cellStyle?: Record<string, any>;
   cellRenderer?: (params: any) => React.ReactNode;
+  headerComponent?: () => React.ReactNode;
+  headerClass?: string;
+  cellClass?: string | ((params: any) => string | string[] | undefined);
 }
 
 export interface ReportSummaryItem {
