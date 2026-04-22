@@ -6,6 +6,8 @@ import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { Marker } from "@/components/Marker";
 import { LocationSearchDropdown } from "@/components/LocationSearchDropdown";
+import WOAgGridTable from "@/components/WOAgGridTable";
+import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1723,6 +1725,790 @@ const Stores: React.FC = () => {
     }
   };
 
+  // ============================================================
+  // AG Grid: helper for inventory row class
+  // ============================================================
+  const inventoryGetRowClass = (params: any): string | undefined => {
+    const item = params.data as StoreItem | undefined;
+    if (!item) return undefined;
+    const classes: string[] = [];
+    if (item.isActive === false) classes.push('spare-row-inactive');
+    if (isDeleteSelectionMode && selectedStoreIds.has(item.id)) classes.push('spare-row-bulk-selected');
+    return classes.length > 0 ? classes.join(' ') : undefined;
+  };
+
+  // ============================================================
+  // AG Grid: Inventory column definitions
+  // ============================================================
+  const inventoryColumnDefs: ColDef[] = useMemo(() => {
+    const cols: ColDef[] = [];
+
+    if (isDeleteSelectionMode) {
+      cols.push({
+        headerName: '',
+        colId: 'bulkSelect',
+        width: 50,
+        minWidth: 50,
+        maxWidth: 50,
+        sortable: false,
+        filter: false,
+        suppressMovable: true,
+        pinned: 'left',
+        headerComponent: () => (
+          <input
+            type="checkbox"
+            checked={filteredItems.length > 0 && filteredItems.every((i: StoreItem) => selectedStoreIds.has(i.id))}
+            onChange={toggleSelectAll}
+            className="h-4 w-4 rounded border-white cursor-pointer accent-white"
+            data-testid="checkbox-select-all"
+          />
+        ),
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem;
+          return (
+            <input
+              type="checkbox"
+              checked={selectedStoreIds.has(item.id)}
+              onChange={() => toggleStoreSelection(item.id)}
+              className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+              data-testid={`checkbox-store-${item.id}`}
+            />
+          );
+        },
+        cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      });
+    }
+
+    cols.push(
+      {
+        field: 'itemCode',
+        headerName: activeTab === 'lubes' ? 'Lube Grade' : activeTab === 'chemicals' ? 'Chem Code' : 'Item Code',
+        flex: 1.4,
+        minWidth: 130,
+        tooltipField: 'itemCode',
+        headerComponent: () => (
+          <span data-testid={getMarkerId(activeTab, '10')}>
+            <span className="sr-only"><Marker id={getMarkerId(activeTab, '10')} /></span>
+            {activeTab === 'lubes' ? 'Lube Grade' : activeTab === 'chemicals' ? 'Chem Code' : 'Item Code'}
+          </span>
+        ),
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem;
+          return (
+            <span className="font-medium text-gray-900 truncate" data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '20') : undefined}>
+              {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '20')} />}
+              {item.itemCode}
+            </span>
+          );
+        },
+      },
+      {
+        field: 'itemName',
+        headerName: activeTab === 'lubes' ? 'Lube Type' : activeTab === 'chemicals' ? 'Chemical Name' : 'Item Name',
+        flex: 1.6,
+        minWidth: 160,
+        tooltipField: 'itemName',
+        headerComponent: () => (
+          <span data-testid={getMarkerId(activeTab, '11')}>
+            <span className="sr-only"><Marker id={getMarkerId(activeTab, '11')} /></span>
+            {activeTab === 'lubes' ? 'Lube Type' : activeTab === 'chemicals' ? 'Chemical Name' : 'Item Name'}
+          </span>
+        ),
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem;
+          return (
+            <span className="text-gray-700 truncate" data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '21') : undefined}>
+              {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '21')} />}
+              {item.itemName}
+            </span>
+          );
+        },
+      },
+      {
+        field: 'storesCategory',
+        headerName: activeTab === 'lubes' ? 'Application' : activeTab === 'chemicals' ? 'Application Area' : 'Stores Category',
+        flex: 1.4,
+        minWidth: 130,
+        tooltipField: 'storesCategory',
+        headerComponent: () => (
+          <span data-testid={getMarkerId(activeTab, '12')}>
+            <span className="sr-only"><Marker id={getMarkerId(activeTab, '12')} /></span>
+            {activeTab === 'lubes' ? 'Application' : activeTab === 'chemicals' ? 'Application Area' : 'Stores Category'}
+          </span>
+        ),
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem;
+          return (
+            <span className="text-gray-600 truncate" data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '22') : undefined}>
+              {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '22')} />}
+              {item.storesCategory}
+            </span>
+          );
+        },
+      },
+      {
+        field: 'uom',
+        headerName: 'UOM',
+        flex: 0.6,
+        minWidth: 70,
+        headerComponent: () => (
+          <span data-testid={getMarkerId(activeTab, '13')}>
+            <span className="sr-only"><Marker id={getMarkerId(activeTab, '13')} /></span>UOM
+          </span>
+        ),
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem;
+          return (
+            <span className="text-gray-700" data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '23') : undefined}>
+              {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '23')} />}
+              {item.uom || '-'}
+            </span>
+          );
+        },
+      },
+      {
+        field: 'rob',
+        headerName: 'ROB',
+        flex: 0.6,
+        minWidth: 70,
+        filter: 'agNumberColumnFilter',
+        headerComponent: () => (
+          <span data-testid={getMarkerId(activeTab, '14')}>
+            <span className="sr-only"><Marker id={getMarkerId(activeTab, '14')} /></span>ROB
+          </span>
+        ),
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem;
+          return (
+            <span className="text-gray-700" data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '24') : undefined}>
+              {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '24')} />}
+              {item.rob}
+            </span>
+          );
+        },
+      },
+      {
+        field: 'min',
+        headerName: 'Min',
+        flex: 0.6,
+        minWidth: 70,
+        filter: 'agNumberColumnFilter',
+        headerComponent: () => (
+          <span data-testid={getMarkerId(activeTab, '15')}>
+            <span className="sr-only"><Marker id={getMarkerId(activeTab, '15')} /></span>Min
+          </span>
+        ),
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem;
+          return (
+            <span className="text-gray-700" data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '25') : undefined}>
+              {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '25')} />}
+              {item.min}
+            </span>
+          );
+        },
+      },
+      {
+        field: 'stock',
+        headerName: 'Stock',
+        flex: 0.7,
+        minWidth: 80,
+        headerComponent: () => (
+          <span data-testid={getMarkerId(activeTab, '16')}>
+            <span className="sr-only"><Marker id={getMarkerId(activeTab, '16')} /></span>Stock
+          </span>
+        ),
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem;
+          return (
+            <span data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '26') : undefined}>
+              {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '26')} />}
+              <span className={`px-2 py-0.5 rounded text-xs font-medium inline-block ${getStockColor(item.stock)}`}>
+                {item.stock}
+              </span>
+            </span>
+          );
+        },
+      },
+      {
+        headerName: 'Location',
+        colId: 'location',
+        flex: 1.1,
+        minWidth: 130,
+        sortable: false,
+        filter: false,
+        headerComponent: () => (
+          <span data-testid={getMarkerId(activeTab, '17')}>
+            <span className="sr-only"><Marker id={getMarkerId(activeTab, '17')} /></span>Location
+          </span>
+        ),
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem;
+          return (
+            <span data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '27') : undefined}>
+              {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '27')} />}
+              <button
+                onClick={() => handleOpenLocationDialog(item)}
+                className="flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left"
+                data-testid={`button-location-${item.id}`}
+              >
+                <MapPin className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate text-sm">@ {item.robLocationA ?? 0} / {item.robLocationB ?? 0}</span>
+                <ChevronDown className="h-3 w-3 flex-shrink-0" />
+              </button>
+            </span>
+          );
+        },
+      },
+    );
+
+    if (activeTab === 'chemicals') {
+      cols.push(
+        {
+          field: 'expiryDate',
+          headerName: 'Expiry',
+          flex: 0.8,
+          minWidth: 90,
+          cellRenderer: (params: ICellRendererParams) => {
+            const item = params.data as StoreItem;
+            if (!item.expiryDate) return <span className="text-xs">-</span>;
+            const d = new Date(item.expiryDate);
+            const today = new Date();
+            const days = Math.floor((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            const colorClass =
+              days < 0 ? 'text-red-600 font-semibold' :
+              days <= 30 ? 'text-orange-600 font-semibold' :
+              days <= 90 ? 'text-yellow-600' :
+              'text-green-600';
+            return <span className={`text-xs ${colorClass}`}>{item.expiryDate}</span>;
+          },
+        },
+        {
+          field: 'batchNumber',
+          headerName: 'Batch #',
+          flex: 0.8,
+          minWidth: 90,
+          cellRenderer: (params: ICellRendererParams) => {
+            const item = params.data as StoreItem;
+            return <span className="text-xs truncate">{item.batchNumber || '-'}</span>;
+          },
+        },
+        {
+          field: 'hazardClassification',
+          headerName: 'Hazard',
+          flex: 0.8,
+          minWidth: 100,
+          cellRenderer: (params: ICellRendererParams) => {
+            const item = params.data as StoreItem;
+            if (!item.hazardClassification || item.hazardClassification === 'None') return <span>-</span>;
+            const colorClass =
+              item.hazardClassification === 'Flammable' ? 'border-red-300 text-red-700 bg-red-50' :
+              item.hazardClassification === 'Toxic' ? 'border-purple-300 text-purple-700 bg-purple-50' :
+              item.hazardClassification === 'Corrosive' ? 'border-yellow-300 text-yellow-700 bg-yellow-50' :
+              item.hazardClassification === 'Oxidizer' ? 'border-blue-300 text-blue-700 bg-blue-50' :
+              item.hazardClassification === 'Compressed Gas' ? 'border-cyan-300 text-cyan-700 bg-cyan-50' :
+              'border-gray-300 text-gray-700 bg-gray-50';
+            return (
+              <Badge variant="outline" className={`text-xs ${colorClass}`}>
+                {item.hazardClassification}
+              </Badge>
+            );
+          },
+        },
+      );
+    }
+
+    if (FEATURES.IHM) {
+      cols.push({
+        field: 'ihmPresence',
+        headerName: 'IHM',
+        flex: 0.5,
+        minWidth: 60,
+        headerComponent: () => (
+          <span data-testid={getMarkerId(activeTab, '18')}>
+            <span className="sr-only"><Marker id={getMarkerId(activeTab, '18')} /></span>IHM
+          </span>
+        ),
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem;
+          const icon = item.ihmPresence === 'Present' ? (
+            <div title="IHM Present"><AlertCircle className="h-4 w-4 text-red-500" /></div>
+          ) : item.ihmPresence === 'Not Present' ? (
+            <div title="IHM Not Present"><CheckCircle className="h-4 w-4 text-green-500" /></div>
+          ) : (
+            <div title="IHM Unknown"><HelpCircle className="h-4 w-4 text-gray-400" /></div>
+          );
+          return (
+            <span className="flex justify-center" data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '28') : undefined}>
+              {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '28')} />}
+              {icon}
+            </span>
+          );
+        },
+        cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      });
+    }
+
+    if (!isDeleteSelectionMode) {
+      cols.push({
+        headerName: 'Actions',
+        colId: 'actions',
+        flex: 1,
+        minWidth: 130,
+        sortable: false,
+        filter: false,
+        headerComponent: () => (
+          <span data-testid={getMarkerId(activeTab, '19')}>
+            <span className="sr-only"><Marker id={getMarkerId(activeTab, '19')} /></span>Actions
+          </span>
+        ),
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem;
+          return (
+            <div className="flex gap-1 items-center justify-end pr-2 whitespace-nowrap w-full">
+              {item.isActive === false ? (
+                !isVessel && canEditStore && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 p-1 hover:bg-green-50 text-green-600"
+                    onClick={async () => {
+                      try {
+                        await apiRequest('PUT', `/technical/api/stores/item/${item.id}`, { isActive: true });
+                        queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+                        toast({ title: "Success", description: "Item restored" });
+                      } catch (error) {
+                        toast({ title: "Error", description: "Failed to restore item", variant: "destructive" });
+                      }
+                    }}
+                    aria-label="Restore Item"
+                    title="Restore"
+                    data-testid={`button-restore-${item.id}`}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-1" />
+                    <span className="text-xs">Restore</span>
+                  </Button>
+                )
+              ) : (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 hover:bg-gray-100"
+                    onClick={() => openViewModal(item)}
+                    aria-label="View Details"
+                    title="View Details"
+                    data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '30') : `button-info-${item.id}`}
+                  >
+                    {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '30')} />}
+                    <Info className="h-4 w-4 text-blue-600" />
+                  </Button>
+                  {((!isVessel && !isHeadOfDept) || isModifyMode) && canEditStore && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 hover:bg-gray-100"
+                      onClick={() => openEditModal(item)}
+                      aria-label="Edit Item"
+                      title="Edit"
+                      data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '29') : `button-edit-${item.id}`}
+                    >
+                      {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '29')} />}
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {!isVessel && canDeleteStore && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 hover:bg-gray-100"
+                      onClick={() => enterDeleteSelectionMode(item.id)}
+                      aria-label="Delete Item"
+                      title="Delete"
+                      data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '31') : `button-delete-${item.id}`}
+                    >
+                      {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '31')} />}
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        },
+      });
+    }
+
+    return cols;
+  }, [activeTab, isDeleteSelectionMode, selectedStoreIds, filteredItems, isVessel, isHeadOfDept, isModifyMode, canEditStore, canDeleteStore, vesselId]);
+
+  // ============================================================
+  // AG Grid: Location-tab items + column definitions
+  // ============================================================
+  const locationItems = useMemo(() => {
+    if (!selectedLocationName) return [] as Array<StoreItem & { _side: 'A' | 'B'; _locRob: number; _locName: string; _editKey: string }>;
+    return filteredItems
+      .filter(item => getItemLocationSide(item, selectedLocationName) !== null)
+      .map(item => {
+        const side = getItemLocationSide(item, selectedLocationName)! as 'A' | 'B';
+        const locRob = side === 'A' ? (item.robLocationA ?? 0) : (item.robLocationB ?? 0);
+        const locName = side === 'A' ? (item.locationAName || '') : (item.locationBName || '');
+        return { ...item, _side: side, _locRob: locRob, _locName: locName, _editKey: `${item.id}-${side}` };
+      });
+  }, [filteredItems, selectedLocationName]);
+
+  const locationColumnDefs: ColDef[] = useMemo(() => {
+    const cols: ColDef[] = [
+      {
+        field: 'itemCode',
+        headerName: 'Item Code',
+        flex: 1,
+        minWidth: 110,
+        headerComponent: () => <span data-testid="stores-loc-col-item-code">Item Code</span>,
+        cellRenderer: (params: ICellRendererParams) => <span className="text-gray-900">{params.value}</span>,
+      },
+      {
+        field: 'itemName',
+        headerName: 'Item Name',
+        flex: 1.6,
+        minWidth: 180,
+        tooltipField: 'itemName',
+        headerComponent: () => <span data-testid="stores-loc-col-item-name">Item Name</span>,
+        cellRenderer: (params: ICellRendererParams) => <span className="text-gray-700 truncate">{params.value}</span>,
+      },
+      {
+        field: 'storesCategory',
+        headerName: 'Stores Category',
+        flex: 1.2,
+        minWidth: 140,
+        headerComponent: () => <span data-testid="stores-loc-col-category">Stores Category</span>,
+        cellRenderer: (params: ICellRendererParams) => <span className="text-gray-700 truncate">{params.value}</span>,
+      },
+      {
+        field: 'uom',
+        headerName: 'UOM',
+        flex: 0.6,
+        minWidth: 70,
+        headerComponent: () => <span data-testid="stores-loc-col-uom">UOM</span>,
+        cellRenderer: (params: ICellRendererParams) => <span className="text-gray-500">{params.value || '-'}</span>,
+      },
+      {
+        field: 'rob',
+        headerName: 'ROB',
+        flex: 0.6,
+        minWidth: 70,
+        filter: 'agNumberColumnFilter',
+        headerComponent: () => <span data-testid="stores-loc-col-rob">ROB</span>,
+      },
+      {
+        field: 'min',
+        headerName: 'Min',
+        flex: 0.6,
+        minWidth: 70,
+        filter: 'agNumberColumnFilter',
+        headerComponent: () => <span data-testid="stores-loc-col-min">Min</span>,
+      },
+      {
+        field: 'stock',
+        headerName: 'Stock',
+        flex: 0.7,
+        minWidth: 80,
+        headerComponent: () => <span data-testid="stores-loc-col-stock">Stock</span>,
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem;
+          return (
+            <span className={`px-2 py-0.5 rounded text-xs font-medium inline-block ${getStockColor(item.stock)}`}>
+              {item.stock}
+            </span>
+          );
+        },
+      },
+      {
+        headerName: 'Location',
+        colId: 'locationChange',
+        flex: 1.4,
+        minWidth: 160,
+        sortable: false,
+        filter: false,
+        headerComponent: () => <span data-testid="stores-loc-col-location">Location</span>,
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem & { _locName: string };
+          const locName = item._locName;
+          return (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className={`flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left border border-gray-200 rounded-md px-2 py-1 ${isChangingStoreLocation || !canEditStore ? 'opacity-50 pointer-events-none' : ''}`}
+                  disabled={isChangingStoreLocation || !canEditStore}
+                  data-testid={`button-change-store-location-${item.id}`}
+                >
+                  <MapPin className="h-3 w-3 flex-shrink-0 text-gray-500" />
+                  <span className="truncate text-xs flex-1">{locName || '-'}</span>
+                  <ChevronsUpDown className="h-3 w-3 flex-shrink-0 text-gray-400" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search locations..." data-testid={`input-search-store-location-${item.id}`} />
+                  <CommandList className="max-h-none">
+                    <CommandEmpty>No locations found.</CommandEmpty>
+                    <div className="max-h-[144px] overflow-y-auto">
+                      <CommandGroup heading="Locations">
+                        {allVesselLocations.map((loc: any) => (
+                          <CommandItem
+                            key={loc.id}
+                            value={loc.locationName}
+                            onSelect={() => {
+                              if (loc.locationName !== locName) {
+                                handleChangeStoreLocation(item, loc.locationName);
+                              }
+                            }}
+                            data-testid={`option-store-location-${loc.id}-${item.id}`}
+                          >
+                            <MapPin className="h-3 w-3 mr-2 flex-shrink-0" />
+                            <span className="truncate">{loc.locationName}</span>
+                            {loc.locationName === locName && <Check className="h-3 w-3 ml-auto text-blue-600" />}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </div>
+                    {canEditStore && (
+                      <CommandGroup className="border-t" forceMount>
+                        <CommandItem
+                          onSelect={() => setCreatingLocationForStoreItem(item)}
+                          data-testid={`button-create-store-location-${item.id}`}
+                          forceMount
+                        >
+                          <Plus className="h-3 w-3 mr-2 text-green-600" />
+                          <span className="text-green-600 font-medium">Create New Location</span>
+                        </CommandItem>
+                      </CommandGroup>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          );
+        },
+      },
+      {
+        headerName: 'Loc ROB',
+        colId: 'locRob',
+        flex: 0.8,
+        minWidth: 90,
+        sortable: false,
+        filter: false,
+        headerComponent: () => <span data-testid="stores-loc-col-loc-rob">Loc ROB</span>,
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem & { _side: 'A' | 'B'; _locRob: number; _editKey: string };
+          const editingLocRobVal = editingLocRobValues[item._editKey];
+          return (
+            <input
+              type="number"
+              min="0"
+              className="w-full text-center border border-gray-200 rounded-md px-2 py-1 text-sm outline-none focus:border-blue-400"
+              value={editingLocRobVal !== undefined ? editingLocRobVal : item._locRob}
+              onChange={(e) => setEditingLocRobValues(prev => ({ ...prev, [item._editKey]: e.target.value }))}
+              onBlur={() => {
+                const newVal = editingLocRobVal !== undefined ? Number(editingLocRobVal) : item._locRob;
+                if (canEditStore && editingLocRobVal !== undefined && newVal !== item._locRob && !isNaN(newVal) && newVal >= 0) {
+                  const fieldKey = item._side === 'A' ? 'robLocationA' : 'robLocationB';
+                  fetch(`/technical/api/stores/${vesselId}/${item.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ [fieldKey]: newVal }),
+                  }).then(() => {
+                    queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+                  });
+                }
+                setEditingLocRobValues(prev => { const n = { ...prev }; delete n[item._editKey]; return n; });
+              }}
+              disabled={!canEditStore}
+              data-testid={`input-loc-rob-${item.id}`}
+            />
+          );
+        },
+      },
+    ];
+
+    if (FEATURES.IHM) {
+      cols.push({
+        headerName: 'IHM',
+        colId: 'ihm',
+        width: 60,
+        minWidth: 60,
+        sortable: false,
+        filter: false,
+        headerComponent: () => <span data-testid="stores-loc-col-ihm">IHM</span>,
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem;
+          if (item.ihmPresence === 'Present') return <div title="IHM Present"><AlertCircle className="h-4 w-4 text-red-500" /></div>;
+          if (item.ihmPresence === 'Not Present') return <div title="IHM Not Present"><CheckCircle className="h-4 w-4 text-green-500" /></div>;
+          return <div title="IHM Unknown"><HelpCircle className="h-4 w-4 text-gray-400" /></div>;
+        },
+        cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      });
+    }
+
+    return cols;
+  }, [activeTab, vesselId, allVesselLocations, isChangingStoreLocation, canEditStore, editingLocRobValues]);
+
+  const locationGetRowClass = (params: any): string | undefined => {
+    const item = params.data as StoreItem | undefined;
+    if (item?.isActive === false) return 'spare-row-inactive';
+    return undefined;
+  };
+
+  // ============================================================
+  // AG Grid: History column definitions
+  // ============================================================
+  const historyColumnDefs: ColDef[] = useMemo(() => [
+    {
+      field: 'dateLocal',
+      headerName: 'Date',
+      flex: 1.2,
+      minWidth: 130,
+      headerComponent: () => (
+        <span data-testid={getMarkerId(activeTab, '2.14')}>
+          <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.14')} /></span>Date
+        </span>
+      ),
+      cellRenderer: (params: ICellRendererParams) => <span className="text-gray-700">{params.value}</span>,
+    },
+    {
+      field: 'eventType',
+      headerName: 'Event',
+      flex: 0.8,
+      minWidth: 100,
+      headerComponent: () => (
+        <span data-testid={getMarkerId(activeTab, '2.15')}>
+          <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.15')} /></span>Event
+        </span>
+      ),
+      cellRenderer: (params: ICellRendererParams) => {
+        const item = params.data as StoresHistoryItem;
+        const colorClass =
+          item.eventType === 'RECEIVE' ? 'bg-green-100 text-green-800' :
+          item.eventType === 'CONSUME' ? 'bg-orange-100 text-orange-800' :
+          item.eventType === 'INITIAL' ? 'bg-blue-100 text-blue-800' :
+          'bg-gray-100 text-gray-800';
+        return <span className={`px-2 py-1 rounded text-xs font-medium ${colorClass}`}>{item.eventType}</span>;
+      },
+    },
+    {
+      field: 'itemName',
+      headerName: 'Item Name',
+      flex: 1.8,
+      minWidth: 160,
+      tooltipField: 'itemName',
+      headerComponent: () => (
+        <span data-testid={getMarkerId(activeTab, '2.16')}>
+          <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.16')} /></span>Item Name
+        </span>
+      ),
+      cellRenderer: (params: ICellRendererParams) => <span className="text-gray-700 truncate">{params.value}</span>,
+    },
+    {
+      field: 'partCode',
+      headerName: 'Part Code',
+      flex: 0.9,
+      minWidth: 100,
+      headerComponent: () => (
+        <span data-testid={getMarkerId(activeTab, '2.17')}>
+          <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.17')} /></span>Part Code
+        </span>
+      ),
+      cellRenderer: (params: ICellRendererParams) => <span className="text-gray-600">{params.value}</span>,
+    },
+    {
+      field: 'uom',
+      headerName: 'UOM',
+      flex: 0.6,
+      minWidth: 70,
+      headerComponent: () => (
+        <span data-testid={getMarkerId(activeTab, '2.18')}>
+          <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.18')} /></span>UOM
+        </span>
+      ),
+      cellRenderer: (params: ICellRendererParams) => <span className="text-gray-600">{params.value || '-'}</span>,
+    },
+    {
+      field: 'qtyChange',
+      headerName: 'Qty Change',
+      flex: 0.8,
+      minWidth: 90,
+      filter: 'agNumberColumnFilter',
+      headerComponent: () => (
+        <span data-testid={getMarkerId(activeTab, '2.19')}>
+          <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.19')} /></span>Qty Change
+        </span>
+      ),
+      cellRenderer: (params: ICellRendererParams) => {
+        const item = params.data as StoresHistoryItem;
+        return (
+          <span className={item.qtyChange > 0 ? 'text-green-600' : 'text-orange-600'}>
+            {item.qtyChange > 0 ? '+' : ''}{item.qtyChange}
+          </span>
+        );
+      },
+    },
+    {
+      field: 'robAfter',
+      headerName: 'ROB After',
+      flex: 0.8,
+      minWidth: 90,
+      filter: 'agNumberColumnFilter',
+      headerComponent: () => (
+        <span data-testid={getMarkerId(activeTab, '2.20')}>
+          <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.20')} /></span>ROB After
+        </span>
+      ),
+      cellRenderer: (params: ICellRendererParams) => <span className="text-gray-700">{params.value}</span>,
+    },
+    {
+      field: 'place',
+      headerName: 'Place',
+      flex: 0.9,
+      minWidth: 100,
+      headerComponent: () => (
+        <span data-testid={getMarkerId(activeTab, '2.21')}>
+          <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.21')} /></span>Place
+        </span>
+      ),
+      cellRenderer: (params: ICellRendererParams) => <span className="text-gray-600">{params.value || '-'}</span>,
+    },
+    {
+      field: 'userId',
+      headerName: 'User',
+      flex: 0.9,
+      minWidth: 100,
+      headerComponent: () => (
+        <span data-testid={getMarkerId(activeTab, '2.22')}>
+          <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.22')} /></span>User
+        </span>
+      ),
+      cellRenderer: (params: ICellRendererParams) => <span className="text-gray-600">{params.value}</span>,
+    },
+    {
+      headerName: 'Remarks',
+      colId: 'remarks',
+      flex: 1.2,
+      minWidth: 130,
+      sortable: false,
+      filter: false,
+      headerComponent: () => (
+        <span data-testid={getMarkerId(activeTab, '2.23')}>
+          <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.23')} /></span>Remarks
+        </span>
+      ),
+      cellRenderer: (params: ICellRendererParams) => {
+        const item = params.data as StoresHistoryItem;
+        const text = item.remarks || item.ref || '-';
+        return <span className="text-gray-600 truncate" title={item.remarks || item.ref}>{text}</span>;
+      },
+    },
+  ], [activeTab]);
+
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Header - Fixed */}
@@ -2135,251 +2921,17 @@ const Stores: React.FC = () => {
       <div className="flex-1 overflow-y-auto">
         {/* Table */}
         {viewMode === "inventory" ? (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-        {/* Table Header */}
-        <div className="bg-[#52baf3] text-white p-4">
-          <div className="grid gap-4 items-center text-sm font-medium" style={{gridTemplateColumns: (() => {
-            const base = activeTab === 'chemicals' ? (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.6fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr') : (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr');
-            if (isDeleteSelectionMode) return `40px ${base}`;
-            return `${base} 1fr`;
-          })()}}>
-            {isDeleteSelectionMode && (
-              <div className="flex items-center justify-center">
-                <input
-                  type="checkbox"
-                  checked={filteredItems.length > 0 && filteredItems.every((item: StoreItem) => selectedStoreIds.has(item.id))}
-                  onChange={toggleSelectAll}
-                  className="h-4 w-4 rounded border-white cursor-pointer accent-white"
-                  data-testid="checkbox-select-all"
-                />
-              </div>
-            )}
-            <div data-testid={getMarkerId(activeTab, "10")}>
-              <Marker id={getMarkerId(activeTab, "10")} />
-              {activeTab === "lubes" ? "Lube Grade" : 
-               activeTab === "chemicals" ? "Chem Code" : "Item Code"}
+          <div className="bg-white rounded-lg shadow overflow-hidden h-full flex flex-col">
+            <div className="flex-1 min-h-[400px]">
+              <WOAgGridTable
+                columnDefs={inventoryColumnDefs}
+                rowData={filteredItems}
+                getRowClass={inventoryGetRowClass}
+                noRowsMessage="No items found. Try adjusting your filters."
+                testId="stores-inventory-grid"
+              />
             </div>
-            <div data-testid={getMarkerId(activeTab, "11")}>
-              <Marker id={getMarkerId(activeTab, "11")} />
-              {activeTab === "lubes" ? "Lube Type" : 
-               activeTab === "chemicals" ? "Chemical Name" : "Item Name"}
-            </div>
-            <div data-testid={getMarkerId(activeTab, "12")}>
-              <Marker id={getMarkerId(activeTab, "12")} />
-              {activeTab === "lubes" ? "Application" : 
-               activeTab === "chemicals" ? "Application Area" : "Stores Category"}
-            </div>
-            <div data-testid={getMarkerId(activeTab, "13")}><Marker id={getMarkerId(activeTab, "13")} />UOM</div>
-            <div data-testid={getMarkerId(activeTab, "14")}>
-              <Marker id={getMarkerId(activeTab, "14")} />
-              {activeTab === "lubes" || activeTab === "chemicals" ? "ROB" : "ROB"}
-            </div>
-            <div data-testid={getMarkerId(activeTab, "15")}><Marker id={getMarkerId(activeTab, "15")} />Min</div>
-            <div data-testid={getMarkerId(activeTab, "16")}><Marker id={getMarkerId(activeTab, "16")} />Stock</div>
-            <div data-testid={getMarkerId(activeTab, "17")}><Marker id={getMarkerId(activeTab, "17")} />Location</div>
-            {activeTab === "chemicals" && <div className="text-center">Expiry</div>}
-            {activeTab === "chemicals" && <div className="text-center">Batch #</div>}
-            {activeTab === "chemicals" && <div className="text-center">Hazard</div>}
-            {FEATURES.IHM && <div className="text-center" data-testid={getMarkerId(activeTab, "18")}><Marker id={getMarkerId(activeTab, "18")} />IHM</div>}
-            {!isDeleteSelectionMode && <div className="text-right pr-2" data-testid={getMarkerId(activeTab, "19")}><Marker id={getMarkerId(activeTab, "19")} />Actions</div>}
           </div>
-        </div>
-
-        {/* Table Body */}
-        <div className="divide-y divide-gray-200">
-          {filteredItems.map((item, index) => (
-            <div key={item.id} className={`hover:bg-gray-50 ${isDeleteSelectionMode && selectedStoreIds.has(item.id) ? 'bg-red-50' : ''} ${item.isActive === false ? 'opacity-50' : ''}`}>
-              <div className="grid gap-4 items-center text-sm py-3 px-4" style={{gridTemplateColumns: (() => {
-                const base = activeTab === 'chemicals' ? (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr 0.6fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr 0.8fr 0.8fr') : (FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr');
-                if (isDeleteSelectionMode) return `40px ${base}`;
-                return `${base} 1fr`;
-              })()}}>
-                {isDeleteSelectionMode && (
-                  <div className="flex items-center justify-center">
-                    <input
-                      type="checkbox"
-                      checked={selectedStoreIds.has(item.id)}
-                      onChange={() => toggleStoreSelection(item.id)}
-                      className="h-4 w-4 rounded border-gray-300 cursor-pointer"
-                      data-testid={`checkbox-store-${item.id}`}
-                    />
-                  </div>
-                )}
-                <div className="font-medium text-gray-900 truncate" data-testid={index === 0 ? getMarkerId(activeTab, "20") : undefined}>
-                  {index === 0 && <Marker id={getMarkerId(activeTab, "20")} />}
-                  {item.itemCode}
-                </div>
-                <div className="text-gray-700 truncate" data-testid={index === 0 ? getMarkerId(activeTab, "21") : undefined}>
-                  {index === 0 && <Marker id={getMarkerId(activeTab, "21")} />}
-                  {item.itemName}
-                </div>
-                <div className="text-gray-600 truncate" data-testid={index === 0 ? getMarkerId(activeTab, "22") : undefined}>
-                  {index === 0 && <Marker id={getMarkerId(activeTab, "22")} />}
-                  {item.storesCategory}
-                </div>
-                <div className="text-gray-700 text-center" data-testid={index === 0 ? getMarkerId(activeTab, "23") : undefined}>
-                  {index === 0 && <Marker id={getMarkerId(activeTab, "23")} />}
-                  {item.uom || "-"}
-                </div>
-                <div className="text-gray-700 text-center" data-testid={index === 0 ? getMarkerId(activeTab, "24") : undefined}>
-                  {index === 0 && <Marker id={getMarkerId(activeTab, "24")} />}
-                  {item.rob}
-                </div>
-                <div className="text-gray-700 text-center" data-testid={index === 0 ? getMarkerId(activeTab, "25") : undefined}>
-                  {index === 0 && <Marker id={getMarkerId(activeTab, "25")} />}
-                  {item.min}
-                </div>
-                <div className="text-center" data-testid={index === 0 ? getMarkerId(activeTab, "26") : undefined}>
-                  {index === 0 && <Marker id={getMarkerId(activeTab, "26")} />}
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium inline-block ${getStockColor(item.stock)}`}>
-                    {item.stock}
-                  </span>
-                </div>
-                {/* Location - opens Inventory Transaction dialog */}
-                <div data-testid={index === 0 ? getMarkerId(activeTab, "27") : undefined}>
-                  {index === 0 && <Marker id={getMarkerId(activeTab, "27")} />}
-                  <button
-                    onClick={() => handleOpenLocationDialog(item)}
-                    className="flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left"
-                    data-testid={`button-location-${item.id}`}
-                  >
-                    <MapPin className="h-3 w-3 flex-shrink-0" />
-                    <span className="truncate text-sm">@ {item.robLocationA ?? 0} / {item.robLocationB ?? 0}</span>
-                    <ChevronDown className="h-3 w-3 flex-shrink-0" />
-                  </button>
-                </div>
-                {activeTab === "chemicals" && (
-                  <div className="text-center text-xs">
-                    {item.expiryDate ? (
-                      <span className={`${
-                        (() => {
-                          const d = new Date(item.expiryDate);
-                          const today = new Date();
-                          const days = Math.floor((d.getTime() - today.getTime()) / (1000*60*60*24));
-                          if (days < 0) return 'text-red-600 font-semibold';
-                          if (days <= 30) return 'text-orange-600 font-semibold';
-                          if (days <= 90) return 'text-yellow-600';
-                          return 'text-green-600';
-                        })()
-                      }`}>
-                        {item.expiryDate}
-                      </span>
-                    ) : '-'}
-                  </div>
-                )}
-                {activeTab === "chemicals" && (
-                  <div className="text-center text-xs truncate">{item.batchNumber || '-'}</div>
-                )}
-                {activeTab === "chemicals" && (
-                  <div className="text-center">
-                    {item.hazardClassification && item.hazardClassification !== 'None' ? (
-                      <Badge variant="outline" className={`text-xs ${
-                        item.hazardClassification === 'Flammable' ? 'border-red-300 text-red-700 bg-red-50' :
-                        item.hazardClassification === 'Toxic' ? 'border-purple-300 text-purple-700 bg-purple-50' :
-                        item.hazardClassification === 'Corrosive' ? 'border-yellow-300 text-yellow-700 bg-yellow-50' :
-                        item.hazardClassification === 'Oxidizer' ? 'border-blue-300 text-blue-700 bg-blue-50' :
-                        item.hazardClassification === 'Compressed Gas' ? 'border-cyan-300 text-cyan-700 bg-cyan-50' :
-                        'border-gray-300 text-gray-700 bg-gray-50'
-                      }`}>
-                        {item.hazardClassification}
-                      </Badge>
-                    ) : '-'}
-                  </div>
-                )}
-                {FEATURES.IHM && (
-                  <div className="flex justify-center" data-testid={index === 0 ? getMarkerId(activeTab, "28") : undefined}>
-                    {index === 0 && <Marker id={getMarkerId(activeTab, "28")} />}
-                    {item.ihmPresence === 'Present' ? (
-                      <div title="IHM Present">
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                      </div>
-                    ) : item.ihmPresence === 'Not Present' ? (
-                      <div title="IHM Not Present">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                      </div>
-                    ) : (
-                      <div title="IHM Unknown">
-                        <HelpCircle className="h-4 w-4 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                )}
-                {!isDeleteSelectionMode && (
-                <div className="flex gap-1 items-center justify-end pr-2 whitespace-nowrap">
-                  {item.isActive === false ? (
-                    !isVessel && canEditStore && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 p-1 hover:bg-green-50 text-green-600"
-                        onClick={async () => {
-                          try {
-                            await apiRequest('PUT', `/technical/api/stores/item/${item.id}`, { isActive: true });
-                            queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
-                            toast({ title: "Success", description: "Item restored" });
-                          } catch (error) {
-                            toast({ title: "Error", description: "Failed to restore item", variant: "destructive" });
-                          }
-                        }}
-                        aria-label="Restore Item"
-                        title="Restore"
-                        data-testid={`button-restore-${item.id}`}
-                      >
-                        <RotateCcw className="h-4 w-4 mr-1" />
-                        <span className="text-xs">Restore</span>
-                      </Button>
-                    )
-                  ) : (
-                    <>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 w-7 p-0 hover:bg-gray-100"
-                        onClick={() => openViewModal(item)}
-                        aria-label="View Details"
-                        title="View Details"
-                        data-testid={index === 0 ? getMarkerId(activeTab, "30") : `button-info-${item.id}`}
-                      >
-                        {index === 0 && <Marker id={getMarkerId(activeTab, "30")} />}
-                        <Info className="h-4 w-4 text-blue-600" />
-                      </Button>
-                      {(!isVessel && !isHeadOfDept || isModifyMode) && canEditStore && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 w-7 p-0 hover:bg-gray-100"
-                          onClick={() => openEditModal(item)}
-                          aria-label="Edit Item"
-                          title="Edit"
-                          data-testid={index === 0 ? getMarkerId(activeTab, "29") : `button-edit-${item.id}`}
-                        >
-                          {index === 0 && <Marker id={getMarkerId(activeTab, "29")} />}
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {!isVessel && canDeleteStore && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 w-7 p-0 hover:bg-gray-100"
-                          onClick={() => enterDeleteSelectionMode(item.id)}
-                          aria-label="Delete Item"
-                          title="Delete"
-                          data-testid={index === 0 ? getMarkerId(activeTab, "31") : `button-delete-${item.id}`}
-                        >
-                          {index === 0 && <Marker id={getMarkerId(activeTab, "31")} />}
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      )}
-                    </>
-                  )}
-                </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
       ) : viewMode === "location" ? (
       /* Location View - Left Panel + Right Table */
       <div className="flex gap-4 flex-1 min-h-0">
@@ -2449,221 +3001,38 @@ const Stores: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Panel - Items Table */}
-        <div className="flex-1 bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col">
-          <div className="overflow-x-auto flex-1 flex flex-col">
-            <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
-              <div className="grid text-sm font-semibold text-white min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '120px 200px 160px 80px 80px 80px 80px 160px 100px 40px' : '120px 200px 160px 80px 80px 80px 80px 160px 100px', minWidth: 'max-content', gap: '12px' }}>
-                <div className="px-2" data-testid="stores-loc-col-item-code">Item Code</div>
-                <div className="px-2" data-testid="stores-loc-col-item-name">Item Name</div>
-                <div className="px-2" data-testid="stores-loc-col-category">Stores Category</div>
-                <div className="px-2" data-testid="stores-loc-col-uom">UOM</div>
-                <div className="px-2 text-center" data-testid="stores-loc-col-rob">ROB</div>
-                <div className="px-2 text-center" data-testid="stores-loc-col-min">Min</div>
-                <div className="px-2 text-center" data-testid="stores-loc-col-stock">Stock</div>
-                <div className="px-2" data-testid="stores-loc-col-location">Location</div>
-                <div className="px-2 text-center" data-testid="stores-loc-col-loc-rob">Loc ROB</div>
-                {FEATURES.IHM && <div className="px-2 text-center" data-testid="stores-loc-col-ihm">IHM</div>}
+        {/* Right Panel - Items Table (AG Grid) */}
+          <div className="flex-1 bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col">
+            {!selectedLocationName ? (
+              <div className="p-8 text-center text-gray-500">Select a location from the left panel to view stores items.</div>
+            ) : storesLoading ? (
+              <div className="p-8 text-center text-gray-500">Loading...</div>
+            ) : (
+              <div className="flex-1 min-h-[400px]">
+                <WOAgGridTable
+                  columnDefs={locationColumnDefs}
+                  rowData={locationItems}
+                  getRowClass={locationGetRowClass}
+                  noRowsMessage="No items found at this location."
+                  testId="stores-by-location-grid"
+                />
               </div>
-            </div>
-            <div className="flex flex-col overflow-y-auto flex-1">
-              {!selectedLocationName ? (
-                <div className="p-8 text-center text-gray-500">Select a location from the left panel to view stores items.</div>
-              ) : storesLoading ? (
-                <div className="p-8 text-center text-gray-500">Loading...</div>
-              ) : (() => {
-                const locationItems = filteredItems.filter(item => {
-                  return getItemLocationSide(item, selectedLocationName) !== null;
-                });
-                if (locationItems.length === 0) {
-                  return <div className="p-8 text-center text-gray-500">No items found at this location.</div>;
-                }
-                return locationItems.map((item) => {
-                  const side = getItemLocationSide(item, selectedLocationName)!;
-                  const stockStatus = getStockColor(item.stock);
-                  const locRob = side === 'A' ? (item.robLocationA ?? 0) : (item.robLocationB ?? 0);
-                  const locName = side === 'A' ? (item.locationAName || '') : (item.locationBName || '');
-                  const editKey = `${item.id}-${side}`;
-                  const editingLocRobVal = editingLocRobValues[editKey];
-                  return (
-                    <div key={item.id} className={`px-4 py-3 border-b border-gray-100 hover:bg-gray-50 ${item.isActive === false ? 'opacity-50 pointer-events-none' : ''}`}>
-                      <div className="grid text-sm items-center min-w-max" style={{ gridTemplateColumns: FEATURES.IHM ? '120px 200px 160px 80px 80px 80px 80px 160px 100px 40px' : '120px 200px 160px 80px 80px 80px 80px 160px 100px', minWidth: 'max-content', gap: '12px' }}>
-                        <div className="px-2 text-gray-900">{item.itemCode}</div>
-                        <div className="px-2 text-gray-700">{item.itemName}</div>
-                        <div className="px-2 text-gray-700">{item.storesCategory}</div>
-                        <div className="px-2 text-gray-500">{item.uom || '-'}</div>
-                        <div className="px-2 text-center">{item.rob}</div>
-                        <div className="px-2 text-center">{item.min}</div>
-                        <div className="px-2 text-center">
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium inline-block ${stockStatus}`}>
-                            {item.stock}
-                          </span>
-                        </div>
-                        <div className="px-2">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <button
-                                className={`flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left border border-gray-200 rounded-md px-2 py-1 ${isChangingStoreLocation || !canEditStore ? 'opacity-50 pointer-events-none' : ''}`}
-                                disabled={isChangingStoreLocation || !canEditStore}
-                                data-testid={`button-change-store-location-${item.id}`}
-                              >
-                                <MapPin className="h-3 w-3 flex-shrink-0 text-gray-500" />
-                                <span className="truncate text-xs flex-1">{locName || '-'}</span>
-                                <ChevronsUpDown className="h-3 w-3 flex-shrink-0 text-gray-400" />
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-56 p-0" align="start">
-                              <Command>
-                                <CommandInput placeholder="Search locations..." data-testid={`input-search-store-location-${item.id}`} />
-                                <CommandList className="max-h-none">
-                                  <CommandEmpty>No locations found.</CommandEmpty>
-                                  <div className="max-h-[144px] overflow-y-auto">
-                                    <CommandGroup heading="Locations">
-                                      {allVesselLocations.map((loc: any) => (
-                                        <CommandItem
-                                          key={loc.id}
-                                          value={loc.locationName}
-                                          onSelect={() => {
-                                            if (loc.locationName !== locName) {
-                                              handleChangeStoreLocation(item, loc.locationName);
-                                            }
-                                          }}
-                                          data-testid={`option-store-location-${loc.id}-${item.id}`}
-                                        >
-                                          <MapPin className="h-3 w-3 mr-2 flex-shrink-0" />
-                                          <span className="truncate">{loc.locationName}</span>
-                                          {loc.locationName === locName && <Check className="h-3 w-3 ml-auto text-blue-600" />}
-                                        </CommandItem>
-                                      ))}
-                                    </CommandGroup>
-                                  </div>
-                                  {canEditStore && (
-                                  <CommandGroup className="border-t" forceMount>
-                                    <CommandItem
-                                      onSelect={() => setCreatingLocationForStoreItem(item)}
-                                      data-testid={`button-create-store-location-${item.id}`}
-                                      forceMount
-                                    >
-                                      <Plus className="h-3 w-3 mr-2 text-green-600" />
-                                      <span className="text-green-600 font-medium">Create New Location</span>
-                                    </CommandItem>
-                                  </CommandGroup>
-                                  )}
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                        <div className="px-2">
-                          <input
-                            type="number"
-                            min="0"
-                            className="w-full text-center border border-gray-200 rounded-md px-2 py-1 text-sm outline-none focus:border-blue-400"
-                            value={editingLocRobVal !== undefined ? editingLocRobVal : locRob}
-                            onChange={(e) => setEditingLocRobValues(prev => ({ ...prev, [editKey]: e.target.value }))}
-                            onBlur={() => {
-                              const newVal = editingLocRobVal !== undefined ? Number(editingLocRobVal) : locRob;
-                              if (canEditStore && editingLocRobVal !== undefined && newVal !== locRob && !isNaN(newVal) && newVal >= 0) {
-                                const fieldKey = side === 'A' ? 'robLocationA' : 'robLocationB';
-                                fetch(`/technical/api/stores/${vesselId}/${item.id}`, {
-                                  method: 'PATCH',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ [fieldKey]: newVal }),
-                                }).then(() => {
-                                  queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
-                                });
-                              }
-                              setEditingLocRobValues(prev => { const n = { ...prev }; delete n[editKey]; return n; });
-                            }}
-                            disabled={!canEditStore}
-                            data-testid={`input-loc-rob-${item.id}`}
-                          />
-                        </div>
-                        {FEATURES.IHM && (
-                          <div className="flex justify-center">
-                            {item.ihmPresence === 'Present' ? (
-                              <div title="IHM Present">
-                                <AlertCircle className="h-4 w-4 text-red-500" />
-                              </div>
-                            ) : item.ihmPresence === 'Not Present' ? (
-                              <div title="IHM Not Present">
-                                <CheckCircle className="h-4 w-4 text-green-500" />
-                              </div>
-                            ) : (
-                              <div title="IHM Unknown">
-                                <HelpCircle className="h-4 w-4 text-gray-400" />
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
+            )}
           </div>
-        </div>
       </div>
       ) : (
-      /* History Table */
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="bg-[#52baf3] text-white p-4">
-          <div className="grid grid-cols-12 gap-4 items-center text-sm font-medium">
-            <div className="col-span-2" data-testid={getMarkerId(activeTab, "2.14")}><Marker id={getMarkerId(activeTab, "2.14")} />Date</div>
-            <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.15")}><Marker id={getMarkerId(activeTab, "2.15")} />Event</div>
-            <div className="col-span-2" data-testid={getMarkerId(activeTab, "2.16")}><Marker id={getMarkerId(activeTab, "2.16")} />Item Name</div>
-            <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.17")}><Marker id={getMarkerId(activeTab, "2.17")} />Part Code</div>
-            <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.18")}><Marker id={getMarkerId(activeTab, "2.18")} />UOM</div>
-            <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.19")}><Marker id={getMarkerId(activeTab, "2.19")} />Qty Change</div>
-            <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.20")}><Marker id={getMarkerId(activeTab, "2.20")} />ROB After</div>
-            <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.21")}><Marker id={getMarkerId(activeTab, "2.21")} />Place</div>
-            <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.22")}><Marker id={getMarkerId(activeTab, "2.22")} />User</div>
-            <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.23")}><Marker id={getMarkerId(activeTab, "2.23")} />Remarks</div>
+        /* History Table (AG Grid) */
+        <div className="bg-white rounded-lg shadow overflow-hidden h-full flex flex-col">
+          <div className="flex-1 min-h-[400px]">
+            <WOAgGridTable
+              columnDefs={historyColumnDefs}
+              rowData={filteredHistoryItems}
+              noRowsMessage="No history entries found. Actions like Receive, Consume, and Archive will appear here."
+              testId="stores-history-grid"
+            />
           </div>
         </div>
-        
-        <div className="divide-y divide-gray-200">
-          {filteredHistoryItems.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              No history entries found. Actions like Receive, Consume, and Archive will appear here.
-            </div>
-          ) : (
-            filteredHistoryItems.map((item) => (
-              <div key={item.id} className="p-4 hover:bg-gray-50">
-                <div className="grid grid-cols-12 gap-4 items-center text-sm">
-                  <div className="col-span-2 text-gray-700">{item.dateLocal}</div>
-                  <div className="col-span-1">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      item.eventType === 'RECEIVE' ? 'bg-green-100 text-green-800' :
-                      item.eventType === 'CONSUME' ? 'bg-orange-100 text-orange-800' :
-                      item.eventType === 'INITIAL' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {item.eventType}
-                    </span>
-                  </div>
-                  <div className="col-span-2 text-gray-700">{item.itemName}</div>
-                  <div className="col-span-1 text-gray-600">{item.partCode}</div>
-                  <div className="col-span-1 text-gray-600">{item.uom || '-'}</div>
-                  <div className="col-span-1">
-                    <span className={item.qtyChange > 0 ? 'text-green-600' : 'text-orange-600'}>
-                      {item.qtyChange > 0 ? '+' : ''}{item.qtyChange}
-                    </span>
-                  </div>
-                  <div className="col-span-1 text-gray-700">{item.robAfter}</div>
-                  <div className="col-span-1 text-gray-600">{item.place || '-'}</div>
-                  <div className="col-span-1 text-gray-600">{item.userId}</div>
-                  <div className="col-span-1 text-gray-600 truncate" title={item.remarks || item.ref}>
-                    {item.remarks || item.ref || '-'}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-      )}
+        )}
 
       {/* Edit Item Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>

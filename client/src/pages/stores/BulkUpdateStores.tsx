@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import WOAgGridTable from "@/components/WOAgGridTable";
+import type { ColDef, ICellRendererParams } from "ag-grid-community";
 
 interface StoreItem {
   id: number;
@@ -354,6 +356,316 @@ export default function BulkUpdateStores() {
     }
   };
 
+  // ============================================================
+  // AG Grid: Bulk Update column definitions
+  // ============================================================
+  const bulkGetRowClass = (params: any): string | undefined => {
+    const item = params.data as StoreItem | undefined;
+    if (!item) return undefined;
+    const consumedA = bulkUpdateData[item.id]?.consumedLocationA || 0;
+    const consumedB = bulkUpdateData[item.id]?.consumedLocationB || 0;
+    const receivedA = bulkUpdateData[item.id]?.receivedLocationA || 0;
+    const receivedB = bulkUpdateData[item.id]?.receivedLocationB || 0;
+    const robA = item.robLocationA ?? 0;
+    const robB = item.robLocationB ?? 0;
+    const hasInsufficientStockA = transactionMode === "consume" && consumedA > robA;
+    const hasInsufficientStockB = transactionMode === "consume" && consumedB > robB;
+    const transactionQtyA = transactionMode === "consume" ? consumedA : receivedA;
+    const transactionQtyB = transactionMode === "consume" ? consumedB : receivedB;
+    const hasAnyTransaction = transactionQtyA > 0 || transactionQtyB > 0;
+    const needsReceivedDate = transactionMode === "receive" && hasAnyTransaction && !dateReceived;
+    if (hasInsufficientStockA || hasInsufficientStockB || needsReceivedDate) return 'bulk-row-error';
+    return undefined;
+  };
+
+  const bulkColumnDefs: ColDef[] = useMemo(() => {
+    const cols: ColDef[] = [
+      {
+        field: 'itemCode',
+        headerName: activeTab === 'lubes' ? 'Lube Grade' : activeTab === 'chemicals' ? 'Chem Code' : 'Item Code',
+        flex: 1,
+        minWidth: 110,
+        cellRenderer: (params: ICellRendererParams) => <span className="text-sm">{params.value}</span>,
+      },
+      {
+        field: 'itemName',
+        headerName: activeTab === 'lubes' ? 'Lube Type' : activeTab === 'chemicals' ? 'Chemical Name' : 'Item Name',
+        flex: 1.4,
+        minWidth: 150,
+        tooltipField: 'itemName',
+        cellRenderer: (params: ICellRendererParams) => <span className="text-sm truncate">{params.value}</span>,
+      },
+      {
+        headerName: `Current Stock (${locationNames.locationA})`,
+        colId: 'currentRobA',
+        flex: 0.9,
+        minWidth: 120,
+        sortable: false,
+        filter: false,
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem;
+          const itemLocA = item.location || locationNames.locationA;
+          const robA = item.robLocationA ?? 0;
+          return (
+            <div className="text-center">
+              <div className="text-[11px] italic text-blue-600 whitespace-normal leading-tight" data-testid={`text-location-a-${item.id}`}>{itemLocA}</div>
+              <div className="text-sm text-gray-800 dark:text-gray-200 font-medium">{robA}</div>
+            </div>
+          );
+        },
+        cellStyle: { borderLeft: '1px solid #e5e7eb' },
+      },
+      {
+        headerName: `Current Stock (${locationNames.locationB})`,
+        colId: 'currentRobB',
+        flex: 0.9,
+        minWidth: 120,
+        sortable: false,
+        filter: false,
+        cellRenderer: (params: ICellRendererParams) => {
+          const item = params.data as StoreItem;
+          const itemLocB = item.location2 || locationNames.locationB;
+          const robB = item.robLocationB ?? 0;
+          return (
+            <div className="text-center">
+              <div className="text-[11px] italic text-blue-600 whitespace-normal leading-tight" data-testid={`text-location-b-${item.id}`}>{itemLocB}</div>
+              <div className="text-sm text-gray-800 dark:text-gray-200 font-medium">{robB}</div>
+            </div>
+          );
+        },
+      },
+    ];
+
+    if (transactionMode === "consume") {
+      cols.push(
+        {
+          headerName: `Consume (${locationNames.locationA})`,
+          colId: 'consumeA',
+          flex: 0.7,
+          minWidth: 90,
+          sortable: false,
+          filter: false,
+          cellRenderer: (params: ICellRendererParams) => {
+            const item = params.data as StoreItem;
+            const robA = item.robLocationA ?? 0;
+            const consumedA = bulkUpdateData[item.id]?.consumedLocationA || 0;
+            const insufficient = consumedA > robA;
+            return (
+              <Input
+                type="number"
+                min="0"
+                max={robA}
+                value={bulkUpdateData[item.id]?.consumedLocationA || ""}
+                onChange={(e) => handleBulkUpdateChange(item.id, 'consumedLocationA', e.target.value)}
+                className={`w-16 h-7 text-sm text-center mx-auto ${insufficient ? 'border-red-500' : ''}`}
+                data-testid={`input-consume-a-${item.id}`}
+                tabIndex={(params.node.rowIndex ?? 0) + 1}
+              />
+            );
+          },
+          cellStyle: { borderLeft: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+        },
+        {
+          headerName: `Consume (${locationNames.locationB})`,
+          colId: 'consumeB',
+          flex: 0.7,
+          minWidth: 90,
+          sortable: false,
+          filter: false,
+          cellRenderer: (params: ICellRendererParams) => {
+            const item = params.data as StoreItem;
+            const robB = item.robLocationB ?? 0;
+            const consumedB = bulkUpdateData[item.id]?.consumedLocationB || 0;
+            const insufficient = consumedB > robB;
+            return (
+              <Input
+                type="number"
+                min="0"
+                max={robB}
+                value={bulkUpdateData[item.id]?.consumedLocationB || ""}
+                onChange={(e) => handleBulkUpdateChange(item.id, 'consumedLocationB', e.target.value)}
+                className={`w-16 h-7 text-sm text-center mx-auto ${insufficient ? 'border-red-500' : ''}`}
+                data-testid={`input-consume-b-${item.id}`}
+                tabIndex={paginatedItems.length + (params.node.rowIndex ?? 0) + 1}
+              />
+            );
+          },
+          cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+        },
+      );
+    } else if (transactionMode === "receive") {
+      cols.push(
+        {
+          headerName: `Receive (${locationNames.locationA})`,
+          colId: 'receiveA',
+          flex: 0.7,
+          minWidth: 90,
+          sortable: false,
+          filter: false,
+          cellRenderer: (params: ICellRendererParams) => {
+            const item = params.data as StoreItem;
+            return (
+              <Input
+                type="number"
+                min="0"
+                value={bulkUpdateData[item.id]?.receivedLocationA || ""}
+                onChange={(e) => handleBulkUpdateChange(item.id, 'receivedLocationA', e.target.value)}
+                className="w-16 h-7 text-sm text-center mx-auto"
+                data-testid={`input-receive-a-${item.id}`}
+                tabIndex={(params.node.rowIndex ?? 0) + 1}
+              />
+            );
+          },
+          cellStyle: { borderLeft: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+        },
+        {
+          headerName: `Receive (${locationNames.locationB})`,
+          colId: 'receiveB',
+          flex: 0.7,
+          minWidth: 90,
+          sortable: false,
+          filter: false,
+          cellRenderer: (params: ICellRendererParams) => {
+            const item = params.data as StoreItem;
+            return (
+              <Input
+                type="number"
+                min="0"
+                value={bulkUpdateData[item.id]?.receivedLocationB || ""}
+                onChange={(e) => handleBulkUpdateChange(item.id, 'receivedLocationB', e.target.value)}
+                className="w-16 h-7 text-sm text-center mx-auto"
+                data-testid={`input-receive-b-${item.id}`}
+                tabIndex={paginatedItems.length + (params.node.rowIndex ?? 0) + 1}
+              />
+            );
+          },
+          cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+        },
+      );
+    }
+
+    cols.push({
+      headerName: 'New ROB',
+      colId: 'newRob',
+      flex: 0.7,
+      minWidth: 90,
+      sortable: false,
+      filter: false,
+      cellRenderer: (params: ICellRendererParams) => {
+        const item = params.data as StoreItem;
+        const consumedA = bulkUpdateData[item.id]?.consumedLocationA || 0;
+        const consumedB = bulkUpdateData[item.id]?.consumedLocationB || 0;
+        const receivedA = bulkUpdateData[item.id]?.receivedLocationA || 0;
+        const receivedB = bulkUpdateData[item.id]?.receivedLocationB || 0;
+        const robA = item.robLocationA ?? 0;
+        const robB = item.robLocationB ?? 0;
+        const effConsumedA = transactionMode === "consume" ? consumedA : 0;
+        const effConsumedB = transactionMode === "consume" ? consumedB : 0;
+        const effReceivedA = transactionMode === "receive" ? receivedA : 0;
+        const effReceivedB = transactionMode === "receive" ? receivedB : 0;
+        const newRobA = robA - effConsumedA + effReceivedA;
+        const newRobB = robB - effConsumedB + effReceivedB;
+        const newROB = newRobA + newRobB;
+        const insuffA = transactionMode === "consume" && consumedA > robA;
+        const insuffB = transactionMode === "consume" && consumedB > robB;
+        const txQtyA = transactionMode === "consume" ? consumedA : receivedA;
+        const txQtyB = transactionMode === "consume" ? consumedB : receivedB;
+        const hasAnyTx = txQtyA > 0 || txQtyB > 0;
+        const needsDate = transactionMode === "receive" && hasAnyTx && !dateReceived;
+        const hasError = insuffA || insuffB || needsDate;
+        return (
+          <div className={`text-sm font-medium text-center ${hasError ? 'text-red-600' : ''}`}>
+            {newROB}
+            {(insuffA || insuffB) && <div className="text-[10px] text-red-600">Insufficient</div>}
+            {needsDate && <div className="text-[10px] text-red-600">Date required</div>}
+          </div>
+        );
+      },
+      cellStyle: { borderLeft: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    });
+
+    if (activeTab === "chemicals") {
+      cols.push(
+        {
+          headerName: 'Expiry Date',
+          colId: 'expiryDate',
+          flex: 0.9,
+          minWidth: 130,
+          sortable: false,
+          filter: false,
+          cellRenderer: (params: ICellRendererParams) => {
+            const item = params.data as StoreItem;
+            return (
+              <Input
+                type="date"
+                value={chemBulkData[item.id]?.expiryDate ?? item.expiryDate ?? ""}
+                onChange={(e) => setChemBulkData(prev => ({
+                  ...prev,
+                  [item.id]: { ...prev[item.id], expiryDate: e.target.value }
+                }))}
+                className="w-32 h-7 text-xs"
+                data-testid={`input-chem-expiry-${item.id}`}
+              />
+            );
+          },
+          cellStyle: { borderLeft: '1px solid #e5e7eb', display: 'flex', alignItems: 'center' },
+        },
+        {
+          headerName: 'Batch #',
+          colId: 'batchNumber',
+          flex: 0.8,
+          minWidth: 100,
+          sortable: false,
+          filter: false,
+          cellRenderer: (params: ICellRendererParams) => {
+            const item = params.data as StoreItem;
+            return (
+              <Input
+                type="text"
+                value={chemBulkData[item.id]?.batchNumber ?? item.batchNumber ?? ""}
+                onChange={(e) => setChemBulkData(prev => ({
+                  ...prev,
+                  [item.id]: { ...prev[item.id], batchNumber: e.target.value }
+                }))}
+                className="w-24 h-7 text-xs"
+                placeholder="Batch #"
+                data-testid={`input-chem-batch-${item.id}`}
+              />
+            );
+          },
+          cellStyle: { display: 'flex', alignItems: 'center' },
+        },
+        {
+          headerName: 'SDS Ref',
+          colId: 'sdsReference',
+          flex: 0.8,
+          minWidth: 100,
+          sortable: false,
+          filter: false,
+          cellRenderer: (params: ICellRendererParams) => {
+            const item = params.data as StoreItem;
+            return (
+              <Input
+                type="text"
+                value={chemBulkData[item.id]?.sdsReference ?? item.sdsReference ?? ""}
+                onChange={(e) => setChemBulkData(prev => ({
+                  ...prev,
+                  [item.id]: { ...prev[item.id], sdsReference: e.target.value }
+                }))}
+                className="w-24 h-7 text-xs"
+                placeholder="SDS Ref"
+                data-testid={`input-chem-sds-${item.id}`}
+              />
+            );
+          },
+          cellStyle: { display: 'flex', alignItems: 'center' },
+        },
+      );
+    }
+
+    return cols;
+  }, [activeTab, transactionMode, locationNames.locationA, locationNames.locationB, bulkUpdateData, chemBulkData, dateReceived, paginatedItems.length]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -550,190 +862,15 @@ export default function BulkUpdateStores() {
             </div>
           ) : (
           <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800 flex flex-col flex-1 min-h-0">
-            <div className="overflow-auto flex-1">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium bg-gray-50 dark:bg-gray-700">
-                      {activeTab === "lubes" ? "Lube Grade" : 
-                       activeTab === "chemicals" ? "Chem Code" : "Item Code"}
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium bg-gray-50 dark:bg-gray-700">
-                      {activeTab === "lubes" ? "Lube Type" : 
-                       activeTab === "chemicals" ? "Chemical Name" : "Item Name"}
-                    </th>
-                    <th className="px-2 py-2 text-center text-xs font-medium border-l bg-gray-50 dark:bg-gray-700" colSpan={2}>
-                      <div className="text-center font-semibold">Current Stock (ROB)</div>
-                    </th>
-                    <th className="px-2 py-2 text-center text-xs font-medium border-l bg-gray-50 dark:bg-gray-700" colSpan={2}>
-                      <div className={`text-center font-semibold ${transactionMode === "consume" ? "text-orange-600" : "text-green-600"}`} data-testid="label-transaction-header">
-                        {transactionLabel}
-                      </div>
-                    </th>
-                    <th className="px-2 py-2 text-center text-xs font-medium border-l bg-gray-50 dark:bg-gray-700">New ROB</th>
-                    {activeTab === "chemicals" && (
-                      <>
-                        <th className="px-2 py-2 text-center text-xs font-medium border-l bg-gray-50 dark:bg-gray-700">Expiry Date</th>
-                        <th className="px-2 py-2 text-center text-xs font-medium bg-gray-50 dark:bg-gray-700">Batch #</th>
-                        <th className="px-2 py-2 text-center text-xs font-medium bg-gray-50 dark:bg-gray-700">SDS Ref</th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedItems.map((item: StoreItem, index: number) => {
-                    const consumedA = bulkUpdateData[item.id]?.consumedLocationA || 0;
-                    const consumedB = bulkUpdateData[item.id]?.consumedLocationB || 0;
-                    const receivedA = bulkUpdateData[item.id]?.receivedLocationA || 0;
-                    const receivedB = bulkUpdateData[item.id]?.receivedLocationB || 0;
-                    const robA = item.robLocationA ?? 0;
-                    const robB = item.robLocationB ?? 0;
-
-                    const effectiveConsumedA = transactionMode === "consume" ? consumedA : 0;
-                    const effectiveConsumedB = transactionMode === "consume" ? consumedB : 0;
-                    const effectiveReceivedA = transactionMode === "receive" ? receivedA : 0;
-                    const effectiveReceivedB = transactionMode === "receive" ? receivedB : 0;
-
-                    const newRobA = robA - effectiveConsumedA + effectiveReceivedA;
-                    const newRobB = robB - effectiveConsumedB + effectiveReceivedB;
-                    const newROB = newRobA + newRobB;
-
-                    const hasInsufficientStockA = transactionMode === "consume" && consumedA > robA;
-                    const hasInsufficientStockB = transactionMode === "consume" && consumedB > robB;
-
-                    const transactionQtyA = transactionMode === "consume" ? consumedA : receivedA;
-                    const transactionQtyB = transactionMode === "consume" ? consumedB : receivedB;
-                    const hasAnyTransaction = transactionQtyA > 0 || transactionQtyB > 0;
-                    const needsReceivedDate = transactionMode === "receive" && hasAnyTransaction && !dateReceived;
-                    const hasError = hasInsufficientStockA || hasInsufficientStockB || needsReceivedDate;
-                    
-                    const itemLocA = item.location || locationNames.locationA;
-                    const itemLocB = item.location2 || locationNames.locationB;
-                    
-                    return (
-                      <tr key={item.id} className={`border-t transition-colors ${hasError ? 'bg-red-50 dark:bg-red-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                        <td className="px-3 py-2 text-sm">{item.itemCode}</td>
-                        <td className="px-3 py-2 text-sm max-w-[150px] truncate" title={item.itemName}>{item.itemName}</td>
-                        <td className="px-2 py-2 border-l">
-                          <div className="text-[11px] italic text-blue-600 whitespace-normal leading-tight" data-testid={`text-location-a-${item.id}`}>{itemLocA}</div>
-                          <div className="text-sm text-gray-800 dark:text-gray-200 font-medium text-center">{robA}</div>
-                        </td>
-                        <td className="px-2 py-2">
-                          <div className="text-[11px] italic text-blue-600 whitespace-normal leading-tight" data-testid={`text-location-b-${item.id}`}>{itemLocB}</div>
-                          <div className="text-sm text-gray-800 dark:text-gray-200 font-medium text-center">{robB}</div>
-                        </td>
-                        {transactionMode === "consume" ? (
-                          <>
-                            <td className="px-1 py-2 border-l text-center">
-                              <Input
-                                type="number"
-                                min="0"
-                                max={robA}
-                                value={bulkUpdateData[item.id]?.consumedLocationA || ""}
-                                onChange={(e) => handleBulkUpdateChange(item.id, 'consumedLocationA', e.target.value)}
-                                className={`w-16 h-7 text-sm text-center mx-auto ${hasInsufficientStockA ? 'border-red-500' : ''}`}
-                                data-testid={`input-consume-a-${item.id}`}
-                                tabIndex={index + 1}
-                              />
-                            </td>
-                            <td className="px-1 py-2 text-center">
-                              <Input
-                                type="number"
-                                min="0"
-                                max={robB}
-                                value={bulkUpdateData[item.id]?.consumedLocationB || ""}
-                                onChange={(e) => handleBulkUpdateChange(item.id, 'consumedLocationB', e.target.value)}
-                                className={`w-16 h-7 text-sm text-center mx-auto ${hasInsufficientStockB ? 'border-red-500' : ''}`}
-                                data-testid={`input-consume-b-${item.id}`}
-                                tabIndex={paginatedItems.length + index + 1}
-                              />
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            <td className="px-1 py-2 border-l text-center">
-                              <Input
-                                type="number"
-                                min="0"
-                                value={bulkUpdateData[item.id]?.receivedLocationA || ""}
-                                onChange={(e) => handleBulkUpdateChange(item.id, 'receivedLocationA', e.target.value)}
-                                className="w-16 h-7 text-sm text-center mx-auto"
-                                data-testid={`input-receive-a-${item.id}`}
-                                tabIndex={index + 1}
-                              />
-                            </td>
-                            <td className="px-1 py-2 text-center">
-                              <Input
-                                type="number"
-                                min="0"
-                                value={bulkUpdateData[item.id]?.receivedLocationB || ""}
-                                onChange={(e) => handleBulkUpdateChange(item.id, 'receivedLocationB', e.target.value)}
-                                className="w-16 h-7 text-sm text-center mx-auto"
-                                data-testid={`input-receive-b-${item.id}`}
-                                tabIndex={paginatedItems.length + index + 1}
-                              />
-                            </td>
-                          </>
-                        )}
-                        <td className="px-2 py-2 text-center border-l">
-                          <div className={`text-sm font-medium ${hasError ? 'text-red-600' : ''}`}>
-                            {newROB}
-                            {(hasInsufficientStockA || hasInsufficientStockB) && (
-                              <div className="text-[10px] text-red-600">Insufficient</div>
-                            )}
-                            {needsReceivedDate && (
-                              <div className="text-[10px] text-red-600">Date required</div>
-                            )}
-                          </div>
-                        </td>
-                        {activeTab === "chemicals" && (
-                          <>
-                            <td className="px-1 py-2 border-l">
-                              <Input
-                                type="date"
-                                value={chemBulkData[item.id]?.expiryDate ?? item.expiryDate ?? ""}
-                                onChange={(e) => setChemBulkData(prev => ({
-                                  ...prev,
-                                  [item.id]: { ...prev[item.id], expiryDate: e.target.value }
-                                }))}
-                                className="w-32 h-7 text-xs"
-                                data-testid={`input-chem-expiry-${item.id}`}
-                              />
-                            </td>
-                            <td className="px-1 py-2">
-                              <Input
-                                type="text"
-                                value={chemBulkData[item.id]?.batchNumber ?? item.batchNumber ?? ""}
-                                onChange={(e) => setChemBulkData(prev => ({
-                                  ...prev,
-                                  [item.id]: { ...prev[item.id], batchNumber: e.target.value }
-                                }))}
-                                className="w-24 h-7 text-xs"
-                                placeholder="Batch #"
-                                data-testid={`input-chem-batch-${item.id}`}
-                              />
-                            </td>
-                            <td className="px-1 py-2">
-                              <Input
-                                type="text"
-                                value={chemBulkData[item.id]?.sdsReference ?? item.sdsReference ?? ""}
-                                onChange={(e) => setChemBulkData(prev => ({
-                                  ...prev,
-                                  [item.id]: { ...prev[item.id], sdsReference: e.target.value }
-                                }))}
-                                className="w-24 h-7 text-xs"
-                                placeholder="SDS Ref"
-                                data-testid={`input-chem-sds-${item.id}`}
-                              />
-                            </td>
-                          </>
-                        )}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <div className="flex-1 min-h-0">
+                <WOAgGridTable
+                  columnDefs={bulkColumnDefs}
+                  rowData={paginatedItems}
+                  getRowClass={bulkGetRowClass}
+                  noRowsMessage="No items match your filters."
+                  testId="bulk-update-stores-grid"
+                />
+              </div>
 
             <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50 dark:bg-gray-700">
               <div className="flex items-center gap-2">
