@@ -851,16 +851,18 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack, globalFilters, em
             </Card>
           </div>
 
-          <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
-            <StoresReportListGrid
-              reports={filteredReports}
-              generatingReports={generatingReports}
-              getPriorityColor={getPriorityColor}
-              onSelectDetail={(id) => setSelectedReport(id)}
-              onPreview={(id) => handlePreviewReport(id)}
-              onGenerate={(id, fmt) => handleGenerateReport(id, fmt)}
-            />
-          </div>
+          {filteredReports.length > 0 && (
+            <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
+              <StoresReportListGrid
+                reports={filteredReports}
+                generatingReports={generatingReports}
+                getPriorityColor={getPriorityColor}
+                onSelectDetail={(id) => setSelectedReport(id)}
+                onPreview={(id) => handlePreviewReport(id)}
+                onGenerate={(id, fmt) => handleGenerateReport(id, fmt)}
+              />
+            </div>
+          )}
 
           {filteredReports.length === 0 && (
             <div className="text-center py-12">

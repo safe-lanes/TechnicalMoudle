@@ -698,16 +698,18 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack, globalFilters, em
             </Card>
           </div>
 
-          <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
-            <SparesReportListGrid
-              reports={filteredReports}
-              generatingReports={generatingReports}
-              getPriorityColor={getPriorityColor}
-              onSelectDetail={(id) => setActiveDetailReport(id)}
-              onPreview={(id) => handlePreviewReport(id)}
-              onGenerate={(id, fmt) => handleGenerateReport(id, fmt)}
-            />
-          </div>
+          {filteredReports.length > 0 && (
+            <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
+              <SparesReportListGrid
+                reports={filteredReports}
+                generatingReports={generatingReports}
+                getPriorityColor={getPriorityColor}
+                onSelectDetail={(id) => setActiveDetailReport(id)}
+                onPreview={(id) => handlePreviewReport(id)}
+                onGenerate={(id, fmt) => handleGenerateReport(id, fmt)}
+              />
+            </div>
+          )}
 
           {filteredReports.length === 0 && (
             <div className="text-center py-12">
