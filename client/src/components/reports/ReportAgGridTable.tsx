@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import type { ColDef, GridReadyEvent, GridApi, SortChangedEvent, RowClickedEvent } from 'ag-grid-community';
+import type { ColDef, GridReadyEvent, GridApi, SortChangedEvent, RowClickedEvent, RowClassParams, GetRowIdParams } from 'ag-grid-community';
 import { ModuleRegistry } from 'ag-grid-community';
 import {
   MenuModule,
@@ -37,8 +37,8 @@ interface ReportAgGridTableProps {
   domLayout?: 'normal' | 'autoHeight' | 'print';
   testId?: string;
   noRowsMessage?: string;
-  getRowClass?: (params: any) => string | string[] | undefined;
-  getRowId?: (params: any) => string;
+  getRowClass?: (params: RowClassParams) => string | string[] | undefined;
+  getRowId?: (params: GetRowIdParams) => string;
 }
 
 const HeaderRendererWrapper: React.FC<{ render: () => React.ReactNode }> = ({ render }) => {
@@ -82,7 +82,7 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({
         },
       };
       if (col.headerClass) def.headerClass = col.headerClass;
-      if (col.cellClass) def.cellClass = col.cellClass as any;
+      if (col.cellClass) def.cellClass = col.cellClass as ColDef['cellClass'];
       if (col.headerComponent) {
         const renderHeader = col.headerComponent;
         def.headerComponent = (params: any) => <HeaderRendererWrapper render={renderHeader} />;

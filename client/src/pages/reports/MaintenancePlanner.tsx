@@ -854,8 +854,10 @@ const PlannerJobsGrid: React.FC<PlannerJobsGridProps> = ({
       header: 'Status', field: 'status', width: 110, sortable: true,
       headerComponent: renderHeaderWithMarker('G21.27', 'Status'),
       cellRenderer: (p: any) => (
-        <span data-testid={p.node?.rowIndex === 0 ? 'G21.39' : `row-job-${p.data.jobId}`}>
-          {p.node?.rowIndex === 0 && <Marker id="G21.39" />}
+        <span data-testid={`row-job-${p.data.jobId}`}>
+          {p.node?.rowIndex === 0 && (
+            <span data-testid="G21.39"><Marker id="G21.39" /></span>
+          )}
           {getStatusBadge(p.data.status)}
         </span>
       ),
