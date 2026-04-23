@@ -242,12 +242,9 @@ export class PostgresStorage {
     }
   }
 
-  private async insertStoresLedgerEntry(values: InsertStoresLedger): Promise<void> {
-    await this.insertWithSequenceRepair('stores_ledger', async () => {
-      const db = await getDb();
-      await db.insert(storesLedger).values(values);
-      return undefined;
-    });
+  private async insertStoresLedgerEntry(values: InsertStoresLedger, txConn?: any): Promise<void> {
+    const conn = txConn || await getDb();
+    await conn.insert(storesLedger).values(values);
   }
 
   // ============= USERS (Module 1) =============
@@ -1457,85 +1454,87 @@ export class PostgresStorage {
     const previousMasterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
     const delta = params.newRHValue - previousMasterRH;
 
-    // Update the MASTER component - update both rhCurrentMaster and currentCumulativeRH for compatibility
-    const masterResult = await db.update(components)
-      .set({
-        rhCurrentMaster: params.newRHValue.toString(),
-        currentCumulativeRH: params.newRHValue.toString(),
-        rhMasterUpdatedAt: now,
-        rhMasterUpdatedBy: params.userId,
-        rhMasterUpdateSource: params.updateSource,
-        lastUpdated: now.toISOString(),
-        updatedAt: now,
-      })
-      .where(eq(components.cuuid, component.cuuid))
-      .returning();
-
-    if (!masterResult[0]) {
-      throw new Error(`Failed to update MASTER component ${params.componentId}`);
-    }
-
     // CRITICAL: Filter by vesselId to prevent cross-vessel RH aggregation
     const masterComponentCode = component.componentCode || '';
     const masterVesselId = component.vesselId;
-    
+
     // CRITICAL SAFEGUARD: Skip cascade if vesselId cannot be determined
-    if (!masterVesselId) {
-      console.warn(`⚠️ [updateMasterRunningHours] Cannot determine vesselId for master "${params.componentId}" - skipping cascade to prevent cross-vessel leak`);
-      return {
-        masterUpdated: masterResult[0],
-        inheritedUpdated: 0,
-      };
+    // Fetch inherited components list before tx (read-only)
+    let inheritedComponents: Component[] = [];
+    if (masterVesselId) {
+      inheritedComponents = await this.getInheritedComponents(component.cuuid, masterVesselId);
     }
-    
-    // Get all inherited components linked to this master
-    const inheritedComponents = await this.getInheritedComponents(component.cuuid, masterVesselId);
 
-    await db.insert(runningHoursAudit).values({
-      vesselId: masterVesselId,
-      componentId: component.cuuid,
-      previousRH: previousMasterRH.toFixed(2),
-      newRH: params.newRHValue.toFixed(2),
-      cumulativeRH: params.newRHValue.toFixed(2),
-      dateUpdatedLocal: now.toISOString().split('T')[0],
-      dateUpdatedTZ: 'UTC',
-      enteredAtUTC: now,
-      userId: params.userId,
-      updatedByUuid: params.userUuid || null,
-      source: params.updateSource.toLowerCase(),
-      notes: params.comments || null,
-      meterReplaced: false,
-      version: 1,
-      componentCode: masterComponentCode,
-      componentName: component.name || null,
-    });
-
-    // Apply DELTA to each inherited component's currentCumulativeRH (actual running hours)
-    // rhCurrentInheritedCached stores the master's absolute value (for display/config)
-    // currentCumulativeRH tracks the child's individual running hours (delta-based)
-    let inheritedUpdated = 0;
-    for (const inherited of inheritedComponents) {
-      // Get child's current actual running hours (use currentCumulativeRH as the source of truth)
-      const currentChildRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || '0');
-      const newChildRH = Math.max(0, currentChildRH + delta); // Apply delta, ensure non-negative
-      
-      await db.update(components)
+    // All writes in one transaction: master UPDATE + audit INSERT + inherited UPDATEs
+    const txResult = await db.transaction(async (tx) => {
+      // Update the MASTER component - update both rhCurrentMaster and currentCumulativeRH for compatibility
+      const masterResult = await tx.update(components)
         .set({
-          rhCurrentInheritedCached: params.newRHValue.toString(), // Cache master's absolute value
-          currentCumulativeRH: newChildRH.toString(), // Child's actual RH with delta applied
-          rhInheritedUpdatedAt: now,
+          rhCurrentMaster: params.newRHValue.toString(),
+          currentCumulativeRH: params.newRHValue.toString(),
+          rhMasterUpdatedAt: now,
+          rhMasterUpdatedBy: params.userId,
+          rhMasterUpdateSource: params.updateSource,
           lastUpdated: now.toISOString(),
           updatedAt: now,
         })
-        .where(eq(components.cuuid, inherited.cuuid));
-      
-      inheritedUpdated++;
-    }
+        .where(eq(components.cuuid, component.cuuid))
+        .returning();
 
-    return {
-      masterUpdated: masterResult[0],
-      inheritedUpdated,
-    };
+      if (!masterResult[0]) {
+        throw new Error(`Failed to update MASTER component ${params.componentId}`);
+      }
+
+      if (!masterVesselId) {
+        console.warn(`⚠️ [updateMasterRunningHours] Cannot determine vesselId for master "${params.componentId}" - skipping cascade to prevent cross-vessel leak`);
+        return { masterUpdated: masterResult[0], inheritedUpdated: 0 };
+      }
+
+      await tx.insert(runningHoursAudit).values({
+        vesselId: masterVesselId,
+        componentId: component.cuuid,
+        previousRH: previousMasterRH.toFixed(2),
+        newRH: params.newRHValue.toFixed(2),
+        cumulativeRH: params.newRHValue.toFixed(2),
+        dateUpdatedLocal: now.toISOString().split('T')[0],
+        dateUpdatedTZ: 'UTC',
+        enteredAtUTC: now,
+        userId: params.userId,
+        updatedByUuid: params.userUuid || null,
+        source: params.updateSource.toLowerCase(),
+        notes: params.comments || null,
+        meterReplaced: false,
+        version: 1,
+        componentCode: masterComponentCode,
+        componentName: component.name || null,
+      });
+
+      // Apply DELTA to each inherited component's currentCumulativeRH (actual running hours)
+      // rhCurrentInheritedCached stores the master's absolute value (for display/config)
+      // currentCumulativeRH tracks the child's individual running hours (delta-based)
+      let inheritedUpdated = 0;
+      for (const inherited of inheritedComponents) {
+        // Get child's current actual running hours (use currentCumulativeRH as the source of truth)
+        const currentChildRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || '0');
+        const newChildRH = Math.max(0, currentChildRH + delta); // Apply delta, ensure non-negative
+
+        await tx.update(components)
+          .set({
+            rhCurrentInheritedCached: params.newRHValue.toString(), // Cache master's absolute value
+            currentCumulativeRH: newChildRH.toString(), // Child's actual RH with delta applied
+            rhInheritedUpdatedAt: now,
+            lastUpdated: now.toISOString(),
+            updatedAt: now,
+          })
+          .where(eq(components.cuuid, inherited.cuuid));
+
+        inheritedUpdated++;
+      }
+
+      return { masterUpdated: masterResult[0], inheritedUpdated };
+    });
+
+    return txResult;
   }
 
   // CENTRALIZED RH UPDATE: Set running hours for any component with automatic field sync
@@ -2657,38 +2656,42 @@ export class PostgresStorage {
     const newRob = (spare.rob ?? 0) - quantity;
     const newRobA = (spare.robLocationA ?? 0) - quantity;
     
-    const updated = await db.update(spares)
-      .set({
-        rob: newRob,
-        robLocationA: newRobA < 0 ? 0 : newRobA,
-        updatedAt: new Date()
-      })
-      .where(eq(spares.suuid, spare.suuid))
-      .returning();
+    const updated = await db.transaction(async (tx) => {
+      const result = await tx.update(spares)
+        .set({
+          rob: newRob,
+          robLocationA: newRobA < 0 ? 0 : newRobA,
+          updatedAt: new Date()
+        })
+        .where(eq(spares.suuid, spare.suuid))
+        .returning();
 
-    await this.createSpareHistory({
-      timestampUTC: new Date(),
-      vesselId: spare.vesselId || 'V001',
-      spareId: spare.id,
-      spareUuid: spare.suuid,
-      partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
-      partName: spare.partName,
-      componentId: spare.componentId || '',
-      componentCode: spare.componentCode ?? null,
-      componentName: spare.componentName,
-      componentSpareCode: spare.componentSpareCode ?? null,
-      eventType: 'CONSUME',
-      qtyChange: -quantity,
-      robAfter: newRob,
-      userId,
-      remarks: remarks ?? null,
-      reference: null,
-      dateLocal: dateLocal ?? null,
-      tz: tz ?? null,
-      place: place ?? null,
+      await this.createSpareHistory({
+        timestampUTC: new Date(),
+        vesselId: spare.vesselId || 'V001',
+        spareId: spare.id,
+        spareUuid: spare.suuid,
+        partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
+        partName: spare.partName,
+        componentId: spare.componentId || '',
+        componentCode: spare.componentCode ?? null,
+        componentName: spare.componentName,
+        componentSpareCode: spare.componentSpareCode ?? null,
+        eventType: 'CONSUME',
+        qtyChange: -quantity,
+        robAfter: newRob,
+        userId,
+        remarks: remarks ?? null,
+        reference: null,
+        dateLocal: dateLocal ?? null,
+        tz: tz ?? null,
+        place: place ?? null,
+      }, tx);
+
+      return result[0];
     });
 
-    // SYNC: Update normalized spare_location_stock table independently per location
+    // SYNC: Update normalized spare_location_stock table independently per location (best-effort, outside tx)
     const vesselId = spare.vesselId || 'V001';
     if (spare.location) {
       try {
@@ -2705,7 +2708,7 @@ export class PostgresStorage {
       }
     }
 
-    return updated[0];
+    return updated;
   }
 
   async consumeSpareFromLocation(
@@ -2743,39 +2746,43 @@ export class PostgresStorage {
     
     const newRob = Math.max(0, currentRob - deducted);
     
-    const updated = await db.update(spares)
-      .set({
-        rob: newRob,
-        robLocationA: newRobA,
-        robLocationB: newRobB,
-        updatedAt: new Date()
-      })
-      .where(eq(spares.suuid, spare.suuid))
-      .returning();
+    const txResult = await db.transaction(async (tx) => {
+      const result = await tx.update(spares)
+        .set({
+          rob: newRob,
+          robLocationA: newRobA,
+          robLocationB: newRobB,
+          updatedAt: new Date()
+        })
+        .where(eq(spares.suuid, spare.suuid))
+        .returning();
 
-    await this.createSpareHistory({
-      timestampUTC: new Date(),
-      vesselId: spare.vesselId || 'V001',
-      spareId: spare.id,
-      spareUuid: spare.suuid,
-      partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
-      partName: spare.partName,
-      componentId: spare.componentId || '',
-      componentCode: spare.componentCode ?? null,
-      componentName: spare.componentName,
-      componentSpareCode: spare.componentSpareCode ?? null,
-      eventType: 'CONSUME',
-      qtyChange: -deducted,
-      robAfter: newRob,
-      userId,
-      remarks: remarks ? `${remarks} (Location ${location})${workOrderRef ? ` WO: ${workOrderRef}` : ''}` : `Location ${location}`,
-      reference: workOrderRef ?? null,
-      dateLocal: dateLocal ?? null,
-      tz: null,
-      place: null,
+      await this.createSpareHistory({
+        timestampUTC: new Date(),
+        vesselId: spare.vesselId || 'V001',
+        spareId: spare.id,
+        spareUuid: spare.suuid,
+        partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
+        partName: spare.partName,
+        componentId: spare.componentId || '',
+        componentCode: spare.componentCode ?? null,
+        componentName: spare.componentName,
+        componentSpareCode: spare.componentSpareCode ?? null,
+        eventType: 'CONSUME',
+        qtyChange: -deducted,
+        robAfter: newRob,
+        userId,
+        remarks: remarks ? `${remarks} (Location ${location})${workOrderRef ? ` WO: ${workOrderRef}` : ''}` : `Location ${location}`,
+        reference: workOrderRef ?? null,
+        dateLocal: dateLocal ?? null,
+        tz: null,
+        place: null,
+      }, tx);
+
+      return result[0];
     });
-    
-    // SYNC: Update normalized spare_location_stock table independently per location
+
+    // SYNC: Update normalized spare_location_stock table independently per location (best-effort, outside tx)
     const vesselId = spare.vesselId || 'V001';
     if (spare.location) {
       try {
@@ -2793,9 +2800,9 @@ export class PostgresStorage {
         console.warn(`[consumeSpareFromLocation] Failed to sync Location B spare_location_stock for spare ${id}: ${syncError.message}`);
       }
     }
-    
+
     return {
-      spare: updated[0],
+      spare: txResult,
       deducted,
       requested: quantity,
       shortageQty,
@@ -2832,40 +2839,44 @@ export class PostgresStorage {
     
     const newRob = currentRob + quantity;
     
-    const updated = await db.update(spares)
-      .set({
-        rob: newRob,
-        robLocationA: newRobA,
-        robLocationB: newRobB,
-        lastOrderDate: dateLocal ?? null,
-        updatedAt: new Date()
-      })
-      .where(eq(spares.suuid, spare.suuid))
-      .returning();
+    const updated = await db.transaction(async (tx) => {
+      const result = await tx.update(spares)
+        .set({
+          rob: newRob,
+          robLocationA: newRobA,
+          robLocationB: newRobB,
+          lastOrderDate: dateLocal ?? null,
+          updatedAt: new Date()
+        })
+        .where(eq(spares.suuid, spare.suuid))
+        .returning();
 
-    await this.createSpareHistory({
-      timestampUTC: new Date(),
-      vesselId: spare.vesselId || 'V001',
-      spareId: spare.id,
-      spareUuid: spare.suuid,
-      partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
-      partName: spare.partName,
-      componentId: spare.componentId || '',
-      componentCode: spare.componentCode ?? null,
-      componentName: spare.componentName,
-      componentSpareCode: spare.componentSpareCode ?? null,
-      eventType: 'RECEIVE',
-      qtyChange: quantity,
-      robAfter: newRob,
-      userId,
-      remarks: remarks ? `${remarks} (Location ${location})${supplierPO ? ` PO: ${supplierPO}` : ''}` : `Location ${location}`,
-      reference: supplierPO ?? null,
-      dateLocal: dateLocal ?? null,
-      tz: null,
-      place: null,
+      await this.createSpareHistory({
+        timestampUTC: new Date(),
+        vesselId: spare.vesselId || 'V001',
+        spareId: spare.id,
+        spareUuid: spare.suuid,
+        partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
+        partName: spare.partName,
+        componentId: spare.componentId || '',
+        componentCode: spare.componentCode ?? null,
+        componentName: spare.componentName,
+        componentSpareCode: spare.componentSpareCode ?? null,
+        eventType: 'RECEIVE',
+        qtyChange: quantity,
+        robAfter: newRob,
+        userId,
+        remarks: remarks ? `${remarks} (Location ${location})${supplierPO ? ` PO: ${supplierPO}` : ''}` : `Location ${location}`,
+        reference: supplierPO ?? null,
+        dateLocal: dateLocal ?? null,
+        tz: null,
+        place: null,
+      }, tx);
+
+      return result[0];
     });
-    
-    // SYNC: Update normalized spare_location_stock table independently per location
+
+    // SYNC: Update normalized spare_location_stock table independently per location (best-effort, outside tx)
     const vesselId = spare.vesselId || 'V001';
     if (spare.location) {
       try {
@@ -2883,9 +2894,9 @@ export class PostgresStorage {
         console.warn(`[receiveSpareToLocation] Failed to sync Location B spare_location_stock for spare ${id}: ${syncError.message}`);
       }
     }
-    
+
     return {
-      spare: updated[0],
+      spare: updated,
       received: quantity,
     };
   }
@@ -2930,41 +2941,45 @@ export class PostgresStorage {
       return spare;
     }
     
-    const updated = await db.update(spares)
-      .set({
-        rob: newTotal,
-        robLocationA: newLocA,
-        robLocationB: newLocB,
-        updatedAt: new Date()
-      })
-      .where(eq(spares.suuid, spare.suuid))
-      .returning();
-
     const adjustmentRemarks = remarks || `Adjustment at Location ${location}: ${location === 'A' ? oldLocA : oldLocB}→${newRob}`;
 
-    await this.createSpareHistory({
-      timestampUTC: new Date(),
-      vesselId: spare.vesselId || 'V001',
-      spareId: spare.id,
-      spareUuid: spare.suuid,
-      partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
-      partName: spare.partName,
-      componentId: spare.componentId || '',
-      componentCode: spare.componentCode ?? null,
-      componentName: spare.componentName,
-      componentSpareCode: spare.componentSpareCode ?? null,
-      eventType: 'ADJUST',
-      qtyChange: netChange,
-      robAfter: newTotal,
-      userId,
-      remarks: adjustmentRemarks,
-      reference: null,
-      dateLocal: dateLocal ?? null,
-      tz: tz ?? null,
-      place: place ?? null,
+    const updated = await db.transaction(async (tx) => {
+      const result = await tx.update(spares)
+        .set({
+          rob: newTotal,
+          robLocationA: newLocA,
+          robLocationB: newLocB,
+          updatedAt: new Date()
+        })
+        .where(eq(spares.suuid, spare.suuid))
+        .returning();
+
+      await this.createSpareHistory({
+        timestampUTC: new Date(),
+        vesselId: spare.vesselId || 'V001',
+        spareId: spare.id,
+        spareUuid: spare.suuid,
+        partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
+        partName: spare.partName,
+        componentId: spare.componentId || '',
+        componentCode: spare.componentCode ?? null,
+        componentName: spare.componentName,
+        componentSpareCode: spare.componentSpareCode ?? null,
+        eventType: 'ADJUST',
+        qtyChange: netChange,
+        robAfter: newTotal,
+        userId,
+        remarks: adjustmentRemarks,
+        reference: null,
+        dateLocal: dateLocal ?? null,
+        tz: tz ?? null,
+        place: place ?? null,
+      }, tx);
+
+      return result[0];
     });
 
-    // SYNC: Update normalized spare_location_stock table independently per location
+    // SYNC: Update normalized spare_location_stock table independently per location (best-effort, outside tx)
     const vesselId = spare.vesselId || 'V001';
     if (spare.location) {
       try {
@@ -2983,7 +2998,7 @@ export class PostgresStorage {
       }
     }
 
-    return updated[0];
+    return updated;
   }
 
   async transferSpareLocation(
@@ -3023,18 +3038,94 @@ export class PostgresStorage {
     }
     
     const newTotalRob = newLocA + newLocB;
-    
-    const updated = await db.update(spares)
-      .set({
-        rob: newTotalRob,
-        robLocationA: newLocA,
-        robLocationB: newLocB,
-        updatedAt: new Date()
-      })
-      .where(eq(spares.suuid, spare.suuid))
-      .returning();
 
-    // SYNC: Update normalized spare_location_stock table independently per location
+    // Only create transfer history entries if this is a true transfer
+    // (total ROB unchanged AND stock moved between locations)
+    const oldTotalRob = oldLocA + oldLocB;
+    const isTrueTransfer = deltaA !== 0 && deltaB !== 0 && newTotalRob === oldTotalRob;
+
+    const txResult = await db.transaction(async (tx) => {
+      const result = await tx.update(spares)
+        .set({
+          rob: newTotalRob,
+          robLocationA: newLocA,
+          robLocationB: newLocB,
+          updatedAt: new Date()
+        })
+        .where(eq(spares.suuid, spare.suuid))
+        .returning();
+
+      if (isTrueTransfer) {
+        const transferQty = Math.abs(deltaA);
+        const fromLocation = deltaA < 0 ? 'A' : 'B';
+        const toLocation = deltaA < 0 ? 'B' : 'A';
+        const transferRemarks = remarks || `Transfer ${transferQty} from Location ${fromLocation} to Location ${toLocation}`;
+
+        await this.createSpareHistory({
+          timestampUTC: new Date(),
+          vesselId: spare.vesselId || 'V001',
+          spareId: spare.id,
+          spareUuid: spare.suuid,
+          partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
+          partName: spare.partName,
+          componentId: spare.componentId || '',
+          componentCode: spare.componentCode ?? null,
+          componentName: spare.componentName,
+          componentSpareCode: spare.componentSpareCode ?? null,
+          eventType: 'TRANSFER',
+          qtyChange: 0,
+          robAfter: newTotalRob,
+          userId,
+          remarks: transferRemarks,
+          reference: null,
+          dateLocal: dateLocal ?? null,
+          tz: tz ?? null,
+          place: place ?? null,
+        }, tx);
+      } else {
+        // Not a true transfer - classify based on net ROB change direction
+        const netChange = (newLocA + newLocB) - (oldLocA + oldLocB);
+        let eventType: string;
+        let eventRemarks: string;
+
+        if (netChange < 0) {
+          eventType = 'CONSUME';
+          eventRemarks = remarks || `Consumed ${Math.abs(netChange)} units (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
+        } else if (netChange > 0) {
+          eventType = 'RECEIVE';
+          eventRemarks = remarks || `Received ${netChange} units (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
+        } else {
+          eventType = 'ADJUSTMENT';
+          eventRemarks = remarks || `Adjustment (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
+        }
+
+        await this.createSpareHistory({
+          timestampUTC: new Date(),
+          vesselId: spare.vesselId || 'V001',
+          spareId: spare.id,
+          spareUuid: spare.suuid,
+          partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
+          partName: spare.partName,
+          componentId: spare.componentId || '',
+          componentCode: spare.componentCode ?? null,
+          componentName: spare.componentName,
+          componentSpareCode: spare.componentSpareCode ?? null,
+          eventType,
+          qtyChange: netChange,
+          robAfter: newTotalRob,
+          userId,
+          remarks: eventRemarks,
+          reference: null,
+          dateLocal: dateLocal ?? null,
+          tz: tz ?? null,
+          place: place ?? null,
+        }, tx);
+      }
+
+      return result[0];
+    });
+
+    // SYNC: Update normalized spare_location_stock table independently per location (best-effort, outside tx)
     const vesselId = spare.vesselId || 'V001';
 
     if (spare.location) {
@@ -3068,81 +3159,7 @@ export class PostgresStorage {
       }
     }
 
-    // Only create transfer history entries if this is a true transfer
-    // (total ROB unchanged AND stock moved between locations)
-    const oldTotalRob = oldLocA + oldLocB;
-    const isTrueTransfer = deltaA !== 0 && deltaB !== 0 && newTotalRob === oldTotalRob;
-    
-    if (isTrueTransfer) {
-      const transferQty = Math.abs(deltaA);
-      const fromLocation = deltaA < 0 ? 'A' : 'B';
-      const toLocation = deltaA < 0 ? 'B' : 'A';
-      const transferRemarks = remarks || `Transfer ${transferQty} from Location ${fromLocation} to Location ${toLocation}`;
-
-      await this.createSpareHistory({
-        timestampUTC: new Date(),
-        vesselId: spare.vesselId || 'V001',
-        spareId: spare.id,
-        spareUuid: spare.suuid,
-        partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
-        partName: spare.partName,
-        componentId: spare.componentId || '',
-        componentCode: spare.componentCode ?? null,
-        componentName: spare.componentName,
-        componentSpareCode: spare.componentSpareCode ?? null,
-        eventType: 'TRANSFER',
-        qtyChange: 0,
-        robAfter: newTotalRob,
-        userId,
-        remarks: transferRemarks,
-        reference: null,
-        dateLocal: dateLocal ?? null,
-        tz: tz ?? null,
-        place: place ?? null,
-      });
-      
-      return { spare: updated[0], isTransfer: true };
-    }
-    
-    // Not a true transfer - classify based on net ROB change direction
-    const netChange = (newLocA + newLocB) - (oldLocA + oldLocB);
-    let eventType: string;
-    let eventRemarks: string;
-
-    if (netChange < 0) {
-      eventType = 'CONSUME';
-      eventRemarks = remarks || `Consumed ${Math.abs(netChange)} units (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
-    } else if (netChange > 0) {
-      eventType = 'RECEIVE';
-      eventRemarks = remarks || `Received ${netChange} units (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
-    } else {
-      eventType = 'ADJUSTMENT';
-      eventRemarks = remarks || `Adjustment (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
-    }
-    
-    await this.createSpareHistory({
-      timestampUTC: new Date(),
-      vesselId: spare.vesselId || 'V001',
-      spareId: spare.id,
-      spareUuid: spare.suuid,
-      partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
-      partName: spare.partName,
-      componentId: spare.componentId || '',
-      componentCode: spare.componentCode ?? null,
-      componentName: spare.componentName,
-      componentSpareCode: spare.componentSpareCode ?? null,
-      eventType,
-      qtyChange: netChange,
-      robAfter: newTotalRob,
-      userId,
-      remarks: eventRemarks,
-      reference: null,
-      dateLocal: dateLocal ?? null,
-      tz: tz ?? null,
-      place: place ?? null,
-    });
-    
-    return { spare: updated[0], isTransfer: false };
+    return { spare: txResult, isTransfer: isTrueTransfer };
   }
 
   async receiveSpare(
@@ -3164,39 +3181,43 @@ export class PostgresStorage {
     const newRob = (spare.rob ?? 0) + quantity;
     const newRobA = (spare.robLocationA ?? 0) + quantity;
     
-    const updated = await db.update(spares)
-      .set({
-        rob: newRob,
-        robLocationA: newRobA,
-        lastOrderDate: dateLocal ?? null,
-        updatedAt: new Date()
-      })
-      .where(eq(spares.suuid, spare.suuid))
-      .returning();
+    const updated = await db.transaction(async (tx) => {
+      const result = await tx.update(spares)
+        .set({
+          rob: newRob,
+          robLocationA: newRobA,
+          lastOrderDate: dateLocal ?? null,
+          updatedAt: new Date()
+        })
+        .where(eq(spares.suuid, spare.suuid))
+        .returning();
 
-    await this.createSpareHistory({
-      timestampUTC: new Date(),
-      vesselId: spare.vesselId || 'V001',
-      spareId: spare.id,
-      spareUuid: spare.suuid,
-      partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
-      partName: spare.partName,
-      componentId: spare.componentId || '',
-      componentCode: spare.componentCode ?? null,
-      componentName: spare.componentName,
-      componentSpareCode: spare.componentSpareCode ?? null,
-      eventType: 'RECEIVE',
-      qtyChange: quantity,
-      robAfter: newRob,
-      userId,
-      remarks: remarks ?? null,
-      reference: supplierPO ?? null,
-      dateLocal: dateLocal ?? null,
-      tz: tz ?? null,
-      place: place ?? null,
+      await this.createSpareHistory({
+        timestampUTC: new Date(),
+        vesselId: spare.vesselId || 'V001',
+        spareId: spare.id,
+        spareUuid: spare.suuid,
+        partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
+        partName: spare.partName,
+        componentId: spare.componentId || '',
+        componentCode: spare.componentCode ?? null,
+        componentName: spare.componentName,
+        componentSpareCode: spare.componentSpareCode ?? null,
+        eventType: 'RECEIVE',
+        qtyChange: quantity,
+        robAfter: newRob,
+        userId,
+        remarks: remarks ?? null,
+        reference: supplierPO ?? null,
+        dateLocal: dateLocal ?? null,
+        tz: tz ?? null,
+        place: place ?? null,
+      }, tx);
+
+      return result[0];
     });
 
-    return updated[0];
+    return updated;
   }
 
   async adjustSpareQuantity(
@@ -3219,38 +3240,42 @@ export class PostgresStorage {
     const newRob = Math.max(0, currentRob + qtyChange);
     const newRobA = Math.max(0, currentRobA + qtyChange); // Apply to location A by default
     
-    const updated = await db.update(spares)
-      .set({
-        rob: newRob,
-        robLocationA: newRobA,
-        updatedAt: new Date()
-      })
-      .where(eq(spares.suuid, spare.suuid))
-      .returning();
-    
-    await this.createSpareHistory({
-      timestampUTC: new Date(),
-      vesselId: spare.vesselId || 'V001',
-      spareId: spare.id,
-      spareUuid: spare.suuid,
-      partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
-      partName: spare.partName,
-      componentId: spare.componentId || '',
-      componentCode: spare.componentCode ?? null,
-      componentName: spare.componentName,
-      componentSpareCode: spare.componentSpareCode ?? null,
-      eventType,
-      qtyChange,
-      robAfter: newRob,
-      userId: 'system',
-      remarks: notes ?? null,
-      reference: reference ?? null,
-      dateLocal: null,
-      tz: null,
-      place: null,
+    const updated = await db.transaction(async (tx) => {
+      const result = await tx.update(spares)
+        .set({
+          rob: newRob,
+          robLocationA: newRobA,
+          updatedAt: new Date()
+        })
+        .where(eq(spares.suuid, spare.suuid))
+        .returning();
+
+      await this.createSpareHistory({
+        timestampUTC: new Date(),
+        vesselId: spare.vesselId || 'V001',
+        spareId: spare.id,
+        spareUuid: spare.suuid,
+        partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
+        partName: spare.partName,
+        componentId: spare.componentId || '',
+        componentCode: spare.componentCode ?? null,
+        componentName: spare.componentName,
+        componentSpareCode: spare.componentSpareCode ?? null,
+        eventType,
+        qtyChange,
+        robAfter: newRob,
+        userId: 'system',
+        remarks: notes ?? null,
+        reference: reference ?? null,
+        dateLocal: null,
+        tz: null,
+        place: null,
+      }, tx);
+
+      return result[0];
     });
-    
-    return updated[0];
+
+    return updated;
   }
 
   async bulkUpdateSpares(
@@ -3586,7 +3611,11 @@ export class PostgresStorage {
     })) as SpareHistory[];
   }
 
-  async createSpareHistory(history: InsertSpareHistory): Promise<SpareHistory> {
+  async createSpareHistory(history: InsertSpareHistory, txConn?: any): Promise<SpareHistory> {
+    if (txConn) {
+      const result = await txConn.insert(sparesHistory).values(history).returning();
+      return result[0];
+    }
     return this.insertWithSequenceRepair('spares_history', async () => {
       const db = await getDb();
       const result = await db.insert(sparesHistory).values(history).returning();
@@ -3735,36 +3764,40 @@ export class PostgresStorage {
     const newLocationRob = Math.max(0, locationRob - qtyNum);
     const newTotalRob = Math.max(0, Number(item.rob || 0) - actualConsumed);
 
-    const updated = await db.update(storesItems)
-      .set({
-        rob: String(newTotalRob),
-        ...(location === 'A' ? { robLocationA: String(newLocationRob) } : { robLocationB: String(newLocationRob) }),
-        updatedAt: new Date()
-      })
-      .where(eq(storesItems.stuuid, item.stuuid))
-      .returning();
+    const updated = await db.transaction(async (tx) => {
+      const result = await tx.update(storesItems)
+        .set({
+          rob: String(newTotalRob),
+          ...(location === 'A' ? { robLocationA: String(newLocationRob) } : { robLocationB: String(newLocationRob) }),
+          updatedAt: new Date()
+        })
+        .where(eq(storesItems.stuuid, item.stuuid))
+        .returning();
 
-    await this.insertStoresLedgerEntry({
-      vesselId: item.vesselId,
-      section: item.itemType,
-      itemId: item.id,
-      storeUuid: item.stuuid,
-      partCode: item.itemCode,
-      itemName: item.itemName,
-      uom: item.uom,
-      eventType: 'CONSUME',
-      qtyChangeBase: String(-actualConsumed),
-      qtyDisplay: String(-actualConsumed),
-      robAfterBase: String(newTotalRob),
-      dateLocal: dateLocal || new Date().toISOString().split('T')[0],
-      tz: tz || 'UTC',
-      timestampUTC: new Date(),
-      place: place,
-      userId: userId,
-      remarks: remarks,
+      await this.insertStoresLedgerEntry({
+        vesselId: item.vesselId,
+        section: item.itemType,
+        itemId: item.id,
+        storeUuid: item.stuuid,
+        partCode: item.itemCode,
+        itemName: item.itemName,
+        uom: item.uom,
+        eventType: 'CONSUME',
+        qtyChangeBase: String(-actualConsumed),
+        qtyDisplay: String(-actualConsumed),
+        robAfterBase: String(newTotalRob),
+        dateLocal: dateLocal || new Date().toISOString().split('T')[0],
+        tz: tz || 'UTC',
+        timestampUTC: new Date(),
+        place: place,
+        userId: userId,
+        remarks: remarks,
+      }, tx);
+
+      return result[0];
     });
 
-    return updated[0];
+    return updated;
   }
 
   async receiveStoresItem(
@@ -3789,37 +3822,41 @@ export class PostgresStorage {
     const newLocationRob = locationRob + qtyNum;
     const newTotalRob = Number(item.rob || 0) + qtyNum;
 
-    const updated = await db.update(storesItems)
-      .set({
-        rob: String(newTotalRob),
-        ...(location === 'A' ? { robLocationA: String(newLocationRob) } : { robLocationB: String(newLocationRob) }),
-        updatedAt: new Date()
-      })
-      .where(eq(storesItems.stuuid, item.stuuid))
-      .returning();
+    const updated = await db.transaction(async (tx) => {
+      const result = await tx.update(storesItems)
+        .set({
+          rob: String(newTotalRob),
+          ...(location === 'A' ? { robLocationA: String(newLocationRob) } : { robLocationB: String(newLocationRob) }),
+          updatedAt: new Date()
+        })
+        .where(eq(storesItems.stuuid, item.stuuid))
+        .returning();
 
-    await this.insertStoresLedgerEntry({
-      vesselId: item.vesselId,
-      section: item.itemType,
-      itemId: item.id,
-      storeUuid: item.stuuid,
-      partCode: item.itemCode,
-      itemName: item.itemName,
-      uom: item.uom,
-      eventType: 'RECEIVE',
-      qtyChangeBase: String(qtyNum),
-      qtyDisplay: String(qtyNum),
-      robAfterBase: String(newTotalRob),
-      dateLocal: dateLocal || new Date().toISOString().split('T')[0],
-      tz: tz || 'UTC',
-      timestampUTC: new Date(),
-      place: place,
-      ref: ref,
-      userId: userId,
-      remarks: remarks,
+      await this.insertStoresLedgerEntry({
+        vesselId: item.vesselId,
+        section: item.itemType,
+        itemId: item.id,
+        storeUuid: item.stuuid,
+        partCode: item.itemCode,
+        itemName: item.itemName,
+        uom: item.uom,
+        eventType: 'RECEIVE',
+        qtyChangeBase: String(qtyNum),
+        qtyDisplay: String(qtyNum),
+        robAfterBase: String(newTotalRob),
+        dateLocal: dateLocal || new Date().toISOString().split('T')[0],
+        tz: tz || 'UTC',
+        timestampUTC: new Date(),
+        place: place,
+        ref: ref,
+        userId: userId,
+        remarks: remarks,
+      }, tx);
+
+      return result[0];
     });
 
-    return updated[0];
+    return updated;
   }
 
   async transferStoresItemLocation(
@@ -3859,107 +3896,109 @@ export class PostgresStorage {
     }
     
     const newTotalRob = newLocA + newLocB;
-    
-    const updated = await db.update(storesItems)
-      .set({
-        rob: String(newTotalRob),
-        robLocationA: String(newLocA),
-        robLocationB: String(newLocB),
-        updatedAt: new Date()
-      })
-      .where(eq(storesItems.stuuid, item.stuuid))
-      .returning();
 
     // Only create transfer ledger entries if this is a true transfer
     // (deltaA == -deltaB means total ROB unchanged, stock moved between locations)
     const isTrueTransfer = deltaA !== 0 && deltaB !== 0 && deltaA === -deltaB;
-    
-    if (isTrueTransfer) {
-      const transferQty = Math.abs(deltaA);
-      const fromLocation = deltaA < 0 ? 'A' : 'B';
-      const toLocation = deltaA < 0 ? 'B' : 'A';
-      const transferRemarks = remarks || `Transfer ${transferQty} from Location ${fromLocation} to Location ${toLocation}`;
 
-      await this.insertStoresLedgerEntry({
-        vesselId: item.vesselId,
-        section: item.itemType,
-        itemId: item.id,
-        storeUuid: item.stuuid,
-        partCode: item.itemCode,
-        itemName: item.itemName,
-        uom: item.uom,
-        eventType: 'TRANSFER_OUT',
-        qtyChangeBase: String(-transferQty),
-        qtyDisplay: String(-transferQty),
-        robAfterBase: String(newTotalRob),
-        dateLocal: dateLocal || new Date().toISOString().split('T')[0],
-        tz: tz || 'UTC',
-        timestampUTC: new Date(),
-        place: place || `Location ${fromLocation}`,
-        userId: userId,
-        remarks: transferRemarks,
-      });
+    const txResult = await db.transaction(async (tx) => {
+      const result = await tx.update(storesItems)
+        .set({
+          rob: String(newTotalRob),
+          robLocationA: String(newLocA),
+          robLocationB: String(newLocB),
+          updatedAt: new Date()
+        })
+        .where(eq(storesItems.stuuid, item.stuuid))
+        .returning();
 
-      await this.insertStoresLedgerEntry({
-        vesselId: item.vesselId,
-        section: item.itemType,
-        itemId: item.id,
-        storeUuid: item.stuuid,
-        partCode: item.itemCode,
-        itemName: item.itemName,
-        uom: item.uom,
-        eventType: 'TRANSFER_IN',
-        qtyChangeBase: String(transferQty),
-        qtyDisplay: String(transferQty),
-        robAfterBase: String(newTotalRob),
-        dateLocal: dateLocal || new Date().toISOString().split('T')[0],
-        tz: tz || 'UTC',
-        timestampUTC: new Date(),
-        place: place || `Location ${toLocation}`,
-        userId: userId,
-        remarks: transferRemarks,
-      });
-      
-      return { item: updated[0], isTransfer: true };
-    }
-    
-    // Not a true transfer - classify based on net ROB change direction
-    const netChange = (newLocA + newLocB) - (oldLocA + oldLocB);
-    let eventType: string;
-    let eventRemarks: string;
+      if (isTrueTransfer) {
+        const transferQty = Math.abs(deltaA);
+        const fromLocation = deltaA < 0 ? 'A' : 'B';
+        const toLocation = deltaA < 0 ? 'B' : 'A';
+        const transferRemarks = remarks || `Transfer ${transferQty} from Location ${fromLocation} to Location ${toLocation}`;
 
-    if (netChange < 0) {
-      eventType = 'CONSUME';
-      eventRemarks = remarks || `Consumed ${Math.abs(netChange)} units (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
-    } else if (netChange > 0) {
-      eventType = 'RECEIVE';
-      eventRemarks = remarks || `Received ${netChange} units (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
-    } else {
-      eventType = 'ADJUSTMENT';
-      eventRemarks = remarks || `Adjustment (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
-    }
-    
-    await this.insertStoresLedgerEntry({
-      vesselId: item.vesselId,
-      section: item.itemType,
-      itemId: item.id,
-      storeUuid: item.stuuid,
-      partCode: item.itemCode,
-      itemName: item.itemName,
-      uom: item.uom,
-      eventType,
-      qtyChangeBase: String(netChange),
-      qtyDisplay: String(netChange),
-      robAfterBase: String(newTotalRob),
-      dateLocal: dateLocal || new Date().toISOString().split('T')[0],
-      tz: tz || 'UTC',
-      timestampUTC: new Date(),
-      place: place,
-      userId: userId,
-      remarks: eventRemarks,
+        await this.insertStoresLedgerEntry({
+          vesselId: item.vesselId,
+          section: item.itemType,
+          itemId: item.id,
+          storeUuid: item.stuuid,
+          partCode: item.itemCode,
+          itemName: item.itemName,
+          uom: item.uom,
+          eventType: 'TRANSFER_OUT',
+          qtyChangeBase: String(-transferQty),
+          qtyDisplay: String(-transferQty),
+          robAfterBase: String(newTotalRob),
+          dateLocal: dateLocal || new Date().toISOString().split('T')[0],
+          tz: tz || 'UTC',
+          timestampUTC: new Date(),
+          place: place || `Location ${fromLocation}`,
+          userId: userId,
+          remarks: transferRemarks,
+        }, tx);
+
+        await this.insertStoresLedgerEntry({
+          vesselId: item.vesselId,
+          section: item.itemType,
+          itemId: item.id,
+          storeUuid: item.stuuid,
+          partCode: item.itemCode,
+          itemName: item.itemName,
+          uom: item.uom,
+          eventType: 'TRANSFER_IN',
+          qtyChangeBase: String(transferQty),
+          qtyDisplay: String(transferQty),
+          robAfterBase: String(newTotalRob),
+          dateLocal: dateLocal || new Date().toISOString().split('T')[0],
+          tz: tz || 'UTC',
+          timestampUTC: new Date(),
+          place: place || `Location ${toLocation}`,
+          userId: userId,
+          remarks: transferRemarks,
+        }, tx);
+      } else {
+        // Not a true transfer - classify based on net ROB change direction
+        const netChange = (newLocA + newLocB) - (oldLocA + oldLocB);
+        let eventType: string;
+        let eventRemarks: string;
+
+        if (netChange < 0) {
+          eventType = 'CONSUME';
+          eventRemarks = remarks || `Consumed ${Math.abs(netChange)} units (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
+        } else if (netChange > 0) {
+          eventType = 'RECEIVE';
+          eventRemarks = remarks || `Received ${netChange} units (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
+        } else {
+          eventType = 'ADJUSTMENT';
+          eventRemarks = remarks || `Adjustment (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`;
+        }
+
+        await this.insertStoresLedgerEntry({
+          vesselId: item.vesselId,
+          section: item.itemType,
+          itemId: item.id,
+          storeUuid: item.stuuid,
+          partCode: item.itemCode,
+          itemName: item.itemName,
+          uom: item.uom,
+          eventType,
+          qtyChangeBase: String(netChange),
+          qtyDisplay: String(netChange),
+          robAfterBase: String(newTotalRob),
+          dateLocal: dateLocal || new Date().toISOString().split('T')[0],
+          tz: tz || 'UTC',
+          timestampUTC: new Date(),
+          place: place,
+          userId: userId,
+          remarks: eventRemarks,
+        }, tx);
+      }
+
+      return result[0];
     });
 
-    return { item: updated[0], isTransfer: false };
+    return { item: txResult, isTransfer: isTrueTransfer };
   }
 
   async adjustStoresItem(
@@ -4003,39 +4042,43 @@ export class PostgresStorage {
       return item;
     }
     
-    const updated = await db.update(storesItems)
-      .set({
-        rob: String(newTotal),
-        robLocationA: String(newLocA),
-        robLocationB: String(newLocB),
-        updatedAt: new Date()
-      })
-      .where(eq(storesItems.stuuid, item.stuuid))
-      .returning();
-
     const adjustmentRemarks = remarks || `Adjustment at Location ${location}: ${location === 'A' ? oldLocA : oldLocB}→${newRob}`;
-    
-    await this.insertStoresLedgerEntry({
-      vesselId: item.vesselId,
-      section: item.itemType,
-      itemId: item.id,
-      storeUuid: item.stuuid,
-      partCode: item.itemCode,
-      itemName: item.itemName,
-      uom: item.uom,
-      eventType: 'ADJUSTMENT',
-      qtyChangeBase: String(netChange),
-      qtyDisplay: String(netChange),
-      robAfterBase: String(newTotal),
-      dateLocal: dateLocal || new Date().toISOString().split('T')[0],
-      tz: tz || 'UTC',
-      timestampUTC: new Date(),
-      place: place || `Location ${location}`,
-      userId: userId,
-      remarks: adjustmentRemarks,
+
+    const updated = await db.transaction(async (tx) => {
+      const result = await tx.update(storesItems)
+        .set({
+          rob: String(newTotal),
+          robLocationA: String(newLocA),
+          robLocationB: String(newLocB),
+          updatedAt: new Date()
+        })
+        .where(eq(storesItems.stuuid, item.stuuid))
+        .returning();
+
+      await this.insertStoresLedgerEntry({
+        vesselId: item.vesselId,
+        section: item.itemType,
+        itemId: item.id,
+        storeUuid: item.stuuid,
+        partCode: item.itemCode,
+        itemName: item.itemName,
+        uom: item.uom,
+        eventType: 'ADJUSTMENT',
+        qtyChangeBase: String(netChange),
+        qtyDisplay: String(netChange),
+        robAfterBase: String(newTotal),
+        dateLocal: dateLocal || new Date().toISOString().split('T')[0],
+        tz: tz || 'UTC',
+        timestampUTC: new Date(),
+        place: place || `Location ${location}`,
+        userId: userId,
+        remarks: adjustmentRemarks,
+      }, tx);
+
+      return result[0];
     });
 
-    return updated[0];
+    return updated;
   }
 
   // ============= MODULE 8: STORES LEDGER =============
@@ -6529,7 +6572,9 @@ export class PostgresStorage {
     const db = await getDb();
     const { parentComponentId, mode, value, dateUpdated, comments, userId, userUuid, meterReplaced, oldMeterFinal, newMeterStart, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
     const now = new Date();
-    
+
+    // ── Phase 1: Reads + Validation (outside transaction) ──
+
     // First resolve the parent component (dual-lookup: cuuid or legacy id)
     const parentResult = await db.select().from(components)
       .where(or(eq(components.cuuid, parentComponentId), eq(components.id, parentComponentId)))
@@ -6541,22 +6586,25 @@ export class PostgresStorage {
     // Get all child components (by parentId - structural hierarchy)
     const children = await db.select().from(components)
       .where(or(eq(components.parentId, resolvedParentId), eq(components.parentId, parentComponentId)));
-    
-    let updatedComponents = 0;
-    let auditsCreated = 0;
+
     let newRH = 0;
-    
+    let updateData: any = {};
+    let parentAuditValues: any = null;
+    let inheritedComponents: any[] = [];
+    let inheritedDelta = 0;
+    let currentRH = 0;
+
     if (parentResult.length > 0) {
       const parent = parentResult[0];
-      const currentRH = parseFloat(parent.currentCumulativeRH || parent.rhCurrentMaster || '0');
-      
+      currentRH = parseFloat(parent.currentCumulativeRH || parent.rhCurrentMaster || '0');
+
       // VALIDATION 1: Date Rule - Check if entry date is not earlier than latest saved RH entry date
       const latestAudit = await db.select()
         .from(runningHoursAudit)
         .where(or(eq(runningHoursAudit.componentId, resolvedParentId), eq(runningHoursAudit.componentId, parentComponentId)))
         .orderBy(desc(runningHoursAudit.enteredAtUTC))
         .limit(1);
-      
+
       if (latestAudit.length > 0) {
         const latestDate = latestAudit[0].dateUpdatedLocal;
         // Parse dates for comparison (format: DD-MMM-YYYY HH:mm)
@@ -6569,25 +6617,25 @@ export class PostgresStorage {
           }
           return new Date(dateStr);
         };
-        
+
         const latestParsedDate = parseDate(latestDate);
         const newParsedDate = parseDate(dateUpdated);
-        
+
         if (newParsedDate < latestParsedDate) {
           throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${latestDate}).`);
         }
       }
-      
+
       // VALIDATION 2: Value Rule - RH must never go backwards (except when isRenewalReset is true for 0)
       if (mode === 'setTotal' && value < currentRH && !isRenewalReset) {
         throw new Error(`Invalid Running Hours. Reading cannot be less than the last saved reading (Last: ${currentRH}).`);
       }
-      
+
       // VALIDATION 3: When value is 0, isRenewalReset must be true
       if (mode === 'setTotal' && value === 0 && !isRenewalReset) {
         throw new Error('Running Hours cannot be set to 0 without confirming renewal/replacement.');
       }
-      
+
       // Handle meter replacement logic
       // When meter is replaced, store the current cumulative total in meterReplacedLastRh
       // The new meter reading starts fresh, but Total = meterReplacedLastRh + new reading
@@ -6601,38 +6649,33 @@ export class PostgresStorage {
       } else {
         newRH = mode === 'addDelta' ? currentRH + value : value;
       }
-      
+
       // Build update object - always update currentCumulativeRH
-      const updateData: any = { 
+      updateData = {
         currentCumulativeRH: newRH.toString(),
         lastUpdated: dateUpdated,
         updatedAt: now
       };
-      
+
       // If meter was replaced, update the meter replacement tracking fields
       if (meterReplaced) {
         updateData.meterReplacedLastRh = previousTotalForReplacement.toString();
         updateData.meterReplacedDate = now;
       }
-      
+
       // If this component is a MASTER type, also update rhCurrentMaster
       if (parent.rhCounterType === 'MASTER') {
         updateData.rhCurrentMaster = newRH.toString();
         updateData.rhMasterUpdatedAt = now;
         updateData.rhMasterUpdateSource = 'MANUAL';
       }
-      
-      await db.update(components)
-        .set(updateData)
-        .where(eq(components.cuuid, resolvedParentId));
-      
-      // Log audit for parent
-      // Calculate the total cumulative RH (includes meter replacement history)
-      const totalCumulativeRH = meterReplaced 
-        ? previousTotalForReplacement + newRH 
+
+      // Prepare parent audit values
+      const totalCumulativeRH = meterReplaced
+        ? previousTotalForReplacement + newRH
         : (parseFloat(parent.meterReplacedLastRh || '0') + newRH);
-      
-      await db.insert(runningHoursAudit).values({
+
+      parentAuditValues = {
         vesselId: parent.vesselId || 'unknown',
         componentId: resolvedParentId,
         previousRH: currentRH.toString(),
@@ -6644,7 +6687,7 @@ export class PostgresStorage {
         userId: userId || 'system',
         updatedByUuid: userUuid || null,
         source: 'cascade',
-        notes: meterReplaced 
+        notes: meterReplaced
           ? `Meter replaced. Old meter final: ${oldMeterFinal || currentRH}. New meter start: ${newMeterStart || value}. ${comments || ''}`
           : comments,
         meterReplaced: meterReplaced || false,
@@ -6655,24 +6698,17 @@ export class PostgresStorage {
         renewalEvidenceUrls: renewalEvidenceUrls || null,
         componentCode: parent.componentCode || null,
         componentName: parent.name || null,
-      });
-      
-      updatedComponents++;
-      auditsCreated++;
-      
-      // If parent is MASTER, also update all INHERITED components that reference this master IN THE SAME VESSEL
-      // Match by BOTH component ID and component code (legacy data uses component code in rhMasterComponentId/rhCounterSource)
-      // CRITICAL: Filter by vesselId to prevent cross-vessel RH aggregation
+      };
+
+      // If parent is MASTER, fetch inherited components for cascade (read outside tx)
       if (parent.rhCounterType === 'MASTER') {
         const masterComponentCode = parent.componentCode || '';
         const masterVesselId = parent.vesselId;
-        
-        // CRITICAL SAFEGUARD: Skip cascade if vesselId cannot be determined
+
         if (!masterVesselId) {
           console.warn(`⚠️ [updateRunningHoursBulk] Cannot determine vesselId for master "${parentComponentId}" - skipping inherited cascade to prevent cross-vessel leak`);
         } else {
-          // Cascade to inherited components in the same vessel only
-          const inheritedComponents = await db.select().from(components)
+          inheritedComponents = await db.select().from(components)
             .where(and(
               eq(components.rhCounterType, 'INHERITED'),
               eq(components.vesselId, masterVesselId),
@@ -6683,103 +6719,117 @@ export class PostgresStorage {
                 eq(components.rhCounterSource, masterComponentCode)
               )
             ));
-        
-          // Calculate the delta from master's change
-          const delta = newRH - currentRH;
-          
-          for (const inherited of inheritedComponents) {
-            // Get inherited component's current individual RH
-            const inheritedCurrentRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || '0');
-            // Apply delta to their individual running hours (they maintain their own offset)
-            const newInheritedRH = inheritedCurrentRH + delta;
-            
-            await db.update(components)
-              .set({
-                rhCurrentInheritedCached: newRH.toString(), // Cache master's absolute value for reference
-                rhInheritedUpdatedAt: now,
-                currentCumulativeRH: newInheritedRH.toString(), // Their individual RH + delta
-                lastUpdated: dateUpdated,
-                updatedAt: now
-              })
-              .where(eq(components.cuuid, inherited.cuuid));
-            
-            // Log audit for inherited component
-            await db.insert(runningHoursAudit).values({
-              vesselId: inherited.vesselId || 'unknown',
-              componentId: inherited.cuuid,
-              previousRH: inheritedCurrentRH.toString(),
-              newRH: newInheritedRH.toString(),
-              cumulativeRH: newInheritedRH.toString(),
-              dateUpdatedLocal: dateUpdated,
-              dateUpdatedTZ: 'UTC',
-              enteredAtUTC: now,
-              userId: userId || 'system',
-              updatedByUuid: userUuid || null,
-              source: 'inherited_cascade',
-              comments: `Inherited delta ${delta} from MASTER ${parent.componentCode || parent.name}`,
-            });
-            
-            updatedComponents++;
-            auditsCreated++;
-          }
+          inheritedDelta = newRH - currentRH;
         }
       }
     }
-    
-    // Calculate delta for structural children 
+
+    // Calculate delta for structural children
     const structuralDelta = mode === 'addDelta' ? value : (newRH - parseFloat(parentResult[0]?.currentCumulativeRH || '0'));
-    
-    // Update all structural children (by parentId hierarchy)
-    for (const child of children) {
-      const childCurrentRH = parseFloat(child.currentCumulativeRH || '0');
-      const childNewRH = childCurrentRH + structuralDelta;
-      
-      const childUpdateData: any = { 
-        currentCumulativeRH: childNewRH.toString(),
-        lastUpdated: dateUpdated,
-        updatedAt: now
-      };
-      
-      // If child is also MASTER type, update its rhCurrentMaster too
-      if (child.rhCounterType === 'MASTER') {
-        childUpdateData.rhCurrentMaster = childNewRH.toString();
-        childUpdateData.rhMasterUpdatedAt = now;
+
+    // ── Phase 2: All writes in one transaction ──
+    const txResult = await db.transaction(async (tx) => {
+      let updatedComponents = 0;
+      let auditsCreated = 0;
+
+      // Parent update + audit
+      if (parentResult.length > 0) {
+        await tx.update(components)
+          .set(updateData)
+          .where(eq(components.cuuid, resolvedParentId));
+
+        await tx.insert(runningHoursAudit).values(parentAuditValues);
+
+        updatedComponents++;
+        auditsCreated++;
+
+        // Inherited components cascade (if MASTER)
+        for (const inherited of inheritedComponents) {
+          const inheritedCurrentRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || '0');
+          const newInheritedRH = inheritedCurrentRH + inheritedDelta;
+
+          await tx.update(components)
+            .set({
+              rhCurrentInheritedCached: newRH.toString(),
+              rhInheritedUpdatedAt: now,
+              currentCumulativeRH: newInheritedRH.toString(),
+              lastUpdated: dateUpdated,
+              updatedAt: now
+            })
+            .where(eq(components.cuuid, inherited.cuuid));
+
+          await tx.insert(runningHoursAudit).values({
+            vesselId: inherited.vesselId || 'unknown',
+            componentId: inherited.cuuid,
+            previousRH: inheritedCurrentRH.toString(),
+            newRH: newInheritedRH.toString(),
+            cumulativeRH: newInheritedRH.toString(),
+            dateUpdatedLocal: dateUpdated,
+            dateUpdatedTZ: 'UTC',
+            enteredAtUTC: now,
+            userId: userId || 'system',
+            updatedByUuid: userUuid || null,
+            source: 'inherited_cascade',
+            comments: `Inherited delta ${inheritedDelta} from MASTER ${parentResult[0]?.componentCode || parentResult[0]?.name}`,
+          });
+
+          updatedComponents++;
+          auditsCreated++;
+        }
       }
-      
-      // If child is INHERITED and its master was updated, cache master's absolute value
-      if (child.rhCounterType === 'INHERITED' && child.rhMasterComponentId === parentComponentId) {
-        childUpdateData.rhCurrentInheritedCached = newRH.toString();
-        childUpdateData.rhInheritedUpdatedAt = now;
+
+      // Update all structural children (by parentId hierarchy)
+      for (const child of children) {
+        const childCurrentRH = parseFloat(child.currentCumulativeRH || '0');
+        const childNewRH = childCurrentRH + structuralDelta;
+
+        const childUpdateData: any = {
+          currentCumulativeRH: childNewRH.toString(),
+          lastUpdated: dateUpdated,
+          updatedAt: now
+        };
+
+        if (child.rhCounterType === 'MASTER') {
+          childUpdateData.rhCurrentMaster = childNewRH.toString();
+          childUpdateData.rhMasterUpdatedAt = now;
+        }
+
+        if (child.rhCounterType === 'INHERITED' && child.rhMasterComponentId === parentComponentId) {
+          childUpdateData.rhCurrentInheritedCached = newRH.toString();
+          childUpdateData.rhInheritedUpdatedAt = now;
+        }
+
+        await tx.update(components)
+          .set(childUpdateData)
+          .where(eq(components.cuuid, child.cuuid));
+
+        await tx.insert(runningHoursAudit).values({
+          vesselId: child.vesselId || 'unknown',
+          componentId: child.cuuid,
+          previousRH: childCurrentRH.toString(),
+          newRH: childNewRH.toString(),
+          cumulativeRH: childNewRH.toString(),
+          dateUpdatedLocal: dateUpdated,
+          dateUpdatedTZ: 'UTC',
+          enteredAtUTC: now,
+          userId: userId || 'system',
+          updatedByUuid: userUuid || null,
+          source: 'cascade',
+          comments: comments,
+        });
+
+        updatedComponents++;
+        auditsCreated++;
       }
-      
-      await db.update(components)
-        .set(childUpdateData)
-        .where(eq(components.cuuid, child.cuuid));
-      
-      await db.insert(runningHoursAudit).values({
-        vesselId: child.vesselId || 'unknown',
-        componentId: child.cuuid,
-        previousRH: childCurrentRH.toString(),
-        newRH: childNewRH.toString(),
-        cumulativeRH: childNewRH.toString(),
-        dateUpdatedLocal: dateUpdated,
-        dateUpdatedTZ: 'UTC',
-        enteredAtUTC: now,
-        userId: userId || 'system',
-        updatedByUuid: userUuid || null,
-        source: 'cascade',
-        comments: comments,
-      });
-      
-      updatedComponents++;
-      auditsCreated++;
-    }
-    
-    return { 
-      updatedComponents, 
-      auditsCreated,
-      workOrdersGenerated: 0, 
-      workOrders: [] 
+
+      return { updatedComponents, auditsCreated };
+    });
+
+    return {
+      updatedComponents: txResult.updatedComponents,
+      auditsCreated: txResult.auditsCreated,
+      workOrdersGenerated: 0,
+      workOrders: []
     };
   }
 
