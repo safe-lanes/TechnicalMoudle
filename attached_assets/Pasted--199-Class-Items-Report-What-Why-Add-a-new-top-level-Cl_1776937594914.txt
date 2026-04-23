@@ -1,0 +1,111 @@
+#199 - Class Items Report
+What & Why
+Add a new top-level "Class Items" category to the Reports module (placed below LSA/FFA Equipment) with a single report node "Class Items Master List". The report lists all jobs where Job.Class Related = Yes, enriched with linked component identity and Section G classification & regulatory data.
+
+Done looks like
+A new "Class Items" entry appears at the bottom of the Reports left-side tree, below "LSA/FFA Equipment".
+Expanding it reveals one report: "Class Items Master List".
+Clicking that report opens an AG Grid showing every class-related job for the selected vessel(s), with job columns (Section C-style), component identity columns, and Section G classification/regulatory columns.
+Standard report behaviors work: vessel/component/department filters from the global filter bar, loading / empty / error states, Excel export.
+No regression to existing reports.
+Database tables affected
+Read-only joins (no writes from the report itself):
+
+jobs — primary table; filter by class_related.
+job_component_links — junction used to resolve job → component(s) when no direct link.
+components — component identity columns.
+component_class_regulatory — Section G fields.
+vessels — vessel name resolution (existing pattern).
+Columns to add
+By default: none. The build is intended to ship without schema changes.
+
+The only schema gap is in component_class_regulatory:
+
+class_code — the Section G UI shows a "Class Code" field (classCode) that has no backing column today.
+information — the Section G UI shows an "Information" field (information) that has no backing column today.
+These two columns currently exist only as UI labels; their values are not persisted anywhere and are not returned by /technical/api/component-class-regulatory/:componentId. Decision required (see Open inputs); if added, both go on the component_class_regulatory table, and Section G create/update flows must persist them.
+
+Out of scope
+Any modification of LSA/FFA reports or their logic.
+Any change to the Job form or Component form, except the optional Section G persistence wiring tied to the open inputs below.
+New URL routes (Reports module uses internal state for selection, not sub-routes).
+Backfills or data migrations of class_related values.
+Normalizing legacy class_related = 'true' values in the database (the report query handles both forms at read time).
+Open inputs (must be answered before build starts)
+Row grain — choose one:
+(a) one row per job;
+(b) one row per (job × linked component);
+(c) one row per (job × linked component × class regulatory record).
+Class Code field — (a) omit column from report, or (b) add class_code text column to component_class_regulatory and wire Section G create/update + UI binding.
+Information field — (a) omit column from report, or (b) add information text column to component_class_regulatory and wire Section G create/update + UI binding.
+Orphan job (class-related job with no linked component) — (a) include row with blank component/Section G fields, or (b) exclude from report.
+Component without Section G rows — (a) include row with blank Section G fields (LEFT JOIN), or (b) exclude (INNER JOIN).
+Inactive / soft-deleted jobs and components (is_deleted = true) — include or exclude.
+Filter logic
+jobs.class_related is checked against 'Yes', 'true', and boolean true (the codebase stores all three forms in different places).
+Vessel scoping uses the same vesselId / vesselIds query parameters used by other report endpoints.
+Optional componentId and department filters mirror the global filter bar.
+Proposed columns (subject to open inputs)
+Job (Section C-style):
+
+Job Code (jobs.job_no)
+Job Title (jobs.job_title)
+Task Type (jobs.maintenance_type)
+Frequency (jobs.frequency_value + jobs.frequency_unit)
+Last Done Date (jobs.last_done_date)
+Next Due Date (jobs.next_due_date)
+Class Related (jobs.class_related)
+Component identity:
+
+Component Code (components.component_code)
+Component Name (components.component_name)
+Department (components.department)
+Vessel (resolved from components.vessel_id)
+Section G (from component_class_regulatory):
+
+Classification Society (classification_society)
+Certificate No. (certificate_number)
+Last Class Survey (last_class_survey)
+Next Class Survey (next_survey_due)
+Survey Type (survey_type)
+Class Requirements (class_requirements)
+Survey Status (survey_status)
+Remarks (remarks)
+Class Code — only if open input #2 = (b)
+Information — only if open input #3 = (b)
+Steps
+Reports tree entry — Add a new top-level "Class Items" category to the Reports tree, positioned immediately below "LSA/FFA Equipment", with one child report node "Class Items Master List". Wire the category's render branch to a new report container component.
+Report container component — Build a new Class Items report container that fetches from the new endpoint using the existing global filters (vessel/component/department), renders the standard report AG Grid wrapper, and supports Excel export. Include loading / empty / error states.
+Backend endpoint — Register a new GET endpoint under the reports module that accepts vessel scoping (single + multi), optional component and department filters, and a format=excel switch.
+Service & query — Implement the service that filters jobs by class_related ∈ {'Yes','true', true}, resolves component(s) using coalesce(jobs.component_id, job_component_links.component_id), LEFT JOINs components and component_class_regulatory, applies vessel scoping, returns rows at the grain chosen in open input #1, and sorts by next_survey_due ASC NULLS LAST. Reuse the existing report Excel utility for export.
+Conditional schema additions — Only if open inputs #2 / #3 select (b): add class_code and/or information text columns to component_class_regulatory via Drizzle schema + generated migration, extend the insert/update flow, and bind them in Section G renderers (Components.tsx, ComponentRegisterForm.tsx, AddEditComponentForm.tsx, ComponentRegisterAddEdit.tsx, admin/AddComponentForm.tsx, admin/FormConfigurationModal.tsx, change-request-forms/ComponentChangeRequestForm.tsx).
+Verification — Manual + e2e check: report appears below LSA/FFA, expands, opens grid; rows match expected count of class-related jobs for the test vessel; Section G fields render where present and blank where absent; Excel export downloads with same columns.
+Architectural notes / constraints
+Categories in the Reports tree do not render content on their own — selection of a child report node is required by the existing implementation.
+class_related value normalization is read-side only in this task. Do not migrate or rewrite stored values.
+Date fields in component_class_regulatory are text in DD-MMM-YYYY format; use the existing date-string comparator already used in component grids — do not introduce a parallel date parser.
+Excel export must reuse the existing report Excel utility used by other report services; do not introduce a new dependency or pattern.
+No URL/router change — the Reports module uses internal state for report selection.
+Relevant files
+client/src/pages/reports/ReportsModule.tsx:52-132,378-404
+client/src/pages/reports/LsaFfaReports.tsx
+client/src/pages/reports/CriticalEquipmentReports.tsx
+client/src/components/AddEditComponentForm.tsx:101-106,740-746,1572-1640
+client/src/components/ComponentRegisterForm.tsx:148-149,217-218,436-437,1771-1846
+client/src/components/ComponentRegisterAddEdit.tsx:187,1180,1996-2010
+client/src/components/admin/AddComponentForm.tsx:88-95,663-680
+client/src/components/admin/FormConfigurationModal.tsx:1850-1860
+client/src/components/change-request-forms/ComponentChangeRequestForm.tsx:48,636-640
+client/src/pages/pms/Components.tsx:2090-2180,3274-3290,3754-3800
+shared/schema.ts:1058,1138,1961-1998,2309
+server/postgresStorage.ts:1698-1731,2021-2058
+server/modules/components/routes.ts:59-62
+server/modules/components/controllers/subEntityController.ts:62-95
+server/modules/components/services/subEntityService.ts:13-40
+server/modules/components/repositories/componentRepository.ts:126-139
+server/modules/reports/routes.ts:55-56
+server/modules/reports/controllers/equipmentReportsController.ts:167-220
+server/modules/reports/services/equipmentReportService.ts:766-900
+server/modules/reports/services/operationsReportService.ts:105-370
+server/services/workOrderService.ts:152,517
+server/services/jobDueScanner.ts:353,726
