@@ -155,6 +155,7 @@ export type DefectSequence = typeof defectSequences.$inferSelect;
 // Running Hours Audit Table
 export const runningHoursAudit = pgTable("running_hours_audit", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  rhauuid: text("rhauuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   componentId: text("component_id").notNull().references(() => components.cuuid),
   previousRH: decimal("previous_rh", { precision: 10, scale: 2 }).notNull(),
@@ -191,6 +192,7 @@ export const runningHoursAudit = pgTable("running_hours_audit", {
 
 export const insertRunningHoursAuditSchema = createInsertSchema(runningHoursAudit).omit({
   id: true,
+  rhauuid: true,
 });
 
 export type InsertRunningHoursAudit = z.infer<typeof insertRunningHoursAuditSchema>;
@@ -620,6 +622,7 @@ export type Spare = typeof spares.$inferSelect;
 // Spares History Table
 export const sparesHistory = pgTable("spares_history", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  shuuid: text("shuuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   timestampUTC: timestamp("timestamp_utc").notNull(),
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   spareId: integer("spare_id").notNull(), // Legacy integer FK — kept during transition
@@ -652,6 +655,7 @@ export const sparesHistory = pgTable("spares_history", {
 
 export const insertSpareHistorySchema = createInsertSchema(sparesHistory).omit({
   id: true,
+  shuuid: true,
 });
 
 export type InsertSpareHistory = z.infer<typeof insertSpareHistorySchema>;
@@ -662,6 +666,7 @@ export type SpareHistory = typeof sparesHistory.$inferSelect & {
 // Stores Ledger Table (for Stores module history)
 export const storesLedger = pgTable("stores_ledger", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  sluuid: text("sluuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   section: text("section").notNull(), // 'stores' | 'lubes' | 'chemicals' | 'others'
   itemId: integer("item_id").notNull(), // Legacy integer FK — kept during transition
@@ -693,6 +698,7 @@ export const storesLedger = pgTable("stores_ledger", {
 
 export const insertStoresLedgerSchema = createInsertSchema(storesLedger).omit({
   id: true,
+  sluuid: true,
 });
 
 export type InsertStoresLedger = z.infer<typeof insertStoresLedgerSchema>;
@@ -777,6 +783,7 @@ export type StoresItem = typeof storesItems.$inferSelect;
 // Change Request Tables for Modify PMS module
 export const changeRequest = pgTable("change_request", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  cruuid: text("cruuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   category: text("category").notNull(), // 'components' | 'work_orders' | 'spares' | 'stores'
   title: text("title").notNull(), // max 120 chars enforced in application
@@ -819,6 +826,7 @@ export const changeRequest = pgTable("change_request", {
 
 export const insertChangeRequestSchema = createInsertSchema(changeRequest).omit({
   id: true,
+  cruuid: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -829,6 +837,7 @@ export type ChangeRequest = typeof changeRequest.$inferSelect;
 // Change Request Attachments
 export const changeRequestAttachment = pgTable("change_request_attachment", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  crauuid: text("crauuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   changeRequestId: integer("change_request_id").notNull(),
   filename: text("filename").notNull(),
   url: text("url").notNull(),
@@ -845,6 +854,7 @@ export const changeRequestAttachment = pgTable("change_request_attachment", {
 
 export const insertChangeRequestAttachmentSchema = createInsertSchema(changeRequestAttachment).omit({
   id: true,
+  crauuid: true,
   uploadedAt: true,
 });
 
@@ -854,6 +864,7 @@ export type ChangeRequestAttachment = typeof changeRequestAttachment.$inferSelec
 // Change Request Comments
 export const changeRequestComment = pgTable("change_request_comment", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  crcuuid: text("crcuuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   changeRequestId: integer("change_request_id").notNull(),
   userId: text("user_id").notNull(),
   message: text("message").notNull(),
@@ -869,6 +880,7 @@ export const changeRequestComment = pgTable("change_request_comment", {
 
 export const insertChangeRequestCommentSchema = createInsertSchema(changeRequestComment).omit({
   id: true,
+  crcuuid: true,
   createdAt: true,
 });
 
@@ -1572,6 +1584,7 @@ export type Defect = typeof defects.$inferSelect;
 // Defect Actions Table for corrective/preventive actions
 export const defectActions = pgTable("defect_actions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  dauuid: text("dauuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   defectId: text("defect_id").notNull().references(() => defects.duuid),
   actionType: text("action_type").notNull(), // 'Corrective' | 'Preventive' | 'Containment' | 'Long-term fix'
   actionDescription: text("action_description").notNull(),
@@ -1598,6 +1611,7 @@ export const defectActions = pgTable("defect_actions", {
 
 export const insertDefectActionSchema = createInsertSchema(defectActions).omit({
   id: true,
+  dauuid: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -1608,6 +1622,7 @@ export type DefectAction = typeof defectActions.$inferSelect;
 // Defect Attachments Table for photos and documents
 export const defectAttachments = pgTable("defect_attachments", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  datuuid: text("datuuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   defectId: text("defect_id").notNull().references(() => defects.duuid),
   filename: text("filename").notNull(),
   url: text("url").notNull(),
@@ -1626,6 +1641,7 @@ export const defectAttachments = pgTable("defect_attachments", {
 
 export const insertDefectAttachmentSchema = createInsertSchema(defectAttachments).omit({
   id: true,
+  datuuid: true,
   uploadedAt: true,
 });
 
@@ -1849,6 +1865,7 @@ export type MasterListType = typeof masterListTypes.$inferSelect;
 // Component Running Hours Log - Detailed audit trail for all running hours updates
 export const componentRunningHoursLog = pgTable("component_running_hours_log", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  crhluuid: text("crhluuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   vesselCode: text("vessel_code").notNull(),
   componentCode: text("component_code").notNull(),
   componentId: text("component_id").notNull().references(() => components.cuuid),
@@ -1874,6 +1891,7 @@ export const componentRunningHoursLog = pgTable("component_running_hours_log", {
 
 export const insertComponentRunningHoursLogSchema = createInsertSchema(componentRunningHoursLog).omit({
   id: true,
+  crhluuid: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2003,6 +2021,7 @@ export type ComponentClassRegulatory = typeof componentClassRegulatory.$inferSel
 // Component Maintenance History Table - Immutable maintenance records (NO EDITS/DELETES ALLOWED)
 export const componentMaintenanceHistory = pgTable("component_maintenance_history", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  cmhuuid: text("cmhuuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   componentId: text("component_id").notNull().references(() => components.cuuid),
   componentCode: text("component_code").notNull(),
   vesselCode: text("vessel_code").notNull(),
@@ -2045,6 +2064,7 @@ export const componentMaintenanceHistory = pgTable("component_maintenance_histor
 
 export const insertComponentMaintenanceHistorySchema = createInsertSchema(componentMaintenanceHistory).omit({
   id: true,
+  cmhuuid: true,
   createdAt: true,
 });
 
@@ -2764,6 +2784,7 @@ export type Survey = typeof surveys.$inferSelect;
 // =====================================================
 export const workOrderExecutionDetails = pgTable("work_order_execution_details", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  woeduuid: text("woeduuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   workOrderId: text("work_order_id").notNull().references(() => workOrders.wouuid), // FK → work_orders.wouuid
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   executedBy: text("executed_by"), // User who performed the work
@@ -2794,6 +2815,7 @@ export const workOrderExecutionDetails = pgTable("work_order_execution_details",
 
 export const insertWorkOrderExecutionDetailsSchema = createInsertSchema(workOrderExecutionDetails).omit({
   id: true,
+  woeduuid: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -2855,6 +2877,7 @@ export type Location = typeof locations.$inferSelect;
 // B3) SPARE_COMPONENT_LINKS - Many-to-many linking between spares and components
 export const spareComponentLinks = pgTable("spare_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  scluuid: text("scluuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   spareId: integer("spare_id").notNull(), // Legacy integer FK — kept during transition
   spareUuid: text("spare_uuid").notNull().references(() => spares.suuid), // FK → spares.suuid
@@ -2875,6 +2898,7 @@ export const spareComponentLinks = pgTable("spare_component_links", {
 
 export const insertSpareComponentLinkSchema = createInsertSchema(spareComponentLinks).omit({
   id: true,
+  scluuid: true,
   linkedAt: true,
 });
 
@@ -2884,6 +2908,7 @@ export type SpareComponentLink = typeof spareComponentLinks.$inferSelect;
 // B5) SPARE_LOCATION_STOCK - Current stock per spare per location
 export const spareLocationStock = pgTable("spare_location_stock", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  slsuuid: text("slsuuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   spareId: integer("spare_id").notNull(), // Legacy integer FK — kept during transition
   spareUuid: text("spare_uuid").notNull().references(() => spares.suuid), // FK → spares.suuid
@@ -2903,6 +2928,7 @@ export const spareLocationStock = pgTable("spare_location_stock", {
 
 export const insertSpareLocationStockSchema = createInsertSchema(spareLocationStock).omit({
   id: true,
+  slsuuid: true,
 });
 
 export type InsertSpareLocationStock = z.infer<typeof insertSpareLocationStockSchema>;
@@ -2911,6 +2937,7 @@ export type SpareLocationStock = typeof spareLocationStock.$inferSelect;
 // B6) INVENTORY_TRANSACTIONS - Single source of truth for history
 export const inventoryTransactions = pgTable("inventory_transactions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  ituuid: text("ituuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   txnDatetime: timestamp("txn_datetime").notNull().defaultNow(),
   spareId: integer("spare_id").notNull(), // Legacy integer FK — kept during transition
@@ -2942,6 +2969,7 @@ export const inventoryTransactions = pgTable("inventory_transactions", {
 
 export const insertInventoryTransactionSchema = createInsertSchema(inventoryTransactions).omit({
   id: true,
+  ituuid: true,
   txnDatetime: true,
 });
 
@@ -3208,6 +3236,7 @@ export type VesselCertificateApplicability = typeof vesselCertificateApplicabili
 // Vessel Certificate Data - stores vessel-specific certificate data (dates, attachments) for Cert & Surveys module
 export const vesselCertificateData = pgTable("vessel_certificate_data", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vcduuid: text("vcduuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid), // External vessel ID from Vessel Master API
   vesselName: text("vessel_name").notNull(), // Vessel name for display
   masterId: text("master_id").notNull(), // References ship_certificates_master.master_id
@@ -3236,6 +3265,7 @@ export const vesselCertificateData = pgTable("vessel_certificate_data", {
 
 export const insertVesselCertificateDataSchema = createInsertSchema(vesselCertificateData).omit({
   id: true,
+  vcduuid: true,
   sortOrder: true,
   createdByUuid: true,
   updatedByUuid: true,
@@ -3355,6 +3385,7 @@ export type VesselSurveyApplicability = typeof vesselSurveyApplicability.$inferS
 // Vessel Survey Data - stores vessel-specific survey data (dates, attachments) for Cert & Surveys module
 export const vesselSurveyData = pgTable("vessel_survey_data", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vsduuid: text("vsduuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid), // External vessel ID from Vessel Master API
   vesselName: text("vessel_name").notNull(), // Vessel name for display
   masterId: text("master_id").notNull(), // References ship_surveys_master.master_id
@@ -3382,6 +3413,7 @@ export const vesselSurveyData = pgTable("vessel_survey_data", {
 
 export const insertVesselSurveyDataSchema = createInsertSchema(vesselSurveyData).omit({
   id: true,
+  vsduuid: true,
   createdAt: true,
   updatedAt: true,
 });
