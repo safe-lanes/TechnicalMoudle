@@ -11,6 +11,7 @@ import {
   Settings2,
   AlertTriangle,
   LifeBuoy,
+  Shield,
   ChevronRight,
   ChevronDown,
   FileText,
@@ -35,6 +36,7 @@ import IhmReports from "./IhmReports";
 import ChangeRequestReports from "./ChangeRequestReports";
 import CriticalEquipmentReports from "./CriticalEquipmentReports";
 import LsaFfaReports from "./LsaFfaReports";
+import ClassItemsReports from "./ClassItemsReports";
 import GlobalFilters, { FilterValues } from "@/components/reports/GlobalFilters";
 
 interface ReportItem {
@@ -127,6 +129,14 @@ const REPORT_CATEGORIES: ReportCategory[] = [
     reports: [
       { id: "lsa-ffa-master-list", name: "LSA/FFA Equipment Master List" },
       { id: "lsa-ffa-maintenance-schedule", name: "Maintenance Schedule & Status" },
+    ],
+  },
+  {
+    id: "class-items",
+    title: "Class Items",
+    icon: Shield,
+    reports: [
+      { id: "class-items-master-list", name: "Class Items Master List" },
     ],
   },
 ];
@@ -398,6 +408,8 @@ const ReportsModule = () => {
         return <CriticalEquipmentReports {...embeddedProps} />;
       case "lsa-ffa-equipment":
         return <LsaFfaReports {...embeddedProps} />;
+      case "class-items":
+        return <ClassItemsReports {...embeddedProps} />;
       default:
         return null;
     }

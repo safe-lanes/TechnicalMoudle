@@ -232,6 +232,41 @@ export async function getLsaFfaMaintenanceSchedule(req: Request, res: Response) 
 }
 
 // ═══════════════════════════════════════════════════════════════
+// CLASS ITEMS MASTER LIST
+// ═══════════════════════════════════════════════════════════════
+
+export async function getClassItemsMasterList(req: Request, res: Response) {
+  try {
+    const vesselId = req.query.vesselId as string;
+    const componentSearch = req.query.componentSearch as string | undefined;
+    const department = req.query.department as string | undefined;
+    const format = (req.query.format as string) || 'json';
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
+
+    if (!vesselId) {
+      return res.status(400).json({ error: "vesselId is required" });
+    }
+
+    const result = await equipmentReportService.getClassItemsMasterList(vesselId, componentSearch, department, format, vesselIds);
+
+    if (result.type === 'excel') {
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      res.send(result.buffer);
+      return;
+    }
+
+    res.json({
+      rows: result.rows,
+      summary: result.summary,
+    });
+  } catch (error: any) {
+    console.error("Error generating class items master list report:", error);
+    res.status(500).json({ error: "Failed to generate report", details: error.message });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // CRITICAL EQUIPMENT SCHEDULE
 // ═══════════════════════════════════════════════════════════════
 
