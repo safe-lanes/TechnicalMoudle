@@ -56,6 +56,7 @@ router.get('/reports/lsa-ffa-master-list', asyncHandler(equipCtrl.getLsaFfaMaste
 router.get('/reports/lsa-ffa-maintenance-schedule', asyncHandler(equipCtrl.getLsaFfaMaintenanceSchedule));
 router.get('/reports/critical-equipment-schedule', asyncHandler(equipCtrl.getCriticalEquipmentSchedule));
 router.get('/reports/class-items-master-list', asyncHandler(equipCtrl.getClassItemsMasterList));
+router.get('/reports/class-items-jobs', asyncHandler(equipCtrl.getClassItemsJobsStatus));
 
 // ── Maintenance Reports ──
 router.get('/reports/due-jobs-7-days/preview', asyncHandler(maintCtrl.getDueJobs7DaysPreview));

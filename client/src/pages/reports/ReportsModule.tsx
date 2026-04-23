@@ -36,7 +36,8 @@ import IhmReports from "./IhmReports";
 import ChangeRequestReports from "./ChangeRequestReports";
 import CriticalEquipmentReports from "./CriticalEquipmentReports";
 import LsaFfaReports from "./LsaFfaReports";
-import ClassItemsReports from "./ClassItemsReports";
+import ClassItemsMasterList from "./ClassItemsMasterList";
+import ClassItemsJobsStatus from "./ClassItemsJobsStatus";
 import GlobalFilters, { FilterValues } from "@/components/reports/GlobalFilters";
 
 interface ReportItem {
@@ -137,6 +138,7 @@ const REPORT_CATEGORIES: ReportCategory[] = [
     icon: Shield,
     reports: [
       { id: "class-items-master-list", name: "Class Items Master List" },
+      { id: "class-items-jobs-status", name: "Class Items Jobs Status" },
     ],
   },
 ];
@@ -409,7 +411,10 @@ const ReportsModule = () => {
       case "lsa-ffa-equipment":
         return <LsaFfaReports {...embeddedProps} />;
       case "class-items":
-        return <ClassItemsReports {...embeddedProps} />;
+        if (selectedReportId === 'class-items-jobs-status') {
+          return <ClassItemsJobsStatus {...embeddedProps} />;
+        }
+        return <ClassItemsMasterList {...embeddedProps} />;
       default:
         return null;
     }

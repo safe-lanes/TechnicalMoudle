@@ -1,0 +1,139 @@
+What Is Required
+The Class Items category must contain exactly 2 separate child report nodes:
+
+text
+Class Items  (category — already exists)
+├── Class Items Master List    ← Report 1 (already exists, needs to be fixed/built properly)
+└── Class Items Jobs Status    ← Report 2 (new, needs to be added)
+The category badge count should update to "2".
+
+Report 1 — "Class Items Master List"
+Purpose: A register of all components on the vessel that are flagged as Class Items — i.e., components.class_item = true. This is a component-level list. One row per component. No job data in this report.
+
+Data Source: components table, filtered where class_item = true AND is_deleted = false AND vessel_id matches the selected vessel(s).
+
+Columns to display (in this order):
+
+#	Column Header	Source Field
+1	Sr. No.	Auto-generated row number
+2	Component Code	components.code
+3	Component Name	components.name
+4	Department	components.department
+5	Maker	components.maker
+6	Model	components.model
+7	Criticality	components.criticality
+8	Classification Society	component_class_regulatory.classification_society (LEFT JOIN — show blank if no record)
+9	Certificate No.	component_class_regulatory.certificate_number
+10	Survey Type	component_class_regulatory.survey_type
+11	Last Class Survey	component_class_regulatory.last_class_survey
+12	Next Class Survey Due	component_class_regulatory.next_survey_due
+13	Class Requirements	component_class_regulatory.class_requirements
+14	Vessel	vessels.name (show only when "All Vessels" is selected)
+Join logic: components LEFT JOIN component_class_regulatory ON component_class_regulatory.component_id = components.cuuid. If a component has multiple regulatory rows, show one row per regulatory record (fan out). If a component has no regulatory record, show it once with blank regulatory columns.
+
+Filters: Vessel selector (single vessel / all vessels), Department dropdown, Search by Component Name/Code — same global filter bar as all other reports.
+
+Backend endpoint: GET /technical/api/reports/class-items-master-list
+Excel export: GET /technical/api/reports/class-items-master-list?format=excel
+
+Report 2 — "Class Items Jobs Status"
+Purpose: A list of all jobs that are marked class_related = 'Yes' on the vessel, showing their current maintenance status (last done, next due). This is a job-level list. One row per job. No regulatory survey data.
+
+Data Source: jobs table filtered where class_related = 'Yes' (also handle legacy values 'true' / true to avoid under-reporting) AND vessel_id matches selected vessel(s) AND is_active = true.
+
+Join logic: jobs LEFT JOIN components using jobs.component_id OR via job_component_links table (use the same hybrid join pattern already used in postgresStorage.getJobs).
+
+Columns to display (in this order):
+
+#	Column Header	Source Field
+1	Sr. No.	Auto-generated row number
+2	Job Code	jobs.job_no
+3	Job Title	jobs.job_title
+4	Component Code	components.code
+5	Component Name	components.name
+6	Department	jobs.department
+7	Task Type	jobs.maintenance_type
+8	Maintenance Basis	jobs.maintenance_basis
+9	Frequency	jobs.frequency_value + jobs.frequency_unit (display as e.g., "6 Months" or "4000 RHS")
+10	Assigned To	jobs.assigned_to
+11	Approver	jobs.approver
+12	Job Priority	jobs.job_priority
+13	Criticality	jobs.criticality
+14	Last Done Date	jobs.last_done_date
+15	Last Done RH	jobs.last_done_running_hours
+16	Next Due Date	jobs.next_due_date
+17	Next Due RH	jobs.next_due_running_hours
+18	Status	Derive from next due date vs today: Overdue (past due), Due (within 30 days), Upcoming (beyond 30 days) — match the logic used elsewhere in the system
+19	Vessel	vessels.name (show only when "All Vessels" is selected)
+Filters: Vessel selector (single vessel / all vessels), Department dropdown, Period (date range applied to Next Due Date), Search by Job Code/Title — same global filter bar as all other reports.
+
+Backend endpoint: GET /technical/api/reports/class-items-jobs
+Excel export: GET /technical/api/reports/class-items-jobs?format=excel
+
+Frontend Changes Required
+File: client/src/pages/reports/ReportsModule.tsx
+
+In REPORT_CATEGORIES, find the existing class-items entry. It currently has one report in its reports[] array. Add the second report node so the array has exactly two entries:
+
+js
+reports: [
+  { id: 'class-items-master-list', name: 'Class Items Master List' },
+  { id: 'class-items-jobs-status', name: 'Class Items Jobs Status' },
+]
+In renderCategoryContent(), the existing case 'class-items': branch currently mounts one component. Change it to handle both child selectedReportId values:
+
+'class-items-master-list' → render <ClassItemsMasterList {...embeddedProps} />
+
+'class-items-jobs-status' → render <ClassItemsJobsStatus {...embeddedProps} />
+
+New file: client/src/pages/reports/ClassItemsMasterList.tsx
+
+Calls GET /technical/api/reports/class-items-master-list with globalFilters
+
+Renders AG Grid with columns defined in Report 1 above
+
+PDF and Excel export buttons (top right, matching all other report screens)
+
+Loading / empty / error states
+
+Rename/refactor existing file (currently ClassItemsReports.tsx or similar):
+
+Rename to ClassItemsJobsStatus.tsx
+
+Rebuild its query to call GET /technical/api/reports/class-items-jobs
+
+Replace all current columns with the Report 2 column set defined above
+
+Fix the data loading issue — the current report shows an empty grid; ensure the backend endpoint is returning data correctly
+
+Backend Changes Required
+Two new endpoints (add to server/modules/reports/routes.ts, controllers/, services/, repositories/ following the same pattern as existing equipment report endpoints):
+
+Endpoint 1: GET /technical/api/reports/class-items-master-list
+
+Query: components WHERE class_item = true AND is_deleted = false LEFT JOIN component_class_regulatory
+
+Fan out on multiple regulatory records per component
+
+Support vesselId, vesselIds, department, search, format=excel query params
+
+Endpoint 2: GET /technical/api/reports/class-items-jobs
+
+Query: jobs WHERE class_related IN ('Yes', 'true', true) AND is_active = true LEFT JOIN components (hybrid join via jobs.component_id + job_component_links)
+
+Derive Status field server-side (Overdue / Due / Upcoming) using same logic as existing work order status derivation
+
+Support vesselId, vesselIds, department, search, dateFrom, dateTo, format=excel query params
+
+Do NOT modify the existing LSA/FFA endpoints, Critical Equipment endpoints, or any other existing report endpoint. Only add new ones.
+
+Definition of Done
+The Class Items category in the Reports tree shows count = 2 and expands to show exactly two child nodes: "Class Items Master List" and "Class Items Jobs Status".
+
+Clicking "Class Items Master List" loads a grid of components with class_item = true, with their regulatory details, PDF/Excel export working.
+
+Clicking "Class Items Jobs Status" loads a grid of jobs with class_related = Yes, showing last done / next due / status columns, PDF/Excel export working.
+
+Both reports respond correctly to vessel filter, department filter, and search bar.
+
+No existing reports, categories, or endpoints are broken.

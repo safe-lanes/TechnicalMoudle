@@ -1390,8 +1390,25 @@ export async function getCriticalEquipmentSchedule(
   };
 }
 
+
 // ═══════════════════════════════════════════════════════════════
-// CLASS ITEMS MASTER LIST
+// CLASS ITEMS — Helpers
+// ═══════════════════════════════════════════════════════════════
+
+const _ciMonthIdx: Record<string, number> = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+function _ciParseDate(s: string | null | undefined): number {
+  if (!s || s === '-') return Number.POSITIVE_INFINITY;
+  const m = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/.exec(s.trim());
+  if (m) {
+    const mo = _ciMonthIdx[m[2].slice(0,1).toUpperCase() + m[2].slice(1).toLowerCase()];
+    if (mo !== undefined) return new Date(parseInt(m[3]), mo, parseInt(m[1])).getTime();
+  }
+  const t = Date.parse(s);
+  return isNaN(t) ? Number.POSITIVE_INFINITY : t;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLASS ITEMS MASTER LIST  (component-level, class_item = true)
 // ═══════════════════════════════════════════════════════════════
 
 export async function getClassItemsMasterList(
@@ -1412,6 +1429,143 @@ export async function getClassItemsMasterList(
   const vesselNameMap = new Map(allVessels.map(v => [v.id, v.name || v.id]));
 
   let allComponents: any[] = [];
+  for (const v of scopedVessels) {
+    allComponents = allComponents.concat(await repo.getComponents(v.id));
+  }
+
+  const compSearchQ = (componentSearch || '').toLowerCase().trim();
+  const deptQ = (departmentFilter || '').toLowerCase().trim();
+
+  const classComps = allComponents.filter(c => {
+    if (c.isDeleted === true) return false;
+    if (!(c.classItem === true || c.classItem === 'true')) return false;
+    if (compSearchQ) {
+      const cn = (c.name || '').toLowerCase();
+      const cc = (c.componentCode || '').toLowerCase();
+      if (!cn.includes(compSearchQ) && !cc.includes(compSearchQ)) return false;
+    }
+    if (deptQ && deptQ !== 'all') {
+      const d = ((c.eqptSystemDept || c.deptCategory || c.department || '') as string).toLowerCase();
+      if (d !== deptQ) return false;
+    }
+    return true;
+  });
+
+  let classRegRows: any[] = [];
+  if (classComps.length > 0) {
+    const db = await getDb();
+    classRegRows = await db.select().from(componentClassRegulatory)
+      .where(inArray(componentClassRegulatory.componentId, classComps.map(c => c.cuuid)));
+  }
+  const regByComponent = new Map<string, any[]>();
+  for (const cr of classRegRows) {
+    if (cr.isDeleted === true) continue;
+    const arr = regByComponent.get(cr.componentId) || [];
+    arr.push(cr);
+    regByComponent.set(cr.componentId, arr);
+  }
+
+  const rows: any[] = [];
+  for (const comp of classComps) {
+    const regs = regByComponent.get(comp.cuuid) || [];
+    if (regs.length === 0) {
+      rows.push(_ciMasterRow(comp, null, vesselNameMap));
+    } else {
+      for (const cr of regs) rows.push(_ciMasterRow(comp, cr, vesselNameMap));
+    }
+  }
+
+  rows.sort((a, b) => _ciParseDate(a.nextSurveyDue) - _ciParseDate(b.nextSurveyDue));
+  rows.forEach((r, i) => { r.sno = i + 1; });
+
+  const isMultiVessel = scopedVessels.length > 1 || vesselId === 'all';
+
+  if (format === 'excel') {
+    const columns: ColumnDef[] = [
+      { key: 'sno', header: 'Sr. No.', width: 6, type: 'number', align: 'center' },
+      { key: 'componentCode', header: 'Component Code', width: 16, type: 'text' },
+      { key: 'componentName', header: 'Component Name', width: 30, type: 'text' },
+      { key: 'department', header: 'Department', width: 14, type: 'text' },
+      { key: 'maker', header: 'Maker', width: 18, type: 'text' },
+      { key: 'model', header: 'Model', width: 18, type: 'text' },
+      { key: 'criticality', header: 'Criticality', width: 12, type: 'text', align: 'center' },
+      { key: 'classificationSociety', header: 'Classification Society', width: 18, type: 'text' },
+      { key: 'certificateNumber', header: 'Certificate No.', width: 18, type: 'text' },
+      { key: 'surveyType', header: 'Survey Type', width: 16, type: 'text' },
+      { key: 'lastClassSurvey', header: 'Last Class Survey', width: 16, type: 'text' },
+      { key: 'nextSurveyDue', header: 'Next Class Survey Due', width: 18, type: 'text' },
+      { key: 'classRequirements', header: 'Class Requirements', width: 24, type: 'text' },
+      ...(isMultiVessel ? [{ key: 'vesselName', header: 'Vessel', width: 22, type: 'text' as const }] : []),
+    ];
+
+    const vesselName = vesselId !== 'all' ? (allVessels.find(v => v.id === vesselId)?.name || vesselId) : 'All Vessels';
+    const lastCol = getLastColumnLetter(columns.length);
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Class Items Master');
+    applyStandardHeader(ws, 'Class Items Master List', `${rows.length} class items`, vesselName, rows.length, lastCol);
+    applyStandardTableHeader(ws, columns);
+    applyStandardDataRows(ws, rows, columns);
+    const lastDataRow = 7 + rows.length;
+    applyStandardPageSetup(ws, 7, columns.length, lastDataRow, vesselName);
+    const buffer = await wb.xlsx.writeBuffer();
+    return {
+      type: 'excel' as const,
+      buffer: Buffer.from(buffer as ArrayBuffer),
+      filename: generateFilename('Class_Items_Master_List', vesselName),
+    };
+  }
+
+  return {
+    type: 'json' as const,
+    rows,
+    summary: {
+      total: rows.length,
+      components: classComps.length,
+      withClassReg: rows.filter(r => r.classificationSociety !== '-').length,
+      withoutClassReg: rows.filter(r => r.classificationSociety === '-').length,
+    },
+  };
+}
+
+function _ciMasterRow(comp: any, cr: any | null, vesselNameMap: Map<string, string>) {
+  return {
+    componentCode: comp.componentCode || '-',
+    componentName: comp.name || '-',
+    department: comp.eqptSystemDept || comp.deptCategory || comp.department || '-',
+    maker: comp.maker || '-',
+    model: comp.model || '-',
+    criticality: comp.critical === true ? 'Yes' : (comp.critical === false ? 'No' : (comp.criticality || '-')),
+    classificationSociety: cr?.classificationSociety || '-',
+    certificateNumber: cr?.certificateNumber || '-',
+    surveyType: cr?.surveyType || '-',
+    lastClassSurvey: cr?.lastClassSurvey || '-',
+    nextSurveyDue: cr?.nextSurveyDue || '-',
+    classRequirements: cr?.classRequirements || '-',
+    vesselName: vesselNameMap.get(comp.vesselId || '') || '-',
+    vesselId: comp.vesselId || '',
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLASS ITEMS JOBS STATUS  (job-level, class_related = Yes)
+// ═══════════════════════════════════════════════════════════════
+
+export async function getClassItemsJobsStatus(
+  vesselId: string,
+  jobSearch: string | undefined,
+  departmentFilter: string | undefined,
+  dateFrom: string | undefined,
+  dateTo: string | undefined,
+  format: string,
+  vesselIds?: string[],
+) {
+  const allVessels = await repo.getVessels();
+  const scopedVessels = vesselId === 'all' && vesselIds?.length
+    ? allVessels.filter(v => vesselIds.includes(v.id))
+    : (vesselId === 'all' ? allVessels : allVessels.filter(v => v.id === vesselId));
+  const vesselNameMap = new Map(allVessels.map(v => [v.id, v.name || v.id]));
+
+  let allComponents: any[] = [];
   let allJobs: any[] = [];
   let allLinks: any[] = [];
   for (const v of scopedVessels) {
@@ -1421,7 +1575,11 @@ export async function getClassItemsMasterList(
   }
 
   const isClassRelated = (val: any) => val === true || val === 'Yes' || val === 'true';
-  const classJobs = allJobs.filter((j: any) => isClassRelated(j.classRelated) && j.isDeleted !== true);
+  const classJobs = allJobs.filter((j: any) =>
+    isClassRelated(j.classRelated) &&
+    j.isDeleted !== true &&
+    (j.isActive === undefined || j.isActive === true)
+  );
 
   const componentByCuuid = new Map<string, any>(allComponents.filter(c => c.isDeleted !== true).map(c => [c.cuuid, c]));
   const linksByJobId = new Map<string, string[]>();
@@ -1431,28 +1589,24 @@ export async function getClassItemsMasterList(
     linksByJobId.set(link.jobId, arr);
   }
 
-  const componentIdsInPlay = new Set<string>();
-  for (const j of classJobs) {
-    if (j.componentId) componentIdsInPlay.add(j.componentId);
-    for (const cid of (linksByJobId.get(j.juuid) || [])) componentIdsInPlay.add(cid);
-  }
-
-  let classRegRows: any[] = [];
-  if (componentIdsInPlay.size > 0) {
-    const db = await getDb();
-    classRegRows = await db.select().from(componentClassRegulatory)
-      .where(inArray(componentClassRegulatory.componentId, Array.from(componentIdsInPlay)));
-  }
-  const firstClassRegByComponent = new Map<string, any>();
-  for (const cr of classRegRows) {
-    if (cr.isDeleted === true) continue;
-    if (!firstClassRegByComponent.has(cr.componentId)) {
-      firstClassRegByComponent.set(cr.componentId, cr);
-    }
-  }
-
-  const compSearchQ = (componentSearch || '').toLowerCase().trim();
+  const jobSearchQ = (jobSearch || '').toLowerCase().trim();
   const deptQ = (departmentFilter || '').toLowerCase().trim();
+  const dateFromTs = dateFrom ? Date.parse(dateFrom) : NaN;
+  const dateToTs = dateTo ? Date.parse(dateTo) : NaN;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayTs = today.getTime();
+  const thirtyDaysTs = 30 * 24 * 60 * 60 * 1000;
+
+  const deriveStatus = (nextDueDate: string | null | undefined): string => {
+    if (!nextDueDate || nextDueDate === '-') return '-';
+    const t = _ciParseDate(nextDueDate);
+    if (!isFinite(t)) return '-';
+    if (t < todayTs) return 'Overdue';
+    if (t - todayTs <= thirtyDaysTs) return 'Due';
+    return 'Upcoming';
+  };
 
   const rows: any[] = [];
   for (const job of classJobs) {
@@ -1465,16 +1619,21 @@ export async function getClassItemsMasterList(
 
     for (const compId of compIds) {
       const comp = compId ? componentByCuuid.get(compId) : null;
-      const cr = compId ? firstClassRegByComponent.get(compId) : null;
 
-      if (compSearchQ) {
-        const cn = (comp?.name || '').toLowerCase();
-        const cc = (comp?.componentCode || '').toLowerCase();
-        if (!cn.includes(compSearchQ) && !cc.includes(compSearchQ)) continue;
+      if (jobSearchQ) {
+        const jc = (job.jobNo || '').toLowerCase();
+        const jt = (job.jobTitle || '').toLowerCase();
+        if (!jc.includes(jobSearchQ) && !jt.includes(jobSearchQ)) continue;
       }
       if (deptQ && deptQ !== 'all') {
-        const d = ((comp?.eqptSystemDept || comp?.deptCategory || comp?.department || job.department || '') as string).toLowerCase();
+        const d = ((job.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || '') as string).toLowerCase();
         if (d !== deptQ) continue;
+      }
+      if (!isNaN(dateFromTs) || !isNaN(dateToTs)) {
+        const dueTs = _ciParseDate(job.nextDueDate);
+        if (!isFinite(dueTs)) continue;
+        if (!isNaN(dateFromTs) && dueTs < dateFromTs) continue;
+        if (!isNaN(dateToTs) && dueTs > dateToTs) continue;
       }
 
       const freq = [job.frequencyValue, job.frequencyUnit].filter(Boolean).join(' ');
@@ -1482,92 +1641,69 @@ export async function getClassItemsMasterList(
       rows.push({
         jobCode: job.jobNo || '-',
         jobTitle: job.jobTitle || '-',
-        taskType: job.maintenanceType || '-',
-        frequency: freq || '-',
-        lastDoneDate: job.lastDoneDate || '-',
-        nextDueDate: job.nextDueDate || '-',
-        classRelated: typeof job.classRelated === 'boolean' ? (job.classRelated ? 'Yes' : 'No') : (job.classRelated || 'Yes'),
         componentCode: comp?.componentCode || '-',
         componentName: comp?.name || '-',
-        department: comp?.eqptSystemDept || comp?.deptCategory || comp?.department || job.department || '-',
+        department: job.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || '-',
+        taskType: job.maintenanceType || '-',
+        maintenanceBasis: job.maintenanceBasis || '-',
+        frequency: freq || '-',
+        assignedTo: job.assignedTo || '-',
+        approver: job.approver || '-',
+        jobPriority: job.jobPriority || '-',
+        criticality: job.criticality || (comp?.critical === true ? 'Yes' : (comp?.critical === false ? 'No' : '-')),
+        lastDoneDate: job.lastDoneDate || '-',
+        lastDoneRH: job.lastDoneRH || job.lastDoneRunningHours || '-',
+        nextDueDate: job.nextDueDate || '-',
+        nextDueRH: job.nextDueRH || job.nextDueRunningHours || '-',
+        status: deriveStatus(job.nextDueDate),
         vesselName: vesselNameMap.get(comp?.vesselId || job.vesselId || '') || '-',
         vesselId: comp?.vesselId || job.vesselId || '',
-        classificationSociety: cr?.classificationSociety || '-',
-        certificateNumber: cr?.certificateNumber || '-',
-        lastClassSurvey: cr?.lastClassSurvey || '-',
-        nextSurveyDue: cr?.nextSurveyDue || '-',
-        surveyType: cr?.surveyType || '-',
-        classRequirements: cr?.classRequirements || '-',
-        surveyStatus: cr?.surveyStatus || '-',
-        remarks: cr?.remarks || '-',
-        classCode: cr?.classCode || '-',
-        information: cr?.information || '-',
       });
     }
   }
 
-  const monthIdx: Record<string, number> = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
-  const parseDDMMM = (s: string | null | undefined): number => {
-    if (!s || s === '-') return Number.POSITIVE_INFINITY;
-    const m = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/.exec(s.trim());
-    if (m) {
-      const mo = monthIdx[m[2].slice(0,1).toUpperCase() + m[2].slice(1).toLowerCase()];
-      if (mo !== undefined) return new Date(parseInt(m[3]), mo, parseInt(m[1])).getTime();
-    }
-    const t = Date.parse(s);
-    return isNaN(t) ? Number.POSITIVE_INFINITY : t;
-  };
-  rows.sort((a, b) => parseDDMMM(a.nextSurveyDue) - parseDDMMM(b.nextSurveyDue));
+  rows.sort((a, b) => _ciParseDate(a.nextDueDate) - _ciParseDate(b.nextDueDate));
   rows.forEach((r, i) => { r.sno = i + 1; });
 
   const isMultiVessel = scopedVessels.length > 1 || vesselId === 'all';
 
   if (format === 'excel') {
     const columns: ColumnDef[] = [
-      { key: 'sno', header: 'S.No', width: 6, type: 'number', align: 'center' },
-      ...(isMultiVessel ? [{ key: 'vesselName', header: 'Vessel', width: 22, type: 'text' as const }] : []),
+      { key: 'sno', header: 'Sr. No.', width: 6, type: 'number', align: 'center' },
       { key: 'jobCode', header: 'Job Code', width: 16, type: 'text' },
       { key: 'jobTitle', header: 'Job Title', width: 32, type: 'text' },
+      { key: 'componentCode', header: 'Component Code', width: 16, type: 'text' },
+      { key: 'componentName', header: 'Component Name', width: 28, type: 'text' },
+      { key: 'department', header: 'Department', width: 12, type: 'text' },
       { key: 'taskType', header: 'Task Type', width: 14, type: 'text' },
-      { key: 'frequency', header: 'Frequency', width: 14, type: 'text' },
-      { key: 'lastDoneDate', header: 'Last Done', width: 14, type: 'text' },
-      { key: 'nextDueDate', header: 'Next Due', width: 14, type: 'text' },
-      { key: 'classRelated', header: 'Class Related', width: 12, type: 'text', align: 'center' },
-      { key: 'componentCode', header: 'Component Code', width: 18, type: 'text' },
-      { key: 'componentName', header: 'Component Name', width: 30, type: 'text' },
-      { key: 'department', header: 'Department', width: 14, type: 'text' },
-      { key: 'classificationSociety', header: 'Classification Society', width: 18, type: 'text' },
-      { key: 'certificateNumber', header: 'Certificate No.', width: 18, type: 'text' },
-      { key: 'lastClassSurvey', header: 'Last Class Survey', width: 16, type: 'text' },
-      { key: 'nextSurveyDue', header: 'Next Class Survey', width: 16, type: 'text' },
-      { key: 'surveyType', header: 'Survey Type', width: 16, type: 'text' },
-      { key: 'classRequirements', header: 'Class Requirements', width: 24, type: 'text' },
-      { key: 'surveyStatus', header: 'Survey Status', width: 14, type: 'text', align: 'center' },
-      { key: 'remarks', header: 'Remarks', width: 24, type: 'text' },
-      { key: 'classCode', header: 'Class Code', width: 14, type: 'text' },
-      { key: 'information', header: 'Information', width: 24, type: 'text' },
+      { key: 'maintenanceBasis', header: 'Maintenance Basis', width: 14, type: 'text' },
+      { key: 'frequency', header: 'Frequency', width: 12, type: 'text' },
+      { key: 'assignedTo', header: 'Assigned To', width: 14, type: 'text' },
+      { key: 'approver', header: 'Approver', width: 14, type: 'text' },
+      { key: 'jobPriority', header: 'Job Priority', width: 12, type: 'text', align: 'center' },
+      { key: 'criticality', header: 'Criticality', width: 12, type: 'text', align: 'center' },
+      { key: 'lastDoneDate', header: 'Last Done Date', width: 14, type: 'text' },
+      { key: 'lastDoneRH', header: 'Last Done RH', width: 12, type: 'text', align: 'right' },
+      { key: 'nextDueDate', header: 'Next Due Date', width: 14, type: 'text' },
+      { key: 'nextDueRH', header: 'Next Due RH', width: 12, type: 'text', align: 'right' },
+      { key: 'status', header: 'Status', width: 12, type: 'text', align: 'center' },
+      ...(isMultiVessel ? [{ key: 'vesselName', header: 'Vessel', width: 22, type: 'text' as const }] : []),
     ];
 
     const vesselName = vesselId !== 'all' ? (allVessels.find(v => v.id === vesselId)?.name || vesselId) : 'All Vessels';
     const lastCol = getLastColumnLetter(columns.length);
-
     const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('Class Items');
-
-    applyStandardHeader(ws, 'Class Items Master List', `${rows.length} class-related job rows`, vesselName, rows.length, lastCol);
+    const ws = wb.addWorksheet('Class Items Jobs');
+    applyStandardHeader(ws, 'Class Items Jobs Status', `${rows.length} class-related jobs`, vesselName, rows.length, lastCol);
     applyStandardTableHeader(ws, columns);
     applyStandardDataRows(ws, rows, columns);
-
     const lastDataRow = 7 + rows.length;
     applyStandardPageSetup(ws, 7, columns.length, lastDataRow, vesselName);
-
     const buffer = await wb.xlsx.writeBuffer();
-    const filename = generateFilename('Class_Items_Master_List', vesselName);
-
     return {
       type: 'excel' as const,
       buffer: Buffer.from(buffer as ArrayBuffer),
-      filename
+      filename: generateFilename('Class_Items_Jobs_Status', vesselName),
     };
   }
 
@@ -1577,8 +1713,9 @@ export async function getClassItemsMasterList(
     summary: {
       total: rows.length,
       jobs: classJobs.length,
-      withClassReg: rows.filter(r => r.classificationSociety !== '-').length,
-      withoutClassReg: rows.filter(r => r.classificationSociety === '-').length,
-    }
+      overdue: rows.filter(r => r.status === 'Overdue').length,
+      due: rows.filter(r => r.status === 'Due').length,
+      upcoming: rows.filter(r => r.status === 'Upcoming').length,
+    },
   };
 }

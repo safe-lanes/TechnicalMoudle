@@ -266,6 +266,36 @@ export async function getClassItemsMasterList(req: Request, res: Response) {
   }
 }
 
+export async function getClassItemsJobsStatus(req: Request, res: Response) {
+  try {
+    const vesselId = req.query.vesselId as string;
+    const jobSearch = (req.query.search as string) || (req.query.jobSearch as string) || undefined;
+    const department = req.query.department as string | undefined;
+    const dateFrom = req.query.dateFrom as string | undefined;
+    const dateTo = req.query.dateTo as string | undefined;
+    const format = (req.query.format as string) || 'json';
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
+
+    if (!vesselId) {
+      return res.status(400).json({ error: "vesselId is required" });
+    }
+
+    const result = await equipmentReportService.getClassItemsJobsStatus(vesselId, jobSearch, department, dateFrom, dateTo, format, vesselIds);
+
+    if (result.type === 'excel') {
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      res.send(result.buffer);
+      return;
+    }
+
+    res.json({ rows: result.rows, summary: result.summary });
+  } catch (error: any) {
+    console.error("Error generating class items jobs status report:", error);
+    res.status(500).json({ error: "Failed to generate report", details: error.message });
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // CRITICAL EQUIPMENT SCHEDULE
 // ═══════════════════════════════════════════════════════════════
