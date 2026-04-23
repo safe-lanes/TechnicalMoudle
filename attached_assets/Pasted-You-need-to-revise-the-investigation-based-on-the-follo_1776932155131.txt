@@ -1,0 +1,335 @@
+You need to revise the investigation based on the following clarified business requirement.
+
+Do not assume anything from previous responses.
+Do not compare this to LSA/FFA or try to copy that design/logic pattern.
+This is a separate requirement and should be investigated on its own merit.
+
+Correct Requirement
+We want a new top-level category in Reports called:
+
+Class Items
+
+It must be placed below LSA/FFA Equipment in the left-side Reports tree as its own separate category, not inside LSA/FFA. The current Reports page shows categories like “Critical Equipment” and “LSA/FFA Equipment” as separate entries in the tree, so “Class Items” should follow that same top-level tree structure.
+
+What this report must show
+This report is specifically for all jobs where the Job field “Class Related” = Yes.
+
+This is important:
+
+The report logic is based on jobs marked as Class Related = Yes
+
+Do not base the primary report logic on component class flag unless needed as supplementary data
+
+Do not propose Option B / Option C style logic unless you are only mentioning them as secondary observations
+
+Primary dataset = jobs where Class Related = Yes
+
+Data to be shown in the report
+The table should be designed so it looks proper and meaningful for class/regulatory tracking.
+
+1. Component-side information
+The report must show the details from Section G of the Components module:
+
+Classification & Regulatory Data
+
+Example fields visible there include classification-related information such as:
+
+Classification Society
+
+Certificate No.
+
+Last Class Survey
+
+Next Class Survey
+
+Survey Type
+
+Class Requirements
+
+Class Code
+
+Information
+
+These Section G details must be included in the report output if available.
+
+2. Job-side information
+The report must list all the jobs where Class Related = Yes
+
+Other supporting information in the report should be similar to Section C of the Component submodule, i.e. the jobs-style listing associated with the component. The component screen’s Section C visibly shows job-oriented columns such as job code, job title, task type, frequency, last done date, and next due date, which is the presentation direction to follow for the report.
+
+So the report should effectively combine:
+
+Section G style component classification/regulatory fields
+
+Section C style job listing fields
+
+filtered by Job.Class Related = Yes
+
+Important constraints
+Do not compare this to LSA/FFA
+
+Do not try to clone LSA/FFA logic
+
+Do not recommend “similar to LSA/FFA report”
+
+Do not frame the implementation around copying any existing report unless you are only reusing generic infrastructure such as AG Grid, export utility, or report container patterns
+
+This report should be investigated as an independent reporting requirement.
+
+Investigation tasks
+Please inspect the codebase and provide precise findings for the below.
+
+1. Reports Tree Structure
+Investigate:
+
+where top-level report categories are configured
+
+how to add a new top-level category called Class Items
+
+how to position it below LSA/FFA Equipment
+
+what happens when a category is clicked
+
+whether the category itself can directly open the AG Grid table
+
+or whether one child report node is mandatory
+
+Recommend the cleanest current-system-compatible approach.
+
+2. Jobs “Class Related” Field
+Investigate the jobs side carefully:
+
+exact frontend field name
+
+exact DB column name
+
+exact table name
+
+storage type
+
+actual values stored, e.g. Yes/No, boolean, enum, nullable
+
+whether the value exists in jobs master/template records only, or also in work orders
+
+whether any current API already filters using this field
+
+whether there are inconsistencies in how this field is stored or interpreted in backend
+
+This field is the primary driver for the report.
+
+3. Section G Data Source
+Investigate the source of Components Section G – Classification & Regulatory Data:
+
+exact table where these values are stored
+
+exact column names
+
+whether they are in components table or a related detail table
+
+whether they are already returned by component APIs
+
+whether they can be joined easily with jobs through component linkage
+
+whether all Section G fields are per component, per vessel, or in another structure
+
+I want exact findings.
+
+4. Section C Style Job Data Source
+Investigate the source behind Components Section C – Jobs:
+
+where the Section C list is fetched from
+
+which API/service/repository returns this data
+
+whether it is job templates or generated work orders
+
+which columns are returned today
+
+whether the same source can be reused for this report
+
+5. Join Logic
+Investigate how a job is linked to a component in the current system.
+
+Please confirm exact relationship path, for example:
+
+jobs.component_id
+
+job_component_links
+
+another junction table
+
+legacy + new structure coexistence
+
+Then explain the safest query path to return:
+
+all jobs where class_related = Yes
+
+joined with component details
+
+joined with Section G classification/regulatory fields
+
+6. API Readiness
+Check whether an existing API already supports this report.
+
+Specifically answer:
+
+Is there already an endpoint returning jobs joined with component details?
+
+Is there already an endpoint returning Section G classification data together with jobs?
+
+Can current reports API be reused?
+
+Is a new endpoint required?
+
+If a new endpoint is required, propose:
+
+endpoint path
+
+request parameters
+
+filters supported
+
+response structure
+
+7. Proposed Report Columns
+Recommend the final report columns in three groups:
+
+A. Job columns
+These should primarily follow the Section C jobs-style listing, such as:
+
+Job Code
+
+Job Title
+
+Task Type
+
+Frequency
+
+Last Done Date
+
+Next Due Date
+
+and any other useful class-job fields
+
+B. Component columns
+Basic linked component identity fields, such as:
+
+Component Code
+
+Component Name
+
+Fleet Equipment Code
+
+Department
+
+Vessel
+
+C. Section G classification/regulatory columns
+Include the fields actually available in Section G:
+
+Classification Society
+
+Certificate No.
+
+Last Class Survey
+
+Next Class Survey
+
+Survey Type
+
+Class Requirements
+
+Class Code
+
+Information
+
+Please mark which are already available and which need new backend join/query work.
+
+8. Frontend Impact
+Identify exact frontend files likely to change for:
+
+adding top-level Class Items category
+
+creating the report screen
+
+rendering AG Grid
+
+wiring global filters if applicable
+
+export support
+
+loading / empty / error states
+
+9. Backend Impact
+Identify exact backend files likely to change for:
+
+route/controller/service/repository
+
+query implementation
+
+export support
+
+any index/performance concern
+
+any data inconsistency risk
+
+10. Edge Cases
+Please explicitly check and comment on:
+
+jobs marked Class Related = Yes but component link missing
+
+jobs marked Class Related = Yes but Section G fields blank
+
+inactive job records
+
+inactive components
+
+multiple components linked to one job
+
+same job template across vessels
+
+vessel filter behavior
+
+“all vessels” behavior if supported by reports module
+
+Final Output Format
+Return your answer in this exact structure:
+
+Executive Summary
+
+Reports Tree Placement
+
+Jobs Class Related Field Findings
+
+Section G Classification Data Findings
+
+Section C Jobs Data Findings
+
+Join Path and Data Model
+
+Existing API Readiness
+
+Proposed Report Columns
+
+Frontend Changes Required
+
+Backend Changes Required
+
+Edge Cases and Risks
+
+Final Recommendation
+
+Most Important Instruction
+Do not misread this again:
+
+This is a new top-level Class Items category
+
+It is below LSA/FFA Equipment
+
+It is for all jobs where Class Related = Yes
+
+It should show Section G component classification/regulatory details
+
+Its job information should be similar to Component Section C
+
+Do not compare or copy LSA/FFA logic, except possibly generic reusable table infrastructure
