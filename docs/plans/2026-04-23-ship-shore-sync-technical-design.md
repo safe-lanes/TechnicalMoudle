@@ -45,6 +45,47 @@
 | 19 | Upload documents/photos | BOTH | BOTH |
 | 20 | View Reports & Dashboards | BOTH | BOTH |
 
+### Domain Expert Validation (2026-04-23)
+
+Domain expert responses received via document (`sync related questions.docx`). All 20 activities classified. Table classification confirmed as matching the architecture design.
+
+| # | Activity | Domain Expert Answer | Sync Category |
+|---|----------|---------------------|---------------|
+| 1 | Create/complete/close Work Order | BOTH | BOTH_EDITABLE |
+| 2 | Approve Work Order (as superintendent) | BOTH | BOTH_EDITABLE |
+| 3 | Postpone Work Order | BOTH | BOTH_EDITABLE |
+| 4 | Update Running Hours (daily readings) | BOTH | BOTH_EDITABLE |
+| 5 | Raise a new Defect | BOTH | BOTH_EDITABLE |
+| 6 | Update defect status (In-Progress, Closed) | BOTH | BOTH_EDITABLE |
+| 7 | Verify/close defect from office side | OFFICE ONLY | BOTH_EDITABLE (with business rule — see below) |
+| 8 | Update Spare Parts stock (consume, receive) | BOTH | BOTH_EDITABLE |
+| 9 | Update Stores inventory (consume, receive) | BOTH | BOTH_EDITABLE |
+| 10 | Add new Component (equipment) | OFFICE ONLY | ONE_WAY_SHORE_TO_SHIP |
+| 11 | Edit component details (maker, model, criticality) | OFFICE ONLY | ONE_WAY_SHORE_TO_SHIP |
+| 12 | Change Job schedule or frequency | OFFICE ONLY | ONE_WAY_SHORE_TO_SHIP |
+| 13 | Submit Modify PMS / Change Request | BOTH | BOTH_EDITABLE |
+| 14 | Approve/reject Change Request | OFFICE ONLY | ONE_WAY_SHORE_TO_SHIP (approval action) |
+| 15 | Update Certificates & Surveys data | BOTH | BOTH_EDITABLE |
+| 16 | Manage Fleet templates | OFFICE ONLY | ONE_WAY_SHORE_TO_SHIP |
+| 17 | Manage Ranks, Org Chart, Access Control | OFFICE ONLY | ONE_WAY_SHORE_TO_SHIP |
+| 18 | Submit Noon Reports | SHIP ONLY | SHIP_ONLY (per maritime standard practice, confirmed by domain expert omission) |
+| 19 | Upload documents/photos to WO or defects | BOTH | BOTH_EDITABLE + sync_file_queue |
+| 20 | View Reports & Dashboards | BOTH (read-only) | NO_SYNC (generated locally from synced data) |
+
+#### Business Rule: Defect Verify/Close (Activity #7)
+
+The `defects` table remains classified as **BOTH_EDITABLE** because both ship and office can raise defects, update status, and add actions. However, **verify/close is office-only**:
+
+- **Rule:** During sync merge (Phase 4.5), if a `defects` row has a `status` field change to `'Verified'` or `'Closed'`, the sync engine must check the `instance_id` of the originating change.
+  - If `instance_id` starts with `SHORE` → accept the status change
+  - If `instance_id` starts with `SHIP` → **reject** the status change, log a sync warning, and revert the field to its previous value
+- **Enforcement:** This rule is enforced at the sync merge layer, not at the application UI layer. The ship application may optionally also hide the Verify/Close buttons in the UI, but the sync engine is the authoritative gate.
+- **Rationale:** Domain expert confirmed verify/close is an office-only supervisory action. Ship crew raises and works on defects; office verifies and closes them.
+
+#### Noon Reports Confirmation (Activity #18)
+
+Domain expert left #18 blank. Classified as **SHIP_ONLY** per standard maritime practice — noon reports are submitted by the vessel's master or duty officer while at sea. Shore/office staff view them (read-only via synced data) but never create or edit them.
+
 ---
 
 ## Architecture: Approach C (Hybrid)
@@ -145,7 +186,7 @@ Noon report tables (all), `defect_sequences`
 | 4.2 | Delta extractor | Query rows with `updated_at > last_checkpoint AND vessel_id = X` |
 | 4.3 | One-way applier (shore→ship) | Upsert by UUID. Overwrite all fields |
 | 4.4 | One-way applier (ship→shore) | Same logic for SHIP_ONLY tables |
-| 4.5 | Field-level merger | Compare field logs. Different fields → auto-merge. Same field → conflict |
+| 4.5 | Field-level merger | Compare field logs. Different fields → auto-merge. Same field → conflict. **Business rule:** Defect `status` changes to `Verified`/`Closed` only accepted from shore instance (`instance_id` prefix `SHORE`); ship-originated verify/close is rejected and reverted — see Domain Expert Validation §Business Rule above |
 | 4.6 | Conflict queue manager | Present conflicts in UI, allow resolution |
 | 4.7 | Checkpoint manager | Track and advance `last_sync_checkpoint`. Partial sync preserves old checkpoint |
 | 4.8 | Payload compression | Gzip all sync payloads (60-70% compression on JSON) |
