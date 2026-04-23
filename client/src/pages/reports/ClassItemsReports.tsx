@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Shield, Eye, FileText, Download, Loader2 } from "lucide-react";
+import { ArrowLeft, Shield, FileText, Download, Loader2, AlertCircle } from "lucide-react";
 import { pdfReportGenerator, formatReportDateRange } from "@/lib/pdfReportGenerator";
 import { ReportPreviewData } from "@/components/reports/ReportPreviewModal";
 import InlineReportPreview from "@/components/reports/InlineReportPreview";
@@ -17,6 +17,7 @@ interface ClassItemsReportsProps {
   globalFilters?: {
     vessels: string[];
     component: string;
+    department?: string;
     dateRange: { from: Date | null; to: Date | null };
   };
   embedded?: boolean;
@@ -32,12 +33,11 @@ const ClassItemsReports: React.FC<ClassItemsReportsProps> = ({ onBack, globalFil
   });
   const [globalVessels, setGlobalVessels] = useState<string[]>(globalFilters?.vessels || []);
   const [globalComponent, setGlobalComponent] = useState<string>(globalFilters?.component || "");
+  const [globalDepartment, setGlobalDepartment] = useState<string>(globalFilters?.department || "");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
   const [isFilterRefreshing, setIsFilterRefreshing] = useState(false);
   const initialLoadRef = useRef(false);
-  const previewVersionRef = useRef(0);
-  const pendingPreviewRef = useRef(false);
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
   const { vesselId: contextVesselId } = useVessel();
@@ -60,10 +60,15 @@ const ClassItemsReports: React.FC<ClassItemsReportsProps> = ({ onBack, globalFil
     if (globalFilters) setGlobalComponent(globalFilters.component || "");
   }, [globalFilters?.component]);
 
+  useEffect(() => {
+    if (globalFilters) setGlobalDepartment(globalFilters.department || "");
+  }, [globalFilters?.department]);
+
   const filterFingerprint = useMemo(() => JSON.stringify({
     v: globalFilters?.vessels,
     c: globalFilters?.component,
-  }), [globalFilters?.vessels, globalFilters?.component]);
+    d: globalFilters?.department,
+  }), [globalFilters?.vessels, globalFilters?.component, globalFilters?.department]);
 
   const effectiveVesselId = (globalFilters?.vessels !== undefined)
     ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
@@ -71,15 +76,16 @@ const ClassItemsReports: React.FC<ClassItemsReportsProps> = ({ onBack, globalFil
 
   const isMultiVessel = effectiveVesselId === 'all';
 
-  const { data: classItemsData, isLoading, isFetching } = useQuery<any>({
-    queryKey: ['/technical/api/reports/class-items-master-list', effectiveVesselId, globalComponent, globalVessels.join(',')],
+  const { data: classItemsData, isLoading, isFetching, isError, error } = useQuery<any>({
+    queryKey: ['/technical/api/reports/class-items-master-list', effectiveVesselId, globalComponent, globalDepartment, globalVessels.join(',')],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.set('vesselId', effectiveVesselId || 'all');
       if (isMultiVessel && globalVessels.length > 0) params.set('vesselIds', globalVessels.join(','));
       if (globalComponent) params.set('componentSearch', globalComponent);
+      if (globalDepartment) params.set('department', globalDepartment);
       const res = await fetch(`/technical/api/reports/class-items-master-list?${params}`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch');
+      if (!res.ok) throw new Error(`Failed to fetch class items report (status ${res.status})`);
       return res.json();
     },
   });
@@ -235,7 +241,13 @@ const ClassItemsReports: React.FC<ClassItemsReportsProps> = ({ onBack, globalFil
   if (embedded) {
     return (
       <div className="w-full">
-        {(isLoading || isFilterRefreshing) && !previewData ? (
+        {isError ? (
+          <div className="flex flex-col items-center justify-center py-16 text-sm text-red-600" data-testid="error-class-items-report">
+            <AlertCircle className="h-6 w-6 mb-2" />
+            <div>Failed to load class items report.</div>
+            <div className="text-xs text-gray-500 mt-1">{(error as any)?.message || 'Please try again.'}</div>
+          </div>
+        ) : (isLoading || isFilterRefreshing) && !previewData ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
             <span className="ml-2 text-sm text-gray-500">Loading class items report…</span>
