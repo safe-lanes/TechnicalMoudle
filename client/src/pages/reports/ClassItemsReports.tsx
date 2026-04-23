@@ -153,7 +153,6 @@ const ClassItemsReports: React.FC<ClassItemsReportsProps> = ({ onBack, globalFil
   useEffect(() => {
     if (!embedded || !selectedReportId || !initialLoadRef.current) return;
     setIsFilterRefreshing(true);
-    pendingPreviewRef.current = true;
   }, [filterFingerprint]);
 
   const handleExcelExport = async () => {
@@ -162,6 +161,7 @@ const ClassItemsReports: React.FC<ClassItemsReportsProps> = ({ onBack, globalFil
     params.set('format', 'excel');
     if (globalVessels.length > 0) params.set('vesselIds', globalVessels.join(','));
     if (globalComponent) params.set('componentSearch', globalComponent);
+    if (globalDepartment) params.set('department', globalDepartment);
     const response = await fetch(`/technical/api/reports/class-items-master-list?${params.toString()}`);
     if (!response.ok) throw new Error('Export failed');
     const blob = await response.blob();
