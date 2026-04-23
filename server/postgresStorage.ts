@@ -4322,9 +4322,15 @@ export class PostgresStorage {
 
   async updateDefect(id: string, data: Partial<InsertDefect>): Promise<Defect> {
     const db = await getDb();
+    // Fetch existing row for old values (needed for future sync field logging)
+    const existingDefect = await this.getDefect(id);
+    if (!existingDefect) {
+      throw new Error(`Defect ${id} not found`);
+    }
+
     const result = await db.update(defects)
       .set({ ...data, updatedAt: new Date() })
-      .where(or(eq(defects.duuid, id), eq(defects.id, id)))
+      .where(eq(defects.duuid, existingDefect.duuid))
       .returning();
     if (!result[0]) {
       throw new Error(`Defect ${id} not found`);
@@ -4334,7 +4340,12 @@ export class PostgresStorage {
 
   async deleteDefect(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(defects).where(or(eq(defects.duuid, id), eq(defects.id, id)));
+    // Fetch existing row to verify it exists before deletion (needed for future sync field logging)
+    const existingDefect = await this.getDefect(id);
+    if (!existingDefect) {
+      throw new Error(`Defect ${id} not found`);
+    }
+    await db.delete(defects).where(eq(defects.duuid, existingDefect.duuid));
   }
 
   async addDefectNote(defectId: string, note: { noteText: string; attachments: string[]; createdBy: string }): Promise<Defect> {
@@ -4387,6 +4398,12 @@ export class PostgresStorage {
     closureFiles?: string[];
   }): Promise<Defect> {
     const db = await getDb();
+    // Fetch existing row for old values (needed for future sync field logging)
+    const existingDefect = await this.getDefect(defectId);
+    if (!existingDefect) {
+      throw new Error(`Defect ${defectId} not found`);
+    }
+
     const result = await db.update(defects)
       .set({
         status: 'Closed',
@@ -4397,9 +4414,9 @@ export class PostgresStorage {
         dateCompleted: new Date().toISOString().split('T')[0],
         updatedAt: new Date(),
       })
-      .where(or(eq(defects.duuid, defectId), eq(defects.id, defectId)))
+      .where(eq(defects.duuid, existingDefect.duuid))
       .returning();
-    
+
     if (!result[0]) {
       throw new Error(`Defect ${defectId} not found`);
     }
@@ -4423,6 +4440,13 @@ export class PostgresStorage {
 
   async updateDefectAction(id: number, updates: Partial<InsertDefectAction>): Promise<DefectAction> {
     const db = await getDb();
+    // Fetch existing row for old values (needed for future sync field logging)
+    const existing = await db.select().from(defectActions).where(eq(defectActions.id, id)).limit(1);
+    if (!existing[0]) {
+      throw new Error(`Defect action ${id} not found`);
+    }
+    const existingAction = existing[0];
+
     const result = await db.update(defectActions)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(defectActions.id, id))
@@ -4435,6 +4459,11 @@ export class PostgresStorage {
 
   async deleteDefectAction(id: number): Promise<void> {
     const db = await getDb();
+    // Fetch existing row to verify it exists before deletion (needed for future sync field logging)
+    const existing = await db.select().from(defectActions).where(eq(defectActions.id, id)).limit(1);
+    if (!existing[0]) {
+      throw new Error(`Defect action ${id} not found`);
+    }
     await db.delete(defectActions).where(eq(defectActions.id, id));
   }
 
@@ -4454,6 +4483,11 @@ export class PostgresStorage {
 
   async deleteDefectAttachment(id: number): Promise<void> {
     const db = await getDb();
+    // Fetch existing row to verify it exists before deletion (needed for future sync field logging)
+    const existing = await db.select().from(defectAttachments).where(eq(defectAttachments.id, id)).limit(1);
+    if (!existing[0]) {
+      throw new Error(`Defect attachment ${id} not found`);
+    }
     await db.delete(defectAttachments).where(eq(defectAttachments.id, id));
   }
 

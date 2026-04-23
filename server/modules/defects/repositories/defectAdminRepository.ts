@@ -21,6 +21,13 @@ export async function createCategory(data: { name: string; sortOrder?: number; i
 
 export async function updateCategory(id: number, updates: any) {
   const { db } = getPostgresClient();
+  // Fetch existing row for old values (needed for future sync field logging)
+  const existing = await db.select().from(defectCategories).where(eq(defectCategories.id, id)).limit(1);
+  if (!existing[0]) {
+    return undefined;
+  }
+  const existingCategory = existing[0];
+
   const [category] = await db.update(defectCategories)
     .set(updates)
     .where(eq(defectCategories.id, id))
@@ -30,6 +37,12 @@ export async function updateCategory(id: number, updates: any) {
 
 export async function deleteCategory(id: number) {
   const { db } = getPostgresClient();
+  // Fetch existing row to verify it exists before deletion (needed for future sync field logging)
+  const existing = await db.select().from(defectCategories).where(eq(defectCategories.id, id)).limit(1);
+  if (!existing[0]) {
+    return undefined;
+  }
+
   const [deleted] = await db.delete(defectCategories)
     .where(eq(defectCategories.id, id))
     .returning();
@@ -55,6 +68,13 @@ export async function createType(data: { name: string; sortOrder?: number; isAct
 
 export async function updateType(id: number, updates: any) {
   const { db } = getPostgresClient();
+  // Fetch existing row for old values (needed for future sync field logging)
+  const existing = await db.select().from(defectTypes).where(eq(defectTypes.id, id)).limit(1);
+  if (!existing[0]) {
+    return undefined;
+  }
+  const existingType = existing[0];
+
   const [defectType] = await db.update(defectTypes)
     .set(updates)
     .where(eq(defectTypes.id, id))
@@ -64,6 +84,12 @@ export async function updateType(id: number, updates: any) {
 
 export async function deleteType(id: number) {
   const { db } = getPostgresClient();
+  // Fetch existing row to verify it exists before deletion (needed for future sync field logging)
+  const existing = await db.select().from(defectTypes).where(eq(defectTypes.id, id)).limit(1);
+  if (!existing[0]) {
+    return undefined;
+  }
+
   const [deleted] = await db.delete(defectTypes)
     .where(eq(defectTypes.id, id))
     .returning();
