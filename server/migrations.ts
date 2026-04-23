@@ -1899,49 +1899,10 @@ const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_wo_anomalies_detected_at ON work_order_anomalies (detected_at DESC)
     `
   },
-  {
-    id: '061_placeholder',
-    name: 'Seed Layer 5 test work orders for all approval tiers',
-    description: 'Creates 4 test WOs in Pending Approval status covering all approval tiers, plus superintendent notifications',
-    sql: `
-      DO $$
-      DECLARE
-        v_vessel_id TEXT := '744535d0-841a-11ed-aa7c-7003bca91a86';
-        v_now TIMESTAMP := NOW();
-      BEGIN
-        -- Only seed if no test WOs exist yet
-        IF NOT EXISTS (SELECT 1 FROM work_orders WHERE work_order_no LIKE 'TEST-L5-%') THEN
-          -- Test WO 1: Standard (daysLate=2, missedCycles=0)
-          INSERT INTO work_orders (id, wouuid, vessel_id, component, component_code, work_order_no, work_order_type, job_title, assigned_to, status, due_date, completion_date_time, date_completed, days_late, missed_cycles, approval_tier, submitted_date, is_execution, created_at, updated_at, data_scope)
-          VALUES ('TEST-L5-STANDARD', gen_random_uuid(), v_vessel_id, 'FO Separators No.02', '702.005.02', 'TEST-L5-STANDARD', 'Planned', 'Test WO - Standard Approval (2 days late)', '2nd Engineer', 'Pending Approval', '2026-03-01', '2026-03-03T00:00:00.000Z', '2026-03-03T00:00:00.000Z', 2, 0, 'standard', '2026-03-03T00:00:00.000Z', true, v_now, v_now, 'vessel');
-
-          -- Test WO 2: CE With Justification (daysLate=10, missedCycles=0)
-          INSERT INTO work_orders (id, wouuid, vessel_id, component, component_code, work_order_no, work_order_type, job_title, assigned_to, status, due_date, completion_date_time, date_completed, days_late, missed_cycles, approval_tier, submitted_date, is_execution, created_at, updated_at, data_scope)
-          VALUES ('TEST-L5-CE-REMARKS', gen_random_uuid(), v_vessel_id, 'FO Separators No.02', '702.005.02', 'TEST-L5-CE-REMARKS', 'Planned', 'Test WO - CE Remarks Required (10 days late)', '2nd Engineer', 'Pending Approval', '2026-02-20', '2026-03-02T00:00:00.000Z', '2026-03-02T00:00:00.000Z', 10, 0, 'ce_with_justification', '2026-03-02T00:00:00.000Z', true, v_now, v_now, 'vessel');
-
-          -- Test WO 3: Superintendent Notification (daysLate=20, missedCycles=0)
-          INSERT INTO work_orders (id, wouuid, vessel_id, component, component_code, work_order_no, work_order_type, job_title, assigned_to, status, due_date, completion_date_time, date_completed, days_late, missed_cycles, approval_tier, superintendent_notified_at, submitted_date, is_execution, created_at, updated_at, data_scope)
-          VALUES ('TEST-L5-SUPT-NOTIFY', gen_random_uuid(), v_vessel_id, 'FO Separators No.02', '702.005.02', 'TEST-L5-SUPT-NOTIFY', 'Planned', 'Test WO - Superintendent Notified (20 days late)', '2nd Engineer', 'Pending Approval', '2026-02-10', '2026-03-02T00:00:00.000Z', '2026-03-02T00:00:00.000Z', 20, 0, 'superintendent_notification', v_now::TEXT, '2026-03-02T00:00:00.000Z', true, v_now, v_now, 'vessel');
-
-          -- Test WO 4: Superintendent Locked (daysLate=35, missedCycles=4)
-          INSERT INTO work_orders (id, wouuid, vessel_id, component, component_code, work_order_no, work_order_type, job_title, assigned_to, status, due_date, completion_date_time, date_completed, days_late, missed_cycles, approval_tier, superintendent_notified_at, superintendent_acknowledged, approval_block_reason, submitted_date, is_execution, created_at, updated_at, data_scope)
-          VALUES ('TEST-L5-LOCKED', gen_random_uuid(), v_vessel_id, 'FO Separators No.02', '702.005.02', 'TEST-L5-LOCKED', 'Planned', 'Test WO - Superintendent Locked (35 days late, 4 cycles)', '2nd Engineer', 'Pending Approval', '2026-01-25', '2026-03-01T00:00:00.000Z', '2026-03-01T00:00:00.000Z', 35, 4, 'superintendent_locked', v_now::TEXT, false, 'Awaiting Superintendent acknowledgment', '2026-03-01T00:00:00.000Z', true, v_now, v_now, 'vessel');
-
-          -- Superintendent notification for WO 3 (superintendent_notification tier)
-          INSERT INTO superintendent_notifications (work_order_id, work_order_code, job_title, component_name, vessel_name, days_late, missed_cycles, approval_tier, is_acknowledged, created_at)
-          VALUES ('TEST-L5-SUPT-NOTIFY', 'TEST-L5-SUPT-NOTIFY', 'Test WO - Superintendent Notified (20 days late)', '702.005.02', v_vessel_id, 20, 0, 'superintendent_notification', false, v_now);
-
-          -- Superintendent notification for WO 4 (superintendent_locked tier)
-          INSERT INTO superintendent_notifications (work_order_id, work_order_code, job_title, component_name, vessel_name, days_late, missed_cycles, approval_tier, is_acknowledged, created_at)
-          VALUES ('TEST-L5-LOCKED', 'TEST-L5-LOCKED', 'Test WO - Superintendent Locked (35 days late, 4 cycles)', '702.005.02', v_vessel_id, 35, 4, 'superintendent_locked', false, v_now);
-
-          RAISE NOTICE 'Layer 5 test data seeded successfully';
-        ELSE
-          RAISE NOTICE 'Layer 5 test data already exists, skipping';
-        END IF;
-      END $$;
-    `
-  },
+  // 061 intentionally removed (was '061_placeholder', a no-op data seed targeting a
+  // non-existent vessel UUID; recorded as Skipped in schema_migrations on 2026-03-12,
+  // row left in place to preserve the applied marker). See git history and
+  // .local/tasks/remove-061-placeholder.md for the full safety analysis.
   {
     id: '062_completion_rh_columns',
     name: 'Add completion_rh columns to work_orders',
