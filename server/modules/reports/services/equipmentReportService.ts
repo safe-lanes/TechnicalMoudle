@@ -1612,54 +1612,48 @@ export async function getClassItemsJobsStatus(
   for (const job of classJobs) {
     const directCompId = job.componentId || null;
     const linkCompIds = linksByJobId.get(job.juuid) || [];
-    const compIds: (string | null)[] = [];
-    if (directCompId) compIds.push(directCompId);
-    for (const cid of linkCompIds) if (!compIds.includes(cid)) compIds.push(cid);
-    if (compIds.length === 0) compIds.push(null);
+    const representativeCompId = directCompId || linkCompIds[0] || null;
+    const comp = representativeCompId ? componentByCuuid.get(representativeCompId) : null;
 
-    for (const compId of compIds) {
-      const comp = compId ? componentByCuuid.get(compId) : null;
-
-      if (jobSearchQ) {
-        const jc = (job.jobNo || '').toLowerCase();
-        const jt = (job.jobTitle || '').toLowerCase();
-        if (!jc.includes(jobSearchQ) && !jt.includes(jobSearchQ)) continue;
-      }
-      if (deptQ && deptQ !== 'all') {
-        const d = ((job.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || '') as string).toLowerCase();
-        if (d !== deptQ) continue;
-      }
-      if (!isNaN(dateFromTs) || !isNaN(dateToTs)) {
-        const dueTs = _ciParseDate(job.nextDueDate);
-        if (!isFinite(dueTs)) continue;
-        if (!isNaN(dateFromTs) && dueTs < dateFromTs) continue;
-        if (!isNaN(dateToTs) && dueTs > dateToTs) continue;
-      }
-
-      const freq = [job.frequencyValue, job.frequencyUnit].filter(Boolean).join(' ');
-
-      rows.push({
-        jobCode: job.jobNo || '-',
-        jobTitle: job.jobTitle || '-',
-        componentCode: comp?.componentCode || '-',
-        componentName: comp?.name || '-',
-        department: job.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || '-',
-        taskType: job.maintenanceType || '-',
-        maintenanceBasis: job.maintenanceBasis || '-',
-        frequency: freq || '-',
-        assignedTo: job.assignedTo || '-',
-        approver: job.approver || '-',
-        jobPriority: job.jobPriority || '-',
-        criticality: job.criticality || (comp?.critical === true ? 'Yes' : (comp?.critical === false ? 'No' : '-')),
-        lastDoneDate: job.lastDoneDate || '-',
-        lastDoneRH: job.lastDoneRH || job.lastDoneRunningHours || '-',
-        nextDueDate: job.nextDueDate || '-',
-        nextDueRH: job.nextDueRH || job.nextDueRunningHours || '-',
-        status: deriveStatus(job.nextDueDate),
-        vesselName: vesselNameMap.get(comp?.vesselId || job.vesselId || '') || '-',
-        vesselId: comp?.vesselId || job.vesselId || '',
-      });
+    if (jobSearchQ) {
+      const jc = (job.jobNo || '').toLowerCase();
+      const jt = (job.jobTitle || '').toLowerCase();
+      if (!jc.includes(jobSearchQ) && !jt.includes(jobSearchQ)) continue;
     }
+    if (deptQ && deptQ !== 'all') {
+      const d = ((job.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || '') as string).toLowerCase();
+      if (d !== deptQ) continue;
+    }
+    if (!isNaN(dateFromTs) || !isNaN(dateToTs)) {
+      const dueTs = _ciParseDate(job.nextDueDate);
+      if (!isFinite(dueTs)) continue;
+      if (!isNaN(dateFromTs) && dueTs < dateFromTs) continue;
+      if (!isNaN(dateToTs) && dueTs > dateToTs) continue;
+    }
+
+    const freq = [job.frequencyValue, job.frequencyUnit].filter(Boolean).join(' ');
+
+    rows.push({
+      jobCode: job.jobNo || '-',
+      jobTitle: job.jobTitle || '-',
+      componentCode: comp?.componentCode || '-',
+      componentName: comp?.name || '-',
+      department: job.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || '-',
+      taskType: job.maintenanceType || '-',
+      maintenanceBasis: job.maintenanceBasis || '-',
+      frequency: freq || '-',
+      assignedTo: job.assignedTo || '-',
+      approver: job.approver || '-',
+      jobPriority: job.jobPriority || '-',
+      criticality: job.criticality || (comp?.critical === true ? 'Yes' : (comp?.critical === false ? 'No' : '-')),
+      lastDoneDate: job.lastDoneDate || '-',
+      lastDoneRH: job.lastDoneRH || job.lastDoneRunningHours || '-',
+      nextDueDate: job.nextDueDate || '-',
+      nextDueRH: job.nextDueRH || job.nextDueRunningHours || '-',
+      status: deriveStatus(job.nextDueDate),
+      vesselName: vesselNameMap.get(comp?.vesselId || job.vesselId || '') || '-',
+      vesselId: comp?.vesselId || job.vesselId || '',
+    });
   }
 
   rows.sort((a, b) => _ciParseDate(a.nextDueDate) - _ciParseDate(b.nextDueDate));

@@ -238,7 +238,7 @@ export async function getLsaFfaMaintenanceSchedule(req: Request, res: Response) 
 export async function getClassItemsMasterList(req: Request, res: Response) {
   try {
     const vesselId = req.query.vesselId as string;
-    const componentSearch = req.query.componentSearch as string | undefined;
+    const componentSearch = (req.query.componentSearch as string) || (req.query.search as string) || undefined;
     const department = req.query.department as string | undefined;
     const format = (req.query.format as string) || 'json';
     const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
