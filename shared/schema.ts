@@ -1024,6 +1024,7 @@ export const alertAcknowledgements = pgTable("alert_acknowledgements", {
   userRole: text("user_role").notNull(),
   comments: text("comments").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
   isSync: boolean("is_sync").default(false),
   createdByUuid: text("created_by_uuid"),
   updatedByUuid: text("updated_by_uuid"),
@@ -1302,6 +1303,7 @@ export const superintendentNotifications = pgTable("superintendent_notifications
   backdatingDays: integer("backdating_days").default(0),
   approvalTier: text("approval_tier"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
   acknowledgedAt: timestamp("acknowledged_at"),
   isAcknowledged: boolean("is_acknowledged").default(false),
   isSync: boolean("is_sync").default(false),
@@ -3504,6 +3506,8 @@ export const workOrderDocuments = pgTable("work_order_documents", {
   storageBackend: text("storage_backend").notNull().default("object"),
   uploadedBy: text("uploaded_by").notNull(),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
   isSync: boolean("is_sync").default(false),
   createdByUuid: text("created_by_uuid"),
   updatedByUuid: text("updated_by_uuid"),
@@ -3519,6 +3523,8 @@ export const workOrderDocuments = pgTable("work_order_documents", {
 export const insertWorkOrderDocumentSchema = createInsertSchema(workOrderDocuments).omit({
   id: true,
   uploadedAt: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export type InsertWorkOrderDocument = z.infer<typeof insertWorkOrderDocumentSchema>;
@@ -3959,6 +3965,8 @@ export const monthlySnapshots = pgTable("monthly_snapshots", {
   count: integer("count").notNull().default(0),
   workOrderIds: text("work_order_ids").array().notNull().default(sql`'{}'::text[]`),
   generatedAt: timestamp("generated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
   isSync: boolean("is_sync").default(false),
   createdByUuid: text("created_by_uuid"),
   updatedByUuid: text("updated_by_uuid"),
@@ -3973,6 +3981,8 @@ export const monthlySnapshots = pgTable("monthly_snapshots", {
 export const insertMonthlySnapshotSchema = createInsertSchema(monthlySnapshots).omit({
   id: true,
   generatedAt: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export type InsertMonthlySnapshot = z.infer<typeof insertMonthlySnapshotSchema>;

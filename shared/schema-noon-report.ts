@@ -273,6 +273,7 @@ export const nrAlerts = pgTable("nr_alerts", {
   createdByUuid: text("created_by_uuid"),
   updatedByUuid: text("updated_by_uuid"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 
   // Soft-delete / sync flags (established pattern)
   isDeleted: boolean("is_deleted").notNull().default(false),
@@ -288,6 +289,7 @@ export const insertNrAlertSchema = createInsertSchema(nrAlerts).omit({
   id: true,
   nauuid: true,
   createdAt: true,
+  updatedAt: true,
 });
 export type InsertNrAlert = z.infer<typeof insertNrAlertSchema>;
 export type NrAlert = typeof nrAlerts.$inferSelect;
