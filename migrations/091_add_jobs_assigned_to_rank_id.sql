@@ -1,5 +1,5 @@
 -- Fix for orphaned ALTER from 0046_fine_mandroid.sql
--- The multi-statement batch aborted when CREATE TABLE master_list_types hit an already-existing table.
+-- The multi-statement batch aborted when CREATE TABLE IF NOT EXISTS master_list_types hit an already-existing table.
 -- This migration re-applies only the ALTER TABLE + UPDATE that was lost.
 -- Idempotent: safe to run even if column already exists.
 

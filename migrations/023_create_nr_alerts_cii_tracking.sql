@@ -1,6 +1,6 @@
 -- Migration 023: Create missing nr_cii_tracking and nr_alerts tables
 -- These tables were defined in shared/schema-noon-report.ts but never had
--- a CREATE TABLE migration. Migration 016 only created 3 of the 5 original
+-- a CREATE TABLE IF NOT EXISTS migration. Migration 016 only created 3 of the 5 original
 -- nr_ tables. All operations are idempotent.
 
 -- ── nr_cii_tracking ────────────────────────────────────────────────────────

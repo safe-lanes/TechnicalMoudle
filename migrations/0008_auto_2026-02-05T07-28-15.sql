@@ -1,4 +1,4 @@
-CREATE TABLE "work_order_postponements" (
+CREATE TABLE IF NOT EXISTS "work_order_postponements" (
 	"id" text PRIMARY KEY NOT NULL,
 	"work_order_id" text NOT NULL,
 	"vessel_id" text NOT NULL,
@@ -19,6 +19,6 @@ CREATE TABLE "work_order_postponements" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX "idx_postponement_work_order" ON "work_order_postponements" USING btree ("work_order_id");--> statement-breakpoint
-CREATE INDEX "idx_postponement_vessel" ON "work_order_postponements" USING btree ("vessel_id");--> statement-breakpoint
-CREATE INDEX "idx_postponement_status" ON "work_order_postponements" USING btree ("status");
+CREATE INDEX IF NOT EXISTS "idx_postponement_work_order" ON "work_order_postponements" USING btree ("work_order_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_postponement_vessel" ON "work_order_postponements" USING btree ("vessel_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_postponement_status" ON "work_order_postponements" USING btree ("status");

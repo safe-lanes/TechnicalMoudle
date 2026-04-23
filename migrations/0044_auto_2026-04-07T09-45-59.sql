@@ -1,1 +1,1 @@
-ALTER TABLE "adm_vessel_org_chart" ADD CONSTRAINT "adm_vessel_org_chart_rank_id_unique" UNIQUE("rank_id");
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'adm_vessel_org_chart_rank_id_unique') THEN ALTER TABLE "adm_vessel_org_chart" ADD CONSTRAINT "adm_vessel_org_chart_rank_id_unique" UNIQUE("rank_id"); END IF; END $$;

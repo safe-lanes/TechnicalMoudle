@@ -1,1 +1,1 @@
-ALTER TABLE "work_orders" ADD COLUMN "postponement_remarks" text;
+ALTER TABLE "work_orders" ADD COLUMN IF NOT EXISTS "postponement_remarks" text;

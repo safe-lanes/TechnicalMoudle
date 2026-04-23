@@ -1,4 +1,4 @@
-CREATE TABLE "report_favorites" (
+CREATE TABLE IF NOT EXISTS "report_favorites" (
         "id" serial PRIMARY KEY NOT NULL,
         "rfuuid" text DEFAULT gen_random_uuid()::text NOT NULL,
         "report_id" text NOT NULL,

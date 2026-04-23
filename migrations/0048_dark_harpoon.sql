@@ -1,1 +1,1 @@
-ALTER TABLE "vessel_org_chart_nodes" ADD COLUMN "role_ruid" text;
+ALTER TABLE "vessel_org_chart_nodes" ADD COLUMN IF NOT EXISTS "role_ruid" text;

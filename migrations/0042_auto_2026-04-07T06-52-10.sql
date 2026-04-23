@@ -1,1 +1,1 @@
-ALTER TABLE "vessel_survey_applicability" ADD COLUMN "is_deleted" boolean DEFAULT false;
+ALTER TABLE "vessel_survey_applicability" ADD COLUMN IF NOT EXISTS "is_deleted" boolean DEFAULT false;

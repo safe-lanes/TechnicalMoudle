@@ -1,1 +1,1 @@
-ALTER TABLE "work_orders" ADD COLUMN "was_rejected" boolean DEFAULT false NOT NULL;
+ALTER TABLE "work_orders" ADD COLUMN IF NOT EXISTS "was_rejected" boolean DEFAULT false NOT NULL;
