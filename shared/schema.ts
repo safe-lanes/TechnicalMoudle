@@ -1992,6 +1992,8 @@ export const componentClassRegulatory = pgTable("component_class_regulatory", {
   lastClassSurvey: text("last_class_survey"), // DD-MMM-YYYY format
   nextSurveyDue: text("next_survey_due"), // DD-MMM-YYYY format
   classRequirements: text("class_requirements"), // Text description of requirements
+  classCode: text("class_code"),
+  information: text("information"),
   surveyStatus: text("survey_status").notNull().default("Active"), // 'Active' | 'Expired' | 'Pending' | 'Cancelled'
   remarks: text("remarks"),
   createdBy: text("created_by").notNull(),

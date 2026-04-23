@@ -1,5 +1,5 @@
 {
-  "id": "6a28598c-bc5a-426f-9659-af6490d0bcd6",
+  "id": "c545b6ea-0323-43ca-b722-6338e29826f0",
   "prevId": "679c44de-3620-4f3e-a43d-5acba575caf3",
   "version": "7",
   "dialect": "postgresql",
@@ -2498,13 +2498,6 @@
             "cycle": false
           }
         },
-        "cruuid": {
-          "name": "cruuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()::text"
-        },
         "vessel_id": {
           "name": "vessel_id",
           "type": "text",
@@ -2705,15 +2698,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "change_request_cruuid_unique": {
-          "name": "change_request_cruuid_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "cruuid"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -2738,13 +2723,6 @@
             "cache": "1",
             "cycle": false
           }
-        },
-        "crauuid": {
-          "name": "crauuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()::text"
         },
         "change_request_id": {
           "name": "change_request_id",
@@ -2829,15 +2807,7 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "change_request_attachment_crauuid_unique": {
-          "name": "change_request_attachment_crauuid_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "crauuid"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -2862,13 +2832,6 @@
             "cache": "1",
             "cycle": false
           }
-        },
-        "crcuuid": {
-          "name": "crcuuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()::text"
         },
         "change_request_id": {
           "name": "change_request_id",
@@ -2947,15 +2910,7 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "change_request_comment_crcuuid_unique": {
-          "name": "change_request_comment_crcuuid_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "crcuuid"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -3243,6 +3198,18 @@
         },
         "class_requirements": {
           "name": "class_requirements",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "class_code": {
+          "name": "class_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "information": {
+          "name": "information",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -3692,13 +3659,6 @@
             "cycle": false
           }
         },
-        "cmhuuid": {
-          "name": "cmhuuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()::text"
-        },
         "component_id": {
           "name": "component_id",
           "type": "text",
@@ -4036,15 +3996,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "component_maintenance_history_cmhuuid_unique": {
-          "name": "component_maintenance_history_cmhuuid_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "cmhuuid"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -4380,13 +4332,6 @@
             "cycle": false
           }
         },
-        "crhluuid": {
-          "name": "crhluuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()::text"
-        },
         "vessel_code": {
           "name": "vessel_code",
           "type": "text",
@@ -4566,15 +4511,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "component_running_hours_log_crhluuid_unique": {
-          "name": "component_running_hours_log_crhluuid_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "crhluuid"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -5116,13 +5053,6 @@
             "cycle": false
           }
         },
-        "dauuid": {
-          "name": "dauuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()::text"
-        },
         "defect_id": {
           "name": "defect_id",
           "type": "text",
@@ -5309,15 +5239,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "defect_actions_dauuid_unique": {
-          "name": "defect_actions_dauuid_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "dauuid"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -5342,13 +5264,6 @@
             "cache": "1",
             "cycle": false
           }
-        },
-        "datuuid": {
-          "name": "datuuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()::text"
         },
         "defect_id": {
           "name": "defect_id",
@@ -5468,15 +5383,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "defect_attachments_datuuid_unique": {
-          "name": "defect_attachments_datuuid_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "datuuid"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -9576,13 +9483,6 @@
             "cycle": false
           }
         },
-        "ituuid": {
-          "name": "ituuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()::text"
-        },
         "vessel_id": {
           "name": "vessel_id",
           "type": "text",
@@ -9828,15 +9728,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "inventory_transactions_ituuid_unique": {
-          "name": "inventory_transactions_ituuid_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "ituuid"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -12893,13 +12785,6 @@
             "cycle": false
           }
         },
-        "rhauuid": {
-          "name": "rhauuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()::text"
-        },
         "vessel_id": {
           "name": "vessel_id",
           "type": "text",
@@ -13162,15 +13047,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "running_hours_audit_rhauuid_unique": {
-          "name": "running_hours_audit_rhauuid_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "rhauuid"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -13928,13 +13805,6 @@
             "cycle": false
           }
         },
-        "scluuid": {
-          "name": "scluuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()::text"
-        },
         "vessel_id": {
           "name": "vessel_id",
           "type": "text",
@@ -14095,13 +13965,6 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "spare_component_links_scluuid_unique": {
-          "name": "spare_component_links_scluuid_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "scluuid"
-          ]
-        },
         "unique_spare_component_link": {
           "name": "unique_spare_component_link",
           "nullsNotDistinct": false,
@@ -14136,13 +13999,6 @@
             "cache": "1",
             "cycle": false
           }
-        },
-        "slsuuid": {
-          "name": "slsuuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()::text"
         },
         "vessel_id": {
           "name": "vessel_id",
@@ -14285,13 +14141,6 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "spare_location_stock_slsuuid_unique": {
-          "name": "spare_location_stock_slsuuid_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "slsuuid"
-          ]
-        },
         "unique_spare_location_stock": {
           "name": "unique_spare_location_stock",
           "nullsNotDistinct": false,
@@ -14843,13 +14692,6 @@
             "cycle": false
           }
         },
-        "shuuid": {
-          "name": "shuuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()::text"
-        },
         "timestamp_utc": {
           "name": "timestamp_utc",
           "type": "timestamp",
@@ -15086,15 +14928,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "spares_history_shuuid_unique": {
-          "name": "spares_history_shuuid_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "shuuid"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -15612,13 +15446,6 @@
             "cycle": false
           }
         },
-        "sluuid": {
-          "name": "sluuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()::text"
-        },
         "vessel_id": {
           "name": "vessel_id",
           "type": "text",
@@ -15845,15 +15672,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "stores_ledger_sluuid_unique": {
-          "name": "stores_ledger_sluuid_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "sluuid"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -16559,13 +16378,6 @@
             "cycle": false
           }
         },
-        "vcduuid": {
-          "name": "vcduuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()::text"
-        },
         "vessel_id": {
           "name": "vessel_id",
           "type": "text",
@@ -16766,15 +16578,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "vessel_certificate_data_vcduuid_unique": {
-          "name": "vessel_certificate_data_vcduuid_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "vcduuid"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -17290,13 +17094,6 @@
             "cycle": false
           }
         },
-        "vsduuid": {
-          "name": "vsduuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()::text"
-        },
         "vessel_id": {
           "name": "vessel_id",
           "type": "text",
@@ -17495,15 +17292,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "vessel_survey_data_vsduuid_unique": {
-          "name": "vessel_survey_data_vsduuid_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "vsduuid"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -18157,13 +17946,6 @@
             "cycle": false
           }
         },
-        "woeduuid": {
-          "name": "woeduuid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()::text"
-        },
         "work_order_id": {
           "name": "work_order_id",
           "type": "text",
@@ -18380,15 +18162,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "work_order_execution_details_woeduuid_unique": {
-          "name": "work_order_execution_details_woeduuid_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "woeduuid"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
