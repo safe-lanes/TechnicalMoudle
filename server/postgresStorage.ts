@@ -8052,18 +8052,18 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async upsertSpareLocationStock(data: InsertSpareLocationStock): Promise<SpareLocationStock> {
-    const db = await getDb();
+  async upsertSpareLocationStock(data: InsertSpareLocationStock, txConn?: any): Promise<SpareLocationStock> {
+    const conn = txConn || await getDb();
     const existing = await this.getSpareLocationStockItem(data.spareId, data.locationId);
-    
+
     if (existing) {
-      const result = await db.update(spareLocationStock)
+      const result = await conn.update(spareLocationStock)
         .set({ qty: data.qty })
         .where(eq(spareLocationStock.id, existing.id))
         .returning();
       return result[0];
     } else {
-      const result = await db.insert(spareLocationStock).values(data).returning();
+      const result = await conn.insert(spareLocationStock).values(data).returning();
       return result[0];
     }
   }
@@ -8193,7 +8193,11 @@ export class PostgresStorage {
 
   // ============= INVENTORY MANAGEMENT: TRANSACTIONS =============
 
-  async createInventoryTransaction(txn: InsertInventoryTransaction): Promise<InventoryTransaction> {
+  async createInventoryTransaction(txn: InsertInventoryTransaction, txConn?: any): Promise<InventoryTransaction> {
+    if (txConn) {
+      const result = await txConn.insert(inventoryTransactions).values(txn).returning();
+      return result[0];
+    }
     return this.insertWithSequenceRepair('inventory_transactions', async () => {
       const db = await getDb();
       const result = await db.insert(inventoryTransactions).values(txn).returning();
@@ -8320,37 +8324,10 @@ export class PostgresStorage {
       throw new Error(`Spare ${input.spareId} not found`);
     }
     
-    // Upsert location stock
-    await this.upsertSpareLocationStock({
-      vesselId: input.vesselId,
-      spareId: input.spareId,
-      spareUuid: spare.suuid,
-      locationId: input.locationId,
-      qty: newLocationQty,
-    });
-    
-    // Create transaction record
-    const transaction = await this.createInventoryTransaction({
-      vesselId: input.vesselId,
-      spareId: input.spareId,
-      spareUuid: spare.suuid,
-      locationId: input.locationId,
-      eventType: input.eventType,
-      qtyChange: input.qtyChange,
-      robTotalBefore: currentTotalRob,
-      robTotalAfter: newTotalRob,
-      robLocationBefore: currentLocationQty,
-      robLocationAfter: newLocationQty,
-      referenceType: input.referenceType,
-      referenceId: input.referenceId,
-      referenceNote: input.referenceNote,
-      userId: input.userId,
-    });
-    
-    // ========== CALCULATE LEGACY ROB VALUES FIRST ==========
-    // Calculate these BEFORE creating history to ensure correct ROB After value
+    // ========== CALCULATE LEGACY ROB VALUES (pure computation, outside tx) ==========
+    // Calculate these BEFORE the transaction to determine target location and new ROB values
     // The legacy spares table (robLocationA, robLocationB) is the authoritative source for ROB
-    // 
+    //
     // LOCATION MAPPING STRATEGY:
     // The vessel has exactly 2 fixed locations (A and B) as per business rules.
     // We use STRICT NAME MATCHING ONLY to ensure correct A/B designation:
@@ -8358,20 +8335,20 @@ export class PostgresStorage {
     // - spare.location2 = text label for Location B
     // If the transaction's location name matches one of these, we update that location's ROB.
     // If it matches neither, the transaction fails to prevent inventory corruption.
-    
+
     const locationName = (location.locationName || '').toLowerCase().trim();
     const spareLocationA = (spare.location || '').toLowerCase().trim();
     const spareLocationB = (spare.location2 || '').toLowerCase().trim();
-    
+
     // Determine which location (A or B) this transaction applies to using STRICT NAME MATCHING
     let targetLocation: 'A' | 'B' | null = null;
-    
+
     if (spareLocationA && locationName === spareLocationA) {
       targetLocation = 'A';
     } else if (spareLocationB && locationName === spareLocationB) {
       targetLocation = 'B';
     }
-    
+
     // Special case: If spare has only one location configured, use that
     if (!targetLocation) {
       if (spareLocationA && !spareLocationB) {
@@ -8388,7 +8365,7 @@ export class PostgresStorage {
         console.warn(`[performInventoryTransaction] Spare ${input.spareId} has no legacy locations configured. Defaulting to Location A.`);
       }
     }
-    
+
     // If name matching failed and spare has both locations configured, fail the transaction
     // This is a data integrity safeguard - ambiguous location mapping must be resolved
     if (!targetLocation) {
@@ -8399,23 +8376,23 @@ export class PostgresStorage {
       console.error(`[performInventoryTransaction] ${errorMsg}`);
       throw new Error(errorMsg);
     }
-    
+
     // Calculate the new location-specific ROB values from legacy spares table (authoritative source)
     const currentRobA = spare.robLocationA ?? 0;
     const currentRobB = spare.robLocationB ?? 0;
-    
+
     let newRobA = currentRobA;
     let newRobB = currentRobB;
-    
+
     if (targetLocation === 'A') {
       newRobA = Math.max(0, currentRobA + input.qtyChange);
     } else {
       newRobB = Math.max(0, currentRobB + input.qtyChange);
     }
-    
+
     // Total ROB is the sum of both locations (derived value) - THIS IS THE CORRECT ROB AFTER
     const calculatedTotalRob = newRobA + newRobB;
-    
+
     // Consistency check: Verify the calculated total matches what we expect
     // This helps catch any discrepancies between the new inventory system and legacy fields
     if (calculatedTotalRob !== newTotalRob) {
@@ -8424,44 +8401,64 @@ export class PostgresStorage {
         `Using legacy calculated value for data integrity.`);
     }
     // ========== END LEGACY ROB CALCULATION ==========
-    
-    // ========== UPDATE LEGACY ROB FIELDS FIRST ==========
-    // Update legacy fields BEFORE creating history to ensure data consistency
-    await db.update(spares)
-      .set({ 
-        rob: calculatedTotalRob,
-        robLocationA: newRobA,
-        robLocationB: newRobB,
-        updatedAt: new Date(), 
-        updatedBy: input.userId 
-      })
-      .where(eq(spares.id, input.spareId));
-    
-    console.log(`[performInventoryTransaction] Updated legacy ROB fields for spare ${input.spareId}: ` +
-      `Location ${targetLocation} (${locationName}), ` +
-      `robLocationA: ${currentRobA} → ${newRobA}, robLocationB: ${currentRobB} → ${newRobB}, ` +
-      `total ROB: ${calculatedTotalRob}`);
-    // ========== END LEGACY ROB UPDATE ==========
-    
-    // ========== CREATE SPARES HISTORY RECORD ==========
-    // This ensures Work Order consumption (and all inventory transactions) appear in Spares History
-    // IMPORTANT: Created AFTER legacy update to ensure consistency
-    // Uses calculatedTotalRob (from legacy spares table) for robAfter, NOT newTotalRob
-    try {
-      // For reference field: prefer the referenceNote (contains WO number) over referenceId (internal ID)
-      // referenceNote format: "WO Approval: WO-2024-001 - comments" or "Consumed during work approval"
-      // Extract work order number from referenceNote if available, otherwise use referenceId
-      let historyReference = input.referenceId ?? null;
-      if (input.referenceNote) {
-        // Extract WO number from note like "WO Approval: WO-2024-001 - ..."
-        const woMatch = input.referenceNote.match(/WO[- ]?\d+[-/]?\d*/i);
-        if (woMatch) {
-          historyReference = woMatch[0]; // Use extracted WO number
-        } else if (input.referenceType === 'WORK_ORDER') {
-          historyReference = input.referenceNote; // Use the full note as reference
-        }
+
+    // Prepare history reference (pure computation, outside tx)
+    let historyReference = input.referenceId ?? null;
+    if (input.referenceNote) {
+      const woMatch = input.referenceNote.match(/WO[- ]?\d+[-/]?\d*/i);
+      if (woMatch) {
+        historyReference = woMatch[0];
+      } else if (input.referenceType === 'WORK_ORDER') {
+        historyReference = input.referenceNote;
       }
-      
+    }
+
+    // ── Phase 2: All writes in one transaction ──
+    const txResult = await db.transaction(async (tx) => {
+      // 1. Upsert location stock
+      await this.upsertSpareLocationStock({
+        vesselId: input.vesselId,
+        spareId: input.spareId,
+        spareUuid: spare.suuid,
+        locationId: input.locationId,
+        qty: newLocationQty,
+      }, tx);
+
+      // 2. Create inventory transaction record
+      const transaction = await this.createInventoryTransaction({
+        vesselId: input.vesselId,
+        spareId: input.spareId,
+        spareUuid: spare.suuid,
+        locationId: input.locationId,
+        eventType: input.eventType,
+        qtyChange: input.qtyChange,
+        robTotalBefore: currentTotalRob,
+        robTotalAfter: newTotalRob,
+        robLocationBefore: currentLocationQty,
+        robLocationAfter: newLocationQty,
+        referenceType: input.referenceType,
+        referenceId: input.referenceId,
+        referenceNote: input.referenceNote,
+        userId: input.userId,
+      }, tx);
+
+      // 3. Update legacy ROB fields on spares table
+      await tx.update(spares)
+        .set({
+          rob: calculatedTotalRob,
+          robLocationA: newRobA,
+          robLocationB: newRobB,
+          updatedAt: new Date(),
+          updatedBy: input.userId
+        })
+        .where(eq(spares.id, input.spareId));
+
+      console.log(`[performInventoryTransaction] Updated legacy ROB fields for spare ${input.spareId}: ` +
+        `Location ${targetLocation} (${locationName}), ` +
+        `robLocationA: ${currentRobA} → ${newRobA}, robLocationB: ${currentRobB} → ${newRobB}, ` +
+        `total ROB: ${calculatedTotalRob}`);
+
+      // 4. Create spares_history record (inside tx for atomicity, matching d2ae1393 pattern)
       await this.createSpareHistory({
         timestampUTC: new Date(),
         vesselId: input.vesselId,
@@ -8473,25 +8470,24 @@ export class PostgresStorage {
         componentCode: spare.componentCode ?? null,
         componentName: spare.componentName,
         componentSpareCode: spare.componentSpareCode ?? null,
-        eventType: input.eventType, // 'CONSUME', 'RECEIVE', 'ADJUST', etc.
+        eventType: input.eventType,
         qtyChange: input.qtyChange,
-        robAfter: calculatedTotalRob, // Total ROB across all locations AFTER transaction (from authoritative legacy source)
+        robAfter: calculatedTotalRob,
         userId: input.userId,
-        remarks: input.referenceNote ?? null, // Full note with details
-        reference: historyReference, // Work Order number for display
-        dateLocal: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+        remarks: input.referenceNote ?? null,
+        reference: historyReference,
+        dateLocal: new Date().toISOString().split('T')[0],
         tz: null,
-        place: location.locationName ?? null, // Storage location name
-      });
+        place: location.locationName ?? null,
+      }, tx);
+
       console.log(`[performInventoryTransaction] Created spares_history entry for spare ${input.spareId}, event: ${input.eventType}, qty: ${input.qtyChange}, robAfter: ${calculatedTotalRob}, ref: ${historyReference || 'N/A'}`);
-    } catch (historyError) {
-      // Log but don't fail the transaction if history creation fails
-      console.error(`[performInventoryTransaction] Failed to create spares_history entry:`, historyError);
-    }
-    // ========== END SPARES HISTORY RECORD ==========
-    
+
+      return { transaction };
+    });
+
     return {
-      transaction,
+      transaction: txResult.transaction,
       newLocationQty,
       newTotalRob: calculatedTotalRob,
     };
