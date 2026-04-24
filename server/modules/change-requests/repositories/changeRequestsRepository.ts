@@ -33,6 +33,10 @@ export async function approveChangeRequest(id: number, reviewerId: string, comme
   return storage.approveChangeRequest(id, reviewerId, comment);
 }
 
+export async function getAuditLogsByEntity(entityType: string, entityId: string): Promise<any[]> {
+  return storage.getAuditLogsByEntity(entityType, entityId);
+}
+
 export async function rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
   return storage.rejectChangeRequest(id, reviewerId, comment);
 }

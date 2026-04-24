@@ -228,6 +228,43 @@ export async function rejectChangeRequest(id: number, body: { comment: string; r
   return updated;
 }
 
+// ── Rejection History ──
+
+export async function getRejectionHistory(id: number) {
+  const existing = await crRepo.getChangeRequest(id);
+  if (!existing) {
+    throw new NotFoundError('Change request not found');
+  }
+
+  const entityIds = Array.from(
+    new Set([existing.cruuid, String(existing.id)].filter(Boolean) as string[])
+  );
+
+  const logs: any[] = [];
+  for (const eid of entityIds) {
+    const entries = await crRepo.getAuditLogsByEntity('change_request', eid);
+    logs.push(...entries);
+  }
+
+  const rejections = logs
+    .filter((entry: any) => entry.actionType === 'reject')
+    .map((entry: any) => {
+      const payload = entry.payload || {};
+      return {
+        rejectedAt: payload.rejectedAt || entry.timestamp,
+        rejectedBy: entry.userId,
+        rejectionComments: payload.rejectionComments ?? null,
+      };
+    })
+    .sort((a, b) => {
+      const ta = new Date(a.rejectedAt).getTime();
+      const tb = new Date(b.rejectedAt).getTime();
+      return tb - ta;
+    });
+
+  return rejections;
+}
+
 // ── Comments ──
 
 export async function getComments(changeRequestId: number) {

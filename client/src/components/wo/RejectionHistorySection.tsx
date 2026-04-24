@@ -2,8 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2, AlertTriangle } from "lucide-react";
 import type { RejectionHistoryEntry } from "./RejectionHistoryBadge";
 
+type EntityType = "work-order" | "change-request";
+
 interface RejectionHistorySectionProps {
-  workOrderId: string;
+  entityType?: EntityType;
+  entityId?: string | number;
+  workOrderId?: string;
 }
 
 function formatDate(value: string | null): string {
@@ -13,17 +17,42 @@ function formatDate(value: string | null): string {
   return d.toLocaleString();
 }
 
-export function RejectionHistorySection({ workOrderId }: RejectionHistorySectionProps) {
+function buildEndpoint(entityType: EntityType, entityId: string | number): string {
+  const id = encodeURIComponent(String(entityId));
+  switch (entityType) {
+    case "change-request":
+      return `/technical/api/change-requests/${id}/rejection-history`;
+    case "work-order":
+    default:
+      return `/technical/api/work-orders/${id}/rejection-history`;
+  }
+}
+
+function buildQueryKey(entityType: EntityType, entityId: string | number): unknown[] {
+  switch (entityType) {
+    case "change-request":
+      return ["/technical/api/change-requests", entityId, "rejection-history"];
+    case "work-order":
+    default:
+      return ["/technical/api/work-orders", entityId, "rejection-history"];
+  }
+}
+
+export function RejectionHistorySection(props: RejectionHistorySectionProps) {
+  const entityType: EntityType = props.entityType ?? "work-order";
+  const entityId = props.entityId ?? props.workOrderId ?? "";
+  const testIdSuffix = String(entityId);
+
   const { data, isLoading, isError } = useQuery<RejectionHistoryEntry[]>({
-    queryKey: ["/technical/api/work-orders", workOrderId, "rejection-history"],
+    queryKey: buildQueryKey(entityType, entityId),
     queryFn: async () => {
-      const res = await fetch(
-        `/technical/api/work-orders/${encodeURIComponent(workOrderId)}/rejection-history`,
-        { credentials: "include" },
-      );
+      const res = await fetch(buildEndpoint(entityType, entityId), {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
       return (await res.json()) as RejectionHistoryEntry[];
     },
+    enabled: Boolean(entityId),
     staleTime: 60_000,
   });
 
@@ -31,7 +60,7 @@ export function RejectionHistorySection({ workOrderId }: RejectionHistorySection
     return (
       <div
         className="rounded-md border border-gray-200 bg-gray-50 p-4 flex items-center gap-2 text-sm text-gray-600"
-        data-testid={`section-rejection-history-loading-${workOrderId}`}
+        data-testid={`section-rejection-history-loading-${testIdSuffix}`}
       >
         <Loader2 className="w-4 h-4 animate-spin" />
         Loading rejection history…
@@ -43,7 +72,7 @@ export function RejectionHistorySection({ workOrderId }: RejectionHistorySection
     return (
       <div
         className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700"
-        data-testid={`section-rejection-history-error-${workOrderId}`}
+        data-testid={`section-rejection-history-error-${testIdSuffix}`}
       >
         Could not load rejection history.
       </div>
@@ -57,13 +86,13 @@ export function RejectionHistorySection({ workOrderId }: RejectionHistorySection
   return (
     <div
       className="rounded-md border border-red-200 bg-red-50 p-4"
-      data-testid={`section-rejection-history-${workOrderId}`}
+      data-testid={`section-rejection-history-${testIdSuffix}`}
     >
       <div className="flex items-center gap-2 mb-3">
         <AlertTriangle className="w-4 h-4 text-red-700" />
         <h3
           className="text-sm font-bold text-red-800 uppercase tracking-wide"
-          data-testid={`heading-rejection-history-${workOrderId}`}
+          data-testid={`heading-rejection-history-${testIdSuffix}`}
         >
           Rejection History ({data.length})
         </h3>
@@ -73,14 +102,14 @@ export function RejectionHistorySection({ workOrderId }: RejectionHistorySection
           <li
             key={`${entry.rejectedAt ?? "unknown"}-${idx}`}
             className="rounded-md border border-red-200 bg-white p-3"
-            data-testid={`item-rejection-history-${workOrderId}-${idx}`}
+            data-testid={`item-rejection-history-${testIdSuffix}-${idx}`}
           >
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-700 mb-1">
               <div>
                 <span className="font-medium">Rejected by: </span>
                 <span
                   className="text-gray-900"
-                  data-testid={`text-rejection-history-by-${workOrderId}-${idx}`}
+                  data-testid={`text-rejection-history-by-${testIdSuffix}-${idx}`}
                 >
                   {entry.rejectedBy || "Unknown"}
                 </span>
@@ -89,7 +118,7 @@ export function RejectionHistorySection({ workOrderId }: RejectionHistorySection
                 <span className="font-medium">When: </span>
                 <span
                   className="text-gray-900"
-                  data-testid={`text-rejection-history-at-${workOrderId}-${idx}`}
+                  data-testid={`text-rejection-history-at-${testIdSuffix}-${idx}`}
                 >
                   {formatDate(entry.rejectedAt)}
                 </span>
@@ -99,7 +128,7 @@ export function RejectionHistorySection({ workOrderId }: RejectionHistorySection
               <span className="font-medium text-gray-700">Reason: </span>
               <span
                 className="text-gray-900 whitespace-pre-wrap"
-                data-testid={`text-rejection-history-reason-${workOrderId}-${idx}`}
+                data-testid={`text-rejection-history-reason-${testIdSuffix}-${idx}`}
               >
                 {entry.rejectionComments?.trim() || "No reason recorded"}
               </span>

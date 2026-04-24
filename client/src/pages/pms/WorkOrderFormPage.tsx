@@ -5979,7 +5979,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
                 {/* Rejection History (only shown if at least one prior rejection exists) */}
                 {workOrderId && (
-                  <RejectionHistorySection workOrderId={workOrderId} />
+                  <RejectionHistorySection entityType="work-order" entityId={workOrderId} />
                 )}
 
                 {/* Layer 5: Approval Tier Banner */}

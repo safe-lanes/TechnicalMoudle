@@ -28,6 +28,7 @@ import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { ChangeRequestModal } from '@/components/modify/ChangeRequestModal';
+import { RejectionHistorySection } from '@/components/wo/RejectionHistorySection';
 import { useVessel } from '@/contexts/VesselContext';
 import { useUIRole } from '@/contexts/UIRoleContext';
 import { useVessels } from '@/hooks/useVessels';
@@ -464,6 +465,12 @@ export function ModifyPMS() {
         
         {viewingRequest && (
           <div className="space-y-6">
+            {/* Rejection History — shown only when at least one prior rejection exists */}
+            <RejectionHistorySection
+              entityType="change-request"
+              entityId={viewingRequest.id}
+            />
+
             {/* Request Info */}
             <div className="grid grid-cols-2 gap-4">
               <div>

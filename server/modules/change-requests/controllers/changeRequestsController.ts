@@ -103,3 +103,11 @@ export async function rejectChangeRequest(req: Request, res: Response) {
   const updated = await crService.rejectChangeRequest(id, req.body);
   res.json(updated);
 }
+
+// ── GET /change-requests/:id/rejection-history ──
+
+export async function getRejectionHistory(req: Request, res: Response) {
+  const id = parseInt(req.params.id);
+  const result = await crService.getRejectionHistory(id);
+  res.json(result);
+}

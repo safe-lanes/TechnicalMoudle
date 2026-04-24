@@ -5540,11 +5540,40 @@ export class PostgresStorage {
   }
 
   async rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
-    return this.updateChangeRequest(id, { 
-      status: 'rejected', 
-      reviewedByUserId: reviewerId, 
-      reviewedAt: new Date() 
+    const existing = await this.getChangeRequest(id);
+    const now = new Date();
+
+    const updated = await this.updateChangeRequest(id, {
+      status: 'rejected',
+      reviewedByUserId: reviewerId,
+      reviewedAt: now,
     });
+
+    // Audit log entry so the rejection (with comment + reviewer) can be
+    // surfaced as part of the rejection history on the Modify PMS page.
+    try {
+      await this.createAuditLog({
+        entityType: 'change_request',
+        entityId: existing?.cruuid || String(id),
+        actionType: 'reject',
+        userId: reviewerId,
+        source: 'web_ui',
+        vesselCode: existing?.vesselId ?? null,
+        componentCode: null,
+        fieldName: null,
+        oldValue: null,
+        newValue: null,
+        payload: {
+          changeRequestId: id,
+          rejectedAt: now.toISOString(),
+          rejectionComments: comment ?? null,
+        },
+      });
+    } catch (auditError) {
+      console.error('Failed to create audit log entry for change request rejection:', auditError);
+    }
+
+    return updated;
   }
 
   async returnChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {

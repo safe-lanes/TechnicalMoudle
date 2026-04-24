@@ -25,6 +25,7 @@ router.get('/change-requests/:id/attachments', asyncHandler(crCtrl.getAttachment
 router.post('/change-requests/:id/attachments', asyncHandler(crCtrl.createAttachment));
 router.put('/change-requests/:id/approve', asyncHandler(crCtrl.approveChangeRequest));
 router.put('/change-requests/:id/reject', asyncHandler(crCtrl.rejectChangeRequest));
+router.get('/change-requests/:id/rejection-history', asyncHandler(crCtrl.getRejectionHistory));
 
 // ── Get by ID (MUST be last — catch-all) ──
 router.get('/change-requests/:id', asyncHandler(crCtrl.getChangeRequest));
