@@ -417,6 +417,7 @@ const Dashboard = () => {
   const queryClient = useQueryClient();
 
   const adminDefaultsToAll = isSailAdmin || isClientAdmin;
+  const isAdminScope = isSailAdmin || isClientAdmin;
   const [mgmtVesselId, setMgmtVesselId] = useState<string>('');
   useEffect(() => {
     if (adminDefaultsToAll && vesselId === 'all' && mgmtVesselId !== 'all') {
@@ -463,7 +464,7 @@ const Dashboard = () => {
       if (!response.ok) throw new Error('Failed to fetch scoped operation data');
       return response.json();
     },
-    enabled: !!effectiveVesselId && !isAllVessels,
+    enabled: !!effectiveVesselId && !isAllVessels && !isAdminScope,
   });
 
   const scopeMeta = scopedResponse?.scopeMeta ?? null;
@@ -2040,7 +2041,7 @@ const Dashboard = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {activeTab === 'management' ? (
+            {activeTab === 'management' && !isAdminScope ? (
               <TooltipProvider>
                 <UITooltip>
                   <TooltipTrigger asChild>
@@ -2085,7 +2086,7 @@ const Dashboard = () => {
                   </TooltipContent>
                 </UITooltip>
               </TooltipProvider>
-            ) : (
+            ) : activeTab === 'overview' ? (
               <>
                 <div style={{ fontSize: '18px', fontWeight: 700, color: '#1a2b4a' }} data-testid="text-current-year">
                   {new Date().getFullYear()}
@@ -2101,7 +2102,7 @@ const Dashboard = () => {
                   Filters
                 </Button>
               </>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -2189,25 +2190,25 @@ const Dashboard = () => {
               </div>
             ) : (
               <>
-                {scopeNotConfigured && !isAllVessels && fallbackMode === 'own-rank' && (
+                {!isAdminScope && scopeNotConfigured && !isAllVessels && fallbackMode === 'own-rank' && (
                   <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700" data-testid="banner-scope-own-rank-fallback">
                     <Info className="h-3.5 w-3.5 flex-shrink-0" />
                     <span>Hierarchy mapping is not configured for this vessel/user. Showing work orders assigned to your own rank only.</span>
                   </div>
                 )}
-                {scopeNotConfigured && !isAllVessels && fallbackMode !== 'own-rank' && vesselWideAccessGranted && (
+                {!isAdminScope && scopeNotConfigured && !isAllVessels && fallbackMode !== 'own-rank' && vesselWideAccessGranted && (
                   <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700" data-testid="banner-scope-not-configured">
                     <Info className="h-3.5 w-3.5 flex-shrink-0" />
                     <span>Team scope not configured for this vessel/user. Showing standard vessel-wide data per your existing access level.</span>
                   </div>
                 )}
-                {scopeNotConfigured && !isAllVessels && fallbackMode !== 'own-rank' && !vesselWideAccessGranted && (
+                {!isAdminScope && scopeNotConfigured && !isAllVessels && fallbackMode !== 'own-rank' && !vesselWideAccessGranted && (
                   <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-red-50 border border-red-200 rounded text-xs text-red-700" data-testid="banner-scope-restricted">
                     <Info className="h-3.5 w-3.5 flex-shrink-0" />
                     <span>Team filtering could not be applied — hierarchy mapping is not configured for this user/vessel and vessel-wide access is not permitted. Contact your administrator to set up org chart mapping.</span>
                   </div>
                 )}
-                {isScopeActive && (
+                {!isAdminScope && isScopeActive && (
                   <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-600" data-testid="banner-scope-active">
                     <Info className="h-3.5 w-3.5 flex-shrink-0" />
                     <span>
@@ -2305,8 +2306,10 @@ const Dashboard = () => {
                         <CardContent className="py-2 px-3 flex flex-col justify-start flex-1">
                           <p className="font-medium text-gray-600 text-[14px]">{card.label}</p>
                           <p className={`text-xl font-bold mt-0.5 ${card.textColor}`} data-testid={card.valueTestId}>{card.value}</p>
-                          <span className={`text-[9px] mt-auto ${isScopeActive && card.rankScoped ? 'text-blue-500' : fallbackMode === 'own-rank' && card.rankScoped ? 'text-amber-500' : 'text-gray-400'}`} data-testid={`scope-label-${card.key}`}>
-                            {isScopeActive && card.rankScoped
+                          <span className={`text-[9px] mt-auto ${!isAdminScope && isScopeActive && card.rankScoped ? 'text-blue-500' : !isAdminScope && fallbackMode === 'own-rank' && card.rankScoped ? 'text-amber-500' : 'text-gray-400'}`} data-testid={`scope-label-${card.key}`}>
+                            {isAdminScope
+                              ? 'Vessel-wide'
+                              : isScopeActive && card.rankScoped
                               ? (hodScope === 'me' ? 'Filtered: Me' : 'Filtered: My Team')
                               : fallbackMode === 'own-rank' && card.rankScoped
                               ? 'Own rank'
