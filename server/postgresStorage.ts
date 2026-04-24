@@ -207,6 +207,7 @@ import {
   type AdmMenumasterAc,
   type AdmRoleMenuAccess,
 } from '@shared/schema';
+import { logFieldChanges, logSoftDelete } from './modules/sync';
 
 /**
  * PostgreSQL Storage Implementation
@@ -1672,17 +1673,25 @@ export class PostgresStorage {
   async createComponentDocument(doc: InsertComponentDocument): Promise<ComponentDocument> {
     const db = await getDb();
     const result = await db.insert(componentDocuments).values(doc).returning();
+    // Sync field logging — INSERT
+    try { await logFieldChanges('component_documents', String(result[0].id), (result[0] as any).vesselCode || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] compDoc create:', e); }
     return result[0];
   }
 
   async updateComponentDocument(id: number, data: Partial<ComponentDocument>): Promise<ComponentDocument> {
     const db = await getDb();
+    // Fetch existing for sync field logging
+    const existingDoc = await db.select().from(componentDocuments).where(eq(componentDocuments.id, id)).limit(1);
     const result = await db.update(componentDocuments)
       .set(data)
       .where(eq(componentDocuments.id, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Component document ${id} not found`);
+    }
+    // Sync field logging — UPDATE
+    if (existingDoc[0]) {
+      try { await logFieldChanges('component_documents', String(id), (existingDoc[0] as any).vesselCode || null, existingDoc[0], result[0], 'system'); } catch (e) { console.error('[FieldLogger] compDoc update:', e); }
     }
     return result[0];
   }
@@ -1823,6 +1832,8 @@ export class PostgresStorage {
   async createComponentMaintenanceHistory(history: InsertComponentMaintenanceHistory): Promise<ComponentMaintenanceHistory> {
     const db = await getDb();
     const result = await db.insert(componentMaintenanceHistory).values(history).returning();
+    // Sync field logging — INSERT
+    try { await logFieldChanges('component_maintenance_history', result[0].cmhuuid, (result[0] as any).vesselCode || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] cmh create:', e); }
     return result[0];
   }
 
@@ -1856,17 +1867,25 @@ export class PostgresStorage {
   async createComponentRequisition(item: InsertComponentRequisition): Promise<ComponentRequisition> {
     const db = await getDb();
     const result = await db.insert(componentRequisitions).values(item).returning();
+    // Sync field logging — INSERT
+    try { await logFieldChanges('component_requisitions', String(result[0].id), (result[0] as any).vesselCode || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] compReq create:', e); }
     return result[0];
   }
 
   async updateComponentRequisition(id: number, data: Partial<ComponentRequisition>): Promise<ComponentRequisition> {
     const db = await getDb();
+    // Fetch existing for sync field logging
+    const existingReq = await this.getComponentRequisitionItem(id);
     const result = await db.update(componentRequisitions)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(componentRequisitions.id, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Component requisition ${id} not found`);
+    }
+    // Sync field logging — UPDATE
+    if (existingReq) {
+      try { await logFieldChanges('component_requisitions', String(id), (existingReq as any).vesselCode || null, existingReq, result[0], 'system'); } catch (e) { console.error('[FieldLogger] compReq update:', e); }
     }
     return result[0];
   }
@@ -1881,6 +1900,8 @@ export class PostgresStorage {
   async createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit> {
     const db = await getDb();
     const result = await db.insert(runningHoursAudit).values(audit).returning();
+    // Sync field logging — INSERT
+    try { await logFieldChanges('running_hours_audit', result[0].rhauuid, (result[0] as any).vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] rha create:', e); }
     return result[0];
   }
 
@@ -2531,6 +2552,10 @@ export class PostgresStorage {
 
   async updateSpare(id: string, data: Partial<Spare>, skipSiblingSync: boolean = false): Promise<Spare> {
     const db = await getDb();
+
+    // Fetch-before-update for sync field logging
+    const existingSpare = await this.getSpare(id);
+
     // Filter out undefined/null partCode to prevent NOT NULL constraint violation
     const { partCode, ...restData } = data;
     const updateData = partCode != null ? { ...restData, partCode, updatedAt: new Date() } : { ...restData, updatedAt: new Date() };
@@ -2538,7 +2563,7 @@ export class PostgresStorage {
     else if (updateData.ihm === 'No') updateData.ihmPresence = 'NO';
     if (updateData.ihmPresence === 'YES' && !updateData.ihm) updateData.ihm = 'Yes';
     else if (updateData.ihmPresence === 'NO' && !updateData.ihm) updateData.ihm = 'No';
-    
+
     const numId = Number(id);
     const result = await db.update(spares)
       .set(updateData)
@@ -2547,8 +2572,15 @@ export class PostgresStorage {
     if (!result[0]) {
       throw new Error(`Spare ${id} not found`);
     }
-    
+
     const updatedSpare = result[0];
+
+    // Sync field logging — spare UPDATE
+    if (existingSpare) {
+      try {
+        await logFieldChanges('spares', existingSpare.suuid, existingSpare.vesselId || null, existingSpare, updatedSpare, (data as any).updatedBy || 'system');
+      } catch (err) { console.error('[FieldLogger] Spare update:', err); }
+    }
 
     // SYNC: Create spare_component_links entry when componentId is updated
     // When skipSiblingSync=true (bulk import), skip entirely — processSpareInventory() handles link creation
@@ -2632,10 +2664,20 @@ export class PostgresStorage {
 
   async deleteSpare(id: string): Promise<void> {
     const db = await getDb();
+    // Fetch-before-delete for sync field logging
+    const existingSpare = await this.getSpare(id);
+
     const numId = Number(id);
     await db.update(spares)
       .set({ isActive: false, updatedAt: new Date() })
       .where(or(eq(spares.suuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(spares.id, numId)] : [])));
+
+    // Sync field logging — spare soft-delete
+    if (existingSpare) {
+      try {
+        await logSoftDelete('spares', existingSpare.suuid, existingSpare.vesselId || null, 'system');
+      } catch (err) { console.error('[FieldLogger] Spare delete:', err); }
+    }
   }
 
   async consumeSpare(
@@ -2690,6 +2732,11 @@ export class PostgresStorage {
 
       return result[0];
     });
+
+    // Sync field logging — spare CONSUME (outside tx, best-effort)
+    try {
+      await logFieldChanges('spares', spare.suuid, spare.vesselId || null, spare, updated, userId);
+    } catch (err) { console.error('[FieldLogger] Spare consume:', err); }
 
     // SYNC: Update normalized spare_location_stock table independently per location (best-effort, outside tx)
     const vesselId = spare.vesselId || 'V001';
@@ -2781,6 +2828,11 @@ export class PostgresStorage {
 
       return result[0];
     });
+
+    // Sync field logging — spare CONSUME from location (outside tx, best-effort)
+    try {
+      await logFieldChanges('spares', spare.suuid, spare.vesselId || null, spare, txResult, userId);
+    } catch (err) { console.error('[FieldLogger] Spare consumeFromLocation:', err); }
 
     // SYNC: Update normalized spare_location_stock table independently per location (best-effort, outside tx)
     const vesselId = spare.vesselId || 'V001';
@@ -2875,6 +2927,11 @@ export class PostgresStorage {
 
       return result[0];
     });
+
+    // Sync field logging — spare RECEIVE to location (outside tx, best-effort)
+    try {
+      await logFieldChanges('spares', spare.suuid, spare.vesselId || null, spare, updated, userId);
+    } catch (err) { console.error('[FieldLogger] Spare receiveToLocation:', err); }
 
     // SYNC: Update normalized spare_location_stock table independently per location (best-effort, outside tx)
     const vesselId = spare.vesselId || 'V001';
@@ -2978,6 +3035,11 @@ export class PostgresStorage {
 
       return result[0];
     });
+
+    // Sync field logging — spare ADJUST at location (outside tx, best-effort)
+    try {
+      await logFieldChanges('spares', spare.suuid, spare.vesselId || null, spare, updated, userId);
+    } catch (err) { console.error('[FieldLogger] Spare adjustAtLocation:', err); }
 
     // SYNC: Update normalized spare_location_stock table independently per location (best-effort, outside tx)
     const vesselId = spare.vesselId || 'V001';
@@ -3125,6 +3187,11 @@ export class PostgresStorage {
       return result[0];
     });
 
+    // Sync field logging — spare TRANSFER (outside tx, best-effort)
+    try {
+      await logFieldChanges('spares', spare.suuid, spare.vesselId || null, spare, txResult, userId);
+    } catch (err) { console.error('[FieldLogger] Spare transfer:', err); }
+
     // SYNC: Update normalized spare_location_stock table independently per location (best-effort, outside tx)
     const vesselId = spare.vesselId || 'V001';
 
@@ -3217,6 +3284,11 @@ export class PostgresStorage {
       return result[0];
     });
 
+    // Sync field logging — spare RECEIVE (outside tx, best-effort)
+    try {
+      await logFieldChanges('spares', spare.suuid, spare.vesselId || null, spare, updated, userId);
+    } catch (err) { console.error('[FieldLogger] Spare receive:', err); }
+
     return updated;
   }
 
@@ -3274,6 +3346,11 @@ export class PostgresStorage {
 
       return result[0];
     });
+
+    // Sync field logging — spare ADJUST quantity (outside tx, best-effort)
+    try {
+      await logFieldChanges('spares', spare.suuid, spare.vesselId || null, spare, updated, 'system');
+    } catch (err) { console.error('[FieldLogger] Spare adjustQuantity:', err); }
 
     return updated;
   }
@@ -3713,7 +3790,7 @@ export class PostgresStorage {
 
   async updateStoresItem(id: string, data: Partial<StoresItem>): Promise<StoresItem> {
     const db = await getDb();
-    
+
     // Block direct ROB updates - these must go through dedicated methods
     // (consumeStoresItem, receiveStoresItem, transferStoresItemLocation, adjustStoresItem)
     const blockedFields = ['rob', 'robLocationA', 'robLocationB'];
@@ -3721,7 +3798,10 @@ export class PostgresStorage {
     if (attemptedRobUpdate) {
       throw new Error('Direct ROB updates are not allowed. Use consume, receive, transfer, or adjust methods to modify stock quantities.');
     }
-    
+
+    // Fetch-before-update for sync field logging
+    const existingItem = await this.getStoresItem(id);
+
     const numId = Number(id);
     const idCondition = or(eq(storesItems.stuuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(storesItems.id, numId)] : []));
     const result = await db.update(storesItems)
@@ -3731,15 +3811,33 @@ export class PostgresStorage {
     if (!result[0]) {
       throw new Error(`Stores item with id ${id} not found`);
     }
+
+    // Sync field logging — stores_items UPDATE
+    if (existingItem) {
+      try {
+        await logFieldChanges('stores_items', existingItem.stuuid, existingItem.vesselId || null, existingItem, result[0], 'system');
+      } catch (err) { console.error('[FieldLogger] StoresItem update:', err); }
+    }
+
     return result[0];
   }
 
   async deleteStoresItem(id: string): Promise<void> {
     const db = await getDb();
+    // Fetch-before-delete for sync field logging
+    const existingItem = await this.getStoresItem(id);
+
     const numId = Number(id);
     await db.update(storesItems)
       .set({ deleted: true, updatedAt: new Date() })
       .where(or(eq(storesItems.stuuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(storesItems.id, numId)] : [])));
+
+    // Sync field logging — stores_items soft-delete
+    if (existingItem) {
+      try {
+        await logSoftDelete('stores_items', existingItem.stuuid, existingItem.vesselId || null, 'system');
+      } catch (err) { console.error('[FieldLogger] StoresItem delete:', err); }
+    }
   }
 
   async consumeStoresItem(
@@ -3796,6 +3894,11 @@ export class PostgresStorage {
 
       return result[0];
     });
+
+    // Sync field logging — stores CONSUME (outside tx, best-effort)
+    try {
+      await logFieldChanges('stores_items', item.stuuid, item.vesselId || null, item, updated, userId);
+    } catch (err) { console.error('[FieldLogger] Stores consume:', err); }
 
     return updated;
   }
@@ -3855,6 +3958,11 @@ export class PostgresStorage {
 
       return result[0];
     });
+
+    // Sync field logging — stores RECEIVE (outside tx, best-effort)
+    try {
+      await logFieldChanges('stores_items', item.stuuid, item.vesselId || null, item, updated, userId);
+    } catch (err) { console.error('[FieldLogger] Stores receive:', err); }
 
     return updated;
   }
@@ -3998,6 +4106,11 @@ export class PostgresStorage {
       return result[0];
     });
 
+    // Sync field logging — stores TRANSFER (outside tx, best-effort)
+    try {
+      await logFieldChanges('stores_items', item.stuuid, item.vesselId || null, item, txResult, userId);
+    } catch (err) { console.error('[FieldLogger] Stores transfer:', err); }
+
     return { item: txResult, isTransfer: isTrueTransfer };
   }
 
@@ -4077,6 +4190,11 @@ export class PostgresStorage {
 
       return result[0];
     });
+
+    // Sync field logging — stores ADJUST (outside tx, best-effort)
+    try {
+      await logFieldChanges('stores_items', item.stuuid, item.vesselId || null, item, updated, userId);
+    } catch (err) { console.error('[FieldLogger] Stores adjust:', err); }
 
     return updated;
   }
@@ -4317,6 +4435,10 @@ export class PostgresStorage {
       id,
       duuid: randomUUID(),
     }).returning();
+
+    // Sync field logging — INSERT
+    try { await logFieldChanges('defects', result[0].duuid, defect.vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defect create:', e); }
+
     return result[0];
   }
 
@@ -4335,6 +4457,10 @@ export class PostgresStorage {
     if (!result[0]) {
       throw new Error(`Defect ${id} not found`);
     }
+
+    // Sync field logging — UPDATE
+    try { await logFieldChanges('defects', existingDefect.duuid, existingDefect.vesselId || null, existingDefect, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defect update:', e); }
+
     return result[0];
   }
 
@@ -4346,6 +4472,9 @@ export class PostgresStorage {
       throw new Error(`Defect ${id} not found`);
     }
     await db.delete(defects).where(eq(defects.duuid, existingDefect.duuid));
+
+    // Sync field logging — DELETE (log as soft-delete for sync)
+    try { await logFieldChanges('defects', existingDefect.duuid, existingDefect.vesselId || null, { is_deleted: false }, { is_deleted: true }, 'system'); } catch (e) { console.error('[FieldLogger] defect delete:', e); }
   }
 
   async addDefectNote(defectId: string, note: { noteText: string; attachments: string[]; createdBy: string }): Promise<Defect> {
@@ -4420,6 +4549,10 @@ export class PostgresStorage {
     if (!result[0]) {
       throw new Error(`Defect ${defectId} not found`);
     }
+
+    // Sync field logging — close UPDATE
+    try { await logFieldChanges('defects', existingDefect.duuid, existingDefect.vesselId || null, existingDefect, result[0], closure.closedBy); } catch (e) { console.error('[FieldLogger] defect close:', e); }
+
     return result[0];
   }
 
@@ -4435,6 +4568,8 @@ export class PostgresStorage {
   async createDefectAction(action: InsertDefectAction): Promise<DefectAction> {
     const db = await getDb();
     const result = await db.insert(defectActions).values(action).returning();
+    // Sync field logging — INSERT (vesselId via parent defect lookup is deferred; log without vesselId)
+    try { await logFieldChanges('defect_actions', result[0].dauuid, null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defectAction create:', e); }
     return result[0];
   }
 
@@ -4454,6 +4589,8 @@ export class PostgresStorage {
     if (!result[0]) {
       throw new Error(`Defect action ${id} not found`);
     }
+    // Sync field logging — UPDATE
+    try { await logFieldChanges('defect_actions', existingAction.dauuid, null, existingAction, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defectAction update:', e); }
     return result[0];
   }
 
@@ -4465,6 +4602,8 @@ export class PostgresStorage {
       throw new Error(`Defect action ${id} not found`);
     }
     await db.delete(defectActions).where(eq(defectActions.id, id));
+    // Sync field logging — DELETE
+    try { await logFieldChanges('defect_actions', existing[0].dauuid, null, { is_deleted: false }, { is_deleted: true }, 'system'); } catch (e) { console.error('[FieldLogger] defectAction delete:', e); }
   }
 
   // ============= MODULE 9: DEFECT ATTACHMENTS =============
@@ -4478,6 +4617,8 @@ export class PostgresStorage {
   async createDefectAttachment(attachment: InsertDefectAttachment): Promise<DefectAttachment> {
     const db = await getDb();
     const result = await db.insert(defectAttachments).values(attachment).returning();
+    // Sync field logging — INSERT
+    try { await logFieldChanges('defect_attachments', result[0].datuuid, null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defectAttachment create:', e); }
     return result[0];
   }
 
@@ -4489,6 +4630,8 @@ export class PostgresStorage {
       throw new Error(`Defect attachment ${id} not found`);
     }
     await db.delete(defectAttachments).where(eq(defectAttachments.id, id));
+    // Sync field logging — DELETE
+    try { await logFieldChanges('defect_attachments', existing[0].datuuid, null, { is_deleted: false }, { is_deleted: true }, 'system'); } catch (e) { console.error('[FieldLogger] defectAttachment delete:', e); }
   }
 
   // ============= MODULE 9: RECURRING DEFECTS =============
@@ -5057,17 +5200,25 @@ export class PostgresStorage {
       reviewedByUserId: request.reviewedByUserId || null,
       reviewedAt: request.reviewedAt || null,
     }).returning();
+    // Sync field logging — INSERT
+    try { await logFieldChanges('change_request', result[0].cruuid, (result[0] as any).vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] CR create:', e); }
     return result[0];
   }
 
   async updateChangeRequest(id: number, data: Partial<ChangeRequest>): Promise<ChangeRequest> {
     const db = await getDb();
+    // Fetch existing for sync field logging
+    const existingCR = await this.getChangeRequest(id);
     const result = await db.update(changeRequest)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(changeRequest.id, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Change request ${id} not found`);
+    }
+    // Sync field logging — UPDATE
+    if (existingCR) {
+      try { await logFieldChanges('change_request', existingCR.cruuid, (existingCR as any).vesselId || null, existingCR, result[0], 'system'); } catch (e) { console.error('[FieldLogger] CR update:', e); }
     }
     return result[0];
   }
@@ -5595,6 +5746,8 @@ export class PostgresStorage {
   async createChangeRequestAttachment(attachment: InsertChangeRequestAttachment): Promise<ChangeRequestAttachment> {
     const db = await getDb();
     const result = await db.insert(changeRequestAttachment).values(attachment).returning();
+    // Sync field logging — INSERT
+    try { await logFieldChanges('change_request_attachment', result[0].crauuid, null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] CRAttach create:', e); }
     return result[0];
   }
 
@@ -5610,6 +5763,8 @@ export class PostgresStorage {
   async createChangeRequestComment(comment: InsertChangeRequestComment): Promise<ChangeRequestComment> {
     const db = await getDb();
     const result = await db.insert(changeRequestComment).values(comment).returning();
+    // Sync field logging — INSERT
+    try { await logFieldChanges('change_request_comment', result[0].crcuuid, null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] CRComment create:', e); }
     return result[0];
   }
 
@@ -5655,10 +5810,14 @@ export class PostgresStorage {
         .set({ ...item, updatedAt: new Date() })
         .where(eq(ihmItems.id, existing.id))
         .returning();
+      // Sync field logging — UPDATE
+      try { await logFieldChanges('ihm_items', String(existing.id), (existing as any).vesselId || null, existing, result[0], 'system'); } catch (e) { console.error('[FieldLogger] ihm update:', e); }
       return result[0];
     } else {
       // Insert new item
       const result = await db.insert(ihmItems).values(item).returning();
+      // Sync field logging — INSERT
+      try { await logFieldChanges('ihm_items', String(result[0].id), (result[0] as any).vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] ihm create:', e); }
       return result[0];
     }
   }
@@ -5698,6 +5857,8 @@ export class PostgresStorage {
   async createIhmMaintenanceLogEntry(entry: InsertIhmMaintenanceLog): Promise<IhmMaintenanceLog> {
     const db = await getDb();
     const result = await db.insert(ihmMaintenanceLog).values(entry).returning();
+    // Sync field logging — INSERT
+    try { await logFieldChanges('ihm_maintenance_log', String(result[0].id), (result[0] as any).vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] ihmLog create:', e); }
     return result[0];
   }
 
@@ -6404,11 +6565,15 @@ export class PostgresStorage {
       ...certificate,
       attachments: certificate.attachments || [],
     }).returning();
+    // Sync field logging — INSERT
+    try { await logFieldChanges('certificates', result[0].id, (result[0] as any).vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] cert create:', e); }
     return result[0];
   }
 
   async updateCertificate(id: string, data: Partial<Certificate>): Promise<Certificate> {
     const db = await getDb();
+    // Fetch existing for sync field logging
+    const existingCert = await this.getCertificate(id);
     const { id: _, createdAt: __, ...updateData } = data as any;
     const result = await db.update(certificates)
       .set({ ...updateData, updatedAt: new Date() })
@@ -6416,6 +6581,10 @@ export class PostgresStorage {
       .returning();
     if (result.length === 0) {
       throw new Error(`Certificate not found: ${id}`);
+    }
+    // Sync field logging — UPDATE
+    if (existingCert) {
+      try { await logFieldChanges('certificates', id, (existingCert as any).vesselId || null, existingCert, result[0], 'system'); } catch (e) { console.error('[FieldLogger] cert update:', e); }
     }
     return result[0];
   }
@@ -6450,11 +6619,15 @@ export class PostgresStorage {
       ...survey,
       attachments: survey.attachments || [],
     }).returning();
+    // Sync field logging — INSERT
+    try { await logFieldChanges('surveys', result[0].id, (result[0] as any).vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] survey create:', e); }
     return result[0];
   }
 
   async updateSurvey(id: string, data: Partial<Survey>): Promise<Survey> {
     const db = await getDb();
+    // Fetch existing for sync field logging
+    const existingSurvey = await this.getSurvey(id);
     const { id: _, createdAt: __, ...updateData } = data as any;
     const result = await db.update(surveys)
       .set({ ...updateData, updatedAt: new Date() })
@@ -6462,6 +6635,10 @@ export class PostgresStorage {
       .returning();
     if (result.length === 0) {
       throw new Error(`Survey not found: ${id}`);
+    }
+    // Sync field logging — UPDATE
+    if (existingSurvey) {
+      try { await logFieldChanges('surveys', id, (existingSurvey as any).vesselId || null, existingSurvey, result[0], 'system'); } catch (e) { console.error('[FieldLogger] survey update:', e); }
     }
     return result[0];
   }
@@ -6493,11 +6670,22 @@ export class PostgresStorage {
   async createWorkOrderExecutionDetail(detail: InsertWorkOrderExecutionDetails): Promise<WorkOrderExecutionDetails> {
     const db = await getDb();
     const result = await db.insert(workOrderExecutionDetails).values(detail).returning();
+
+    // Sync field logging — WO execution detail INSERT
+    try {
+      const row = result[0] as any;
+      await logFieldChanges('work_order_execution_details', row.woeduuid || String(row.id), row.vesselId || null, null, row, 'system');
+    } catch (err) { console.error('[FieldLogger] WOExecDetail create:', err); }
+
     return result[0];
   }
 
   async updateWorkOrderExecutionDetail(id: number, data: Partial<WorkOrderExecutionDetails>): Promise<WorkOrderExecutionDetails> {
     const db = await getDb();
+
+    // Fetch-before-update for sync field logging
+    const existing = await db.select().from(workOrderExecutionDetails).where(eq(workOrderExecutionDetails.id, id));
+
     const { id: _, createdAt: __, ...updateData } = data as any;
     const result = await db.update(workOrderExecutionDetails)
       .set({ ...updateData, updatedAt: new Date() })
@@ -6506,6 +6694,16 @@ export class PostgresStorage {
     if (result.length === 0) {
       throw new Error(`WorkOrderExecutionDetail not found: ${id}`);
     }
+
+    // Sync field logging — WO execution detail UPDATE
+    if (existing[0]) {
+      try {
+        const old = existing[0] as any;
+        const row = result[0] as any;
+        await logFieldChanges('work_order_execution_details', old.woeduuid || String(old.id), old.vesselId || null, old, row, 'system');
+      } catch (err) { console.error('[FieldLogger] WOExecDetail update:', err); }
+    }
+
     return result[0];
   }
 
@@ -6568,11 +6766,22 @@ export class PostgresStorage {
   async createWorkOrderPostponement(postponement: InsertWorkOrderPostponement): Promise<WorkOrderPostponement> {
     const db = await getDb();
     const result = await db.insert(workOrderPostponements).values(postponement).returning();
+
+    // Sync field logging — WO postponement INSERT
+    try {
+      const row = result[0] as any;
+      await logFieldChanges('work_order_postponements', row.id, row.vesselId || null, null, row, 'system');
+    } catch (err) { console.error('[FieldLogger] WOPostponement create:', err); }
+
     return result[0];
   }
 
   async updateWorkOrderPostponement(id: string, updates: Partial<InsertWorkOrderPostponement>): Promise<WorkOrderPostponement> {
     const db = await getDb();
+
+    // Fetch-before-update for sync field logging
+    const existing = await this.getWorkOrderPostponementById(id);
+
     const { id: _, ...updateData } = updates as any;
     const result = await db.update(workOrderPostponements)
       .set({ ...updateData, updatedAt: new Date() })
@@ -6581,6 +6790,15 @@ export class PostgresStorage {
     if (result.length === 0) {
       throw new Error(`WorkOrderPostponement not found: ${id}`);
     }
+
+    // Sync field logging — WO postponement UPDATE
+    if (existing) {
+      try {
+        const row = result[0] as any;
+        await logFieldChanges('work_order_postponements', id, (existing as any).vesselId || null, existing, row, 'system');
+      } catch (err) { console.error('[FieldLogger] WOPostponement update:', err); }
+    }
+
     return result[0];
   }
 
@@ -7761,6 +7979,11 @@ export class PostgresStorage {
 
       const created = result[0];
 
+      // Sync field logging — spare_component_links INSERT
+      try {
+        await logFieldChanges('spare_component_links', (created as any).scluuid || String((created as any).id), link.vesselId || null, null, created, link.linkedBy || 'system');
+      } catch (err) { console.error('[FieldLogger] SpareComponentLink create:', err); }
+
       if (!skipSiblingSync && link.componentId && link.vesselId) {
         try {
           await this.createSiblingLinks(link.spareId, link.spareUuid, link.componentId, link.vesselId, link.linkedBy);
@@ -7874,11 +8097,24 @@ export class PostgresStorage {
 
   async deleteSpareComponentLink(spareId: number, componentId: string): Promise<void> {
     const db = await getDb();
+    // Fetch-before-delete for sync field logging
+    const existing = await db.select().from(spareComponentLinks).where(
+      and(eq(spareComponentLinks.spareId, spareId), eq(spareComponentLinks.componentId, componentId))
+    );
+
     await db.delete(spareComponentLinks)
       .where(and(
         eq(spareComponentLinks.spareId, spareId),
         eq(spareComponentLinks.componentId, componentId)
       ));
+
+    // Sync field logging — spare_component_links DELETE
+    if (existing[0]) {
+      try {
+        const row = existing[0] as any;
+        await logSoftDelete('spare_component_links', row.scluuid || String(row.id), row.vesselId || null, 'system');
+      } catch (err) { console.error('[FieldLogger] SpareComponentLink delete:', err); }
+    }
   }
 
   async getLinkedComponentsForSpare(spareId: number, vesselId?: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>> {

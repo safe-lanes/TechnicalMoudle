@@ -1,4 +1,5 @@
 import * as surveyRepo from '../repositories/surveyRepository';
+import { logFieldChanges } from '../../sync';
 
 // ── Types ──
 
@@ -325,6 +326,13 @@ export async function updateSurvey(compoundId: string, body: any) {
     if (attachments !== undefined) updateData.attachments = attachments;
 
     result = await surveyRepo.updateSurveyData(vesselId, masterId, updateData);
+    // Sync field logging — vessel_survey_data UPDATE
+    if (result && result[0]) {
+      try {
+        const row = result[0] as any;
+        await logFieldChanges('vessel_survey_data', row.vsduuid || String(row.id), vesselId, existingData[0], row, 'system');
+      } catch (err) { console.error('[FieldLogger] VesselSurveyData update:', err); }
+    }
   } else {
     // Insert new record
     result = await surveyRepo.insertSurveyData({
@@ -339,6 +347,13 @@ export async function updateSurvey(compoundId: string, body: any) {
       lastEditUpload,
       attachments: attachments || [],
     });
+    // Sync field logging — vessel_survey_data INSERT
+    if (result && result[0]) {
+      try {
+        const row = result[0] as any;
+        await logFieldChanges('vessel_survey_data', row.vsduuid || String(row.id), vesselId, null, row, 'system');
+      } catch (err) { console.error('[FieldLogger] VesselSurveyData create:', err); }
+    }
   }
 
   if (!result) {

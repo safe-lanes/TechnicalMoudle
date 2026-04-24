@@ -1,4 +1,5 @@
 import * as certRepo from '../repositories/certificateRepository';
+import { logFieldChanges } from '../../sync';
 
 // ── Types ──
 
@@ -279,6 +280,13 @@ export async function updateCertificate(certId: string, body: any) {
   let result;
   if (existingData.length > 0) {
     result = await certRepo.updateCertificateData(vesselId, masterId, updateData);
+    // Sync field logging — vessel_certificate_data UPDATE
+    if (result && result[0]) {
+      try {
+        const row = result[0] as any;
+        await logFieldChanges('vessel_certificate_data', row.vcduuid || String(row.id), vesselId, existingData[0], row, 'system');
+      } catch (err) { console.error('[FieldLogger] VesselCertData update:', err); }
+    }
   } else {
     result = await certRepo.insertCertificateData({
       vesselId,
@@ -286,6 +294,13 @@ export async function updateCertificate(certId: string, body: any) {
       masterId,
       ...updateData,
     });
+    // Sync field logging — vessel_certificate_data INSERT
+    if (result && result[0]) {
+      try {
+        const row = result[0] as any;
+        await logFieldChanges('vessel_certificate_data', row.vcduuid || String(row.id), vesselId, null, row, 'system');
+      } catch (err) { console.error('[FieldLogger] VesselCertData create:', err); }
+    }
   }
 
   if (!result) {

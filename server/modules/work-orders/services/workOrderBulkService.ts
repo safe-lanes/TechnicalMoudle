@@ -3,6 +3,7 @@ import { ValidationError } from '../../shared/errors';
 import { calculateMissedCycles, calculateNextDueDate } from '@shared/dateUtils';
 import { resolveHodForDepartment } from '../../ranks/hodResolutionService';
 import { invalidateComplianceCache } from './complianceAnomalyService';
+import { logFieldChanges } from '../../sync';
 
 // ── Bulk Approve Work Orders ──
 
@@ -107,6 +108,11 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
 
       await repo.update(workOrderId, updateData);
 
+      // Sync field logging — bulk approve
+      try {
+        await logFieldChanges('work_orders', existingWO.wouuid, existingWO.vesselId || null, existingWO, { ...existingWO, ...updateData }, approver || 'system');
+      } catch (err) { console.error('[FieldLogger] WO bulkApprove:', err); }
+
       if (missedCycles >= 1 && existingWO.maintenanceBasis === 'Calendar') {
         try {
           const { createSkippedCycleRecords } = await import('../utils/skippedCycleBackfill');
@@ -199,6 +205,11 @@ export async function bulkReject(workOrderIds: string[], approver?: string, reje
       };
 
       await repo.update(workOrderId, updateData);
+
+      // Sync field logging — bulk reject
+      try {
+        await logFieldChanges('work_orders', existingWO.wouuid, existingWO.vesselId || null, existingWO, { ...existingWO, ...updateData }, actor || rejectApprover || 'system');
+      } catch (err) { console.error('[FieldLogger] WO bulkReject:', err); }
 
       // Audit Trail: capture the actual approver who rejected the work order so
       // rejection-history UIs do not fall back to "system".

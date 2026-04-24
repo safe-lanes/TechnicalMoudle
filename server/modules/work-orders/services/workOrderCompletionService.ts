@@ -4,6 +4,7 @@ import { calculateMissedCycles as calcMissedCyclesShared, calculateMissedCyclesR
 import { detectAndLogAnomalies } from './anomalyDetectionService';
 import { invalidateComplianceCache } from './complianceAnomalyService';
 import { validateRHEntry } from '../../running-hours/services/rhTimelineValidationService';
+import { logFieldChanges } from '../../sync';
 
 // ── Complete Work Order ──
 
@@ -263,6 +264,11 @@ export async function completeWorkOrder(
     rhJustificationProvidedBy: body.rhJustification ? (executionData.performedBy || 'System') : undefined,
     rhJustificationDate: body.rhJustification ? new Date() : undefined
   });
+
+  // Sync field logging — log completion UPDATE
+  try {
+    await logFieldChanges('work_orders', workOrder.wouuid, workOrder.vesselId || null, workOrder, updatedWorkOrder, executionData.performedBy || 'system');
+  } catch (err) { console.error('[FieldLogger] WO complete:', err); }
 
   // Auto-populate component_maintenance_history
   try {

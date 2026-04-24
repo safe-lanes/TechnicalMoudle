@@ -9,6 +9,7 @@ import { storage } from '../../../storage';
 import { getDb } from '../../../db';
 import { plannerDates } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { logFieldChanges } from '../../sync';
 
 async function resolveRankIdFromLabel(assignedTo: string | null | undefined): Promise<string | null> {
   if (!assignedTo) return null;
@@ -787,6 +788,12 @@ export async function createWorkOrder(body: any) {
   workOrderData = await applyAssignmentSync({ ...workOrderData });
 
   const workOrder = await repo.create(workOrderData);
+
+  // Sync field logging — log INSERT
+  try {
+    await logFieldChanges('work_orders', workOrder.wouuid, workOrder.vesselId || null, null, workOrder, body.userId || body.performedBy || 'system');
+  } catch (err) { console.error('[FieldLogger] WO create:', err); }
+
   return workOrder;
 }
 
@@ -1218,6 +1225,11 @@ export async function updateWorkOrder(id: string, body: any) {
   }
 
   const workOrder = await repo.update(id, updateData);
+
+  // Sync field logging — log UPDATE (existingWO already fetched at top of function)
+  try {
+    await logFieldChanges('work_orders', existingWO.wouuid, existingWO.vesselId || null, existingWO, workOrder, body.userId || body.approver || body.performedBy || 'system');
+  } catch (err) { console.error('[FieldLogger] WO update:', err); }
 
   // POSTPONEMENT AUDIT: Create a record in work_order_postponements when transitioning to Postponed
   if (isBeingPostponed && existingWO.status !== 'Postponed') {
@@ -1789,7 +1801,15 @@ export async function updateWorkOrder(id: string, body: any) {
 // ── Delete Work Order ──
 
 export async function deleteWorkOrder(id: string) {
+  // Fetch before delete for sync logging
+  const existingWO = await repo.findById(id);
   await repo.remove(id);
+  // Sync field logging — log DELETE as soft-delete marker
+  if (existingWO) {
+    try {
+      await logFieldChanges('work_orders', existingWO.wouuid, existingWO.vesselId || null, { is_deleted: false }, { is_deleted: true }, 'system');
+    } catch (err) { console.error('[FieldLogger] WO delete:', err); }
+  }
 }
 
 // ── Save Overdue Reason ──
@@ -1801,6 +1821,10 @@ export async function saveOverdueReason(id: string, overdueReason: string, overd
   }
 
   const updated = await repo.update(id, { overdueReason, overdueReasonDetails });
+  // Sync field logging
+  try {
+    await logFieldChanges('work_orders', workOrder.wouuid, workOrder.vesselId || null, workOrder, updated, 'system');
+  } catch (err) { console.error('[FieldLogger] WO overdueReason:', err); }
   return updated;
 }
 
