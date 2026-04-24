@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
   ColDef,
@@ -360,6 +360,7 @@ function WorkOrderAnomaliesDetails({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const { data: vessels = [] } = useVessels();
 
   const effectiveVesselId = vesselId && vesselId !== 'all' ? vesselId : undefined;
@@ -396,6 +397,21 @@ function WorkOrderAnomaliesDetails({
   const anomalies = anomaliesQuery.data || [];
   const isLoading = anomaliesQuery.isLoading;
 
+  const trimmedSearch = searchTerm.trim().toLowerCase();
+  const filteredAnomalies = useMemo(() => {
+    if (!trimmedSearch) return anomalies;
+    return anomalies.filter((a) => {
+      const fields = [
+        a.componentCode,
+        a.componentName,
+        a.workOrderCode,
+        a.jobTitle,
+      ];
+      return fields.some((f) => (f || '').toLowerCase().includes(trimmedSearch));
+    });
+  }, [anomalies, trimmedSearch]);
+  const isSearchActive = trimmedSearch.length > 0;
+
   const vesselNameById = useMemo(
     () => new Map(vessels.map(v => [v.id, v.name])),
     [vessels],
@@ -421,6 +437,16 @@ function WorkOrderAnomaliesDetails({
       .filter((id): id is number => typeof id === 'number');
     setSelectedAnomalyIds(ids);
   }, []);
+
+  useEffect(() => {
+    if (!isSearchActive || selectedAnomalyIds.length === 0) return;
+    const visibleIds = new Set(filteredAnomalies.map((a) => a.id));
+    const hasHiddenSelection = selectedAnomalyIds.some((id) => !visibleIds.has(id));
+    if (hasHiddenSelection) {
+      gridApiRef.current?.deselectAll();
+      setSelectedAnomalyIds([]);
+    }
+  }, [filteredAnomalies, isSearchActive, selectedAnomalyIds]);
 
   const isRowSelectable = useCallback(
     (node: IRowNode<Anomaly>) => node.data?.status === 'PENDING_REVIEW',
@@ -504,6 +530,47 @@ function WorkOrderAnomaliesDetails({
               <option value="LOW">Low</option>
             </select>
           </div>
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+            <Search className="w-3 h-3" style={{ position: 'absolute', left: '6px', color: '#9e9e9e', pointerEvents: 'none' }} />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search component or job title…"
+              style={{
+                fontSize: '11px',
+                padding: '4px 22px 4px 22px',
+                borderRadius: '6px',
+                border: '1px solid #e0e0e0',
+                background: '#fafafa',
+                color: '#424242',
+                width: '220px',
+                outline: 'none',
+              }}
+              data-testid="input-wo-anomaly-search"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                aria-label="Clear search"
+                style={{
+                  position: 'absolute',
+                  right: '4px',
+                  background: 'none',
+                  border: 'none',
+                  padding: '2px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: '#9e9e9e',
+                }}
+                data-testid="button-clear-wo-anomaly-search"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
           <button
             onClick={() => {
               queryClient.invalidateQueries({ queryKey: ['/technical/api/anomalies/dashboard'] });
@@ -539,7 +606,9 @@ function WorkOrderAnomaliesDetails({
           >
             {isLoading
               ? 'Loading…'
-              : `${anomalies.length} ${anomalies.length === 1 ? 'anomaly' : 'anomalies'}`}
+              : isSearchActive
+                ? `${filteredAnomalies.length} of ${anomalies.length} ${anomalies.length === 1 ? 'anomaly' : 'anomalies'}`
+                : `${anomalies.length} ${anomalies.length === 1 ? 'anomaly' : 'anomalies'}`}
           </span>
           {canAcknowledge && selectedAnomalyIds.length > 0 && (
             <button
@@ -594,12 +663,12 @@ function WorkOrderAnomaliesDetails({
         <div style={{ height: '50vh', minHeight: '320px' }} data-testid="ag-grid-wo-anomalies-wrap">
           <WOAgGridTable
             columnDefs={columnDefs}
-            rowData={anomalies}
+            rowData={filteredAnomalies}
             height="100%"
             rowHeight={42}
             headerHeight={42}
             loading={isLoading}
-            noRowsMessage="No anomalies detected"
+            noRowsMessage={isSearchActive ? 'No anomalies match your search' : 'No anomalies detected'}
             testId="ag-grid-wo-anomalies"
             getRowId={(params) => String((params.data as Anomaly).id)}
             rowSelection={canAcknowledge ? 'multiple' : undefined}
