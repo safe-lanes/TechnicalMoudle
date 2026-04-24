@@ -18,6 +18,7 @@ import chatbotRoutes from './chatbot/routes';
 import miscRoutes from './misc/routes';
 import accessControlRoutes from './access-control/routes';
 import ranksRoutes from './ranks/routes';
+import syncRoutes from './sync/routes';
 // ====== NOON REPORT MODULE — START (remove this line to disable) ======
 import noonReportRoutes from './noon-report/routes';
 // ====== NOON REPORT MODULE — END ======
@@ -44,6 +45,7 @@ moduleRouter.use(chatbotRoutes);
 moduleRouter.use(miscRoutes);
 moduleRouter.use(accessControlRoutes);
 moduleRouter.use(ranksRoutes);
+moduleRouter.use(syncRoutes);
 // ====== NOON REPORT MODULE — START (remove this line to disable) ======
 moduleRouter.use(noonReportRoutes);
 // ====== NOON REPORT MODULE — END ======
