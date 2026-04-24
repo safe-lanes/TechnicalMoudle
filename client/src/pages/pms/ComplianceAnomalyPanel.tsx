@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { ColDef } from "ag-grid-community";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useVessels } from "@/hooks/useVessels";
+import WOAgGridTable from "@/components/WOAgGridTable";
 import {
   AlertTriangle,
   Calendar,
@@ -422,8 +425,10 @@ function WorkOrderAnomaliesDetails({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
+  const { data: vessels = [] } = useVessels();
 
   const effectiveVesselId = vesselId && vesselId !== 'all' ? vesselId : undefined;
+  const isAllVessels = !effectiveVesselId;
 
   const anomaliesQuery = useQuery<Anomaly[]>({
     queryKey: ['/technical/api/anomalies/dashboard', effectiveVesselId, severityFilter],
@@ -455,6 +460,273 @@ function WorkOrderAnomaliesDetails({
 
   const anomalies = anomaliesQuery.data || [];
   const isLoading = anomaliesQuery.isLoading;
+
+  const vesselNameById = useMemo(
+    () => new Map(vessels.map(v => [v.id, v.name])),
+    [vessels],
+  );
+
+  const columnDefs: ColDef[] = useMemo(() => {
+    const vesselCol: ColDef = {
+      headerName: 'Vessel',
+      field: 'vesselId',
+      minWidth: 130,
+      flex: 1,
+      valueGetter: (params: any) => {
+        const vid = params.data?.vesselId;
+        return (vid && vesselNameById.get(String(vid))) || (vid || '—');
+      },
+      cellRenderer: (params: any) => (
+        <span className="truncate font-medium" data-testid={`cell-anomaly-vessel-${params.data?.id ?? ''}`}>
+          {params.value || '—'}
+        </span>
+      ),
+    };
+
+    const componentCol: ColDef = {
+      headerName: 'Component',
+      field: 'componentName',
+      minWidth: 170,
+      flex: 1.2,
+      valueGetter: (params: any) => {
+        const code = params.data?.componentCode;
+        const name = params.data?.componentName;
+        if (code && name) return `${code} — ${name}`;
+        return code || name || '—';
+      },
+      tooltipValueGetter: (params: any) => params.value || '',
+    };
+
+    const woCol: ColDef = {
+      headerName: 'Work Order No',
+      field: 'workOrderCode',
+      minWidth: 170,
+      flex: 1,
+      valueGetter: (params: any) =>
+        params.data?.workOrderCode || params.data?.workOrderId || '—',
+      cellRenderer: (params: any) => {
+        const a = params.data as Anomaly | undefined;
+        if (!a) return null;
+        return (
+          <span
+            className="text-blue-600 underline cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              setLocation(`/pms/work-order/${a.workOrderCode || a.workOrderId}`);
+            }}
+            data-testid={`link-wo-${a.id}`}
+          >
+            {params.value}
+          </span>
+        );
+      },
+    };
+
+    const jobTitleCol: ColDef = {
+      headerName: 'Job Title',
+      field: 'jobTitle',
+      minWidth: 200,
+      flex: 1.5,
+      tooltipValueGetter: (params: any) => params.data?.jobTitle || '',
+      valueFormatter: (params: any) => params.value || '—',
+    };
+
+    const anomalyTypeCol: ColDef = {
+      headerName: 'Anomaly Type',
+      field: 'anomalyType',
+      minWidth: 180,
+      flex: 1.2,
+      sortable: false,
+      cellRenderer: (params: any) => {
+        const a = params.data as Anomaly | undefined;
+        if (!a) return null;
+        const colors = WO_SEVERITY_COLORS[a.severity] || WO_SEVERITY_COLORS.LOW;
+        const allTypes = (a.anomalyDetails as AnomalyDetails)?.allAnomalyTypes || [a.anomalyType];
+        return (
+          <div className="flex items-center gap-1 flex-wrap h-full">
+            {allTypes.map((type: string) => (
+              <span
+                key={type}
+                style={{
+                  fontSize: '9px',
+                  fontWeight: 600,
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  background: colors.badge,
+                  color: '#fff',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.3px',
+                }}
+                data-testid={`badge-type-${type.toLowerCase()}-${a.id}`}
+              >
+                {ANOMALY_TYPE_LABELS[type] || type}
+              </span>
+            ))}
+          </div>
+        );
+      },
+    };
+
+    const severityCol: ColDef = {
+      headerName: 'Severity',
+      field: 'severity',
+      minWidth: 100,
+      flex: 0.6,
+      cellRenderer: (params: any) => {
+        const sev = (params.value as string) || 'LOW';
+        const colors = WO_SEVERITY_COLORS[sev] || WO_SEVERITY_COLORS.LOW;
+        const label = sev === 'MEDIUM' ? 'MED' : sev;
+        return (
+          <span
+            className="px-3 py-1 rounded-full text-xs font-medium shrink-0"
+            style={{ background: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+            data-testid={`badge-severity-${(params.data as Anomaly | undefined)?.id ?? ''}`}
+          >
+            {label}
+          </span>
+        );
+      },
+    };
+
+    const detailsCol: ColDef = {
+      headerName: 'Details',
+      field: 'daysLate',
+      minWidth: 180,
+      flex: 1.2,
+      sortable: false,
+      cellRenderer: (params: any) => {
+        const a = params.data as Anomaly | undefined;
+        if (!a) return null;
+        const colors = WO_SEVERITY_COLORS[a.severity] || WO_SEVERITY_COLORS.LOW;
+        const backdatingDays = (a.anomalyDetails as AnomalyDetails)?.backdatingInfo?.daysBackdated || 0;
+        const parts: React.ReactNode[] = [];
+        if (a.daysLate > 0) {
+          parts.push(
+            <span key="late" data-testid={`text-days-late-${a.id}`}>
+              <strong>{a.daysLate}</strong> days late
+            </span>
+          );
+        }
+        if (a.missedCycles > 0) {
+          parts.push(
+            <span key="cycles" data-testid={`text-missed-cycles-${a.id}`}>
+              <strong>{a.missedCycles}</strong> cycles missed
+            </span>
+          );
+        }
+        if (backdatingDays > 0) {
+          parts.push(
+            <span key="back" data-testid={`text-backdated-${a.id}`}>
+              <strong>{backdatingDays}</strong> days backdated
+            </span>
+          );
+        }
+        if (parts.length === 0) return <span className="text-gray-400">—</span>;
+        return (
+          <div className="flex items-center gap-2 flex-wrap text-xs h-full" style={{ color: colors.text }}>
+            {parts.map((p, i) => (
+              <span key={i} className="whitespace-nowrap">{p}</span>
+            ))}
+          </div>
+        );
+      },
+    };
+
+    const dueDateCol: ColDef = {
+      headerName: 'Due Date',
+      field: 'dueDate',
+      minWidth: 120,
+      flex: 0.8,
+      valueFormatter: (params: any) => formatDateNullable(params.value),
+    };
+
+    const completedCol: ColDef = {
+      headerName: 'Completed',
+      field: 'completionDate',
+      minWidth: 120,
+      flex: 0.8,
+      valueFormatter: (params: any) => formatDateNullable(params.value),
+    };
+
+    const detectedCol: ColDef = {
+      headerName: 'Detected',
+      field: 'detectedAt',
+      minWidth: 110,
+      flex: 0.8,
+      valueGetter: (params: any) => params.data?.detectedAt || null,
+      cellRenderer: (params: any) => {
+        const a = params.data as Anomaly | undefined;
+        if (!a?.detectedAt) return <span className="text-gray-400">—</span>;
+        return (
+          <span className="text-xs text-gray-500 whitespace-nowrap" data-testid={`text-detected-${a.id}`}>
+            <Clock className="w-3 h-3 inline-block mr-1" style={{ verticalAlign: 'text-bottom' }} />
+            {timeAgo(a.detectedAt)}
+          </span>
+        );
+      },
+    };
+
+    const actionsCol: ColDef = {
+      headerName: 'Actions',
+      field: 'id',
+      minWidth: canAcknowledge ? 150 : 90,
+      flex: 0,
+      sortable: false,
+      filter: false,
+      resizable: false,
+      cellRenderer: (params: any) => {
+        const a = params.data as Anomaly | undefined;
+        if (!a) return null;
+        return (
+          <div className="flex items-center justify-center gap-2 h-full">
+            <button
+              className="px-2 py-1 rounded border border-gray-200 bg-white text-gray-700 text-xs flex items-center gap-1 hover:bg-gray-50"
+              onClick={(e) => {
+                e.stopPropagation();
+                setLocation(`/pms/work-order/${a.workOrderCode || a.workOrderId}`);
+              }}
+              data-testid={`button-view-details-${a.id}`}
+            >
+              <Eye className="w-3 h-3" />
+              View
+            </button>
+            {canAcknowledge && a.status === 'PENDING_REVIEW' && (
+              <button
+                className="px-2 py-1 rounded text-white text-xs flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{ background: '#1565C0' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  acknowledgeMutation.mutate({
+                    anomalyId: a.id,
+                    acknowledgedBy: 'Superintendent',
+                  });
+                }}
+                disabled={acknowledgeMutation.isPending}
+                data-testid={`button-acknowledge-${a.id}`}
+              >
+                <CheckSquare className="w-3 h-3" />
+                Ack
+              </button>
+            )}
+          </div>
+        );
+      },
+    };
+
+    return [
+      ...(isAllVessels ? [vesselCol] : []),
+      componentCol,
+      woCol,
+      jobTitleCol,
+      anomalyTypeCol,
+      severityCol,
+      detailsCol,
+      dueDateCol,
+      completedCol,
+      detectedCol,
+      actionsCol,
+    ];
+  }, [isAllVessels, vesselNameById, canAcknowledge, acknowledgeMutation, setLocation]);
 
   return (
     <div>
@@ -504,189 +776,42 @@ function WorkOrderAnomaliesDetails({
         </div>
       </div>
 
-      <div style={{ minHeight: '100px', maxHeight: '50vh', overflow: 'auto' }}>
-        {isLoading ? (
-          <div style={{ padding: '16px' }}>
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                style={{
-                  height: '72px',
-                  background: '#f5f5f5',
-                  borderRadius: '8px',
-                  marginBottom: '8px',
-                  animation: 'pulse 1.5s infinite',
-                }}
-              />
-            ))}
-          </div>
-        ) : anomalies.length === 0 ? (
-          <div
-            style={{
-              padding: '32px 16px',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-            data-testid="empty-state-wo-anomalies"
-          >
-            <CheckCircle className="w-10 h-10" style={{ color: '#4CAF50' }} />
-            <span style={{ fontSize: '14px', fontWeight: 500, color: '#4CAF50' }}>
-              No anomalies detected
-            </span>
-            <span style={{ fontSize: '12px', color: '#9e9e9e' }}>
-              All work orders are on track!
-            </span>
-          </div>
-        ) : (
-          <div>
-            {anomalies.map((anomaly) => {
-              const colors = WO_SEVERITY_COLORS[anomaly.severity] || WO_SEVERITY_COLORS.LOW;
-              const allTypes = (anomaly.anomalyDetails as AnomalyDetails)?.allAnomalyTypes || [anomaly.anomalyType];
-              const backdatingDays = (anomaly.anomalyDetails as AnomalyDetails)?.backdatingInfo?.daysBackdated || 0;
-
-              return (
-                <div
-                  key={anomaly.id}
-                  style={{
-                    borderLeft: `4px solid ${colors.border}`,
-                    background: colors.bg,
-                    borderRadius: '8px',
-                    padding: '10px 12px',
-                    marginBottom: '6px',
-                    transition: 'box-shadow 0.15s',
-                  }}
-                  className="hover:shadow-md"
-                  data-testid={`card-anomaly-${anomaly.id}`}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                        <span
-                          style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: '#1565C0',
-                            cursor: 'pointer',
-                            textDecoration: 'underline',
-                          }}
-                          onClick={() => setLocation(`/pms/work-order/${anomaly.workOrderCode || anomaly.workOrderId}`)}
-                          data-testid={`link-wo-${anomaly.id}`}
-                        >
-                          {anomaly.workOrderCode || anomaly.workOrderId}
-                        </span>
-                        {allTypes.map((type: string) => (
-                          <span
-                            key={type}
-                            style={{
-                              fontSize: '9px',
-                              fontWeight: 600,
-                              padding: '1px 5px',
-                              borderRadius: '4px',
-                              background: colors.badge,
-                              color: '#fff',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.3px',
-                            }}
-                            data-testid={`badge-type-${type.toLowerCase()}-${anomaly.id}`}
-                          >
-                            {ANOMALY_TYPE_LABELS[type] || type}
-                          </span>
-                        ))}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#424242', fontWeight: 500, marginBottom: '2px' }}>
-                        {anomaly.jobTitle || 'Unknown Job'}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#757575', marginBottom: '4px' }}>
-                        {anomaly.componentCode && <span>{anomaly.componentCode} — </span>}
-                        {anomaly.componentName || ''}
-                      </div>
-                      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '11px', color: colors.text }}>
-                        {anomaly.daysLate > 0 && (
-                          <span data-testid={`text-days-late-${anomaly.id}`}>
-                            <strong>{anomaly.daysLate}</strong> days late
-                          </span>
-                        )}
-                        {anomaly.missedCycles > 0 && (
-                          <span data-testid={`text-missed-cycles-${anomaly.id}`}>
-                            <strong>{anomaly.missedCycles}</strong> cycles missed
-                          </span>
-                        )}
-                        {backdatingDays > 0 && (
-                          <span data-testid={`text-backdated-${anomaly.id}`}>
-                            <strong>{backdatingDays}</strong> days backdated
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', gap: '12px', fontSize: '10px', color: '#9e9e9e', marginTop: '4px' }}>
-                        <span>Due: {formatDateNullable(anomaly.dueDate)}</span>
-                        <span>Completed: {formatDateNullable(anomaly.completionDate)}</span>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
-                      <span style={{ fontSize: '10px', color: '#9e9e9e', whiteSpace: 'nowrap' }} data-testid={`text-detected-${anomaly.id}`}>
-                        <Clock className="w-3 h-3 inline-block mr-1" style={{ verticalAlign: 'text-bottom' }} />
-                        {timeAgo(anomaly.detectedAt)}
-                      </span>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <button
-                          onClick={() => setLocation(`/pms/work-order/${anomaly.workOrderCode || anomaly.workOrderId}`)}
-                          style={{
-                            fontSize: '10px',
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            border: '1px solid #e0e0e0',
-                            background: '#fff',
-                            color: '#424242',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                          }}
-                          data-testid={`button-view-details-${anomaly.id}`}
-                        >
-                          <Eye className="w-3 h-3" />
-                          View
-                        </button>
-                        {canAcknowledge && anomaly.status === 'PENDING_REVIEW' && (
-                          <button
-                            onClick={() => {
-                              acknowledgeMutation.mutate({
-                                anomalyId: anomaly.id,
-                                acknowledgedBy: 'Superintendent',
-                              });
-                            }}
-                            disabled={acknowledgeMutation.isPending}
-                            style={{
-                              fontSize: '10px',
-                              padding: '3px 8px',
-                              borderRadius: '4px',
-                              border: 'none',
-                              background: '#1565C0',
-                              color: '#fff',
-                              cursor: acknowledgeMutation.isPending ? 'not-allowed' : 'pointer',
-                              opacity: acknowledgeMutation.isPending ? 0.6 : 1,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '3px',
-                            }}
-                            data-testid={`button-acknowledge-${anomaly.id}`}
-                          >
-                            <CheckSquare className="w-3 h-3" />
-                            Ack
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {!isLoading && anomalies.length === 0 ? (
+        <div
+          style={{
+            padding: '32px 16px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px',
+            minHeight: '160px',
+            justifyContent: 'center',
+          }}
+          data-testid="empty-state-wo-anomalies"
+        >
+          <CheckCircle className="w-10 h-10" style={{ color: '#4CAF50' }} />
+          <span style={{ fontSize: '14px', fontWeight: 500, color: '#4CAF50' }}>
+            No anomalies detected
+          </span>
+          <span style={{ fontSize: '12px', color: '#9e9e9e' }}>
+            All work orders are on track!
+          </span>
+        </div>
+      ) : (
+        <div style={{ height: '50vh', minHeight: '320px' }} data-testid="ag-grid-wo-anomalies-wrap">
+          <WOAgGridTable
+            columnDefs={columnDefs}
+            rowData={anomalies}
+            height="100%"
+            rowHeight={42}
+            headerHeight={42}
+            noRowsMessage={isLoading ? 'Loading anomalies…' : 'No anomalies detected'}
+            testId="ag-grid-wo-anomalies"
+            getRowId={(params) => String((params.data as Anomaly).id)}
+          />
+        </div>
+      )}
 
       <div style={{
         paddingTop: '12px',
