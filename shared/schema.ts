@@ -3990,5 +3990,183 @@ export const insertMonthlySnapshotSchema = createInsertSchema(monthlySnapshots).
 export type InsertMonthlySnapshot = z.infer<typeof insertMonthlySnapshotSchema>;
 export type MonthlySnapshot = typeof monthlySnapshots.$inferSelect;
 
+// ════════════════════════════════════════════════════════════════════════════════
+// SYNC INFRASTRUCTURE — Ship-Shore synchronization tables
+// ════════════════════════════════════════════════════════════════════════════════
+
+export const syncMetadata = pgTable("sync_metadata", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  smuuid: text("smuuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  instanceId: text("instance_id").notNull().unique(),
+  vesselId: text("vessel_id"),
+  lastSyncCheckpoint: timestamp("last_sync_checkpoint"),
+  lastSyncStatus: text("last_sync_status"),
+  lastSyncAt: timestamp("last_sync_at"),
+  syncDirection: text("sync_direction"),
+  syncApiKey: text("sync_api_key"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
+  isSync: boolean("is_sync").default(false).notNull(),
+});
+
+export const insertSyncMetadataSchema = createInsertSchema(syncMetadata).omit({
+  id: true, smuuid: true, createdAt: true, updatedAt: true,
+});
+
+export type InsertSyncMetadata = z.infer<typeof insertSyncMetadataSchema>;
+export type SyncMetadata = typeof syncMetadata.$inferSelect;
+
+export const syncFieldLog = pgTable("sync_field_log", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  logUuid: text("log_uuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  tableName: text("table_name").notNull(),
+  rowUuid: text("row_uuid").notNull(),
+  fieldName: text("field_name").notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  vesselId: text("vessel_id"),
+  changedAt: timestamp("changed_at").defaultNow().notNull(),
+  changedByUserId: text("changed_by_user_id"),
+  instanceId: text("instance_id").notNull(),
+  syncBatchId: text("sync_batch_id"),
+  isSynced: boolean("is_synced").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
+  isSync: boolean("is_sync").default(false).notNull(),
+}, (table) => ({
+  idxTableRowUuid: index("idx_sfl_table_row_uuid").on(table.tableName, table.rowUuid),
+  idxVesselSynced: index("idx_sfl_vessel_synced").on(table.vesselId, table.isSynced),
+  idxInstanceSynced: index("idx_sfl_instance_synced").on(table.instanceId, table.isSynced),
+  idxChangedAt: index("idx_sfl_changed_at").on(table.changedAt),
+  idxSyncBatchId: index("idx_sfl_sync_batch_id").on(table.syncBatchId),
+}));
+
+export const insertSyncFieldLogSchema = createInsertSchema(syncFieldLog).omit({
+  id: true, logUuid: true, createdAt: true, updatedAt: true,
+});
+
+export type InsertSyncFieldLog = z.infer<typeof insertSyncFieldLogSchema>;
+export type SyncFieldLog = typeof syncFieldLog.$inferSelect;
+
+export const syncConflicts = pgTable("sync_conflicts", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  conflictUuid: text("conflict_uuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  tableName: text("table_name").notNull(),
+  rowUuid: text("row_uuid").notNull(),
+  fieldName: text("field_name").notNull(),
+  shipValue: text("ship_value"),
+  shipChangedAt: timestamp("ship_changed_at"),
+  shipChangedBy: text("ship_changed_by"),
+  shoreValue: text("shore_value"),
+  shoreChangedAt: timestamp("shore_changed_at"),
+  shoreChangedBy: text("shore_changed_by"),
+  resolution: text("resolution"),
+  resolvedValue: text("resolved_value"),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: text("resolved_by"),
+  vesselId: text("vessel_id"),
+  syncBatchId: text("sync_batch_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
+  isSync: boolean("is_sync").default(false).notNull(),
+}, (table) => ({
+  idxUnresolved: index("idx_sc_unresolved").on(table.resolution),
+  idxTableRowField: index("idx_sc_table_row_field").on(table.tableName, table.rowUuid, table.fieldName),
+  idxVessel: index("idx_sc_vessel").on(table.vesselId),
+  idxSyncBatch: index("idx_sc_sync_batch").on(table.syncBatchId),
+}));
+
+export const insertSyncConflictsSchema = createInsertSchema(syncConflicts).omit({
+  id: true, conflictUuid: true, createdAt: true, updatedAt: true,
+});
+
+export type InsertSyncConflict = z.infer<typeof insertSyncConflictsSchema>;
+export type SyncConflict = typeof syncConflicts.$inferSelect;
+
+export const syncFileQueue = pgTable("sync_file_queue", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  queueUuid: text("queue_uuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  tableName: text("table_name").notNull(),
+  rowUuid: text("row_uuid").notNull(),
+  fileKey: text("file_key").notNull(),
+  fileName: text("file_name"),
+  fileSizeBytes: integer("file_size_bytes"),
+  fileHash: text("file_hash"),
+  direction: text("direction").notNull(),
+  status: text("status").default("pending").notNull(),
+  chunkOffset: integer("chunk_offset").default(0),
+  totalChunks: integer("total_chunks"),
+  priority: integer("priority").default(0),
+  retryCount: integer("retry_count").default(0),
+  lastError: text("last_error"),
+  vesselId: text("vessel_id"),
+  instanceId: text("instance_id").notNull(),
+  syncBatchId: text("sync_batch_id"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
+  isSync: boolean("is_sync").default(false).notNull(),
+}, (table) => ({
+  idxPending: index("idx_sfq_pending").on(table.status, table.priority),
+  idxVessel: index("idx_sfq_vessel").on(table.vesselId),
+  idxInstanceDirection: index("idx_sfq_instance_direction").on(table.instanceId, table.direction),
+  idxSyncBatch: index("idx_sfq_sync_batch").on(table.syncBatchId),
+}));
+
+export const insertSyncFileQueueSchema = createInsertSchema(syncFileQueue).omit({
+  id: true, queueUuid: true, createdAt: true, updatedAt: true,
+});
+
+export type InsertSyncFileQueue = z.infer<typeof insertSyncFileQueueSchema>;
+export type SyncFileQueue = typeof syncFileQueue.$inferSelect;
+
+export const syncBatches = pgTable("sync_batches", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  batchUuid: text("batch_uuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  initiatedByInstance: text("initiated_by_instance").notNull(),
+  vesselId: text("vessel_id"),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  status: text("status").default("in_progress").notNull(),
+  recordsSent: integer("records_sent").default(0),
+  recordsReceived: integer("records_received").default(0),
+  conflictsFound: integer("conflicts_found").default(0),
+  conflictsResolved: integer("conflicts_resolved").default(0),
+  filesQueued: integer("files_queued").default(0),
+  filesCompleted: integer("files_completed").default(0),
+  checkpointBefore: timestamp("checkpoint_before"),
+  checkpointAfter: timestamp("checkpoint_after"),
+  errorMessage: text("error_message"),
+  durationMs: integer("duration_ms"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
+  isSync: boolean("is_sync").default(false).notNull(),
+}, (table) => ({
+  idxVesselStatus: index("idx_sb_vessel_status").on(table.vesselId, table.status),
+  idxStartedAt: index("idx_sb_started_at").on(table.startedAt),
+  idxInstance: index("idx_sb_instance").on(table.initiatedByInstance),
+}));
+
+export const insertSyncBatchesSchema = createInsertSchema(syncBatches).omit({
+  id: true, batchUuid: true, createdAt: true, updatedAt: true,
+});
+
+export type InsertSyncBatch = z.infer<typeof insertSyncBatchesSchema>;
+export type SyncBatch = typeof syncBatches.$inferSelect;
+
 // ====== NOON REPORT MODULE SCHEMA — remove this line to disable ======
 export * from './schema-noon-report';
