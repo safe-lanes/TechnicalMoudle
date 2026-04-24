@@ -1,6 +1,12 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { ColDef } from "ag-grid-community";
+import type {
+  ColDef,
+  ICellRendererParams,
+  ITooltipParams,
+  ValueFormatterParams,
+  ValueGetterParams,
+} from "ag-grid-community";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -159,6 +165,13 @@ function formatDate(dateStr: string): string {
 
 function formatDateNullable(dateStr: string | null | undefined): string {
   if (!dateStr) return 'N/A';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatDateOrDash(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -466,46 +479,46 @@ function WorkOrderAnomaliesDetails({
     [vessels],
   );
 
-  const columnDefs: ColDef[] = useMemo(() => {
-    const vesselCol: ColDef = {
+  const columnDefs: ColDef<Anomaly>[] = useMemo(() => {
+    const vesselCol: ColDef<Anomaly> = {
       headerName: 'Vessel',
       field: 'vesselId',
       minWidth: 130,
       flex: 1,
-      valueGetter: (params: any) => {
+      valueGetter: (params: ValueGetterParams<Anomaly>) => {
         const vid = params.data?.vesselId;
         return (vid && vesselNameById.get(String(vid))) || (vid || '—');
       },
-      cellRenderer: (params: any) => (
+      cellRenderer: (params: ICellRendererParams<Anomaly>) => (
         <span className="truncate font-medium" data-testid={`cell-anomaly-vessel-${params.data?.id ?? ''}`}>
           {params.value || '—'}
         </span>
       ),
     };
 
-    const componentCol: ColDef = {
+    const componentCol: ColDef<Anomaly> = {
       headerName: 'Component',
       field: 'componentName',
       minWidth: 170,
       flex: 1.2,
-      valueGetter: (params: any) => {
+      valueGetter: (params: ValueGetterParams<Anomaly>) => {
         const code = params.data?.componentCode;
         const name = params.data?.componentName;
         if (code && name) return `${code} — ${name}`;
         return code || name || '—';
       },
-      tooltipValueGetter: (params: any) => params.value || '',
+      tooltipValueGetter: (params: ITooltipParams<Anomaly>) => (params.value as string) || '',
     };
 
-    const woCol: ColDef = {
+    const woCol: ColDef<Anomaly> = {
       headerName: 'Work Order No',
       field: 'workOrderCode',
       minWidth: 170,
       flex: 1,
-      valueGetter: (params: any) =>
+      valueGetter: (params: ValueGetterParams<Anomaly>) =>
         params.data?.workOrderCode || params.data?.workOrderId || '—',
-      cellRenderer: (params: any) => {
-        const a = params.data as Anomaly | undefined;
+      cellRenderer: (params: ICellRendererParams<Anomaly>) => {
+        const a = params.data;
         if (!a) return null;
         return (
           <span
@@ -522,23 +535,23 @@ function WorkOrderAnomaliesDetails({
       },
     };
 
-    const jobTitleCol: ColDef = {
+    const jobTitleCol: ColDef<Anomaly> = {
       headerName: 'Job Title',
       field: 'jobTitle',
       minWidth: 200,
       flex: 1.5,
-      tooltipValueGetter: (params: any) => params.data?.jobTitle || '',
-      valueFormatter: (params: any) => params.value || '—',
+      tooltipValueGetter: (params: ITooltipParams<Anomaly>) => params.data?.jobTitle || '',
+      valueFormatter: (params: ValueFormatterParams<Anomaly>) => (params.value as string) || '—',
     };
 
-    const anomalyTypeCol: ColDef = {
+    const anomalyTypeCol: ColDef<Anomaly> = {
       headerName: 'Anomaly Type',
       field: 'anomalyType',
       minWidth: 180,
       flex: 1.2,
       sortable: false,
-      cellRenderer: (params: any) => {
-        const a = params.data as Anomaly | undefined;
+      cellRenderer: (params: ICellRendererParams<Anomaly>) => {
+        const a = params.data;
         if (!a) return null;
         const colors = WO_SEVERITY_COLORS[a.severity] || WO_SEVERITY_COLORS.LOW;
         const allTypes = (a.anomalyDetails as AnomalyDetails)?.allAnomalyTypes || [a.anomalyType];
@@ -567,12 +580,12 @@ function WorkOrderAnomaliesDetails({
       },
     };
 
-    const severityCol: ColDef = {
+    const severityCol: ColDef<Anomaly> = {
       headerName: 'Severity',
       field: 'severity',
       minWidth: 100,
       flex: 0.6,
-      cellRenderer: (params: any) => {
+      cellRenderer: (params: ICellRendererParams<Anomaly>) => {
         const sev = (params.value as string) || 'LOW';
         const colors = WO_SEVERITY_COLORS[sev] || WO_SEVERITY_COLORS.LOW;
         const label = sev === 'MEDIUM' ? 'MED' : sev;
@@ -580,7 +593,7 @@ function WorkOrderAnomaliesDetails({
           <span
             className="px-3 py-1 rounded-full text-xs font-medium shrink-0"
             style={{ background: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
-            data-testid={`badge-severity-${(params.data as Anomaly | undefined)?.id ?? ''}`}
+            data-testid={`badge-severity-${params.data?.id ?? ''}`}
           >
             {label}
           </span>
@@ -588,14 +601,14 @@ function WorkOrderAnomaliesDetails({
       },
     };
 
-    const detailsCol: ColDef = {
+    const detailsCol: ColDef<Anomaly> = {
       headerName: 'Details',
       field: 'daysLate',
       minWidth: 180,
       flex: 1.2,
       sortable: false,
-      cellRenderer: (params: any) => {
-        const a = params.data as Anomaly | undefined;
+      cellRenderer: (params: ICellRendererParams<Anomaly>) => {
+        const a = params.data;
         if (!a) return null;
         const colors = WO_SEVERITY_COLORS[a.severity] || WO_SEVERITY_COLORS.LOW;
         const backdatingDays = (a.anomalyDetails as AnomalyDetails)?.backdatingInfo?.daysBackdated || 0;
@@ -632,30 +645,32 @@ function WorkOrderAnomaliesDetails({
       },
     };
 
-    const dueDateCol: ColDef = {
+    const dueDateCol: ColDef<Anomaly> = {
       headerName: 'Due Date',
       field: 'dueDate',
       minWidth: 120,
       flex: 0.8,
-      valueFormatter: (params: any) => formatDateNullable(params.value),
+      valueFormatter: (params: ValueFormatterParams<Anomaly>) =>
+        formatDateNullable(params.value as string | null | undefined),
     };
 
-    const completedCol: ColDef = {
+    const completedCol: ColDef<Anomaly> = {
       headerName: 'Completed',
       field: 'completionDate',
       minWidth: 120,
       flex: 0.8,
-      valueFormatter: (params: any) => formatDateNullable(params.value),
+      valueFormatter: (params: ValueFormatterParams<Anomaly>) =>
+        formatDateOrDash(params.value as string | null | undefined),
     };
 
-    const detectedCol: ColDef = {
+    const detectedCol: ColDef<Anomaly> = {
       headerName: 'Detected',
       field: 'detectedAt',
       minWidth: 110,
       flex: 0.8,
-      valueGetter: (params: any) => params.data?.detectedAt || null,
-      cellRenderer: (params: any) => {
-        const a = params.data as Anomaly | undefined;
+      valueGetter: (params: ValueGetterParams<Anomaly>) => params.data?.detectedAt || null,
+      cellRenderer: (params: ICellRendererParams<Anomaly>) => {
+        const a = params.data;
         if (!a?.detectedAt) return <span className="text-gray-400">—</span>;
         return (
           <span className="text-xs text-gray-500 whitespace-nowrap" data-testid={`text-detected-${a.id}`}>
@@ -666,7 +681,7 @@ function WorkOrderAnomaliesDetails({
       },
     };
 
-    const actionsCol: ColDef = {
+    const actionsCol: ColDef<Anomaly> = {
       headerName: 'Actions',
       field: 'id',
       minWidth: canAcknowledge ? 150 : 90,
@@ -674,8 +689,8 @@ function WorkOrderAnomaliesDetails({
       sortable: false,
       filter: false,
       resizable: false,
-      cellRenderer: (params: any) => {
-        const a = params.data as Anomaly | undefined;
+      cellRenderer: (params: ICellRendererParams<Anomaly>) => {
+        const a = params.data;
         if (!a) return null;
         return (
           <div className="flex items-center justify-center gap-2 h-full">
@@ -806,7 +821,8 @@ function WorkOrderAnomaliesDetails({
             height="100%"
             rowHeight={42}
             headerHeight={42}
-            noRowsMessage={isLoading ? 'Loading anomalies…' : 'No anomalies detected'}
+            loading={isLoading}
+            noRowsMessage="No anomalies detected"
             testId="ag-grid-wo-anomalies"
             getRowId={(params) => String((params.data as Anomaly).id)}
           />

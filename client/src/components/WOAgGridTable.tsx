@@ -72,6 +72,7 @@ interface WOAgGridTableProps {
   rowSelection?: 'single' | 'multiple';
   onSelectionChanged?: (event: SelectionChangedEvent) => void;
   getRowId?: GetRowIdFunc;
+  loading?: boolean;
 }
 
 const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
@@ -91,6 +92,7 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
   rowSelection,
   onSelectionChanged,
   getRowId,
+  loading,
 }) => {
   const gridApiRef = useRef<GridApi | null>(null);
 
@@ -142,6 +144,7 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
         rowData={rowData}
         columnDefs={columnDefs}
         defaultColDef={defaultColDef}
+        loading={loading}
         onGridReady={onGridReady}
         onRowClicked={onRowClicked}
         onSortChanged={useExternalSort ? handleSortChanged : undefined}
