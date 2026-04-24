@@ -74,6 +74,7 @@ interface WOAgGridTableProps {
   getRowId?: GetRowIdFunc;
   loading?: boolean;
   isRowSelectable?: IsRowSelectable;
+  onGridReady?: (event: GridReadyEvent) => void;
 }
 
 const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
@@ -95,6 +96,7 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
   getRowId,
   loading,
   isRowSelectable,
+  onGridReady: onGridReadyProp,
 }) => {
   const gridApiRef = useRef<GridApi | null>(null);
 
@@ -116,7 +118,8 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
 
   const onGridReady = useCallback((event: GridReadyEvent) => {
     gridApiRef.current = event.api;
-  }, []);
+    onGridReadyProp?.(event);
+  }, [onGridReadyProp]);
 
   const handleSortChanged = useCallback((event: SortChangedEvent) => {
     if (!onSortChanged) return;

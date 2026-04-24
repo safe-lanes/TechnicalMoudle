@@ -1,19 +1,26 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import type { GridApi, GridReadyEvent } from "ag-grid-community";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import WOAgGridTable from "@/components/WOAgGridTable";
 import {
+  ANOMALY_TYPE_LABELS,
   buildAnomalyColumnDefs,
+  formatDateNullable,
+  formatDateOrDash,
+  timeAgo,
   type Anomaly,
+  type AnomalyDetails,
   type AnomalyStats,
 } from "@/pages/pms/anomalyColumnDefs";
 import {
   AlertTriangle,
   ArrowLeft,
+  Download,
   RefreshCw,
   Filter,
 } from "lucide-react";
@@ -27,6 +34,7 @@ export default function AnomaliesPage() {
 
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('PENDING_REVIEW');
+  const [gridApi, setGridApi] = useState<GridApi | null>(null);
 
   const canView = isSailAdmin || isClientAdmin || isHeadOfDept;
   const canAcknowledge = isSailAdmin || isClientAdmin;
@@ -102,6 +110,58 @@ export default function AnomaliesPage() {
   const stats = statsQuery.data;
   const anomalies = anomaliesQuery.data || [];
   const isLoading = anomaliesQuery.isLoading;
+
+  const handleGridReady = useCallback((event: GridReadyEvent) => {
+    setGridApi(event.api);
+  }, []);
+
+  const handleExportCsv = useCallback(() => {
+    if (!gridApi) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const exportColumnKeys = gridApi
+      .getAllDisplayedColumns()
+      .map((col) => col.getColId())
+      .filter((id) => id !== 'actions');
+    gridApi.exportDataAsCsv({
+      fileName: `work-order-anomalies-${today}.csv`,
+      columnKeys: exportColumnKeys,
+      processCellCallback: (params) => {
+        const colId = params.column.getColId();
+        const a = params.node?.data as Anomaly | undefined;
+        if (!a) return params.value ?? '';
+
+        if (colId === 'anomalyType') {
+          const allTypes = (a.anomalyDetails as AnomalyDetails | null)?.allAnomalyTypes
+            || [a.anomalyType];
+          return allTypes.map((t) => ANOMALY_TYPE_LABELS[t] || t).join(', ');
+        }
+        if (colId === 'severity') {
+          const sev = (a.severity || 'LOW').toString();
+          return sev.charAt(0) + sev.slice(1).toLowerCase();
+        }
+        if (colId === 'daysLate') {
+          const backdating = (a.anomalyDetails as AnomalyDetails | null)?.backdatingInfo?.daysBackdated || 0;
+          const parts: string[] = [];
+          if (a.daysLate > 0) parts.push(`${a.daysLate} days late`);
+          if (a.missedCycles > 0) parts.push(`${a.missedCycles} cycles missed`);
+          if (backdating > 0) parts.push(`${backdating} days backdated`);
+          return parts.join('; ');
+        }
+        if (colId === 'dueDate') {
+          return formatDateNullable(a.dueDate);
+        }
+        if (colId === 'completionDate') {
+          return formatDateOrDash(a.completionDate);
+        }
+        if (colId === 'detectedAt') {
+          return a.detectedAt ? timeAgo(a.detectedAt) : '';
+        }
+        return params.value ?? '';
+      },
+    });
+  }, [gridApi]);
+
+  const canExport = !!gridApi && !isLoading && anomalies.length > 0;
 
   return (
     <div style={{ minHeight: '100vh', background: '#f5f5f5' }} data-testid="page-anomalies">
@@ -183,6 +243,27 @@ export default function AnomaliesPage() {
             data-testid="button-refresh-all-anomalies"
           >
             <RefreshCw className="w-3.5 h-3.5" style={{ color: '#757575' }} />
+          </button>
+          <button
+            onClick={handleExportCsv}
+            disabled={!canExport}
+            style={{
+              background: canExport ? '#fff' : '#f5f5f5',
+              border: '1px solid #e0e0e0',
+              borderRadius: '6px',
+              padding: '5px 10px',
+              cursor: canExport ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '12px',
+              color: canExport ? '#424242' : '#bdbdbd',
+            }}
+            data-testid="button-export-anomalies-csv"
+            title="Export the visible rows to a CSV file"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export CSV
           </button>
         </div>
       </div>
@@ -266,6 +347,7 @@ export default function AnomaliesPage() {
             noRowsMessage="No anomalies detected — all work orders are on track!"
             testId="ag-grid-anomalies-page"
             getRowId={(params) => String((params.data as Anomaly).id)}
+            onGridReady={handleGridReady}
           />
         </div>
       </div>

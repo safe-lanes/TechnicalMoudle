@@ -361,6 +361,7 @@ export function buildAnomalyColumnDefs(opts: BuildAnomalyColumnDefsOptions): Col
   const actionsCol: ColDef<Anomaly> = {
     headerName: 'Actions',
     field: 'id',
+    colId: 'actions',
     minWidth: canAcknowledge ? 150 : 90,
     flex: 0,
     sortable: false,
