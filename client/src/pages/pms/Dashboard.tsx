@@ -412,12 +412,12 @@ const Dashboard = () => {
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
-  const { isSailAdmin, isClientAdmin, isHeadOfDept, isVessel } = useUIRole();
+  const { isSailAdmin, isClientAdmin, isTechSuperintendent, isHeadOfDept, isVessel } = useUIRole();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const adminDefaultsToAll = isSailAdmin || isClientAdmin;
-  const isAdminScope = isSailAdmin || isClientAdmin;
+  const isAdminScope = isSailAdmin || isClientAdmin || isTechSuperintendent;
   const [mgmtVesselId, setMgmtVesselId] = useState<string>('');
   useEffect(() => {
     if (adminDefaultsToAll && vesselId === 'all' && mgmtVesselId !== 'all') {
