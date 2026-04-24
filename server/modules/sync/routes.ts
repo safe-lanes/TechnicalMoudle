@@ -19,4 +19,8 @@ router.get('/sync/conflicts', asyncHandler(syncController.unresolvedConflictsHan
 // Sync engine trigger (manual or scheduled)
 router.post('/sync/trigger', asyncHandler(syncController.triggerSyncHandler));
 
+// File sync endpoints
+router.post('/sync/file/upload-chunk', asyncHandler(syncController.uploadChunkHandler));
+router.get('/sync/file/queue', asyncHandler(syncController.fileQueueHandler));
+
 export default router;

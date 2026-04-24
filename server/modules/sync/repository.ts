@@ -234,10 +234,30 @@ export async function queueFile(data: {
   vesselId?: string | null;
   instanceId: string;
   syncBatchId?: string | null;
+  totalChunks?: number | null;
+  priority?: number | null;
 }): Promise<SyncFileQueue> {
   const db = await getDb();
   const result = await db.insert(syncFileQueue).values(data).returning();
   return result[0];
+}
+
+export async function getFileQueueEntry(queueUuid: string): Promise<SyncFileQueue | undefined> {
+  const db = await getDb();
+  const rows = await db.select().from(syncFileQueue)
+    .where(eq(syncFileQueue.queueUuid, queueUuid))
+    .limit(1);
+  return rows[0];
+}
+
+export async function incrementRetryCount(queueUuid: string): Promise<void> {
+  const db = await getDb();
+  await db.update(syncFileQueue)
+    .set({
+      retryCount: sql`COALESCE("retry_count", 0) + 1`,
+      updatedAt: new Date(),
+    })
+    .where(eq(syncFileQueue.queueUuid, queueUuid));
 }
 
 export async function getPendingFiles(

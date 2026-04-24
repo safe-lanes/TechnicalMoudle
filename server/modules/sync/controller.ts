@@ -4,7 +4,9 @@
 
 import { Request, Response } from 'express';
 import * as syncService from './service';
+import * as syncRepo from './repository';
 import { getSyncEngine } from './syncEngine';
+import { FileSyncProcessor } from './fileSyncProcessor';
 
 // ── POST /sync/initiate ──
 
@@ -188,5 +190,45 @@ export async function triggerSyncHandler(req: Request, res: Response) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] trigger error:', error);
     res.status(500).json({ error: 'Failed to trigger sync' });
+  }
+}
+
+// ── POST /sync/file/upload-chunk ──
+
+export async function uploadChunkHandler(req: Request, res: Response) {
+  try {
+    const chunk = req.body;
+    if (!chunk.queueUuid || chunk.chunkIndex === undefined || !chunk.totalChunks || !chunk.data) {
+      return res.status(400).json({ error: 'queueUuid, chunkIndex, totalChunks, and data are required' });
+    }
+
+    const processor = new FileSyncProcessor();
+    const result = await processor.receiveChunk(chunk);
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Sync] upload-chunk error:', error);
+    res.status(500).json({ error: 'Failed to receive file chunk' });
+  }
+}
+
+// ── GET /sync/file/queue ──
+
+export async function fileQueueHandler(req: Request, res: Response) {
+  try {
+    const vesselId = (req.query.vesselId as string) || '';
+    const direction = (req.query.direction as string) || 'ship_to_shore';
+    const limit = parseInt(req.query.limit as string) || 50;
+
+    if (!vesselId) {
+      return res.status(400).json({ error: 'vesselId query param is required' });
+    }
+
+    const files = await syncRepo.getPendingFiles(vesselId, direction, limit);
+    res.json({ files, count: files.length });
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Sync] file-queue error:', error);
+    res.status(500).json({ error: 'Failed to get file queue' });
   }
 }

@@ -4,6 +4,7 @@ import * as repo from '../repositories/componentRepository';
 import { objectStorageClient, ObjectNotFoundError } from '../../../objectStorage';
 import { insertComponentDocumentSchema } from '@shared/schema';
 import { NotFoundError, ValidationError, ForbiddenError } from '../../shared/errors';
+import { FileSyncProcessor } from '../../sync/fileSyncProcessor';
 
 interface UserInfo {
   username: string;
@@ -116,7 +117,19 @@ export async function createDocument(body: any, file: Express.Multer.File, user:
   const documentData = insertComponentDocumentSchema.parse(coercedBody);
 
   try {
-    return await repo.createDocument(documentData);
+    const createdDoc = await repo.createDocument(documentData);
+
+    // Queue file for sync (best-effort — never blocks upload)
+    try {
+      await FileSyncProcessor.queueFileForSync(
+        'component_documents', String(createdDoc.id), createdDoc.fileKey,
+        createdDoc.fileName, createdDoc.fileSize ?? null, createdDoc.vesselCode
+      );
+    } catch (syncErr) {
+      console.error('[CompDocService] File sync queue failed (non-fatal):', syncErr);
+    }
+
+    return createdDoc;
   } catch (dbError) {
     console.error('Failed to create document in database, rolling back file upload:', dbError);
     try {

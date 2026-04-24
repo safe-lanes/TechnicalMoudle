@@ -24,6 +24,7 @@
 
 import * as syncRepo from './repository';
 import { applyOneWayRows } from './oneWayApplier';
+import { FileSyncProcessor } from './fileSyncProcessor';
 import {
   getTablesByCategory,
   getTableSyncConfig,
@@ -93,12 +94,12 @@ export class SyncEngine {
       console.log(`[SyncEngine] Batch initiated: ${batchUuid}`);
 
       // Step 2: PUSH — Send local changes to shore
-      const pushResult = await this.executePush(batchUuid, vesselId, lastCheckpoint);
+      const pushResult = await this.executePush(batchUuid!, vesselId, lastCheckpoint);
       recordsPushed = pushResult.totalPushed;
       console.log(`[SyncEngine] Pushed ${recordsPushed} records`);
 
       // Step 3: PULL — Get shore's changes
-      const pullResult = await this.executePull(batchUuid, vesselId, lastCheckpoint);
+      const pullResult = await this.executePull(batchUuid!, vesselId, lastCheckpoint);
       recordsPulled = pullResult.totalPulled;
       conflictsFound = pullResult.conflictsFound;
       conflictsAutoResolved = pullResult.conflictsAutoResolved;
@@ -112,6 +113,22 @@ export class SyncEngine {
       });
       console.log(`[SyncEngine] Sync completed. Checkpoint: ${completeResult.newCheckpoint}`);
 
+      // Step 5: Process file queue (after field data is synced)
+      let filesProcessedCount = 0;
+      let filesFailedCount = 0;
+      try {
+        const fileProcessor = new FileSyncProcessor();
+        const fileResult = await fileProcessor.processQueue(vesselId, batchUuid!);
+        filesProcessedCount = fileResult.filesProcessed;
+        filesFailedCount = fileResult.filesFailed;
+        console.log(
+          `[SyncEngine] Files: ${fileResult.filesProcessed} processed, ${fileResult.filesFailed} failed, ${fileResult.bytesTransferred} bytes`
+        );
+      } catch (fileError: any) {
+        console.warn(`[SyncEngine] File sync failed (non-fatal): ${fileError.message}`);
+        // File sync failure is non-fatal — field data is already synced
+      }
+
       const durationMs = Date.now() - startTime;
       return {
         success: true,
@@ -120,7 +137,7 @@ export class SyncEngine {
         recordsPulled,
         conflictsFound,
         conflictsAutoResolved,
-        filesQueued: 0,
+        filesQueued: filesProcessedCount + filesFailedCount,
         durationMs,
         error: null,
         newCheckpoint: completeResult.newCheckpoint,

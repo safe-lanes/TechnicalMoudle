@@ -5,6 +5,7 @@ import sharp from 'sharp';
 import * as docRepo from '../repositories/documentRepository';
 import { ObjectStorageService, parseObjectPath } from '../../../objectStorage';
 import { ValidationError, NotFoundError } from '../../shared/errors';
+import { FileSyncProcessor } from '../../sync/fileSyncProcessor';
 import type { WorkOrderDocument } from '@shared/schema';
 
 const ALLOWED_FILE_TYPES = [
@@ -196,6 +197,17 @@ export async function uploadDocument(
       storageBackend,
       uploadedBy,
     });
+
+    // Queue file for sync (best-effort — never blocks upload)
+    try {
+      await FileSyncProcessor.queueFileForSync(
+        'work_order_documents', doc.id, doc.fileKey,
+        doc.fileName, doc.fileSize, doc.vesselId
+      );
+    } catch (syncErr) {
+      console.error('[WODocService] File sync queue failed (non-fatal):', syncErr);
+    }
+
     return doc;
   } catch (dbError) {
     console.error('DB insert failed, rolling back file upload:', dbError);
