@@ -5,6 +5,7 @@
 import { Request, Response } from 'express';
 import * as syncService from './service';
 import * as syncRepo from './repository';
+import * as provisioningService from './provisioningService';
 import { getSyncEngine } from './syncEngine';
 import { FileSyncProcessor } from './fileSyncProcessor';
 
@@ -230,5 +231,113 @@ export async function fileQueueHandler(req: Request, res: Response) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] file-queue error:', error);
     res.status(500).json({ error: 'Failed to get file queue' });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// Provisioning endpoints (offline_admin / Sail Admin gated)
+// ══════════════════════════════════════════════════════════════
+
+// ── POST /sync/provision/:vesselId ──
+
+export async function generateProvisionHandler(req: Request, res: Response) {
+  try {
+    const { vesselId } = req.params;
+    if (!vesselId) {
+      return res.status(400).json({ error: 'vesselId param is required' });
+    }
+
+    const userId = (req as any).user?.userUuid || (req as any).user?.username || 'system';
+    console.log(`[Provisioning] Generating bundle for vessel ${vesselId} by ${userId}`);
+
+    const bundle = await provisioningService.generateProvisioningBundle(vesselId, userId);
+
+    res.json({
+      manifest: bundle.manifest,
+      downloadReady: true,
+      totalRows: bundle.manifest.totalRows,
+      tables: bundle.manifest.tables.length,
+    });
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Provisioning] generate error:', error);
+    res.status(500).json({ error: 'Failed to generate provisioning bundle' });
+  }
+}
+
+// ── GET /sync/provision/manifest/:vesselId ──
+
+export async function getManifestHandler(req: Request, res: Response) {
+  try {
+    const { vesselId } = req.params;
+    if (!vesselId) {
+      return res.status(400).json({ error: 'vesselId param is required' });
+    }
+
+    const bundle = await provisioningService.generateProvisioningBundle(vesselId, 'preview');
+    res.json(bundle.manifest);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Provisioning] manifest error:', error);
+    res.status(500).json({ error: 'Failed to generate manifest' });
+  }
+}
+
+// ── GET /sync/provision/download/:vesselId ──
+
+export async function downloadProvisionHandler(req: Request, res: Response) {
+  try {
+    const { vesselId } = req.params;
+    if (!vesselId) {
+      return res.status(400).json({ error: 'vesselId param is required' });
+    }
+
+    const userId = (req as any).user?.userUuid || (req as any).user?.username || 'system';
+    const bundle = await provisioningService.generateProvisioningBundle(vesselId, userId);
+
+    const fileName = `provision_${vesselId}_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.json(bundle);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Provisioning] download error:', error);
+    res.status(500).json({ error: 'Failed to download provisioning bundle' });
+  }
+}
+
+// ── POST /sync/provision/import ──
+
+export async function importProvisionHandler(req: Request, res: Response) {
+  try {
+    const bundle = req.body;
+    if (!bundle?.manifest?.vesselId || !bundle?.data) {
+      return res.status(400).json({ error: 'Invalid bundle format. Must contain manifest and data.' });
+    }
+
+    const result = await provisioningService.importProvisioningBundle(bundle);
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Provisioning] import error:', error);
+    res.status(500).json({ error: 'Failed to import provisioning bundle' });
+  }
+}
+
+// ── POST /sync/provision/verify ──
+
+export async function verifyProvisionHandler(req: Request, res: Response) {
+  try {
+    const manifest = req.body;
+    if (!manifest?.vesselId || !manifest?.tables) {
+      return res.status(400).json({ error: 'Invalid manifest format. Must contain vesselId and tables.' });
+    }
+
+    const result = await provisioningService.verifyProvisioning(manifest);
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Provisioning] verify error:', error);
+    res.status(500).json({ error: 'Failed to verify provisioning' });
   }
 }
