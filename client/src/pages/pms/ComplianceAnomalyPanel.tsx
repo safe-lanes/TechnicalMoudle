@@ -12,6 +12,16 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import WOAgGridTable from "@/components/WOAgGridTable";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   buildAnomalyColumnDefs,
   timeAgo,
   type Anomaly,
@@ -393,7 +403,15 @@ function WorkOrderAnomaliesDetails({
 
   const [selectedAnomalyIds, setSelectedAnomalyIds] = useState<number[]>([]);
   const [isBulkAcking, setIsBulkAcking] = useState(false);
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const gridApiRef = useRef<SelectionChangedEvent['api'] | null>(null);
+
+  const selectedWorkOrderLabels = useMemo(() => {
+    const idSet = new Set(selectedAnomalyIds);
+    return anomalies
+      .filter((a) => idSet.has(a.id))
+      .map((a) => a.workOrderCode || a.workOrderId);
+  }, [anomalies, selectedAnomalyIds]);
 
   const onSelectionChanged = useCallback((event: SelectionChangedEvent) => {
     gridApiRef.current = event.api;
@@ -411,6 +429,7 @@ function WorkOrderAnomaliesDetails({
 
   const handleBulkAcknowledge = useCallback(async () => {
     if (selectedAnomalyIds.length === 0 || isBulkAcking) return;
+    setBulkConfirmOpen(false);
     setIsBulkAcking(true);
     const total = selectedAnomalyIds.length;
     const results = await Promise.allSettled(
@@ -524,7 +543,7 @@ function WorkOrderAnomaliesDetails({
           </span>
           {canAcknowledge && selectedAnomalyIds.length > 0 && (
             <button
-              onClick={handleBulkAcknowledge}
+              onClick={() => setBulkConfirmOpen(true)}
               disabled={isBulkAcking}
               style={{
                 background: '#1565C0',
@@ -612,6 +631,55 @@ function WorkOrderAnomaliesDetails({
             : 'No anomalies recorded'}
         </span>
       </div>
+
+      <AlertDialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+        <AlertDialogContent data-testid="dialog-confirm-bulk-ack">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {`Acknowledge ${selectedAnomalyIds.length} ${selectedAnomalyIds.length === 1 ? 'anomaly' : 'anomalies'}?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedWorkOrderLabels.length > 0 ? (
+                <>
+                  This will acknowledge the following work orders:
+                  <span
+                    style={{
+                      display: 'block',
+                      marginTop: '8px',
+                      maxHeight: '160px',
+                      overflowY: 'auto',
+                      fontSize: '12px',
+                      color: '#424242',
+                      background: '#f5f5f5',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '6px',
+                      padding: '8px 10px',
+                      lineHeight: 1.5,
+                    }}
+                    data-testid="text-bulk-ack-wo-list"
+                  >
+                    {selectedWorkOrderLabels.slice(0, 20).join(', ')}
+                    {selectedWorkOrderLabels.length > 20
+                      ? `, +${selectedWorkOrderLabels.length - 20} more`
+                      : ''}
+                  </span>
+                </>
+              ) : (
+                'This will acknowledge the selected anomalies.'
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-bulk-ack">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkAcknowledge}
+              data-testid="button-confirm-bulk-ack"
+            >
+              {`Acknowledge ${selectedAnomalyIds.length}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
