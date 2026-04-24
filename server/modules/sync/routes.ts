@@ -16,4 +16,7 @@ router.get('/sync/status', asyncHandler(syncController.statusHandler));
 router.get('/sync/batches', asyncHandler(syncController.recentBatchesHandler));
 router.get('/sync/conflicts', asyncHandler(syncController.unresolvedConflictsHandler));
 
+// Sync engine trigger (manual or scheduled)
+router.post('/sync/trigger', asyncHandler(syncController.triggerSyncHandler));
+
 export default router;

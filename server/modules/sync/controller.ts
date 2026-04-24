@@ -4,6 +4,7 @@
 
 import { Request, Response } from 'express';
 import * as syncService from './service';
+import { getSyncEngine } from './syncEngine';
 
 // ── POST /sync/initiate ──
 
@@ -168,5 +169,24 @@ export async function unresolvedConflictsHandler(req: Request, res: Response) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] conflicts error:', error);
     res.status(500).json({ error: 'Failed to get unresolved conflicts' });
+  }
+}
+
+// ── POST /sync/trigger ──
+
+export async function triggerSyncHandler(req: Request, res: Response) {
+  try {
+    const { vesselId } = req.body;
+    if (!vesselId) {
+      return res.status(400).json({ error: 'vesselId is required' });
+    }
+
+    const engine = getSyncEngine();
+    const result = await engine.runSync(vesselId);
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Sync] trigger error:', error);
+    res.status(500).json({ error: 'Failed to trigger sync' });
   }
 }
