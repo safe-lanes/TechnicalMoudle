@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Cloud, CloudOff, RefreshCw, AlertTriangle, Check } from 'lucide-react';
+import { useLocation } from 'wouter';
+import { Cloud, CloudOff, RefreshCw, AlertTriangle, Check, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -13,6 +14,7 @@ import { SyncConflictDialog } from './SyncConflictDialog';
 export function SyncStatusIndicator() {
   const { status, syncNow } = useOffline();
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+  const [, setLocation] = useLocation();
 
   const hasPendingChanges = status.pendingCount > 0 || status.failedCount > 0 || status.conflictCount > 0;
   
@@ -105,9 +107,9 @@ export function SyncStatusIndicator() {
               </div>
             )}
             
-            <Button 
-              size="sm" 
-              className="w-full" 
+            <Button
+              size="sm"
+              className="w-full"
               onClick={syncNow}
               disabled={!status.isOnline || status.isSyncing}
               data-testid="btn-sync-now"
@@ -123,6 +125,17 @@ export function SyncStatusIndicator() {
                   Sync Now
                 </>
               )}
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs text-muted-foreground"
+              onClick={() => setLocation('/admin/sync-dashboard')}
+              data-testid="btn-open-sync-dashboard"
+            >
+              <ExternalLink className="h-3 w-3 mr-1" />
+              Open Sync Dashboard
             </Button>
           </div>
         </PopoverContent>

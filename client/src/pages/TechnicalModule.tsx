@@ -33,6 +33,8 @@ import ShipsSurveysAdmin from "./admin/ShipsSurveysAdmin";
 import AccessControl from "./admin/AccessControl";
 import RanksAdmin from "./admin/RanksAdmin";
 import AddEditFleetComponent from "./admin/AddEditFleetComponent";
+import SyncDashboard from "./admin/SyncDashboard";
+import SyncProvisioning from "./admin/SyncProvisioning";
 // ====== NOON REPORT MODULE — START (remove to disable) ======
 import NoonEntryForm from "./noon-report/NoonEntryForm";
 import ReportHistory from "./noon-report/ReportHistory";
@@ -239,6 +241,10 @@ export const TechnicalModule = () => {
                 </button>
               </div>
             </div>
+          ) : selectedSubModule === "admin" && selectedMenuItem === "sync-dashboard" ? (
+            <SyncDashboard />
+          ) : selectedSubModule === "admin" && selectedMenuItem === "sync-provisioning" ? (
+            <SyncProvisioning />
           ) : selectedSubModule === "admin" && selectedMenuItem === "fleet-component-editor" ? (
             <AddEditFleetComponent />
           ) : selectedSubModule === "admin" ? (

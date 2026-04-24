@@ -33,6 +33,8 @@ import {
   FileDown,
   Ship,
   UserCog,
+  Cloud,
+  HardDrive,
 } from "lucide-react";
 
 interface SideMenuBarProps {
@@ -84,8 +86,8 @@ const menuConfigs: Record<string, MenuItem[]> = {
     { id: "ships-surveys", label: "Ship's Surveys", icon: ClipboardCheck },
     { id: "ranks", label: "Ranks", icon: UserCog },
     { id: "access-control", label: "Access Control", icon: ShieldCheck },
-    // { id: "permissions", label: "Permissions", icon: Shield },
-    // { id: "bulk-data-import", label: "Data Management", icon: FileSpreadsheet },
+    { id: "sync-dashboard", label: "Sync Dashboard", icon: Cloud },
+    { id: "sync-provisioning", label: "Ship Provisioning", icon: HardDrive },
   ],
   // ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
   "noon-report": [
