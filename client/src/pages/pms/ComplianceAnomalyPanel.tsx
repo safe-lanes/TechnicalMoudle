@@ -449,7 +449,7 @@ function WorkOrderAnomaliesDetails({
       const params = new URLSearchParams();
       if (effectiveVesselId) params.set('vesselId', effectiveVesselId);
       if (severityFilter !== 'ALL') params.set('severity', severityFilter);
-      params.set('limit', '10');
+      params.set('limit', '1000');
       const res = await fetch(`/technical/api/anomalies/dashboard?${params}`);
       if (!res.ok) throw new Error('Failed to fetch anomalies');
       return res.json();
@@ -788,6 +788,25 @@ function WorkOrderAnomaliesDetails({
           >
             <RefreshCw className="w-3.5 h-3.5" style={{ color: '#757575' }} />
           </button>
+          <span
+            style={{
+              fontSize: '11px',
+              color: '#616161',
+              padding: '4px 8px',
+              borderRadius: '6px',
+              background: '#f5f5f5',
+              border: '1px solid #e0e0e0',
+              fontWeight: 500,
+              minHeight: '22px',
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
+            data-testid="text-wo-anomalies-count"
+          >
+            {isLoading
+              ? 'Loading…'
+              : `${anomalies.length} ${anomalies.length === 1 ? 'anomaly' : 'anomalies'}`}
+          </span>
         </div>
       </div>
 
