@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
   ColDef,
@@ -483,8 +483,10 @@ function WorkOrderAnomaliesDetails({
 
   const [selectedAnomalyIds, setSelectedAnomalyIds] = useState<number[]>([]);
   const [isBulkAcking, setIsBulkAcking] = useState(false);
+  const gridApiRef = useRef<SelectionChangedEvent['api'] | null>(null);
 
   const onSelectionChanged = useCallback((event: SelectionChangedEvent) => {
+    gridApiRef.current = event.api;
     const ids = event.api
       .getSelectedNodes()
       .map((n: IRowNode<Anomaly>) => n.data?.id)
@@ -512,6 +514,7 @@ function WorkOrderAnomaliesDetails({
     const fail = total - ok;
     queryClient.invalidateQueries({ queryKey: ['/technical/api/anomalies/dashboard'] });
     queryClient.invalidateQueries({ queryKey: ['/technical/api/anomalies/statistics'] });
+    gridApiRef.current?.deselectAll();
     setSelectedAnomalyIds([]);
     setIsBulkAcking(false);
     if (fail === 0) {
@@ -793,6 +796,13 @@ function WorkOrderAnomaliesDetails({
       headerCheckboxSelection: true,
       headerCheckboxSelectionFilteredOnly: true,
       cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      cellRenderer: (params: ICellRendererParams<Anomaly>) => (
+        <span
+          data-testid={`cell-select-anomaly-${params.data?.id ?? 'unknown'}`}
+          style={{ display: 'none' }}
+          aria-hidden="true"
+        />
+      ),
     };
 
     return [
