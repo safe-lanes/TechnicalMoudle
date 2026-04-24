@@ -171,7 +171,7 @@ sequenceDiagram
     alt Cached AND domain matches
         TStore-->>Hook: tenantId ✅
     else Cache miss / domain changed
-        Hook->>Server: POST /technical/api/v2/tenant/init {domain}
+        Hook->>Server: POST /technical/api/tenant/init {domain}
         Server->>TCM: resolveTenant(domain)
         TCM->>Master: SELECT tuid FROM tenants WHERE domain=?
         alt Found & active
@@ -206,11 +206,11 @@ sequenceDiagram
     participant Master as Master DB
     participant TenantDB as Tenant DB
 
-    Page->>RQ: useQuery(["/technical/api/v2/work-orders"])
+    Page->>RQ: useQuery(["/technical/api/work-orders"])
     RQ->>Fetch: fetch()
     Fetch->>TStore: getTenantId() (AES decrypt)
     Fetch->>Auth: getAuthToken() (AES decrypt)
-    Fetch->>Server: GET /technical/api/v2/work-orders<br/>x-tenant-id, Authorization: Bearer JWT
+    Fetch->>Server: GET /technical/api/work-orders<br/>x-tenant-id, Authorization: Bearer JWT
 
     Server->>TenMW: tenantMiddleware
     TenMW->>TCM: validateTuid(tuid)
@@ -255,8 +255,8 @@ flowchart LR
     P1["Phase 1<br/>Master DB +<br/>TenantConnectionManager"] --> P2
     P2["Phase 2<br/>Server middleware<br/>(tenant + auth)"] --> P3
     P3["Phase 3<br/>Frontend<br/>tenant layer"] --> P4
-    P4["Phase 4<br/>Per-tenant migrations<br/>+ module cut-over"] --> P5
-    P5["Phase 5<br/>Decommission<br/>legacy mock-auth"]
+    P4["Phase 4<br/>Per-tenant migrations<br/>+ env-by-env cut-over"] --> P5
+    P5["Phase 5<br/>Drop single-tenant<br/>boot branch + mock auth"]
 
     style P0 fill:#e8f5e9,stroke:#2e7d32
     style P1 fill:#e3f2fd,stroke:#1565c0
@@ -296,10 +296,10 @@ flowchart LR
 |---|---|
 | `tenantMiddleware`: extract `x-tenant-id`, validate against master, call `runInTenantContext` | new `server/middleware/tenantMiddleware.ts` |
 | `authMiddleware`: `jwt.verify`, attach `req.user`, cross-check JWT `domain` vs `tuid` | new `server/middleware/authMiddleware.ts` |
-| Mount new chain under `/technical/api/v2` (legacy `/technical/api` stays for back-compat) | `server/routes.ts` |
-| Exempt-path list (`/technical/api/v2/tenant/init`, `/api/health`) | new `server/middleware/exemptPaths.ts` |
-| Dev escape: `AUTH_BYPASS=true` short-circuits both middlewares | `server/middleware/auth.ts` |
-| New endpoint `POST /technical/api/v2/tenant/init` | `server/routes.ts` |
+| Boot logic in the route registration file branches on `MASTER_DATABASE_URL`: with the var set, mount `tenantMiddleware → authMiddleware → moduleRouter` on `/technical/api/*`; without it, today's `mockAuthMiddleware → moduleRouter` chain runs unchanged | `server/routes.ts` (future Phase 2 PR — out of scope for this docs task) |
+| Exempt-path list (`/technical/api/tenant/init`, `/technical/api/tenant/health`) | new `server/middleware/exemptPaths.ts` |
+| Dev escape: `AUTH_BYPASS=true` short-circuits both middlewares | new `server/middleware/authMiddleware.ts` (mockAuthMiddleware itself is left untouched in Phase 2) |
+| New endpoint `POST /technical/api/tenant/init` mounted **before** the catch-all chain | new `server/modules/tenant/routes.ts`, wired in the route registration file |
 
 **Risk:** Medium — exempt-path list is a known foot-gun.
 
@@ -316,14 +316,14 @@ flowchart LR
 
 **Risk:** Low–Medium — composing two interceptors is the main risk.
 
-### Phase 4 — Per-Tenant Migrations + Module Cut-over
+### Phase 4 — Per-Tenant Migrations + Environment Cut-over
 
 | Task | Files |
 |---|---|
 | On first `getTenantDb(tuid)` for a tenant, run full migration suite against that tenant DB | `server/utils/tenantConnectionManager.ts` |
 | One-shot promotion script: register existing prod DB as the `default` tenant in master | new `scripts/promote-to-tenant.ts` |
-| Module-by-module cut-over — each module mounts under `/technical/api` (legacy) **and** `/technical/api/v2` (tenant-aware) | `server/modules/index.ts` |
-| Frontend pages migrated module-by-module to call `/v2` endpoints | `client/src/pages/**` |
+| Environment-by-environment cut-over (dev → staging → prod) — each environment flips `MASTER_DATABASE_URL` once; module priority order applies to post-flip smoke testing rather than to URL changes | (no client URL changes — single API surface) |
+| Dev parity harness: boot two server instances against the same DB, one with `MASTER_DATABASE_URL` set and one without, diff GET responses across all 8 modules | new `scripts/parity-diff.ts` |
 | Per-tenant migration audit log (which tenant has which migrations applied) | new admin endpoint |
 
 **Risk:** **High** — migration bugs are amplified N-fold across tenants. Mitigate with dry-runs and per-tenant audit log.
@@ -334,8 +334,8 @@ flowchart LR
 
 | Task | Files |
 |---|---|
-| Remove `/technical/api` legacy mount | `server/routes.ts` |
-| Remove `mockAuthMiddleware` (or gate behind `AUTH_BYPASS` only) | `server/middleware/auth.ts` |
+| Drop the single-tenant `else` branch from the boot logic so the multi-tenant chain on `/technical/api/*` becomes unconditional | `server/routes.ts` (Phase 5 PR — out of scope for this docs task) |
+| Remove `mockAuthMiddleware` (or gate behind `AUTH_BYPASS` only) | `server/middleware/auth.ts` (Phase 5 PR — out of scope for this docs task) |
 | Remove eager `pool`/`db` exports in `server/db.ts` | `server/db.ts` |
 | Move agreed reference tables to master DB | `shared/master/schema.ts`, migrations |
 
@@ -460,7 +460,7 @@ flowchart LR
 | Backend | ➕ `server/utils/tenantConnectionManager.ts` | Pool cache, ALS, master lookup |
 | Backend | ➕ `shared/master/schema.ts` | Master DB schema (tenants table) |
 | Backend | ✏️ `server/db.ts` | `getDb()` reads from ALS |
-| Backend | ✏️ `server/routes.ts` | Mount `/technical/api/v2` chain |
+| Backend | ✏️ `server/routes.ts` (Phase 2 PR, **not** this docs task) | Branch boot logic on `MASTER_DATABASE_URL` to pick the multi-tenant chain on the existing `/technical/api/*` mount |
 | Backend | ✏️ `server/migrations.ts` | Accept `Pool` arg |
 | Backend | ✏️ `server/initDb.ts` | Accept `Pool` arg |
 | Scripts | ➕ `scripts/promote-to-tenant.ts` | Register existing DB as default tenant |
@@ -487,7 +487,7 @@ flowchart LR
 2. **Existing prod data** — does today's DB need to be promoted as the "default" tenant, or is this green-field?
 3. **Reference-data split** — fleet/vessel master records: per-tenant (each company manages its own) or master (Sail manages globally)?
 4. **`x-rank` mock-auth** — does QA still need rank impersonation, or does the parent JWT now carry `rank`?
-5. **Cut-over timeline** — gradual module-by-module (recommended) or big-bang?
+5. **Cut-over timeline** — environment-by-environment with soak windows (dev → staging → prod, recommended) or big-bang flip in prod? PMS's single API surface means there is no per-module toggle, so the unit of risk is always the environment.
 6. **Per-tenant infra** — N physical Postgres databases on the same server, or N separate servers? (Affects backup, monitoring, cost.)
 
 ---
@@ -512,7 +512,7 @@ flowchart LR
 | **Storage layer** | `IStorage` interface implemented once in `postgresStorage.ts` (~100 methods, all call `await getDb()` at the top) | `server/storage.ts`, `server/postgresStorage.ts` |
 | **Request scoping** | **None** — no `AsyncLocalStorage`, no per-request DB binding | n/a |
 | **Routes** | All mounted under `/technical/api` via a single `moduleRouter` aggregating per-module sub-routers | `server/routes.ts`, `server/modules/index.ts` |
-| **Module structure** | One folder per domain with `routes.ts` → `controllers/` → `services/` → `repositories/` (already very close to Crewing's `server/v2/<module>/` layout) | `server/modules/{work-orders, defects, spares, stores, running-hours, components, …}` |
+| **Module structure** | One folder per domain with `routes.ts` → `controllers/` → `services/` → `repositories/` (functionally equivalent to Crewing's per-module layout, despite the different folder name) | `server/modules/{work-orders, defects, spares, stores, running-hours, components, …}` |
 | **Schema** | 96 tables in `shared/schema.ts`. No `tenant_id` / `tuid` column anywhere. "Soft tenancy" via `vessel_id` (vuuid) only | `shared/schema.ts` |
 | **Migrations** | Hybrid: legacy JS array (frozen, 001–081), Drizzle-generated `0XXX_*.sql`, hand-written `0XX_*.sql`. Applied at startup by `runDrizzleMigrations`. **Strict rule:** never `db:push` on an existing DB (post-085 incident) | `server/migrations.ts`, `migrations/`, `replit.md` |
 | **Reference data** | Master lists, ranks, fleets, vessels — all live in the same DB as transactional data | `shared/schema.ts`, `server/initDb.ts` |
@@ -525,12 +525,12 @@ flowchart LR
 |---|---|
 | **Identity origin** | Parent SAIL-Audits app sets `sessionStorage["credentials"]` (AES-encrypted JWT), `localStorage["domain"]`, `localStorage["userProfile"]`, etc. and redirects to `/crewing/` |
 | **Boot guard** | `App.tsx` calls `getAuthToken()` → if missing, `redirectToLogin()` clears storage and bounces to `VITE_PARENT_LOGIN_URL` |
-| **Tenant init** | `useTenantInit` reads encrypted `domain`, checks cached `tenantId`/`tenantDomain` in `localStorage`, and on cache miss calls `POST /api/v2/tenant/init { domain }` which queries the **master** `tenants` table and returns `{tuid, companyName}` |
+| **Tenant init** | `useTenantInit` reads encrypted `domain`, checks cached `tenantId`/`tenantDomain` in `localStorage`, and on cache miss calls `POST /api/v2/tenant/init { domain }` (Crewing path) which queries the **master** `tenants` table and returns `{tuid, companyName}`. PMS will mount the same endpoint at `/technical/api/tenant/init` to fit its existing single-API surface. |
 | **Fetch interceptor** | `tenantFetch.ts` patches `window.fetch` to inject `x-tenant-id` (decrypted from `localStorage["tenantId"]`) + `Authorization: Bearer <jwt>` on every `/api/*` call; on `401` it logs the user out |
 | **Server middleware chain** | `tenantMiddleware` → validates `x-tenant-id` against master DB → calls `runInTenantContext(tuid, …)` which puts the tenant Drizzle instance into `AsyncLocalStorage`. `authMiddleware` runs second, verifies JWT, cross-checks JWT `domain` against `tuid` |
 | **Connection manager** | `TenantConnectionManager` keeps a `poolCache<tuid, pg.Pool>`; on miss it opens a new pool, runs pending migrations for that tenant, caches it. Has 5-minute TTL cache for `domain → tuid` lookups |
 | **Service layer** | Every service method calls `const db = getDb()` which reads from `AsyncLocalStorage` — so the **same code path automatically targets the right DB** based on the request's tenant |
-| **Schema split** | `shared/v2/<module>/schema.ts` defines per-tenant tables; a separate **master schema** holds `tenants`, plus shared reference data (nationalities, ports, ranks) |
+| **Schema split** | Crewing's per-tenant tables live under `shared/v2/<module>/schema.ts`; a separate **master schema** holds `tenants`, plus shared reference data (nationalities, ports, ranks). PMS will keep its existing `shared/schema.ts` layout for per-tenant tables and add a parallel `shared/master/schema.ts` for the master schema. |
 | **Env vars** | `MASTER_DATABASE_URL` (required to enable multi-tenant mode), `JWT_SECRET`, `AUTH_BYPASS`, `VITE_PARENT_LOGIN_URL`, `VITE_AUTH_BYPASS`, `VITE_CLIENT_ENCRYPTION_KEY` |
 
 ---
@@ -544,7 +544,7 @@ flowchart LR
 | Per-request DB scoping | None (global pool) | `AsyncLocalStorage` with per-tenant pool | **Large** — touches every storage method indirectly |
 | Frontend fetch | Only `x-rank` injected | `x-tenant-id` + `Authorization` injected, 401 handling | **Medium** — pattern is identical, just expanded |
 | Storage encryption | Already uses `CryptoJS` AES | Same library, same pattern | **Small** — reuse existing `secureStorage.ts` |
-| Module/route layout | `/technical/api/<module>/…` | `/api/v2/<module>/…` | **Small** — naming choice; mount path can stay `/technical/api/v2` |
+| Module/route layout | `/technical/api/<module>/…` | `/api/v2/<module>/…` (Crewing) | **None** — PMS keeps its single `/technical/api/*` surface; the chain in front of it is what changes |
 | Migration runner | Per-DB, runs at startup | Per-tenant, runs on first connection | **Medium** — need to factor `runDrizzleMigrations` to accept a `Pool` arg and run lazily per tenant |
 | Reference data (master lists, ranks, fleets) | Same DB as tenant data | Master DB | **Medium** — needs a split decision per table |
 | `vessel_id` isolation | Only mechanism today | Becomes secondary — primary isolation is by tenant DB | **Conceptual** — vessel is now "within a tenant" |

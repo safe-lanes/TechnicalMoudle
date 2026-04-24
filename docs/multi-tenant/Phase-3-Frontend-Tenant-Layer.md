@@ -17,7 +17,7 @@ flowchart TB
         A2 -- no token --> A3["redirectToLogin()<br/>→ VITE_PARENT_LOGIN_URL"]
         A2 -- token OK --> A4["useTenantInit()"]
         A4 --> A5["tenantStorage cache check"]
-        A5 -- miss --> A6["POST /v2/tenant/init {domain}"]
+        A5 -- miss --> A6["POST /technical/api/tenant/init {domain}"]
         A5 -- hit --> A7["render AuthenticatedApp"]
         A6 --> A7
     end
@@ -135,7 +135,10 @@ import { getAuthToken, handleUnauthorized } from "./authToken";
 import { tenantStorage } from "./tenantStorage";
 import { getActiveRank } from "./activeRank";   // re-export from existing file
 
-const API_PREFIX = "/technical/api/";    // matches both legacy and /v2
+const API_PREFIX = "/technical/api/";    // PMS has a single API surface
+
+// Paths that are exempt from auth (no logout on 401) — keep in sync with server's exemptPaths.ts
+const EXEMPT_PATHS = ["/technical/api/tenant/init", "/technical/api/tenant/health"];
 
 let installed = false;
 
@@ -164,7 +167,10 @@ export function installApiInterceptor() {
 
     const response = await originalFetch(input, { ...init, headers });
 
-    if (response.status === 401 && url.includes("/v2/")) {
+    // 401 logout only when multi-tenant mode is active and the path isn't exempt.
+    // In single-tenant dev (mock auth) the server doesn't return 401, so this is a no-op.
+    const isExempt = EXEMPT_PATHS.some(p => url.includes(p));
+    if (response.status === 401 && !isExempt) {
       handleUnauthorized();
     }
     return response;
@@ -175,7 +181,7 @@ export function installApiInterceptor() {
 **Critical design choices:**
 - **One interceptor, not two.** Composing two `window.fetch` wrappers is fragile; the second wrap loses access to the original `fetch`. Consolidate.
 - **`if (!headers.has(...))` guards** preserve any explicit headers passed by callers (used in tests and by `apiRequest`).
-- **401 handling only on `/v2/*`** — legacy `/technical/api/*` routes still rely on mock auth and shouldn't trigger logout.
+- **401 handling skips exempt paths** — `/tenant/init` returning 404/403 is not a session expiry signal, so we don't log the user out for those.
 
 ### Update `queryClient.ts`
 
@@ -231,7 +237,7 @@ export function useTenantInit() {
       }
 
       try {
-        const res = await apiRequest("POST", "/technical/api/v2/tenant/init", { domain });
+        const res = await apiRequest("POST", "/technical/api/tenant/init", { domain });
         const data = await res.json();
         tenantStorage.setTenantId(data.tenantId);
         tenantStorage.setTenantDomain(domain);
@@ -308,8 +314,8 @@ export default function App() {
 | 2 | With bypass off and no `sessionStorage["credentials"]`, app redirects to `VITE_PARENT_LOGIN_URL` | Manual: clear storage, reload |
 | 3 | With token present and unknown domain, error UI shown ("Tenant initialization failed") | Manual with bad domain |
 | 4 | With token + valid domain, tenant init succeeds; `tenantStorage.getTenantId()` populated; subsequent requests carry all 3 headers | DevTools network tab |
-| 5 | A 401 from `/v2/*` triggers logout; a 401 from `/technical/api/*` does NOT | Stub server response |
-| 6 | `x-rank` impersonation still works on legacy and `/v2` routes | Existing rank-switch UI |
+| 5 | A 401 from any non-exempt `/technical/api/*` request triggers logout; 401 from `/technical/api/tenant/init` does NOT | Stub server response |
+| 6 | `x-rank` impersonation still works on every API call | Existing rank-switch UI |
 | 7 | Refresh on a deep-linked page (e.g. `/work-orders/123`) survives — re-runs init from cache | Manual |
 
 ---
@@ -319,7 +325,7 @@ export default function App() {
 ### 10.1 Unit
 - `tenantStorage.set/get/clear` round-trip.
 - `installApiInterceptor`: stub `fetch`, fire request to `/technical/api/foo`, assert all 3 headers added.
-- `installApiInterceptor`: 401 on `/v2/foo` → `handleUnauthorized` called once.
+- `installApiInterceptor`: 401 on `/technical/api/foo` → `handleUnauthorized` called once; 401 on `/technical/api/tenant/init` → no logout.
 
 ### 10.2 Component
 - `TenantInitGate` loading state, error state, ready state (with mocked `useTenantInit`).
@@ -338,7 +344,7 @@ export default function App() {
 | Two interceptors fight over `window.fetch` (e.g. dev tools, MSW) | `installed` flag in `tenantFetch.ts`; document the wrap order |
 | AES key mismatch between parent and PMS → can't decrypt credentials → infinite redirect loop | `redirectToLogin` clears storage but a missing token then triggers another redirect; **break the loop** by checking `document.referrer` and showing an error page if we just came from the login URL |
 | Refresh after tenant init clears React state but cache survives → flicker | Cached tuid is read synchronously in `useTenantInit`'s effect; only show loading on cache miss |
-| `apiRequest` POST to `/v2/tenant/init` fails because server requires `x-tenant-id` | Server's `exemptPaths.ts` lists this path explicitly; verify in Phase 2 acceptance |
+| `apiRequest` POST to `/technical/api/tenant/init` fails because the chained middleware requires `x-tenant-id` | Server mounts the `/tenant` router **before** the catch-all chain (Phase 2 §8) and `exemptPaths.ts` lists the path explicitly; verify in Phase 2 acceptance |
 | Unit tests that stub `fetch` break because of the global wrap | Reset wrap in test teardown by saving the original `window.fetch` |
 
 ---

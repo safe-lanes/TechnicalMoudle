@@ -1,29 +1,28 @@
-# Phase 5 — Decommission Legacy
+# Phase 5 — Decommission Single-Tenant Scaffolding
 
-> **Goal:** Remove the legacy `/technical/api` mount, `mockAuthMiddleware`, and the eager `pool`/`db` exports. Optionally migrate truly universal lookup tables to the master DB.
-> **Risk:** 🟢 Low if Phase 4 was thorough; 🔴 High otherwise (legacy mount removal is irreversible without a revert)
+> **Goal:** Make multi-tenant mode mandatory. Remove the single-tenant boot branch in `server/routes.ts`, retire `mockAuthMiddleware` (or fence it behind `AUTH_BYPASS=true` for local dev), and drop the eager `pool`/`db` exports that pre-date the ALS path.
+> **Risk:** 🟢 Low if Phase 4 was thorough; 🔴 High otherwise (this is the irreversible one)
 > **Estimated effort:** 1 PR, ~3 days
-> **Prerequisites:** Phase 4 fully complete, all modules served on `/v2`, ≥7 days of clean prod soak
+> **Prerequisites:** Phase 4 fully complete, prod has been on multi-tenant mode for ≥7 days with no auth/tenant 5xx
 > **Unblocks:** Optional follow-ups (encryption-at-rest for `tenants.db_url`, master-DB shared lookups)
 
 ---
 
 ## 1. Goal
 
-Remove the back-compat scaffolding that let Phases 1–4 ship safely.
+Remove the back-compat scaffolding that let Phases 1–4 ship safely. After Phase 5, `MASTER_DATABASE_URL` is **mandatory** in every environment; there is no single-tenant fallback boot path.
 
 ```mermaid
 flowchart LR
     subgraph Before["Before Phase 5"]
-        A1["/technical/api/* → mockAuth → moduleRouter"]
-        A2["/technical/api/v2/* → tenantMW → authMW → moduleRouter"]
+        A1["server/routes.ts: branch on MASTER_DATABASE_URL<br/>→ single-tenant OR multi-tenant chain"]
+        A2["server/middleware/auth.ts: mockAuthMiddleware (live in single-tenant mode)"]
         A3["server/db.ts: eager pool/db exports (deprecated)"]
-        A4["server/middleware/auth.ts: mockAuthMiddleware"]
     end
     subgraph After["After Phase 5"]
-        B1["/technical/api/v2/* → tenantMW → authMW → moduleRouter"]
-        B2["server/db.ts: getDb() / getPool() only"]
-        B3["mockAuthMiddleware: removed (or AUTH_BYPASS-only)"]
+        B1["server/routes.ts: multi-tenant chain only"]
+        B2["server/middleware/auth.ts: mockAuthMiddleware AUTH_BYPASS-only (or removed)"]
+        B3["server/db.ts: getDb() / getPool() only"]
     end
     Before ==> After
     style Before fill:#fff3e0,stroke:#e65100
@@ -32,52 +31,51 @@ flowchart LR
 
 ---
 
-## 2. Files to modify
+## 2. Files to modify (in the future Phase 5 PR)
 
 | Action | File | Change |
 |---|---|---|
-| ✏️ | `server/routes.ts` | Remove `app.use('/technical/api', mockAuthMiddleware)` and `app.use('/technical/api', moduleRouter)` |
-| ✏️ | `server/middleware/auth.ts` | Delete `mockAuthMiddleware` and `initMockAuthRankId` (or gate behind `AUTH_BYPASS=true` for dev convenience) |
-| ✏️ | `server/db.ts` | Remove the eager `pool`/`db` exports (lines 11–21); `getDb`/`getPool` remain |
-| ✏️ | `server/postgresClient.ts` | The `cachedPostgres` global stays — it backs the **fallback** path of `getDb()` when no ALS context exists. Keep it; consider renaming to `legacyPostgres` for clarity |
-| ✏️ | `replit.md` | Update the **Authentication** section to reflect new reality |
+| ✏️ | `server/routes.ts` | Drop the `else` branch that mounts `mockAuthMiddleware`; the multi-tenant chain becomes unconditional |
+| ✏️ | `server/middleware/auth.ts` | Delete `mockAuthMiddleware` and `initMockAuthRankId`, **or** fence them behind `AUTH_BYPASS=true` so they only run in local dev |
+| ✏️ | `server/db.ts` | Remove the eager `pool`/`db` exports; `getDb`/`getPool` remain |
+| ✏️ | `server/postgresClient.ts` | The `cachedPostgres` global stays — it backs the **fallback** path of `getDb()` when no ALS context exists (e.g. background jobs in system context). Consider renaming to `legacySystemPostgres` for clarity |
 | ➕ | `docs/multi-tenant/POST-MIGRATION-OPS.md` (optional) | Ops runbook for adding new tenants |
+| ✏️ | Project documentation | Update authentication section to reflect that multi-tenant mode is mandatory and reference this docs folder for the architecture |
+
+> **Note:** The current documentation task (Task #128) does **not** modify `server/routes.ts`, `server/middleware/auth.ts`, or `replit.md`. The table above describes the scope of the future Phase 5 PR when it is actually executed.
 
 ---
 
-## 3. Step-by-step
+## 3. Step-by-step (future Phase 5 PR)
 
-### Step 3.1 — Remove the legacy mount
+### Step 3.1 — Drop the single-tenant boot branch
 
-Edit `server/routes.ts:24-31`:
+The `if (process.env.MASTER_DATABASE_URL) { … } else { … }` branch added in Phase 2 collapses to just the `if` body:
 
 ```typescript
-// REMOVED in Phase 5:
-// await initMockAuthRankId();
-// app.use('/technical/api', mockAuthMiddleware);
-// app.use('/technical/api', moduleRouter);
-
 // REMAINS (was added in Phase 2):
-if (process.env.MASTER_DATABASE_URL) {
-  const tenantRoutes = (await import('./modules/tenant/routes')).default;
-  const { tenantMiddleware } = await import('./middleware/tenantMiddleware');
-  const { authMiddleware } = await import('./middleware/authMiddleware');
-  app.use('/technical/api/v2/tenant', tenantRoutes);
-  app.use('/technical/api/v2', tenantMiddleware, authMiddleware, moduleRouter);
-}
+const tenantRoutes = (await import('./modules/tenant/routes')).default;
+const { tenantMiddleware } = await import('./middleware/tenantMiddleware');
+const { authMiddleware } = await import('./middleware/authMiddleware');
+app.use('/technical/api/tenant', tenantRoutes);
+app.use('/technical/api', tenantMiddleware, authMiddleware, moduleRouter);
+
+// REMOVED in Phase 5:
+//   else { mockAuthMiddleware path }
 ```
 
-**Hard requirement:** `MASTER_DATABASE_URL` is now mandatory in all environments — single-tenant mode is gone. Document this in `replit.md`.
+**Hard requirement:** `MASTER_DATABASE_URL` is now mandatory in all environments. If it is missing at boot, fail fast with a clear error rather than silently falling back.
 
 ### Step 3.2 — Delete or gate `mockAuthMiddleware`
 
-Two options. **Recommended:** keep behind `AUTH_BYPASS` for local dev, delete entirely otherwise.
+Two options. **Recommended:** keep behind `AUTH_BYPASS=true` for local dev, fail loud otherwise.
 
-`server/middleware/auth.ts`:
+Sketch (in `server/middleware/auth.ts` when Phase 5 is executed):
 
 ```typescript
 // Phase 5: mockAuthMiddleware retained ONLY for AUTH_BYPASS=true local dev.
-// In production, requests reach handlers via authMiddleware which sets req.user from JWT.
+// In every other context, requests reach handlers via authMiddleware which sets
+// req.user from JWT.
 
 export const mockAuthMiddleware = (req, res, next) => {
   if (process.env.AUTH_BYPASS !== "true") {
@@ -87,11 +85,11 @@ export const mockAuthMiddleware = (req, res, next) => {
 };
 ```
 
-This kills the security risk of the mock middleware accidentally being mounted in prod.
+This kills the security risk of the mock middleware accidentally being mounted in prod. Note that with the boot branch removed (§3.1), the only way `mockAuthMiddleware` runs is if `AUTH_BYPASS=true` and a developer wires it explicitly in a dev-only path — so the guard above is belt-and-braces.
 
 ### Step 3.3 — Remove eager `db`/`pool` exports
 
-Edit `server/db.ts`:
+`server/db.ts` becomes ALS-aware only:
 
 ```typescript
 // REMOVED in Phase 5: the eager singleton exports.
@@ -106,7 +104,7 @@ import { getCurrentTenantContext } from './utils/asyncLocalStorage';
 export async function getDb() {
   const ctx = getCurrentTenantContext();
   if (ctx) return ctx.db;
-  // Fallback path — only used by master DB migration runner and admin tools
+  // Fallback path — only used by background services running in system context
   const postgres = await resolvePostgres();
   if (!postgres) throw new Error('PostgreSQL not available');
   return postgres.db;
@@ -121,23 +119,9 @@ export async function getPool() {
 
 Run `tsc --noEmit` and the Phase 0 `scripts/check-direct-db-imports.sh` — must be green.
 
-### Step 3.4 — Update documentation
+### Step 3.4 — Update project documentation
 
-`replit.md` — replace the **Authentication** section:
-
-```markdown
-## Authentication
-
-PMS authenticates against a parent SAIL-Audits app via JWT.
-
-- **Multi-tenant mode** (production): `MASTER_DATABASE_URL`, `JWT_SECRET`, and the
-  parent app must all be configured. Requests are routed to the right tenant DB
-  via `TenantConnectionManager` + `AsyncLocalStorage`.
-- **Dev bypass**: set `AUTH_BYPASS=true` and `VITE_AUTH_BYPASS=true` to skip
-  JWT/tenant validation; `mockAuthMiddleware` populates `req.user`.
-
-See `docs/multi-tenant/README.md` for the architecture overview.
-```
+Update the project's authentication/architecture documentation to reflect the new reality: PMS authenticates against a parent SAIL-Audits app via JWT, multi-tenant mode is mandatory, and `mockAuthMiddleware` only runs in `AUTH_BYPASS` dev mode. Reference `docs/multi-tenant/README.md` for the architecture overview.
 
 ### Step 3.5 — (Optional) Move universal lookups to master
 
@@ -148,7 +132,7 @@ If decided in [Decision Q3](./README.md#7-decision-log-open-questions): tables l
 3. Update PMS code that reads these tables to query the master DB.
 4. Drop the tables from each tenant DB.
 
-**Don't bundle this with the legacy-removal PR** — it has independent risk.
+**Don't bundle this with the decommission PR** — it has independent risk.
 
 ---
 
@@ -156,15 +140,15 @@ If decided in [Decision Q3](./README.md#7-decision-log-open-questions): tables l
 
 | # | Criterion | How to verify |
 |---|---|---|
-| 1 | `app.use('/technical/api', …)` no longer appears in `server/routes.ts` | grep |
-| 2 | `curl /technical/api/work-orders` returns 404 | Manual |
-| 3 | All app screens function exclusively via `/technical/api/v2/*` | E2E test pass |
+| 1 | `server/routes.ts` no longer contains the `else` branch that mounts `mockAuthMiddleware` | grep |
+| 2 | Booting without `MASTER_DATABASE_URL` fails fast with a clear error | Manual: unset env var, restart, observe |
+| 3 | All app screens function via `/technical/api/*` with the multi-tenant chain | E2E test pass |
 | 4 | Phase 0 lint check still green | `bash scripts/check-direct-db-imports.sh` |
 | 5 | `import { db } from "./db"` returns nothing in `server/` | grep |
 | 6 | `import { pool } from "./db"` returns nothing in `server/` | grep |
 | 7 | `mockAuthMiddleware` either deleted OR throws 500 unless `AUTH_BYPASS=true` | Code review |
 | 8 | Prod soak after deploy: 24h with no 5xx attributable to auth/tenant | Monitoring |
-| 9 | `replit.md` Authentication section updated | Diff review |
+| 9 | Project authentication documentation updated | Diff review |
 
 ---
 
@@ -172,10 +156,11 @@ If decided in [Decision Q3](./README.md#7-decision-log-open-questions): tables l
 
 | Risk | Mitigation |
 |---|---|
-| A page or background job still hits `/technical/api/<module>/X` and now 404s | Phase 4's per-module cut-over checklist; final grep before merging Phase 5 |
+| A page or background job still relies on the single-tenant boot path → 500s after the flip | Phase 4 must close all gaps before this PR; final grep for `mockAuthMiddleware` references before merging |
 | Eager `db` removal breaks a hidden top-level usage in a file Phase 0 missed | Re-run Phase 0's lint check; also `tsc --noEmit` |
-| Background services (e.g. alerts engine) run outside any request → no ALS context → throws | These services use the legacy `getDb()` fallback path which goes through `resolvePostgres()` and the singleton. **Deliberate design decision:** background jobs run in "system" context, not tenant context. Document explicitly. |
+| Background services (e.g. alerts engine) run outside any request → no ALS context → throws | See §6 — this must be addressed in Phase 4.5 before Phase 5 |
 | Removing `mockAuthMiddleware` breaks dev workflow | Keep behind `AUTH_BYPASS=true`, document in README |
+| Fail-fast on missing `MASTER_DATABASE_URL` blocks a hot restart in an environment that lost the var | Ops checklist: confirm env vars before every restart; the same is already true for `DATABASE_URL` |
 
 ---
 
@@ -203,21 +188,21 @@ After Phase 5, these still call `await getDb()`, but **outside any HTTP request*
 
 If Phase 5 ships and a critical issue is found:
 
-1. `git revert <Phase-5 PR>` — restores legacy mount and eager exports.
+1. `git revert <Phase-5 PR>` — restores the boot branch and eager exports.
 2. Redeploy.
-3. Frontend continues to work because Phase 4 already moved it to `/v2` — but any 404s during the gap will be brief.
+3. The frontend continues to work because the API surface is unchanged; the rollback restores the multi-tenant chain (which has been live since Phase 4) — Phase 5 only removed the unused single-tenant fallback and the eager DB exports.
 
-**Hard truth:** Phase 5 is the one phase with no graceful runtime rollback. Stage carefully.
+**Hard truth:** Phase 5's irreversibility is conceptual, not operational — once removed, the single-tenant fallback path is gone from the binary, and any environment that loses `MASTER_DATABASE_URL` after this point fails to boot. Stage carefully.
 
 ---
 
 ## 8. Definition of Done
 
-- [ ] Legacy `/technical/api` mount removed from `server/routes.ts`.
+- [ ] Single-tenant boot branch removed from `server/routes.ts`.
 - [ ] `mockAuthMiddleware` deleted or `AUTH_BYPASS`-gated.
 - [ ] Eager `pool`/`db` exports removed from `server/db.ts`.
 - [ ] All background services explicitly multi-tenant aware (per §6).
-- [ ] `replit.md` Authentication section updated.
+- [ ] Project authentication documentation updated to reference `docs/multi-tenant/README.md`.
 - [ ] Phase 0 lint check green.
 - [ ] Acceptance criteria 1–9 green.
 - [ ] 24h prod soak clean.

@@ -11,10 +11,10 @@
 | **00** | **Overview (this file)** | `README.md` | — | — |
 | 0 | Foundations — seam refactor | [`Phase-0-Foundations.md`](./Phase-0-Foundations.md) | 🟢 Low | None (pure refactor) |
 | 1 | Master DB + Connection Manager | [`Phase-1-Master-DB-Connection-Manager.md`](./Phase-1-Master-DB-Connection-Manager.md) | 🟡 Medium | None (gated by env flag) |
-| 2 | Server middleware chain | [`Phase-2-Server-Middleware.md`](./Phase-2-Server-Middleware.md) | 🟡 Medium | New `/v2` mount only |
-| 3 | Frontend tenant layer | [`Phase-3-Frontend-Tenant-Layer.md`](./Phase-3-Frontend-Tenant-Layer.md) | 🟡 Medium | New code path; legacy still works |
-| 4 | Per-tenant migrations + module cut-over | [`Phase-4-Migrations-Cutover.md`](./Phase-4-Migrations-Cutover.md) | 🔴 High | Live cut-over begins |
-| 5 | Decommission legacy | [`Phase-5-Decommission.md`](./Phase-5-Decommission.md) | 🟢 Low | Removes mock auth |
+| 2 | Server middleware chain | [`Phase-2-Server-Middleware.md`](./Phase-2-Server-Middleware.md) | 🟡 Medium | Adds tenant + JWT chain to `/technical/api/*`, gated by `MASTER_DATABASE_URL` |
+| 3 | Frontend tenant layer | [`Phase-3-Frontend-Tenant-Layer.md`](./Phase-3-Frontend-Tenant-Layer.md) | 🟡 Medium | New code path; single-tenant still works |
+| 4 | Per-tenant migrations + environment cut-over | [`Phase-4-Migrations-Cutover.md`](./Phase-4-Migrations-Cutover.md) | 🔴 High | Live cut-over: dev → staging → prod |
+| 5 | Decommission single-tenant scaffolding | [`Phase-5-Decommission.md`](./Phase-5-Decommission.md) | 🟢 Low | Multi-tenant becomes mandatory; mock auth retired |
 
 > Companion doc: [`../V2-Multi-Tenant-Approach.md`](../V2-Multi-Tenant-Approach.md) — long-form architectural blueprint with diagrams.
 
@@ -27,7 +27,7 @@
 | Auth | `mockAuthMiddleware` injects hardcoded `Sail Admin` on every request | `server/middleware/auth.ts` |
 | DB pool | Single global `pg.Pool` from `process.env.DATABASE_URL`, lazy-cached | `server/postgresClient.ts`, `server/db.ts` |
 | Storage | `IStorage` implemented once in `postgresStorage.ts` (~100 methods, all start with `await getDb()`) | `server/storage.ts`, `server/postgresStorage.ts` |
-| Routes | All mounted under `/technical/api` via `moduleRouter` | `server/routes.ts:27-31`, `server/modules/index.ts` |
+| Routes | All mounted under `/technical/api` via `moduleRouter` (single API surface — no `/v2` prefix) | `server/routes.ts`, `server/modules/index.ts` |
 | Frontend fetch | TanStack Query default fetcher; `installRankFetchInterceptor` injects only `x-rank` | `client/src/lib/queryClient.ts`, `client/src/lib/activeRank.ts` |
 | Schema | 96 tables in `shared/schema.ts`; **no `tenant_id` anywhere**; soft tenancy via `vessel_id` | `shared/schema.ts` |
 | Migrations | `runDrizzleMigrations` + `runHandWrittenMigrations` at startup; **never `db:push`** on existing DB (post-085 rule) | `server/migrations.ts`, `replit.md` |
@@ -74,10 +74,10 @@ flowchart LR
 flowchart TB
     P0["Phase 0<br/>Foundations<br/>━━━━━━━━━━<br/>• Refactor migration runner<br/>• Eliminate direct db imports<br/>• Lint rule"]
     P1["Phase 1<br/>Master DB + TCM<br/>━━━━━━━━━━<br/>• shared/master/schema.ts<br/>• TenantConnectionManager<br/>• AsyncLocalStorage seam"]
-    P2["Phase 2<br/>Server Middleware<br/>━━━━━━━━━━<br/>• tenantMiddleware<br/>• authMiddleware (JWT)<br/>• /technical/api/v2 mount<br/>• /tenant/init endpoint"]
+    P2["Phase 2<br/>Server Middleware<br/>━━━━━━━━━━<br/>• tenantMiddleware<br/>• authMiddleware (JWT)<br/>• /technical/api/* gated by MASTER_DATABASE_URL<br/>• /technical/api/tenant/init endpoint"]
     P3["Phase 3<br/>Frontend Layer<br/>━━━━━━━━━━<br/>• tenantStorage (AES)<br/>• authToken<br/>• tenantFetch<br/>• useTenantInit"]
-    P4["Phase 4<br/>Cut-over<br/>━━━━━━━━━━<br/>• Per-tenant migrations<br/>• Promote existing DB<br/>• Module-by-module switch"]
-    P5["Phase 5<br/>Decommission<br/>━━━━━━━━━━<br/>• Remove /technical/api legacy<br/>• Remove mockAuthMiddleware<br/>• Move ref data to master"]
+    P4["Phase 4<br/>Cut-over<br/>━━━━━━━━━━<br/>• Per-tenant migrations<br/>• Promote existing DB<br/>• Env-by-env flip (dev → staging → prod)"]
+    P5["Phase 5<br/>Decommission<br/>━━━━━━━━━━<br/>• Drop single-tenant boot branch<br/>• Retire mockAuthMiddleware<br/>• Move ref data to master"]
 
     P0 --> P1
     P1 --> P2
@@ -156,15 +156,15 @@ The phases below are **PMS-specific** — file paths, env vars, and gotchas refe
 → Full detail: [`Phase-1-Master-DB-Connection-Manager.md`](./Phase-1-Master-DB-Connection-Manager.md)
 
 ### Phase 2 — Server Middleware (1 PR, ~1 week)
-**What changes:** New `/technical/api/v2` mount with `tenantMiddleware → authMiddleware`. Legacy `/technical/api` untouched.
+**What changes:** The existing `/technical/api/*` mount is wrapped in `tenantMiddleware → authMiddleware` when `MASTER_DATABASE_URL` is set. There is no parallel route prefix — PMS keeps a single API surface and the boot logic picks the chain.
 
 - New files: `server/middleware/tenantMiddleware.ts`, `server/middleware/authMiddleware.ts`, `server/middleware/exemptPaths.ts`.
 - New env vars: `JWT_SECRET`, `AUTH_BYPASS`.
-- New endpoint: `POST /technical/api/v2/tenant/init` (exempt from middleware).
-- In `server/routes.ts:31`, add second mount: `app.use('/technical/api/v2', tenantMiddleware, authMiddleware, moduleRouter)`.
-- `mockAuthMiddleware` stays on `/technical/api` for back-compat.
+- New endpoint: `POST /technical/api/tenant/init` mounted at `/technical/api/tenant` **before** the catch-all chain (exempt from tenant + auth middleware).
+- Boot logic in the route registration file branches on `MASTER_DATABASE_URL`: when set, mounts the tenant + auth chain; when unset, falls back to today's `mockAuthMiddleware` chain.
+- The two chains are mutually exclusive — `mockAuthMiddleware` is **not** mounted when multi-tenant mode is active.
 
-**Acceptance:** Legacy routes still work with `x-rank`; `/v2` routes require valid `x-tenant-id` + `Authorization`.
+**Acceptance:** Without `MASTER_DATABASE_URL` the server behaves identically to today; with it set, every `/technical/api/*` request requires `x-tenant-id` + `Authorization`, and `/technical/api/tenant/init` is reachable without either.
 
 → Full detail: [`Phase-2-Server-Middleware.md`](./Phase-2-Server-Middleware.md)
 
@@ -181,36 +181,38 @@ The phases below are **PMS-specific** — file paths, env vars, and gotchas refe
 
 → Full detail: [`Phase-3-Frontend-Tenant-Layer.md`](./Phase-3-Frontend-Tenant-Layer.md)
 
-### Phase 4 — Per-Tenant Migrations + Cut-over (4–8 PRs, ~3 weeks)
-**What changes:** This is the live one. Existing prod DB gets registered as the "default" tenant; modules switch from legacy mount to `/v2` one at a time.
+### Phase 4 — Per-Tenant Migrations + Environment Cut-over (4–6 PRs / ops actions, ~3 weeks)
+**What changes:** This is the live one. The existing prod DB gets registered as the "default" tenant, and `MASTER_DATABASE_URL` is flipped on environment-by-environment. Because PMS has a single API surface, the unit of risk is the environment, not the module — there is no per-route toggle.
 
 - Promotion script `scripts/promote-to-tenant.ts`: writes one row to `master.tenants` pointing `db_url = current DATABASE_URL`.
-- `TenantConnectionManager.getTenantDb(tuid)` runs full migration suite on first connection (re-uses Phase 0 pool-aware runner).
-- Add `tenant_health` admin endpoint: per-tenant migration status.
-- **Module cut-over order** (least → most critical, to limit blast radius):
+- Dry-run script `scripts/dry-run-tenant-migrations.ts`: must report **zero pending migrations** before flipping any environment.
+- `TenantConnectionManager.getTenantDb(tuid)` runs the full migration suite on first connection (re-uses Phase 0 pool-aware runner) — a no-op against a promoted existing DB.
+- Add `tenant_health` admin endpoint at `/technical/api/admin/tenant-health` (Sail Admin gated): per-tenant migration status.
+- **Environment promotion order:** dev → staging (≥48 h soak) → prod (≥7 d soak).
+- **Post-flip smoke order in each environment** (least → most critical, to surface regressions safely):
   1. Components (read-mostly)
   2. Reports (read-only)
   3. Spares
   4. Stores
   5. Defects
-  6. Work Orders + Running Hours (the heart of PMS — last, after the pattern is proven)
+  6. Work Orders + Running Hours (heart of PMS — exercise together)
   7. Noon Report (has the most direct-import files even after Phase 0; double-check)
   8. Access Control + Admin
-- Each module's frontend pages are switched from `/technical/api/<module>/` to `/technical/api/v2/<module>/` in the same PR as its backend cut-over.
+- Dev parity harness: boot one server with `MASTER_DATABASE_URL` set and one without, both pointing at the same DB; diff GET responses across all 8 modules → must be empty.
 
-**Acceptance:** All modules respond identically on `/v2` and legacy mounts in side-by-side smoke tests; per-tenant migration audit log shows green for "default" tenant.
+**Acceptance:** Parity diff empty in dev; per-tenant migration audit log shows green for the default tenant in every environment; staging and prod soak windows pass without 5xx attributable to tenant/auth.
 
 → Full detail: [`Phase-4-Migrations-Cutover.md`](./Phase-4-Migrations-Cutover.md)
 
-### Phase 5 — Decommission Legacy (1 PR, ~3 days)
-**What changes:** Remove the legacy `/technical/api` mount, `mockAuthMiddleware`, eager `pool`/`db` exports. Optionally migrate read-only reference tables to master.
+### Phase 5 — Decommission Single-Tenant Scaffolding (1 PR, ~3 days)
+**What changes:** Make multi-tenant mode mandatory. Drop the single-tenant boot branch in the route registration file, retire `mockAuthMiddleware` (or fence behind `AUTH_BYPASS=true` for local dev), and remove the eager `pool`/`db` exports. Optionally migrate read-only reference tables to master.
 
-- Remove line `app.use('/technical/api', mockAuthMiddleware)` and the bare `app.use('/technical/api', moduleRouter)` from `server/routes.ts`.
+- Drop the `else` branch (the one that mounts `mockAuthMiddleware`) from the boot logic in the route registration file. The multi-tenant chain becomes unconditional.
 - Gate `mockAuthMiddleware` behind `AUTH_BYPASS=true` for dev only, or delete entirely.
-- Remove the eager exports `pool`/`db` from `server/db.ts:11-21`.
+- Remove the eager `pool`/`db` exports from `server/db.ts`; only `getDb()` / `getPool()` remain.
 - Optional: move `nationalities`, `ports`, `countries`, `ranks_master` to master DB (see Phase 5 doc for the trade-offs).
 
-**Acceptance:** No legacy routes reachable; QA suite green; `tenant_health` shows all tenants migrated.
+**Acceptance:** Booting without `MASTER_DATABASE_URL` fails fast with a clear error; QA suite green; `tenant_health` shows all tenants migrated.
 
 → Full detail: [`Phase-5-Decommission.md`](./Phase-5-Decommission.md)
 
@@ -253,7 +255,7 @@ flowchart TB
     subgraph Tomorrow["server/index.ts after Phase 4"]
         B1[initStorage] --> B2["if MASTER_DATABASE_URL:<br/>connect master, verify tenants table<br/>else: runBackupAndMigrations on global"]
         B2 --> B3["initializeDatabase<br/>(only if single-tenant)"]
-        B3 --> B4[registerRoutes<br/>+ /v2 mount]
+        B3 --> B4["registerRoutes<br/>(boot logic branches on<br/>MASTER_DATABASE_URL → tenant+auth chain<br/>or single-tenant mock chain)"]
         B4 --> B5["TenantConnectionManager:<br/>migrations run lazily<br/>on first request per tenant"]
     end
 ```
@@ -316,8 +318,8 @@ These need answers **before Phase 1 starts**. Each decision propagates downstrea
 | Median request latency overhead from middleware chain | **< 5 ms** |
 | Pool count at steady state with 10 active tenants | **≤ 30 connections** (3 per tenant cap) |
 | Files still importing `db` directly (after Phase 0) | **0** |
-| Modules served on `/v2` (after Phase 4) | **All 8** |
-| Routes still on legacy `/technical/api` (after Phase 5) | **0** |
+| Modules verified on the multi-tenant chain after the env flip (Phase 4) | **All 8** |
+| Single-tenant boot branch references in the route registration file (after Phase 5) | **0** |
 
 ---
 
@@ -332,6 +334,6 @@ These need answers **before Phase 1 starts**. Each decision propagates downstrea
 | **ALS** | `AsyncLocalStorage` — Node.js built-in for binding values to a specific async execution context |
 | **Exempt paths** | Routes that skip `tenantMiddleware`/`authMiddleware` (health checks, `/tenant/init`) |
 | **Domain** | Tenant identifier from the parent app's `localStorage["domain"]` (e.g. `acme-shipping.example.com`) |
-| **`/v2` mount** | New route prefix `/technical/api/v2/*` that runs the tenant-aware middleware chain |
+| **Multi-tenant chain** | The `tenantMiddleware → authMiddleware → moduleRouter` stack mounted at `/technical/api/*` when `MASTER_DATABASE_URL` is set. PMS has a single API surface — there is no `/v2` prefix. |
 | **Promotion script** | `scripts/promote-to-tenant.ts` — registers the existing prod DB as the "default" tenant |
 | **post-085 rule** | The strict no-`db:push` rule from `replit.md`, established after migration 085 corrupted schema tracking |

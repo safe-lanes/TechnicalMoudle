@@ -1,7 +1,7 @@
 # Phase 2 — Server Middleware Chain
 
-> **Goal:** Add `tenantMiddleware → authMiddleware` and mount the tenant-aware routes under `/technical/api/v2`. Legacy `/technical/api` routes remain untouched.
-> **Risk:** 🟡 Medium (exempt-path list is a known foot-gun)
+> **Goal:** Wire `tenantMiddleware → authMiddleware` into the existing `/technical/api` mount, gated by `MASTER_DATABASE_URL`. PMS has a single API surface — there is **no** parallel `/v2` prefix.
+> **Risk:** 🟡 Medium (single mount point flips behaviour based on env)
 > **Estimated effort:** 1 PR, ~1 week
 > **Prerequisites:** Phase 1 complete
 > **Unblocks:** Phase 4
@@ -10,30 +10,27 @@
 
 ## 1. Goal
 
-After this phase, two route prefixes coexist:
+After this phase, the existing `/technical/api/*` mount runs one of two middleware stacks depending on whether `MASTER_DATABASE_URL` is set at boot.
 
 ```mermaid
 flowchart LR
-    subgraph Legacy["Legacy mount (untouched)"]
-        L1["/technical/api/*"] --> L2[mockAuthMiddleware]
-        L2 --> L3[moduleRouter]
+    subgraph SingleTenant["Single-tenant mode (MASTER_DATABASE_URL unset)"]
+        S1["/technical/api/*"] --> S2[mockAuthMiddleware]
+        S2 --> S3[moduleRouter]
     end
-    subgraph New["New mount"]
-        N1["/technical/api/v2/*"] --> N2[exemptPathCheck]
-        N2 --> N3[tenantMiddleware]
-        N3 --> N4[authMiddleware]
-        N4 --> N5[moduleRouter]
+    subgraph MultiTenant["Multi-tenant mode (MASTER_DATABASE_URL set)"]
+        M1["/technical/api/tenant/init"] --> M2["(exempt — no middleware)"]
+        M3["/technical/api/* (everything else)"] --> M4[tenantMiddleware]
+        M4 --> M5[authMiddleware]
+        M5 --> M6[moduleRouter]
     end
-    subgraph Exempt["Exempt /v2 paths"]
-        E1["/technical/api/v2/tenant/init<br/>/technical/api/v2/health"]
-    end
-    N2 -.bypass.-> E1
-    style Legacy fill:#fff3e0,stroke:#e65100
-    style New fill:#e8f5e9,stroke:#2e7d32
-    style Exempt fill:#fffde7,stroke:#f9a825
+    style SingleTenant fill:#fff3e0,stroke:#e65100
+    style MultiTenant fill:#e8f5e9,stroke:#2e7d32
 ```
 
-The same `moduleRouter` is mounted twice. That's intentional: it lets us cut over modules to `/v2` one at a time in Phase 4 without duplicating code.
+**Key idea:** the same `moduleRouter` is mounted in both modes. The path stays `/technical/api/*` for every module. What changes is which auth/tenant chain runs in front of it.
+
+The `/technical/api/tenant/init` endpoint is mounted **before** the tenant middleware so the client can resolve a `tuid` from a domain without already having one. It is the only request-time path that touches the master DB.
 
 ---
 
@@ -44,9 +41,10 @@ The same `moduleRouter` is mounted twice. That's intentional: it lets us cut ove
 | ➕ Create | `server/middleware/tenantMiddleware.ts` | Validate `x-tenant-id`, bind ALS |
 | ➕ Create | `server/middleware/authMiddleware.ts` | Verify JWT, cross-check domain |
 | ➕ Create | `server/middleware/exemptPaths.ts` | Path matcher for endpoints that skip tenant/auth |
-| ➕ Create | `server/modules/tenant/routes.ts` | `POST /tenant/init`, `GET /health` |
-| ✏️ Modify | `server/routes.ts` | Add `/v2` mount + `/tenant/init` (legacy `/technical/api` mount kept) |
-| ✏️ Modify | `server/middleware/auth.ts` | Allow `mockAuthMiddleware` to recognise tenant context (forward-compat) |
+| ➕ Create | `server/modules/tenant/routes.ts` | `POST /tenant/init`, `GET /tenant/health` |
+| ✏️ Modify (future Phase 2 PR) | `server/routes.ts` | Branch the mount on `MASTER_DATABASE_URL`; mount `/tenant/init` before the catch-all chain |
+
+> **Note:** `server/middleware/auth.ts` is **not** modified by Phase 2. In multi-tenant mode `mockAuthMiddleware` is simply not registered; in single-tenant mode it continues to run unchanged.
 
 ---
 
@@ -54,16 +52,19 @@ The same `moduleRouter` is mounted twice. That's intentional: it lets us cut ove
 
 | Var | Required when | Notes |
 |---|---|---|
-| `JWT_SECRET` | `MASTER_DATABASE_URL` is set | Used by `authMiddleware` |
-| `AUTH_BYPASS` | Dev only | When `=true`, both middlewares short-circuit; `req.user` populated from a default like `mockAuthMiddleware` |
+| `MASTER_DATABASE_URL` | Multi-tenant mode | Presence of this var is the **only** flag that switches the mount behaviour |
+| `JWT_SECRET` | Multi-tenant mode | Used by `authMiddleware` |
+| `AUTH_BYPASS` | Dev only | When `=true`, both middlewares short-circuit; `req.user` is populated like `mockAuthMiddleware` does today |
 
 **Behaviour matrix:**
 
-| `MASTER_DATABASE_URL` | `AUTH_BYPASS` | `/v2` requests | `/technical/api` requests |
-|---|---|---|---|
-| unset | n/a | 503 (tenant manager unavailable) | Mock auth, current behaviour |
-| set | `true` | Skip middleware, mock user | Mock auth, current behaviour |
-| set | `false`/unset | Full tenant + JWT chain | Mock auth, current behaviour |
+| `MASTER_DATABASE_URL` | `AUTH_BYPASS` | Stack on `/technical/api/*` |
+|---|---|---|
+| unset | n/a | `mockAuthMiddleware → moduleRouter` (today's behaviour, unchanged) |
+| set | `true` | `tenantMiddleware (bypass) → authMiddleware (bypass) → moduleRouter` |
+| set | `false`/unset | `tenantMiddleware → authMiddleware → moduleRouter` |
+
+There is **never** a state where both `mockAuthMiddleware` and `authMiddleware` run on the same request — the boot-time branch picks one chain.
 
 ---
 
@@ -73,8 +74,8 @@ The same `moduleRouter` is mounted twice. That's intentional: it lets us cut ove
 
 ```typescript
 const EXEMPT_PATTERNS: RegExp[] = [
-  /^\/technical\/api\/v2\/tenant\/init\/?$/,
-  /^\/technical\/api\/v2\/health\/?$/,
+  /^\/technical\/api\/tenant\/init\/?$/,
+  /^\/technical\/api\/tenant\/health\/?$/,
 ];
 
 export function isExemptPath(path: string): boolean {
@@ -82,7 +83,7 @@ export function isExemptPath(path: string): boolean {
 }
 ```
 
-Keep this list **tiny** and explicit. Every entry is a potential cross-tenant leak vector.
+Keep this list **tiny** and explicit. Every entry is a potential cross-tenant leak vector. Mounting `/tenant/init` as its own router before the catch-all (see §8) is a belt-and-braces measure on top of this matcher.
 
 ---
 
@@ -99,7 +100,6 @@ export async function tenantMiddleware(req: Request, res: Response, next: NextFu
   if (isExemptPath(req.path)) return next();
 
   if (process.env.AUTH_BYPASS === "true") {
-    // Dev escape hatch — must still bind a tenant context if MASTER_DATABASE_URL is set
     const devTuid = process.env.DEV_TENANT_TUID;
     if (!devTuid) return next();
     const tcm = getTenantManager();
@@ -124,7 +124,6 @@ export async function tenantMiddleware(req: Request, res: Response, next: NextFu
     return res.status(403).json({ error: "Unknown or inactive tenant" });
   }
 
-  // Bind ALS context for the rest of the request chain
   return tcm.runInTenantContext(tuid, () => new Promise<void>((resolve, reject) => {
     next();
     res.on("finish", resolve);
@@ -134,7 +133,7 @@ export async function tenantMiddleware(req: Request, res: Response, next: NextFu
 }
 ```
 
-**Critical detail:** `runInTenantContext` must wrap the **entire downstream chain**, not just the synchronous `next()` call. The Promise-wrapped pattern above guarantees the ALS scope stays alive until the response finishes, so any `await getDb()` inside route handlers (even deep in async stacks) sees the right context.
+**Critical detail:** `runInTenantContext` must wrap the **entire downstream chain**, not just the synchronous `next()` call. The Promise-wrapped pattern above keeps the ALS scope alive until the response finishes, so any `await getDb()` inside route handlers (even deep in async stacks) sees the right context.
 
 ---
 
@@ -180,8 +179,6 @@ export async function authMiddleware(req: AuthenticatedRequest, res: Response, n
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET!) as any;
 
-    // Cross-check JWT.domain against the tenant we already validated.
-    // (Optional but recommended — prevents replay of a JWT across tenants.)
     const expectedDomain = req.headers["x-tenant-domain"];
     if (expectedDomain && payload.domain !== expectedDomain) {
       return res.status(403).json({ error: "JWT/tenant domain mismatch" });
@@ -236,37 +233,43 @@ router.post("/init", async (req, res) => {
 export default router;
 ```
 
-**Note:** this endpoint is exempt from `tenantMiddleware`/`authMiddleware` (because the client doesn't yet know the tuid when calling it). It is the **only** endpoint that hits the master DB from the request path.
+**Note:** this router is mounted at `/technical/api/tenant` **before** the tenant/auth chain (see §8). It is the only endpoint that hits the master DB from the request path.
 
 ---
 
-## 8. Wiring in `server/routes.ts`
+## 8. Wiring (conceptual change to `server/routes.ts`)
 
-Modify `server/routes.ts:24-31`:
+The boot-time route registration where the legacy mount lives today changes to a branch on `MASTER_DATABASE_URL`. The shape of the change:
 
 ```typescript
-// === existing single-tenant mount (kept for back-compat through Phase 4) ===
-await initMockAuthRankId();
-app.use('/technical/api', mockAuthMiddleware);
-console.log('🔒 Mock authentication enabled for /technical/api/* routes');
-app.use('/technical/api', moduleRouter);
+// Where the existing single-tenant mount is registered today:
+//   app.use('/technical/api', mockAuthMiddleware);
+//   app.use('/technical/api', moduleRouter);
 
-// === new multi-tenant mount (Phase 2+) ===
 if (process.env.MASTER_DATABASE_URL) {
+  // Multi-tenant mode
   const tenantRoutes = (await import('./modules/tenant/routes')).default;
   const { tenantMiddleware } = await import('./middleware/tenantMiddleware');
   const { authMiddleware } = await import('./middleware/authMiddleware');
 
-  // Exempt routes mounted FIRST, before middleware
-  app.use('/technical/api/v2/tenant', tenantRoutes);
+  // Exempt routes mounted FIRST, before the catch-all middleware chain
+  app.use('/technical/api/tenant', tenantRoutes);
 
-  // All other v2 routes go through the chain
-  app.use('/technical/api/v2', tenantMiddleware, authMiddleware, moduleRouter);
-  console.log('🔒 Multi-tenant routes enabled at /technical/api/v2/*');
+  // All other API routes go through the tenant + auth chain
+  app.use('/technical/api', tenantMiddleware, authMiddleware, moduleRouter);
+  console.log('🔒 Multi-tenant routes enabled at /technical/api/*');
+} else {
+  // Single-tenant mode (today's behaviour, unchanged)
+  await initMockAuthRankId();
+  app.use('/technical/api', mockAuthMiddleware);
+  app.use('/technical/api', moduleRouter);
+  console.log('🔒 Mock authentication enabled for /technical/api/* routes');
 }
 ```
 
-**Mount order is critical.** Express matches in registration order — `/v2/tenant` must be registered before the catch-all `/v2` mount, otherwise the middleware will run on `/tenant/init` and reject for missing `x-tenant-id`.
+**Mount order is critical.** Express matches in registration order — `/technical/api/tenant` must be registered before the catch-all `/technical/api` mount, otherwise the middleware will run on `/tenant/init` and reject for missing `x-tenant-id` (the `isExemptPath` check is a backstop, not the only line of defence).
+
+> **Reminder:** This Phase 2 PR is the one that touches `server/routes.ts` when the work is actually executed. The current documentation task (Task #128) does **not** modify `server/routes.ts` — only describes the future change conceptually.
 
 ---
 
@@ -274,14 +277,14 @@ if (process.env.MASTER_DATABASE_URL) {
 
 | # | Criterion | How to verify |
 |---|---|---|
-| 1 | Without `MASTER_DATABASE_URL`, `/v2/*` routes return 404 (mount not registered) | `curl /technical/api/v2/work-orders` |
-| 2 | With flag set, `POST /technical/api/v2/tenant/init {domain}` returns `{tenantId, companyName}` for a registered tenant | `curl` with seeded master |
-| 3 | `/v2/work-orders` without `x-tenant-id` returns 400 | `curl` |
-| 4 | `/v2/work-orders` with valid `x-tenant-id` but no `Authorization` returns 401 | `curl` |
-| 5 | `/v2/work-orders` with both headers and a valid JWT returns the tenant's data | Integration test |
-| 6 | `/technical/api/work-orders` (legacy) keeps working with `x-rank` only | Existing E2E test should still pass |
-| 7 | With `AUTH_BYPASS=true`, no headers required on `/v2/*` | Dev convenience |
-| 8 | `tenantMiddleware` does NOT execute on `/v2/tenant/init` (no infinite recursion) | Trace logs during test |
+| 1 | Without `MASTER_DATABASE_URL`, the server boots into single-tenant mode and every existing `/technical/api/*` route works as today | Existing E2E test should still pass |
+| 2 | With `MASTER_DATABASE_URL` set, `POST /technical/api/tenant/init {domain}` returns `{tenantId, companyName}` for a registered tenant | `curl` with seeded master |
+| 3 | With multi-tenant mode on, `/technical/api/work-orders` without `x-tenant-id` returns 400 | `curl` |
+| 4 | With multi-tenant mode on, `/technical/api/work-orders` with valid `x-tenant-id` but no `Authorization` returns 401 | `curl` |
+| 5 | With multi-tenant mode on, `/technical/api/work-orders` with both headers and a valid JWT returns the tenant's data | Integration test |
+| 6 | `mockAuthMiddleware` is **not** mounted when `MASTER_DATABASE_URL` is set | Trace logs at boot; grep response middleware chain |
+| 7 | With `AUTH_BYPASS=true` on top of multi-tenant mode, no JWT/tenant headers are required | Dev convenience |
+| 8 | `tenantMiddleware` does NOT execute on `/technical/api/tenant/init` (mount order + `isExemptPath`) | Trace logs during test |
 
 ---
 
@@ -290,13 +293,13 @@ if (process.env.MASTER_DATABASE_URL) {
 ### 10.1 Unit
 - `tenantMiddleware`: missing header → 400; unknown tuid → 403; valid → calls `next()` inside ALS context.
 - `authMiddleware`: missing `Authorization` → 401; bad signature → 401; good token → `req.user` populated; bypass mode → mock user.
-- `isExemptPath`: covers `/v2/tenant/init`, rejects everything else.
+- `isExemptPath`: covers `/technical/api/tenant/init` and `/technical/api/tenant/health`, rejects everything else.
 
 ### 10.2 Integration
 - Seed master DB with one tenant pointing at the dev tenant DB.
-- Hit `POST /v2/tenant/init` with the dev domain → receive `tenantId`.
-- Hit `GET /v2/vessels` with that `tenantId` + a self-signed JWT → receive vessel list.
-- Hit `GET /vessels` (legacy) → still works.
+- Hit `POST /technical/api/tenant/init` with the dev domain → receive `tenantId`.
+- Hit `GET /technical/api/vessels` with that `tenantId` + a self-signed JWT → receive vessel list.
+- Boot the same server **without** `MASTER_DATABASE_URL` → confirm `/technical/api/vessels` works on mock auth as today.
 
 ### 10.3 Concurrency
 - Fire 100 parallel requests across 5 tenants and verify no cross-contamination of returned data.
@@ -308,26 +311,28 @@ if (process.env.MASTER_DATABASE_URL) {
 | Risk | Mitigation |
 |---|---|
 | Forgotten exempt route → entire feature unreachable | All exempt paths centralised in `exemptPaths.ts`, code-reviewed line-by-line |
-| Mount order wrong → `/v2/tenant/init` falls through middleware | Smoke test in CI hits `/v2/tenant/init` and asserts no `x-tenant-id` was required |
+| Mount order wrong → `/technical/api/tenant/init` falls through middleware | Smoke test in CI hits `/technical/api/tenant/init` and asserts no `x-tenant-id` was required |
 | `runInTenantContext` Promise wrapping doesn't await `res.on('finish')` properly → ALS evicted before downstream `await getDb()` resolves | Phase 1 concurrency test catches this; add a regression test that does `await new Promise(r => setTimeout(r, 50))` then `getDb()` |
-| Both `mockAuthMiddleware` AND new `authMiddleware` run on a route by accident | Explicit mount paths — `mockAuthMiddleware` only on `/technical/api`, `authMiddleware` only on `/technical/api/v2` |
+| Boot-time branch mis-evaluates `MASTER_DATABASE_URL` (e.g. empty string) → wrong stack registered | Treat any falsy / empty value as "unset"; log which branch was taken at boot |
 | `JWT_SECRET` mismatch with parent app → all requests 401 | Ops runbook: confirm secret value matches Crewing's deployment; smoke test on staging first |
 
 ---
 
 ## 12. Rollback plan
 
-1. Unset `MASTER_DATABASE_URL` — `/v2` mount disappears, legacy paths unchanged.
+1. Unset `MASTER_DATABASE_URL` and restart — server boots back into single-tenant mode with mock auth.
 2. Or `git revert <Phase-2 PR>` — Phase 1 stays in place, app reverts to single-tenant.
+
+Because there is only one mount path, rollback is **all-or-nothing per environment**: an environment is either fully on multi-tenant or fully on single-tenant. There is no per-route mid-state to manage.
 
 ---
 
 ## 13. Definition of Done
 
 - [ ] `tenantMiddleware`, `authMiddleware`, `exemptPaths` all created.
-- [ ] `POST /technical/api/v2/tenant/init` and `GET /technical/api/v2/health` reachable.
-- [ ] `/v2/*` mount registered conditionally on `MASTER_DATABASE_URL`.
-- [ ] Legacy `/technical/api/*` mount unchanged.
+- [ ] `POST /technical/api/tenant/init` and `GET /technical/api/tenant/health` reachable in multi-tenant mode.
+- [ ] `server/routes.ts` boot logic branches on `MASTER_DATABASE_URL`.
+- [ ] Single-tenant boot path is byte-identical to today's behaviour.
 - [ ] Acceptance criteria 1–8 green.
 - [ ] Manual smoke test passed on staging with one seeded tenant.
 - [ ] Concurrency test from §10.3 green.
