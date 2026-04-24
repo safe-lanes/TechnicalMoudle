@@ -46,7 +46,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Search, Eye, Edit, Trash2, Send, Clock, CheckCircle, XCircle, RotateCcw, Package, ClipboardList, Archive, Store, ExternalLink, ChevronDown } from "lucide-react";
+import { Plus, Search, Eye, Edit, Trash2, Send, Clock, CheckCircle, XCircle, RotateCcw, Package, ClipboardList, Archive, Store, ExternalLink, ChevronDown, Loader2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { TargetPicker } from "@/components/TargetPicker";
 import { ProposeChanges } from "@/components/ProposeChanges";
@@ -140,7 +140,32 @@ export default function ModifyPMS() {
   const [showSnapshotDialog, setShowSnapshotDialog] = useState(false);
   const [snapshotToView, setSnapshotToView] = useState<any>(null);
   const [isNewRequestModalOpen, setIsNewRequestModalOpen] = useState(false);
-  
+
+  // Approve / reject dialog state for change-request review
+  const [reviewDialog, setReviewDialog] = useState<{
+    open: boolean;
+    action: 'approve' | 'reject';
+    requestId: number | null;
+    label: string;
+  }>({ open: false, action: 'reject', requestId: null, label: '' });
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewError, setReviewError] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+
+  const openReviewDialog = (action: 'approve' | 'reject', requestId: number, label: string) => {
+    setReviewComment('');
+    setReviewError('');
+    setReviewSubmitting(false);
+    setReviewDialog({ open: true, action, requestId, label });
+  };
+
+  const closeReviewDialog = () => {
+    setReviewDialog({ open: false, action: 'reject', requestId: null, label: '' });
+    setReviewComment('');
+    setReviewError('');
+    setReviewSubmitting(false);
+  };
+
   // Form state for create/edit
   const [formData, setFormData] = useState({
     title: '',
@@ -1124,48 +1149,28 @@ export default function ModifyPMS() {
             <div className="flex gap-2">
               {viewingRequest && viewingRequest.status === 'submitted' && !isVessel && !isHeadOfDept && (
                 <>
-                  <Button 
+                  <Button
                     variant="destructive"
                     onClick={() => {
-                      const comment = prompt('Please provide a reason for rejection:');
-                      if (comment) {
-                        fetch(`/technical/api/change-requests/${viewingRequest.id}/reject`, {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ comment, reviewerId: 'current_user' })
-                        }).then(() => {
-                          queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
-                          setViewingRequest(null);
-                          toast({
-                            title: "Change request rejected",
-                            description: "The change request has been rejected"
-                          });
-                        });
-                      }
+                      const label = viewingRequest.title
+                        ? `CR-${viewingRequest.id} • ${viewingRequest.title}`
+                        : `CR-${viewingRequest.id}`;
+                      openReviewDialog('reject', viewingRequest.id, label);
                     }}
+                    data-testid="button-cr-reject"
                   >
                     Reject
                   </Button>
-                  <Button 
+                  <Button
                     variant="default"
                     className="bg-green-600 hover:bg-green-700"
                     onClick={() => {
-                      const comment = prompt('Please provide approval comments:');
-                      if (comment) {
-                        fetch(`/technical/api/change-requests/${viewingRequest.id}/approve`, {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ comment, reviewerId: 'current_user' })
-                        }).then(() => {
-                          queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
-                          setViewingRequest(null);
-                          toast({
-                            title: "Change request approved",
-                            description: "The change request has been approved successfully"
-                          });
-                        });
-                      }
+                      const label = viewingRequest.title
+                        ? `CR-${viewingRequest.id} • ${viewingRequest.title}`
+                        : `CR-${viewingRequest.id}`;
+                      openReviewDialog('approve', viewingRequest.id, label);
                     }}
+                    data-testid="button-cr-approve"
                   >
                     Approve
                   </Button>
@@ -1173,6 +1178,140 @@ export default function ModifyPMS() {
               )}
             </div>
             <Button onClick={() => setViewingRequest(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approve / Reject Change Request Dialog */}
+      <Dialog
+        open={reviewDialog.open}
+        onOpenChange={(open) => {
+          if (!open && !reviewSubmitting) closeReviewDialog();
+        }}
+      >
+        <DialogContent className="max-w-lg" data-testid="dialog-review-change-request">
+          <DialogHeader>
+            <DialogTitle>
+              {reviewDialog.action === 'reject' ? 'Reject Change Request' : 'Approve Change Request'}
+            </DialogTitle>
+            <DialogDescription>
+              {reviewDialog.action === 'reject'
+                ? (reviewDialog.label
+                  ? `Provide a reason for rejecting ${reviewDialog.label}. This will be visible to the requester.`
+                  : 'Provide a reason for rejection. This will be visible to the requester.')
+                : (reviewDialog.label
+                  ? `Add approval comments for ${reviewDialog.label}. These will be visible to the requester.`
+                  : 'Add approval comments. These will be visible to the requester.')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="review-comment-textarea">
+              {reviewDialog.action === 'reject' ? (
+                <>Rejection reason <span className="text-red-600">*</span></>
+              ) : (
+                <>Approval comments <span className="text-red-600">*</span></>
+              )}
+            </Label>
+            <Textarea
+              id="review-comment-textarea"
+              value={reviewComment}
+              onChange={(e) => {
+                setReviewComment(e.target.value);
+                if (reviewError) setReviewError('');
+              }}
+              placeholder={
+                reviewDialog.action === 'reject'
+                  ? 'Explain why this is being rejected (minimum 10 characters)'
+                  : 'Add comments to accompany this approval'
+              }
+              rows={5}
+              maxLength={1000}
+              disabled={reviewSubmitting}
+              data-testid="textarea-review-comment"
+            />
+            <div className="flex items-center justify-between text-xs">
+              <span className={reviewError ? 'text-red-600' : 'text-gray-500'} data-testid="text-review-error">
+                {reviewError || (reviewDialog.action === 'reject'
+                  ? 'Minimum 10 characters required.'
+                  : 'Please provide a comment to accompany this approval.')}
+              </span>
+              <span className="text-gray-400" data-testid="text-review-count">
+                {reviewComment.length}/1000
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={closeReviewDialog}
+              disabled={reviewSubmitting}
+              data-testid="button-review-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant={reviewDialog.action === 'reject' ? 'destructive' : 'default'}
+              className={reviewDialog.action === 'approve' ? 'bg-green-600 hover:bg-green-700' : undefined}
+              disabled={reviewSubmitting}
+              onClick={async () => {
+                const comment = reviewComment.trim();
+                if (reviewDialog.action === 'reject' && comment.length < 10) {
+                  setReviewError('Please provide at least 10 characters explaining the rejection.');
+                  return;
+                }
+                if (reviewDialog.action === 'approve' && comment.length === 0) {
+                  setReviewError('Please provide a comment to accompany this approval.');
+                  return;
+                }
+                if (!reviewDialog.requestId) return;
+                setReviewSubmitting(true);
+                try {
+                  const endpoint = reviewDialog.action === 'reject' ? 'reject' : 'approve';
+                  const response = await fetch(`/technical/api/change-requests/${reviewDialog.requestId}/${endpoint}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ comment, reviewerId: 'current_user' }),
+                  });
+                  if (!response.ok) throw new Error(`Failed to ${endpoint}`);
+                  queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
+                  setViewingRequest(null);
+                  toast({
+                    title: reviewDialog.action === 'reject' ? 'Change request rejected' : 'Change request approved',
+                    description: reviewDialog.action === 'reject'
+                      ? 'The change request has been rejected'
+                      : 'The change request has been approved successfully',
+                  });
+                  closeReviewDialog();
+                } catch {
+                  toast({
+                    title: 'Error',
+                    description: reviewDialog.action === 'reject'
+                      ? 'Failed to reject the change request'
+                      : 'Failed to approve the change request',
+                    variant: 'destructive',
+                  });
+                  setReviewSubmitting(false);
+                }
+              }}
+              data-testid="button-review-confirm"
+            >
+              {reviewSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                  {reviewDialog.action === 'reject' ? 'Rejecting...' : 'Approving...'}
+                </>
+              ) : reviewDialog.action === 'reject' ? (
+                <>
+                  <XCircle className="w-4 h-4 mr-1" />
+                  Confirm Rejection
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-1" />
+                  Confirm Approval
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -3,6 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { MessageSquare, X, Calendar } from "lucide-react";
 
 interface StoresChangeRequestFormProps {
@@ -48,6 +57,23 @@ const StoresChangeRequestForm: React.FC<StoresChangeRequestFormProps> = ({
   ]);
 
   const [changedFields, setChangedFields] = useState<Set<string>>(new Set());
+
+  const [commentDialog, setCommentDialog] = useState<{
+    open: boolean;
+    index: number | null;
+    itemName: string;
+  }>({ open: false, index: null, itemName: "" });
+  const [commentDraft, setCommentDraft] = useState("");
+
+  const openCommentDialog = (index: number, itemName: string) => {
+    setCommentDraft(storeItems[index]?.comments || "");
+    setCommentDialog({ open: true, index, itemName });
+  };
+
+  const closeCommentDialog = () => {
+    setCommentDialog({ open: false, index: null, itemName: "" });
+    setCommentDraft("");
+  };
 
   const handleInputChange = (field: string, value: string) => {
     if (field === 'placeReceived') {
@@ -220,16 +246,12 @@ const StoresChangeRequestForm: React.FC<StoresChangeRequestFormProps> = ({
                   {item.newRob}
                 </div>
                 <div className="flex justify-center">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="h-8 w-8 p-0 text-[#52baf3] hover:bg-[#52baf3] hover:text-white"
-                    onClick={() => {
-                      const comment = prompt(`Add comment for ${item.itemName}:`);
-                      if (comment) {
-                        handleItemChange(index, 'comments', comment);
-                      }
-                    }}
+                    onClick={() => openCommentDialog(index, item.itemName)}
+                    data-testid={`button-item-comment-${index}`}
                   >
                     <MessageSquare className="h-4 w-4" />
                   </Button>
@@ -256,6 +278,62 @@ const StoresChangeRequestForm: React.FC<StoresChangeRequestFormProps> = ({
           Save Updates
         </Button>
       </div>
+
+      <Dialog
+        open={commentDialog.open}
+        onOpenChange={(open) => {
+          if (!open) closeCommentDialog();
+        }}
+      >
+        <DialogContent className="max-w-lg" data-testid="dialog-item-comment">
+          <DialogHeader>
+            <DialogTitle>
+              {commentDialog.itemName ? `Comment for ${commentDialog.itemName}` : 'Add Comment'}
+            </DialogTitle>
+            <DialogDescription>
+              Add a comment for this item. Leave blank to clear an existing comment.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="item-comment-textarea">Comment</Label>
+            <Textarea
+              id="item-comment-textarea"
+              value={commentDraft}
+              onChange={(e) => setCommentDraft(e.target.value)}
+              placeholder="Add a comment for this item"
+              rows={5}
+              maxLength={500}
+              data-testid="textarea-item-comment"
+            />
+            <div className="flex items-center justify-end text-xs">
+              <span className="text-gray-400" data-testid="text-item-comment-count">
+                {commentDraft.length}/500
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={closeCommentDialog}
+              data-testid="button-item-comment-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-[#52baf3] hover:bg-[#40a8e0] text-white"
+              onClick={() => {
+                if (commentDialog.index !== null) {
+                  handleItemChange(commentDialog.index, 'comments', commentDraft.trim());
+                }
+                closeCommentDialog();
+              }}
+              data-testid="button-item-comment-save"
+            >
+              Save Comment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
