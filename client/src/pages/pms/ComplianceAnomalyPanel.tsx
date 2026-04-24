@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
   ColDef,
   ICellRendererParams,
+  IRowNode,
   ITooltipParams,
+  SelectionChangedEvent,
   ValueFormatterParams,
   ValueGetterParams,
 } from "ag-grid-community";
@@ -479,6 +481,55 @@ function WorkOrderAnomaliesDetails({
     [vessels],
   );
 
+  const [selectedAnomalyIds, setSelectedAnomalyIds] = useState<number[]>([]);
+  const [isBulkAcking, setIsBulkAcking] = useState(false);
+
+  const onSelectionChanged = useCallback((event: SelectionChangedEvent) => {
+    const ids = event.api
+      .getSelectedNodes()
+      .map((n: IRowNode<Anomaly>) => n.data?.id)
+      .filter((id): id is number => typeof id === 'number');
+    setSelectedAnomalyIds(ids);
+  }, []);
+
+  const isRowSelectable = useCallback(
+    (node: IRowNode<Anomaly>) => node.data?.status === 'PENDING_REVIEW',
+    [],
+  );
+
+  const handleBulkAcknowledge = useCallback(async () => {
+    if (selectedAnomalyIds.length === 0 || isBulkAcking) return;
+    setIsBulkAcking(true);
+    const total = selectedAnomalyIds.length;
+    const results = await Promise.allSettled(
+      selectedAnomalyIds.map((id) =>
+        apiRequest('PATCH', `/technical/api/anomalies/${id}/acknowledge`, {
+          acknowledgedBy: 'Superintendent',
+        }),
+      ),
+    );
+    const ok = results.filter((r) => r.status === 'fulfilled').length;
+    const fail = total - ok;
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/anomalies/dashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/anomalies/statistics'] });
+    setSelectedAnomalyIds([]);
+    setIsBulkAcking(false);
+    if (fail === 0) {
+      toast({ title: `Acknowledged ${ok} ${ok === 1 ? 'anomaly' : 'anomalies'}` });
+    } else if (ok === 0) {
+      toast({
+        title: `Failed to acknowledge ${fail} ${fail === 1 ? 'anomaly' : 'anomalies'}`,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: `Acknowledged ${ok} of ${total} anomalies`,
+        description: `${fail} failed — please try again.`,
+        variant: 'destructive',
+      });
+    }
+  }, [selectedAnomalyIds, isBulkAcking, queryClient, toast]);
+
   const columnDefs: ColDef<Anomaly>[] = useMemo(() => {
     const vesselCol: ColDef<Anomaly> = {
       headerName: 'Vessel',
@@ -728,7 +779,24 @@ function WorkOrderAnomaliesDetails({
       },
     };
 
+    const selectCol: ColDef<Anomaly> = {
+      headerName: '',
+      colId: 'select',
+      width: 44,
+      minWidth: 44,
+      maxWidth: 44,
+      pinned: 'left',
+      sortable: false,
+      filter: false,
+      resizable: false,
+      checkboxSelection: (params) => params.data?.status === 'PENDING_REVIEW',
+      headerCheckboxSelection: true,
+      headerCheckboxSelectionFilteredOnly: true,
+      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    };
+
     return [
+      ...(canAcknowledge ? [selectCol] : []),
       ...(isAllVessels ? [vesselCol] : []),
       componentCol,
       woCol,
@@ -807,6 +875,30 @@ function WorkOrderAnomaliesDetails({
               ? 'Loading…'
               : `${anomalies.length} ${anomalies.length === 1 ? 'anomaly' : 'anomalies'}`}
           </span>
+          {canAcknowledge && selectedAnomalyIds.length > 0 && (
+            <button
+              onClick={handleBulkAcknowledge}
+              disabled={isBulkAcking}
+              style={{
+                background: '#1565C0',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '4px 10px',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: isBulkAcking ? 'not-allowed' : 'pointer',
+                opacity: isBulkAcking ? 0.6 : 1,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+              data-testid="button-bulk-ack-wo-anomalies"
+            >
+              <CheckSquare className="w-3 h-3" />
+              {isBulkAcking ? 'Acknowledging…' : `Bulk Acknowledge (${selectedAnomalyIds.length})`}
+            </button>
+          )}
         </div>
       </div>
 
@@ -844,6 +936,9 @@ function WorkOrderAnomaliesDetails({
             noRowsMessage="No anomalies detected"
             testId="ag-grid-wo-anomalies"
             getRowId={(params) => String((params.data as Anomaly).id)}
+            rowSelection={canAcknowledge ? 'multiple' : undefined}
+            onSelectionChanged={canAcknowledge ? onSelectionChanged : undefined}
+            isRowSelectable={canAcknowledge ? isRowSelectable : undefined}
           />
         </div>
       )}

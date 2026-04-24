@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import type { ColDef, GridReadyEvent, GridApi, RowClickedEvent, SortChangedEvent, SelectionChangedEvent, GetRowIdFunc } from 'ag-grid-community';
+import type { ColDef, GridReadyEvent, GridApi, RowClickedEvent, SortChangedEvent, SelectionChangedEvent, GetRowIdFunc, IsRowSelectable } from 'ag-grid-community';
 import { ModuleRegistry } from 'ag-grid-community';
 import {
   AllEnterpriseModule,
@@ -73,6 +73,7 @@ interface WOAgGridTableProps {
   onSelectionChanged?: (event: SelectionChangedEvent) => void;
   getRowId?: GetRowIdFunc;
   loading?: boolean;
+  isRowSelectable?: IsRowSelectable;
 }
 
 const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
@@ -93,6 +94,7 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
   onSelectionChanged,
   getRowId,
   loading,
+  isRowSelectable,
 }) => {
   const gridApiRef = useRef<GridApi | null>(null);
 
@@ -175,6 +177,7 @@ const WOAgGridTable: React.FC<WOAgGridTableProps> = ({
         rowSelection={rowSelection}
         onSelectionChanged={onSelectionChanged}
         getRowId={getRowId}
+        isRowSelectable={isRowSelectable}
         domLayout={domLayout}
         reactiveCustomComponents={true}
         overlayNoRowsTemplate={overlayNoRowsTemplate}
