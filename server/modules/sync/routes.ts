@@ -29,6 +29,17 @@ router.post('/sync/prune', requireOfflineAdmin, asyncHandler(syncController.prun
 router.get('/sync/health', asyncHandler(syncController.healthCheckHandler));
 router.get('/sync/table-stats', asyncHandler(syncController.tableStatsHandler));
 
+// Settings endpoints (admin only)
+router.get('/sync/settings', requireOfflineAdmin, asyncHandler(syncController.getSettingsHandler));
+router.put('/sync/settings', requireOfflineAdmin, asyncHandler(syncController.updateSettingsHandler));
+router.post('/sync/settings/test-connection', requireOfflineAdmin, asyncHandler(syncController.testConnectionHandler));
+
+// Fleet overview (shore admin)
+router.get('/sync/fleet-overview', requireOfflineAdmin, asyncHandler(syncController.fleetOverviewHandler));
+
+// Instance info (public — used by frontend to determine ship vs shore)
+router.get('/sync/instance-info', asyncHandler(syncController.instanceInfoHandler));
+
 // Provisioning endpoints (offline_admin / Sail Admin gated)
 // Static routes MUST come before parameterized :vesselId to avoid Express matching "import"/"verify" as a vesselId
 router.post('/sync/provision/import', requireOfflineAdmin, asyncHandler(syncController.importProvisionHandler));

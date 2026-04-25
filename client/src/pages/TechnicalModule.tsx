@@ -35,6 +35,7 @@ import RanksAdmin from "./admin/RanksAdmin";
 import AddEditFleetComponent from "./admin/AddEditFleetComponent";
 import SyncDashboard from "./admin/SyncDashboard";
 import SyncProvisioning from "./admin/SyncProvisioning";
+import SyncFleetOverview from "./admin/SyncFleetOverview";
 // ====== NOON REPORT MODULE — START (remove to disable) ======
 import NoonEntryForm from "./noon-report/NoonEntryForm";
 import ReportHistory from "./noon-report/ReportHistory";
@@ -245,6 +246,8 @@ export const TechnicalModule = () => {
             <SyncDashboard />
           ) : selectedSubModule === "admin" && selectedMenuItem === "sync-provisioning" ? (
             <SyncProvisioning />
+          ) : selectedSubModule === "admin" && selectedMenuItem === "sync-fleet" ? (
+            <SyncFleetOverview />
           ) : selectedSubModule === "admin" && selectedMenuItem === "fleet-component-editor" ? (
             <AddEditFleetComponent />
           ) : selectedSubModule === "admin" ? (

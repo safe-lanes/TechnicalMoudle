@@ -6,13 +6,15 @@
 
 import { eq, and, ne, gt, desc, asc, inArray, isNull, sql } from 'drizzle-orm';
 import { getDb } from '../../db';
+import { getPool } from '../../db';
 import {
-  syncMetadata, syncFieldLog, syncConflicts, syncFileQueue, syncBatches,
+  syncMetadata, syncFieldLog, syncConflicts, syncFileQueue, syncBatches, syncSettings,
   type InsertSyncMetadata, type SyncMetadata,
   type SyncFieldLog,
   type InsertSyncConflict, type SyncConflict,
   type InsertSyncFileQueue, type SyncFileQueue,
   type InsertSyncBatch, type SyncBatch,
+  type SyncSettings,
 } from '@shared/schema';
 
 // ═══════════════════════════════════════════════════════════════
@@ -373,4 +375,54 @@ export async function getRecentBatches(vesselId: string, limit: number = 10): Pr
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(syncBatches.startedAt))
     .limit(limit);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// sync_settings
+// ═══════════════════════════════════════════════════════════════
+
+export async function getAllSettings(): Promise<Record<string, string>> {
+  const db = await getDb();
+  const rows = await db.select().from(syncSettings)
+    .where(eq(syncSettings.isDeleted, false));
+  const map: Record<string, string> = {};
+  for (const row of rows) {
+    map[row.settingKey] = row.settingValue ?? '';
+  }
+  return map;
+}
+
+export async function getAllSettingsFull(): Promise<SyncSettings[]> {
+  const db = await getDb();
+  return db.select().from(syncSettings)
+    .where(eq(syncSettings.isDeleted, false))
+    .orderBy(asc(syncSettings.settingKey));
+}
+
+export async function getSetting(key: string): Promise<string | null> {
+  const db = await getDb();
+  const rows = await db.select().from(syncSettings)
+    .where(and(
+      eq(syncSettings.settingKey, key),
+      eq(syncSettings.isDeleted, false),
+    ))
+    .limit(1);
+  return rows[0]?.settingValue ?? null;
+}
+
+export async function updateSetting(key: string, value: string, userId?: string): Promise<void> {
+  const db = await getDb();
+  await db.update(syncSettings)
+    .set({
+      settingValue: value,
+      updatedAt: new Date(),
+      ...(userId ? { updatedByUuid: userId } : {}),
+    })
+    .where(eq(syncSettings.settingKey, key));
+}
+
+export async function updateSettings(settings: Record<string, string>, userId?: string): Promise<void> {
+  for (const [key, value] of Object.entries(settings)) {
+    await updateSetting(key, value, userId);
+  }
 }

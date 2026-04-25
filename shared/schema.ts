@@ -4168,5 +4168,28 @@ export const insertSyncBatchesSchema = createInsertSchema(syncBatches).omit({
 export type InsertSyncBatch = z.infer<typeof insertSyncBatchesSchema>;
 export type SyncBatch = typeof syncBatches.$inferSelect;
 
+export const syncSettings = pgTable("sync_settings", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  ssuuid: text("ssuuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  settingKey: text("setting_key").notNull().unique(),
+  settingValue: text("setting_value"),
+  settingType: text("setting_type").default("text"),
+  description: text("description"),
+  isEditable: boolean("is_editable").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
+  isSync: boolean("is_sync").default(false).notNull(),
+});
+
+export const insertSyncSettingsSchema = createInsertSchema(syncSettings).omit({
+  id: true, ssuuid: true, createdAt: true, updatedAt: true,
+});
+
+export type InsertSyncSettings = z.infer<typeof insertSyncSettingsSchema>;
+export type SyncSettings = typeof syncSettings.$inferSelect;
+
 // ====== NOON REPORT MODULE SCHEMA — remove this line to disable ======
 export * from './schema-noon-report';

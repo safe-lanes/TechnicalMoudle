@@ -59,6 +59,7 @@ export class SyncEngine {
   private instanceId: string;
   private shoreBaseUrl: string;
   private syncApiKey: string;
+  private settingsLoaded: boolean = false;
 
   constructor() {
     this.instanceId = process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
@@ -66,11 +67,37 @@ export class SyncEngine {
     this.syncApiKey = process.env.SYNC_API_KEY || '';
   }
 
+  /** Load settings from DB (with env var fallback). Called once per sync cycle. */
+  async loadSettings(): Promise<void> {
+    if (this.settingsLoaded) return;
+
+    try {
+      const settings = await syncRepo.getAllSettings();
+
+      this.instanceId = settings['instance_id'] || process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
+      this.shoreBaseUrl = settings['shore_url'] || process.env.SYNC_SHORE_URL || '';
+      this.syncApiKey = process.env.SYNC_API_KEY || '';
+
+      this.settingsLoaded = true;
+      console.log(`[SyncEngine] Settings loaded from DB — instanceId=${this.instanceId}, shoreUrl=${this.shoreBaseUrl || '(empty)'}, localMode=${this.isLocalMode()}`);
+    } catch (error) {
+      // DB might not be ready — fall back to env vars (already set in constructor)
+      console.warn('[SyncEngine] Could not load DB settings, using env vars:', error);
+    }
+  }
+
+  /** Force reload on next sync cycle (called when settings are updated via API) */
+  reloadSettings(): void {
+    this.settingsLoaded = false;
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // PUBLIC — Run a complete sync cycle
   // ═══════════════════════════════════════════════════════════════
 
   async runSync(vesselId: string): Promise<SyncResult> {
+    await this.loadSettings();
+
     const startTime = Date.now();
     let batchUuid: string | null = null;
     let recordsPushed = 0;
@@ -490,6 +517,11 @@ export class SyncEngine {
       !this.shoreBaseUrl ||
       this.shoreBaseUrl === ''
     );
+  }
+
+  /** Get current instance ID (for use by controllers) */
+  getInstanceId(): string {
+    return this.instanceId;
   }
 }
 

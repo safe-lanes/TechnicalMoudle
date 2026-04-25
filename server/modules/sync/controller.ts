@@ -10,6 +10,7 @@ import { getSyncEngine } from './syncEngine';
 import { FileSyncProcessor } from './fileSyncProcessor';
 import { runPruning } from './pruningService';
 import { runHealthCheck, getTableStats } from './healthMonitor';
+import { getPool } from '../../db';
 
 // ── POST /sync/initiate ──
 
@@ -391,5 +392,112 @@ export async function tableStatsHandler(req: Request, res: Response) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] table stats error:', error);
     res.status(500).json({ error: 'Failed to get table stats' });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// Settings, Fleet Overview & Instance Info endpoints
+// ══════════════════════════════════════════════════════════════
+
+// ── GET /sync/settings ──
+
+export async function getSettingsHandler(req: Request, res: Response) {
+  try {
+    const settings = await syncRepo.getAllSettingsFull();
+    res.json({ settings });
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Sync] get settings error:', error);
+    res.status(500).json({ error: 'Failed to get sync settings' });
+  }
+}
+
+// ── PUT /sync/settings ──
+
+export async function updateSettingsHandler(req: Request, res: Response) {
+  try {
+    const { settings } = req.body;
+    if (!settings || typeof settings !== 'object') {
+      return res.status(400).json({ error: 'settings object is required' });
+    }
+
+    const userId = (req as any).user?.userUuid || (req as any).user?.username || 'system';
+    await syncRepo.updateSettings(settings, userId);
+
+    // Force sync engine to reload settings from DB
+    const engine = getSyncEngine();
+    engine.reloadSettings();
+
+    res.json({ success: true, message: 'Settings updated. Sync engine will reload on next cycle.' });
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Sync] update settings error:', error);
+    res.status(500).json({ error: 'Failed to update sync settings' });
+  }
+}
+
+// ── POST /sync/settings/test-connection ──
+
+export async function testConnectionHandler(req: Request, res: Response) {
+  try {
+    const { shoreUrl } = req.body;
+    if (!shoreUrl) {
+      return res.status(400).json({ error: 'shoreUrl is required' });
+    }
+
+    const startTime = Date.now();
+    const response = await fetch(`${shoreUrl}/sync/health`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(10000),
+    });
+    const latencyMs = Date.now() - startTime;
+
+    if (response.ok) {
+      const data = await response.json();
+      res.json({ connected: true, latencyMs, shoreHealth: data, message: `Connected in ${latencyMs}ms` });
+    } else {
+      res.json({ connected: false, latencyMs, message: `Shore responded with ${response.status}` });
+    }
+  } catch (error: any) {
+    res.json({ connected: false, latencyMs: null, message: `Connection failed: ${error.message}` });
+  }
+}
+
+// ── GET /sync/instance-info ──
+
+export async function instanceInfoHandler(req: Request, res: Response) {
+  try {
+    const envInstanceId = process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
+    let dbInstanceId: string | null = null;
+    try {
+      dbInstanceId = await syncRepo.getSetting('instance_id');
+    } catch {}
+
+    const effectiveId = (dbInstanceId && dbInstanceId.trim()) || envInstanceId;
+    const isShip = effectiveId.startsWith('SHIP-');
+    const isShore = !isShip;
+
+    res.json({
+      instanceId: effectiveId,
+      isShore,
+      isShip,
+      instanceType: isShip ? 'ship' : 'shore',
+    });
+  } catch (error: any) {
+    console.error('[Sync] instance info error:', error);
+    res.status(500).json({ error: 'Failed to get instance info' });
+  }
+}
+
+// ── GET /sync/fleet-overview ──
+
+export async function fleetOverviewHandler(req: Request, res: Response) {
+  try {
+    const overview = await syncService.getFleetSyncOverview();
+    res.json({ vessels: overview });
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Sync] fleet overview error:', error);
+    res.status(500).json({ error: 'Failed to get fleet sync overview' });
   }
 }

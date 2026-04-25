@@ -35,7 +35,9 @@ import {
   UserCog,
   Cloud,
   HardDrive,
+  Globe,
 } from "lucide-react";
+import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 
 interface SideMenuBarProps {
   selectedItem?: string;
@@ -88,6 +90,7 @@ const menuConfigs: Record<string, MenuItem[]> = {
     { id: "access-control", label: "Access Control", icon: ShieldCheck },
     { id: "sync-dashboard", label: "Sync Dashboard", icon: Cloud },
     { id: "sync-provisioning", label: "Ship Provisioning", icon: HardDrive },
+    // sync-fleet is conditionally added at runtime (shore-only)
   ],
   // ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
   "noon-report": [
@@ -112,6 +115,7 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
   const { isSailAdmin } = useUIRole();
   const vesselCtx = useContext(VesselContext);
   const vesselId = vesselCtx?.vesselId ?? "";
+  const { isShore } = useSyncInstanceInfo();
 
   // Sidebar badge: unacknowledged noon-report alert count
   const { data: alertCountData } = useQuery<{ count: number }>({
@@ -127,7 +131,11 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
   });
   const nrAlertCount = alertCountData?.count ?? 0;
 
-  const allMenuItems = menuConfigs[subModule] || menuConfigs.pms;
+  let allMenuItems = menuConfigs[subModule] || menuConfigs.pms;
+  // Conditionally add shore-only Fleet Sync Overview to admin menu
+  if (subModule === "admin" && isShore) {
+    allMenuItems = [...allMenuItems, { id: "sync-fleet", label: "Fleet Overview", icon: Globe }];
+  }
   const menuItems = allMenuItems.filter((item) => {
     if (item.id === "access-control") return isSailAdmin;
     return canViewSidebarItem(subModule, item.id);

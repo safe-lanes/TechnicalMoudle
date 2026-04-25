@@ -18,6 +18,7 @@
  */
 
 import { getPool } from '../../db';
+import * as syncRepo from './repository';
 
 export interface PruneConfig {
   fieldLogDays: number;
@@ -36,10 +37,21 @@ export interface PruneResult {
   timestamp: string;
 }
 
-function getRetentionConfig(): PruneConfig {
+async function getRetentionConfig(): Promise<PruneConfig> {
+  // Try DB settings first, then env vars, then defaults
+  let dbFieldLogDays: string | null = null;
+  let dbBatchDays: string | null = null;
+  try {
+    const settings = await syncRepo.getAllSettings();
+    dbFieldLogDays = settings['field_log_retention_days'] || null;
+    dbBatchDays = settings['batch_retention_days'] || null;
+  } catch {
+    // DB not ready — use env/defaults
+  }
+
   return {
-    fieldLogDays: parseInt(process.env.SYNC_PRUNE_FIELD_LOG_DAYS || '90', 10),
-    batchDays: parseInt(process.env.SYNC_PRUNE_BATCH_DAYS || '365', 10),
+    fieldLogDays: parseInt(dbFieldLogDays || process.env.SYNC_PRUNE_FIELD_LOG_DAYS || '90', 10),
+    batchDays: parseInt(dbBatchDays || process.env.SYNC_PRUNE_BATCH_DAYS || '365', 10),
     fileQueueDays: parseInt(process.env.SYNC_PRUNE_FILE_QUEUE_DAYS || '90', 10),
     conflictDays: parseInt(process.env.SYNC_PRUNE_CONFLICT_DAYS || '180', 10),
   };
@@ -124,7 +136,8 @@ async function pruneConflicts(config: PruneConfig): Promise<number> {
  */
 export async function runPruning(overrideConfig?: Partial<PruneConfig>): Promise<PruneResult> {
   const start = Date.now();
-  const config = { ...getRetentionConfig(), ...overrideConfig };
+  const baseConfig = await getRetentionConfig();
+  const config = { ...baseConfig, ...overrideConfig };
 
   console.log(`[SyncPruning] Starting prune cycle — retention: fieldLog=${config.fieldLogDays}d, batches=${config.batchDays}d, fileQueue=${config.fileQueueDays}d, conflicts=${config.conflictDays}d`);
 
