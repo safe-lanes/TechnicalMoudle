@@ -69,6 +69,9 @@ const MENU_NAME_MAP: Record<string, Record<string, string>> = {
     "ships-surveys": "admin-ships-surveys",
     "ranks": "admin-ranks",
     "access-control": "admin-access-control",
+    "sync-dashboard": "admin-sync-dashboard",
+    "sync-provisioning": "admin-sync-provisioning",
+    "sync-fleet": "admin-sync-fleet",
   },
 };
 
@@ -102,6 +105,9 @@ const ROUTE_TO_MENU_NAME: Record<string, string> = {
   "/admin/ships-surveys": "admin-ships-surveys",
   "/admin/ranks": "admin-ranks",
   "/admin/access-control": "admin-access-control",
+  "/admin/sync-dashboard": "admin-sync-dashboard",
+  "/admin/sync-provisioning": "admin-sync-provisioning",
+  "/admin/sync-fleet": "admin-sync-fleet",
 };
 
 const CHILD_ROUTE_PATTERNS: Array<{ pattern: RegExp; parentMenuName: string }> = [
