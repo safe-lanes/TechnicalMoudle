@@ -102,6 +102,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   pmsAlertEngine.start(5 * 60 * 1000); // Run every 5 minutes
   console.log('[PmsAlertEngine] Alert scanner started - will evaluate overdue jobs, low spares, skipped cycles');
 
+  // Start Sync Pruning Scheduler - cleans up old sync data every 24 hours
+  const { syncPruningScheduler } = await import("./modules/sync/pruningService");
+  syncPruningScheduler.start(24 * 60 * 60 * 1000); // Run every 24 hours
+  console.log('[SyncPruning] Scheduler started - will prune old sync logs, batches, file queue, conflicts');
+
+  // Start Sync Health Monitor - checks sync health every 6 hours
+  const { syncHealthScheduler } = await import("./modules/sync/healthMonitor");
+  syncHealthScheduler.start(6 * 60 * 60 * 1000); // Run every 6 hours
+  console.log('[SyncHealth] Health monitor started - will check stale syncs, conflicts, stuck files, log overflow');
+
   // Dev-only seed endpoint for recurring defects testing
   if (process.env.NODE_ENV === 'development') {
     // Seed recurring defects test data
@@ -510,10 +520,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   process.on('SIGTERM', () => {
     console.log('Cleaning up scheduled tasks...');
     clearInterval(postponementCheckInterval);
+    syncPruningScheduler.stop();
+    syncHealthScheduler.stop();
   });
   process.on('SIGINT', () => {
     console.log('Cleaning up scheduled tasks...');
     clearInterval(postponementCheckInterval);
+    syncPruningScheduler.stop();
+    syncHealthScheduler.stop();
   });
 
   return httpServer;

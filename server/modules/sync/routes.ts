@@ -24,6 +24,11 @@ router.post('/sync/trigger', asyncHandler(syncController.triggerSyncHandler));
 router.post('/sync/file/upload-chunk', asyncHandler(syncController.uploadChunkHandler));
 router.get('/sync/file/queue', asyncHandler(syncController.fileQueueHandler));
 
+// Pruning & Health endpoints
+router.post('/sync/prune', requireOfflineAdmin, asyncHandler(syncController.pruneHandler));
+router.get('/sync/health', asyncHandler(syncController.healthCheckHandler));
+router.get('/sync/table-stats', asyncHandler(syncController.tableStatsHandler));
+
 // Provisioning endpoints (offline_admin / Sail Admin gated)
 // Static routes MUST come before parameterized :vesselId to avoid Express matching "import"/"verify" as a vesselId
 router.post('/sync/provision/import', requireOfflineAdmin, asyncHandler(syncController.importProvisionHandler));

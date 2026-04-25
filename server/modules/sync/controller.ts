@@ -8,6 +8,8 @@ import * as syncRepo from './repository';
 import * as provisioningService from './provisioningService';
 import { getSyncEngine } from './syncEngine';
 import { FileSyncProcessor } from './fileSyncProcessor';
+import { runPruning } from './pruningService';
+import { runHealthCheck, getTableStats } from './healthMonitor';
 
 // ── POST /sync/initiate ──
 
@@ -339,5 +341,55 @@ export async function verifyProvisionHandler(req: Request, res: Response) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Provisioning] verify error:', error);
     res.status(500).json({ error: 'Failed to verify provisioning' });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// Pruning & Health endpoints
+// ══════════════════════════════════════════════════════════════
+
+// ── POST /sync/prune ──
+
+export async function pruneHandler(req: Request, res: Response) {
+  try {
+    const overrides = req.body || {};
+    const config: Record<string, number> = {};
+    if (overrides.fieldLogDays !== undefined) config.fieldLogDays = parseInt(overrides.fieldLogDays, 10);
+    if (overrides.batchDays !== undefined) config.batchDays = parseInt(overrides.batchDays, 10);
+    if (overrides.fileQueueDays !== undefined) config.fileQueueDays = parseInt(overrides.fileQueueDays, 10);
+    if (overrides.conflictDays !== undefined) config.conflictDays = parseInt(overrides.conflictDays, 10);
+
+    const result = await runPruning(Object.keys(config).length > 0 ? config : undefined);
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Sync] prune error:', error);
+    res.status(500).json({ error: 'Failed to run pruning' });
+  }
+}
+
+// ── GET /sync/health ──
+
+export async function healthCheckHandler(req: Request, res: Response) {
+  try {
+    const result = await runHealthCheck();
+    res.json(result);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Sync] health check error:', error);
+    res.status(500).json({ error: 'Failed to run health check' });
+  }
+}
+
+// ── GET /sync/table-stats ──
+
+export async function tableStatsHandler(req: Request, res: Response) {
+  try {
+    const stats = await getTableStats();
+    res.json(stats);
+  } catch (error: any) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error('[Sync] table stats error:', error);
+    res.status(500).json({ error: 'Failed to get table stats' });
   }
 }

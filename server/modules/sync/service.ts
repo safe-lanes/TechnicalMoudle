@@ -18,6 +18,7 @@ import {
   type SyncCategory,
 } from '../../../shared/syncConfig';
 import { getPool } from '../../db';
+import { getTableStats } from './healthMonitor';
 
 // ═══════════════════════════════════════════════════════════════
 // 1. INITIATE
@@ -437,6 +438,14 @@ export async function getSyncStatus(vesselId: string, instanceId: string) {
   const pendingFiles = await repo.getPendingFileCount(vesselId);
   const recentBatches = await repo.getRecentBatches(vesselId, 5);
 
+  // Fetch table stats in parallel (non-blocking — if it fails, skip gracefully)
+  let tableStats: Record<string, { total: number; active: number }> = {};
+  try {
+    tableStats = await getTableStats();
+  } catch (err) {
+    console.warn('[Sync] Failed to fetch table stats for status:', err);
+  }
+
   return {
     instance: metadata ? {
       instanceId: metadata.instanceId,
@@ -460,6 +469,7 @@ export async function getSyncStatus(vesselId: string, instanceId: string) {
       conflictsFound: b.conflictsFound,
       conflictsResolved: b.conflictsResolved,
     })),
+    tableStats,
   };
 }
 
