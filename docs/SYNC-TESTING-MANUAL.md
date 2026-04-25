@@ -45,7 +45,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 | 💾 Hard Drive icon | **Ship Provisioning** | Prepare initial data package for a ship |
 | 🌐 Globe icon | **Fleet Overview** | See all vessels' sync status (**office only** — you won't see this on a ship) |
 
-[SCREENSHOT: Left sidebar showing Admin section with Sync Dashboard, Ship Provisioning, and Fleet Overview menu items]
+![Admin sidebar showing Sync Dashboard, Ship Provisioning, and Fleet Overview menu items](screenshots/02-admin-sidebar-sync-links.png)
 
 ---
 
@@ -58,7 +58,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 1. Click **Admin** in the top menu bar
 2. Click **Sync Dashboard** (cloud icon) in the left sidebar
 
-[SCREENSHOT: Full Sync Dashboard page after loading]
+![Full Sync Dashboard page](screenshots/03-sync-dashboard-full.png)
 
 3. Look at the **top of the page**. You should see the title **"Sync Dashboard"** with the subtitle "Monitor sync status, trigger sync, and resolve conflicts"
 
@@ -71,15 +71,15 @@ The "Sync" feature does this automatically. Your job is to test that it works co
    | **Conflicts** | Amber/Orange | A number — should be **0** if everything is normal |
    | **File Queue** | Purple | Shows "X pending" — should be **0 pending** normally |
 
-   [SCREENSHOT: The four status cards — Last Sync, Last Status, Conflicts, File Queue]
+   ![Status cards — Last Sync, Last Status, Conflicts, File Queue](screenshots/03-sync-dashboard-full.png)
 
 5. Below the cards, look for the **vessel selector dropdown** at the top right. It says "Select vessel...". Click it and pick your test vessel.
 
-   [SCREENSHOT: Vessel dropdown selector open with vessel list]
+   ![Vessel dropdown selector](screenshots/03-sync-dashboard-full.png)
 
 6. Scroll down. You should see a section called **"Recent Sync History"** with a table. The table columns are: Date/Time, Status, Pushed, Pulled, Conflicts, Files, Duration. If no sync has happened yet, you'll see a cloud icon with "No sync history yet" — that's OK.
 
-   [SCREENSHOT: Recent Sync History section with table or empty state]
+   ![Recent Sync History section](screenshots/03-sync-dashboard-full.png)
 
 ### Pass/Fail
 
@@ -101,7 +101,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 3. Below the status cards, find the section titled **"Sync Now"** (with a lightning bolt ⚡ icon)
 4. Click the blue **"Sync Now"** button
 
-   [SCREENSHOT: The "Sync Now" section with the blue button before clicking]
+   ![Sync Now section with the blue button](screenshots/03-sync-dashboard-full.png)
 
 5. Watch what happens:
    - The button text changes to **"Syncing..."** with a spinning icon
@@ -112,7 +112,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
      - "Pulling shore updates..."
      - "Processing file queue..."
 
-   [SCREENSHOT: Sync in progress — progress bar visible, log messages scrolling]
+   *[The sync progress bar and log messages will appear here during an active sync]*
 
 6. Wait for the sync to finish (usually 2–10 seconds). When done:
    - The progress bar reaches 100%
@@ -127,13 +127,13 @@ The "Sync" feature does this automatically. Your job is to test that it works co
    | 📄 Purple file | **Files** | How many files were transferred |
    | 🕐 Grey clock | **Duration** | How long the sync took |
 
-   [SCREENSHOT: Sync completed — five summary boxes showing Pushed, Pulled, Conflicts, Files, Duration]
+   *[The five summary boxes will appear here after sync completes]*
 
 7. A green toast notification should appear at the top right saying **"Sync Complete"** with "Pushed X, pulled Y records"
 
 8. Scroll down to **"Recent Sync History"** — a new row should appear at the top of the table with a green **"Completed"** badge
 
-   [SCREENSHOT: New row in Recent Sync History showing Completed status]
+   ![Recent Sync History with Completed rows](screenshots/03-sync-dashboard-full.png)
 
 ### Pass/Fail
 
@@ -156,13 +156,13 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 2. Click **Work Orders** in the left sidebar
 3. Find any work order in the list and click on it to open it
 
-   [SCREENSHOT: Work Orders list page with at least one work order visible]
+   ![Work Orders list page](screenshots/11-work-orders-page.png)
 
 4. Find a text field you can edit — for example, the **Remarks** field at the bottom of the work order
 5. Type something you'll recognize later, like:
    > "Sync test by [your name] — [today's date]"
 
-   [SCREENSHOT: Work order form with the Remarks field highlighted]
+   *[Open a work order and find the Remarks field at the bottom]*
 
 6. Click **Save** to save your changes
 7. Now go back to the Sync Dashboard: Click **Admin** → **Sync Dashboard**
@@ -172,7 +172,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 11. After sync finishes, look at the summary boxes:
     - **Pushed** should show at least **1** (your work order change was sent)
 
-   [SCREENSHOT: Sync summary showing Pushed count > 0 after work order edit]
+   *[After sync, the Pushed count in the summary boxes should show 1 or more]*
 
 ### Pass/Fail
 
@@ -192,13 +192,13 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 2. Click **Spares** in the left sidebar
 3. Find a spare part that has stock (look for the **ROB** column — it should be more than 0)
 
-   [SCREENSHOT: Spares list showing the ROB column with values > 0]
+   ![Spares Inventory page with ROB column](screenshots/12-spares-page.png)
 
 4. Click on the spare part to select it
 5. Look for the **"Consume or Receive Spare"** dialog or the Consume/Receive buttons
 6. Click **"Consume"** (the red button with a minus icon)
 
-   [SCREENSHOT: "Consume or Receive Spare" dialog with Consume and Receive buttons]
+   *[Click a spare to see the Consume or Receive Spare dialog]*
 
 7. In the **Consume Spare** dialog that opens:
    - Enter **Qty**: 1
@@ -206,7 +206,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
    - Optionally add **Remarks**: "Sync test"
    - Click the **Save** button at the bottom
 
-   [SCREENSHOT: Consume Spare dialog with quantity filled in]
+   *[Fill in the quantity and click Save in the Consume Spare dialog]*
 
 8. Verify the **ROB** number went down by 1
 9. Go to **Admin → Sync Dashboard**
@@ -231,7 +231,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 2. Click **Stores** in the left sidebar
 3. Find a stores item that has stock (ROB > 0)
 
-   [SCREENSHOT: Stores list showing items with ROB values]
+   ![Stores Inventory page with ROB and Stock columns](screenshots/13-stores-page.png)
 
 4. Select the item and perform a **Consume** or **Issue** action (similar to spares)
 5. Enter quantity: 1 and save
@@ -257,7 +257,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 2. Click **Defect Log** in the left sidebar
 3. Look for the **"New Defect"** button (blue button, usually at the top right of the page)
 
-   [SCREENSHOT: Defects page with the "New Defect" button visible]
+   ![Defects Dashboard page](screenshots/14-defects-page.png)
 
 4. Click **"New Defect"**
 5. The **New Defect Report** form opens. Fill in:
@@ -267,7 +267,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
    - **Priority**: pick any
    - Fill in any other required fields (marked with *)
 
-   [SCREENSHOT: New Defect Report form with fields being filled in]
+   *[Fill in the New Defect Report form — Title, Description, Category, Priority]*
 
 6. Click **Save** at the bottom of the form
 7. Note the **defect number** that was assigned
@@ -303,7 +303,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 2. Click **Certificates** in the left sidebar
 3. Find a certificate in the list and click on it
 
-   [SCREENSHOT: Certificates list page]
+   ![Certificates list page](screenshots/16-certificates-page.png)
 
 4. Change a date field — for example, the **Issue Date** or **Expiry Date**
 5. Save the change
@@ -327,14 +327,14 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 2. Click **Running Hrs** in the left sidebar
 3. The **Running Hours** page opens showing a table of components
 
-   [SCREENSHOT: Running Hours page showing component table]
+   ![Running Hours page](screenshots/15-running-hours-page.png)
 
 4. Find a component (e.g., Main Engine) and click the **"Update Running Hours"** button/icon on its row
 5. In the **"Update Running Hours"** dialog:
    - Enter the new running hours value (higher than the current value)
    - Click **Save** / **Update**
 
-   [SCREENSHOT: "Update Running Hours" dialog with new value entered]
+   *[Enter new running hours value in the Update Running Hours dialog]*
 
 6. Check if child components' hours also updated (some components cascade to children)
 7. Go to **Admin → Sync Dashboard** → Click **"Sync Now"**
@@ -378,16 +378,16 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 2. Click **Ship Provisioning** (hard drive icon) in the left sidebar
 3. The **"Ship Provisioning"** page opens with the title and subtitle "Generate and manage vessel data bundles for initial ship server deployment"
 
-   [SCREENSHOT: Ship Provisioning page header and vessel selector]
+   ![Ship Provisioning page with vessel selector](screenshots/05-ship-provisioning-page.png)
 
 4. Under the **"Select Vessel"** section, click the dropdown that says "Select a vessel..."
 5. Pick your test vessel from the list
 
-   [SCREENSHOT: Vessel dropdown open with vessel list]
+   *[Click the vessel dropdown to select your test vessel]*
 
 6. Now look for the **"Manifest Preview"** section below. Click the **"Preview"** button (has an eye 👁️ icon)
 
-   [SCREENSHOT: Manifest Preview section with the Preview button]
+   ![Ship Provisioning — Select Vessel and Preview](screenshots/05-ship-provisioning-page.png)
 
 7. Wait a few seconds. A table should appear showing:
 
@@ -399,7 +399,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 
    Above the table, you'll see **summary boxes**: one showing the total number of **Tables**, one showing **Total Rows**, and one showing the **Vessel** name.
 
-   [SCREENSHOT: Manifest preview table with summary boxes above it]
+   *[After clicking Preview, a table of tables and row counts appears]*
 
 8. Check that the numbers make sense:
    - **components**: should have rows (50–500 is typical)
@@ -410,14 +410,14 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 9. Now scroll down to the **"Generate & Download Bundle"** section
 10. Click the green **"Generate & Download Bundle"** button
 
-   [SCREENSHOT: Generate & Download Bundle button and progress bar]
+   *[Click the green Generate & Download Bundle button]*
 
 11. Wait for the download:
     - A progress bar appears with messages: "Initiating bundle generation..." → "Exporting tables..." → "Preparing download..." → "Download complete!"
     - A file downloads to your computer (named something like `provision_VESSELID_2026-04-25.json`)
     - A green notification appears: **"Bundle Downloaded"** with the file size
 
-   [SCREENSHOT: Download complete notification showing file name and size]
+   *[A green notification appears when the download completes]*
 
 12. Check the downloaded file size — it should be between **1 MB and 20 MB** for a typical vessel
 
@@ -451,14 +451,14 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 3. It **should NOT be visible** — you should only see "Sync Dashboard" and "Ship Provisioning"
 4. If you don't see it → that's correct! Mark Part A as PASS
 
-[SCREENSHOT: Side-by-side comparison — office sidebar shows Fleet Overview, ship sidebar does not]
+![Admin sidebar showing Fleet Overview link (office server)](screenshots/02-admin-sidebar-sync-links.png)
 
 ### Part B: Check the Fleet Overview page (office only)
 
 1. Click **Fleet Overview** in the left sidebar
 2. The page opens with the title **"Fleet Sync Overview"** and subtitle "Shore-side fleet-wide sync monitoring and configuration"
 
-   [SCREENSHOT: Fleet Sync Overview page header]
+   ![Fleet Sync Overview page](screenshots/06-fleet-overview-page.png)
 
 3. Look at the **four summary cards** at the top:
 
@@ -469,7 +469,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
    | **Stale (>48h)** | How many vessels haven't synced for over 48 hours (amber/orange) |
    | **Conflicts** | Total unresolved conflicts across all vessels (red if > 0) |
 
-   [SCREENSHOT: Four summary cards at the top of Fleet Overview]
+   ![Fleet Overview summary cards — Total Vessels, Synced, Stale, Conflicts](screenshots/06-fleet-overview-page.png)
 
 4. Below the cards, look at the **"Fleet Vessels"** table:
 
@@ -484,7 +484,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
    | **Files** | Number of pending file transfers |
    | **Actions** | Three small buttons: 👁️ (view dashboard), 🔄 (sync now), 💾 (provision) |
 
-   [SCREENSHOT: Fleet Vessels table with vessel rows and status badges]
+   ![Fleet Vessels table with status badges](screenshots/06-fleet-overview-page.png)
 
 5. Check that all your fleet vessels appear in the table
 
@@ -494,7 +494,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 2. Find the **"Sync Settings"** section (has a gear ⚙️ icon and says "Database-persisted sync configuration")
 3. Click on it to **expand** it (it's collapsed by default)
 
-   [SCREENSHOT: Sync Settings section expanded showing all fields]
+   ![Sync Settings panel expanded](screenshots/08-fleet-overview-settings-expanded.png)
 
 4. You should see these settings:
 
@@ -514,7 +514,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 5. Try changing one setting — for example, change **Sync Interval (min)** from 60 to 30
 6. Click the **"Save Settings"** button (bottom right of the settings panel). A number badge shows how many settings you changed.
 
-   [SCREENSHOT: Save Settings button with change count badge]
+   ![Fleet Overview full page with Settings and Save button](screenshots/07-fleet-overview-full.png)
 
 7. A green notification should appear: **"Settings saved"** — "Sync engine will reload on next cycle."
 8. **Refresh the page** (press F5 or click the browser refresh)
@@ -528,7 +528,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
    - ✅ Green text: **"Connected in Xms"** — the connection works
    - ❌ Red text: **"Connection failed: ..."** — the connection doesn't work (may be expected if there's no second server)
 
-   [SCREENSHOT: Test Connection result — showing either Connected or Failed message]
+   *[Click the Test button next to Shore URL to see Connected or Failed result]*
 
 ### Pass/Fail
 
@@ -559,7 +559,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
    | **Red** with line ☁️ | Offline — cannot reach the other server |
    | **Blue spinning** 🔄 | Sync is currently running |
 
-   [SCREENSHOT: Top header bar with the sync status cloud icon circled]
+   ![Header bar with sync cloud icon on the right](screenshots/18-header-bar-sync-icon.png)
 
 3. If there's a **small yellow number badge** on the cloud icon, it shows how many pending items there are (changes + conflicts)
 
@@ -571,7 +571,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
    - A **"Sync Now"** button at the bottom
    - A link to **"Open Sync Dashboard"** at the very bottom
 
-   [SCREENSHOT: Sync Status popup expanded showing all items]
+   ![Sync Status popup showing Online badge, Sync Now button, and dashboard link](screenshots/17-sync-status-icon-popup.png)
 
 5. If you see "All changes synced" in green, click **"Open Sync Dashboard"** to go to the full dashboard
 
@@ -619,7 +619,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
 
 12. Scroll down on the Sync Dashboard to the **"Unresolved Conflicts"** section (has an amber branch icon and may show a red badge with the count)
 
-   [SCREENSHOT: Unresolved Conflicts section showing one conflict]
+   *[The Unresolved Conflicts section appears below the sync history when conflicts exist]*
 
 13. You should see a table with these columns:
 
@@ -636,7 +636,7 @@ The "Sync" feature does this automatically. Your job is to test that it works co
     - **"Ship Wins"** → the ship's text is kept
     - **"Shore Wins"** → the office's text is kept
 
-   [SCREENSHOT: Conflict row with Ship Wins and Shore Wins buttons]
+   *[Each conflict row has "Ship Wins" and "Shore Wins" buttons — click one to resolve]*
 
 15. After clicking, a notification says **"Conflict Resolved"**
 16. The conflict disappears from the table
