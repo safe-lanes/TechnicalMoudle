@@ -1,0 +1,19 @@
+{
+  "id": "f302a288-27e6-4d44-9122-b72ac082a735",
+  "type": "spares",
+  "mode": "upsert",
+  "vesselId": "744dc41e-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-03-02T09:24:19.630Z",
+  "completedAt": "2026-03-02T09:35:13.193Z",
+  "status": "complete",
+  "created": 3152,
+  "updated": 0,
+  "skipped": 9337,
+  "archived": 0,
+  "originalName": "Veesel_Spare Sheet.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\spares\\1772444113172_Veesel_Spare_Sheet.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 3152
+}

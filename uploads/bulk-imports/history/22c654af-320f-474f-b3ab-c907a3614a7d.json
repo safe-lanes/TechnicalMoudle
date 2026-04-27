@@ -1,0 +1,19 @@
+{
+  "id": "22c654af-320f-474f-b3ab-c907a3614a7d",
+  "type": "components",
+  "mode": "upsert",
+  "vesselId": "V005",
+  "userId": 1,
+  "startedAt": "2026-01-07T10:59:42.762Z",
+  "completedAt": "2026-01-07T10:59:43.858Z",
+  "status": "complete",
+  "created": 272,
+  "updated": 67,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Vessel component _ Test Vessel_01_Rev01.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\components\\1767783583856_Vessel_component___Test_Vessel_01_Rev01.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

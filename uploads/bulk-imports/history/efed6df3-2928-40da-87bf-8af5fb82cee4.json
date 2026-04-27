@@ -1,0 +1,17 @@
+{
+  "id": "efed6df3-2928-40da-87bf-8af5fb82cee4",
+  "type": "components",
+  "mode": "upsert",
+  "vesselId": "V015",
+  "userId": 1,
+  "startedAt": "2026-01-06T04:12:06.754Z",
+  "completedAt": "2026-01-06T04:12:08.031Z",
+  "status": "complete",
+  "created": 329,
+  "updated": 94,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "components 1.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\components\\1767672728029_components_1.xlsx",
+  "errorReport": null
+}

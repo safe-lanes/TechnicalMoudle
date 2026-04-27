@@ -1,0 +1,18 @@
+{
+  "id": "92f9bd85-45aa-40a0-987d-7d0a7c8d2d9f",
+  "type": "fleet-jobs",
+  "mode": "upsert",
+  "userId": 1,
+  "startedAt": "2026-02-11T06:08:17.466Z",
+  "completedAt": "2026-02-11T06:08:17.562Z",
+  "status": "complete",
+  "created": 1,
+  "updated": 2,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Fleet_Job Sheet.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\fleet-jobs\\1770790097560_Fleet_Job_Sheet.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

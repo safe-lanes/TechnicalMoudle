@@ -1,0 +1,19 @@
+{
+  "id": "0dab899e-8552-41f2-8e8f-b97ac35c74cf",
+  "type": "jobs",
+  "mode": "upsert",
+  "vesselId": "743feb08-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-01-08T07:02:29.166Z",
+  "completedAt": "2026-01-08T07:02:31.580Z",
+  "status": "complete",
+  "created": 0,
+  "updated": 293,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "jobs_template Test Vessel_01 Rev_01.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\jobs\\1767855751544_jobs_template_Test_Vessel_01_Rev_01.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

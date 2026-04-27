@@ -1,0 +1,71 @@
+{
+  "id": "92694610-4729-48ea-9ecc-ed59710110a2",
+  "type": "stores",
+  "mode": "upsert",
+  "vesselId": "cec1b7d6-72a4-45c8-b72c-30e31621a255",
+  "userId": 1,
+  "startedAt": "2026-03-12T12:27:25.483Z",
+  "completedAt": "2026-03-12T12:27:25.592Z",
+  "status": "complete",
+  "created": 10,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Stores - Others.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\stores\\1773318445591_Stores_-_Others.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0,
+  "rowResults": [
+    {
+      "rowNumber": 2,
+      "primaryIdentifier": "OT-0001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 3,
+      "primaryIdentifier": "OT-0002",
+      "action": "created"
+    },
+    {
+      "rowNumber": 4,
+      "primaryIdentifier": "OT-0003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 5,
+      "primaryIdentifier": "OT-0004",
+      "action": "created"
+    },
+    {
+      "rowNumber": 6,
+      "primaryIdentifier": "OT-0005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 7,
+      "primaryIdentifier": "OT-0006",
+      "action": "created"
+    },
+    {
+      "rowNumber": 8,
+      "primaryIdentifier": "OT-0007",
+      "action": "created"
+    },
+    {
+      "rowNumber": 9,
+      "primaryIdentifier": "OT-0008",
+      "action": "created"
+    },
+    {
+      "rowNumber": 10,
+      "primaryIdentifier": "OT-0009",
+      "action": "created"
+    },
+    {
+      "rowNumber": 11,
+      "primaryIdentifier": "OT-0010",
+      "action": "created"
+    }
+  ]
+}

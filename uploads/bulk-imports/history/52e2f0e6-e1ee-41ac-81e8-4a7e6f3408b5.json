@@ -1,0 +1,71 @@
+{
+  "id": "52e2f0e6-e1ee-41ac-81e8-4a7e6f3408b5",
+  "type": "stores",
+  "mode": "upsert",
+  "vesselId": "cec1b7d6-72a4-45c8-b72c-30e31621a255",
+  "userId": 1,
+  "startedAt": "2026-03-12T12:26:53.742Z",
+  "completedAt": "2026-03-12T12:26:54.061Z",
+  "status": "complete",
+  "created": 10,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Stores - Lubes.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\stores\\1773318414059_Stores_-_Lubes.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0,
+  "rowResults": [
+    {
+      "rowNumber": 2,
+      "primaryIdentifier": "LU-0001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 3,
+      "primaryIdentifier": "LU-0002",
+      "action": "created"
+    },
+    {
+      "rowNumber": 4,
+      "primaryIdentifier": "LU-0003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 5,
+      "primaryIdentifier": "LU-0004",
+      "action": "created"
+    },
+    {
+      "rowNumber": 6,
+      "primaryIdentifier": "LU-0005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 7,
+      "primaryIdentifier": "LU-0006",
+      "action": "created"
+    },
+    {
+      "rowNumber": 8,
+      "primaryIdentifier": "LU-0007",
+      "action": "created"
+    },
+    {
+      "rowNumber": 9,
+      "primaryIdentifier": "LU-0008",
+      "action": "created"
+    },
+    {
+      "rowNumber": 10,
+      "primaryIdentifier": "LU-0009",
+      "action": "created"
+    },
+    {
+      "rowNumber": 11,
+      "primaryIdentifier": "LU-0010",
+      "action": "created"
+    }
+  ]
+}

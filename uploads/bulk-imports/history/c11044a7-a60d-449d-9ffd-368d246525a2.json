@@ -1,0 +1,19 @@
+{
+  "id": "c11044a7-a60d-449d-9ffd-368d246525a2",
+  "type": "stores",
+  "mode": "upsert",
+  "vesselId": "V004",
+  "userId": 1,
+  "startedAt": "2026-01-07T04:29:35.240Z",
+  "completedAt": "2026-01-07T04:29:35.320Z",
+  "status": "complete",
+  "created": 9,
+  "updated": 1,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "stores_template (6).xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\stores\\1767760175319_stores_template__6_.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

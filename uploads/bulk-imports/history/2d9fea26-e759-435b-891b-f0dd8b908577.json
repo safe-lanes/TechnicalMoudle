@@ -1,0 +1,19 @@
+{
+  "id": "2d9fea26-e759-435b-891b-f0dd8b908577",
+  "type": "stores",
+  "mode": "upsert",
+  "vesselId": "743ef9d1-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-02-25T04:24:10.333Z",
+  "completedAt": "2026-02-25T04:24:10.440Z",
+  "status": "complete",
+  "created": 10,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Stores - Chemicals.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\stores\\1771993450438_Stores_-_Chemicals.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

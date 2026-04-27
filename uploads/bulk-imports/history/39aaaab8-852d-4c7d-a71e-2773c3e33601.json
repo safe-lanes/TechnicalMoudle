@@ -1,0 +1,19 @@
+{
+  "id": "39aaaab8-852d-4c7d-a71e-2773c3e33601",
+  "type": "spares",
+  "mode": "upsert",
+  "vesselId": "",
+  "userId": 1,
+  "startedAt": "2026-02-20T06:35:52.841Z",
+  "completedAt": "2026-02-20T06:35:53.216Z",
+  "status": "complete",
+  "created": 0,
+  "updated": 0,
+  "skipped": 3381,
+  "archived": 0,
+  "originalName": "spares_templaten - Test Vessel_01 Rev_01.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\spares\\1771569353214_spares_templaten_-_Test_Vessel_01_Rev_01.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

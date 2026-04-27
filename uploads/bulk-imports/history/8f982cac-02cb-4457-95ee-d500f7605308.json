@@ -1,0 +1,19 @@
+{
+  "id": "8f982cac-02cb-4457-95ee-d500f7605308",
+  "type": "jobs",
+  "mode": "upsert",
+  "vesselId": "744dc41e-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-03-02T07:21:19.954Z",
+  "completedAt": "2026-03-02T07:21:46.326Z",
+  "status": "complete",
+  "created": 0,
+  "updated": 0,
+  "skipped": 495,
+  "archived": 0,
+  "originalName": "Vessel_Job Sheet.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\jobs\\1772436106325_Vessel_Job_Sheet.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

@@ -1,0 +1,16 @@
+{
+  "id": "0fe76e6d-0e8e-4601-9a3b-feb8128c9317",
+  "type": "fleet-jobs",
+  "mode": "upsert",
+  "userId": 1,
+  "startedAt": "2026-02-10T04:37:22.031Z",
+  "completedAt": "2026-02-10T04:37:22.098Z",
+  "status": "failed",
+  "created": 0,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Fleet_Job Sheet.xlsx",
+  "storedFilePath": null,
+  "errorReport": null
+}

@@ -1,0 +1,90 @@
+{
+  "id": "0c2c439a-f3b2-43d4-8ba5-b30642bef356",
+  "type": "components",
+  "mode": "upsert",
+  "vesselId": "74481b72-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-04-13T11:10:36.405Z",
+  "completedAt": "2026-04-13T11:10:36.492Z",
+  "status": "complete",
+  "created": 14,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "02_Components _ Test_Vessel_04.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\components\\1776078636491_02_Components___Test_Vessel_04.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0,
+  "spareComponentLinksExpected": 0,
+  "spareComponentLinksDbTotal": 0,
+  "spareComponentLinksDbDelta": 0,
+  "rowResults": [
+    {
+      "rowNumber": 35,
+      "primaryIdentifier": "50",
+      "action": "created"
+    },
+    {
+      "rowNumber": 38,
+      "primaryIdentifier": "502",
+      "action": "created"
+    },
+    {
+      "rowNumber": 51,
+      "primaryIdentifier": "505",
+      "action": "created"
+    },
+    {
+      "rowNumber": 290,
+      "primaryIdentifier": "8",
+      "action": "created"
+    },
+    {
+      "rowNumber": 291,
+      "primaryIdentifier": "80",
+      "action": "created"
+    },
+    {
+      "rowNumber": 294,
+      "primaryIdentifier": "81",
+      "action": "created"
+    },
+    {
+      "rowNumber": 36,
+      "primaryIdentifier": "501",
+      "action": "created"
+    },
+    {
+      "rowNumber": 42,
+      "primaryIdentifier": "503",
+      "action": "created"
+    },
+    {
+      "rowNumber": 49,
+      "primaryIdentifier": "504",
+      "action": "created"
+    },
+    {
+      "rowNumber": 292,
+      "primaryIdentifier": "801",
+      "action": "created"
+    },
+    {
+      "rowNumber": 295,
+      "primaryIdentifier": "813",
+      "action": "created"
+    },
+    {
+      "rowNumber": 39,
+      "primaryIdentifier": "502.005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 52,
+      "primaryIdentifier": "505.001",
+      "action": "created"
+    }
+  ],
+  "warnings": []
+}

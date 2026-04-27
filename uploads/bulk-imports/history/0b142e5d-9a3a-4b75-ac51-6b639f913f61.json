@@ -1,0 +1,19 @@
+{
+  "id": "0b142e5d-9a3a-4b75-ac51-6b639f913f61",
+  "type": "jobs",
+  "mode": "upsert",
+  "vesselId": "",
+  "userId": 1,
+  "startedAt": "2026-02-20T06:45:45.755Z",
+  "completedAt": "2026-02-20T06:45:47.024Z",
+  "status": "complete",
+  "created": 0,
+  "updated": 312,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "jobs_template Test Vessel_With LSA and FFA.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\jobs\\1771569947023_jobs_template_Test_Vessel_With_LSA_and_FFA.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

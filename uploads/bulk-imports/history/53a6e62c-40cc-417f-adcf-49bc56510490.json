@@ -1,0 +1,45 @@
+{
+  "id": "53a6e62c-40cc-417f-adcf-49bc56510490",
+  "type": "jobs",
+  "mode": "upsert",
+  "vesselId": "744bafc7-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-04-20T08:34:01.766Z",
+  "completedAt": "2026-04-20T08:34:01.991Z",
+  "status": "complete",
+  "created": 4,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "05_Jobs _ Test_Vessel_04.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\jobs\\1776674041990_05_Jobs___Test_Vessel_04.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0,
+  "spareComponentLinksExpected": 0,
+  "spareComponentLinksDbTotal": 0,
+  "spareComponentLinksDbDelta": 0,
+  "rowResults": [
+    {
+      "rowNumber": 2,
+      "primaryIdentifier": "MKR-IN-00071",
+      "action": "created"
+    },
+    {
+      "rowNumber": 3,
+      "primaryIdentifier": "MKR-IN-00071",
+      "action": "created"
+    },
+    {
+      "rowNumber": 4,
+      "primaryIdentifier": "MKR-IN-00072",
+      "action": "created"
+    },
+    {
+      "rowNumber": 5,
+      "primaryIdentifier": "MKR-IN-00072",
+      "action": "created"
+    }
+  ],
+  "warnings": []
+}

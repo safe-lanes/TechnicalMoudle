@@ -1,0 +1,810 @@
+{
+  "id": "52d18789-9b6b-4111-ab4e-7f3f3ab2f446",
+  "type": "makers",
+  "mode": "upsert",
+  "vesselId": "744cf286-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-03-25T10:50:34.491Z",
+  "completedAt": "2026-03-25T10:50:34.908Z",
+  "status": "complete",
+  "created": 0,
+  "updated": 157,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Maker List.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\makers\\1774435834906_Maker_List.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0,
+  "spareComponentLinksExpected": 0,
+  "spareComponentLinksDbTotal": 0,
+  "spareComponentLinksDbDelta": 0,
+  "rowResults": [
+    {
+      "rowNumber": 2,
+      "primaryIdentifier": "MKR-000005",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 3,
+      "primaryIdentifier": "MKR-000096",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 4,
+      "primaryIdentifier": "MKR-000050",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 5,
+      "primaryIdentifier": "MKR-000023",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 6,
+      "primaryIdentifier": "MKR-000086",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 7,
+      "primaryIdentifier": "MKR-999999",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 8,
+      "primaryIdentifier": "MKR-000066",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 9,
+      "primaryIdentifier": "MKR-000064",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 10,
+      "primaryIdentifier": "MKR-000010",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 11,
+      "primaryIdentifier": "MKR-000044",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 12,
+      "primaryIdentifier": "MKR-000110",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 13,
+      "primaryIdentifier": "MKR-000056",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 14,
+      "primaryIdentifier": "MKR-000025",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 15,
+      "primaryIdentifier": "MKR-000034",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 16,
+      "primaryIdentifier": "MKR-000071",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 17,
+      "primaryIdentifier": "MKR-000013",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 18,
+      "primaryIdentifier": "MKR-000007",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 19,
+      "primaryIdentifier": "MKR-000027",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 20,
+      "primaryIdentifier": "MKR-000026",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 21,
+      "primaryIdentifier": "MKR-000100",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 22,
+      "primaryIdentifier": "MKR-000037",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 23,
+      "primaryIdentifier": "MKR-000022",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 24,
+      "primaryIdentifier": "MKR-000077",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 25,
+      "primaryIdentifier": "MKR-000085",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 26,
+      "primaryIdentifier": "MKR-000042",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 27,
+      "primaryIdentifier": "MKR-000062",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 28,
+      "primaryIdentifier": "MKR-000094",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 29,
+      "primaryIdentifier": "MKR-000021",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 30,
+      "primaryIdentifier": "MKR-000047",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 31,
+      "primaryIdentifier": "MKR-000018",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 32,
+      "primaryIdentifier": "MKR-000109",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 33,
+      "primaryIdentifier": "MKR-000103",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 34,
+      "primaryIdentifier": "MKR-000105",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 35,
+      "primaryIdentifier": "MKR-000032",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 36,
+      "primaryIdentifier": "MKR-000107",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 37,
+      "primaryIdentifier": "MKR-000004",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 38,
+      "primaryIdentifier": "MKR-000111",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 39,
+      "primaryIdentifier": "MKR-000101",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 40,
+      "primaryIdentifier": "MKR-000098",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 41,
+      "primaryIdentifier": "MKR-000031",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 42,
+      "primaryIdentifier": "MKR-000099",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 43,
+      "primaryIdentifier": "MKR-000106",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 44,
+      "primaryIdentifier": "MKR-000074",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 45,
+      "primaryIdentifier": "MKR-000108",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 46,
+      "primaryIdentifier": "MKR-000046",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 47,
+      "primaryIdentifier": "MKR-000006",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 48,
+      "primaryIdentifier": "MKR-000028",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 49,
+      "primaryIdentifier": "MKR-000030",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 50,
+      "primaryIdentifier": "MKR-000003",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 51,
+      "primaryIdentifier": "MKR-000048",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 52,
+      "primaryIdentifier": "MKR-000011",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 53,
+      "primaryIdentifier": "MKR-000043",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 54,
+      "primaryIdentifier": "MKR-000083",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 55,
+      "primaryIdentifier": "MKR-000041",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 56,
+      "primaryIdentifier": "MKR-000049",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 57,
+      "primaryIdentifier": "MKR-000057",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 58,
+      "primaryIdentifier": "MKR-000076",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 59,
+      "primaryIdentifier": "MKR-000075",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 60,
+      "primaryIdentifier": "MKR-000001",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 61,
+      "primaryIdentifier": "MKR-000016",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 62,
+      "primaryIdentifier": "MKR-000051",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 63,
+      "primaryIdentifier": "MKR-000069",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 64,
+      "primaryIdentifier": "MKR-000014",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 65,
+      "primaryIdentifier": "MKR-000073",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 66,
+      "primaryIdentifier": "MKR-000035",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 67,
+      "primaryIdentifier": "MKR-000080",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 68,
+      "primaryIdentifier": "MKR-000082",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 69,
+      "primaryIdentifier": "MKR-000053",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 70,
+      "primaryIdentifier": "MKR-000078",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 71,
+      "primaryIdentifier": "MKR-000063",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 72,
+      "primaryIdentifier": "MKR-000052",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 73,
+      "primaryIdentifier": "MKR-000081",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 74,
+      "primaryIdentifier": "MKR-000061",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 75,
+      "primaryIdentifier": "MKR-000008",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 76,
+      "primaryIdentifier": "MKR-000067",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 77,
+      "primaryIdentifier": "MKR-000090",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 78,
+      "primaryIdentifier": "MKR-000104",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 79,
+      "primaryIdentifier": "MKR-000091",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 80,
+      "primaryIdentifier": "MKR-000055",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 81,
+      "primaryIdentifier": "MKR-000068",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 82,
+      "primaryIdentifier": "MKR-000102",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 83,
+      "primaryIdentifier": "MKR-000033",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 84,
+      "primaryIdentifier": "MKR-000060",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 85,
+      "primaryIdentifier": "MKR-000045",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 86,
+      "primaryIdentifier": "MKR-000095",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 87,
+      "primaryIdentifier": "MKR-000002",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 88,
+      "primaryIdentifier": "MKR-000088",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 89,
+      "primaryIdentifier": "MKR-000039",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 90,
+      "primaryIdentifier": "MKR-000038",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 91,
+      "primaryIdentifier": "MKR-000087",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 92,
+      "primaryIdentifier": "MKR-000089",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 93,
+      "primaryIdentifier": "MKR-000092",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 94,
+      "primaryIdentifier": "MKR-000012",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 95,
+      "primaryIdentifier": "MKR-000009",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 96,
+      "primaryIdentifier": "MKR-000036",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 97,
+      "primaryIdentifier": "MKR-000020",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 98,
+      "primaryIdentifier": "MKR-000079",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 99,
+      "primaryIdentifier": "MKR-000093",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 100,
+      "primaryIdentifier": "MKR-000054",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 101,
+      "primaryIdentifier": "MKR-000065",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 102,
+      "primaryIdentifier": "MKR-000058",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 103,
+      "primaryIdentifier": "MKR-000017",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 104,
+      "primaryIdentifier": "MKR-000024",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 105,
+      "primaryIdentifier": "MKR-000015",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 106,
+      "primaryIdentifier": "MKR-000072",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 107,
+      "primaryIdentifier": "MKR-000070",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 108,
+      "primaryIdentifier": "MKR-000059",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 109,
+      "primaryIdentifier": "MKR-000019",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 110,
+      "primaryIdentifier": "MKR-000097",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 111,
+      "primaryIdentifier": "MKR-000084",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 112,
+      "primaryIdentifier": "MKR-000040",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 113,
+      "primaryIdentifier": "MKR-000029",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 114,
+      "primaryIdentifier": "MKR-000112",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 115,
+      "primaryIdentifier": "MKR-000113",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 116,
+      "primaryIdentifier": "MKR-000114",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 117,
+      "primaryIdentifier": "MKR-000115",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 118,
+      "primaryIdentifier": "MKR-000116",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 119,
+      "primaryIdentifier": "MKR-000117",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 120,
+      "primaryIdentifier": "MKR-000118",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 121,
+      "primaryIdentifier": "MKR-000119",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 122,
+      "primaryIdentifier": "MKR-000120",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 123,
+      "primaryIdentifier": "MKR-000121",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 124,
+      "primaryIdentifier": "MKR-000122",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 125,
+      "primaryIdentifier": "MKR-000123",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 126,
+      "primaryIdentifier": "MKR-000124",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 127,
+      "primaryIdentifier": "MKR-000125",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 128,
+      "primaryIdentifier": "MKR-000126",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 129,
+      "primaryIdentifier": "MKR-000127",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 130,
+      "primaryIdentifier": "MKR-000128",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 131,
+      "primaryIdentifier": "MKR-000129",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 132,
+      "primaryIdentifier": "MKR-000130",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 133,
+      "primaryIdentifier": "MKR-000131",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 134,
+      "primaryIdentifier": "MKR-000132",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 135,
+      "primaryIdentifier": "MKR-000133",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 136,
+      "primaryIdentifier": "MKR-000134",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 137,
+      "primaryIdentifier": "MKR-000135",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 138,
+      "primaryIdentifier": "MKR-000136",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 139,
+      "primaryIdentifier": "MKR-000137",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 140,
+      "primaryIdentifier": "MKR-000138",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 141,
+      "primaryIdentifier": "MKR-000139",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 142,
+      "primaryIdentifier": "MKR-000140",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 143,
+      "primaryIdentifier": "MKR-000141",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 144,
+      "primaryIdentifier": "MKR-000142",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 145,
+      "primaryIdentifier": "MKR-000143",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 146,
+      "primaryIdentifier": "MKR-000144",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 147,
+      "primaryIdentifier": "MKR-000145",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 148,
+      "primaryIdentifier": "MKR-000146",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 149,
+      "primaryIdentifier": "MKR-000147",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 150,
+      "primaryIdentifier": "MKR-000148",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 151,
+      "primaryIdentifier": "MKR-000149",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 152,
+      "primaryIdentifier": "MKR-000150",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 153,
+      "primaryIdentifier": "MKR-000151",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 154,
+      "primaryIdentifier": "MKR-000152",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 155,
+      "primaryIdentifier": "MKR-000153",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 156,
+      "primaryIdentifier": "MKR-000154",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 157,
+      "primaryIdentifier": "MKR-000155",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 158,
+      "primaryIdentifier": "MKR-000156",
+      "action": "updated"
+    }
+  ],
+  "warnings": []
+}

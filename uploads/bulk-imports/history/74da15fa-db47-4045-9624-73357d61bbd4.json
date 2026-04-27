@@ -1,0 +1,2652 @@
+{
+  "id": "74da15fa-db47-4045-9624-73357d61bbd4",
+  "type": "jobs",
+  "mode": "upsert",
+  "vesselId": "cd03135a-f38a-40de-b7d6-27ba85b633dc",
+  "userId": 1,
+  "startedAt": "2026-03-12T06:46:00.819Z",
+  "completedAt": "2026-03-12T06:46:22.282Z",
+  "status": "undo_failed",
+  "created": 339,
+  "updated": 0,
+  "skipped": 156,
+  "archived": 0,
+  "originalName": "Vessel_Job Sheet.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\jobs\\1773297982279_Vessel_Job_Sheet.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0,
+  "rowResults": [
+    {
+      "rowNumber": 2,
+      "primaryIdentifier": "MKR-IN-00001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 3,
+      "primaryIdentifier": "MKR-IN-00002",
+      "action": "created"
+    },
+    {
+      "rowNumber": 4,
+      "primaryIdentifier": "MKR-IN-00003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 5,
+      "primaryIdentifier": "MKR-RE-00001",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 6,
+      "primaryIdentifier": "MKR-IN-00004",
+      "action": "created"
+    },
+    {
+      "rowNumber": 7,
+      "primaryIdentifier": "MKR-IN-00005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 8,
+      "primaryIdentifier": "MKR-OV-00001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 9,
+      "primaryIdentifier": "MKR-IN-00006",
+      "action": "created"
+    },
+    {
+      "rowNumber": 10,
+      "primaryIdentifier": "MKR-RE-00002",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 11,
+      "primaryIdentifier": "MKR-IN-00007",
+      "action": "created"
+    },
+    {
+      "rowNumber": 12,
+      "primaryIdentifier": "MKR-IN-00008",
+      "action": "created"
+    },
+    {
+      "rowNumber": 13,
+      "primaryIdentifier": "MKR-IN-00009",
+      "action": "created"
+    },
+    {
+      "rowNumber": 14,
+      "primaryIdentifier": "MKR-OV-00002",
+      "action": "created"
+    },
+    {
+      "rowNumber": 15,
+      "primaryIdentifier": "MKR-RE-00003",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 16,
+      "primaryIdentifier": "MKR-OV-00003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 17,
+      "primaryIdentifier": "MKR-OV-00003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 18,
+      "primaryIdentifier": "MKR-OV-00003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 19,
+      "primaryIdentifier": "MKR-OV-00003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 20,
+      "primaryIdentifier": "MKR-OV-00003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 21,
+      "primaryIdentifier": "MKR-OV-00003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 22,
+      "primaryIdentifier": "MKR-RE-00004",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 23,
+      "primaryIdentifier": "MKR-RE-00004",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 24,
+      "primaryIdentifier": "MKR-RE-00004",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 25,
+      "primaryIdentifier": "MKR-RE-00004",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 26,
+      "primaryIdentifier": "MKR-RE-00004",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 27,
+      "primaryIdentifier": "MKR-RE-00004",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 28,
+      "primaryIdentifier": "MKR-RE-00005",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 29,
+      "primaryIdentifier": "MKR-RE-00005",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 30,
+      "primaryIdentifier": "MKR-RE-00005",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 31,
+      "primaryIdentifier": "MKR-RE-00005",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 32,
+      "primaryIdentifier": "MKR-RE-00005",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 33,
+      "primaryIdentifier": "MKR-RE-00005",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 34,
+      "primaryIdentifier": "MKR-OV-00004",
+      "action": "created"
+    },
+    {
+      "rowNumber": 35,
+      "primaryIdentifier": "MKR-OV-00004",
+      "action": "created"
+    },
+    {
+      "rowNumber": 36,
+      "primaryIdentifier": "MKR-OV-00004",
+      "action": "created"
+    },
+    {
+      "rowNumber": 37,
+      "primaryIdentifier": "MKR-OV-00004",
+      "action": "created"
+    },
+    {
+      "rowNumber": 38,
+      "primaryIdentifier": "MKR-OV-00004",
+      "action": "created"
+    },
+    {
+      "rowNumber": 39,
+      "primaryIdentifier": "MKR-OV-00004",
+      "action": "created"
+    },
+    {
+      "rowNumber": 40,
+      "primaryIdentifier": "MKR-RE-00006",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 41,
+      "primaryIdentifier": "MKR-RE-00006",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 42,
+      "primaryIdentifier": "MKR-RE-00006",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 43,
+      "primaryIdentifier": "MKR-RE-00006",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 44,
+      "primaryIdentifier": "MKR-RE-00006",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 45,
+      "primaryIdentifier": "MKR-RE-00006",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 46,
+      "primaryIdentifier": "MKR-RE-00007",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 47,
+      "primaryIdentifier": "MKR-RE-00007",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 48,
+      "primaryIdentifier": "MKR-RE-00007",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 49,
+      "primaryIdentifier": "MKR-RE-00007",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 50,
+      "primaryIdentifier": "MKR-RE-00007",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 51,
+      "primaryIdentifier": "MKR-RE-00007",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 52,
+      "primaryIdentifier": "MKR-OV-00005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 53,
+      "primaryIdentifier": "MKR-OV-00005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 54,
+      "primaryIdentifier": "MKR-OV-00005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 55,
+      "primaryIdentifier": "MKR-OV-00005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 56,
+      "primaryIdentifier": "MKR-OV-00005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 57,
+      "primaryIdentifier": "MKR-OV-00005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 58,
+      "primaryIdentifier": "MKR-RE-00008",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 59,
+      "primaryIdentifier": "MKR-RE-00008",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 60,
+      "primaryIdentifier": "MKR-RE-00008",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 61,
+      "primaryIdentifier": "MKR-RE-00008",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 62,
+      "primaryIdentifier": "MKR-RE-00008",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 63,
+      "primaryIdentifier": "MKR-RE-00008",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 64,
+      "primaryIdentifier": "MKR-OV-00006",
+      "action": "created"
+    },
+    {
+      "rowNumber": 65,
+      "primaryIdentifier": "MKR-OV-00006",
+      "action": "created"
+    },
+    {
+      "rowNumber": 66,
+      "primaryIdentifier": "MKR-OV-00006",
+      "action": "created"
+    },
+    {
+      "rowNumber": 67,
+      "primaryIdentifier": "MKR-OV-00006",
+      "action": "created"
+    },
+    {
+      "rowNumber": 68,
+      "primaryIdentifier": "MKR-OV-00006",
+      "action": "created"
+    },
+    {
+      "rowNumber": 69,
+      "primaryIdentifier": "MKR-OV-00006",
+      "action": "created"
+    },
+    {
+      "rowNumber": 70,
+      "primaryIdentifier": "MKR-OV-00006",
+      "action": "failed",
+      "error": "insert or update on table \"job_component_links\" violates foreign key constraint \"job_component_links_job_id_jobs_juuid_fk\""
+    },
+    {
+      "rowNumber": 71,
+      "primaryIdentifier": "MKR-RE-00009",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 72,
+      "primaryIdentifier": "MKR-RE-00009",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 73,
+      "primaryIdentifier": "MKR-RE-00009",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 74,
+      "primaryIdentifier": "MKR-RE-00009",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 75,
+      "primaryIdentifier": "MKR-RE-00009",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 76,
+      "primaryIdentifier": "MKR-IN-00010",
+      "action": "created"
+    },
+    {
+      "rowNumber": 77,
+      "primaryIdentifier": "MKR-IN-00010",
+      "action": "created"
+    },
+    {
+      "rowNumber": 78,
+      "primaryIdentifier": "MKR-IN-00010",
+      "action": "created"
+    },
+    {
+      "rowNumber": 79,
+      "primaryIdentifier": "MKR-IN-00010",
+      "action": "created"
+    },
+    {
+      "rowNumber": 80,
+      "primaryIdentifier": "MKR-IN-00010",
+      "action": "created"
+    },
+    {
+      "rowNumber": 81,
+      "primaryIdentifier": "MKR-IN-00010",
+      "action": "created"
+    },
+    {
+      "rowNumber": 82,
+      "primaryIdentifier": "MKR-RE-00010",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 83,
+      "primaryIdentifier": "MKR-RE-00010",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 84,
+      "primaryIdentifier": "MKR-RE-00010",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 85,
+      "primaryIdentifier": "MKR-RE-00010",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 86,
+      "primaryIdentifier": "MKR-RE-00010",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 87,
+      "primaryIdentifier": "MKR-RE-00010",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 88,
+      "primaryIdentifier": "MKR-IN-00011",
+      "action": "created"
+    },
+    {
+      "rowNumber": 89,
+      "primaryIdentifier": "MKR-IN-00011",
+      "action": "created"
+    },
+    {
+      "rowNumber": 90,
+      "primaryIdentifier": "MKR-IN-00011",
+      "action": "created"
+    },
+    {
+      "rowNumber": 91,
+      "primaryIdentifier": "MKR-IN-00011",
+      "action": "created"
+    },
+    {
+      "rowNumber": 92,
+      "primaryIdentifier": "MKR-IN-00011",
+      "action": "created"
+    },
+    {
+      "rowNumber": 93,
+      "primaryIdentifier": "MKR-IN-00011",
+      "action": "created"
+    },
+    {
+      "rowNumber": 94,
+      "primaryIdentifier": "MKR-RE-00011",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 95,
+      "primaryIdentifier": "MKR-RE-00011",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 96,
+      "primaryIdentifier": "MKR-RE-00011",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 97,
+      "primaryIdentifier": "MKR-RE-00011",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 98,
+      "primaryIdentifier": "MKR-RE-00011",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 99,
+      "primaryIdentifier": "MKR-RE-00011",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 100,
+      "primaryIdentifier": "MKR-IN-00012",
+      "action": "created"
+    },
+    {
+      "rowNumber": 101,
+      "primaryIdentifier": "MKR-IN-00012",
+      "action": "created"
+    },
+    {
+      "rowNumber": 102,
+      "primaryIdentifier": "MKR-IN-00012",
+      "action": "created"
+    },
+    {
+      "rowNumber": 103,
+      "primaryIdentifier": "MKR-IN-00012",
+      "action": "created"
+    },
+    {
+      "rowNumber": 104,
+      "primaryIdentifier": "MKR-IN-00012",
+      "action": "created"
+    },
+    {
+      "rowNumber": 105,
+      "primaryIdentifier": "MKR-IN-00012",
+      "action": "created"
+    },
+    {
+      "rowNumber": 106,
+      "primaryIdentifier": "MKR-IN-00012",
+      "action": "created"
+    },
+    {
+      "rowNumber": 107,
+      "primaryIdentifier": "MKR-RE-00012",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 108,
+      "primaryIdentifier": "MKR-RE-00012",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 109,
+      "primaryIdentifier": "MKR-RE-00012",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 110,
+      "primaryIdentifier": "MKR-RE-00012",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 111,
+      "primaryIdentifier": "MKR-RE-00012",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 112,
+      "primaryIdentifier": "MKR-RE-00012",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 113,
+      "primaryIdentifier": "MKR-RE-00012",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 114,
+      "primaryIdentifier": "MKR-IN-00013",
+      "action": "created"
+    },
+    {
+      "rowNumber": 115,
+      "primaryIdentifier": "MKR-RE-00013",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 116,
+      "primaryIdentifier": "MKR-IN-00014",
+      "action": "created"
+    },
+    {
+      "rowNumber": 117,
+      "primaryIdentifier": "MKR-RE-00014",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 118,
+      "primaryIdentifier": "MKR-IN-00015",
+      "action": "created"
+    },
+    {
+      "rowNumber": 119,
+      "primaryIdentifier": "MKR-IN-00015",
+      "action": "created"
+    },
+    {
+      "rowNumber": 120,
+      "primaryIdentifier": "MKR-IN-00015",
+      "action": "created"
+    },
+    {
+      "rowNumber": 121,
+      "primaryIdentifier": "MKR-IN-00015",
+      "action": "created"
+    },
+    {
+      "rowNumber": 122,
+      "primaryIdentifier": "MKR-IN-00015",
+      "action": "created"
+    },
+    {
+      "rowNumber": 123,
+      "primaryIdentifier": "MKR-IN-00015",
+      "action": "created"
+    },
+    {
+      "rowNumber": 124,
+      "primaryIdentifier": "MKR-RE-00015",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 125,
+      "primaryIdentifier": "MKR-RE-00015",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 126,
+      "primaryIdentifier": "MKR-RE-00015",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 127,
+      "primaryIdentifier": "MKR-RE-00015",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 128,
+      "primaryIdentifier": "MKR-RE-00015",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 129,
+      "primaryIdentifier": "MKR-RE-00015",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 130,
+      "primaryIdentifier": "MKR-IN-00016",
+      "action": "created"
+    },
+    {
+      "rowNumber": 131,
+      "primaryIdentifier": "MKR-OV-00007",
+      "action": "created"
+    },
+    {
+      "rowNumber": 132,
+      "primaryIdentifier": "MKR-RE-00016",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 133,
+      "primaryIdentifier": "MKR-IN-00017",
+      "action": "created"
+    },
+    {
+      "rowNumber": 134,
+      "primaryIdentifier": "MKR-OV-00008",
+      "action": "created"
+    },
+    {
+      "rowNumber": 135,
+      "primaryIdentifier": "MKR-CL-00001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 136,
+      "primaryIdentifier": "MKR-OV-00009",
+      "action": "created"
+    },
+    {
+      "rowNumber": 137,
+      "primaryIdentifier": "MKR-OV-00009",
+      "action": "created"
+    },
+    {
+      "rowNumber": 138,
+      "primaryIdentifier": "MKR-OV-00009",
+      "action": "created"
+    },
+    {
+      "rowNumber": 139,
+      "primaryIdentifier": "MKR-OV-00009",
+      "action": "created"
+    },
+    {
+      "rowNumber": 140,
+      "primaryIdentifier": "MKR-OV-00009",
+      "action": "created"
+    },
+    {
+      "rowNumber": 141,
+      "primaryIdentifier": "MKR-OV-00009",
+      "action": "created"
+    },
+    {
+      "rowNumber": 142,
+      "primaryIdentifier": "MKR-RE-00017",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 143,
+      "primaryIdentifier": "MKR-RE-00017",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 144,
+      "primaryIdentifier": "MKR-RE-00017",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 145,
+      "primaryIdentifier": "MKR-RE-00017",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 146,
+      "primaryIdentifier": "MKR-RE-00017",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 147,
+      "primaryIdentifier": "MKR-RE-00017",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 148,
+      "primaryIdentifier": "MKR-OV-00010",
+      "action": "created"
+    },
+    {
+      "rowNumber": 149,
+      "primaryIdentifier": "MKR-OV-00010",
+      "action": "created"
+    },
+    {
+      "rowNumber": 150,
+      "primaryIdentifier": "MKR-OV-00010",
+      "action": "created"
+    },
+    {
+      "rowNumber": 151,
+      "primaryIdentifier": "MKR-OV-00010",
+      "action": "created"
+    },
+    {
+      "rowNumber": 152,
+      "primaryIdentifier": "MKR-OV-00010",
+      "action": "created"
+    },
+    {
+      "rowNumber": 153,
+      "primaryIdentifier": "MKR-OV-00010",
+      "action": "created"
+    },
+    {
+      "rowNumber": 154,
+      "primaryIdentifier": "MKR-RE-00018",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 155,
+      "primaryIdentifier": "MKR-RE-00018",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 156,
+      "primaryIdentifier": "MKR-RE-00018",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 157,
+      "primaryIdentifier": "MKR-RE-00018",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 158,
+      "primaryIdentifier": "MKR-RE-00018",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 159,
+      "primaryIdentifier": "MKR-RE-00018",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 160,
+      "primaryIdentifier": "MKR-OV-00011",
+      "action": "created"
+    },
+    {
+      "rowNumber": 161,
+      "primaryIdentifier": "MKR-OV-00012",
+      "action": "created"
+    },
+    {
+      "rowNumber": 162,
+      "primaryIdentifier": "MKR-OV-00013",
+      "action": "created"
+    },
+    {
+      "rowNumber": 163,
+      "primaryIdentifier": "MKR-OV-00014",
+      "action": "created"
+    },
+    {
+      "rowNumber": 164,
+      "primaryIdentifier": "MKR-IN-00018",
+      "action": "created"
+    },
+    {
+      "rowNumber": 165,
+      "primaryIdentifier": "MKR-IN-00018",
+      "action": "created"
+    },
+    {
+      "rowNumber": 166,
+      "primaryIdentifier": "MKR-IN-00018",
+      "action": "created"
+    },
+    {
+      "rowNumber": 167,
+      "primaryIdentifier": "MKR-IN-00018",
+      "action": "created"
+    },
+    {
+      "rowNumber": 168,
+      "primaryIdentifier": "MKR-IN-00018",
+      "action": "created"
+    },
+    {
+      "rowNumber": 169,
+      "primaryIdentifier": "MKR-IN-00018",
+      "action": "created"
+    },
+    {
+      "rowNumber": 170,
+      "primaryIdentifier": "MKR-RE-00019",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 171,
+      "primaryIdentifier": "MKR-RE-00019",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 172,
+      "primaryIdentifier": "MKR-RE-00019",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 173,
+      "primaryIdentifier": "MKR-RE-00019",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 174,
+      "primaryIdentifier": "MKR-RE-00019",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 175,
+      "primaryIdentifier": "MKR-RE-00019",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 176,
+      "primaryIdentifier": "MKR-OV-00015",
+      "action": "created"
+    },
+    {
+      "rowNumber": 177,
+      "primaryIdentifier": "MKR-OV-00015",
+      "action": "created"
+    },
+    {
+      "rowNumber": 178,
+      "primaryIdentifier": "MKR-OV-00015",
+      "action": "created"
+    },
+    {
+      "rowNumber": 179,
+      "primaryIdentifier": "MKR-OV-00015",
+      "action": "created"
+    },
+    {
+      "rowNumber": 180,
+      "primaryIdentifier": "MKR-OV-00015",
+      "action": "created"
+    },
+    {
+      "rowNumber": 181,
+      "primaryIdentifier": "MKR-OV-00015",
+      "action": "created"
+    },
+    {
+      "rowNumber": 182,
+      "primaryIdentifier": "MKR-RE-00020",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 183,
+      "primaryIdentifier": "MKR-RE-00020",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 184,
+      "primaryIdentifier": "MKR-RE-00020",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 185,
+      "primaryIdentifier": "MKR-RE-00020",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 186,
+      "primaryIdentifier": "MKR-RE-00020",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 187,
+      "primaryIdentifier": "MKR-RE-00020",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 188,
+      "primaryIdentifier": "MKR-RE-00021",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 189,
+      "primaryIdentifier": "MKR-RE-00021",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 190,
+      "primaryIdentifier": "MKR-RE-00021",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 191,
+      "primaryIdentifier": "MKR-RE-00021",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 192,
+      "primaryIdentifier": "MKR-RE-00021",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 193,
+      "primaryIdentifier": "MKR-RE-00021",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 194,
+      "primaryIdentifier": "MKR-RE-00022",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 195,
+      "primaryIdentifier": "MKR-RE-00022",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 196,
+      "primaryIdentifier": "MKR-RE-00022",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 197,
+      "primaryIdentifier": "MKR-RE-00022",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 198,
+      "primaryIdentifier": "MKR-RE-00022",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 199,
+      "primaryIdentifier": "MKR-RE-00022",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 200,
+      "primaryIdentifier": "MKR-RE-00023",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 201,
+      "primaryIdentifier": "MKR-RE-00023",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 202,
+      "primaryIdentifier": "MKR-RE-00023",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 203,
+      "primaryIdentifier": "MKR-RE-00023",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 204,
+      "primaryIdentifier": "MKR-RE-00023",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 205,
+      "primaryIdentifier": "MKR-RE-00023",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 206,
+      "primaryIdentifier": "MKR-RE-00024",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 207,
+      "primaryIdentifier": "MKR-RE-00024",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 208,
+      "primaryIdentifier": "MKR-RE-00024",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 209,
+      "primaryIdentifier": "MKR-RE-00024",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 210,
+      "primaryIdentifier": "MKR-RE-00024",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 211,
+      "primaryIdentifier": "MKR-RE-00024",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 212,
+      "primaryIdentifier": "MKR-OV-00016",
+      "action": "created"
+    },
+    {
+      "rowNumber": 213,
+      "primaryIdentifier": "MKR-RE-00025",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 214,
+      "primaryIdentifier": "MKR-OV-00017",
+      "action": "created"
+    },
+    {
+      "rowNumber": 215,
+      "primaryIdentifier": "MKR-OV-00018",
+      "action": "created"
+    },
+    {
+      "rowNumber": 216,
+      "primaryIdentifier": "MKR-IN-00019",
+      "action": "created"
+    },
+    {
+      "rowNumber": 217,
+      "primaryIdentifier": "MKR-RE-00026",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 218,
+      "primaryIdentifier": "MKR-OV-00019",
+      "action": "created"
+    },
+    {
+      "rowNumber": 219,
+      "primaryIdentifier": "MKR-RE-00027",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 220,
+      "primaryIdentifier": "MKR-OV-00020",
+      "action": "created"
+    },
+    {
+      "rowNumber": 221,
+      "primaryIdentifier": "MKR-RE-00028",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 222,
+      "primaryIdentifier": "MKR-IN-00020",
+      "action": "created"
+    },
+    {
+      "rowNumber": 223,
+      "primaryIdentifier": "MKR-IN-00021",
+      "action": "created"
+    },
+    {
+      "rowNumber": 224,
+      "primaryIdentifier": "MKR-RE-00029",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 225,
+      "primaryIdentifier": "MKR-OV-00021",
+      "action": "created"
+    },
+    {
+      "rowNumber": 226,
+      "primaryIdentifier": "MKR-RE-00030",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 227,
+      "primaryIdentifier": "MKR-OV-00022",
+      "action": "created"
+    },
+    {
+      "rowNumber": 228,
+      "primaryIdentifier": "MKR-RE-00031",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 229,
+      "primaryIdentifier": "MKR-IN-00022",
+      "action": "created"
+    },
+    {
+      "rowNumber": 230,
+      "primaryIdentifier": "MKR-IN-00023",
+      "action": "created"
+    },
+    {
+      "rowNumber": 231,
+      "primaryIdentifier": "MKR-IN-00024",
+      "action": "created"
+    },
+    {
+      "rowNumber": 232,
+      "primaryIdentifier": "MKR-IN-00025",
+      "action": "created"
+    },
+    {
+      "rowNumber": 233,
+      "primaryIdentifier": "MKR-RE-00032",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 234,
+      "primaryIdentifier": "MKR-RE-00033",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 235,
+      "primaryIdentifier": "MKR-IN-00026",
+      "action": "created"
+    },
+    {
+      "rowNumber": 236,
+      "primaryIdentifier": "MKR-RE-00034",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 237,
+      "primaryIdentifier": "MKR-RE-00035",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 238,
+      "primaryIdentifier": "MKR-IN-00027",
+      "action": "created"
+    },
+    {
+      "rowNumber": 239,
+      "primaryIdentifier": "MKR-OV-00023",
+      "action": "created"
+    },
+    {
+      "rowNumber": 240,
+      "primaryIdentifier": "MKR-RE-00036",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 241,
+      "primaryIdentifier": "MKR-RE-00037",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 242,
+      "primaryIdentifier": "MKR-RE-00037",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 243,
+      "primaryIdentifier": "MKR-RE-00038",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 244,
+      "primaryIdentifier": "MKR-IN-00028",
+      "action": "created"
+    },
+    {
+      "rowNumber": 245,
+      "primaryIdentifier": "MKR-RE-00039",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 246,
+      "primaryIdentifier": "MKR-IN-00029",
+      "action": "created"
+    },
+    {
+      "rowNumber": 247,
+      "primaryIdentifier": "MKR-RE-00040",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 248,
+      "primaryIdentifier": "MKR-IN-00030",
+      "action": "created"
+    },
+    {
+      "rowNumber": 249,
+      "primaryIdentifier": "MKR-IN-00031",
+      "action": "created"
+    },
+    {
+      "rowNumber": 250,
+      "primaryIdentifier": "MKR-IN-00032",
+      "action": "created"
+    },
+    {
+      "rowNumber": 251,
+      "primaryIdentifier": "MKR-IN-00033",
+      "action": "created"
+    },
+    {
+      "rowNumber": 252,
+      "primaryIdentifier": "MKR-RE-00041",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 253,
+      "primaryIdentifier": "MKR-IN-00034",
+      "action": "created"
+    },
+    {
+      "rowNumber": 254,
+      "primaryIdentifier": "MKR-RE-00042",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 255,
+      "primaryIdentifier": "MKR-IN-00035",
+      "action": "created"
+    },
+    {
+      "rowNumber": 256,
+      "primaryIdentifier": "MKR-RE-00043",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 257,
+      "primaryIdentifier": "MKR-IN-00036",
+      "action": "created"
+    },
+    {
+      "rowNumber": 258,
+      "primaryIdentifier": "MKR-IN-00037",
+      "action": "created"
+    },
+    {
+      "rowNumber": 259,
+      "primaryIdentifier": "MKR-IN-00038",
+      "action": "created"
+    },
+    {
+      "rowNumber": 260,
+      "primaryIdentifier": "MKR-IN-00039",
+      "action": "created"
+    },
+    {
+      "rowNumber": 261,
+      "primaryIdentifier": "MKR-IN-00040",
+      "action": "created"
+    },
+    {
+      "rowNumber": 262,
+      "primaryIdentifier": "MKR-IN-00041",
+      "action": "created"
+    },
+    {
+      "rowNumber": 263,
+      "primaryIdentifier": "MKR-IN-00042",
+      "action": "created"
+    },
+    {
+      "rowNumber": 264,
+      "primaryIdentifier": "MKR-IN-00043",
+      "action": "created"
+    },
+    {
+      "rowNumber": 265,
+      "primaryIdentifier": "MKR-IN-00044",
+      "action": "created"
+    },
+    {
+      "rowNumber": 266,
+      "primaryIdentifier": "MKR-IN-00045",
+      "action": "created"
+    },
+    {
+      "rowNumber": 267,
+      "primaryIdentifier": "MKR-IN-00046",
+      "action": "created"
+    },
+    {
+      "rowNumber": 268,
+      "primaryIdentifier": "MKR-IN-00047",
+      "action": "created"
+    },
+    {
+      "rowNumber": 269,
+      "primaryIdentifier": "MKR-IN-00048",
+      "action": "created"
+    },
+    {
+      "rowNumber": 270,
+      "primaryIdentifier": "MKR-RE-00044",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 271,
+      "primaryIdentifier": "MKR-IN-00049",
+      "action": "created"
+    },
+    {
+      "rowNumber": 272,
+      "primaryIdentifier": "MKR-IN-00050",
+      "action": "created"
+    },
+    {
+      "rowNumber": 273,
+      "primaryIdentifier": "MKR-IN-00051",
+      "action": "created"
+    },
+    {
+      "rowNumber": 274,
+      "primaryIdentifier": "MKR-IN-00052",
+      "action": "created"
+    },
+    {
+      "rowNumber": 275,
+      "primaryIdentifier": "MKR-IN-00053",
+      "action": "created"
+    },
+    {
+      "rowNumber": 276,
+      "primaryIdentifier": "MKR-IN-00054",
+      "action": "created"
+    },
+    {
+      "rowNumber": 277,
+      "primaryIdentifier": "MKR-IN-00055",
+      "action": "created"
+    },
+    {
+      "rowNumber": 278,
+      "primaryIdentifier": "MKR-IN-00056",
+      "action": "created"
+    },
+    {
+      "rowNumber": 279,
+      "primaryIdentifier": "MKR-IN-00057",
+      "action": "created"
+    },
+    {
+      "rowNumber": 280,
+      "primaryIdentifier": "MKR-IN-00058",
+      "action": "created"
+    },
+    {
+      "rowNumber": 281,
+      "primaryIdentifier": "MKR-IN-00059",
+      "action": "created"
+    },
+    {
+      "rowNumber": 282,
+      "primaryIdentifier": "MKR-IN-00060",
+      "action": "created"
+    },
+    {
+      "rowNumber": 283,
+      "primaryIdentifier": "MKR-IN-00061",
+      "action": "created"
+    },
+    {
+      "rowNumber": 284,
+      "primaryIdentifier": "MKR-IN-00062",
+      "action": "created"
+    },
+    {
+      "rowNumber": 285,
+      "primaryIdentifier": "MKR-IN-00063",
+      "action": "created"
+    },
+    {
+      "rowNumber": 286,
+      "primaryIdentifier": "MKR-IN-00064",
+      "action": "created"
+    },
+    {
+      "rowNumber": 287,
+      "primaryIdentifier": "MKR-IN-00065",
+      "action": "created"
+    },
+    {
+      "rowNumber": 288,
+      "primaryIdentifier": "MKR-IN-00066",
+      "action": "created"
+    },
+    {
+      "rowNumber": 289,
+      "primaryIdentifier": "MKR-IN-00067",
+      "action": "created"
+    },
+    {
+      "rowNumber": 290,
+      "primaryIdentifier": "MKR-IN-00068",
+      "action": "created"
+    },
+    {
+      "rowNumber": 291,
+      "primaryIdentifier": "MKR-IN-00069",
+      "action": "created"
+    },
+    {
+      "rowNumber": 292,
+      "primaryIdentifier": "MKR-IN-00070",
+      "action": "created"
+    },
+    {
+      "rowNumber": 293,
+      "primaryIdentifier": "MKR-RE-00045",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 294,
+      "primaryIdentifier": "MKR-CL-00002",
+      "action": "created"
+    },
+    {
+      "rowNumber": 295,
+      "primaryIdentifier": "MKR-RE-00046",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 296,
+      "primaryIdentifier": "MKR-IN-00071",
+      "action": "created"
+    },
+    {
+      "rowNumber": 297,
+      "primaryIdentifier": "MKR-IN-00072",
+      "action": "created"
+    },
+    {
+      "rowNumber": 298,
+      "primaryIdentifier": "MKR-RE-00047",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 299,
+      "primaryIdentifier": "MKR-RE-00048",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 300,
+      "primaryIdentifier": "MKR-IN-00073",
+      "action": "created"
+    },
+    {
+      "rowNumber": 301,
+      "primaryIdentifier": "MKR-IN-00074",
+      "action": "created"
+    },
+    {
+      "rowNumber": 302,
+      "primaryIdentifier": "MKR-OV-00024",
+      "action": "created"
+    },
+    {
+      "rowNumber": 303,
+      "primaryIdentifier": "MKR-OV-00025",
+      "action": "created"
+    },
+    {
+      "rowNumber": 304,
+      "primaryIdentifier": "MKR-OV-00026",
+      "action": "created"
+    },
+    {
+      "rowNumber": 305,
+      "primaryIdentifier": "MKR-IN-00073",
+      "action": "created"
+    },
+    {
+      "rowNumber": 306,
+      "primaryIdentifier": "MKR-IN-00074",
+      "action": "created"
+    },
+    {
+      "rowNumber": 307,
+      "primaryIdentifier": "MKR-OV-00024",
+      "action": "created"
+    },
+    {
+      "rowNumber": 308,
+      "primaryIdentifier": "MKR-OV-00025",
+      "action": "created"
+    },
+    {
+      "rowNumber": 309,
+      "primaryIdentifier": "MKR-OV-00026",
+      "action": "created"
+    },
+    {
+      "rowNumber": 310,
+      "primaryIdentifier": "MKR-IN-00075",
+      "action": "created"
+    },
+    {
+      "rowNumber": 311,
+      "primaryIdentifier": "MKR-IN-00076",
+      "action": "created"
+    },
+    {
+      "rowNumber": 312,
+      "primaryIdentifier": "MKR-IN-00075",
+      "action": "created"
+    },
+    {
+      "rowNumber": 313,
+      "primaryIdentifier": "MKR-IN-00076",
+      "action": "created"
+    },
+    {
+      "rowNumber": 314,
+      "primaryIdentifier": "MKR-IN-00077",
+      "action": "created"
+    },
+    {
+      "rowNumber": 315,
+      "primaryIdentifier": "MKR-RE-00049",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 316,
+      "primaryIdentifier": "MKR-IN-00078",
+      "action": "created"
+    },
+    {
+      "rowNumber": 317,
+      "primaryIdentifier": "MKR-IN-00077",
+      "action": "created"
+    },
+    {
+      "rowNumber": 318,
+      "primaryIdentifier": "MKR-RE-00049",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 319,
+      "primaryIdentifier": "MKR-IN-00078",
+      "action": "created"
+    },
+    {
+      "rowNumber": 320,
+      "primaryIdentifier": "MKR-IN-00079",
+      "action": "created"
+    },
+    {
+      "rowNumber": 321,
+      "primaryIdentifier": "MKR-IN-00080",
+      "action": "created"
+    },
+    {
+      "rowNumber": 322,
+      "primaryIdentifier": "MKR-OV-00027",
+      "action": "created"
+    },
+    {
+      "rowNumber": 323,
+      "primaryIdentifier": "MKR-OV-00028",
+      "action": "created"
+    },
+    {
+      "rowNumber": 324,
+      "primaryIdentifier": "MKR-OV-00029",
+      "action": "created"
+    },
+    {
+      "rowNumber": 325,
+      "primaryIdentifier": "MKR-IN-00081",
+      "action": "created"
+    },
+    {
+      "rowNumber": 326,
+      "primaryIdentifier": "MKR-RE-00050",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 327,
+      "primaryIdentifier": "MKR-IN-00082",
+      "action": "created"
+    },
+    {
+      "rowNumber": 328,
+      "primaryIdentifier": "MKR-IN-00083",
+      "action": "created"
+    },
+    {
+      "rowNumber": 329,
+      "primaryIdentifier": "MKR-IN-00084",
+      "action": "created"
+    },
+    {
+      "rowNumber": 330,
+      "primaryIdentifier": "MKR-IN-00085",
+      "action": "created"
+    },
+    {
+      "rowNumber": 331,
+      "primaryIdentifier": "MKR-IN-00086",
+      "action": "created"
+    },
+    {
+      "rowNumber": 332,
+      "primaryIdentifier": "MKR-RE-00051",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 333,
+      "primaryIdentifier": "MKR-IN-00087",
+      "action": "created"
+    },
+    {
+      "rowNumber": 334,
+      "primaryIdentifier": "MKR-IN-00088",
+      "action": "created"
+    },
+    {
+      "rowNumber": 335,
+      "primaryIdentifier": "MKR-OV-00030",
+      "action": "created"
+    },
+    {
+      "rowNumber": 336,
+      "primaryIdentifier": "MKR-OV-00031",
+      "action": "created"
+    },
+    {
+      "rowNumber": 337,
+      "primaryIdentifier": "MKR-OV-00032",
+      "action": "created"
+    },
+    {
+      "rowNumber": 338,
+      "primaryIdentifier": "MKR-IN-00087",
+      "action": "created"
+    },
+    {
+      "rowNumber": 339,
+      "primaryIdentifier": "MKR-IN-00088",
+      "action": "created"
+    },
+    {
+      "rowNumber": 340,
+      "primaryIdentifier": "MKR-OV-00030",
+      "action": "created"
+    },
+    {
+      "rowNumber": 341,
+      "primaryIdentifier": "MKR-OV-00031",
+      "action": "created"
+    },
+    {
+      "rowNumber": 342,
+      "primaryIdentifier": "MKR-OV-00032",
+      "action": "created"
+    },
+    {
+      "rowNumber": 343,
+      "primaryIdentifier": "MKR-IN-00089",
+      "action": "created"
+    },
+    {
+      "rowNumber": 344,
+      "primaryIdentifier": "MKR-RE-00052",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 345,
+      "primaryIdentifier": "MKR-OV-00033",
+      "action": "created"
+    },
+    {
+      "rowNumber": 346,
+      "primaryIdentifier": "MKR-IN-00090",
+      "action": "created"
+    },
+    {
+      "rowNumber": 347,
+      "primaryIdentifier": "MKR-IN-00091",
+      "action": "created"
+    },
+    {
+      "rowNumber": 348,
+      "primaryIdentifier": "MKR-IN-00092",
+      "action": "created"
+    },
+    {
+      "rowNumber": 349,
+      "primaryIdentifier": "MKR-CL-00003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 350,
+      "primaryIdentifier": "MKR-IN-00093",
+      "action": "created"
+    },
+    {
+      "rowNumber": 351,
+      "primaryIdentifier": "MKR-CL-00004",
+      "action": "created"
+    },
+    {
+      "rowNumber": 352,
+      "primaryIdentifier": "MKR-IN-00094",
+      "action": "created"
+    },
+    {
+      "rowNumber": 353,
+      "primaryIdentifier": "MKR-IN-00095",
+      "action": "created"
+    },
+    {
+      "rowNumber": 354,
+      "primaryIdentifier": "MKR-CL-00005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 355,
+      "primaryIdentifier": "MKR-RE-00053",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 356,
+      "primaryIdentifier": "MKR-IN-00096",
+      "action": "created"
+    },
+    {
+      "rowNumber": 357,
+      "primaryIdentifier": "MKR-IN-00097",
+      "action": "created"
+    },
+    {
+      "rowNumber": 358,
+      "primaryIdentifier": "MKR-IN-00098",
+      "action": "created"
+    },
+    {
+      "rowNumber": 359,
+      "primaryIdentifier": "MKR-IN-00099",
+      "action": "created"
+    },
+    {
+      "rowNumber": 360,
+      "primaryIdentifier": "MKR-IN-00100",
+      "action": "created"
+    },
+    {
+      "rowNumber": 361,
+      "primaryIdentifier": "MKR-IN-00101",
+      "action": "created"
+    },
+    {
+      "rowNumber": 362,
+      "primaryIdentifier": "MKR-IN-00102",
+      "action": "created"
+    },
+    {
+      "rowNumber": 363,
+      "primaryIdentifier": "MKR-IN-00103",
+      "action": "created"
+    },
+    {
+      "rowNumber": 364,
+      "primaryIdentifier": "MKR-IN-00104",
+      "action": "created"
+    },
+    {
+      "rowNumber": 365,
+      "primaryIdentifier": "MKR-IN-00105",
+      "action": "created"
+    },
+    {
+      "rowNumber": 366,
+      "primaryIdentifier": "MKR-IN-00106",
+      "action": "created"
+    },
+    {
+      "rowNumber": 367,
+      "primaryIdentifier": "MKR-IN-00107",
+      "action": "created"
+    },
+    {
+      "rowNumber": 368,
+      "primaryIdentifier": "MKR-IN-00108",
+      "action": "created"
+    },
+    {
+      "rowNumber": 369,
+      "primaryIdentifier": "MKR-IN-00109",
+      "action": "created"
+    },
+    {
+      "rowNumber": 370,
+      "primaryIdentifier": "MKR-IN-00110",
+      "action": "created"
+    },
+    {
+      "rowNumber": 371,
+      "primaryIdentifier": "MKR-IN-00111",
+      "action": "created"
+    },
+    {
+      "rowNumber": 372,
+      "primaryIdentifier": "MKR-IN-00112",
+      "action": "created"
+    },
+    {
+      "rowNumber": 373,
+      "primaryIdentifier": "MKR-IN-00113",
+      "action": "created"
+    },
+    {
+      "rowNumber": 374,
+      "primaryIdentifier": "MKR-RE-00054",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 375,
+      "primaryIdentifier": "MKR-IN-00114",
+      "action": "created"
+    },
+    {
+      "rowNumber": 376,
+      "primaryIdentifier": "MKR-OV-00034",
+      "action": "created"
+    },
+    {
+      "rowNumber": 377,
+      "primaryIdentifier": "MKR-IN-00115",
+      "action": "created"
+    },
+    {
+      "rowNumber": 378,
+      "primaryIdentifier": "MKR-IN-00116",
+      "action": "created"
+    },
+    {
+      "rowNumber": 379,
+      "primaryIdentifier": "MKR-IN-00117",
+      "action": "created"
+    },
+    {
+      "rowNumber": 380,
+      "primaryIdentifier": "MKR-IN-00118",
+      "action": "created"
+    },
+    {
+      "rowNumber": 381,
+      "primaryIdentifier": "MKR-IN-00119",
+      "action": "created"
+    },
+    {
+      "rowNumber": 382,
+      "primaryIdentifier": "MKR-IN-00120",
+      "action": "created"
+    },
+    {
+      "rowNumber": 383,
+      "primaryIdentifier": "MKR-IN-00121",
+      "action": "created"
+    },
+    {
+      "rowNumber": 384,
+      "primaryIdentifier": "MKR-IN-00122",
+      "action": "created"
+    },
+    {
+      "rowNumber": 385,
+      "primaryIdentifier": "MKR-IN-00123",
+      "action": "created"
+    },
+    {
+      "rowNumber": 386,
+      "primaryIdentifier": "MKR-RE-00055",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 387,
+      "primaryIdentifier": "MKR-IN-00124",
+      "action": "created"
+    },
+    {
+      "rowNumber": 388,
+      "primaryIdentifier": "MKR-IN-00125",
+      "action": "created"
+    },
+    {
+      "rowNumber": 389,
+      "primaryIdentifier": "MKR-IN-00126",
+      "action": "created"
+    },
+    {
+      "rowNumber": 390,
+      "primaryIdentifier": "MKR-IN-00127",
+      "action": "created"
+    },
+    {
+      "rowNumber": 391,
+      "primaryIdentifier": "MKR-IN-00128",
+      "action": "created"
+    },
+    {
+      "rowNumber": 392,
+      "primaryIdentifier": "MKR-IN-00129",
+      "action": "created"
+    },
+    {
+      "rowNumber": 393,
+      "primaryIdentifier": "MKR-IN-00130",
+      "action": "created"
+    },
+    {
+      "rowNumber": 394,
+      "primaryIdentifier": "MKR-IN-00126",
+      "action": "created"
+    },
+    {
+      "rowNumber": 395,
+      "primaryIdentifier": "MKR-IN-00127",
+      "action": "created"
+    },
+    {
+      "rowNumber": 396,
+      "primaryIdentifier": "MKR-IN-00128",
+      "action": "created"
+    },
+    {
+      "rowNumber": 397,
+      "primaryIdentifier": "MKR-IN-00129",
+      "action": "created"
+    },
+    {
+      "rowNumber": 398,
+      "primaryIdentifier": "MKR-IN-00130",
+      "action": "created"
+    },
+    {
+      "rowNumber": 399,
+      "primaryIdentifier": "MKR-IN-00131",
+      "action": "created"
+    },
+    {
+      "rowNumber": 400,
+      "primaryIdentifier": "MKR-IN-00132",
+      "action": "created"
+    },
+    {
+      "rowNumber": 401,
+      "primaryIdentifier": "MKR-IN-00133",
+      "action": "created"
+    },
+    {
+      "rowNumber": 402,
+      "primaryIdentifier": "MKR-IN-00134",
+      "action": "created"
+    },
+    {
+      "rowNumber": 403,
+      "primaryIdentifier": "MKR-IN-00135",
+      "action": "created"
+    },
+    {
+      "rowNumber": 404,
+      "primaryIdentifier": "MKR-IN-00136",
+      "action": "created"
+    },
+    {
+      "rowNumber": 405,
+      "primaryIdentifier": "MKR-IN-00137",
+      "action": "created"
+    },
+    {
+      "rowNumber": 406,
+      "primaryIdentifier": "MKR-IN-00138",
+      "action": "created"
+    },
+    {
+      "rowNumber": 407,
+      "primaryIdentifier": "MKR-IN-00139",
+      "action": "created"
+    },
+    {
+      "rowNumber": 408,
+      "primaryIdentifier": "MKR-IN-00140",
+      "action": "created"
+    },
+    {
+      "rowNumber": 409,
+      "primaryIdentifier": "MKR-RE-00056",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 410,
+      "primaryIdentifier": "MKR-CL-00006",
+      "action": "created"
+    },
+    {
+      "rowNumber": 411,
+      "primaryIdentifier": "MKR-RE-00057",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 412,
+      "primaryIdentifier": "MKR-CL-00007",
+      "action": "created"
+    },
+    {
+      "rowNumber": 413,
+      "primaryIdentifier": "MKR-IN-00141",
+      "action": "created"
+    },
+    {
+      "rowNumber": 414,
+      "primaryIdentifier": "MKR-IN-00142",
+      "action": "created"
+    },
+    {
+      "rowNumber": 415,
+      "primaryIdentifier": "MKR-IN-00143",
+      "action": "created"
+    },
+    {
+      "rowNumber": 416,
+      "primaryIdentifier": "MKR-IN-00144",
+      "action": "created"
+    },
+    {
+      "rowNumber": 417,
+      "primaryIdentifier": "MKR-IN-00145",
+      "action": "created"
+    },
+    {
+      "rowNumber": 418,
+      "primaryIdentifier": "MKR-IN-00146",
+      "action": "created"
+    },
+    {
+      "rowNumber": 419,
+      "primaryIdentifier": "MKR-IN-00147",
+      "action": "created"
+    },
+    {
+      "rowNumber": 420,
+      "primaryIdentifier": "MKR-OV-00035",
+      "action": "created"
+    },
+    {
+      "rowNumber": 421,
+      "primaryIdentifier": "MKR-IN-00148",
+      "action": "created"
+    },
+    {
+      "rowNumber": 422,
+      "primaryIdentifier": "MKR-IN-00147",
+      "action": "created"
+    },
+    {
+      "rowNumber": 423,
+      "primaryIdentifier": "MKR-OV-00035",
+      "action": "created"
+    },
+    {
+      "rowNumber": 424,
+      "primaryIdentifier": "MKR-IN-00148",
+      "action": "created"
+    },
+    {
+      "rowNumber": 425,
+      "primaryIdentifier": "MKR-IN-00147",
+      "action": "created"
+    },
+    {
+      "rowNumber": 426,
+      "primaryIdentifier": "MKR-OV-00035",
+      "action": "created"
+    },
+    {
+      "rowNumber": 427,
+      "primaryIdentifier": "MKR-IN-00148",
+      "action": "created"
+    },
+    {
+      "rowNumber": 428,
+      "primaryIdentifier": "MKR-IN-00149",
+      "action": "created"
+    },
+    {
+      "rowNumber": 429,
+      "primaryIdentifier": "MKR-IN-00150",
+      "action": "created"
+    },
+    {
+      "rowNumber": 430,
+      "primaryIdentifier": "MKR-IN-00151",
+      "action": "created"
+    },
+    {
+      "rowNumber": 431,
+      "primaryIdentifier": "MKR-IN-00152",
+      "action": "created"
+    },
+    {
+      "rowNumber": 432,
+      "primaryIdentifier": "MKR-IN-00153",
+      "action": "created"
+    },
+    {
+      "rowNumber": 433,
+      "primaryIdentifier": "MKR-IN-00154",
+      "action": "created"
+    },
+    {
+      "rowNumber": 434,
+      "primaryIdentifier": "MKR-IN-00155",
+      "action": "created"
+    },
+    {
+      "rowNumber": 435,
+      "primaryIdentifier": "MKR-IN-00156",
+      "action": "created"
+    },
+    {
+      "rowNumber": 436,
+      "primaryIdentifier": "MKR-IN-00157",
+      "action": "created"
+    },
+    {
+      "rowNumber": 437,
+      "primaryIdentifier": "MKR-IN-00158",
+      "action": "created"
+    },
+    {
+      "rowNumber": 438,
+      "primaryIdentifier": "MKR-IN-00159",
+      "action": "created"
+    },
+    {
+      "rowNumber": 439,
+      "primaryIdentifier": "MKR-IN-00160",
+      "action": "created"
+    },
+    {
+      "rowNumber": 440,
+      "primaryIdentifier": "MKR-IN-00161",
+      "action": "created"
+    },
+    {
+      "rowNumber": 441,
+      "primaryIdentifier": "MKR-IN-00162",
+      "action": "created"
+    },
+    {
+      "rowNumber": 442,
+      "primaryIdentifier": "MKR-IN-00163",
+      "action": "created"
+    },
+    {
+      "rowNumber": 443,
+      "primaryIdentifier": "MKR-IN-00164",
+      "action": "created"
+    },
+    {
+      "rowNumber": 444,
+      "primaryIdentifier": "MKR-RE-00058",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 445,
+      "primaryIdentifier": "MKR-IN-00164",
+      "action": "created"
+    },
+    {
+      "rowNumber": 446,
+      "primaryIdentifier": "MKR-RE-00058",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 447,
+      "primaryIdentifier": "MKR-IN-00165",
+      "action": "created"
+    },
+    {
+      "rowNumber": 448,
+      "primaryIdentifier": "MKR-IN-00166",
+      "action": "created"
+    },
+    {
+      "rowNumber": 449,
+      "primaryIdentifier": "MKR-IN-00167",
+      "action": "created"
+    },
+    {
+      "rowNumber": 450,
+      "primaryIdentifier": "MKR-IN-00165",
+      "action": "created"
+    },
+    {
+      "rowNumber": 451,
+      "primaryIdentifier": "MKR-IN-00166",
+      "action": "created"
+    },
+    {
+      "rowNumber": 452,
+      "primaryIdentifier": "MKR-IN-00167",
+      "action": "created"
+    },
+    {
+      "rowNumber": 453,
+      "primaryIdentifier": "MKR-SE-00001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 454,
+      "primaryIdentifier": "MKR-RE-00059",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 455,
+      "primaryIdentifier": "MKR-IN-00168",
+      "action": "created"
+    },
+    {
+      "rowNumber": 456,
+      "primaryIdentifier": "MKR-IN-00169",
+      "action": "created"
+    },
+    {
+      "rowNumber": 457,
+      "primaryIdentifier": "MKR-IN-00170",
+      "action": "created"
+    },
+    {
+      "rowNumber": 458,
+      "primaryIdentifier": "MKR-IN-00171",
+      "action": "created"
+    },
+    {
+      "rowNumber": 459,
+      "primaryIdentifier": "MKR-IN-00172",
+      "action": "created"
+    },
+    {
+      "rowNumber": 460,
+      "primaryIdentifier": "MKR-IN-00173",
+      "action": "created"
+    },
+    {
+      "rowNumber": 461,
+      "primaryIdentifier": "MKR-IN-00174",
+      "action": "created"
+    },
+    {
+      "rowNumber": 462,
+      "primaryIdentifier": "MKR-IN-00175",
+      "action": "created"
+    },
+    {
+      "rowNumber": 463,
+      "primaryIdentifier": "MKR-IN-00176",
+      "action": "created"
+    },
+    {
+      "rowNumber": 464,
+      "primaryIdentifier": "MKR-IN-00177",
+      "action": "created"
+    },
+    {
+      "rowNumber": 465,
+      "primaryIdentifier": "MKR-IN-00178",
+      "action": "created"
+    },
+    {
+      "rowNumber": 466,
+      "primaryIdentifier": "MKR-IN-00179",
+      "action": "created"
+    },
+    {
+      "rowNumber": 467,
+      "primaryIdentifier": "MKR-IN-00180",
+      "action": "created"
+    },
+    {
+      "rowNumber": 468,
+      "primaryIdentifier": "MKR-IN-00181",
+      "action": "created"
+    },
+    {
+      "rowNumber": 469,
+      "primaryIdentifier": "MKR-IN-00182",
+      "action": "created"
+    },
+    {
+      "rowNumber": 470,
+      "primaryIdentifier": "MKR-IN-00183",
+      "action": "created"
+    },
+    {
+      "rowNumber": 471,
+      "primaryIdentifier": "MKR-IN-00184",
+      "action": "created"
+    },
+    {
+      "rowNumber": 472,
+      "primaryIdentifier": "MKR-IN-00185",
+      "action": "created"
+    },
+    {
+      "rowNumber": 473,
+      "primaryIdentifier": "MKR-IN-00186",
+      "action": "created"
+    },
+    {
+      "rowNumber": 474,
+      "primaryIdentifier": "MKR-IN-00187",
+      "action": "created"
+    },
+    {
+      "rowNumber": 475,
+      "primaryIdentifier": "MKR-IN-00188",
+      "action": "created"
+    },
+    {
+      "rowNumber": 476,
+      "primaryIdentifier": "MKR-IN-00189",
+      "action": "created"
+    },
+    {
+      "rowNumber": 477,
+      "primaryIdentifier": "MKR-IN-00190",
+      "action": "created"
+    },
+    {
+      "rowNumber": 478,
+      "primaryIdentifier": "MKR-IN-00191",
+      "action": "created"
+    },
+    {
+      "rowNumber": 479,
+      "primaryIdentifier": "MKR-IN-00192",
+      "action": "created"
+    },
+    {
+      "rowNumber": 480,
+      "primaryIdentifier": "MKR-IN-00193",
+      "action": "created"
+    },
+    {
+      "rowNumber": 481,
+      "primaryIdentifier": "MKR-RE-00060",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 482,
+      "primaryIdentifier": "MKR-RE-00060",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    },
+    {
+      "rowNumber": 483,
+      "primaryIdentifier": "MKR-IN-00194",
+      "action": "created"
+    },
+    {
+      "rowNumber": 484,
+      "primaryIdentifier": "MKR-IN-00188",
+      "action": "created"
+    },
+    {
+      "rowNumber": 485,
+      "primaryIdentifier": "MKR-IN-00189",
+      "action": "created"
+    },
+    {
+      "rowNumber": 486,
+      "primaryIdentifier": "MKR-IN-00195",
+      "action": "created"
+    },
+    {
+      "rowNumber": 487,
+      "primaryIdentifier": "MKR-IN-00196",
+      "action": "created"
+    },
+    {
+      "rowNumber": 488,
+      "primaryIdentifier": "MKR-IN-00197",
+      "action": "created"
+    },
+    {
+      "rowNumber": 489,
+      "primaryIdentifier": "MKR-IN-00195",
+      "action": "created"
+    },
+    {
+      "rowNumber": 490,
+      "primaryIdentifier": "MKR-IN-00196",
+      "action": "created"
+    },
+    {
+      "rowNumber": 491,
+      "primaryIdentifier": "MKR-IN-00197",
+      "action": "created"
+    },
+    {
+      "rowNumber": 492,
+      "primaryIdentifier": "MKR-IN-00198",
+      "action": "created"
+    },
+    {
+      "rowNumber": 493,
+      "primaryIdentifier": "MKR-OV-00036",
+      "action": "created"
+    },
+    {
+      "rowNumber": 494,
+      "primaryIdentifier": "MKR-IN-00199",
+      "action": "created"
+    },
+    {
+      "rowNumber": 495,
+      "primaryIdentifier": "MKR-IN-00200",
+      "action": "created"
+    },
+    {
+      "rowNumber": 496,
+      "primaryIdentifier": "MKR-RE-00061",
+      "action": "skipped",
+      "error": "Invalid Task Type 'Replacement'. Allowed values: Inspection, Overhaul, Service, Test, Renew/Replace, Measurement/Calibration, Megger Test, Cleaning, Lubrication, Survey, Analysis, Checks"
+    }
+  ]
+}

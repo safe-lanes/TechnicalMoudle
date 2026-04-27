@@ -1,0 +1,75 @@
+{
+  "id": "7ef7a6da-0a2d-4b46-a52f-e0da158a7f02",
+  "type": "stores",
+  "mode": "upsert",
+  "vesselId": "744cf286-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-03-25T11:04:24.789Z",
+  "completedAt": "2026-03-25T11:04:24.891Z",
+  "status": "complete",
+  "created": 10,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Stores - Chemicals.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\stores\\1774436664890_Stores_-_Chemicals.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0,
+  "spareComponentLinksExpected": 0,
+  "spareComponentLinksDbTotal": 0,
+  "spareComponentLinksDbDelta": 0,
+  "rowResults": [
+    {
+      "rowNumber": 2,
+      "primaryIdentifier": "CH-0001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 3,
+      "primaryIdentifier": "CH-0002",
+      "action": "created"
+    },
+    {
+      "rowNumber": 4,
+      "primaryIdentifier": "CH-0003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 5,
+      "primaryIdentifier": "CH-0004",
+      "action": "created"
+    },
+    {
+      "rowNumber": 6,
+      "primaryIdentifier": "CH-0005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 7,
+      "primaryIdentifier": "CH-0006",
+      "action": "created"
+    },
+    {
+      "rowNumber": 8,
+      "primaryIdentifier": "CH-0007",
+      "action": "created"
+    },
+    {
+      "rowNumber": 9,
+      "primaryIdentifier": "CH-0008",
+      "action": "created"
+    },
+    {
+      "rowNumber": 10,
+      "primaryIdentifier": "CH-0009",
+      "action": "created"
+    },
+    {
+      "rowNumber": 11,
+      "primaryIdentifier": "CH-0010",
+      "action": "created"
+    }
+  ],
+  "warnings": []
+}

@@ -1,0 +1,19 @@
+{
+  "id": "aa4bbfdb-e41b-4754-88d3-dcba7bace610",
+  "type": "fleet-components",
+  "mode": "upsert",
+  "vesselId": "",
+  "userId": 1,
+  "startedAt": "2026-02-26T07:15:02.864Z",
+  "completedAt": "2026-02-26T07:15:02.895Z",
+  "status": "complete",
+  "created": 9,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Fleet_Component Sheet.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\fleet-components\\1772090102893_Fleet_Component_Sheet.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

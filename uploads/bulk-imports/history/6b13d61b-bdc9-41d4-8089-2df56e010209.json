@@ -1,0 +1,16 @@
+{
+  "id": "6b13d61b-bdc9-41d4-8089-2df56e010209",
+  "type": "fleet-spares",
+  "mode": "upsert",
+  "userId": 1,
+  "startedAt": "2026-02-10T04:40:14.544Z",
+  "completedAt": "2026-02-10T04:40:14.568Z",
+  "status": "failed",
+  "created": 0,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Fleet Spares.xlsx",
+  "storedFilePath": null,
+  "errorReport": null
+}

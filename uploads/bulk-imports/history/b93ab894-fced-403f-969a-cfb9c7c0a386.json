@@ -1,0 +1,145 @@
+{
+  "id": "b93ab894-fced-403f-969a-cfb9c7c0a386",
+  "type": "makers",
+  "mode": "upsert",
+  "vesselId": "74481b72-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-04-13T11:03:54.876Z",
+  "completedAt": "2026-04-13T11:03:55.075Z",
+  "status": "complete",
+  "created": 0,
+  "updated": 24,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "01_Makers List _ Test_Vessel_04.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\makers\\1776078235070_01_Makers_List___Test_Vessel_04.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0,
+  "spareComponentLinksExpected": 0,
+  "spareComponentLinksDbTotal": 0,
+  "spareComponentLinksDbDelta": 0,
+  "rowResults": [
+    {
+      "rowNumber": 2,
+      "primaryIdentifier": "MKR-500001",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 3,
+      "primaryIdentifier": "MKR-500002",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 4,
+      "primaryIdentifier": "MKR-500003",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 5,
+      "primaryIdentifier": "MKR-500004",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 6,
+      "primaryIdentifier": "MKR-500005",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 7,
+      "primaryIdentifier": "MKR-500006",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 8,
+      "primaryIdentifier": "MKR-500007",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 9,
+      "primaryIdentifier": "MKR-500008",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 10,
+      "primaryIdentifier": "MKR-500009",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 11,
+      "primaryIdentifier": "MKR-500010",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 12,
+      "primaryIdentifier": "MKR-500011",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 13,
+      "primaryIdentifier": "MKR-500012",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 14,
+      "primaryIdentifier": "MKR-500013",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 15,
+      "primaryIdentifier": "MKR-999999",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 16,
+      "primaryIdentifier": "MKR-500014",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 17,
+      "primaryIdentifier": "MKR-500015",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 18,
+      "primaryIdentifier": "MKR-500016",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 19,
+      "primaryIdentifier": "MKR-500017",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 20,
+      "primaryIdentifier": "MKR-500018",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 21,
+      "primaryIdentifier": "MKR-500019",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 22,
+      "primaryIdentifier": "MKR-500020",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 23,
+      "primaryIdentifier": "MKR-500021",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 24,
+      "primaryIdentifier": "MKR-500022",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 25,
+      "primaryIdentifier": "MKR-500023",
+      "action": "updated"
+    }
+  ],
+  "warnings": []
+}

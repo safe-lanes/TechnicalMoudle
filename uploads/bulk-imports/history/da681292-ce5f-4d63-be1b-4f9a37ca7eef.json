@@ -1,0 +1,19 @@
+{
+  "id": "da681292-ce5f-4d63-be1b-4f9a37ca7eef",
+  "type": "components",
+  "mode": "upsert",
+  "vesselId": "744dc41e-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-03-02T06:30:40.371Z",
+  "completedAt": "2026-03-02T06:30:44.390Z",
+  "status": "complete",
+  "created": 1446,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Vessel_Component Sheet.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\components\\1772433044388_Vessel_Component_Sheet.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

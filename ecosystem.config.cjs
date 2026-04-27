@@ -7,6 +7,17 @@ module.exports = {
             autorestart: true, // Automatically restart the application if it crashes
             watch: false, // Set to true if you want pm2 to watch for file changes and automatically reload
             // max_memory_restart: '1G', // Restart the application if memory usage exceeds this limit
-        },
+				 // Default environment (used if no --env flag passed)
+		env: {
+			APP_ENV: "dev",
+			NODE_ENV: "development",
+			EXTERNAL_MASTER_DATA_URL_DEV:"https://dev.sl-sail.com/b/api/v1/crewmasterdata/getallmasterdata"
+		},
+		env_production: {
+			APP_ENV: "production",
+			NODE_ENV:"production",
+			EXTERNAL_MASTER_DATA_URL_PROD:"https://sl-sail.com/b/api/v1/crewmasterdata/getallmasterdata"
+		}
+		},
     ],
 };

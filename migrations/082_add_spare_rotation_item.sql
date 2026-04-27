@@ -1,0 +1,1 @@
+ALTER TABLE spares ADD COLUMN IF NOT EXISTS is_rotation_item BOOLEAN NOT NULL DEFAULT false;

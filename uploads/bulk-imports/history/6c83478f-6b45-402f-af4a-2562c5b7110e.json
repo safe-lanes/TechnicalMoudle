@@ -1,0 +1,735 @@
+{
+  "id": "6c83478f-6b45-402f-af4a-2562c5b7110e",
+  "type": "fleet-components",
+  "mode": "upsert",
+  "vesselId": "",
+  "userId": 1,
+  "startedAt": "2026-03-30T09:18:16.634Z",
+  "completedAt": "2026-03-30T09:18:16.978Z",
+  "status": "complete",
+  "created": 78,
+  "updated": 64,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "fleet_components_template (3).xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\fleet-components\\1774862296977_fleet_components_template__3_.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0,
+  "spareComponentLinksExpected": 0,
+  "spareComponentLinksDbTotal": 0,
+  "spareComponentLinksDbDelta": 0,
+  "rowResults": [
+    {
+      "rowNumber": 2,
+      "primaryIdentifier": "2",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 3,
+      "primaryIdentifier": "278",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 4,
+      "primaryIdentifier": "278.010",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 5,
+      "primaryIdentifier": "278.010.YY",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 6,
+      "primaryIdentifier": "285",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 7,
+      "primaryIdentifier": "285.001",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 8,
+      "primaryIdentifier": "285.001.YY",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 9,
+      "primaryIdentifier": "4",
+      "action": "created"
+    },
+    {
+      "rowNumber": 10,
+      "primaryIdentifier": "401",
+      "action": "created"
+    },
+    {
+      "rowNumber": 11,
+      "primaryIdentifier": "401.005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 12,
+      "primaryIdentifier": "401.005.YY",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 13,
+      "primaryIdentifier": "403",
+      "action": "created"
+    },
+    {
+      "rowNumber": 14,
+      "primaryIdentifier": "403.001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 15,
+      "primaryIdentifier": "403.001.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 16,
+      "primaryIdentifier": "403.006",
+      "action": "created"
+    },
+    {
+      "rowNumber": 17,
+      "primaryIdentifier": "403.006.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 18,
+      "primaryIdentifier": "411",
+      "action": "created"
+    },
+    {
+      "rowNumber": 19,
+      "primaryIdentifier": "411.001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 20,
+      "primaryIdentifier": "411.001.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 21,
+      "primaryIdentifier": "411.002",
+      "action": "created"
+    },
+    {
+      "rowNumber": 22,
+      "primaryIdentifier": "411.002.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 23,
+      "primaryIdentifier": "5",
+      "action": "created"
+    },
+    {
+      "rowNumber": 24,
+      "primaryIdentifier": "501",
+      "action": "created"
+    },
+    {
+      "rowNumber": 25,
+      "primaryIdentifier": "501.002",
+      "action": "created"
+    },
+    {
+      "rowNumber": 26,
+      "primaryIdentifier": "501.002.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 27,
+      "primaryIdentifier": "502",
+      "action": "created"
+    },
+    {
+      "rowNumber": 28,
+      "primaryIdentifier": "502.005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 29,
+      "primaryIdentifier": "502.005.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 30,
+      "primaryIdentifier": "502.005.AB",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 31,
+      "primaryIdentifier": "503",
+      "action": "created"
+    },
+    {
+      "rowNumber": 32,
+      "primaryIdentifier": "503.002",
+      "action": "created"
+    },
+    {
+      "rowNumber": 33,
+      "primaryIdentifier": "503.002.YY",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 34,
+      "primaryIdentifier": "503.007",
+      "action": "created"
+    },
+    {
+      "rowNumber": 35,
+      "primaryIdentifier": "503.007.YY",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 36,
+      "primaryIdentifier": "503.008",
+      "action": "created"
+    },
+    {
+      "rowNumber": 37,
+      "primaryIdentifier": "503.008.YY",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 38,
+      "primaryIdentifier": "503.016",
+      "action": "created"
+    },
+    {
+      "rowNumber": 39,
+      "primaryIdentifier": "503.016.YY",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 40,
+      "primaryIdentifier": "503.019",
+      "action": "created"
+    },
+    {
+      "rowNumber": 41,
+      "primaryIdentifier": "503.019.YY",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 42,
+      "primaryIdentifier": "503.021",
+      "action": "created"
+    },
+    {
+      "rowNumber": 43,
+      "primaryIdentifier": "503.021.YY",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 44,
+      "primaryIdentifier": "504",
+      "action": "created"
+    },
+    {
+      "rowNumber": 45,
+      "primaryIdentifier": "504.001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 46,
+      "primaryIdentifier": "504.001.YY",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 47,
+      "primaryIdentifier": "505",
+      "action": "created"
+    },
+    {
+      "rowNumber": 48,
+      "primaryIdentifier": "505.001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 49,
+      "primaryIdentifier": "505.001.YY",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 50,
+      "primaryIdentifier": "554",
+      "action": "created"
+    },
+    {
+      "rowNumber": 51,
+      "primaryIdentifier": "554.001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 52,
+      "primaryIdentifier": "554.001.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 53,
+      "primaryIdentifier": "554.003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 54,
+      "primaryIdentifier": "554.003.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 55,
+      "primaryIdentifier": "554.005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 56,
+      "primaryIdentifier": "554.005.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 57,
+      "primaryIdentifier": "6",
+      "action": "created"
+    },
+    {
+      "rowNumber": 58,
+      "primaryIdentifier": "601",
+      "action": "created"
+    },
+    {
+      "rowNumber": 59,
+      "primaryIdentifier": "601.001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 60,
+      "primaryIdentifier": "601.001.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 61,
+      "primaryIdentifier": "601.002",
+      "action": "created"
+    },
+    {
+      "rowNumber": 62,
+      "primaryIdentifier": "601.002.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 63,
+      "primaryIdentifier": "601.003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 64,
+      "primaryIdentifier": "601.003.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 65,
+      "primaryIdentifier": "601.004",
+      "action": "created"
+    },
+    {
+      "rowNumber": 66,
+      "primaryIdentifier": "601.004.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 67,
+      "primaryIdentifier": "601.005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 68,
+      "primaryIdentifier": "601.005.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 69,
+      "primaryIdentifier": "601.006",
+      "action": "created"
+    },
+    {
+      "rowNumber": 70,
+      "primaryIdentifier": "601.006.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 71,
+      "primaryIdentifier": "601.007",
+      "action": "created"
+    },
+    {
+      "rowNumber": 72,
+      "primaryIdentifier": "601.007.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 73,
+      "primaryIdentifier": "601.010",
+      "action": "created"
+    },
+    {
+      "rowNumber": 74,
+      "primaryIdentifier": "601.010.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 75,
+      "primaryIdentifier": "601.016",
+      "action": "created"
+    },
+    {
+      "rowNumber": 76,
+      "primaryIdentifier": "601.016.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 77,
+      "primaryIdentifier": "601.018",
+      "action": "created"
+    },
+    {
+      "rowNumber": 78,
+      "primaryIdentifier": "601.018.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 79,
+      "primaryIdentifier": "601.026",
+      "action": "created"
+    },
+    {
+      "rowNumber": 80,
+      "primaryIdentifier": "601.026.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 81,
+      "primaryIdentifier": "601.053",
+      "action": "created"
+    },
+    {
+      "rowNumber": 82,
+      "primaryIdentifier": "601.053.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 83,
+      "primaryIdentifier": "601.059",
+      "action": "created"
+    },
+    {
+      "rowNumber": 84,
+      "primaryIdentifier": "601.059.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 85,
+      "primaryIdentifier": "601.060",
+      "action": "created"
+    },
+    {
+      "rowNumber": 86,
+      "primaryIdentifier": "601.060.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 87,
+      "primaryIdentifier": "601.064",
+      "action": "created"
+    },
+    {
+      "rowNumber": 88,
+      "primaryIdentifier": "601.064.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 89,
+      "primaryIdentifier": "601.066",
+      "action": "created"
+    },
+    {
+      "rowNumber": 90,
+      "primaryIdentifier": "601.066.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 91,
+      "primaryIdentifier": "651",
+      "action": "created"
+    },
+    {
+      "rowNumber": 92,
+      "primaryIdentifier": "651.001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 93,
+      "primaryIdentifier": "651.001.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 94,
+      "primaryIdentifier": "651.002",
+      "action": "created"
+    },
+    {
+      "rowNumber": 95,
+      "primaryIdentifier": "651.002.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 96,
+      "primaryIdentifier": "651.003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 97,
+      "primaryIdentifier": "651.003.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 98,
+      "primaryIdentifier": "651.004",
+      "action": "created"
+    },
+    {
+      "rowNumber": 99,
+      "primaryIdentifier": "651.004.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 100,
+      "primaryIdentifier": "651.007",
+      "action": "created"
+    },
+    {
+      "rowNumber": 101,
+      "primaryIdentifier": "651.007.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 102,
+      "primaryIdentifier": "651.018",
+      "action": "created"
+    },
+    {
+      "rowNumber": 103,
+      "primaryIdentifier": "651.018.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 104,
+      "primaryIdentifier": "651.020",
+      "action": "created"
+    },
+    {
+      "rowNumber": 105,
+      "primaryIdentifier": "651.020.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 106,
+      "primaryIdentifier": "651.046",
+      "action": "created"
+    },
+    {
+      "rowNumber": 107,
+      "primaryIdentifier": "651.046.ZZ",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 108,
+      "primaryIdentifier": "651.053",
+      "action": "created"
+    },
+    {
+      "rowNumber": 109,
+      "primaryIdentifier": "651.053.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 110,
+      "primaryIdentifier": "665",
+      "action": "created"
+    },
+    {
+      "rowNumber": 111,
+      "primaryIdentifier": "665.001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 112,
+      "primaryIdentifier": "665.001.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 113,
+      "primaryIdentifier": "665.003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 114,
+      "primaryIdentifier": "665.003.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 115,
+      "primaryIdentifier": "7",
+      "action": "created"
+    },
+    {
+      "rowNumber": 116,
+      "primaryIdentifier": "702",
+      "action": "created"
+    },
+    {
+      "rowNumber": 117,
+      "primaryIdentifier": "702.005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 118,
+      "primaryIdentifier": "702.005.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 119,
+      "primaryIdentifier": "702.010",
+      "action": "created"
+    },
+    {
+      "rowNumber": 120,
+      "primaryIdentifier": "702.010.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 121,
+      "primaryIdentifier": "712",
+      "action": "created"
+    },
+    {
+      "rowNumber": 122,
+      "primaryIdentifier": "712.011",
+      "action": "created"
+    },
+    {
+      "rowNumber": 123,
+      "primaryIdentifier": "712.011.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 124,
+      "primaryIdentifier": "712.013",
+      "action": "created"
+    },
+    {
+      "rowNumber": 125,
+      "primaryIdentifier": "712.013.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 126,
+      "primaryIdentifier": "721",
+      "action": "created"
+    },
+    {
+      "rowNumber": 127,
+      "primaryIdentifier": "721.001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 128,
+      "primaryIdentifier": "721.001.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 129,
+      "primaryIdentifier": "721.003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 130,
+      "primaryIdentifier": "721.003.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 131,
+      "primaryIdentifier": "721.801",
+      "action": "created"
+    },
+    {
+      "rowNumber": 132,
+      "primaryIdentifier": "721.801.ZZ",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 133,
+      "primaryIdentifier": "8",
+      "action": "created"
+    },
+    {
+      "rowNumber": 134,
+      "primaryIdentifier": "801",
+      "action": "created"
+    },
+    {
+      "rowNumber": 135,
+      "primaryIdentifier": "801.001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 136,
+      "primaryIdentifier": "801.001.AA",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 137,
+      "primaryIdentifier": "813",
+      "action": "created"
+    },
+    {
+      "rowNumber": 138,
+      "primaryIdentifier": "813.010",
+      "action": "created"
+    },
+    {
+      "rowNumber": 139,
+      "primaryIdentifier": "813.010.ZZ",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 140,
+      "primaryIdentifier": "813.011",
+      "action": "created"
+    },
+    {
+      "rowNumber": 141,
+      "primaryIdentifier": "813.011.ZZ",
+      "action": "updated"
+    },
+    {
+      "rowNumber": 142,
+      "primaryIdentifier": "813.012",
+      "action": "created"
+    },
+    {
+      "rowNumber": 143,
+      "primaryIdentifier": "813.012.ZZ",
+      "action": "updated"
+    }
+  ],
+  "warnings": []
+}

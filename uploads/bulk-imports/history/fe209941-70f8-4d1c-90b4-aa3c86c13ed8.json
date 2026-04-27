@@ -1,0 +1,19 @@
+{
+  "id": "fe209941-70f8-4d1c-90b4-aa3c86c13ed8",
+  "type": "components",
+  "mode": "upsert",
+  "vesselId": "743ef9d1-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-02-25T04:12:35.616Z",
+  "completedAt": "2026-02-25T04:12:36.657Z",
+  "status": "complete",
+  "created": 297,
+  "updated": 3,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Vessel component _ Test Vessel_With LSA and FFA.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\components\\1771992756656_Vessel_component___Test_Vessel_With_LSA_and_FFA.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

@@ -1,0 +1,19 @@
+{
+  "id": "b7cc904b-87b8-487c-8e4f-603537b14582",
+  "type": "stores",
+  "mode": "upsert",
+  "vesselId": "743ef9d1-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-02-25T04:24:23.917Z",
+  "completedAt": "2026-02-25T04:24:23.999Z",
+  "status": "complete",
+  "created": 10,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Stores - Others.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\stores\\1771993463998_Stores_-_Others.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

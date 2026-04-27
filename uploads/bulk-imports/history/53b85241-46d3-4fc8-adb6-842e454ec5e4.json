@@ -1,0 +1,19 @@
+{
+  "id": "53b85241-46d3-4fc8-adb6-842e454ec5e4",
+  "type": "stores",
+  "mode": "upsert",
+  "vesselId": "",
+  "userId": 1,
+  "startedAt": "2026-01-15T04:11:50.692Z",
+  "completedAt": "2026-01-15T04:11:50.788Z",
+  "status": "complete",
+  "created": 10,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Stores - Lubes.xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\stores\\1768450310786_Stores_-_Lubes.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

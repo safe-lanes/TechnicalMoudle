@@ -1,0 +1,125 @@
+{
+  "id": "c1427be9-6299-4de6-913b-18421233b1d7",
+  "type": "makers",
+  "mode": "upsert",
+  "vesselId": "744cf286-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-03-30T09:08:03.612Z",
+  "completedAt": "2026-03-30T09:08:03.955Z",
+  "status": "complete",
+  "created": 19,
+  "updated": 1,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "makers-template (1).xlsx",
+  "storedFilePath": "local:C:\\GitHub\\technical_build\\uploads\\bulk-imports\\makers\\1774861683954_makers-template__1_.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0,
+  "spareComponentLinksExpected": 0,
+  "spareComponentLinksDbTotal": 0,
+  "spareComponentLinksDbDelta": 0,
+  "rowResults": [
+    {
+      "rowNumber": 2,
+      "primaryIdentifier": "MKR-500001",
+      "action": "created"
+    },
+    {
+      "rowNumber": 3,
+      "primaryIdentifier": "MKR-500002",
+      "action": "created"
+    },
+    {
+      "rowNumber": 4,
+      "primaryIdentifier": "MKR-500003",
+      "action": "created"
+    },
+    {
+      "rowNumber": 5,
+      "primaryIdentifier": "MKR-500004",
+      "action": "created"
+    },
+    {
+      "rowNumber": 6,
+      "primaryIdentifier": "MKR-500005",
+      "action": "created"
+    },
+    {
+      "rowNumber": 7,
+      "primaryIdentifier": "MKR-500006",
+      "action": "created"
+    },
+    {
+      "rowNumber": 8,
+      "primaryIdentifier": "MKR-500007",
+      "action": "created"
+    },
+    {
+      "rowNumber": 9,
+      "primaryIdentifier": "MKR-500008",
+      "action": "created"
+    },
+    {
+      "rowNumber": 10,
+      "primaryIdentifier": "MKR-500009",
+      "action": "created"
+    },
+    {
+      "rowNumber": 11,
+      "primaryIdentifier": "MKR-500010",
+      "action": "created"
+    },
+    {
+      "rowNumber": 12,
+      "primaryIdentifier": "MKR-500011",
+      "action": "created"
+    },
+    {
+      "rowNumber": 13,
+      "primaryIdentifier": "MKR-500012",
+      "action": "created"
+    },
+    {
+      "rowNumber": 14,
+      "primaryIdentifier": "MKR-500013",
+      "action": "created"
+    },
+    {
+      "rowNumber": 15,
+      "primaryIdentifier": "MKR-500014",
+      "action": "created"
+    },
+    {
+      "rowNumber": 16,
+      "primaryIdentifier": "MKR-500015",
+      "action": "created"
+    },
+    {
+      "rowNumber": 17,
+      "primaryIdentifier": "MKR-500016",
+      "action": "created"
+    },
+    {
+      "rowNumber": 18,
+      "primaryIdentifier": "MKR-500017",
+      "action": "created"
+    },
+    {
+      "rowNumber": 19,
+      "primaryIdentifier": "MKR-500018",
+      "action": "created"
+    },
+    {
+      "rowNumber": 20,
+      "primaryIdentifier": "MKR-500019",
+      "action": "created"
+    },
+    {
+      "rowNumber": 21,
+      "primaryIdentifier": "MKR-999999",
+      "action": "updated"
+    }
+  ],
+  "warnings": []
+}

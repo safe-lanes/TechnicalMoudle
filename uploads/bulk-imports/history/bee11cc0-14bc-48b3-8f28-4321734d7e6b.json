@@ -1,0 +1,17 @@
+{
+  "id": "bee11cc0-14bc-48b3-8f28-4321734d7e6b",
+  "type": "jobs",
+  "mode": "upsert",
+  "vesselId": "V015",
+  "userId": 1,
+  "startedAt": "2025-12-24T09:16:57.906Z",
+  "completedAt": "2025-12-24T09:17:02.255Z",
+  "status": "complete",
+  "created": 57,
+  "updated": 89,
+  "skipped": 74,
+  "archived": 0,
+  "originalName": "jobs_template Test Vessel_01 2.xlsx",
+  "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/jobs/1766567822254_jobs_template_Test_Vessel_01_2.xlsx",
+  "errorReport": null
+}
