@@ -22,3 +22,6 @@ replit.nix
 uploads/
 .agents/
 .worktrees/
+
+# Deployment output
+ship-deploy/
