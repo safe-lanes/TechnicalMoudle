@@ -37,6 +37,46 @@ import { getImportHistory, getHistoryFile } from '../services/historyService';
 import { createRecordSnapshot } from '../services/undoService';
 import { getSparesExcelColumns } from '@shared/sparesTemplateFields';
 
+// ── File Storage Helper ──
+// Stores uploaded import files. On Replit, uses Replit Object Storage.
+// On ship/local servers, saves directly to disk (skips Replit SDK entirely
+// to avoid a 30-120s TCP timeout connecting to the non-existent sidecar).
+async function storeUploadedFile(
+  fileBuffer: Buffer,
+  originalName: string,
+  effectiveType: string
+): Promise<string | null> {
+  const timestamp = Date.now();
+  const safeFileName = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
+
+  // Only attempt Replit Object Storage when running on Replit
+  if (process.env.REPL_ID) {
+    try {
+      const { Client } = await import('@replit/object-storage');
+      const client = new Client();
+      const objectPath = `bulk-imports/${effectiveType}/${timestamp}_${safeFileName}`;
+      await client.uploadFromBytes(objectPath, fileBuffer);
+      console.log(`📁 File uploaded to Replit Object Storage: ${objectPath}`);
+      return `replit:${objectPath}`;
+    } catch (uploadError) {
+      console.warn('⚠️ Replit Object Storage failed, falling back to local storage:', (uploadError as Error).message);
+    }
+  }
+
+  // Local file storage (ship server / dev / Replit fallback)
+  try {
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'bulk-imports', effectiveType);
+    await fsPromises.mkdir(uploadsDir, { recursive: true });
+    const localFilePath = path.join(uploadsDir, `${timestamp}_${safeFileName}`);
+    await fsPromises.writeFile(localFilePath, fileBuffer);
+    console.log(`📁 File saved locally at: ${localFilePath}`);
+    return `local:${localFilePath}`;
+  } catch (localError) {
+    console.error('⚠️ Failed to store file locally:', localError);
+    return null; // File storage is optional — import already succeeded
+  }
+}
+
 // ── Template ──
 export async function getTemplate(req: Request, res: Response) {
   const { type, vesselId } = req.query;
@@ -836,40 +876,8 @@ export async function doImport(req: Request, res: Response) {
       storeType  // Pass store type for stores import (determines which tab: Stores, Lubes, Chemicals, Others)
     );
 
-    // Save the uploaded file for later retrieval using Replit Object Storage SDK
-    let storedFilePath: string | null = null;
-    try {
-      const { Client } = await import('@replit/object-storage');
-      const client = new Client();
-      
-      const timestamp = Date.now();
-      const safeFileName = cachedData.originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const objectPath = `bulk-imports/${effectiveType}/${timestamp}_${safeFileName}`;
-      
-      // Upload file using the Replit Object Storage SDK
-      await client.uploadFromBytes(objectPath, cachedData.file);
-      storedFilePath = `replit:${objectPath}`;
-      console.log(`📁 File uploaded to Replit Object Storage: ${objectPath}`);
-    } catch (uploadError) {
-      console.warn('⚠️ Replit Object Storage failed, falling back to local storage:', (uploadError as Error).message);
-      
-      // Fallback: Save file locally
-      try {
-        const uploadsDir = path.join(process.cwd(), 'uploads', 'bulk-imports', effectiveType);
-        await fsPromises.mkdir(uploadsDir, { recursive: true });
-        
-        const timestamp = Date.now();
-        const safeFileName = cachedData.originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const localFilePath = path.join(uploadsDir, `${timestamp}_${safeFileName}`);
-        
-        await fsPromises.writeFile(localFilePath, cachedData.file);
-        storedFilePath = `local:${localFilePath}`;
-        console.log(`📁 File saved locally at: ${localFilePath}`);
-      } catch (localError) {
-        console.error('⚠️ Failed to store file locally:', localError);
-        // Continue - file storage is optional, import succeeded
-      }
-    }
+    // Save the uploaded file for later retrieval
+    const storedFilePath = await storeUploadedFile(cachedData.file, cachedData.originalName, effectiveType);
 
     // Update ImportHistory with status='complete' and include file path (file-based storage only)
     await updateFileBasedHistory(historyId, {
@@ -982,28 +990,7 @@ export async function doImportStream(req: Request, res: Response) {
       }
     );
 
-    let storedFilePath: string | null = null;
-    try {
-      const { Client } = await import('@replit/object-storage');
-      const client = new Client();
-      const timestamp = Date.now();
-      const safeFileName = cachedData.originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const objectPath = `bulk-imports/${effectiveType}/${timestamp}_${safeFileName}`;
-      await client.uploadFromBytes(objectPath, cachedData.file);
-      storedFilePath = `replit:${objectPath}`;
-    } catch (uploadError) {
-      try {
-        const uploadsDir = path.join(process.cwd(), 'uploads', 'bulk-imports', effectiveType);
-        await fsPromises.mkdir(uploadsDir, { recursive: true });
-        const timestamp = Date.now();
-        const safeFileName = cachedData.originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const localFilePath = path.join(uploadsDir, `${timestamp}_${safeFileName}`);
-        await fsPromises.writeFile(localFilePath, cachedData.file);
-        storedFilePath = `local:${localFilePath}`;
-      } catch (_localError) {
-        // File storage is optional
-      }
-    }
+    const storedFilePath = await storeUploadedFile(cachedData.file, cachedData.originalName, effectiveType);
 
     await updateFileBasedHistory(historyId, {
       ...importResult,
