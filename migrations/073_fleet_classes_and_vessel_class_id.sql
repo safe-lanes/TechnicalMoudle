@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS fleet_classes (
   updated_by_uuid TEXT,
   is_deleted BOOLEAN NOT NULL DEFAULT false,
   is_sync BOOLEAN NOT NULL DEFAULT false,
+  sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );

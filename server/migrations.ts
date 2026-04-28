@@ -1794,7 +1794,7 @@ const migrations: Migration[] = [
     sql: `
       CREATE TABLE IF NOT EXISTS admn_role_master (
         id INTEGER PRIMARY KEY,
-        ruid UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+        ruid TEXT NOT NULL UNIQUE DEFAULT gen_random_uuid()::text,
         assigned_role VARCHAR NOT NULL,
         roletype VARCHAR NOT NULL,
         orderby INTEGER,
@@ -1802,8 +1802,8 @@ const migrations: Migration[] = [
         sort_order INTEGER,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW(),
-        created_by_uuid UUID,
-        updated_by_uuid UUID,
+        created_by_uuid TEXT,
+        updated_by_uuid TEXT,
         is_deleted BOOLEAN DEFAULT false,
         is_sync BOOLEAN DEFAULT false
       );
@@ -1936,17 +1936,17 @@ const migrations: Migration[] = [
     sql: `
       CREATE TABLE IF NOT EXISTS adm_menumaster_ac (
         id INTEGER PRIMARY KEY,
-        muid UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+        muid TEXT NOT NULL UNIQUE DEFAULT gen_random_uuid()::text,
         name VARCHAR NOT NULL,
         display_name VARCHAR NOT NULL,
         route VARCHAR,
-        parent_menu UUID,
+        parent_menu TEXT,
         is_active BOOLEAN DEFAULT true,
         sort_order INTEGER,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW(),
-        created_by_uuid UUID,
-        updated_by_uuid UUID,
+        created_by_uuid TEXT,
+        updated_by_uuid TEXT,
         is_deleted BOOLEAN DEFAULT false,
         is_sync BOOLEAN DEFAULT false,
         FOREIGN KEY (parent_menu) REFERENCES adm_menumaster_ac(muid)
@@ -3305,7 +3305,19 @@ export async function runDrizzleMigrations(): Promise<{ applied: number; skipped
           appliedStmts++;
         } catch (error: any) {
           if (error.code === '42P07' || error.code === '42701' || error.code === '42704') {
+            // Object already exists — safe to skip (table, column, or constraint)
             console.log(`    ⚠️  Statement skipped (object exists): ${stmt.substring(0, 80).replace(/\n/g, ' ')}...`);
+            skippedStmts++;
+            continue;
+          }
+          if (error.code === '42P01' || error.code === '42830') {
+            // 42P01 = undefined_table: Drizzle-generated migrations may ALTER tables
+            //   created by later hand-written migrations (sort-order mismatch).
+            // 42830 = no unique constraint: FK references a column whose UNIQUE
+            //   constraint is created by a later statement or migration.
+            // Both are non-fatal on fresh DBs — the hand-written migration will
+            // create the table/constraint with the correct schema.
+            console.log(`    ⚠️  Statement skipped (${error.code}): ${stmt.substring(0, 80).replace(/\n/g, ' ')}...`);
             skippedStmts++;
             continue;
           }
