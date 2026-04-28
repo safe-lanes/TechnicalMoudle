@@ -29,9 +29,15 @@ cp -r dist/ ship-deploy/dist/
 echo "[4/5] Copying migrations..."
 cp -r migrations/ ship-deploy/migrations/
 
-# Step 5: Copy package files
+# Step 5: Copy package files (strip devDependencies to avoid postinstall conflicts)
 echo "[5/5] Copying package files..."
-cp package.json ship-deploy/
+node -e "
+  const pkg = require('./package.json');
+  delete pkg.devDependencies;
+  delete pkg.scripts;  // Remove dev scripts (build, dev, etc.)
+  pkg.scripts = { start: 'NODE_ENV=production node dist/index.js' };
+  require('fs').writeFileSync('ship-deploy/package.json', JSON.stringify(pkg, null, 2) + '\n');
+"
 cp package-lock.json ship-deploy/
 
 # Create .env template

@@ -50,7 +50,7 @@ fi
 # Check node_modules
 if [ ! -d node_modules ]; then
     echo "[Setup] Installing dependencies (first run)..."
-    npm install --production
+    npm install --omit=dev
 fi
 
 # Check migrations folder

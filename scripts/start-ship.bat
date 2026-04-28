@@ -49,7 +49,7 @@ if "%SYNC_INSTANCE_ID%"=="" (
 REM Check if node_modules exists
 if not exist node_modules (
     echo [Setup] Installing dependencies (first run)...
-    call npm install --production
+    call npm install --omit=dev
     if %ERRORLEVEL% NEQ 0 (
         echo ERROR: npm install failed!
         echo Check that Node.js is installed and internet is available.

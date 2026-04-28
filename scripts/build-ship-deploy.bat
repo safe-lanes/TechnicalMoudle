@@ -31,9 +31,9 @@ REM Step 4: Copy migrations (required at runtime — migration runner reads SQL 
 echo [4/5] Copying migrations...
 xcopy /s /e /i /q migrations ship-deploy\migrations
 
-REM Step 5: Copy package files
+REM Step 5: Copy package files (strip devDependencies to avoid postinstall conflicts)
 echo [5/5] Copying package files...
-copy package.json ship-deploy\
+node -e "const pkg=require('./package.json'); delete pkg.devDependencies; delete pkg.scripts; pkg.scripts={start:'NODE_ENV=production node dist/index.js'}; require('fs').writeFileSync('ship-deploy/package.json',JSON.stringify(pkg,null,2)+'\n');"
 copy package-lock.json ship-deploy\
 
 REM Create .env template
