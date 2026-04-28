@@ -72,6 +72,26 @@ export async function generateProvisioningBundle(
     data: [],
   };
 
+  // Phase 0: Export the vessel row FIRST — almost every other table has
+  // a FK to vessels.vuuid, so it must exist before anything else on import.
+  try {
+    const vesselRows = await pool.query(
+      'SELECT * FROM vessels WHERE vuuid = $1',
+      [vesselId]
+    );
+    if (vesselRows.rows.length > 0) {
+      bundle.data.push({ tableName: 'vessels', rows: vesselRows.rows });
+      bundle.manifest.tables.push({
+        tableName: 'vessels',
+        rowCount: vesselRows.rows.length,
+        category: 'IDENTITY (vessel self)',
+      });
+      bundle.manifest.totalRows += vesselRows.rows.length;
+    }
+  } catch (err: any) {
+    console.warn(`[Provisioning] Could not export vessels row: ${err.message}`);
+  }
+
   // Follow the sync phase order for export
   const phaseOrder = getSyncPhaseOrder();
 
@@ -147,25 +167,6 @@ export async function generateProvisioningBundle(
     }
   }
 
-  // Also include the vessel row itself (NO_SYNC but needed for ship to know its own identity)
-  try {
-    const vesselRows = await pool.query(
-      'SELECT * FROM vessels WHERE vuuid = $1',
-      [vesselId]
-    );
-    if (vesselRows.rows.length > 0) {
-      bundle.data.push({ tableName: 'vessels', rows: vesselRows.rows });
-      bundle.manifest.tables.push({
-        tableName: 'vessels',
-        rowCount: vesselRows.rows.length,
-        category: 'IDENTITY (vessel self)',
-      });
-      bundle.manifest.totalRows += vesselRows.rows.length;
-    }
-  } catch (err: any) {
-    console.warn(`[Provisioning] Could not export vessels row: ${err.message}`);
-  }
-
   console.log(
     `[Provisioning] Bundle generated for vessel ${vesselName} (${vesselId}): ` +
       `${bundle.manifest.totalRows} total rows across ${bundle.manifest.tables.length} tables`
@@ -175,6 +176,49 @@ export async function generateProvisioningBundle(
 }
 
 // ── Bundle Import (Ship side) ──
+
+/**
+ * Tables with self-referencing FKs need rows sorted so parents come before
+ * children. Without this, child rows fail when the parent isn't inserted yet.
+ */
+const SELF_REF_TABLES: Record<string, { idCol: string; parentCol: string }> = {
+  adm_menumaster_ac: { idCol: 'muid', parentCol: 'parent_menu' },
+  vessel_org_chart_nodes: { idCol: 'node_uuid', parentCol: 'parent_node_uuid' },
+};
+
+function topologicalSort(
+  rows: any[],
+  idCol: string,
+  parentCol: string
+): any[] {
+  const sorted: any[] = [];
+  const remaining = [...rows];
+  const inserted = new Set<string>();
+
+  // Iteratively add rows whose parent is null or already inserted
+  let maxIterations = rows.length + 1;
+  while (remaining.length > 0 && maxIterations > 0) {
+    maxIterations--;
+    const beforeLen = remaining.length;
+    for (let i = remaining.length - 1; i >= 0; i--) {
+      const row = remaining[i];
+      const parentId = row[parentCol];
+      if (
+        parentId === null ||
+        parentId === undefined ||
+        inserted.has(String(parentId))
+      ) {
+        sorted.push(row);
+        inserted.add(String(row[idCol]));
+        remaining.splice(i, 1);
+      }
+    }
+    if (remaining.length === beforeLen) break; // circular ref — stop
+  }
+  // Append any remaining rows (circular refs or missing parents)
+  sorted.push(...remaining);
+  return sorted;
+}
 
 export async function importProvisioningBundle(
   bundle: ProvisioningBundle
@@ -196,6 +240,37 @@ export async function importProvisioningBundle(
     `[Provisioning] Bundle contains ${bundle.manifest.totalRows} rows across ${bundle.manifest.tables.length} tables`
   );
 
+  // Cache for GENERATED ALWAYS identity columns per table
+  const identityAlwaysCache = new Map<string, Set<string>>();
+
+  async function getAlwaysIdentityCols(
+    tableName: string
+  ): Promise<Set<string>> {
+    if (identityAlwaysCache.has(tableName))
+      return identityAlwaysCache.get(tableName)!;
+    try {
+      const result = await pool.query(
+        `SELECT a.attname AS column_name
+         FROM pg_attribute a
+         JOIN pg_class c ON a.attrelid = c.oid
+         JOIN pg_namespace n ON c.relnamespace = n.oid
+         WHERE n.nspname = 'public'
+           AND c.relname = $1
+           AND a.attidentity = 'a'`,
+        [tableName]
+      );
+      const cols = new Set<string>(
+        (result.rows || []).map((r: any) => r.column_name)
+      );
+      identityAlwaysCache.set(tableName, cols);
+      return cols;
+    } catch {
+      const empty = new Set<string>();
+      identityAlwaysCache.set(tableName, empty);
+      return empty;
+    }
+  }
+
   for (const tableData of bundle.data) {
     if (tableData.rows.length === 0) continue;
 
@@ -213,13 +288,31 @@ export async function importProvisioningBundle(
             [tableData.tableName, `%${identityCol}%`]
           );
           hasUniqueIdentity = ixResult.rows.length > 0;
-        } catch { /* fallback to DO NOTHING */ }
+        } catch {
+          /* fallback to DO NOTHING */
+        }
       }
 
-      for (const row of tableData.rows) {
+      // Detect GENERATED ALWAYS columns to exclude from INSERT
+      const alwaysCols = await getAlwaysIdentityCols(tableData.tableName);
+
+      // Topological sort for self-referencing tables
+      let rowsToInsert = tableData.rows;
+      const selfRef = SELF_REF_TABLES[tableData.tableName];
+      if (selfRef) {
+        rowsToInsert = topologicalSort(
+          tableData.rows,
+          selfRef.idCol,
+          selfRef.parentCol
+        );
+      }
+
+      for (const row of rowsToInsert) {
         try {
-          // Build column list — include ALL columns (provisioning preserves exact data)
-          const columns = Object.keys(row).filter((k) => row[k] !== undefined);
+          // Build column list — exclude undefined values and GENERATED ALWAYS columns
+          const columns = Object.keys(row).filter(
+            (k) => row[k] !== undefined && !alwaysCols.has(k)
+          );
           // Stringify JSON/JSONB values (objects/arrays become strings for pg parameterized queries)
           const values = columns.map((k) => {
             const v = row[k];
@@ -253,6 +346,27 @@ export async function importProvisioningBundle(
           if (!rowError.message.includes('duplicate key')) {
             errors.push(
               `${tableData.tableName}: ${rowError.message.slice(0, 120)}`
+            );
+          }
+        }
+      }
+
+      // Advance sequences for tables where GENERATED ALWAYS columns were skipped
+      if (alwaysCols.size > 0 && tableRowCount > 0) {
+        const alwaysColNames = Array.from(alwaysCols);
+        for (let ci = 0; ci < alwaysColNames.length; ci++) {
+          const col = alwaysColNames[ci];
+          try {
+            await pool.query(
+              `SELECT setval(
+                pg_get_serial_sequence('"${tableData.tableName}"', '${col}'),
+                GREATEST(COALESCE((SELECT MAX("${col}") FROM "${tableData.tableName}"), 0), 1)
+              )`
+            );
+          } catch (seqErr: any) {
+            // Not fatal — sequence may not exist for all identity columns
+            console.warn(
+              `[Provisioning] Could not advance sequence for ${tableData.tableName}.${col}: ${seqErr.message}`
             );
           }
         }
