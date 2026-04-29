@@ -240,6 +240,60 @@ export async function importProvisioningBundle(
     `[Provisioning] Bundle contains ${bundle.manifest.totalRows} rows across ${bundle.manifest.tables.length} tables`
   );
 
+  // ── Pre-import: clear seeded RBAC/rank data so shore UUIDs import cleanly ──
+  // Ship migrations seed roles, menus, ranks, and permissions with auto-generated
+  // UUIDs. The shore bundle has the same logical rows with DIFFERENT UUIDs.
+  // Attempting to upsert causes cascading FK violations. Solution: delete existing
+  // seeded data (children first) and let the shore bundle import cleanly.
+  const bundleTableNames = new Set(bundle.data.map((d) => d.tableName));
+  const rbacCleanupNeeded =
+    bundleTableNames.has('admn_role_master') ||
+    bundleTableNames.has('adm_menumaster_ac') ||
+    bundleTableNames.has('adm_role_menu_access');
+  const ranksCleanupNeeded = bundleTableNames.has('adm_available_ranks');
+
+  if (rbacCleanupNeeded) {
+    console.log('[Provisioning] Clearing seeded RBAC data before import...');
+    try {
+      // Delete in FK-safe order: children → parents
+      const deleted1 = await pool.query('DELETE FROM adm_role_menu_access');
+      const deleted2 = await pool.query(
+        'DELETE FROM adm_menumaster_ac WHERE parent_menu IS NOT NULL'
+      );
+      const deleted3 = await pool.query('DELETE FROM adm_menumaster_ac');
+      const deleted4 = await pool.query('DELETE FROM admn_role_master');
+      console.log(
+        `[Provisioning] RBAC cleanup: deleted ${deleted1.rowCount} permissions, ` +
+          `${(deleted2.rowCount || 0) + (deleted3.rowCount || 0)} menus, ${deleted4.rowCount} roles`
+      );
+    } catch (cleanupErr: any) {
+      console.error(
+        `[Provisioning] RBAC cleanup failed: ${cleanupErr.message}`
+      );
+      errors.push(`RBAC cleanup: ${cleanupErr.message}`);
+    }
+  }
+
+  if (ranksCleanupNeeded) {
+    console.log('[Provisioning] Clearing seeded ranks data before import...');
+    try {
+      // Child tables referencing adm_available_ranks.rank_id
+      await pool.query('DELETE FROM adm_vessel_org_chart');
+      await pool.query('DELETE FROM vessel_org_chart_nodes');
+      const deletedRanks = await pool.query(
+        'DELETE FROM adm_available_ranks'
+      );
+      console.log(
+        `[Provisioning] Ranks cleanup: deleted ${deletedRanks.rowCount} ranks + org chart rows`
+      );
+    } catch (cleanupErr: any) {
+      // Non-fatal: tables may not exist on all DBs
+      console.warn(
+        `[Provisioning] Ranks cleanup partial: ${cleanupErr.message}`
+      );
+    }
+  }
+
   // Cache for GENERATED ALWAYS identity columns per table
   const identityAlwaysCache = new Map<string, Set<string>>();
 
@@ -307,17 +361,23 @@ export async function importProvisioningBundle(
         );
       }
 
-      // Detect columns that actually exist on the target table — shore bundle
-      // may include columns (e.g. audit/sync columns from migration 052) that
-      // the ship DB hasn't received yet.  INSERT with non-existent columns
-      // would fail with "column X does not exist".
+      // Detect columns that actually exist on the target table and their types.
+      // Shore bundle may include columns (e.g. audit/sync columns from migration
+      // 052) that the ship DB hasn't received yet — INSERT would fail.
+      // Also track JSON/JSONB columns for proper value serialization.
       let existingCols: Set<string> | null = null;
+      let jsonCols: Set<string> = new Set();
       try {
         const colResult = await pool.query(
-          `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
+          `SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
           [tableData.tableName]
         );
         existingCols = new Set(colResult.rows.map((r: any) => r.column_name));
+        jsonCols = new Set(
+          colResult.rows
+            .filter((r: any) => r.data_type === 'json' || r.data_type === 'jsonb')
+            .map((r: any) => r.column_name)
+        );
       } catch { /* fallback: don't filter */ }
 
       for (const row of rowsToInsert) {
@@ -328,10 +388,24 @@ export async function importProvisioningBundle(
             (k) => row[k] !== undefined && !alwaysCols.has(k) &&
               (existingCols === null || existingCols.has(k))
           );
-          // Stringify JSON/JSONB values (objects/arrays become strings for pg parameterized queries)
+          // Serialize values — handle JSON/JSONB columns carefully to avoid
+          // "invalid input syntax for type json" errors.
           const values = columns.map((k) => {
             const v = row[k];
-            if (v !== null && typeof v === 'object' && !(v instanceof Date)) {
+            if (v === null || v === undefined) return v;
+            if (jsonCols.has(k)) {
+              // JSON column: ensure value is a valid JSON string for PostgreSQL
+              if (typeof v === 'object' && !(v instanceof Date)) {
+                return JSON.stringify(v);
+              }
+              if (typeof v === 'string') {
+                // Validate it's parseable JSON; if not, wrap as JSON string
+                try { JSON.parse(v); return v; } catch { return JSON.stringify(v); }
+              }
+              return JSON.stringify(v);
+            }
+            // Non-JSON column: stringify objects for TEXT/VARCHAR columns
+            if (typeof v === 'object' && !(v instanceof Date)) {
               return JSON.stringify(v);
             }
             return v;
@@ -379,9 +453,13 @@ export async function importProvisioningBundle(
               );
               const values = columns.map((k) => {
                 const v = row[k];
-                if (v !== null && typeof v === 'object' && !(v instanceof Date)) {
+                if (v === null || v === undefined) return v;
+                if (jsonCols.has(k)) {
+                  if (typeof v === 'object' && !(v instanceof Date)) return JSON.stringify(v);
+                  if (typeof v === 'string') { try { JSON.parse(v); return v; } catch { return JSON.stringify(v); } }
                   return JSON.stringify(v);
                 }
+                if (typeof v === 'object' && !(v instanceof Date)) return JSON.stringify(v);
                 return v;
               });
               const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
