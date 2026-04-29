@@ -1,15 +1,11 @@
 -- Migration 107: Re-apply standard audit columns for ship databases
 --
--- Root cause: Inline migration 052_standard_audit_columns executes as a single
--- batch. On ship servers where some tables didn't exist at first boot, PostgreSQL
--- rolled back ALL ALTER TABLE statements, but the error handler falsely marked
--- the migration as complete. Result: none of the 410 column additions took effect.
---
--- This SQL file migration re-applies ALL the same columns. Because SQL file
--- migrations split on '--> statement-breakpoint' and skip individual failures
--- (42P07, 42701, 42704, 42P01), each table is handled independently.
--- On shore/dev databases where 052 already ran, every statement safely no-ops
--- via ADD COLUMN IF NOT EXISTS.
+-- Inline migration 052 runs before SQL file migrations. On fresh databases,
+-- tables created by SQL files do not exist yet when 052 runs, so those ALTER
+-- TABLE statements are skipped. This file runs after all tables are created
+-- and fills the gap. Each statement is separated by a breakpoint marker so
+-- failures on individual tables are skipped safely (42P07, 42701, 42704, 42P01).
+-- On databases where 052 already applied, every statement no-ops via IF NOT EXISTS.
 
 ALTER TABLE "alert_config"
   ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
