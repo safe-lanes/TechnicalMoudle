@@ -307,11 +307,26 @@ export async function importProvisioningBundle(
         );
       }
 
+      // Detect columns that actually exist on the target table — shore bundle
+      // may include columns (e.g. audit/sync columns from migration 052) that
+      // the ship DB hasn't received yet.  INSERT with non-existent columns
+      // would fail with "column X does not exist".
+      let existingCols: Set<string> | null = null;
+      try {
+        const colResult = await pool.query(
+          `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
+          [tableData.tableName]
+        );
+        existingCols = new Set(colResult.rows.map((r: any) => r.column_name));
+      } catch { /* fallback: don't filter */ }
+
       for (const row of rowsToInsert) {
         try {
-          // Build column list — exclude undefined values and GENERATED ALWAYS columns
+          // Build column list — exclude undefined values, GENERATED ALWAYS columns,
+          // and columns that don't exist on the target table
           const columns = Object.keys(row).filter(
-            (k) => row[k] !== undefined && !alwaysCols.has(k)
+            (k) => row[k] !== undefined && !alwaysCols.has(k) &&
+              (existingCols === null || existingCols.has(k))
           );
           // Stringify JSON/JSONB values (objects/arrays become strings for pg parameterized queries)
           const values = columns.map((k) => {
@@ -342,8 +357,51 @@ export async function importProvisioningBundle(
           await pool.query(query, values);
           tableRowCount++;
         } catch (rowError: any) {
-          // Log but continue
-          if (!rowError.message.includes('duplicate key')) {
+          // PK conflict on a table with a UUID identity column: the ship DB has
+          // a row with the same integer PK but a different UUID (e.g. seed data).
+          // Delete the conflicting row by PK and retry so the shore's authoritative
+          // data takes precedence.
+          if (
+            rowError.message.includes('duplicate key') &&
+            identityCol &&
+            row[identityCol] &&
+            row.id !== undefined
+          ) {
+            try {
+              await pool.query(
+                `DELETE FROM "${tableData.tableName}" WHERE id = $1 AND "${identityCol}" != $2`,
+                [row.id, row[identityCol]]
+              );
+              // Rebuild columns/values (same logic as above, inlined for retry)
+              const columns = Object.keys(row).filter(
+                (k) => row[k] !== undefined && !alwaysCols.has(k) &&
+                  (existingCols === null || existingCols.has(k))
+              );
+              const values = columns.map((k) => {
+                const v = row[k];
+                if (v !== null && typeof v === 'object' && !(v instanceof Date)) {
+                  return JSON.stringify(v);
+                }
+                return v;
+              });
+              const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
+              const colNames = columns.map((c) => `"${c}"`).join(', ');
+              const updateSet = columns
+                .filter((c) => c !== identityCol)
+                .map((c) => `"${c}" = EXCLUDED."${c}"`)
+                .join(', ');
+              const retryQuery = `INSERT INTO "${tableData.tableName}" (${colNames}) VALUES (${placeholders}) ON CONFLICT ("${identityCol}") DO UPDATE SET ${updateSet}`;
+              await pool.query(retryQuery, values);
+              tableRowCount++;
+            } catch (retryError: any) {
+              if (!retryError.message.includes('duplicate key')) {
+                errors.push(
+                  `${tableData.tableName}: ${retryError.message.slice(0, 120)}`
+                );
+              }
+            }
+          } else if (!rowError.message.includes('duplicate key')) {
+            // Log non-duplicate-key errors
             errors.push(
               `${tableData.tableName}: ${rowError.message.slice(0, 120)}`
             );
