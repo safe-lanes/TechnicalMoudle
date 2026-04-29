@@ -12,6 +12,9 @@ interface Migration {
   name: string;
   description: string;
   sql: string;
+  /** When true, split SQL on semicolons and execute each statement independently.
+   *  Use for multi-table ALTER migrations so one missing table doesn't roll back all. */
+  perStatement?: boolean;
 }
 
 const migrations: Migration[] = [
@@ -1199,6 +1202,7 @@ const migrations: Migration[] = [
     id: '052_standard_audit_columns',
     name: 'Add standard audit columns to all tables',
     description: 'Adds 7 standard columns (sort_order, created_at, updated_at, created_by_uuid, updated_by_uuid, is_deleted, is_sync) to all tables missing them. 410 alterations across 71 tables. Safe: uses ADD COLUMN IF NOT EXISTS only.',
+    perStatement: true,
     sql: `
       ALTER TABLE "alert_config"
         ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
@@ -2929,6 +2933,7 @@ const migrations: Migration[] = [
     id: '090_audit_columns_backfill_v2',
     name: 'Backfill remaining standard audit columns on 13 tables',
     description: 'Adds the missing audit columns (is_sync, created_by_uuid, updated_by_uuid, is_deleted, sort_order) on 13 tables that were missed by prior migrations. Idempotent via IF NOT EXISTS. Follows migration 052 pattern: BOOLEAN DEFAULT FALSE for flags, TEXT for *_by_uuid, INTEGER DEFAULT 0 for sort_order. Does not enforce NOT NULL to keep the change safe and reversible.',
+    perStatement: true,
     sql: `
       -- adm_role_menu_access (3 cols)
       ALTER TABLE adm_role_menu_access ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
@@ -2980,6 +2985,7 @@ const migrations: Migration[] = [
     id: '091_audit_columns_backfill_remaining_11',
     name: 'Backfill standard audit columns on remaining 11 tables',
     description: 'Adds the full set of 5 standard audit columns (is_sync, created_by_uuid, updated_by_uuid, is_deleted, sort_order) on the 11 tables that previously had none of them. Idempotent via IF NOT EXISTS. Mirrors the pattern from 090_audit_columns_backfill_v2: BOOLEAN DEFAULT FALSE for flags, TEXT for *_by_uuid, INTEGER DEFAULT 0 for sort_order. Columns kept nullable for safety and reversibility.',
+    perStatement: true,
     sql: `
       -- additional_groups (5 cols)
       ALTER TABLE additional_groups ADD COLUMN IF NOT EXISTS is_sync BOOLEAN DEFAULT FALSE;
@@ -3166,20 +3172,64 @@ export async function runMigrations(): Promise<{ applied: number; skipped: numbe
       }
       
       console.log(`  📝 Applying migration: ${migration.id} - ${migration.name}`);
-      
-      try {
-        await db.execute(sql.raw(migration.sql));
+
+      if (migration.perStatement) {
+        // Per-statement execution for multi-table ALTER migrations.
+        // Splitting on ';' and executing each independently prevents one
+        // missing/non-existent table from rolling back ALL statements in the batch.
+        // Same safe-error handling as the SQL file runner (runDrizzleMigrations).
+        //
+        // Strip single-line SQL comments before splitting to avoid false splits
+        // on semicolons inside comments (e.g. "-- table (2 cols; sort_order...)").
+        const cleanedSql = migration.sql.replace(/--[^\n]*/g, '');
+        const statements = cleanedSql
+          .split(';')
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
+
+        let appliedStmts = 0;
+        let skippedStmts = 0;
+
+        for (const stmt of statements) {
+          try {
+            await db.execute(sql.raw(stmt));
+            appliedStmts++;
+          } catch (stmtError: any) {
+            const safeError =
+              stmtError.code === '42P07' ||  // duplicate_table
+              stmtError.code === '42701' ||  // duplicate_column
+              stmtError.code === '42704' ||  // undefined_object
+              stmtError.code === '42P01' ||  // undefined_table
+              stmtError.code === '42830';    // invalid_foreign_key
+            if (safeError) {
+              console.log(`    ⚠️  Statement skipped (${stmtError.code}): ${stmt.substring(0, 80).replace(/\n/g, ' ')}...`);
+              skippedStmts++;
+              continue;
+            }
+            console.error(`  ❌ Migration ${migration.id} failed at statement:`, stmtError.message);
+            throw stmtError;
+          }
+        }
+
         await markMigrationComplete(db, migration);
         applied++;
-        console.log(`  ✅ Migration ${migration.id} applied successfully`);
-      } catch (error: any) {
-        if (error.message?.includes('already exists') || error.message?.includes('does not exist') || error.code === '42701' || error.code === '42704') {
-          console.log(`  ⚠️  Migration ${migration.id} - object already/does not exist, marking as complete`);
+        console.log(`  ✅ Migration ${migration.id}: ${appliedStmts} statements applied, ${skippedStmts} skipped`);
+      } else {
+        // Single-batch execution (existing behavior for DO $$ blocks, single-table migrations, etc.)
+        try {
+          await db.execute(sql.raw(migration.sql));
           await markMigrationComplete(db, migration);
-          skipped++;
-        } else {
-          console.error(`  ❌ Migration ${migration.id} failed:`, error.message);
-          throw error;
+          applied++;
+          console.log(`  ✅ Migration ${migration.id} applied successfully`);
+        } catch (error: any) {
+          if (error.message?.includes('already exists') || error.message?.includes('does not exist') || error.code === '42701' || error.code === '42704') {
+            console.log(`  ⚠️  Migration ${migration.id} - object already/does not exist, marking as complete`);
+            await markMigrationComplete(db, migration);
+            skipped++;
+          } else {
+            console.error(`  ❌ Migration ${migration.id} failed:`, error.message);
+            throw error;
+          }
         }
       }
     }
