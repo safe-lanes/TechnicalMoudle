@@ -917,6 +917,7 @@ export async function doImport(req: Request, res: Response) {
 
 // ── SSE Streaming Import ──
 export async function doImportStream(req: Request, res: Response) {
+  console.log(`📦 [IMPORT_STREAM] Request received at ${new Date().toISOString()}`);
   const historyId = uuidv4();
   const startedAt = new Date();
 
@@ -932,9 +933,11 @@ export async function doImportStream(req: Request, res: Response) {
 
   try {
     const { fileToken, type, mode, archiveMissing, vesselId, rowIndices, storeType } = req.body;
+    console.log(`📦 [IMPORT_STREAM] Type: ${type}, Mode: ${mode}, VesselId: ${vesselId}, FileToken: ${fileToken ? 'present' : 'missing'}`);
 
     const cachedData = dryRunCache.get(fileToken);
     if (!cachedData) {
+      console.warn(`📦 [IMPORT_STREAM] Cache miss — fileToken expired or invalid`);
       sendEvent('error', { message: 'Invalid or expired file token' });
       return res.end();
     }
@@ -973,6 +976,9 @@ export async function doImportStream(req: Request, res: Response) {
       status: 'in_progress'
     });
 
+    console.log(`📦 [IMPORT_STREAM] Starting performImport: ${totalRows} rows, type=${effectiveType}, mode=${mode}`);
+    const importStartTime = Date.now();
+
     const importResult = await performImport(
       effectiveType,
       dataToImport,
@@ -990,6 +996,9 @@ export async function doImportStream(req: Request, res: Response) {
       }
     );
 
+    const importDuration = ((Date.now() - importStartTime) / 1000).toFixed(1);
+    console.log(`📦 [IMPORT_STREAM] performImport complete in ${importDuration}s — created=${importResult.created}, updated=${importResult.updated}, skipped=${importResult.skipped}`);
+
     const storedFilePath = await storeUploadedFile(cachedData.file, cachedData.originalName, effectiveType);
 
     await updateFileBasedHistory(historyId, {
@@ -1005,9 +1014,10 @@ export async function doImportStream(req: Request, res: Response) {
     const failedCount = importResult.rowResults ? importResult.rowResults.filter((r: any) => r.action === 'failed').length : 0;
     const { rowResults, ...summaryResult } = importResult;
     sendEvent('complete', { ...summaryResult, failed: failedCount, historyId });
+    console.log(`📦 [IMPORT_STREAM] Complete — total time: ${((Date.now() - startedAt.getTime()) / 1000).toFixed(1)}s`);
     res.end();
   } catch (error: any) {
-    console.error('Import stream error:', error);
+    console.error(`📦 [IMPORT_STREAM] ERROR after ${((Date.now() - startedAt.getTime()) / 1000).toFixed(1)}s:`, error);
 
     try {
       await updateFileBasedHistory(historyId, {
