@@ -23,7 +23,7 @@
  */
 
 import * as syncRepo from './repository';
-import { applyOneWayRows } from './oneWayApplier';
+import { applyOneWayRows, getColumnMeta } from './oneWayApplier';
 import { FileSyncProcessor } from './fileSyncProcessor';
 import {
   getTablesByCategory,
@@ -120,6 +120,22 @@ export class SyncEngine {
       batchUuid = initResult.batchUuid;
       console.log(`[SyncEngine] Batch initiated: ${batchUuid}`);
 
+      // Create local batch row so error persistence works on ship.
+      // In remote mode the batch was created on SHORE's DB — the ship has no row,
+      // so updateBatch() would fail with "Batch not found". ON CONFLICT handles
+      // local mode where initiateSyncSession already created the row.
+      try {
+        const localPool = await getPool();
+        await localPool.query(
+          `INSERT INTO sync_batches (batch_uuid, initiated_by_instance, vessel_id, checkpoint_before, status)
+           VALUES ($1, $2, $3, $4, 'in_progress')
+           ON CONFLICT (batch_uuid) DO NOTHING`,
+          [batchUuid, this.instanceId, vesselId, lastCheckpoint]
+        );
+      } catch (localBatchErr: any) {
+        console.warn(`[SyncEngine] Could not create local batch row: ${localBatchErr.message}`);
+      }
+
       // Step 2: PUSH — Send local changes to shore
       const pushResult = await this.executePush(batchUuid!, vesselId, lastCheckpoint);
       recordsPushed = pushResult.totalPushed;
@@ -132,8 +148,8 @@ export class SyncEngine {
       conflictsAutoResolved = pullResult.conflictsAutoResolved;
       const pullErrors = pullResult.errors;
       console.log(`[SyncEngine] Pulled ${recordsPulled} records, ${conflictsFound} conflicts`);
-      if (pullErrors.length > 0) {
-        console.warn(`[SyncEngine] ${pullErrors.length} apply errors during pull`);
+      if (pullResult.totalApplyErrors > 0) {
+        console.warn(`[SyncEngine] ${pullResult.totalApplyErrors} apply errors during pull`);
       }
 
       // Step 4: COMPLETE — Advance checkpoint
@@ -296,11 +312,13 @@ export class SyncEngine {
     lastCheckpoint: Date | null
   ): Promise<{
     totalPulled: number;
+    totalApplyErrors: number;
     conflictsFound: number;
     conflictsAutoResolved: number;
     errors: string[];
   }> {
     let totalPulled = 0;
+    let totalApplyErrors = 0;
     let conflictsFound = 0;
     let conflictsAutoResolved = 0;
     const allErrors: string[] = [];
@@ -357,6 +375,7 @@ export class SyncEngine {
         try {
           const result = await applyOneWayRows(tableData.tableName, tableData.rows);
           totalPulled += result.inserted + result.updated + result.softDeleted;
+          totalApplyErrors += result.errors.length;
           if (result.errors.length > 0) {
             // Collect first 5 error details for batch record
             const errorSamples = result.errors.slice(0, 5).map(
@@ -381,6 +400,8 @@ export class SyncEngine {
           await this.applyFieldLog(log);
           totalPulled++;
         } catch (err: any) {
+          totalApplyErrors++;
+          allErrors.push(`${log.tableName}.${log.fieldName}: ${err.message}`);
           console.error(`[SyncEngine] Failed to apply field log ${log.tableName}.${log.fieldName}:`, err.message);
         }
       }
@@ -411,7 +432,7 @@ export class SyncEngine {
       }
     }
 
-    return { totalPulled, conflictsFound, conflictsAutoResolved, errors: allErrors };
+    return { totalPulled, totalApplyErrors, conflictsFound, conflictsAutoResolved, errors: allErrors };
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -445,15 +466,20 @@ export class SyncEngine {
     const identityCol = config.identityColumn || 'id';
     const fieldNameSnake = camelToSnake(log.fieldName);
 
-    try {
-      const pool = await getPool();
-      await pool.query(
-        `UPDATE "${log.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = NOW() WHERE "${identityCol}" = $2`,
-        [log.newValue, log.rowUuid]
-      );
-    } catch (err: any) {
-      console.error(`[SyncEngine] applyFieldLog ${log.tableName}."${fieldNameSnake}":`, err.message);
+    const pool = await getPool();
+
+    // JSON coercion: if the column is json/jsonb, ensure the value is valid JSON
+    const meta = await getColumnMeta(pool, log.tableName);
+    let valueToApply: string | null = log.newValue;
+    if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
+      try { JSON.parse(valueToApply); } catch { valueToApply = JSON.stringify(valueToApply); }
     }
+
+    // Let errors bubble up to the caller for proper counting (Defect D fix)
+    await pool.query(
+      `UPDATE "${log.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = NOW() WHERE "${identityCol}" = $2`,
+      [valueToApply, log.rowUuid]
+    );
   }
 
   // ═══════════════════════════════════════════════════════════════
