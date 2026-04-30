@@ -130,7 +130,11 @@ export class SyncEngine {
       recordsPulled = pullResult.totalPulled;
       conflictsFound = pullResult.conflictsFound;
       conflictsAutoResolved = pullResult.conflictsAutoResolved;
+      const pullErrors = pullResult.errors;
       console.log(`[SyncEngine] Pulled ${recordsPulled} records, ${conflictsFound} conflicts`);
+      if (pullErrors.length > 0) {
+        console.warn(`[SyncEngine] ${pullErrors.length} apply errors during pull`);
+      }
 
       // Step 4: COMPLETE — Advance checkpoint
       const completeResult = await this.callSyncApi('POST', '/sync/complete', {
@@ -156,6 +160,18 @@ export class SyncEngine {
         // File sync failure is non-fatal — field data is already synced
       }
 
+      // Step 6: Store apply errors in batch record (if any)
+      const errorMessage = pullErrors.length > 0
+        ? pullErrors.join('\n')
+        : null;
+      if (errorMessage && batchUuid) {
+        try {
+          await syncRepo.updateBatch(batchUuid, { errorMessage });
+        } catch (updateErr: any) {
+          console.warn(`[SyncEngine] Failed to store errors in batch: ${updateErr.message}`);
+        }
+      }
+
       const durationMs = Date.now() - startTime;
       return {
         success: true,
@@ -166,7 +182,7 @@ export class SyncEngine {
         conflictsAutoResolved,
         filesQueued: filesProcessedCount + filesFailedCount,
         durationMs,
-        error: null,
+        error: errorMessage,
         newCheckpoint: completeResult.newCheckpoint,
       };
     } catch (error: any) {
@@ -282,10 +298,12 @@ export class SyncEngine {
     totalPulled: number;
     conflictsFound: number;
     conflictsAutoResolved: number;
+    errors: string[];
   }> {
     let totalPulled = 0;
     let conflictsFound = 0;
     let conflictsAutoResolved = 0;
+    const allErrors: string[] = [];
 
     // A. Request remote changes
     const pullData = await this.callSyncApiWithRetry('POST', '/sync/pull', {
@@ -297,15 +315,61 @@ export class SyncEngine {
 
     // B. Apply ONE_WAY rows (remote is master, overwrite local)
     if (pullData.oneWayRows && pullData.oneWayRows.length > 0) {
+      // Pre-cleanup: clear seeded RBAC/rank data so shore UUIDs import cleanly.
+      // Same logic as provisioning (commit 0de153bc): ship migrations seed
+      // roles/menus/ranks/permissions with auto-generated UUIDs that differ from
+      // shore's UUIDs, causing cascading FK violations on upsert.
+      const pulledTableNames = new Set(
+        pullData.oneWayRows.map((t: any) => t.tableName)
+      );
+      const pool = await getPool();
+
+      if (
+        pulledTableNames.has('admn_role_master') ||
+        pulledTableNames.has('adm_menumaster_ac') ||
+        pulledTableNames.has('adm_role_menu_access')
+      ) {
+        try {
+          console.log('[SyncEngine] Clearing seeded RBAC data before sync apply...');
+          await pool.query('DELETE FROM adm_role_menu_access');
+          await pool.query('DELETE FROM adm_menumaster_ac WHERE parent_menu IS NOT NULL');
+          await pool.query('DELETE FROM adm_menumaster_ac');
+          await pool.query('DELETE FROM admn_role_master');
+          console.log('[SyncEngine] RBAC cleanup complete');
+        } catch (cleanupErr: any) {
+          console.error(`[SyncEngine] RBAC cleanup failed: ${cleanupErr.message}`);
+        }
+      }
+
+      if (pulledTableNames.has('adm_available_ranks')) {
+        try {
+          console.log('[SyncEngine] Clearing seeded ranks data before sync apply...');
+          await pool.query('DELETE FROM adm_vessel_org_chart');
+          await pool.query('DELETE FROM vessel_org_chart_nodes');
+          await pool.query('DELETE FROM adm_available_ranks');
+          console.log('[SyncEngine] Ranks cleanup complete');
+        } catch (cleanupErr: any) {
+          console.warn(`[SyncEngine] Ranks cleanup partial: ${cleanupErr.message}`);
+        }
+      }
+
       for (const tableData of pullData.oneWayRows) {
         try {
           const result = await applyOneWayRows(tableData.tableName, tableData.rows);
           totalPulled += result.inserted + result.updated + result.softDeleted;
           if (result.errors.length > 0) {
-            console.warn(`[SyncEngine] ${result.errors.length} errors applying ${tableData.tableName}`);
+            // Collect first 5 error details for batch record
+            const errorSamples = result.errors.slice(0, 5).map(
+              (e) => `${tableData.tableName}[${e.rowIndex}]: ${e.error}`
+            );
+            if (result.errors.length > 5) {
+              errorSamples.push(`... and ${result.errors.length - 5} more`);
+            }
+            allErrors.push(...errorSamples);
           }
         } catch (err: any) {
           console.error(`[SyncEngine] Failed to apply one-way rows for ${tableData.tableName}:`, err.message);
+          allErrors.push(`${tableData.tableName}: ${err.message}`);
         }
       }
     }
@@ -347,7 +411,7 @@ export class SyncEngine {
       }
     }
 
-    return { totalPulled, conflictsFound, conflictsAutoResolved };
+    return { totalPulled, conflictsFound, conflictsAutoResolved, errors: allErrors };
   }
 
   // ═══════════════════════════════════════════════════════════════

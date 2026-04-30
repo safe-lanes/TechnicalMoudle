@@ -100,6 +100,17 @@ export async function applyOneWayRows(
     }
   }
 
+  // Log detailed error messages so operators can diagnose failures
+  if (result.errors.length > 0) {
+    console.error(`[OneWayApplier] ${result.errors.length} errors applying ${tableName}:`);
+    result.errors.slice(0, 5).forEach((e) =>
+      console.error(`  - row ${e.rowIndex}: ${e.error}`)
+    );
+    if (result.errors.length > 5) {
+      console.error(`  ... and ${result.errors.length - 5} more`);
+    }
+  }
+
   return result;
 }
 
