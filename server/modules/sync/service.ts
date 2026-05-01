@@ -11,7 +11,7 @@
  */
 
 import * as repo from './repository';
-import { applyOneWayRows } from './oneWayApplier';
+import { applyOneWayRows, getColumnMeta } from './oneWayApplier';
 import {
   getTableSyncConfig,
   getTablesByCategory,
@@ -113,8 +113,10 @@ export async function receivePushData(
     }
   }
 
-  // 2. Store ship's field logs (BOTH_EDITABLE changes) — shore records them for conflict detection
+  // 2. Store AND apply ship's field logs (BOTH_EDITABLE changes)
   let fieldLogsStored = 0;
+  let fieldLogsApplied = 0;
+  let fieldLogApplyErrors = 0;
   if (payload.fieldLogs && payload.fieldLogs.length > 0) {
     // Validate business rules before accepting
     const acceptedLogs: typeof payload.fieldLogs = [];
@@ -149,6 +151,36 @@ export async function receivePushData(
           instanceId: log.instanceId,
         }))
       );
+
+      // 3. Apply field logs to actual data tables — ship's changes must update shore's DB.
+      //    Without this step, field logs are stored for conflict detection but the actual
+      //    tables (work_orders, spares, stores, etc.) never get updated.
+      //    Mirrors applyFieldLog() in syncEngine.ts.
+      const pool = await getPool();
+      for (const log of acceptedLogs) {
+        const config = getTableSyncConfig(log.tableName);
+        if (!config) continue;
+        const identityCol = config.identityColumn || 'id';
+        const fieldNameSnake = toSnakeCase(log.fieldName);
+
+        try {
+          // JSON coercion for json/jsonb columns
+          const meta = await getColumnMeta(pool, log.tableName);
+          let valueToApply: string | null = log.newValue;
+          if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
+            try { JSON.parse(valueToApply); } catch { valueToApply = JSON.stringify(valueToApply); }
+          }
+
+          await pool.query(
+            `UPDATE "${log.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = NOW() WHERE "${identityCol}" = $2`,
+            [valueToApply, log.rowUuid]
+          );
+          fieldLogsApplied++;
+        } catch (err: any) {
+          fieldLogApplyErrors++;
+          console.error(`[Sync Push] Failed to apply field log ${log.tableName}.${log.fieldName} for ${log.rowUuid}: ${err.message}`);
+        }
+      }
     }
     totalReceived += fieldLogsStored;
   }
@@ -158,11 +190,17 @@ export async function receivePushData(
     recordsReceived: (batch.recordsReceived ?? 0) + totalReceived,
   });
 
-  console.log(`[Sync Push] Batch ${batchUuid}: ${fieldLogsStored} field logs, ${oneWaySummary.length} one-way tables`);
+  console.log(
+    `[Sync Push] Batch ${batchUuid}: ${fieldLogsStored} field logs stored, ` +
+    `${fieldLogsApplied} applied, ${fieldLogApplyErrors} apply errors, ` +
+    `${oneWaySummary.length} one-way tables`
+  );
 
   return {
     received: totalReceived,
     fieldLogsStored,
+    fieldLogsApplied,
+    fieldLogApplyErrors,
     oneWaySummary,
   };
 }
