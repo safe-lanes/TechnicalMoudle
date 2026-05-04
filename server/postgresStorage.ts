@@ -8781,17 +8781,123 @@ export class PostgresStorage {
   }
 
   async getSparesWithInventoryByVessel(vesselId: string): Promise<SpareWithInventory[]> {
-    const sparesInVessel = await this.getSpares(vesselId);
-    const results: SpareWithInventory[] = [];
-    
-    for (const spare of sparesInVessel) {
-      const withInventory = await this.getSpareWithInventory(spare.suuid);
-      if (withInventory) {
-        results.push(withInventory);
-      }
-    }
-    
-    return results;
+    const db = await getDb();
+
+    // Single JOINed query replaces the N+1 pattern (was 3N+1 queries: getSpare + getLocations + getLinkedComponents per spare).
+    // Locations are filtered to match spare.location / spare.location_2 (same logic as getSpareLocationsWithQty).
+    // linkedComponents filtered to same vessel (same logic as getLinkedComponentsForSpare).
+    const result = await db.execute(sql`
+      SELECT s.*,
+        COALESCE(json_agg(DISTINCT jsonb_build_object(
+          'locationId', sls.location_id,
+          'locationName', l.location_name,
+          'qty', sls.qty
+        )) FILTER (WHERE sls.id IS NOT NULL
+          AND LOWER(TRIM(l.location_name)) IN (
+            LOWER(TRIM(COALESCE(s.location, ''))),
+            LOWER(TRIM(COALESCE(s.location_2, '')))
+          )
+        ), '[]'::json) AS locations,
+        COALESCE(json_agg(DISTINCT jsonb_build_object(
+          'componentId', scl.component_id,
+          'componentCode', c.component_code,
+          'componentName', c.name
+        )) FILTER (WHERE scl.id IS NOT NULL AND c.vessel_id = s.vessel_id), '[]'::json) AS linked_components
+      FROM spares s
+      LEFT JOIN spare_location_stock sls ON sls.spare_id = s.id
+      LEFT JOIN locations l ON sls.location_id = l.id
+      LEFT JOIN spare_component_links scl ON scl.spare_id = s.id
+      LEFT JOIN components c ON scl.component_id = c.cuuid
+      WHERE s.vessel_id = ${vesselId}
+        AND s.deleted = false
+        AND s.data_scope = 'vessel'
+      GROUP BY s.id
+    `);
+
+    const rows = result.rows as any[];
+    return rows.map((row: any) => {
+      // Parse JSON aggregated columns (may already be parsed by the driver)
+      const locs: Array<{ locationId: number; locationName: string; qty: number }> =
+        typeof row.locations === 'string' ? JSON.parse(row.locations) : (row.locations || []);
+      const linked: Array<{ componentId: string; componentCode: string; componentName: string }> =
+        typeof row.linked_components === 'string' ? JSON.parse(row.linked_components) : (row.linked_components || []);
+
+      const robTotal = locs.reduce((sum, l) => sum + (l.qty || 0), 0);
+
+      // Map snake_case DB columns back to camelCase Spare object
+      const spare: any = {
+        id: row.id,
+        partCode: row.part_code,
+        partName: row.part_name,
+        componentId: row.component_id,
+        componentCode: row.component_code,
+        componentName: row.component_name,
+        componentSpareCode: row.component_spare_code,
+        critical: row.critical,
+        rob: row.rob,
+        robLocationA: row.rob_location_a,
+        robLocationB: row.rob_location_b,
+        min: row.min,
+        max: row.max,
+        unitCost: row.unit_cost,
+        stockingNumber: row.stocking_number,
+        leadTime: row.lead_time,
+        supplier: row.supplier,
+        lastOrderDate: row.last_order_date,
+        location: row.location,
+        vesselId: row.vessel_id,
+        deleted: row.deleted,
+        dataScope: row.data_scope,
+        fleetEquipmentCode: row.fleet_equipment_code,
+        fleetPartCode: row.fleet_part_code,
+        partNumber: row.part_number,
+        uom: row.uom,
+        drawingNumber: row.drawing_number,
+        drawingNo: row.drawing_no,
+        location2: row.location_2,
+        remarks: row.remarks,
+        unit: row.unit,
+        positionNumber: row.position_number,
+        note: row.note,
+        specification: row.specification,
+        maker: row.maker,
+        makerCode: row.maker_code,
+        model: row.model,
+        manualName: row.manual_name,
+        pageNumber: row.page_number,
+        criticality: row.criticality,
+        isActive: row.is_active,
+        ihm: row.ihm,
+        ihmPresence: row.ihm_presence,
+        evidenceType: row.evidence_type,
+        partCategory: row.part_category,
+        applicableVesselIds: row.applicable_vessel_ids,
+        scopeNotes: row.scope_notes,
+        createdAt: row.created_at,
+        createdBy: row.created_by,
+        updatedAt: row.updated_at,
+        updatedBy: row.updated_by,
+        suuid: row.suuid,
+        sortOrder: row.sort_order,
+        createdByUuid: row.created_by_uuid,
+        updatedByUuid: row.updated_by_uuid,
+        isDeleted: row.is_deleted,
+        isSync: row.is_sync,
+        isRotationItem: row.is_rotation_item,
+      };
+
+      return {
+        spare,
+        robTotal,
+        stockStatus: robTotal <= (spare.min ?? 0) ? "At Min" as const : "OK" as const,
+        locations: locs,
+        linkedComponents: linked.map(l => ({
+          componentId: l.componentId,
+          componentCode: l.componentCode || '',
+          componentName: l.componentName || '',
+        })),
+      };
+    });
   }
 
   async getSparesWithInventoryByComponent(componentId: string): Promise<SpareWithInventory[]> {
