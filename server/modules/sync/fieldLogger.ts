@@ -30,6 +30,17 @@ const SKIP_FIELDS = new Set([
   'id', // integer PK — not meaningful for sync
 ]);
 
+/**
+ * JSON-aware serialization for field values.
+ * Prevents String() from converting objects/arrays to "[object Object]".
+ */
+function serializeFieldValue(value: any): string | null {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'object' || Array.isArray(value)) return JSON.stringify(value);
+  return String(value);
+}
+
 // Get instance ID from environment — each ship/shore server has a unique identity
 function getInstanceId(): string {
   return process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
@@ -82,7 +93,7 @@ export async function logFieldChanges(
           rowUuid,
           fieldName,
           oldValue: null,
-          newValue: String(newValue),
+          newValue: serializeFieldValue(newValue),
           vesselId,
           changedAt,
           changedByUserId: userId,
@@ -105,8 +116,8 @@ export async function logFieldChanges(
       const newVal = newRow[key];
 
       // Compare as strings to handle type differences (number vs string, date vs string, etc.)
-      const oldStr = oldVal === null || oldVal === undefined ? null : String(oldVal);
-      const newStr = newVal === null || newVal === undefined ? null : String(newVal);
+      const oldStr = serializeFieldValue(oldVal);
+      const newStr = serializeFieldValue(newVal);
 
       if (oldStr === newStr) continue; // No change — skip
 

@@ -1,5 +1,6 @@
 import * as repo from '../repositories/workOrderRepository';
 import { NotFoundError } from '../../shared/errors';
+import { ensureArray, ensureJsonObject } from '../../shared/jsonHelpers';
 
 // Helper: Convert DD-MMM-YYYY to ISO YYYY-MM-DD for HTML date inputs
 function convertToIsoDate(dateStr: string | null | undefined): string {
@@ -23,7 +24,7 @@ function convertToIsoDate(dateStr: string | null | undefined): string {
 
 // Enrich spare parts with ROB (Remaining On Board) inventory data
 async function enrichSparePartsWithROB(spareParts: any[], vesselId: string) {
-  if (!spareParts || spareParts.length === 0) return spareParts;
+  if (!Array.isArray(spareParts) || spareParts.length === 0) return [];
 
   const partCodes = spareParts.map((sp: any) => sp.partCode).filter(Boolean);
   const partNumbers = spareParts.map((sp: any) => sp.partNo).filter(Boolean);
@@ -281,8 +282,8 @@ export async function getWorkOrderContext(workOrderId: string) {
 
   // Build templateData from job data (Part A - immutable from job definition)
   // This ensures Section A is populated from the job template
-  const rawSpareParts = job?.requiredSpareParts || [];
-  const enrichedSpareParts = await enrichSparePartsWithROB(rawSpareParts as any[], workOrder.vesselId as string);
+  const rawSpareParts = ensureArray(job?.requiredSpareParts);
+  const enrichedSpareParts = await enrichSparePartsWithROB(rawSpareParts, workOrder.vesselId as string);
 
   const templateData = job ? {
     woTitle: job.jobTitle,
@@ -314,8 +315,8 @@ export async function getWorkOrderContext(workOrderId: string) {
     briefWorkDescription: job.briefWorkDescription || job.jobDescription,
     jobDescription: job.jobDescription,
     requiredSpareParts: enrichedSpareParts,
-    requiredTools: job.requiredTools || [],
-    safetyRequirements: job.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] },
+    requiredTools: ensureArray(job.requiredTools),
+    safetyRequirements: ensureJsonObject(job.safetyRequirements, { ppeRequirements: [], permitRequirements: [], otherRequirements: [] }),
     workHistory,
     vesselId: workOrder.vesselId
   } : {
@@ -386,7 +387,7 @@ export async function getWorkOrderContext(workOrderId: string) {
     riskAssessmentStatus: correctedWorkOrder.riskAssessmentStatus || '',
     safetyChecklistsStatus: correctedWorkOrder.safetyChecklistsStatus || '',
     operationalFormsStatus: correctedWorkOrder.operationalFormsStatus || '',
-    uploadedDocuments: correctedWorkOrder.uploadedDocuments || [],
+    uploadedDocuments: ensureArray(correctedWorkOrder.uploadedDocuments),
     // B2 - Work Duration
     startDateTime: correctedWorkOrder.startDateTime || '',
     completionDateTime: correctedWorkOrder.completionDateTime || '',
@@ -404,7 +405,7 @@ export async function getWorkOrderContext(workOrderId: string) {
     readingDate: correctedWorkOrder.readingDate || '',
     runningHours: correctedWorkOrder.runningHours || '',
     // B4 - Spare Parts Consumed
-    consumedSpareParts: correctedWorkOrder.consumedSpareParts || [],
+    consumedSpareParts: ensureArray(correctedWorkOrder.consumedSpareParts),
     // Metadata
     woExecutionId: correctedWorkOrder.woExecutionId || '',
     remarks: correctedWorkOrder.remarks || '',

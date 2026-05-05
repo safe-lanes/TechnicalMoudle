@@ -1,5 +1,6 @@
 import * as repo from '../repositories/jobRepository';
 import { NotFoundError } from '../../shared/errors';
+import { ensureArray, ensureJsonObject } from '../../shared/jsonHelpers';
 
 // Helper: Convert DD-MMM-YYYY to ISO YYYY-MM-DD for HTML date inputs
 function convertToIsoDate(dateStr: string | null | undefined): string {
@@ -52,7 +53,7 @@ export async function getJobContext(jobId: string) {
       status: wo.status || 'Completed',
       description: wo.workCarriedOut || wo.jobTitle || 'Maintenance completed',
       remarks: wo.completionRemarks || wo.remarks || wo.jobExperienceNotes || formDataRemarks || '',
-      sparesUsed: (wo.consumedSpareParts as any[]) || [],
+      sparesUsed: ensureArray(wo.consumedSpareParts),
       missedCycles: wo.missedCycles || 0,
       originalDueDate: wo.originalDueDate || null,
       isSkipped: false,
@@ -125,10 +126,10 @@ export async function getJobContext(jobId: string) {
     return dateB.localeCompare(dateA);
   });
 
-  // Get spare parts, tools, safety requirements
-  const rawSpareParts = (job.requiredSpareParts || []) as any[];
-  const tools = (job.requiredTools || []) as any[];
-  const safetyReqs = job.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] };
+  // Get spare parts, tools, safety requirements — ensureArray guards against corrupted JSON
+  const rawSpareParts = ensureArray(job.requiredSpareParts);
+  const tools = ensureArray(job.requiredTools);
+  const safetyReqs = ensureJsonObject(job.safetyRequirements, { ppeRequirements: [], permitRequirements: [], otherRequirements: [] });
 
   // Enrich spare parts with ROB inventory data
   const partCodes = rawSpareParts.map((sp: any) => sp.partCode).filter(Boolean);

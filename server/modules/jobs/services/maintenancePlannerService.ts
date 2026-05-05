@@ -2,6 +2,7 @@ import * as repo from '../repositories/jobRepository';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { calculateCompanyStandardGraceEnd, buildCompanyGraceConfig } from '@shared/workOrders/status';
 import { ValidationError } from '../../shared/errors';
+import { ensureArray } from '../../shared/jsonHelpers';
 import { storage } from '../../../storage';
 
 // ── Types ──
@@ -288,7 +289,7 @@ export async function getMaintenancePlannerData(filters: PlannerFilters) {
 
     // Calculate spare status
     let spareStatus: 'OK' | 'LOW' | 'ZERO' | 'NOT_SET' = 'NOT_SET';
-    const requiredSpares = job.requiredSpareParts as any[] || [];
+    const requiredSpares = ensureArray(job.requiredSpareParts);
 
     if (requiredSpares.length > 0) {
       let hasZero = false;

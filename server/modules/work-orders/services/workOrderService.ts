@@ -1,5 +1,6 @@
 import * as repo from '../repositories/workOrderRepository';
 import { NotFoundError, ValidationError } from '../../shared/errors';
+import { ensureArray } from '../../shared/jsonHelpers';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { computeSpareConsumptionDelta, ConsumedSpareEntry } from '../utils/spareConsumptionDelta';
@@ -1270,8 +1271,8 @@ export async function updateWorkOrder(id: string, body: any) {
   // ========== SPARE CONSUMPTION ON SAVE (Real-time ROB update) ==========
   const isApprovalAction = updateData.approvalAction === 'approved' && updateData.status === 'Completed';
   if (!isApprovalAction && !isBeingRejected && !woIsCompleted) {
-    const currentConsumed = (updateData.consumedSpareParts || []) as ConsumedSpareEntry[];
-    const previousConsumed = (existingWO.consumedSpareParts || []) as ConsumedSpareEntry[];
+    const currentConsumed = ensureArray(updateData.consumedSpareParts) as ConsumedSpareEntry[];
+    const previousConsumed = ensureArray(existingWO.consumedSpareParts) as ConsumedSpareEntry[];
 
     const sparesToProcess = computeSpareConsumptionDelta(currentConsumed, previousConsumed);
     const woVesselId = existingWO.vesselId || 'V001';
@@ -1628,8 +1629,9 @@ export async function updateWorkOrder(id: string, body: any) {
     const freshWO = await repo.findById(id);
     const woForSpares = freshWO || workOrder;
 
-    if (woForSpares && woForSpares.consumedSpareParts && Array.isArray(woForSpares.consumedSpareParts)) {
-      const consumedSpares = woForSpares.consumedSpareParts as Array<{
+    const approvalConsumedSpares = ensureArray(woForSpares?.consumedSpareParts);
+    if (approvalConsumedSpares.length > 0) {
+      const consumedSpares = approvalConsumedSpares as Array<{
         partNo: string;
         partCode?: string;
         description?: string;

@@ -468,11 +468,22 @@ export class SyncEngine {
 
     const pool = await getPool();
 
-    // JSON coercion: if the column is json/jsonb, ensure the value is valid JSON
+    // JSON coercion: if the column is json/jsonb, ensure the value is valid JSON.
+    // The field logger stores JSON values as JSON strings (e.g., '[{"spareId":"abc"}]').
+    // For json/jsonb columns, we must pass a parsed object so pg serializes it correctly,
+    // OR pass the raw JSON string which pg accepts directly for json/jsonb types.
     const meta = await getColumnMeta(pool, log.tableName);
-    let valueToApply: string | null = log.newValue;
+    let valueToApply: any = log.newValue;
     if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
-      try { JSON.parse(valueToApply); } catch { valueToApply = JSON.stringify(valueToApply); }
+      try {
+        // Parse to validate it's proper JSON, then pass the string as-is
+        // (pg accepts JSON strings directly for json/jsonb columns)
+        JSON.parse(valueToApply);
+        // valueToApply is already a valid JSON string — pass as-is
+      } catch {
+        // Not valid JSON (corrupted legacy value like "[object Object]") — reset to empty
+        valueToApply = '[]';
+      }
     }
 
     // Let errors bubble up to the caller for proper counting (Defect D fix)

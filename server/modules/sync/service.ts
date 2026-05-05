@@ -166,9 +166,15 @@ export async function receivePushData(
         try {
           // JSON coercion for json/jsonb columns
           const meta = await getColumnMeta(pool, log.tableName);
-          let valueToApply: string | null = log.newValue;
+          let valueToApply: any = log.newValue;
           if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
-            try { JSON.parse(valueToApply); } catch { valueToApply = JSON.stringify(valueToApply); }
+            try {
+              JSON.parse(valueToApply);
+              // Valid JSON string — pass as-is (pg accepts for json/jsonb)
+            } catch {
+              // Not valid JSON (corrupted like "[object Object]") — reset to empty
+              valueToApply = '[]';
+            }
           }
 
           await pool.query(

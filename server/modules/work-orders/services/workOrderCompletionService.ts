@@ -1,5 +1,6 @@
 import * as repo from '../repositories/workOrderRepository';
 import { NotFoundError, ValidationError } from '../../shared/errors';
+import { ensureArray } from '../../shared/jsonHelpers';
 import { calculateMissedCycles as calcMissedCyclesShared, calculateMissedCyclesRH } from '@shared/dateUtils';
 import { detectAndLogAnomalies } from './anomalyDetectionService';
 import { invalidateComplianceCache } from './complianceAnomalyService';
@@ -495,8 +496,9 @@ export async function completeWorkOrder(
   }
 
   // Auto-deduct consumed spares from inventory
-  if (workOrder.consumedSpareParts && Array.isArray(workOrder.consumedSpareParts)) {
-    const consumedSpares = workOrder.consumedSpareParts as Array<{
+  const parsedConsumedSpares = ensureArray(workOrder.consumedSpareParts);
+  if (parsedConsumedSpares.length > 0) {
+    const consumedSpares = parsedConsumedSpares as Array<{
       partNo: string;
       partCode?: string;
       description?: string;
