@@ -126,7 +126,7 @@ export async function insertCertificateData(data: {
     .values(data)
     .onConflictDoNothing({
       target: [vesselCertificateData.vesselId, vesselCertificateData.masterId],
-      targetWhere: sql`${vesselCertificateData.isDeleted} = false`,
+      where: sql`${vesselCertificateData.isDeleted} = false`,
     })
     .returning();
   if (inserted.length > 0) return inserted;

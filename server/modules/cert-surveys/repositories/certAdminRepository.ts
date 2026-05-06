@@ -141,7 +141,7 @@ export async function insertApplicability(data: any, tx?: any) {
     .values(data)
     .onConflictDoNothing({
       target: [vesselCertificateApplicability.vesselId, vesselCertificateApplicability.masterId],
-      targetWhere: sql`${vesselCertificateApplicability.isDeleted} = false`,
+      where: sql`${vesselCertificateApplicability.isDeleted} = false`,
     })
     .returning();
 }
@@ -163,7 +163,7 @@ export async function insertApplicabilityBulk(data: Array<{
     .values(data)
     .onConflictDoNothing({
       target: [vesselCertificateApplicability.vesselId, vesselCertificateApplicability.masterId],
-      targetWhere: sql`${vesselCertificateApplicability.isDeleted} = false`,
+      where: sql`${vesselCertificateApplicability.isDeleted} = false`,
     })
     .returning();
 }

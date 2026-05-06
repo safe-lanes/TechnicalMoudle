@@ -144,7 +144,7 @@ export async function insertApplicabilityBulk(data: Array<{
     .values(data)
     .onConflictDoNothing({
       target: [vesselSurveyApplicability.vesselId, vesselSurveyApplicability.masterId],
-      targetWhere: sql`${vesselSurveyApplicability.isDeleted} = false`,
+      where: sql`${vesselSurveyApplicability.isDeleted} = false`,
     })
     .returning();
 }
