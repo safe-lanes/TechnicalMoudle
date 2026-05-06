@@ -9,7 +9,11 @@ import { eq, and, inArray, or, like, notInArray, sql } from 'drizzle-orm';
 
 // ── Helpers ──
 
-function getDb() {
+// Optional `tx` lets callers run repo operations inside a Drizzle transaction
+// (e.g. saveMasterCertificates wraps master upserts + applicability fan-out so
+// a 23505/42P10 mid-flight rolls back cleanly instead of leaving orphan rows).
+function getDb(tx?: any) {
+  if (tx) return tx;
   const postgres = getPostgresClient();
   if (!postgres) return null;
   return postgres.db;
@@ -27,16 +31,16 @@ export async function getMasterCertificates() {
     .orderBy(shipCertificatesMaster.sequence);
 }
 
-export async function getMasterCertificateByMasterId(masterId: string) {
-  const db = await getDb();
+export async function getMasterCertificateByMasterId(masterId: string, tx?: any) {
+  const db = getDb(tx);
   if (!db) return null;
   return db.select().from(shipCertificatesMaster)
     .where(eq(shipCertificatesMaster.masterId, masterId))
     .limit(1);
 }
 
-export async function getMasterCertificateSystemFlag(masterId: string) {
-  const db = await getDb();
+export async function getMasterCertificateSystemFlag(masterId: string, tx?: any) {
+  const db = getDb(tx);
   if (!db) return null;
   return db.select({ id: shipCertificatesMaster.id, isSystemDefined: shipCertificatesMaster.isSystemDefined })
     .from(shipCertificatesMaster)
@@ -44,22 +48,22 @@ export async function getMasterCertificateSystemFlag(masterId: string) {
     .limit(1);
 }
 
-export async function updateMasterCertificate(masterId: string, data: any) {
-  const db = await getDb();
+export async function updateMasterCertificate(masterId: string, data: any, tx?: any) {
+  const db = getDb(tx);
   if (!db) return null;
   return db.update(shipCertificatesMaster)
     .set({ ...data, updatedAt: new Date() })
     .where(eq(shipCertificatesMaster.masterId, masterId));
 }
 
-export async function insertMasterCertificate(data: any) {
-  const db = await getDb();
+export async function insertMasterCertificate(data: any, tx?: any) {
+  const db = getDb(tx);
   if (!db) return null;
   return db.insert(shipCertificatesMaster).values(data);
 }
 
-export async function deleteMasterCertificate(masterId: string) {
-  const db = await getDb();
+export async function deleteMasterCertificate(masterId: string, tx?: any) {
+  const db = getDb(tx);
   if (!db) return null;
   return db.update(shipCertificatesMaster)
     .set({ isDeleted: true, updatedAt: new Date() })
@@ -115,8 +119,8 @@ export async function getApplicabilityByVesselId(vesselId: string) {
     ));
 }
 
-export async function getApplicabilityByVesselAndMaster(vesselId: string, masterId: string) {
-  const db = await getDb();
+export async function getApplicabilityByVesselAndMaster(vesselId: string, masterId: string, tx?: any) {
+  const db = getDb(tx);
   if (!db) return null;
   return db.select()
     .from(vesselCertificateApplicability)
@@ -127,8 +131,8 @@ export async function getApplicabilityByVesselAndMaster(vesselId: string, master
     ));
 }
 
-export async function insertApplicability(data: any) {
-  const db = await getDb();
+export async function insertApplicability(data: any, tx?: any) {
+  const db = getDb(tx);
   if (!db) return null;
   // Make insert idempotent against the partial unique index
   // uniq_vessel_certificate_applicability_live so concurrent initialize/update
@@ -148,8 +152,8 @@ export async function insertApplicabilityBulk(data: Array<{
   masterId: string;
   isApplicable: boolean;
   isDeleted?: boolean;
-}>) {
-  const db = await getDb();
+}>, tx?: any) {
+  const db = getDb(tx);
   if (!db) return null;
   // Make insert idempotent against the partial unique index
   // uniq_vessel_certificate_applicability_live so concurrent initialize/bulk-update
@@ -164,8 +168,8 @@ export async function insertApplicabilityBulk(data: Array<{
     .returning();
 }
 
-export async function updateApplicability(vesselId: string, masterId: string, isApplicable: boolean) {
-  const db = await getDb();
+export async function updateApplicability(vesselId: string, masterId: string, isApplicable: boolean, tx?: any) {
+  const db = getDb(tx);
   if (!db) return null;
   return db.update(vesselCertificateApplicability)
     .set({ isApplicable, updatedAt: new Date() })
@@ -177,8 +181,8 @@ export async function updateApplicability(vesselId: string, masterId: string, is
     .returning();
 }
 
-export async function bulkUpdateApplicability(vesselIds: string[], masterId: string, isApplicable: boolean) {
-  const db = await getDb();
+export async function bulkUpdateApplicability(vesselIds: string[], masterId: string, isApplicable: boolean, tx?: any) {
+  const db = getDb(tx);
   if (!db) return null;
   return db.update(vesselCertificateApplicability)
     .set({ isApplicable, updatedAt: new Date() })
@@ -199,8 +203,8 @@ export async function getDistinctVessels() {
   }).from(vesselCertificateApplicability);
 }
 
-export async function getApplicabilityByMasterIds(masterIds: string[]) {
-  const db = await getDb();
+export async function getApplicabilityByMasterIds(masterIds: string[], tx?: any) {
+  const db = getDb(tx);
   if (!db) return null;
   return db.select({
     vesselId: vesselCertificateApplicability.vesselId,
@@ -212,8 +216,8 @@ export async function getApplicabilityByMasterIds(masterIds: string[]) {
     ));
 }
 
-export async function getAllVessels() {
-  const db = await getDb();
+export async function getAllVessels(tx?: any) {
+  const db = getDb(tx);
   if (!db) return null;
   return db.select({
     vesselId: vessels.vuuid,
@@ -238,8 +242,8 @@ export async function getCompanyCertificates() {
     );
 }
 
-export async function getCompanyApplicableMasterIds() {
-  const db = await getDb();
+export async function getCompanyApplicableMasterIds(tx?: any) {
+  const db = getDb(tx);
   if (!db) return null;
   return db.select({
     masterId: shipCertificatesMaster.masterId,
@@ -257,8 +261,8 @@ export async function getCompanyApplicableMasterIds() {
     );
 }
 
-export async function getAllApplicabilityRecords() {
-  const db = await getDb();
+export async function getAllApplicabilityRecords(tx?: any) {
+  const db = getDb(tx);
   if (!db) return null;
   return db.select({
     vesselId: vesselCertificateApplicability.vesselId,
@@ -269,8 +273,8 @@ export async function getAllApplicabilityRecords() {
     );
 }
 
-export async function softDeleteApplicabilityByMasterIds(masterIds: string[]) {
-  const db = await getDb();
+export async function softDeleteApplicabilityByMasterIds(masterIds: string[], tx?: any) {
+  const db = getDb(tx);
   if (!db) return null;
   if (masterIds.length === 0) return [];
   return db.update(vesselCertificateApplicability)

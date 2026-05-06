@@ -89,6 +89,108 @@ export async function ensureMaintenanceHistoryImmutability(): Promise<void> {
 }
 
 /**
+ * Ensure the partial unique index uniq_vessel_certificate_applicability_live
+ * exists on vessel_certificate_applicability(vessel_id, master_id) WHERE
+ * is_deleted = false.
+ *
+ * Why this lives at startup as well as in migration 095:
+ * Every insertApplicability/insertApplicabilityBulk call uses ON CONFLICT
+ * (vessel_id, master_id) WHERE is_deleted = false. Without that exact partial
+ * index Postgres raises 42P10 ("there is no unique or exclusion constraint
+ * matching the ON CONFLICT specification") and the entire request 500s. On the
+ * deployed ship database this exact failure broke Admin → Ship Certificates
+ * (Master/Company Save toasted an error while persisting orphan rows; Vessel
+ * Save and per-row checkbox toggles 500ed outright). This invariant guarantees
+ * the index is present even when migration 095 was skipped or rolled back.
+ */
+export async function ensureCertApplicabilityIndex(): Promise<void> {
+  console.log('🔒 Ensuring partial unique index for vessel_certificate_applicability...');
+
+  const postgres = await resolvePostgres();
+  if (!postgres) {
+    console.log('⚠️  Skipping cert applicability index check - PostgreSQL connection unavailable');
+    return;
+  }
+
+  const { db } = postgres;
+
+  try {
+    const tableCheck = await db.execute(sql`
+      SELECT 1 FROM information_schema.tables
+      WHERE table_name = 'vessel_certificate_applicability'
+      LIMIT 1
+    `);
+    if ((tableCheck.rows as any[]).length === 0) {
+      console.log('⚠️  vessel_certificate_applicability table does not exist yet — skipping index check');
+      return;
+    }
+
+    const before = await db.execute(sql`
+      SELECT 1 FROM pg_indexes
+      WHERE indexname = 'uniq_vessel_certificate_applicability_live'
+      LIMIT 1
+    `);
+    const existedBefore = (before.rows as any[]).length > 0;
+
+    if (!existedBefore) {
+      console.warn(
+        '⚠️  Missing uniq_vessel_certificate_applicability_live — repairing now. ' +
+        'This means migration 095 did not apply cleanly on this database. ' +
+        'Cleaning up duplicate live rows before creating the index.'
+      );
+
+      await db.execute(sql`
+        DELETE FROM vessel_certificate_applicability AS vca
+        USING (
+          SELECT id
+          FROM (
+            SELECT
+              id,
+              ROW_NUMBER() OVER (
+                PARTITION BY vessel_id, master_id
+                ORDER BY updated_at DESC NULLS LAST, id DESC
+              ) AS rn
+            FROM vessel_certificate_applicability
+            WHERE is_deleted = false OR is_deleted IS NULL
+          ) ranked
+          WHERE ranked.rn > 1
+        ) dup
+        WHERE vca.id = dup.id
+      `);
+    }
+
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS uniq_vessel_certificate_applicability_live
+        ON vessel_certificate_applicability (vessel_id, master_id)
+        WHERE is_deleted = false
+    `);
+
+    const verify = await db.execute(sql`
+      SELECT 1 FROM pg_indexes
+      WHERE indexname = 'uniq_vessel_certificate_applicability_live'
+      LIMIT 1
+    `);
+    if ((verify.rows as any[]).length === 0) {
+      throw new Error(
+        'uniq_vessel_certificate_applicability_live still missing after CREATE INDEX IF NOT EXISTS — ' +
+        'cert admin writes will continue to fail with 42P10.'
+      );
+    }
+
+    if (existedBefore) {
+      console.log('✅ uniq_vessel_certificate_applicability_live verified');
+    } else {
+      console.log('✅ uniq_vessel_certificate_applicability_live repaired and verified');
+    }
+  } catch (error: any) {
+    throw new Error(
+      `Failed to ensure cert applicability unique index: ${error.message}. ` +
+      `Cert admin writes (Save Master, Save Vessel, applicability checkbox) will return 500 until this is resolved.`
+    );
+  }
+}
+
+/**
  * Run index migrations to update unique constraints to include vessel_id.
  * This ensures each vessel has independent records with the same codes.
  */

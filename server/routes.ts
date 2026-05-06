@@ -5,7 +5,7 @@ import * as fs from "fs";
 import * as path from "path";
 import moduleRouter from "./modules";
 import { mockAuthMiddleware, initMockAuthRankId } from "./middleware/auth";
-import { ensureMaintenanceHistoryImmutability } from "./initDb";
+import { ensureMaintenanceHistoryImmutability, ensureCertApplicabilityIndex } from "./initDb";
 import { getSeedDefectsData, ALL_SEED_IDS } from "./modules/defects/services/seedData";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -19,6 +19,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error(error);
     console.error('Server cannot start without immutability enforcement for component_maintenance_history table');
     process.exit(1); // Fail fast - do not serve traffic without immutability
+  }
+
+  try {
+    await ensureCertApplicabilityIndex();
+  } catch (error: any) {
+    console.error('❌ FATAL: Failed to ensure cert applicability unique index');
+    console.error(error);
+    console.error('Server cannot start without uniq_vessel_certificate_applicability_live — Admin → Ship Certificates writes would 500.');
+    process.exit(1);
   }
 
   // Apply mock authentication middleware for all API routes during development

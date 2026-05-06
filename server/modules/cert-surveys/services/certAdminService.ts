@@ -1,5 +1,6 @@
 import * as certAdminRepo from '../repositories/certAdminRepository';
 import { ensureVesselExists } from './vesselEnsureService';
+import { getPostgresClient } from '../../../postgresClient';
 
 // ══════════════════════════════════════════════════════════
 // Master Certificate Admin
@@ -27,13 +28,24 @@ export async function saveMasterCertificates(body: any) {
     throw Object.assign(new Error("certificates must be an array"), { statusCode: 400 });
   }
 
+  const postgres = getPostgresClient();
+  if (!postgres) {
+    throw Object.assign(new Error("Database not available"), { statusCode: 503 });
+  }
+
   console.log(`Saving ${certificates.length} ship certificates master entries...`);
 
+  // Wrap master upserts + applicability fan-out in a single transaction so a
+  // mid-flight failure (e.g. 23505/42P10) rolls back cleanly instead of leaving
+  // orphan ship_certificates_master rows without their applicability records —
+  // the exact bug that had Master/Company tab "Save" toasting an error while
+  // silently persisting partial data on the deployed ship.
+  return await postgres.db.transaction(async (tx) => {
   // Handle deletions
   let deletedCount = 0;
   if (deletedMasterIds.length > 0) {
     for (const masterId of deletedMasterIds) {
-      const existing = await certAdminRepo.getMasterCertificateSystemFlag(masterId);
+      const existing = await certAdminRepo.getMasterCertificateSystemFlag(masterId, tx);
       if (!existing) {
         throw Object.assign(new Error("Database not available"), { statusCode: 503 });
       }
@@ -41,7 +53,7 @@ export async function saveMasterCertificates(body: any) {
         console.log(`Skipped deletion of system-defined certificate: ${masterId}`);
         continue;
       }
-      await certAdminRepo.deleteMasterCertificate(masterId);
+      await certAdminRepo.deleteMasterCertificate(masterId, tx);
       deletedCount++;
       console.log(`Deleted certificate: ${masterId}`);
     }
@@ -56,14 +68,14 @@ export async function saveMasterCertificates(body: any) {
   const newlyInsertedMasterIds: string[] = [];
   const vesselSpecificSet = new Set(vesselSpecificCerts);
 
-  const allVesselsResult = await certAdminRepo.getAllVessels();
+  const allVesselsResult = await certAdminRepo.getAllVessels(tx);
   if (!allVesselsResult) {
     throw Object.assign(new Error("Database not available"), { statusCode: 503 });
   }
   const allVessels = allVesselsResult.map(v => ({ id: v.vesselId, name: v.vesselName }));
 
   for (const cert of certificates) {
-    const existing = await certAdminRepo.getMasterCertificateByMasterId(cert.masterId);
+    const existing = await certAdminRepo.getMasterCertificateByMasterId(cert.masterId, tx);
     if (!existing) {
       throw Object.assign(new Error("Database not available"), { statusCode: 503 });
     }
@@ -85,7 +97,7 @@ export async function saveMasterCertificates(body: any) {
         companyId: cert.companyId || null,
         companyGroup: cert.companyGroup || null,
         companySequence: cert.companySequence || null,
-      });
+      }, tx);
       if (wasDeleted) {
         insertedCount++;
         newlyInsertedMasterIds.push(cert.masterId);
@@ -107,7 +119,7 @@ export async function saveMasterCertificates(body: any) {
         companyId: cert.companyId || null,
         companyGroup: cert.companyGroup || null,
         companySequence: cert.companySequence || null,
-      });
+      }, tx);
       insertedCount++;
       newlyInsertedMasterIds.push(cert.masterId);
     }
@@ -131,7 +143,7 @@ export async function saveMasterCertificates(body: any) {
 
     const idsToCheck = [...companyApplicableNewIds, ...vesselOnlyMasterIds];
     const existingApplicability = idsToCheck.length > 0
-      ? await certAdminRepo.getApplicabilityByMasterIds(idsToCheck)
+      ? await certAdminRepo.getApplicabilityByMasterIds(idsToCheck, tx)
       : [];
     if (!existingApplicability) {
       throw Object.assign(new Error("Database not available"), { statusCode: 503 });
@@ -181,20 +193,20 @@ export async function saveMasterCertificates(body: any) {
     }
 
     if (applicabilityToInsert.length > 0) {
-      await certAdminRepo.insertApplicabilityBulk(applicabilityToInsert);
+      await certAdminRepo.insertApplicabilityBulk(applicabilityToInsert, tx);
       console.log(`Created ${applicabilityToInsert.length} applicability records for new certificates`);
     }
   }
 
   // Sync: ensure ALL company-applicable master certs have applicability records for all vessels
   // This catches certs that were updated to applicableToCompany=true after initial creation
-  const companyApplicableResult = await certAdminRepo.getCompanyApplicableMasterIds();
+  const companyApplicableResult = await certAdminRepo.getCompanyApplicableMasterIds(tx);
   if (!companyApplicableResult) {
     throw Object.assign(new Error("Database not available"), { statusCode: 503 });
   }
   const companyApplicableIds = new Set(companyApplicableResult.map(r => r.masterId));
 
-  const allApplicabilityRecords = await certAdminRepo.getAllApplicabilityRecords();
+  const allApplicabilityRecords = await certAdminRepo.getAllApplicabilityRecords(tx);
   if (!allApplicabilityRecords) {
     throw Object.assign(new Error("Database not available"), { statusCode: 503 });
   }
@@ -226,7 +238,7 @@ export async function saveMasterCertificates(body: any) {
   }
 
   if (syncInserts.length > 0) {
-    await certAdminRepo.insertApplicabilityBulk(syncInserts);
+    await certAdminRepo.insertApplicabilityBulk(syncInserts, tx);
     console.log(`Synced ${syncInserts.length} missing applicability records for company-applicable certificates`);
   }
 
@@ -241,7 +253,7 @@ export async function saveMasterCertificates(body: any) {
   }
 
   if (staleApplicabilityMasterIds.length > 0) {
-    await certAdminRepo.softDeleteApplicabilityByMasterIds(staleApplicabilityMasterIds);
+    await certAdminRepo.softDeleteApplicabilityByMasterIds(staleApplicabilityMasterIds, tx);
     console.log(`Soft-deleted ${staleApplicabilityMasterIds.length} stale non-company applicability master IDs: ${staleApplicabilityMasterIds.join(', ')}`);
   }
 
@@ -254,6 +266,7 @@ export async function saveMasterCertificates(body: any) {
     updated: updatedCount,
     deleted: deletedCount
   };
+  });
 }
 
 // ── DELETE /admin/ship-certificates-master/:masterId ──
@@ -419,33 +432,39 @@ export async function updateApplicability(body: any) {
     throw Object.assign(new Error("vesselId, masterId, and isApplicable are required"), { statusCode: 400 });
   }
 
-  // Check if record exists
-  const existingRecord = await certAdminRepo.getApplicabilityByVesselAndMaster(vesselId, masterId);
-  if (existingRecord === null) {
+  const postgres = getPostgresClient();
+  if (!postgres) {
     throw Object.assign(new Error("Database not available"), { statusCode: 503 });
   }
 
-  if (existingRecord.length === 0) {
-    // Create new record
-    const newRecord = await certAdminRepo.insertApplicability({
-      vesselId,
-      vesselName: vesselName || vesselId,
-      masterId,
-      isApplicable,
-    });
-    if (!newRecord) {
+  // Atomic SELECT-then-INSERT/UPDATE so the partial unique index
+  // uniq_vessel_certificate_applicability_live cannot 23505 a concurrent caller.
+  return await postgres.db.transaction(async (tx) => {
+    const existingRecord = await certAdminRepo.getApplicabilityByVesselAndMaster(vesselId, masterId, tx);
+    if (existingRecord === null) {
       throw Object.assign(new Error("Database not available"), { statusCode: 503 });
     }
-    return { success: true, record: newRecord[0] };
-  }
 
-  // Update existing record
-  const updatedRecord = await certAdminRepo.updateApplicability(vesselId, masterId, isApplicable);
-  if (!updatedRecord) {
-    throw Object.assign(new Error("Database not available"), { statusCode: 503 });
-  }
+    if (existingRecord.length === 0) {
+      const newRecord = await certAdminRepo.insertApplicability({
+        vesselId,
+        vesselName: vesselName || vesselId,
+        masterId,
+        isApplicable,
+      }, tx);
+      if (!newRecord) {
+        throw Object.assign(new Error("Database not available"), { statusCode: 503 });
+      }
+      return { success: true, record: newRecord[0] };
+    }
 
-  return { success: true, record: updatedRecord[0] };
+    const updatedRecord = await certAdminRepo.updateApplicability(vesselId, masterId, isApplicable, tx);
+    if (!updatedRecord) {
+      throw Object.assign(new Error("Database not available"), { statusCode: 503 });
+    }
+
+    return { success: true, record: updatedRecord[0] };
+  });
 }
 
 // ── POST /admin/vessel-certificate-applicability/bulk-update ──
@@ -459,29 +478,38 @@ export async function bulkUpdateApplicability(body: any) {
 
   const vesselIds = vessels.map(v => v.id);
 
-  // Update all matching records
-  const updatedRecords = await certAdminRepo.bulkUpdateApplicability(vesselIds, masterId, isApplicable);
-  if (!updatedRecords) {
+  const postgres = getPostgresClient();
+  if (!postgres) {
     throw Object.assign(new Error("Database not available"), { statusCode: 503 });
   }
 
-  // For vessels without existing records, create them
-  const updatedVesselIds = new Set(updatedRecords.map(r => r.vesselId));
-  const missingVessels = vessels.filter(v => !updatedVesselIds.has(v.id));
-
-  if (missingVessels.length > 0) {
-    const newRecords = await certAdminRepo.insertApplicability(
-      missingVessels.map(v => ({
-        vesselId: v.id,
-        vesselName: v.name,
-        masterId,
-        isApplicable,
-      }))
-    );
-    if (newRecords) {
-      updatedRecords.push(...newRecords);
+  // Atomic UPDATE-then-INSERT so partial unique index 42P10/23505 doesn't
+  // commit half a bulk save. Caused Vessel Save 500s on the deployed ship
+  // when the index was missing — now it rolls back cleanly even on conflicts.
+  return await postgres.db.transaction(async (tx) => {
+    const updatedRecords = await certAdminRepo.bulkUpdateApplicability(vesselIds, masterId, isApplicable, tx);
+    if (!updatedRecords) {
+      throw Object.assign(new Error("Database not available"), { statusCode: 503 });
     }
-  }
 
-  return { success: true, records: updatedRecords };
+    const updatedVesselIds = new Set(updatedRecords.map(r => r.vesselId));
+    const missingVessels = vessels.filter(v => !updatedVesselIds.has(v.id));
+
+    if (missingVessels.length > 0) {
+      const newRecords = await certAdminRepo.insertApplicability(
+        missingVessels.map(v => ({
+          vesselId: v.id,
+          vesselName: v.name,
+          masterId,
+          isApplicable,
+        })),
+        tx
+      );
+      if (newRecords) {
+        updatedRecords.push(...newRecords);
+      }
+    }
+
+    return { success: true, records: updatedRecords };
+  });
 }
