@@ -201,7 +201,12 @@ export default function ApprovalWorkflow() {
   };
 
   const toggleModule = (id: string) => {
-    if (isSearching) return;
+    if (isSearching) {
+      setSearchQuery("");
+      setActiveModuleId(id);
+      setExpandedModules((prev) => new Set(prev).add(id));
+      return;
+    }
     setActiveModuleId(id);
     setExpandedModules((prev) => {
       const next = new Set(prev);
@@ -211,7 +216,13 @@ export default function ApprovalWorkflow() {
   };
 
   const toggleSubModule = (id: string, modId: string) => {
-    if (isSearching) return;
+    if (isSearching) {
+      setSearchQuery("");
+      setActiveModuleId(modId);
+      setExpandedModules((prev) => new Set(prev).add(modId));
+      setExpandedSubModules((prev) => new Set(prev).add(id));
+      return;
+    }
     setActiveModuleId(modId);
     setExpandedSubModules((prev) => {
       const next = new Set(prev);
@@ -449,8 +460,7 @@ export default function ApprovalWorkflow() {
                   Select an Approval Function
                 </h3>
                 <p className="text-sm text-gray-400 dark:text-gray-500 max-w-xs leading-relaxed">
-                  Expand a module in the tree on the left and click on an
-                  approval function to view it here.
+                  Select an approval function from the tree on the left.
                 </p>
               </div>
             </div>
