@@ -245,7 +245,11 @@ export class PostgresStorage {
 
   private async insertStoresLedgerEntry(values: InsertStoresLedger, txConn?: any): Promise<void> {
     const conn = txConn || await getDb();
-    await conn.insert(storesLedger).values(values);
+    const result = await conn.insert(storesLedger).values(values).returning();
+    // Sync field logging — INSERT (best-effort)
+    if (result[0]) {
+      try { await logFieldChanges('stores_ledger', result[0].sluuid, result[0].vesselId || null, null, result[0], values.userId || 'system'); } catch (e) { console.error('[FieldLogger] stores_ledger create:', e); }
+    }
   }
 
   // ============= USERS (Module 1) =============
@@ -1491,7 +1495,7 @@ export class PostgresStorage {
         return { masterUpdated: masterResult[0], inheritedUpdated: 0 };
       }
 
-      await tx.insert(runningHoursAudit).values({
+      const rhaResult = await tx.insert(runningHoursAudit).values({
         vesselId: masterVesselId,
         componentId: component.cuuid,
         previousRH: previousMasterRH.toFixed(2),
@@ -1508,7 +1512,9 @@ export class PostgresStorage {
         version: 1,
         componentCode: masterComponentCode,
         componentName: component.name || null,
-      });
+      }).returning();
+      // Sync field logging — INSERT (best-effort)
+      try { await logFieldChanges('running_hours_audit', rhaResult[0].rhauuid, masterVesselId, null, rhaResult[0], params.userId); } catch (e) { console.error('[FieldLogger] rha tx create:', e); }
 
       // Apply DELTA to each inherited component's currentCumulativeRH (actual running hours)
       // rhCurrentInheritedCached stores the master's absolute value (for display/config)
@@ -2504,6 +2510,9 @@ export class PostgresStorage {
     }).returning();
 
     const createdSpare = result[0];
+
+    // Sync field logging — INSERT
+    try { await logFieldChanges('spares', createdSpare.suuid, createdSpare.vesselId || null, null, createdSpare, 'system'); } catch (e) { console.error('[FieldLogger] spare create:', e); }
 
     // SYNC: Create spare_component_links entry when componentId is present
     // When skipSiblingSync=true (bulk import), skip entirely — processSpareInventory() handles link creation
@@ -3503,7 +3512,10 @@ export class PostgresStorage {
       }).returning();
       const createdSpare = result[0];
       results.push(createdSpare);
-      
+
+      // Sync field logging — INSERT
+      try { await logFieldChanges('spares', createdSpare.suuid, createdSpare.vesselId || null, null, createdSpare, 'system'); } catch (e) { console.error('[FieldLogger] spare bulk create:', e); }
+
       // SYNC: Create spare_location_stock entries independently for each assigned location
       if (createdSpare.vesselId) {
         const vesselId = createdSpare.vesselId;
@@ -3526,7 +3538,7 @@ export class PostgresStorage {
         }
       }
     }
-    
+
     return results;
   }
 
@@ -3574,11 +3586,18 @@ export class PostgresStorage {
         // Filter out undefined/null partCode to preserve existing value and prevent NOT NULL constraint violation
         const { partCode, ...restSpare } = spare;
         const updateData = partCode != null ? { ...restSpare, partCode, updatedAt: new Date() } : { ...restSpare, updatedAt: new Date() };
-        
+
+        const oldSpare = { ...existing };
         await db.update(spares)
           .set(updateData)
           .where(eq(spares.suuid, existing.suuid));
         updated++;
+
+        // Sync field logging — UPDATE
+        try {
+          const updatedSpare = await db.select().from(spares).where(eq(spares.suuid, existing.suuid)).then(r => r[0]);
+          if (updatedSpare) await logFieldChanges('spares', existing.suuid, existing.vesselId || null, oldSpare, updatedSpare, 'system');
+        } catch (e) { console.error('[FieldLogger] spare bulk upsert update:', e); }
 
         // SYNC: Update spare_location_stock independently per location if ROB values changed
         const newRobA = spare.robLocationA ?? existing.robLocationA ?? 0;
@@ -3621,9 +3640,14 @@ export class PostgresStorage {
           min: spare.min ?? 0,
         }).returning();
         created++;
-        
+
         // SYNC: Create spare_location_stock entries independently for each assigned location
         const createdSpare = result[0];
+
+        // Sync field logging — INSERT
+        if (createdSpare) {
+          try { await logFieldChanges('spares', createdSpare.suuid, createdSpare.vesselId || null, null, createdSpare, 'system'); } catch (e) { console.error('[FieldLogger] spare bulk upsert create:', e); }
+        }
         if (createdSpare?.vesselId) {
           const vesselId = createdSpare.vesselId;
 
@@ -3689,15 +3713,20 @@ export class PostgresStorage {
   }
 
   async createSpareHistory(history: InsertSpareHistory, txConn?: any): Promise<SpareHistory> {
+    let created: SpareHistory;
     if (txConn) {
       const result = await txConn.insert(sparesHistory).values(history).returning();
-      return result[0];
+      created = result[0];
+    } else {
+      created = await this.insertWithSequenceRepair('spares_history', async () => {
+        const db = await getDb();
+        const result = await db.insert(sparesHistory).values(history).returning();
+        return result[0];
+      });
     }
-    return this.insertWithSequenceRepair('spares_history', async () => {
-      const db = await getDb();
-      const result = await db.insert(sparesHistory).values(history).returning();
-      return result[0];
-    });
+    // Sync field logging — INSERT (best-effort, outside tx)
+    try { await logFieldChanges('spares_history', created.shuuid, (created as any).vesselId || null, null, created, 'system'); } catch (e) { console.error('[FieldLogger] spares_history create:', e); }
+    return created;
   }
 
   // ============= MODULE 8: STORES ITEMS =============
@@ -3761,7 +3790,10 @@ export class PostgresStorage {
     }).returning();
     
     const created = result[0];
-    
+
+    // Sync field logging — INSERT
+    try { await logFieldChanges('stores_items', created.stuuid, created.vesselId || null, null, created, userId || 'system'); } catch (e) { console.error('[FieldLogger] stores_items create:', e); }
+
     // Create initial ledger entry if starting with non-zero ROB
     if (totalRob > 0) {
       await this.insertStoresLedgerEntry({
@@ -3784,7 +3816,7 @@ export class PostgresStorage {
         remarks: 'Initial stock on item creation',
       });
     }
-    
+
     return created;
   }
 
@@ -4407,21 +4439,26 @@ export class PostgresStorage {
     let nextSeq: number;
     if (existingSeq.length === 0) {
       // Create new sequence for this vessel/year starting at 1
-      await db.insert(defectSequences).values({
+      const seqResult = await db.insert(defectSequences).values({
         vesselId,
         year: currentYear,
         lastSequence: 1,
-      });
+      }).returning();
       nextSeq = 1;
+      // Sync field logging — INSERT
+      try { await logFieldChanges('defect_sequences', String(seqResult[0].id), vesselId, null, seqResult[0], 'system'); } catch (e) { console.error('[FieldLogger] defect_sequences create:', e); }
     } else {
       // Increment existing sequence
       nextSeq = existingSeq[0].lastSequence + 1;
+      const oldSeq = { ...existingSeq[0] };
       await db.update(defectSequences)
         .set({ lastSequence: nextSeq })
         .where(and(
           eq(defectSequences.vesselId, vesselId),
           eq(defectSequences.year, currentYear)
         ));
+      // Sync field logging — UPDATE
+      try { await logFieldChanges('defect_sequences', String(existingSeq[0].id), vesselId, oldSeq, { ...oldSeq, lastSequence: nextSeq }, 'system'); } catch (e) { console.error('[FieldLogger] defect_sequences update:', e); }
     }
     
     // Format: D{VesselCode 3 digits}-{Year 2 digits}-{Seq 4 digits}
@@ -7019,7 +7056,9 @@ export class PostgresStorage {
           .set(updateData)
           .where(eq(components.cuuid, resolvedParentId));
 
-        await tx.insert(runningHoursAudit).values(parentAuditValues);
+        const parentAuditResult = await tx.insert(runningHoursAudit).values(parentAuditValues).returning();
+        // Sync field logging — parent audit INSERT
+        try { await logFieldChanges('running_hours_audit', parentAuditResult[0].rhauuid, parentAuditResult[0].vesselId || null, null, parentAuditResult[0], userId || 'system'); } catch (e) { console.error('[FieldLogger] rha cascade parent:', e); }
 
         updatedComponents++;
         auditsCreated++;
@@ -7039,7 +7078,7 @@ export class PostgresStorage {
             })
             .where(eq(components.cuuid, inherited.cuuid));
 
-          await tx.insert(runningHoursAudit).values({
+          const inheritedAuditResult = await tx.insert(runningHoursAudit).values({
             vesselId: inherited.vesselId || 'unknown',
             componentId: inherited.cuuid,
             previousRH: inheritedCurrentRH.toString(),
@@ -7052,7 +7091,9 @@ export class PostgresStorage {
             updatedByUuid: userUuid || null,
             source: 'inherited_cascade',
             comments: `Inherited delta ${inheritedDelta} from MASTER ${parentResult[0]?.componentCode || parentResult[0]?.name}`,
-          });
+          }).returning();
+          // Sync field logging — inherited audit INSERT
+          try { await logFieldChanges('running_hours_audit', inheritedAuditResult[0].rhauuid, inherited.vesselId || null, null, inheritedAuditResult[0], userId || 'system'); } catch (e) { console.error('[FieldLogger] rha cascade inherited:', e); }
 
           updatedComponents++;
           auditsCreated++;
@@ -7084,7 +7125,7 @@ export class PostgresStorage {
           .set(childUpdateData)
           .where(eq(components.cuuid, child.cuuid));
 
-        await tx.insert(runningHoursAudit).values({
+        const childAuditResult = await tx.insert(runningHoursAudit).values({
           vesselId: child.vesselId || 'unknown',
           componentId: child.cuuid,
           previousRH: childCurrentRH.toString(),
@@ -7097,7 +7138,9 @@ export class PostgresStorage {
           updatedByUuid: userUuid || null,
           source: 'cascade',
           comments: comments,
-        });
+        }).returning();
+        // Sync field logging — structural child audit INSERT
+        try { await logFieldChanges('running_hours_audit', childAuditResult[0].rhauuid, child.vesselId || null, null, childAuditResult[0], userId || 'system'); } catch (e) { console.error('[FieldLogger] rha cascade child:', e); }
 
         updatedComponents++;
         auditsCreated++;
@@ -8326,9 +8369,13 @@ export class PostgresStorage {
         .set({ qty: data.qty })
         .where(eq(spareLocationStock.id, existing.id))
         .returning();
+      // Sync field logging — UPDATE
+      try { await logFieldChanges('spare_location_stock', result[0].slsuuid, (result[0] as any).vesselId || (data as any).vesselId || null, existing, result[0], 'system'); } catch (e) { console.error('[FieldLogger] spare_location_stock update:', e); }
       return result[0];
     } else {
       const result = await conn.insert(spareLocationStock).values(data).returning();
+      // Sync field logging — INSERT
+      try { await logFieldChanges('spare_location_stock', result[0].slsuuid, (result[0] as any).vesselId || (data as any).vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] spare_location_stock create:', e); }
       return result[0];
     }
   }
@@ -8336,20 +8383,22 @@ export class PostgresStorage {
   async updateSpareLocationStockQty(spareId: number, locationId: number, qtyChange: number): Promise<SpareLocationStock> {
     const db = await getDb();
     const existing = await this.getSpareLocationStockItem(spareId, locationId);
-    
+
     if (!existing) {
       throw new Error(`No stock record found for spare ${spareId} at location ${locationId}`);
     }
-    
+
     const newQty = existing.qty + qtyChange;
     if (newQty < 0) {
       throw new Error(`Cannot reduce stock below zero. Current: ${existing.qty}, Requested change: ${qtyChange}`);
     }
-    
+
     const result = await db.update(spareLocationStock)
       .set({ qty: newQty })
       .where(eq(spareLocationStock.id, existing.id))
       .returning();
+    // Sync field logging — UPDATE
+    try { await logFieldChanges('spare_location_stock', result[0].slsuuid, (result[0] as any).vesselId || null, existing, result[0], 'system'); } catch (e) { console.error('[FieldLogger] spare_location_stock qty update:', e); }
     return result[0];
   }
 
@@ -8459,15 +8508,20 @@ export class PostgresStorage {
   // ============= INVENTORY MANAGEMENT: TRANSACTIONS =============
 
   async createInventoryTransaction(txn: InsertInventoryTransaction, txConn?: any): Promise<InventoryTransaction> {
+    let created: InventoryTransaction;
     if (txConn) {
       const result = await txConn.insert(inventoryTransactions).values(txn).returning();
-      return result[0];
+      created = result[0];
+    } else {
+      created = await this.insertWithSequenceRepair('inventory_transactions', async () => {
+        const db = await getDb();
+        const result = await db.insert(inventoryTransactions).values(txn).returning();
+        return result[0];
+      });
     }
-    return this.insertWithSequenceRepair('inventory_transactions', async () => {
-      const db = await getDb();
-      const result = await db.insert(inventoryTransactions).values(txn).returning();
-      return result[0];
-    });
+    // Sync field logging — INSERT (best-effort, outside tx)
+    try { await logFieldChanges('inventory_transactions', created.ituuid, (created as any).vesselId || null, null, created, (txn as any).userId || 'system'); } catch (e) { console.error('[FieldLogger] inventory_transactions create:', e); }
+    return created;
   }
 
   async getInventoryTransactions(vesselId: string, options?: {

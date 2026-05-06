@@ -6,6 +6,7 @@ import * as docRepo from '../repositories/documentRepository';
 import { ObjectStorageService, parseObjectPath } from '../../../objectStorage';
 import { ValidationError, NotFoundError } from '../../shared/errors';
 import { FileSyncProcessor } from '../../sync/fileSyncProcessor';
+import { logFieldChanges } from '../../sync';
 import type { WorkOrderDocument } from '@shared/schema';
 
 const ALLOWED_FILE_TYPES = [
@@ -198,6 +199,9 @@ export async function uploadDocument(
       uploadedBy,
     });
 
+    // Sync field logging — INSERT
+    try { await logFieldChanges('work_order_documents', doc.id, vesselId, null, doc, uploadedBy || 'system'); } catch (e) { console.error('[FieldLogger] wo_documents create:', e); }
+
     // Queue file for sync (best-effort — never blocks upload)
     try {
       await FileSyncProcessor.queueFileForSync(
@@ -262,9 +266,17 @@ export async function deleteDocument(documentId: string): Promise<void> {
   }
 
   await docRepo.deleteById(documentId);
+  // Sync field logging — hard DELETE (log as soft-delete equivalent for sync)
+  try { await logFieldChanges('work_order_documents', doc.id, doc.vesselId || null, { is_deleted: false }, { is_deleted: true }, 'system'); } catch (e) { console.error('[FieldLogger] wo_documents delete:', e); }
 }
 
 export async function linkDocumentsToExecution(workOrderId: string, executionId: string): Promise<void> {
+  // Fetch existing docs before update for field logging
+  const existingDocs = await docRepo.findByWorkOrderId(workOrderId);
   await docRepo.linkExecutionId(workOrderId, executionId);
+  // Sync field logging — UPDATE (log each affected document)
+  for (const oldDoc of existingDocs) {
+    try { await logFieldChanges('work_order_documents', oldDoc.id, oldDoc.vesselId || null, oldDoc, { ...oldDoc, executionId }, 'system'); } catch (e) { console.error('[FieldLogger] wo_documents link:', e); }
+  }
   console.log(`Linked documents for WO ${workOrderId} to execution ${executionId}`);
 }
