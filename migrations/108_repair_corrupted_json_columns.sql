@@ -95,20 +95,24 @@ AND required_tools::text != 'null';
 
 --> statement-breakpoint
 
--- component_maintenance_history.spares_used (has immutability trigger — must disable first)
-ALTER TABLE component_maintenance_history DISABLE TRIGGER prevent_maintenance_history_update;
-
---> statement-breakpoint
-
-UPDATE component_maintenance_history SET spares_used = '[]'::json
-WHERE spares_used IS NOT NULL
-AND spares_used::text NOT LIKE '[%'
-AND spares_used::text NOT LIKE '{%'
-AND spares_used::text != 'null';
-
---> statement-breakpoint
-
-ALTER TABLE component_maintenance_history ENABLE TRIGGER prevent_maintenance_history_update;
+-- component_maintenance_history.spares_used (has immutability trigger — must be handled atomically)
+-- Using DO block so DISABLE + UPDATE + ENABLE execute as ONE statement (no trigger race)
+DO $$
+BEGIN
+  -- Disable immutability trigger
+  ALTER TABLE component_maintenance_history DISABLE TRIGGER prevent_maintenance_history_update;
+  -- Repair corrupted JSON
+  UPDATE component_maintenance_history SET spares_used = '[]'::json
+  WHERE spares_used IS NOT NULL
+  AND spares_used::text NOT LIKE '[%'
+  AND spares_used::text NOT LIKE '{%'
+  AND spares_used::text != 'null';
+  -- Re-enable trigger
+  ALTER TABLE component_maintenance_history ENABLE TRIGGER prevent_maintenance_history_update;
+EXCEPTION WHEN OTHERS THEN
+  -- If anything fails (e.g., trigger doesn't exist yet, table empty), re-enable and continue
+  ALTER TABLE component_maintenance_history ENABLE TRIGGER prevent_maintenance_history_update;
+END $$;
 
 --> statement-breakpoint
 
