@@ -95,12 +95,20 @@ AND required_tools::text != 'null';
 
 --> statement-breakpoint
 
--- component_maintenance_history.spares_used
+-- component_maintenance_history.spares_used (has immutability trigger — must disable first)
+ALTER TABLE component_maintenance_history DISABLE TRIGGER prevent_maintenance_history_update;
+
+--> statement-breakpoint
+
 UPDATE component_maintenance_history SET spares_used = '[]'::json
 WHERE spares_used IS NOT NULL
 AND spares_used::text NOT LIKE '[%'
 AND spares_used::text NOT LIKE '{%'
 AND spares_used::text != 'null';
+
+--> statement-breakpoint
+
+ALTER TABLE component_maintenance_history ENABLE TRIGGER prevent_maintenance_history_update;
 
 --> statement-breakpoint
 
