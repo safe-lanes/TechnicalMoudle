@@ -324,12 +324,10 @@ export default function ApprovalWorkflow() {
               </div>
             )}
             {APPROVAL_MODULES.map((mod) => {
+              if (isSearching && mod.id !== activeModuleId) return null;
               const ModIcon = mod.icon;
               const modExpanded = isModuleExpanded(mod.id);
-              const totalLeaves = mod.subModules.reduce(
-                (sum, s) => sum + s.functions.length,
-                0
-              );
+              const subModuleCount = mod.subModules.length;
               return (
                 <div
                   key={mod.id}
@@ -352,13 +350,14 @@ export default function ApprovalWorkflow() {
                     <ModIcon className="h-4 w-4 flex-shrink-0 text-[#52baf3]" />
                     <span className="truncate flex-1">{mod.title}</span>
                     <span className="text-[11px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 rounded-full px-1.5 py-0.5 min-w-[20px] text-center flex-shrink-0">
-                      {totalLeaves}
+                      {subModuleCount}
                     </span>
                   </div>
 
                   {modExpanded && (
                     <div className="bg-gray-50/40 dark:bg-gray-800/20">
                       {mod.subModules.map((sub) => {
+                        if (isSearching && !matchedSubModuleIds?.has(sub.id)) return null;
                         const SubIcon = sub.icon;
                         const subExpanded = isSubModuleExpanded(sub.id);
                         return (
