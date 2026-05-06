@@ -264,3 +264,181 @@ function buildInsertParts(
 
   return { columns, placeholders, values };
 }
+
+// ════════════════════════════════════════════════════════════════════════════════
+// FIELD LOG INSERT APPLIER — Handles INSERT for new BOTH_EDITABLE rows via field logs
+// ════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Field log entry structure (as received from push/pull).
+ */
+export interface FieldLogEntry {
+  tableName: string;
+  rowUuid: string;
+  fieldName: string;
+  oldValue: string | null;
+  newValue: string | null;
+  vesselId?: string | null;
+  changedAt?: string | Date;
+  changedByUserId?: string | null;
+  instanceId?: string;
+}
+
+/**
+ * Apply a batch of field logs, handling both INSERT (new rows) and UPDATE (existing fields).
+ *
+ * Logic:
+ * - Group field logs by (tableName, rowUuid)
+ * - If ALL logs in a group have oldValue === null → it's an INSERT
+ *   - Check if row already exists (idempotency)
+ *   - If not: build INSERT INTO ... ON CONFLICT DO NOTHING
+ * - Otherwise → individual UPDATE per field (existing behavior, delegated to caller)
+ *
+ * Returns:
+ * - insertedRows: count of new rows inserted
+ * - updateLogs: field logs that need UPDATE (not part of an INSERT group)
+ * - errors: any errors during INSERT
+ */
+export async function applyFieldLogInserts(
+  fieldLogs: FieldLogEntry[]
+): Promise<{
+  insertedRows: number;
+  updateLogs: FieldLogEntry[];
+  errors: string[];
+}> {
+  if (fieldLogs.length === 0) {
+    return { insertedRows: 0, updateLogs: [], errors: [] };
+  }
+
+  const pool = await getPool();
+  let insertedRows = 0;
+  const updateLogs: FieldLogEntry[] = [];
+  const errors: string[] = [];
+
+  // 1. Group by (tableName, rowUuid)
+  const groups = new Map<string, FieldLogEntry[]>();
+  for (const log of fieldLogs) {
+    const key = `${log.tableName}::${log.rowUuid}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(log);
+  }
+
+  // 2. Classify each group as INSERT or UPDATE
+  const groupKeys = Array.from(groups.keys());
+  for (const groupKey of groupKeys) {
+    const logs = groups.get(groupKey)!;
+    const isInsertGroup = logs.every((l: FieldLogEntry) => l.oldValue === null);
+
+    if (!isInsertGroup) {
+      // Standard UPDATE — pass back to caller for per-field application
+      updateLogs.push(...logs);
+      continue;
+    }
+
+    // INSERT group — all oldValues are null → new row
+    const tableName = logs[0].tableName;
+    const rowUuid = logs[0].rowUuid;
+
+    const config = getTableSyncConfig(tableName);
+    if (!config) {
+      errors.push(`${tableName}: unknown table`);
+      updateLogs.push(...logs); // fallback to UPDATE attempt
+      continue;
+    }
+
+    const identityCol = config.identityColumn || 'id';
+
+    try {
+      // Idempotency check — does row already exist?
+      const existCheck = await pool.query(
+        `SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+        [rowUuid]
+      );
+
+      if (existCheck.rows.length > 0) {
+        // Row exists — treat as UPDATE (maybe a re-sync or partial previous apply)
+        updateLogs.push(...logs);
+        continue;
+      }
+
+      // Build the row object from field logs
+      const meta = await getColumnMeta(pool, tableName);
+      const rowData: Record<string, any> = {};
+
+      // Set identity column
+      rowData[identityCol] = rowUuid;
+
+      // Set vessel_id if available from logs and config requires it
+      if (config.vesselScopeColumn && logs[0].vesselId) {
+        rowData[config.vesselScopeColumn] = logs[0].vesselId;
+      }
+
+      // Set all logged fields
+      for (const log of logs) {
+        const snakeField = toSnakeCase(log.fieldName);
+
+        // Skip GENERATED ALWAYS columns
+        if (meta.identityAlwaysCols.has(snakeField)) continue;
+
+        // JSON coercion
+        let value: any = log.newValue;
+        if (value !== null && meta.jsonCols.has(snakeField)) {
+          try {
+            JSON.parse(value);
+            // Valid JSON string — use as-is
+          } catch {
+            value = '[]'; // Corrupted → reset
+          }
+        }
+
+        rowData[snakeField] = value;
+      }
+
+      // Add timestamps
+      if (!rowData['created_at']) rowData['created_at'] = new Date();
+      if (!rowData['updated_at']) rowData['updated_at'] = new Date();
+
+      // Build INSERT statement
+      const columns: string[] = [];
+      const placeholders: string[] = [];
+      const values: any[] = [];
+      let paramIdx = 1;
+
+      for (const [col, val] of Object.entries(rowData)) {
+        // Skip GENERATED ALWAYS columns
+        if (meta.identityAlwaysCols.has(col)) continue;
+
+        columns.push(`"${col}"`);
+        placeholders.push(`$${paramIdx}`);
+        // Coerce value for correct pg type
+        if (val !== null && meta.jsonCols.has(col)) {
+          // Already handled above, pass as-is
+          values.push(val);
+        } else if (val instanceof Date) {
+          values.push(val);
+        } else {
+          values.push(val);
+        }
+        paramIdx++;
+      }
+
+      if (columns.length === 0) {
+        errors.push(`${tableName}.${rowUuid}: no columns to insert`);
+        continue;
+      }
+
+      const insertSQL = `INSERT INTO "${tableName}" (${columns.join(', ')}) VALUES (${placeholders.join(', ')}) ON CONFLICT ("${identityCol}") DO NOTHING`;
+
+      await pool.query(insertSQL, values);
+      insertedRows++;
+      console.log(`[FieldLogInsert] Inserted new row ${tableName}.${rowUuid} (${columns.length} columns)`);
+    } catch (err: any) {
+      errors.push(`${tableName}.${rowUuid}: ${err.message}`);
+      console.error(`[FieldLogInsert] Failed to insert ${tableName}.${rowUuid}:`, err.message);
+      // Fallback: don't push to updateLogs because the row doesn't exist
+      // — UPDATE would also fail. Just log the error.
+    }
+  }
+
+  return { insertedRows, updateLogs, errors };
+}

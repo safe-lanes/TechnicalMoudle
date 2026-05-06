@@ -11,7 +11,7 @@
  */
 
 import * as repo from './repository';
-import { applyOneWayRows, getColumnMeta } from './oneWayApplier';
+import { applyOneWayRows, getColumnMeta, applyFieldLogInserts } from './oneWayApplier';
 import {
   getTableSyncConfig,
   getTablesByCategory,
@@ -156,8 +156,18 @@ export async function receivePushData(
       //    Without this step, field logs are stored for conflict detection but the actual
       //    tables (work_orders, spares, stores, etc.) never get updated.
       //    Mirrors applyFieldLog() in syncEngine.ts.
+
+      // Phase 1: Detect INSERT groups (all oldValue=null) and insert new rows
+      const insertResult = await applyFieldLogInserts(acceptedLogs);
+      fieldLogsApplied += insertResult.insertedRows;
+      fieldLogApplyErrors += insertResult.errors.length;
+      if (insertResult.errors.length > 0) {
+        insertResult.errors.forEach(e => console.error(`[Sync Push] INSERT error: ${e}`));
+      }
+
+      // Phase 2: Apply remaining UPDATE field logs (non-INSERT groups + existing rows)
       const pool = await getPool();
-      for (const log of acceptedLogs) {
+      for (const log of insertResult.updateLogs) {
         const config = getTableSyncConfig(log.tableName);
         if (!config) continue;
         const identityCol = config.identityColumn || 'id';

@@ -23,7 +23,7 @@
  */
 
 import * as syncRepo from './repository';
-import { applyOneWayRows, getColumnMeta } from './oneWayApplier';
+import { applyOneWayRows, getColumnMeta, applyFieldLogInserts } from './oneWayApplier';
 import { FileSyncProcessor } from './fileSyncProcessor';
 import {
   getTablesByCategory,
@@ -393,9 +393,18 @@ export class SyncEngine {
       }
     }
 
-    // C. Apply BOTH_EDITABLE field logs (merge individual fields)
+    // C. Apply BOTH_EDITABLE field logs (INSERT new rows + UPDATE existing fields)
     if (pullData.fieldLogs && pullData.fieldLogs.length > 0) {
-      for (const log of pullData.fieldLogs) {
+      // Phase 1: Detect INSERT groups (all oldValue=null) and insert new rows
+      const insertResult = await applyFieldLogInserts(pullData.fieldLogs);
+      totalPulled += insertResult.insertedRows;
+      if (insertResult.errors.length > 0) {
+        totalApplyErrors += insertResult.errors.length;
+        allErrors.push(...insertResult.errors);
+      }
+
+      // Phase 2: Apply remaining UPDATE field logs (non-INSERT groups + existing rows)
+      for (const log of insertResult.updateLogs) {
         try {
           await this.applyFieldLog(log);
           totalPulled++;
