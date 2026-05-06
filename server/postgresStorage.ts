@@ -207,7 +207,7 @@ import {
   type AdmMenumasterAc,
   type AdmRoleMenuAccess,
 } from '@shared/schema';
-import { logFieldChanges, logSoftDelete } from './modules/sync';
+import { logFieldChanges, logSoftDelete, FileSyncProcessor } from './modules/sync';
 
 /**
  * PostgreSQL Storage Implementation
@@ -4654,9 +4654,14 @@ export class PostgresStorage {
   async createDefectAttachment(attachment: InsertDefectAttachment): Promise<DefectAttachment> {
     const db = await getDb();
     const result = await db.insert(defectAttachments).values(attachment).returning();
+    const created = result[0];
     // Sync field logging — INSERT
-    try { await logFieldChanges('defect_attachments', result[0].datuuid, null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defectAttachment create:', e); }
-    return result[0];
+    try { await logFieldChanges('defect_attachments', created.datuuid, null, null, created, 'system'); } catch (e) { console.error('[FieldLogger] defectAttachment create:', e); }
+    // Queue binary file for sync if stored locally (not base64 data URIs or external URLs)
+    if (created.url && (created.url.startsWith('local://') || created.url.startsWith('.private/'))) {
+      try { await FileSyncProcessor.queueFileForSync('defect_attachments', created.datuuid, created.url, created.filename, null, null); } catch (e) { console.error('[FileSyncQueue] defectAttachment:', e); }
+    }
+    return created;
   }
 
   async deleteDefectAttachment(id: number): Promise<void> {
@@ -5783,9 +5788,14 @@ export class PostgresStorage {
   async createChangeRequestAttachment(attachment: InsertChangeRequestAttachment): Promise<ChangeRequestAttachment> {
     const db = await getDb();
     const result = await db.insert(changeRequestAttachment).values(attachment).returning();
+    const created = result[0];
     // Sync field logging — INSERT
-    try { await logFieldChanges('change_request_attachment', result[0].crauuid, null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] CRAttach create:', e); }
-    return result[0];
+    try { await logFieldChanges('change_request_attachment', created.crauuid, null, null, created, 'system'); } catch (e) { console.error('[FieldLogger] CRAttach create:', e); }
+    // Queue binary file for sync if stored locally (not base64 data URIs or external URLs)
+    if (created.url && (created.url.startsWith('local://') || created.url.startsWith('.private/'))) {
+      try { await FileSyncProcessor.queueFileForSync('change_request_attachment', created.crauuid, created.url, created.filename, null, null); } catch (e) { console.error('[FileSyncQueue] CRAttach:', e); }
+    }
+    return created;
   }
 
   // ============= MODULE 12: CHANGE REQUEST COMMENTS =============

@@ -17,9 +17,11 @@
  * - work_order_documents  — fileKey + storageBackend ('local' | 'object')
  * - component_documents   — fileKey + storageBackend ('local' | 'object')
  *
- * Tables with URL references only (no binary sync needed):
- * - defect_attachments    — url column (synced via field logging)
- * - change_request_attachment — url column (synced via field logging)
+ * Tables with URL references (synced via field logging, binary sync if local://):
+ * - defect_attachments    — url column (base64 data URI or local:// path)
+ * - change_request_attachment — url column (base64 data URI or local:// path)
+ *
+ * Storage dirs per table mapped via getStorageDir() helper.
  *
  * Priority: Small files (<100KB) first, then by creation date
  */
@@ -36,6 +38,18 @@ const TEMP_DIR = path.resolve(process.cwd(), '.private', 'sync-temp');
 // Storage base directories (match the app's conventions)
 const WO_DOCS_DIR = path.resolve(process.cwd(), '.private', 'wo-docs');
 const COMPONENT_DOCS_DIR = path.resolve(process.cwd(), '.private', 'component-docs');
+const DEFECT_DOCS_DIR = path.resolve(process.cwd(), '.private', 'defect-docs');
+const CR_DOCS_DIR = path.resolve(process.cwd(), '.private', 'cr-docs');
+
+/** Resolve table name to its local file storage directory */
+function getStorageDir(tableName: string): string {
+  switch (tableName) {
+    case 'component_documents': return COMPONENT_DOCS_DIR;
+    case 'defect_attachments':  return DEFECT_DOCS_DIR;
+    case 'change_request_attachment': return CR_DOCS_DIR;
+    default: return WO_DOCS_DIR; // work_order_documents and fallback
+  }
+}
 
 export interface FileChunk {
   queueUuid: string;
@@ -258,8 +272,7 @@ export class FileSyncProcessor {
     // WO docs use local:// prefix for local storage
     if (fileKey.startsWith('local://')) {
       const relativePath = fileKey.replace('local://', '');
-      const baseDir =
-        tableName === 'component_documents' ? COMPONENT_DOCS_DIR : WO_DOCS_DIR;
+      const baseDir = getStorageDir(tableName);
       const fullPath = path.join(baseDir, relativePath);
       if (fs.existsSync(fullPath)) {
         return fs.readFileSync(fullPath);
@@ -267,10 +280,8 @@ export class FileSyncProcessor {
     }
 
     // Try as a plain relative key under the appropriate directory
-    const dirs = [WO_DOCS_DIR, COMPONENT_DOCS_DIR];
-    if (tableName === 'component_documents') {
-      dirs.reverse(); // Check component dir first
-    }
+    const primaryDir = getStorageDir(tableName);
+    const dirs = [primaryDir, ...[WO_DOCS_DIR, COMPONENT_DOCS_DIR, DEFECT_DOCS_DIR, CR_DOCS_DIR].filter(d => d !== primaryDir)];
 
     for (const dir of dirs) {
       const fullPath = path.join(dir, fileKey);
@@ -306,13 +317,10 @@ export class FileSyncProcessor {
 
     if (fileKey.startsWith('local://')) {
       const relativePath = fileKey.replace('local://', '');
-      const baseDir =
-        tableName === 'component_documents' ? COMPONENT_DOCS_DIR : WO_DOCS_DIR;
+      const baseDir = getStorageDir(tableName);
       targetPath = path.join(baseDir, relativePath);
     } else {
-      // Default to WO docs dir unless it's a component doc
-      const baseDir =
-        tableName === 'component_documents' ? COMPONENT_DOCS_DIR : WO_DOCS_DIR;
+      const baseDir = getStorageDir(tableName);
       targetPath = path.join(baseDir, fileKey);
     }
 
@@ -388,12 +396,7 @@ export class FileSyncProcessor {
       let fileHash: string | null = null;
       try {
         const resolvedPath = fileKey.startsWith('local://')
-          ? path.join(
-              tableName === 'component_documents'
-                ? COMPONENT_DOCS_DIR
-                : WO_DOCS_DIR,
-              fileKey.replace('local://', '')
-            )
+          ? path.join(getStorageDir(tableName), fileKey.replace('local://', ''))
           : fileKey;
         if (fs.existsSync(resolvedPath)) {
           const buffer = fs.readFileSync(resolvedPath);
