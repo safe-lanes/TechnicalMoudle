@@ -164,6 +164,7 @@ export default function ApprovalWorkflow() {
   const [expandedSubModules, setExpandedSubModules] = useState<Set<string>>(
     new Set()
   );
+  const [activeModuleId, setActiveModuleId] = useState<string>("pms");
   const [selected, setSelected] = useState<SelectedLeaf | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isEditMode, setIsEditMode] = useState(false);
@@ -171,42 +172,37 @@ export default function ApprovalWorkflow() {
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const isSearching = normalizedQuery.length > 0;
 
-  const filteredModules = useMemo(() => {
-    if (!isSearching) return APPROVAL_MODULES;
-    return APPROVAL_MODULES.map((mod) => {
-      const subs = mod.subModules
-        .map((sub) => {
-          const fns = sub.functions.filter((fn) =>
-            fn.name.toLowerCase().includes(normalizedQuery)
-          );
-          return fns.length > 0 ? { ...sub, functions: fns } : null;
-        })
-        .filter((s): s is SubModuleNode => s !== null);
-      return subs.length > 0 ? { ...mod, subModules: subs } : null;
-    }).filter((m): m is ModuleNode => m !== null);
-  }, [isSearching, normalizedQuery]);
+  const matchedSubModuleIds = useMemo(() => {
+    if (!isSearching) return null;
+    const activeMod = APPROVAL_MODULES.find((m) => m.id === activeModuleId);
+    if (!activeMod) return new Set<string>();
+    const ids = new Set<string>();
+    for (const sub of activeMod.subModules) {
+      if (sub.functions.some((fn) => fn.name.toLowerCase().includes(normalizedQuery))) {
+        ids.add(sub.id);
+      }
+    }
+    return ids;
+  }, [isSearching, normalizedQuery, activeModuleId]);
 
-  const autoExpandedModuleIds = useMemo(
-    () => (isSearching ? new Set(filteredModules.map((m) => m.id)) : null),
-    [isSearching, filteredModules]
-  );
-  const autoExpandedSubModuleIds = useMemo(
-    () =>
-      isSearching
-        ? new Set(filteredModules.flatMap((m) => m.subModules.map((s) => s.id)))
-        : null,
-    [isSearching, filteredModules]
-  );
+  const isLeafVisible = (modId: string, fnName: string) => {
+    if (!isSearching) return true;
+    if (modId !== activeModuleId) return false;
+    return fnName.toLowerCase().includes(normalizedQuery);
+  };
 
-  const isModuleExpanded = (id: string) =>
-    autoExpandedModuleIds ? autoExpandedModuleIds.has(id) : expandedModules.has(id);
-  const isSubModuleExpanded = (id: string) =>
-    autoExpandedSubModuleIds
-      ? autoExpandedSubModuleIds.has(id)
-      : expandedSubModules.has(id);
+  const isModuleExpanded = (id: string) => {
+    if (isSearching) return id === activeModuleId;
+    return expandedModules.has(id);
+  };
+  const isSubModuleExpanded = (id: string) => {
+    if (isSearching) return matchedSubModuleIds?.has(id) ?? false;
+    return expandedSubModules.has(id);
+  };
 
   const toggleModule = (id: string) => {
     if (isSearching) return;
+    setActiveModuleId(id);
     setExpandedModules((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -214,8 +210,9 @@ export default function ApprovalWorkflow() {
     });
   };
 
-  const toggleSubModule = (id: string) => {
+  const toggleSubModule = (id: string, modId: string) => {
     if (isSearching) return;
+    setActiveModuleId(modId);
     setExpandedSubModules((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -307,15 +304,15 @@ export default function ApprovalWorkflow() {
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {filteredModules.length === 0 && (
+            {isSearching && (matchedSubModuleIds?.size ?? 0) === 0 && (
               <div
                 className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
                 data-testid="text-no-results"
               >
-                No matching approval functions.
+                No matching approval functions in this module.
               </div>
             )}
-            {filteredModules.map((mod) => {
+            {APPROVAL_MODULES.map((mod) => {
               const ModIcon = mod.icon;
               const modExpanded = isModuleExpanded(mod.id);
               const totalLeaves = mod.subModules.reduce(
@@ -328,7 +325,11 @@ export default function ApprovalWorkflow() {
                   data-testid={`tree-module-${mod.id}`}
                 >
                   <div
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-semibold transition-colors border-b border-gray-100 dark:border-gray-800 cursor-pointer text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-semibold transition-colors border-b border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                      activeModuleId === mod.id
+                        ? "text-blue-700 dark:text-blue-300 bg-blue-50/40 dark:bg-blue-900/10"
+                        : "text-gray-800 dark:text-gray-200"
+                    }`}
                     onClick={() => toggleModule(mod.id)}
                     data-testid={`button-toggle-module-${mod.id}`}
                   >
@@ -353,7 +354,7 @@ export default function ApprovalWorkflow() {
                           <div key={sub.id} data-testid={`tree-submodule-${sub.id}`}>
                             <div
                               className="w-full flex items-center gap-2 pl-7 pr-3 py-2 text-left text-[13px] font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 border-b border-gray-100/70 dark:border-gray-800/70"
-                              onClick={() => toggleSubModule(sub.id)}
+                              onClick={() => toggleSubModule(sub.id, mod.id)}
                               data-testid={`button-toggle-submodule-${sub.id}`}
                             >
                               {subExpanded ? (
@@ -370,7 +371,9 @@ export default function ApprovalWorkflow() {
 
                             {subExpanded && (
                               <div>
-                                {sub.functions.map((fn) => {
+                                {sub.functions
+                                  .filter((fn) => isLeafVisible(mod.id, fn.name))
+                                  .map((fn) => {
                                   const isSelected =
                                     selected?.functionId === fn.id &&
                                     selected?.subModuleId === sub.id &&
@@ -383,13 +386,14 @@ export default function ApprovalWorkflow() {
                                           ? "bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 font-medium border-l-2 border-l-blue-500"
                                           : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200"
                                       }`}
-                                      onClick={() =>
+                                      onClick={() => {
+                                        setActiveModuleId(mod.id);
                                         setSelected({
                                           moduleId: mod.id,
                                           subModuleId: sub.id,
                                           functionId: fn.id,
-                                        })
-                                      }
+                                        });
+                                      }}
                                       data-testid={`button-function-${fn.id}`}
                                     >
                                       <FileText className="h-3.5 w-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
