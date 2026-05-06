@@ -12,31 +12,40 @@
 -- guaranteed by migration 095 + ensureCertApplicabilityIndex startup invariant).
 
 -- Step 1: company-applicable masters (applicableToCompany = true OR masterId LIKE 'CMP-%')
--- get a row for every active vessel.
-INSERT INTO vessel_certificate_applicability
-  (vessel_id, vessel_name, master_id, is_applicable, is_deleted, created_at, updated_at)
-SELECT
-  v.vuuid,
-  v.name,
-  m.master_id,
-  true,
-  false,
-  NOW(),
-  NOW()
-FROM ship_certificates_master m
-CROSS JOIN vessels v
-WHERE m.is_deleted = false
-  AND m.is_active = true
-  AND v.is_active = true
-  AND (m.applicable_to_company = true OR m.master_id LIKE 'CMP-%')
-  AND NOT EXISTS (
-    SELECT 1
-    FROM vessel_certificate_applicability vca
-    WHERE vca.vessel_id = v.vuuid
-      AND vca.master_id = m.master_id
-      AND (vca.is_deleted = false OR vca.is_deleted IS NULL)
-  )
-ON CONFLICT (vessel_id, master_id) WHERE is_deleted = false DO NOTHING;
+-- get a row for every active vessel. Wrap in a DO block so we can capture
+-- and log the inserted row count for operator visibility.
+DO $$
+DECLARE
+  inserted_count INTEGER;
+BEGIN
+  INSERT INTO vessel_certificate_applicability
+    (vessel_id, vessel_name, master_id, is_applicable, is_deleted, created_at, updated_at)
+  SELECT
+    v.vuuid,
+    v.name,
+    m.master_id,
+    true,
+    false,
+    NOW(),
+    NOW()
+  FROM ship_certificates_master m
+  CROSS JOIN vessels v
+  WHERE m.is_deleted = false
+    AND m.is_active = true
+    AND v.is_active = true
+    AND (m.applicable_to_company = true OR m.master_id LIKE 'CMP-%')
+    AND NOT EXISTS (
+      SELECT 1
+      FROM vessel_certificate_applicability vca
+      WHERE vca.vessel_id = v.vuuid
+        AND vca.master_id = m.master_id
+        AND (vca.is_deleted = false OR vca.is_deleted IS NULL)
+    )
+  ON CONFLICT (vessel_id, master_id) WHERE is_deleted = false DO NOTHING;
+
+  GET DIAGNOSTICS inserted_count = ROW_COUNT;
+  RAISE NOTICE '[migration 109] Backfilled % company-applicable applicability row(s).', inserted_count;
+END $$;
 
 -- Step 2: log VES-* (vessel-specific) masters that have no applicability rows at all.
 -- These were created with targetVessels at the time, so we cannot CROSS JOIN safely

@@ -134,36 +134,48 @@ export async function ensureCertApplicabilityIndex(): Promise<void> {
 
     if (!existedBefore) {
       console.warn(
-        '⚠️  Missing uniq_vessel_certificate_applicability_live — repairing now. ' +
-        'This means migration 095 did not apply cleanly on this database. ' +
-        'Cleaning up duplicate live rows before creating the index.'
+        '⚠️  Missing uniq_vessel_certificate_applicability_live — attempting to create. ' +
+        'This means migration 095 did not apply cleanly on this database.'
       );
-
-      await db.execute(sql`
-        DELETE FROM vessel_certificate_applicability AS vca
-        USING (
-          SELECT id
-          FROM (
-            SELECT
-              id,
-              ROW_NUMBER() OVER (
-                PARTITION BY vessel_id, master_id
-                ORDER BY updated_at DESC NULLS LAST, id DESC
-              ) AS rn
-            FROM vessel_certificate_applicability
-            WHERE is_deleted = false OR is_deleted IS NULL
-          ) ranked
-          WHERE ranked.rn > 1
-        ) dup
-        WHERE vca.id = dup.id
-      `);
     }
 
-    await db.execute(sql`
-      CREATE UNIQUE INDEX IF NOT EXISTS uniq_vessel_certificate_applicability_live
-        ON vessel_certificate_applicability (vessel_id, master_id)
+    // Attempt CREATE UNIQUE INDEX IF NOT EXISTS. If duplicate live rows
+    // exist (Postgres error 23505 during index build) we deliberately do NOT
+    // auto-delete them — silent dedupe risks data loss. Instead, surface the
+    // offending (vessel_id, master_id) pairs for an operator to reconcile.
+    try {
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS uniq_vessel_certificate_applicability_live
+          ON vessel_certificate_applicability (vessel_id, master_id)
+          WHERE is_deleted = false
+      `);
+    } catch (createErr: any) {
+      // 23505 / 42P07-style failures usually mean duplicate live rows.
+      const dupes = await db.execute(sql`
+        SELECT vessel_id, master_id, COUNT(*)::int AS live_count,
+               ARRAY_AGG(id ORDER BY updated_at DESC NULLS LAST, id DESC) AS row_ids
+        FROM vessel_certificate_applicability
         WHERE is_deleted = false
-    `);
+        GROUP BY vessel_id, master_id
+        HAVING COUNT(*) > 1
+        ORDER BY live_count DESC
+        LIMIT 25
+      `);
+      const dupRows = dupes.rows as any[];
+      if (dupRows.length > 0) {
+        const summary = dupRows
+          .map(r => `(vessel_id=${r.vessel_id}, master_id=${r.master_id}, live_count=${r.live_count}, ids=[${r.row_ids}])`)
+          .join('\n  ');
+        throw new Error(
+          `Cannot create uniq_vessel_certificate_applicability_live: ${dupRows.length}+ duplicate live (vessel_id, master_id) groups exist. ` +
+          `Operator must reconcile these manually (soft-delete the obsolete row in each group) before the server can start. ` +
+          `Top duplicate groups (limit 25):\n  ${summary}\n` +
+          `Original CREATE INDEX error: ${createErr.message}`
+        );
+      }
+      // Not a duplicate-row failure — re-raise.
+      throw createErr;
+    }
 
     const verify = await db.execute(sql`
       SELECT 1 FROM pg_indexes
@@ -180,7 +192,7 @@ export async function ensureCertApplicabilityIndex(): Promise<void> {
     if (existedBefore) {
       console.log('✅ uniq_vessel_certificate_applicability_live verified');
     } else {
-      console.log('✅ uniq_vessel_certificate_applicability_live repaired and verified');
+      console.log('✅ uniq_vessel_certificate_applicability_live created and verified');
     }
   } catch (error: any) {
     throw new Error(
