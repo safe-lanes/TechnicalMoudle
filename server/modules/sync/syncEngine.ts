@@ -139,7 +139,8 @@ export class SyncEngine {
       // Step 2: PUSH — Send local changes to shore
       const pushResult = await this.executePush(batchUuid!, vesselId, lastCheckpoint);
       recordsPushed = pushResult.totalPushed;
-      console.log(`[SyncEngine] Pushed ${recordsPushed} records`);
+      const pushedLogUuids = pushResult.pushedLogUuids;
+      console.log(`[SyncEngine] Pushed ${recordsPushed} records (${pushedLogUuids.length} field logs)`);
 
       // Step 3: PULL — Get shore's changes
       const pullResult = await this.executePull(batchUuid!, vesselId, lastCheckpoint);
@@ -159,6 +160,20 @@ export class SyncEngine {
         instanceId: this.instanceId,
       });
       console.log(`[SyncEngine] Sync completed. Checkpoint: ${completeResult.newCheckpoint}`);
+
+      // Step 4b: Mark local field logs as synced.
+      // In remote mode, completeSyncSession marks logs in SHORE's DB but the ship's
+      // local DB still has them as is_synced=false. Without this step, the same logs
+      // would be re-pushed on the next sync cycle, overwriting newer shore values.
+      if (pushedLogUuids.length > 0) {
+        try {
+          await syncRepo.markFieldLogsSynced(pushedLogUuids, batchUuid!);
+          console.log(`[SyncEngine] Marked ${pushedLogUuids.length} local field logs as synced`);
+        } catch (markErr: any) {
+          // Non-fatal: worst case, logs will be re-pushed next cycle (duplicate but not data loss)
+          console.warn(`[SyncEngine] Failed to mark local logs as synced: ${markErr.message}`);
+        }
+      }
 
       // Step 5: Process file queue (after field data is synced)
       let filesProcessedCount = 0;
@@ -242,7 +257,7 @@ export class SyncEngine {
     batchUuid: string,
     vesselId: string,
     lastCheckpoint: Date | null
-  ): Promise<{ totalPushed: number }> {
+  ): Promise<{ totalPushed: number; pushedLogUuids: string[] }> {
     let totalPushed = 0;
 
     // A. Gather SHIP_ONLY rows changed since checkpoint (only from ship instances)
@@ -264,6 +279,8 @@ export class SyncEngine {
 
     // B. Gather BOTH_EDITABLE field logs (unsynced, from this instance)
     const fieldLogs = await syncRepo.getUnsyncedFieldLogs(this.instanceId, vesselId);
+    // Capture logUuids so the caller can mark them as synced after COMPLETE succeeds
+    const pushedLogUuids = fieldLogs.map(l => l.logUuid);
 
     // C. Send in chunks
     const fieldLogPayloads = fieldLogs.map(log => ({
@@ -299,7 +316,7 @@ export class SyncEngine {
       });
     }
 
-    return { totalPushed };
+    return { totalPushed, pushedLogUuids };
   }
 
   // ═══════════════════════════════════════════════════════════════

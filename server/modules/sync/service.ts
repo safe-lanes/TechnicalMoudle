@@ -166,6 +166,9 @@ export async function receivePushData(
       }
 
       // Phase 2: Apply remaining UPDATE field logs (non-INSERT groups + existing rows)
+      // Defence: skip stale logs where local row was updated MORE RECENTLY than the
+      // incoming changedAt.  This prevents re-pushed (duplicate) field logs from
+      // reverting newer shore edits.  A per-row query is unavoidable but cheap.
       const pool = await getPool();
       for (const log of insertResult.updateLogs) {
         const config = getTableSyncConfig(log.tableName);
@@ -174,6 +177,26 @@ export async function receivePushData(
         const fieldNameSnake = toSnakeCase(log.fieldName);
 
         try {
+          // Stale-log guard: only apply if the incoming change is at least as new as
+          // the row's current updated_at.  This prevents old re-pushed logs from
+          // overwriting newer local edits (e.g., category revert scenario).
+          const logChangedAt = log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt));
+          const freshCheck = await pool.query(
+            `SELECT "updated_at" FROM "${log.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+            [log.rowUuid]
+          );
+          if (freshCheck.rows.length > 0) {
+            const localUpdatedAt = new Date(freshCheck.rows[0].updated_at);
+            if (logChangedAt < localUpdatedAt) {
+              // Incoming log is older than local row — skip to prevent stale overwrite
+              console.log(
+                `[Sync Push] Skipping stale field log ${log.tableName}.${log.fieldName} for ${log.rowUuid} ` +
+                `(log ${logChangedAt.toISOString()} < row ${localUpdatedAt.toISOString()})`
+              );
+              continue;
+            }
+          }
+
           // JSON coercion for json/jsonb columns
           const meta = await getColumnMeta(pool, log.tableName);
           let valueToApply: any = log.newValue;

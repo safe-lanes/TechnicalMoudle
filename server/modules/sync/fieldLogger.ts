@@ -22,12 +22,16 @@ import { getDb } from '../../db';
 import { syncFieldLog } from '../../../shared/schema';
 import { requiresFieldLogging } from '../../../shared/syncConfig';
 
-// Fields to NEVER log — these are meta fields managed by the system, not user data
+// Fields to NEVER log — these are meta fields managed by the system, not user data.
+// NOTE: 'id' was previously skipped here (assumed to be an integer auto-PK).
+// Many BOTH_EDITABLE tables have text PK 'id' (defects, work_orders, work_order_executions,
+// work_order_documents, work_order_postponements, etc.) — those values are essential for
+// INSERT replication via applyFieldLogInserts(). For tables with GENERATED ALWAYS integer id,
+// the column is already filtered out by getColumnMeta().identityAlwaysCols in oneWayApplier.
 const SKIP_FIELDS = new Set([
   'updated_at', 'updatedAt',
   'created_at', 'createdAt',
   'is_sync', 'isSync',
-  'id', // integer PK — not meaningful for sync
 ]);
 
 /**
