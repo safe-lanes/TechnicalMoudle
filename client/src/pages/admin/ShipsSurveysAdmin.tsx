@@ -1952,17 +1952,11 @@ export default function ShipsSurveysAdmin() {
                       return (
                         <tr key={`vessel-only-${survey.id}`} className="hover:bg-gray-50 bg-green-50">
                           <td className="px-3 py-3 text-center">
-                            <Checkbox 
-                              checked={survey.applicable}
-                              onCheckedChange={(checked) => {
-                                if (viewModes.vessel === "edit") {
-                                  setVesselOnlySurveys(prev => prev.map(s => 
-                                    s.id === survey.id ? { ...s, applicable: !!checked } : s
-                                  ));
-                                }
-                              }}
-                              disabled={viewModes.vessel !== "edit"}
-                              className="border-blue-500 data-[state=checked]:bg-blue-500"
+                            <Checkbox
+                              checked
+                              disabled
+                              title="Vessel-added surveys are always applicable to the vessel they were added to."
+                              className="border-blue-500 bg-blue-500 data-[state=checked]:bg-blue-500"
                               data-testid={`checkbox-vessel-only-applicable-${survey.id}`}
                             />
                           </td>
