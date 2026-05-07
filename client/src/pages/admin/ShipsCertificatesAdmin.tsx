@@ -2312,6 +2312,7 @@ export default function ShipsCertificatesAdmin() {
                 {/* Vessel-only certificates (not from Company) — filtered by vessel applicability */}
                 {selectedVessels.length > 0 && vesselOnlyCerts.filter(cert => {
                   if (cert.id >= 2000) return true;
+                  if (viewModes.vessel === "edit") return true;
                   const vesselIds = getSelectedVesselIds();
                   return vesselIds.some(vesselId =>
                     vesselApplicabilityData.some((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId)
