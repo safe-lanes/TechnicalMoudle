@@ -348,6 +348,10 @@ export async function applyFieldLogInserts(
 
     const identityCol = config.identityColumn || 'id';
 
+    // Hoist meta + rowData so they're accessible in the catch block for conflict resolution
+    let meta: Awaited<ReturnType<typeof getColumnMeta>> | null = null;
+    let rowData: Record<string, any> = {};
+
     try {
       // Idempotency check — does row already exist?
       const existCheck = await pool.query(
@@ -362,8 +366,8 @@ export async function applyFieldLogInserts(
       }
 
       // Build the row object from field logs
-      const meta = await getColumnMeta(pool, tableName);
-      const rowData: Record<string, any> = {};
+      meta = await getColumnMeta(pool, tableName);
+      rowData = {};
 
       // Set identity column
       rowData[identityCol] = rowUuid;
@@ -433,10 +437,118 @@ export async function applyFieldLogInserts(
       insertedRows++;
       console.log(`[FieldLogInsert] Inserted new row ${tableName}.${rowUuid} (${columns.length} columns)`);
     } catch (err: any) {
-      errors.push(`${tableName}.${rowUuid}: ${err.message}`);
-      console.error(`[FieldLogInsert] Failed to insert ${tableName}.${rowUuid}:`, err.message);
-      // Fallback: don't push to updateLogs because the row doesn't exist
-      // — UPDATE would also fail. Just log the error.
+      // 23505 = unique_violation — another unique constraint (not the identity column)
+      // was violated. This happens when both ship and shore independently created rows
+      // for the same logical entity (e.g., same vessel_id + master_id in vessel_certificate_data).
+      // Fallback: find the conflicting row and apply updates to it.
+      if (err.code === '23505') {
+        console.warn(
+          `[FieldLogInsert] Unique constraint hit for ${tableName}.${rowUuid} — ` +
+          `falling back to field-level UPDATE (constraint: ${err.constraint || 'unknown'})`
+        );
+        try {
+          // Ensure meta is available for the fallback path
+          if (!meta) meta = await getColumnMeta(pool, tableName);
+
+          // Apply each field log as an UPDATE against the existing row.
+          // Since we don't know the conflicting row's identity column value,
+          // query for it using fields we know are part of the row.
+          const vesselScopeCol = config.vesselScopeColumn;
+          const vesselIdVal = logs[0].vesselId;
+
+          // Try to find the existing row by querying with vessel scope + non-null fields
+          // that are likely part of the unique constraint
+          let existingIdentity: string | null = null;
+          if (vesselScopeCol && vesselIdVal) {
+            // Build a lookup query using unique-looking fields from the rowData
+            const lookupResult = await pool.query(
+              `SELECT "${identityCol}" FROM "${tableName}" WHERE "${vesselScopeCol}" = $1 LIMIT 2`,
+              [vesselIdVal]
+            );
+            // If exactly 1 row matches, use it. Otherwise try a more specific query.
+            if (lookupResult.rows.length === 1) {
+              existingIdentity = lookupResult.rows[0][identityCol];
+            } else {
+              // For tables with composite unique keys (e.g., vessel_id + master_id),
+              // use all available non-null fields from rowData for the lookup
+              const lookupCols: string[] = [];
+              const lookupVals: any[] = [];
+              let pIdx = 1;
+              for (const [col, val] of Object.entries(rowData)) {
+                if (col === identityCol || val === null || val === undefined) continue;
+                if (['created_at', 'updated_at'].includes(col)) continue;
+                lookupCols.push(`"${col}" = $${pIdx}`);
+                lookupVals.push(val);
+                pIdx++;
+                if (pIdx > 5) break; // Limit to 5 columns for lookup efficiency
+              }
+              if (lookupCols.length > 0) {
+                const lookupSQL = `SELECT "${identityCol}" FROM "${tableName}" WHERE ${lookupCols.join(' AND ')} LIMIT 1`;
+                const specificResult = await pool.query(lookupSQL, lookupVals);
+                if (specificResult.rows.length > 0) {
+                  existingIdentity = specificResult.rows[0][identityCol];
+                }
+              }
+            }
+          }
+
+          if (existingIdentity) {
+            // Apply field-level updates to the existing row
+            let fieldsApplied = 0;
+            for (const log of logs) {
+              const fieldSnake = toSnakeCase(log.fieldName);
+              if (fieldSnake === identityCol || fieldSnake === 'created_at' || fieldSnake === 'updated_at') continue;
+              if (meta.identityAlwaysCols.has(fieldSnake)) continue;
+              if (log.newValue === null) continue;
+
+              let valueToApply: any = log.newValue;
+              if (meta.jsonCols.has(fieldSnake)) {
+                try { JSON.parse(valueToApply); } catch { valueToApply = '[]'; }
+              }
+
+              try {
+                await pool.query(
+                  `UPDATE "${tableName}" SET "${fieldSnake}" = $1, "updated_at" = NOW() WHERE "${identityCol}" = $2`,
+                  [valueToApply, existingIdentity]
+                );
+                fieldsApplied++;
+              } catch (updateErr: any) {
+                // Best-effort per-field update
+                console.warn(`[FieldLogInsert] Conflict fallback UPDATE failed for ${tableName}.${fieldSnake}: ${updateErr.message}`);
+              }
+            }
+
+            // Converge identity: adopt the incoming rowUuid so future UPDATE logs
+            // from the remote instance will match this row by its identity column.
+            if (existingIdentity !== rowUuid) {
+              try {
+                await pool.query(
+                  `UPDATE "${tableName}" SET "${identityCol}" = $1 WHERE "${identityCol}" = $2`,
+                  [rowUuid, existingIdentity]
+                );
+                console.log(`[FieldLogInsert] Identity converged: ${tableName} "${identityCol}" ${existingIdentity} → ${rowUuid}`);
+              } catch (convergeErr: any) {
+                // Non-fatal — may fail if incoming rowUuid already exists (shouldn't happen)
+                console.warn(`[FieldLogInsert] Identity convergence failed for ${tableName}: ${convergeErr.message}`);
+              }
+            }
+
+            if (fieldsApplied > 0) {
+              insertedRows++; // Count as successfully synced
+              console.log(`[FieldLogInsert] Conflict resolved: updated ${fieldsApplied} fields on existing ${tableName} row (identity: ${existingIdentity})`);
+            }
+          } else {
+            // Could not find conflicting row — log as error
+            errors.push(`${tableName}.${rowUuid}: unique constraint conflict but could not find existing row`);
+          }
+        } catch (fallbackErr: any) {
+          errors.push(`${tableName}.${rowUuid}: conflict fallback failed: ${fallbackErr.message}`);
+          console.error(`[FieldLogInsert] Conflict fallback error for ${tableName}.${rowUuid}:`, fallbackErr.message);
+        }
+      } else {
+        errors.push(`${tableName}.${rowUuid}: ${err.message}`);
+        console.error(`[FieldLogInsert] Failed to insert ${tableName}.${rowUuid}:`, err.message);
+      }
     }
   }
 
