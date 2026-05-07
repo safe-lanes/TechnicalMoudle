@@ -92,6 +92,27 @@ export class SyncEngine {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // HELPER — Resolve vessel UUID → vessel_code (cached)
+  // ═══════════════════════════════════════════════════════════════
+  private vesselCodeCache = new Map<string, string | null>();
+
+  private async getVesselCode(vesselId: string): Promise<string | null> {
+    if (this.vesselCodeCache.has(vesselId)) return this.vesselCodeCache.get(vesselId)!;
+    try {
+      const pool = await getPool();
+      const result = await pool.query(
+        `SELECT vessel_code FROM vessels WHERE vuuid = $1 LIMIT 1`,
+        [vesselId]
+      );
+      const code = result.rows[0]?.vessel_code || null;
+      this.vesselCodeCache.set(vesselId, code);
+      return code;
+    } catch {
+      return null;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // PUBLIC — Run a complete sync cycle
   // ═══════════════════════════════════════════════════════════════
 
@@ -278,21 +299,26 @@ export class SyncEngine {
     }
 
     // B. Gather BOTH_EDITABLE field logs (unsynced, from this instance)
-    const fieldLogs = await syncRepo.getUnsyncedFieldLogs(this.instanceId, vesselId);
+    //    Pass vesselCode so logs stored with vessel_code (for vessel_code-scoped tables) are also found
+    const vesselCode = await this.getVesselCode(vesselId);
+    const fieldLogs = await syncRepo.getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode);
     // Capture logUuids so the caller can mark them as synced after COMPLETE succeeds
-    const pushedLogUuids = fieldLogs.map(l => l.logUuid);
+    const pushedLogUuids = fieldLogs.map(l => l.logUuid ?? (l as any).log_uuid);
 
     // C. Send in chunks
-    const fieldLogPayloads = fieldLogs.map(log => ({
-      tableName: log.tableName,
-      rowUuid: log.rowUuid,
-      fieldName: log.fieldName,
-      oldValue: log.oldValue,
-      newValue: log.newValue,
-      vesselId: log.vesselId,
-      changedAt: log.changedAt instanceof Date ? log.changedAt.toISOString() : String(log.changedAt),
-      changedByUserId: log.changedByUserId,
-      instanceId: log.instanceId,
+    //    Field logs may come from raw SQL (snake_case) or Drizzle (camelCase) — handle both
+    const fieldLogPayloads = fieldLogs.map((log: any) => ({
+      tableName: log.tableName ?? log.table_name,
+      rowUuid: log.rowUuid ?? log.row_uuid,
+      fieldName: log.fieldName ?? log.field_name,
+      oldValue: log.oldValue ?? log.old_value,
+      newValue: log.newValue ?? log.new_value,
+      vesselId: log.vesselId ?? log.vessel_id,
+      changedAt: (log.changedAt ?? log.changed_at) instanceof Date
+        ? (log.changedAt ?? log.changed_at).toISOString()
+        : String(log.changedAt ?? log.changed_at),
+      changedByUserId: log.changedByUserId ?? log.changed_by_user_id,
+      instanceId: log.instanceId ?? log.instance_id,
     }));
 
     if (fieldLogPayloads.length > 0 || shipOnlyRows.length > 0) {

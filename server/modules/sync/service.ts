@@ -21,6 +21,30 @@ import { getPool } from '../../db';
 import { getTableStats } from './healthMonitor';
 
 // ═══════════════════════════════════════════════════════════════
+// HELPER — Vessel UUID ↔ vessel_code lookup
+// Some tables use vessel_code instead of vessel_id for scoping.
+// Sync queries pass vessel UUID (vuuid), so we need the code for those tables.
+// ═══════════════════════════════════════════════════════════════
+
+let vesselCodeCache = new Map<string, string | null>();
+
+async function getVesselCodeForUuid(vesselId: string): Promise<string | null> {
+  if (vesselCodeCache.has(vesselId)) return vesselCodeCache.get(vesselId)!;
+  try {
+    const pool = await getPool();
+    const result = await pool.query(
+      `SELECT vessel_code FROM vessels WHERE vuuid = $1 LIMIT 1`,
+      [vesselId]
+    );
+    const code = result.rows[0]?.vessel_code || null;
+    vesselCodeCache.set(vesselId, code);
+    return code;
+  } catch {
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // 1. INITIATE
 // ═══════════════════════════════════════════════════════════════
 
@@ -266,19 +290,26 @@ export async function preparePullData(
     );
   }
 
+  // Pre-resolve vessel_code for tables that use vessel_code scope
+  const vesselCode = await getVesselCodeForUuid(vesselId);
+
   // 1. Gather ONE_WAY_SHORE_TO_SHIP full-row snapshots
   const oneWayRows = await gatherOneWayShoreRows(vesselId, lastCheckpoint);
 
   // 2. Gather shore's BOTH_EDITABLE field logs (excluding ship's own changes)
-  const shoreFieldLogs = await repo.getFieldLogsSinceCheckpoint(
+  //    Pass vesselCode so logs stored with vessel_code (instead of UUID) are also found
+  const shoreFieldLogsRaw = await repo.getFieldLogsSinceCheckpoint(
     vesselId,
     lastCheckpoint,
-    shipInstanceId
+    shipInstanceId,
+    vesselCode
   );
+  const shoreFieldLogs = shoreFieldLogsRaw.map(normalizeFieldLog);
 
   // 3. Detect conflicts — ship pushed its field logs in step 2 (PUSH),
   //    now compare: did ship AND shore both change the same field on the same row?
-  const shipFieldLogs = await repo.getUnsyncedFieldLogs(shipInstanceId, vesselId);
+  const shipFieldLogsRaw = await repo.getUnsyncedFieldLogs(shipInstanceId, vesselId, vesselCode);
+  const shipFieldLogs = shipFieldLogsRaw.map(normalizeFieldLog);
 
   // Build lookup: tableName:rowUuid:fieldName → ship's log entry
   const shipChangeMap = new Map<string, typeof shipFieldLogs[0]>();
@@ -455,13 +486,18 @@ export async function completeSyncSession(
   const startedAt = batch.startedAt instanceof Date ? batch.startedAt : new Date(batch.startedAt);
   const durationMs = now.getTime() - startedAt.getTime();
 
+  // Pre-resolve vessel_code for dual-scope field log queries
+  const vesselCode = await getVesselCodeForUuid(vesselId);
+
   // 1. Mark all field logs sent in this session as synced
   //    - Shore's logs that were sent to ship
-  const shoreLogs = await repo.getFieldLogsSinceCheckpoint(
+  const shoreLogsRaw = await repo.getFieldLogsSinceCheckpoint(
     vesselId,
     batch.checkpointBefore,
-    instanceId // exclude ship's own
+    instanceId, // exclude ship's own
+    vesselCode
   );
+  const shoreLogs = shoreLogsRaw.map(normalizeFieldLog);
   if (shoreLogs.length > 0) {
     await repo.markFieldLogsSynced(
       shoreLogs.map(l => l.logUuid),
@@ -470,7 +506,8 @@ export async function completeSyncSession(
   }
 
   //    - Ship's logs that were received by shore
-  const shipLogs = await repo.getUnsyncedFieldLogs(instanceId, vesselId);
+  const shipLogsRaw = await repo.getUnsyncedFieldLogs(instanceId, vesselId, vesselCode);
+  const shipLogs = shipLogsRaw.map(normalizeFieldLog);
   if (shipLogs.length > 0) {
     await repo.markFieldLogsSynced(
       shipLogs.map(l => l.logUuid),
@@ -575,6 +612,9 @@ async function gatherOneWayShoreRows(
   const results: Array<{ tableName: string; rows: any[] }> = [];
   const pool = await getPool();
 
+  // Pre-resolve vessel_code for tables scoped by vessel_code instead of vessel_id (UUID)
+  const vesselCode = await getVesselCodeForUuid(vesselId);
+
   for (const config of oneWayTables) {
     try {
       let query: string;
@@ -591,13 +631,18 @@ async function gatherOneWayShoreRows(
           query = `SELECT * FROM "${config.tableName}" ORDER BY updated_at ASC LIMIT 5000`;
         }
       } else if (vesselCol) {
-        // Vessel-scoped tables
+        // Vessel-scoped tables — use vessel_code or vessel_id depending on column type
+        const scopeValue = vesselCol === 'vessel_code' ? vesselCode : vesselId;
+        if (!scopeValue) {
+          console.warn(`[Sync Pull] Skipping ${config.tableName}: no ${vesselCol} value for vessel ${vesselId}`);
+          continue;
+        }
         if (sinceCheckpoint) {
           query = `SELECT * FROM "${config.tableName}" WHERE "${vesselCol}" = $1 AND updated_at > $2 ORDER BY updated_at ASC LIMIT 5000`;
-          params.push(vesselId, sinceCheckpoint);
+          params.push(scopeValue, sinceCheckpoint);
         } else {
           query = `SELECT * FROM "${config.tableName}" WHERE "${vesselCol}" = $1 ORDER BY updated_at ASC LIMIT 5000`;
-          params.push(vesselId);
+          params.push(scopeValue);
         }
       } else {
         // Table has no vessel column and isn't global — skip
@@ -620,6 +665,27 @@ async function gatherOneWayShoreRows(
 /** Convert camelCase to snake_case */
 function toSnakeCase(str: string): string {
   return str.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+}
+
+/**
+ * Normalize a field log row from raw SQL (snake_case) to the camelCase shape
+ * that the rest of service.ts expects. Handles both Drizzle and raw SQL results.
+ */
+function normalizeFieldLog(row: any) {
+  return {
+    logUuid: row.logUuid ?? row.log_uuid,
+    tableName: row.tableName ?? row.table_name,
+    rowUuid: row.rowUuid ?? row.row_uuid,
+    fieldName: row.fieldName ?? row.field_name,
+    oldValue: row.oldValue ?? row.old_value,
+    newValue: row.newValue ?? row.new_value,
+    vesselId: row.vesselId ?? row.vessel_id,
+    changedAt: row.changedAt ?? row.changed_at,
+    changedByUserId: row.changedByUserId ?? row.changed_by_user_id,
+    instanceId: row.instanceId ?? row.instance_id,
+    isSynced: row.isSynced ?? row.is_synced,
+    syncBatchId: row.syncBatchId ?? row.sync_batch_id,
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════

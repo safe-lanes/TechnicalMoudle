@@ -80,38 +80,58 @@ export async function getAllInstanceMetadata(): Promise<SyncMetadata[]> {
 export async function getUnsyncedFieldLogs(
   instanceId: string,
   vesselId: string,
+  vesselCode?: string | null,
   limit: number = 1000
 ): Promise<SyncFieldLog[]> {
-  const db = await getDb();
-  return db.select().from(syncFieldLog)
-    .where(and(
-      eq(syncFieldLog.instanceId, instanceId),
-      eq(syncFieldLog.vesselId, vesselId),
-      eq(syncFieldLog.isSynced, false),
-    ))
-    .orderBy(asc(syncFieldLog.changedAt))
-    .limit(limit);
+  // Some tables log vesselCode (e.g. "V001") instead of vesselId (UUID) in the
+  // vesselId column. Query for both to capture all unsynced logs for this vessel.
+  const pool = await getPool();
+  const vesselValues = [vesselId];
+  if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
+
+  const placeholders = vesselValues.map((_, i) => `$${i + 2}`).join(', ');
+  const result = await pool.query(
+    `SELECT * FROM sync_field_log
+     WHERE instance_id = $1
+       AND vessel_id IN (${placeholders})
+       AND is_synced = false
+     ORDER BY changed_at ASC
+     LIMIT ${limit}`,
+    [instanceId, ...vesselValues]
+  );
+  return result.rows;
 }
 
 export async function getFieldLogsSinceCheckpoint(
   vesselId: string,
   sinceTimestamp: Date | null,
   excludeInstanceId: string,
+  vesselCode?: string | null,
   limit: number = 5000
 ): Promise<SyncFieldLog[]> {
-  const db = await getDb();
-  const conditions = [
-    eq(syncFieldLog.vesselId, vesselId),
-    ne(syncFieldLog.instanceId, excludeInstanceId),
-    eq(syncFieldLog.isSynced, false),
-  ];
+  // Match both vesselId (UUID) and vesselCode (e.g. "V001") since some tables
+  // log vessel_code in the vessel_id column of sync_field_log.
+  const pool = await getPool();
+  const vesselValues = [vesselId];
+  if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
+
+  const vesselPlaceholders = vesselValues.map((_, i) => `$${i + 1}`).join(', ');
+  let paramIdx = vesselValues.length;
+
+  let query = `SELECT * FROM sync_field_log
+     WHERE vessel_id IN (${vesselPlaceholders})
+       AND instance_id != $${++paramIdx}
+       AND is_synced = false`;
+  const params: any[] = [...vesselValues, excludeInstanceId];
+
   if (sinceTimestamp) {
-    conditions.push(gt(syncFieldLog.changedAt, sinceTimestamp));
+    query += ` AND changed_at > $${++paramIdx}`;
+    params.push(sinceTimestamp);
   }
-  return db.select().from(syncFieldLog)
-    .where(and(...conditions))
-    .orderBy(asc(syncFieldLog.changedAt))
-    .limit(limit);
+  query += ` ORDER BY changed_at ASC LIMIT ${limit}`;
+
+  const result = await pool.query(query, params);
+  return result.rows;
 }
 
 export async function markFieldLogsSynced(logUuids: string[], batchId: string): Promise<number> {
@@ -123,15 +143,16 @@ export async function markFieldLogsSynced(logUuids: string[], batchId: string): 
   return logUuids.length;
 }
 
-export async function getFieldLogCount(vesselId: string, isSynced: boolean): Promise<number> {
-  const db = await getDb();
-  const result = await db.select({ count: sql<number>`count(*)::int` })
-    .from(syncFieldLog)
-    .where(and(
-      eq(syncFieldLog.vesselId, vesselId),
-      eq(syncFieldLog.isSynced, isSynced),
-    ));
-  return result[0]?.count ?? 0;
+export async function getFieldLogCount(vesselId: string, isSynced: boolean, vesselCode?: string | null): Promise<number> {
+  const pool = await getPool();
+  const vesselValues = [vesselId];
+  if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
+  const placeholders = vesselValues.map((_, i) => `$${i + 1}`).join(', ');
+  const result = await pool.query(
+    `SELECT count(*)::int AS count FROM sync_field_log WHERE vessel_id IN (${placeholders}) AND is_synced = $${vesselValues.length + 1}`,
+    [...vesselValues, isSynced]
+  );
+  return result.rows[0]?.count ?? 0;
 }
 
 export async function insertFieldLogs(entries: Array<{

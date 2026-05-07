@@ -7,6 +7,7 @@ import { plannerDates, type Job, type Component, type WorkOrder, type PmsVesselS
 import { eq, and } from 'drizzle-orm';
 import { storage } from '../../../storage';
 import { randomUUID } from 'crypto';
+import { logFieldChanges } from '../../sync';
 
 export interface WorkOrderPlannerFilters {
   vesselId: string;
@@ -319,6 +320,7 @@ export async function savePlannedDate(vesselId: string, jobId: string, component
   );
 
   if (existing.length > 0) {
+    const oldRow = existing[0] as any;
     await database.update(plannerDates)
       .set({ plannedDate: plannedDate || null })
       .where(
@@ -328,14 +330,20 @@ export async function savePlannedDate(vesselId: string, jobId: string, component
           eq(plannerDates.componentId, componentId)
         )
       );
+    // Log field changes for sync
+    await logFieldChanges('planner_dates', oldRow.pduuid, vesselId, oldRow, { ...oldRow, plannedDate: plannedDate || null }, null);
   } else {
-    await database.insert(plannerDates).values({
-      pduuid: randomUUID(),
+    const newPduuid = randomUUID();
+    const newRow = {
+      pduuid: newPduuid,
       vesselId,
       jobId,
       componentId,
       plannedDate: plannedDate || null,
-    });
+    };
+    await database.insert(plannerDates).values(newRow);
+    // Log INSERT for sync
+    await logFieldChanges('planner_dates', newPduuid, vesselId, null, newRow, null);
   }
 
   return { success: true };
@@ -384,6 +392,7 @@ export async function bulkSavePlannedDate(
       );
 
       if (existing.length > 0) {
+        const oldRow = existing[0] as any;
         await tx.update(plannerDates)
           .set({ plannedDate })
           .where(
@@ -393,15 +402,21 @@ export async function bulkSavePlannedDate(
               eq(plannerDates.componentId, item.componentId)
             )
           );
+        // Log field changes for sync (pass tx as connection for transaction safety)
+        await logFieldChanges('planner_dates', oldRow.pduuid, vesselId, oldRow, { ...oldRow, plannedDate }, null, tx);
         updated++;
       } else {
-        await tx.insert(plannerDates).values({
-          pduuid: randomUUID(),
+        const newPduuid = randomUUID();
+        const newRow = {
+          pduuid: newPduuid,
           vesselId,
           jobId: item.jobId,
           componentId: item.componentId,
           plannedDate,
-        });
+        };
+        await tx.insert(plannerDates).values(newRow);
+        // Log INSERT for sync
+        await logFieldChanges('planner_dates', newPduuid, vesselId, null, newRow, null, tx);
         inserted++;
       }
     }
