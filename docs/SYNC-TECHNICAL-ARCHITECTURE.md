@@ -1,7 +1,7 @@
 # Ship-Shore Sync — Technical Architecture
 
-> **Version:** 1.0  
-> **Last Updated:** 2026-04-25  
+> **Version:** 1.2  
+> **Last Updated:** 2026-05-07  
 > **Domain Sign-Off:** Jeevan Naik, Rahul Singh Sisodiya, Sahil Puri (24-Apr-2026)  
 > **Source of Truth:** `shared/syncConfig.ts`
 
@@ -317,6 +317,7 @@ Ship SyncEngine                           Shore API
 - Ship sends its SHIP_ONLY table rows (full snapshots) — applied via `oneWayApplier.ts`
 - Ship sends its BOTH_EDITABLE field logs (unsynced changes) — stored in shore's `sync_field_log`
 - Business rules enforced: e.g., defect verification from ship is rejected
+- **Stale-log guard (v1.2):** UPDATE field logs are skipped if `changedAt < row.updated_at` to prevent old re-pushed logs from overwriting newer local edits
 - Data sent in chunks of 200 records (`CHUNK_SIZE` in `syncEngine.ts`)
 
 **3. PULL** (`service.ts → preparePullData`)
@@ -331,7 +332,8 @@ Ship SyncEngine                           Shore API
 - Winning value is applied to the data table via direct SQL UPDATE
 
 **5. COMPLETE** (`service.ts → completeSyncSession`)
-- Marks all transferred field logs as synced (`is_synced = true`)
+- Marks all transferred field logs as synced (`is_synced = true`) on the shore DB
+- **Ship-side marking (v1.2):** After COMPLETE succeeds, the engine marks pushed logUuids as synced in the ship's local DB. Without this, field logs would be re-pushed every sync cycle.
 - Advances the checkpoint timestamp in `sync_metadata`
 - Updates batch status to `completed` with duration
 
@@ -383,8 +385,10 @@ await logSoftDelete('work_orders', row.wouuid, vesselId, userId);
 The following fields are never logged (system-managed, not user data):
 
 ```typescript
-const SKIP_FIELDS = ['updated_at', 'updatedAt', 'created_at', 'createdAt', 'is_sync', 'isSync', 'id'];
+const SKIP_FIELDS = ['updated_at', 'updatedAt', 'created_at', 'createdAt', 'is_sync', 'isSync'];
 ```
+
+> **Note (v1.2):** `'id'` was removed from SKIP_FIELDS in fix `0ee8b86c`. Many BOTH_EDITABLE tables (defects, work_orders, work_order_executions, work_order_documents, work_order_postponements) have `id` as a semantic TEXT PRIMARY KEY (e.g., `D019-26-0023`). Skipping it prevented INSERT replication on the receiving side. For tables with GENERATED ALWAYS integer `id`, the column is filtered by `getColumnMeta().identityAlwaysCols` in oneWayApplier.
 
 ### Logging Behavior
 
@@ -394,6 +398,81 @@ const SKIP_FIELDS = ['updated_at', 'updatedAt', 'created_at', 'createdAt', 'is_s
 | UPDATE | `{...}` | `{...}` | Only fields where `String(old) !== String(new)` |
 | Soft-DELETE | `{is_deleted: false}` | `{is_deleted: true}` | Single entry for `is_deleted` field |
 | Hard DELETE | `{...}` | `null` | Warning logged, no field log entry (system uses soft-delete) |
+
+### Wiring Coverage (all 30 BOTH_EDITABLE tables)
+
+Every BOTH_EDITABLE table has `logFieldChanges()` wired to all write paths. The table below shows where each table's logging calls live.
+
+#### Work Order Domain
+
+| Table | Identity Col | INSERT | UPDATE | DELETE | File(s) |
+|-------|-------------|--------|--------|--------|---------|
+| `work_orders` | `wouuid` | `workOrderService.ts` | `workOrderService.ts` | `workOrderService.ts` | WO module service |
+| `work_order_executions` | `woeuuid` | `executionService.ts` | `executionService.ts` | — | WO module service |
+| `work_order_execution_details` | `woeduuid` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+| `work_order_postponements` | `wopuuid` | `workOrderService.ts` | — | — | WO module service |
+| `work_order_documents` | `id` (text PK) | `woDocumentService.ts` | `woDocumentService.ts` | `woDocumentService.ts` | WO docs service |
+
+#### Defect Domain
+
+| Table | Identity Col | INSERT | UPDATE | DELETE | File(s) |
+|-------|-------------|--------|--------|--------|---------|
+| `defects` | `duuid` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+| `defect_actions` | `dauuid` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+| `defect_attachments` | `datuuid` | `postgresStorage.ts` | — | — | Central storage |
+| `defect_sequences` | `dsuuid` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+
+#### Spare Parts & Stores
+
+| Table | Identity Col | INSERT | UPDATE | DELETE | File(s) |
+|-------|-------------|--------|--------|--------|---------|
+| `spares` | `suuid` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage (single + bulk) |
+| `stores_items` | `stuuid` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+| `spares_history` | `shuuid` | `postgresStorage.ts` | — | — | Immutable ledger (INSERT-only) |
+| `spare_location_stock` | `slsuuid` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+| `stores_ledger` | `sluuid` | `postgresStorage.ts` | — | — | Immutable ledger (INSERT-only) |
+| `inventory_transactions` | `ituuid` | `postgresStorage.ts` | — | — | Immutable ledger (INSERT-only) |
+
+#### Change Request
+
+| Table | Identity Col | INSERT | UPDATE | DELETE | File(s) |
+|-------|-------------|--------|--------|--------|---------|
+| `change_request` | `cruuid` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+| `change_request_attachment` | `crauuid` | `postgresStorage.ts` | — | — | Central storage |
+| `change_request_comment` | `crcuuid` | `postgresStorage.ts` | — | — | Central storage |
+
+#### Certificates & Surveys
+
+| Table | Identity Col | INSERT | UPDATE | DELETE | File(s) |
+|-------|-------------|--------|--------|--------|---------|
+| `certificates` | text PK `id` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+| `surveys` | text PK `id` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+| `vessel_certificate_data` | `vcduuid` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+| `vessel_survey_data` | `vsduuid` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+
+#### Running Hours & Maintenance
+
+| Table | Identity Col | INSERT | UPDATE | DELETE | File(s) |
+|-------|-------------|--------|--------|--------|---------|
+| `running_hours_audit` | `rhauuid` | `postgresStorage.ts` | — | — | Immutable ledger (INSERT-only, 4 paths) |
+| `component_running_hours_log` | `crhluuid` | — | — | — | No write paths in codebase |
+| `component_maintenance_history` | `cmhuuid` | `postgresStorage.ts` | — | — | Immutable ledger (INSERT-only) |
+
+#### Documents & Requisitions
+
+| Table | Identity Col | INSERT | UPDATE | DELETE | File(s) |
+|-------|-------------|--------|--------|--------|---------|
+| `component_documents` | text PK `id` | `postgresStorage.ts` | `postgresStorage.ts` | `postgresStorage.ts` | Central storage |
+| `component_requisitions` | text PK `id` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+
+#### IHM (Inventory of Hazardous Materials)
+
+| Table | Identity Col | INSERT | UPDATE | DELETE | File(s) |
+|-------|-------------|--------|--------|--------|---------|
+| `ihm_items` | int PK `id` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+| `ihm_maintenance_log` | int PK `id` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+
+> **Note:** `component_running_hours_log` has no write paths anywhere in the server codebase. Data appears to be written externally or via a mechanism not yet implemented. When write paths are added, field logging must be wired.
 
 ### Field Log Entry Schema
 
@@ -446,17 +525,24 @@ From `shared/syncConfig.ts`, the `defects` table has a business rule:
 
 ### Tables with Binary Files
 
-| Table | Storage | Notes |
-|-------|---------|-------|
-| `work_order_documents` | `fileKey` + `storageBackend` (`local` or `object`) | Real binary files |
-| `component_documents` | `fileKey` + `storageBackend` | Real binary files |
+| Table | Storage | `queueFileForSync` Location | Notes |
+|-------|---------|---------------------------|-------|
+| `work_order_documents` | `fileKey` + `storageBackend` (`local` or `object`) | `woDocumentService.ts → uploadDocument()` | Real binary files |
+| `component_documents` | `fileKey` + `storageBackend` | `postgresStorage.ts → createComponentDocument()` | Real binary files |
 
-### Tables with URL References Only (no binary sync needed)
+### Tables with URL References (conditional binary sync)
+
+| Table | Column | `queueFileForSync` Location | Notes |
+|-------|--------|---------------------------|-------|
+| `defect_attachments` | `url` (text) | `postgresStorage.ts → createDefectAttachment()` | URL-only (base64 data URI or external URL). Binary sync queued only for `local://` or `.private/` paths (future-proofing). Field logging handles the URL string sync. |
+| `change_request_attachment` | `url` (text) | `postgresStorage.ts → createChangeRequestAttachment()` | Same as defect_attachments. |
+
+### Tables with JSON-Embedded File References (no separate binary sync needed)
 
 | Table | Column | Notes |
 |-------|--------|-------|
-| `defect_attachments` | `url` | Synced via field logging |
-| `change_request_attachment` | `url` | Synced via field logging |
+| `work_orders` | `uploaded_documents` (JSON) | Stores `{type, fileName, fileKey, uploadedAt, uploadedBy}` array. The actual binary files are uploaded via `POST /work-orders/:id/documents` which creates `work_order_documents` rows (already wired). The JSON metadata is synced via field logging. |
+| `work_order_executions` | `uploaded_documents` (JSON) | Same pattern — references `work_order_documents` files. |
 
 ### Transfer Protocol
 
@@ -469,11 +555,15 @@ From `shared/syncConfig.ts`, the `defects` table has a business rule:
 
 ### Storage Directories
 
-```
-.private/wo-docs/          — Work order documents
-.private/component-docs/   — Component documents
-.private/sync-temp/        — Temporary chunk storage during reassembly
-```
+| Directory | Table(s) | Mapped via |
+|-----------|----------|-----------|
+| `.private/wo-docs/` | `work_order_documents` (default fallback) | `getStorageDir()` |
+| `.private/component-docs/` | `component_documents` | `getStorageDir()` |
+| `.private/defect-docs/` | `defect_attachments` | `getStorageDir()` |
+| `.private/cr-docs/` | `change_request_attachment` | `getStorageDir()` |
+| `.private/sync-temp/` | — | Temporary chunk storage during reassembly |
+
+The `getStorageDir(tableName)` helper in `fileSyncProcessor.ts` maps each table name to its local storage directory.
 
 ### Queue Lifecycle
 
@@ -907,3 +997,60 @@ From `server/modules/sync/middleware.ts`, the following roles are allowed:
 | `getProvisioningTables()` | `TableSyncConfig[]` | All tables except NO_SYNC |
 | `getTablesWithBusinessRules()` | `TableSyncConfig[]` | Tables with sync business rules |
 | `getSyncPhaseOrder()` | `string[][]` | 6-phase dependency order for sync/provisioning |
+
+---
+
+## 15. Post-Merge Fix Log
+
+All fixes applied after the initial sync system merge to `replit_dev` (2026-04-25), in chronological order.
+
+### Round 1 — Ship Deployment & Runtime Fixes (2026-04-28 to 2026-05-01)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 1 | `06f85de0` | Skip Replit Object Storage on ship server | Prevented 504 timeout on ship startup |
+| 2 | `4e99738e` | Diagnostic logging for import-stream endpoint | Debuggability |
+| 3 | `d08a6431` | Migration 107 re-applies audit columns + PK conflict handling | Provisioning idempotency |
+| 4 | `74f96ec1` | Split inline migrations 052/090/091 into per-statement execution | Fixed fresh-DB migration failures |
+| 5 | `729e603c` | Remove apostrophe from migration 107 comment | Fixed SQL parse error |
+| 6 | `0de153bc` | Clear seeded RBAC/rank data before import + JSON serialization | Fixed 261 FK constraint errors during provisioning |
+| 7 | `3411c2d0` | Detailed error logging + RBAC cleanup in pull + batch error storage | Fixed sync pull RBAC FK failures |
+| 8 | `a9feb236` | 5 sync apply defects: schema-aware id handling, JSON coercion, error counter, batch persistence | Fixed field log application pipeline |
+| 9 | `44e2087f` | `receivePushData` applies field logs to actual tables | **THE critical fix** — field logs were stored but never applied to data tables |
+
+### Round 2 — Data Integrity & Field Logger Fixes (2026-05-03 to 2026-05-05)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 10 | `c7a97477` | JSON-aware field value serialization in fieldLogger + defensive guards + data repair migration | Fixed `[object Object]` corruption in JSON/JSONB columns during field logging |
+| 11 | `521d493e` | Disable immutability trigger before repairing component_maintenance_history JSON columns | Migration safety for immutable tables |
+| 12 | `ed9c50c3` | Wrap component_maintenance_history repair in atomic DO block | Migration atomicity |
+
+### Round 3 — Sync Engine Enhancement (2026-05-05)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 13 | `168c2602` | `applyFieldLogInserts()` in oneWayApplier — handles INSERT for new BOTH_EDITABLE rows via field logs | **Critical** — previously new rows created on ship could never be synced to shore because the apply pipeline only handled UPDATEs |
+
+### Round 4 — Field Logging & File Sync Completeness (2026-05-06)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 14 | `7574cf11` | Wire `logFieldChanges` to 7 unlogged BOTH_EDITABLE tables + 3 missing INSERT paths | **20 new logging calls** across 10 tables that previously had zero field logging. Tables: `spares` (single + bulk), `stores_items`, `spares_history`, `spare_location_stock`, `stores_ledger`, `inventory_transactions`, `defect_sequences`, `running_hours_audit` (4 INSERT paths), `work_order_documents` (INSERT + UPDATE + DELETE). Without this, changes to these tables would never sync. |
+| 15 | `11965179` | Wire `FileSyncProcessor.queueFileForSync()` for defect and CR attachments + extend `getStorageDir()` | Added file sync support for `defect_attachments` and `change_request_attachment` tables (conditional on `local://` paths). Added 2 new storage directories. Refactored 5 hardcoded storage dir lookups to use centralized `getStorageDir()` helper. |
+
+### Round 5 — Sync Apply Pipeline Fixes (2026-05-07)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 16 | `ebb813b7` | `applyFieldLogInserts()` 23505 unique constraint fallback for cert/survey tables | `vessel_certificate_data` has a partial unique index on `(vessel_id, master_id) WHERE is_deleted = false`. When ship and shore independently create rows for the same logical entity, INSERT fails on this index (not the identity column ON CONFLICT). Fix: detect 23505, find existing row via progressive lookup, apply field-level UPDATEs, converge identity UUID. |
+| 17 | `0ee8b86c` | Defect INSERT sync failure — remove `'id'` from fieldLogger SKIP_FIELDS | `defects`, `work_orders`, `work_order_executions`, `work_order_documents`, `work_order_postponements` all have TEXT PK `id` (e.g., `D019-26-0023`). Since `id` was skipped, `applyFieldLogInserts` built INSERTs missing the NOT NULL primary key → silent failure. Fix: removed `'id'` from SKIP_FIELDS. GENERATED ALWAYS integer ids are already handled by `getColumnMeta().identityAlwaysCols`. |
+| 18 | `0ee8b86c` | Field log re-push causing data revert (category revert scenario) | After `executePush`, `completeSyncSession` marks logs as synced in SHORE's DB only. Ship's local DB kept them as `is_synced=false` → re-pushed every cycle → `receivePushData` blindly applied old values, overwriting newer shore edits. Fix A: engine marks local pushed logUuids as synced after COMPLETE. Fix B: `receivePushData` stale-log guard skips UPDATE logs where `changedAt < row.updated_at`. |
+
+### Investigated & Confirmed No-Op
+
+| Item | Investigation Result |
+|------|---------------------|
+| `work_orders.uploaded_documents` JSON column | Binary files are uploaded via `POST /work-orders/:id/documents` → `woDocumentService.uploadDocument()` which already calls `queueFileForSync()`. The JSON column stores metadata references only, synced via field logging. The legacy `WorkOrderForm.tsx` misc `/upload-document` path is dead code (never invoked with `onSubmit`). **No fix needed.** |
+| `work_order_executions.uploaded_documents` JSON column | Same as above — references `work_order_documents` table files. **No fix needed.** |
+| `component_running_hours_log` field logging | No write paths exist anywhere in the server codebase. Table is in `syncConfig.ts` as BOTH_EDITABLE but data is apparently written externally. **Logging must be wired when write paths are added.** |
