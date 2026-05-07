@@ -2314,28 +2314,37 @@ export default function ShipsCertificatesAdmin() {
                   if (cert.id >= 2000) return true;
                   const vesselIds = getSelectedVesselIds();
                   return vesselIds.some(vesselId =>
-                    vesselApplicabilityData.some((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId && a.isApplicable === true)
+                    vesselApplicabilityData.some((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId)
                   );
                 }).map((cert, idx) => {
                   const companyGroupLabel = companyGroupLabels.find(g => g.key === cert.companyGroup)?.label || "";
                   const displayCompanyGroup = cert.companyGroup ? `${cert.companyGroup}. ${companyGroupLabel}` : "";
+                  const applicability = getCertificateApplicability(cert.masterId);
+                  const isMixed = applicability === 'mixed';
+                  const isChecked = applicability === true;
                   
                   return (
-                    <tr key={`vessel-only-${cert.id}`} className="hover:bg-gray-50 bg-green-50">
+                    <tr key={`vessel-only-${cert.id}`} className={cn("hover:bg-gray-50 bg-green-50", isMixed && "bg-amber-50")}>
                       <td className="px-3 py-3 text-center">
-                        <Checkbox 
-                          checked={cert.applicable}
-                          onCheckedChange={(checked) => {
-                            if (viewModes.vessel === "edit") {
-                              setVesselOnlyCerts(prev => prev.map(c => 
-                                c.id === cert.id ? { ...c, applicable: !!checked } : c
-                              ));
-                            }
-                          }}
-                          disabled={viewModes.vessel !== "edit"}
-                          className="border-blue-500 data-[state=checked]:bg-blue-500"
-                          data-testid={`checkbox-vessel-only-applicable-${cert.id}`}
-                        />
+                        <div className="flex flex-col items-center gap-1">
+                          <Checkbox
+                            checked={isMixed ? false : isChecked}
+                            onCheckedChange={(checked) => {
+                              if (!conflictCheck.hasConflict && viewModes.vessel === "edit") {
+                                handleApplicabilityChange(cert.masterId, !!checked);
+                              }
+                            }}
+                            disabled={conflictCheck.hasConflict || viewModes.vessel !== "edit"}
+                            className={cn(
+                              "border-blue-500 data-[state=checked]:bg-blue-500",
+                              isMixed && "border-amber-500 bg-amber-100"
+                            )}
+                            data-testid={`checkbox-vessel-only-applicable-${cert.id}`}
+                          />
+                          {isMixed && (
+                            <span className="text-xs text-amber-600">Mixed</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-3 text-sm">{companyCertificates.length + companyOnlyCerts.length + idx + 1}</td>
                       <td className="px-3 py-3 text-sm font-medium text-gray-400">-</td>
