@@ -1,6 +1,6 @@
 # Ship-Shore Sync — Technical Architecture
 
-> **Version:** 1.2  
+> **Version:** 1.3  
 > **Last Updated:** 2026-05-07  
 > **Domain Sign-Off:** Jeevan Naik, Rahul Singh Sisodiya, Sahil Puri (24-Apr-2026)  
 > **Source of Truth:** `shared/syncConfig.ts`
@@ -19,9 +19,9 @@ The Ship-Shore Sync system enables bidirectional data synchronization between a 
 **Key numbers:**
 - 108 tables classified across 4 sync categories
 - 41 ONE_WAY_SHORE_TO_SHIP tables
-- 30 BOTH_EDITABLE tables
+- 31 BOTH_EDITABLE tables (planner_dates reclassified from NO_SYNC in v1.3)
 - 6 SHIP_ONLY tables
-- 31 NO_SYNC tables
+- 30 NO_SYNC tables
 - 22 API endpoints across 6 functional groups
 
 ---
@@ -149,7 +149,7 @@ Shore is the authoritative source. Ship receives read-only copies. No conflict p
 | `vessel_survey_applicability` | `vsauuid` | `vessel_id` | Survey applicability |
 | `adm_vessel_org_chart` | `avocuuid` | `vessel_id` | Vessel org chart |
 
-### 3.2 BOTH_EDITABLE (30 tables)
+### 3.2 BOTH_EDITABLE (31 tables)
 
 Both ship and shore can edit these tables. Uses field-level delta sync via `sync_field_log`. Conflicts are detected when both sides change the same field on the same row.
 
@@ -220,6 +220,12 @@ Both ship and shore can edit these tables. Uses field-level delta sync via `sync
 | `ihm_items` | — | `vessel_id` | IHM items (integer PK) |
 | `ihm_maintenance_log` | — | `vessel_id` | IHM maintenance log |
 
+#### Planning (added v1.3)
+
+| Table | Identity Column | Vessel Scope | Notes |
+|-------|----------------|-------------|-------|
+| `planner_dates` | `pduuid` | `vessel_id` | Maintenance planner dates. Shore sets planned dates, ship can adjust. Reclassified from NO_SYNC in v1.3 (fix 21, commit `05b87ed3`). Field logging wired to all 4 write paths in `workOrderPlannerService.ts`. |
+
 ### 3.3 SHIP_ONLY (6 tables)
 
 Ship is the authoritative source. Shore receives overwrites. All are noon report tables.
@@ -233,7 +239,7 @@ Ship is the authoritative source. Shore receives overwrites. All are noon report
 | `nr_fuel_rob` | `nfruuid` | `vessel_id` | Fuel ROB per vessel/fuel type |
 | `nr_voyage_legs` | `nvluuid` | `vessel_id` | Voyage leg tracking |
 
-### 3.4 NO_SYNC (31 tables)
+### 3.4 NO_SYNC (30 tables)
 
 Never synced. Instance-local data only.
 
@@ -250,7 +256,7 @@ Never synced. Instance-local data only.
 `alert_events`, `alert_deliveries`, `alert_acknowledgements`
 
 **Local computation/planning:**
-`work_order_anomalies`, `planner_dates`, `schema_migrations`, `form_version_usage`, `recurring_defects`, `recurring_defect_links`
+`work_order_anomalies`, ~~`planner_dates`~~ *(moved to BOTH_EDITABLE in v1.3)*, `schema_migrations`, `form_version_usage`, `recurring_defects`, `recurring_defect_links`
 
 ---
 
@@ -321,7 +327,8 @@ Ship SyncEngine                           Shore API
 - Data sent in chunks of 200 records (`CHUNK_SIZE` in `syncEngine.ts`)
 
 **3. PULL** (`service.ts → preparePullData`)
-- Shore gathers ONE_WAY_SHORE_TO_SHIP rows changed since checkpoint
+- **Vessel-code resolution (v1.3):** Resolves `vesselId` (UUID) → `vesselCode` (e.g. "V001") via `getVesselCodeForUuid()`. Tables with `vesselScopeColumn='vessel_code'` (e.g. `fleet_vessel_mapping`, `master_data`) use the resolved code for queries. Field log queries use `IN (vesselId, vesselCode)` to match logs stored with either identifier.
+- Shore gathers ONE_WAY_SHORE_TO_SHIP rows changed since checkpoint (`gatherOneWayShoreRows`)
 - Shore gathers its own BOTH_EDITABLE field logs (excluding ship's own changes)
 - **Conflict detection:** If both ship and shore changed the same field on the same row, a `sync_conflicts` record is created
 - Non-conflicting shore changes are sent as field logs for ship to apply
@@ -334,14 +341,19 @@ Ship SyncEngine                           Shore API
 **5. COMPLETE** (`service.ts → completeSyncSession`)
 - Marks all transferred field logs as synced (`is_synced = true`) on the shore DB
 - **Ship-side marking (v1.2):** After COMPLETE succeeds, the engine marks pushed logUuids as synced in the ship's local DB. Without this, field logs would be re-pushed every sync cycle.
+- **Vessel-code aware (v1.3):** Resolves vesselCode and passes to field log queries so logs stored with vessel_code are also found and marked as synced.
 - Advances the checkpoint timestamp in `sync_metadata`
 - Updates batch status to `completed` with duration
 
 **6. FILE SYNC** (`fileSyncProcessor.ts`)
 - Runs after field data sync is complete (non-fatal if it fails)
+- `SyncEngine` passes `shoreBaseUrl` to `FileSyncProcessor` constructor (v1.3)
 - Processes `sync_file_queue` entries for the vessel
-- Files chunked into 256KB pieces, base64-encoded
+- Files chunked into 256KB pieces, base64-encoded, **with file metadata in each chunk** (v1.3 — `fileKey`, `tableName`, `fileName`, `fileSizeBytes`, `vesselId`)
+- Chunks sent via `POST {shoreUrl}/sync/file/upload-chunk`
+- **Receiver creates mirror queue entry** via `queueFileWithUuid()` (v1.3 — ON CONFLICT DO NOTHING)
 - SHA-256 hash verification on reassembly
+- Assembled file saved to correct storage directory via `saveLocalFile()` using chunk metadata
 - Resume from last successful chunk on interrupted transfer
 
 ### Retry & Error Handling
@@ -399,7 +411,7 @@ const SKIP_FIELDS = ['updated_at', 'updatedAt', 'created_at', 'createdAt', 'is_s
 | Soft-DELETE | `{is_deleted: false}` | `{is_deleted: true}` | Single entry for `is_deleted` field |
 | Hard DELETE | `{...}` | `null` | Warning logged, no field log entry (system uses soft-delete) |
 
-### Wiring Coverage (all 30 BOTH_EDITABLE tables)
+### Wiring Coverage (all 31 BOTH_EDITABLE tables)
 
 Every BOTH_EDITABLE table has `logFieldChanges()` wired to all write paths. The table below shows where each table's logging calls live.
 
@@ -471,6 +483,12 @@ Every BOTH_EDITABLE table has `logFieldChanges()` wired to all write paths. The 
 |-------|-------------|--------|--------|--------|---------|
 | `ihm_items` | int PK `id` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
 | `ihm_maintenance_log` | int PK `id` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+
+#### Planning (added v1.3)
+
+| Table | Identity Col | INSERT | UPDATE | DELETE | File(s) |
+|-------|-------------|--------|--------|--------|---------|
+| `planner_dates` | `pduuid` | `workOrderPlannerService.ts` | `workOrderPlannerService.ts` | — | WO planner service (single + bulk, 4 paths total) |
 
 > **Note:** `component_running_hours_log` has no write paths anywhere in the server codebase. Data appears to be written externally or via a mechanism not yet implemented. When write paths are added, field logging must be wired.
 
@@ -552,6 +570,9 @@ From `shared/syncConfig.ts`, the `defects` table has a business rule:
 - **Hash verification:** SHA-256 of complete file checked after reassembly
 - **Resume:** Tracks `chunk_offset` — interrupted transfers resume from last successful chunk
 - **Direction:** Determined by `SYNC_INSTANCE_ID` prefix (SHIP → `ship_to_shore`, SHORE → `shore_to_ship`)
+- **Chunk metadata:** Each `FileChunk` includes `fileKey`, `tableName`, `fileName`, `fileSizeBytes`, `vesselId` — so the receiving side knows where to save the file without needing the sender's queue entry (FIX 22)
+- **Mirror queue entry:** `receiveChunk()` creates a tracking record on the receiving side via `queueFileWithUuid()` (ON CONFLICT DO NOTHING) for status monitoring and backward compatibility
+- **Shore URL:** `FileSyncProcessor` constructor accepts `shoreUrl` from `SyncEngine` (DB-loaded settings via `sync_settings` table, not just `SYNC_SHORE_URL` env var)
 
 ### Storage Directories
 
@@ -1046,6 +1067,15 @@ All fixes applied after the initial sync system merge to `replit_dev` (2026-04-2
 | 16 | `ebb813b7` | `applyFieldLogInserts()` 23505 unique constraint fallback for cert/survey tables | `vessel_certificate_data` has a partial unique index on `(vessel_id, master_id) WHERE is_deleted = false`. When ship and shore independently create rows for the same logical entity, INSERT fails on this index (not the identity column ON CONFLICT). Fix: detect 23505, find existing row via progressive lookup, apply field-level UPDATEs, converge identity UUID. |
 | 17 | `0ee8b86c` | Defect INSERT sync failure — remove `'id'` from fieldLogger SKIP_FIELDS | `defects`, `work_orders`, `work_order_executions`, `work_order_documents`, `work_order_postponements` all have TEXT PK `id` (e.g., `D019-26-0023`). Since `id` was skipped, `applyFieldLogInserts` built INSERTs missing the NOT NULL primary key → silent failure. Fix: removed `'id'` from SKIP_FIELDS. GENERATED ALWAYS integer ids are already handled by `getColumnMeta().identityAlwaysCols`. |
 | 18 | `0ee8b86c` | Field log re-push causing data revert (category revert scenario) | After `executePush`, `completeSyncSession` marks logs as synced in SHORE's DB only. Ship's local DB kept them as `is_synced=false` → re-pushed every cycle → `receivePushData` blindly applied old values, overwriting newer shore edits. Fix A: engine marks local pushed logUuids as synced after COMPLETE. Fix B: `receivePushData` stale-log guard skips UPDATE logs where `changedAt < row.updated_at`. |
+
+### Round 6 — QA Comprehensive Sync Fixes (2026-05-07)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 19 | `3bd0eb79` | Increase Express body parser limit from 10mb to 50mb | Large sync payloads (many ONE_WAY tables) were being rejected with HTTP 413 "Request Entity Too Large". |
+| 20 | `05b87ed3` | Vessel-code scope mismatch — ONE_WAY tables with `vesselScopeColumn='vessel_code'` returned 0 rows | `gatherOneWayShoreRows()` always passed `vesselId` (UUID) regardless of whether the table used `vessel_code` or `vessel_id`. Tables like `fleet_vessel_mapping`, `master_data`, `component_class_regulatory` got 0 rows. Fix: resolve `vesselId→vesselCode` via new `getVesselCodeForUuid()` cached helper, pass correct value per table. Also updated `getUnsyncedFieldLogs`, `getFieldLogsSinceCheckpoint`, `getFieldLogCount` to accept optional `vesselCode` and query with `IN (vesselId, vesselCode)` for field logs stored with either identifier. Added `normalizeFieldLog()` helper for snake_case→camelCase from raw SQL. Threaded vesselCode through `preparePullData`, `completeSyncSession`, `executePush`. |
+| 21 | `05b87ed3` | `planner_dates` not syncing (classified as NO_SYNC) | Reclassified from `NO_SYNC` to `BOTH_EDITABLE` with `direction: 'bidirectional'` in `syncConfig.ts`. Wired `logFieldChanges('planner_dates', ...)` to all 4 write paths in `workOrderPlannerService.ts`: `savePlannedDate` UPDATE + INSERT, `bulkSavePlannedDate` UPDATE + INSERT (bulk passes `tx` for transaction safety). |
+| 22 | `876b8d18` | Binary file transfer — receiving side silently discarded assembled files | `receiveChunk()` called `getFileQueueEntry(chunk.queueUuid)` to find `fileKey`/`tableName` for saving, but the queue entry only exists in the SENDER's DB — the receiver had no matching row. `fileEntry` was `undefined`, so the file was assembled and hash-verified but never saved to disk. Fix: (a) extended `FileChunk` interface with file metadata (`fileKey`, `tableName`, `fileName`, `fileSizeBytes`, `vesselId`); (b) `processQueue()` populates metadata in every chunk; (c) `receiveChunk()` creates mirror queue entry via new `queueFileWithUuid()` (ON CONFLICT DO NOTHING); (d) resolves save location from chunk metadata first, queue entry fallback for backward compat; (e) `FileSyncProcessor` constructor accepts `shoreUrl` from `SyncEngine` (DB-loaded settings, not just env var). |
 
 ### Investigated & Confirmed No-Op
 
