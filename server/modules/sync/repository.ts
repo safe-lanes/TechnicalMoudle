@@ -265,6 +265,39 @@ export async function queueFile(data: {
   return result[0];
 }
 
+/**
+ * Queue a file with a specific queueUuid (used by the RECEIVING side to create
+ * a mirror entry matching the sender's queue UUID for tracking).
+ */
+export async function queueFileWithUuid(data: {
+  queueUuid: string;
+  tableName: string;
+  rowUuid: string;
+  fileKey: string;
+  fileName?: string | null;
+  fileSizeBytes?: number | null;
+  fileHash?: string | null;
+  direction: string;
+  vesselId?: string | null;
+  instanceId: string;
+  syncBatchId?: string | null;
+  totalChunks?: number | null;
+  priority?: number | null;
+}): Promise<SyncFileQueue> {
+  const pool = await getPool();
+  // Use raw SQL with ON CONFLICT to handle duplicates gracefully
+  const result = await pool.query(
+    `INSERT INTO sync_file_queue (queue_uuid, table_name, row_uuid, file_key, file_name, file_size_bytes, file_hash, direction, vessel_id, instance_id, total_chunks, priority, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'in_progress')
+     ON CONFLICT (queue_uuid) DO NOTHING
+     RETURNING *`,
+    [data.queueUuid, data.tableName, data.rowUuid, data.fileKey, data.fileName ?? null,
+     data.fileSizeBytes ?? null, data.fileHash ?? null, data.direction, data.vesselId ?? null,
+     data.instanceId, data.totalChunks ?? null, data.priority ?? 0]
+  );
+  return result.rows[0];
+}
+
 export async function getFileQueueEntry(queueUuid: string): Promise<SyncFileQueue | undefined> {
   const db = await getDb();
   const rows = await db.select().from(syncFileQueue)

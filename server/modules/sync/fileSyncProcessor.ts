@@ -57,13 +57,24 @@ export interface FileChunk {
   totalChunks: number;
   data: string; // base64 encoded chunk
   fileHash: string; // SHA-256 of complete file (for final verification)
+  // File metadata — included so the RECEIVING side knows where to save the file
+  // (the receiver doesn't have the sender's sync_file_queue entry)
+  fileKey: string;
+  tableName: string;
+  fileName: string | null;
+  fileSizeBytes: number | null;
+  vesselId: string | null;
 }
 
 export class FileSyncProcessor {
   private instanceId: string;
+  private shoreUrl: string;
 
-  constructor() {
+  constructor(shoreUrl?: string) {
     this.instanceId = process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
+    // Shore URL can be passed by the SyncEngine (which loads from DB settings)
+    // or fall back to the env var
+    this.shoreUrl = shoreUrl || process.env.SYNC_SHORE_URL || '';
     // Ensure temp directory exists
     if (!fs.existsSync(TEMP_DIR)) {
       fs.mkdirSync(TEMP_DIR, { recursive: true });
@@ -130,6 +141,12 @@ export class FileSyncProcessor {
             totalChunks,
             data: chunkData,
             fileHash: hash,
+            // Include file metadata so the RECEIVING side can save the file
+            fileKey: fileEntry.fileKey,
+            tableName: fileEntry.tableName,
+            fileName: fileEntry.fileName ?? null,
+            fileSizeBytes: fileEntry.fileSizeBytes ?? null,
+            vesselId: fileEntry.vesselId ?? null,
           };
 
           // Send chunk (via sync API or local mode)
@@ -205,6 +222,37 @@ export class FileSyncProcessor {
       `[FileSyncProcessor] Received chunk ${chunk.chunkIndex + 1}/${chunk.totalChunks} for ${chunk.queueUuid}`
     );
 
+    // Ensure a mirror queue entry exists on the RECEIVING side for tracking.
+    // The sender's sync_file_queue entry only exists in the sender's DB,
+    // so the receiver needs its own record to track status and provide fileKey/tableName.
+    try {
+      const existing = await syncRepo.getFileQueueEntry(chunk.queueUuid);
+      if (!existing && chunk.fileKey && chunk.tableName) {
+        // Create a receiving-side queue entry with the same queueUuid
+        const reverseDirection = this.instanceId.toUpperCase().startsWith('SHIP')
+          ? 'shore_to_ship'
+          : 'ship_to_shore';
+        await syncRepo.queueFileWithUuid({
+          queueUuid: chunk.queueUuid,
+          tableName: chunk.tableName,
+          rowUuid: chunk.queueUuid, // placeholder — actual rowUuid not needed for receive
+          fileKey: chunk.fileKey,
+          fileName: chunk.fileName,
+          fileSizeBytes: chunk.fileSizeBytes,
+          fileHash: chunk.fileHash,
+          direction: reverseDirection,
+          vesselId: chunk.vesselId,
+          instanceId: this.instanceId,
+          totalChunks: chunk.totalChunks,
+          priority: 0,
+        });
+        console.log(`[FileSyncProcessor] Created mirror queue entry for ${chunk.queueUuid}`);
+      }
+    } catch (mirrorErr: any) {
+      // Non-fatal — we can still save the file using chunk metadata
+      console.warn(`[FileSyncProcessor] Mirror queue entry creation failed: ${mirrorErr.message}`);
+    }
+
     // Check if all chunks received
     if (chunk.chunkIndex === chunk.totalChunks - 1) {
       // Reassemble the file
@@ -224,23 +272,40 @@ export class FileSyncProcessor {
         return { received: true, complete: false };
       }
 
-      // Save to final location
-      const fileEntry = await syncRepo.getFileQueueEntry(chunk.queueUuid);
-      if (fileEntry) {
-        await this.saveLocalFile(
-          fileEntry.fileKey,
-          fileEntry.tableName,
-          assembled
-        );
-        await syncRepo.markFileCompleted(chunk.queueUuid);
+      // Resolve where to save the file.
+      // Primary source: chunk metadata (always available in new protocol).
+      // Fallback: queue entry in local DB (for backwards compatibility).
+      let fileKey = chunk.fileKey;
+      let tableName = chunk.tableName;
+
+      if (!fileKey || !tableName) {
+        const fileEntry = await syncRepo.getFileQueueEntry(chunk.queueUuid);
+        if (fileEntry) {
+          fileKey = fileEntry.fileKey;
+          tableName = fileEntry.tableName;
+        }
+      }
+
+      if (fileKey && tableName) {
+        await this.saveLocalFile(fileKey, tableName, assembled);
+
+        // Mark mirror queue entry as completed
+        try {
+          await syncRepo.markFileCompleted(chunk.queueUuid);
+        } catch (_e) { /* best-effort */ }
+
         console.log(
-          `[FileSyncProcessor] File assembled and saved: ${fileEntry.fileKey} (${assembled.length} bytes, hash verified)`
+          `[FileSyncProcessor] File assembled and saved: ${fileKey} (${assembled.length} bytes, hash verified)`
+        );
+      } else {
+        console.error(
+          `[FileSyncProcessor] Cannot save file ${chunk.queueUuid}: no fileKey/tableName in chunk or queue entry`
         );
       }
 
       // Clean up temp chunks
       fs.rmSync(tempPath, { recursive: true, force: true });
-      return { received: true, complete: true };
+      return { received: true, complete: !!fileKey };
     }
 
     return { received: true, complete: false };
@@ -338,17 +403,16 @@ export class FileSyncProcessor {
    * Send a chunk to the other side via sync API.
    */
   private async sendChunk(chunk: FileChunk): Promise<void> {
-    const shoreUrl = process.env.SYNC_SHORE_URL || '';
     const localMode = process.env.SYNC_LOCAL_MODE === 'true';
 
-    if (localMode || !shoreUrl) {
+    if (localMode || !this.shoreUrl) {
       // Local mode — save chunk directly (simulates receive on "other side")
       await this.receiveChunk(chunk);
       return;
     }
 
     // Remote mode — HTTP call
-    const response = await fetch(`${shoreUrl}/sync/file/upload-chunk`, {
+    const response = await fetch(`${this.shoreUrl}/sync/file/upload-chunk`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

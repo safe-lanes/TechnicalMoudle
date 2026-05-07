@@ -200,7 +200,7 @@ export class SyncEngine {
       let filesProcessedCount = 0;
       let filesFailedCount = 0;
       try {
-        const fileProcessor = new FileSyncProcessor();
+        const fileProcessor = new FileSyncProcessor(this.shoreBaseUrl);
         const fileResult = await fileProcessor.processQueue(vesselId, batchUuid!);
         filesProcessedCount = fileResult.filesProcessed;
         filesFailedCount = fileResult.filesFailed;
