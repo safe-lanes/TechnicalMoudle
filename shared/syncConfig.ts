@@ -1479,7 +1479,8 @@ export function getSyncPhaseOrder(): string[][] {
     ['work_orders', 'defects', 'spares', 'stores_items', 'change_request',
      'certificates', 'surveys', 'vessel_certificate_data', 'vessel_survey_data',
      'running_hours_audit', 'component_running_hours_log',
-     'component_maintenance_history', 'ihm_items', 'defect_sequences'],
+     'component_maintenance_history', 'ihm_items', 'defect_sequences',
+     'planner_dates'],
     // Phase 4: Child entities (FK to parent rows in Phase 3)
     ['work_order_executions', 'work_order_execution_details', 'work_order_postponements',
      'work_order_documents', 'defect_actions', 'defect_attachments',
