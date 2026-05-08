@@ -197,6 +197,10 @@ export async function receivePushData(
       // Defence: skip stale logs where local row was updated MORE RECENTLY than the
       // incoming changedAt.  This prevents re-pushed (duplicate) field logs from
       // reverting newer shore edits.  A per-row query is unavoidable but cheap.
+      //
+      // IMPORTANT: Use the log's changedAt (not NOW()) for updated_at when applying.
+      // Using NOW() would cause subsequent fields from the same batch to be stale-skipped
+      // because applying field A would set updated_at=NOW() > changedAt for field B.
       const pool = await getPool();
       for (const log of insertResult.updateLogs) {
         const config = getTableSyncConfig(log.tableName);
@@ -239,9 +243,11 @@ export async function receivePushData(
             }
           }
 
+          // Use the log's changedAt for updated_at — NOT NOW() — so that subsequent
+          // fields from the same batch (same changedAt) don't get stale-skipped.
           await pool.query(
-            `UPDATE "${log.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = NOW() WHERE "${identityCol}" = $2`,
-            [valueToApply, log.rowUuid]
+            `UPDATE "${log.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
+            [valueToApply, log.rowUuid, logChangedAt]
           );
           fieldLogsApplied++;
         } catch (err: any) {
@@ -677,7 +683,12 @@ async function gatherOneWayShoreRows(
 
 /** Convert camelCase to snake_case */
 function toSnakeCase(str: string): string {
-  return str.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+  // Handle consecutive uppercase (acronyms) correctly:
+  // timestampUTC → timestamp_utc, previousRH → previous_rh, completionRHValidated → completion_rh_validated
+  return str
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')   // split acronym from next word: "RHV" → "RH_V"
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')       // split camelCase: "timestamp" + "U" → "timestamp_U"
+    .toLowerCase();
 }
 
 /**

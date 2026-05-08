@@ -543,6 +543,7 @@ export class SyncEngine {
     fieldName: string;
     oldValue: string | null;
     newValue: string | null;
+    changedAt?: string | Date;
     changedByUserId?: string | null;
     instanceId?: string;
   }): Promise<void> {
@@ -584,10 +585,13 @@ export class SyncEngine {
       }
     }
 
+    // Use the log's changedAt for updated_at — NOT NOW() — so that subsequent
+    // fields from the same batch (same changedAt) don't get stale-skipped.
+    const logTs = log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt));
     // Let errors bubble up to the caller for proper counting (Defect D fix)
     await pool.query(
-      `UPDATE "${log.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = NOW() WHERE "${identityCol}" = $2`,
-      [valueToApply, log.rowUuid]
+      `UPDATE "${log.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
+      [valueToApply, log.rowUuid, logTs]
     );
   }
 
@@ -738,5 +742,10 @@ export function getSyncEngine(): SyncEngine {
 // ── Helpers ──
 
 function camelToSnake(str: string): string {
-  return str.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`);
+  // Handle consecutive uppercase (acronyms) correctly:
+  // timestampUTC → timestamp_utc, previousRH → previous_rh, completionRHValidated → completion_rh_validated
+  return str
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .toLowerCase();
 }
