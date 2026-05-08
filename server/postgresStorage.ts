@@ -8772,6 +8772,7 @@ export class PostgresStorage {
       }, tx);
 
       // 3. Update legacy ROB fields on spares table
+      const spareOld = { rob: spare.rob, robLocationA: spare.robLocationA, robLocationB: spare.robLocationB };
       await tx.update(spares)
         .set({
           rob: calculatedTotalRob,
@@ -8781,6 +8782,16 @@ export class PostgresStorage {
           updatedBy: input.userId
         })
         .where(eq(spares.id, input.spareId));
+
+      // Sync field logging — spares ROB change
+      try {
+        await logFieldChanges(
+          'spares', spare.suuid, input.vesselId,
+          spareOld,
+          { rob: calculatedTotalRob, robLocationA: newRobA, robLocationB: newRobB },
+          input.userId, tx
+        );
+      } catch (e) { console.error('[FieldLogger] spares ROB tx update:', e); }
 
       console.log(`[performInventoryTransaction] Updated legacy ROB fields for spare ${input.spareId}: ` +
         `Location ${targetLocation} (${locationName}), ` +
