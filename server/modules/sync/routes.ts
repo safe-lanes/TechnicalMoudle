@@ -40,6 +40,10 @@ router.get('/sync/fleet-overview', requireOfflineAdmin, asyncHandler(syncControl
 // Instance info (public — used by frontend to determine ship vs shore)
 router.get('/sync/instance-info', asyncHandler(syncController.instanceInfoHandler));
 
+// Diagnostic log endpoints (for QA / debugging)
+router.get('/sync/diag-log', asyncHandler(syncController.diagLogHandler));
+router.get('/sync/diag-logs', asyncHandler(syncController.diagLogsListHandler));
+
 // Provisioning endpoints (offline_admin / Sail Admin gated)
 // Static routes MUST come before parameterized :vesselId to avoid Express matching "import"/"verify" as a vesselId
 router.post('/sync/provision/import', requireOfflineAdmin, asyncHandler(syncController.importProvisionHandler));

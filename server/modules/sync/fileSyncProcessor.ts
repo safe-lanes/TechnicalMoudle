@@ -30,6 +30,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import * as syncRepo from './repository';
+import { syncDiag } from './syncDiagLogger';
 
 const CHUNK_SIZE_BYTES = 256 * 1024; // 256KB per chunk
 const MAX_FILE_RETRIES = 3;
@@ -103,12 +104,14 @@ export class FileSyncProcessor {
       : 'shore_to_ship';
     const pendingFiles = await syncRepo.getPendingFiles(vesselId, direction, 50);
 
+    syncDiag(`FILE-SYNC START: ${pendingFiles.length} pending files for vessel=${vesselId}, direction=${direction}`);
     console.log(
       `[FileSyncProcessor] ${pendingFiles.length} pending files for vessel ${vesselId} (${direction})`
     );
 
     for (const fileEntry of pendingFiles) {
       try {
+        syncDiag(`FILE-SYNC PROCESS: ${fileEntry.tableName}/${fileEntry.fileKey} (${fileEntry.fileSizeBytes || '?'} bytes) status=${fileEntry.status}`);
         await syncRepo.updateFileStatus(fileEntry.queueUuid, 'in_progress');
 
         // Read the file from local storage
@@ -165,6 +168,7 @@ export class FileSyncProcessor {
         // Mark completed
         await syncRepo.markFileCompleted(fileEntry.queueUuid);
         filesProcessed++;
+        syncDiag(`FILE-SYNC OK: ${fileEntry.fileKey} — transferred ${fileBuffer.length} bytes in ${totalChunks} chunks`);
         console.log(
           `[FileSyncProcessor] Completed: ${fileEntry.fileName || fileEntry.fileKey} (${totalChunks} chunks, ${fileBuffer.length} bytes)`
         );
@@ -187,12 +191,14 @@ export class FileSyncProcessor {
           // best-effort
         }
 
+        syncDiag(`FILE-SYNC FAIL: ${fileEntry.fileKey} — ${error.message}`);
         console.error(
           `[FileSyncProcessor] Failed: ${fileEntry.fileName || fileEntry.fileKey} — ${error.message} (retry ${retryCount}/${MAX_FILE_RETRIES})`
         );
       }
     }
 
+    syncDiag(`FILE-SYNC DONE: processed=${filesProcessed}, failed=${filesFailed}, bytes=${bytesTransferred}`);
     return { filesProcessed, filesFailed, bytesTransferred };
   }
 

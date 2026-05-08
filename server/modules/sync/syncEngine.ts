@@ -30,6 +30,7 @@ import {
   getTableSyncConfig,
 } from '../../../shared/syncConfig';
 import { getPool } from '../../db';
+import { syncDiag } from './syncDiagLogger';
 
 // ── Configuration ──
 
@@ -127,6 +128,7 @@ export class SyncEngine {
     let conflictsAutoResolved = 0;
 
     try {
+      syncDiag(`=== SYNC START === vessel=${vesselId}, instance=${this.instanceId}, mode=${this.isLocalMode() ? 'LOCAL' : 'REMOTE'}`);
       console.log(`[SyncEngine] Starting sync for vessel ${vesselId} from instance ${this.instanceId}`);
 
       // Step 1: INITIATE
@@ -182,6 +184,8 @@ export class SyncEngine {
       });
       console.log(`[SyncEngine] Sync completed. Checkpoint: ${completeResult.newCheckpoint}`);
 
+      syncDiag(`SYNC COMPLETE: checkpoint=${completeResult.newCheckpoint}`);
+
       // Step 4b: Mark local field logs as synced.
       // In remote mode, completeSyncSession marks logs in SHORE's DB but the ship's
       // local DB still has them as is_synced=false. Without this step, the same logs
@@ -189,6 +193,7 @@ export class SyncEngine {
       if (pushedLogUuids.length > 0) {
         try {
           await syncRepo.markFieldLogsSynced(pushedLogUuids, batchUuid!);
+          syncDiag(`PUSH DONE: marked ${pushedLogUuids.length} field logs as synced locally`);
           console.log(`[SyncEngine] Marked ${pushedLogUuids.length} local field logs as synced`);
         } catch (markErr: any) {
           // Non-fatal: worst case, logs will be re-pushed next cycle (duplicate but not data loss)
@@ -225,6 +230,7 @@ export class SyncEngine {
       }
 
       const durationMs = Date.now() - startTime;
+      syncDiag(`=== SYNC END === vessel=${vesselId}, duration=${durationMs}ms, status=success, pushed=${recordsPushed}, pulled=${recordsPulled}, conflicts=${conflictsFound}, files=${filesProcessedCount}+${filesFailedCount}`);
       return {
         success: true,
         batchUuid,
@@ -239,6 +245,7 @@ export class SyncEngine {
       };
     } catch (error: any) {
       const durationMs = Date.now() - startTime;
+      syncDiag(`=== SYNC END === vessel=${vesselId}, duration=${durationMs}ms, status=FAILED, error=${error.message}`);
       console.error(`[SyncEngine] Sync failed for vessel ${vesselId}:`, error.message);
 
       // Mark batch as failed if it was created
@@ -301,7 +308,21 @@ export class SyncEngine {
     // B. Gather BOTH_EDITABLE field logs (unsynced, from this instance)
     //    Pass vesselCode so logs stored with vessel_code (for vessel_code-scoped tables) are also found
     const vesselCode = await this.getVesselCode(vesselId);
+    syncDiag(`PUSH START: gathering field logs for vessel=${vesselId}, vesselCode=${vesselCode}`);
     const fieldLogs = await syncRepo.getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode);
+    syncDiag(`PUSH: found ${fieldLogs.length} unsynced field logs`);
+    // Table breakdown
+    const pushTables: Record<string, number> = {};
+    fieldLogs.forEach((l: any) => { pushTables[l.tableName ?? l.table_name] = (pushTables[l.tableName ?? l.table_name] || 0) + 1; });
+    if (Object.keys(pushTables).length > 0) syncDiag(`PUSH table breakdown:`, pushTables);
+    // Sample first 5 logs
+    fieldLogs.slice(0, 5).forEach((l: any, i: number) => {
+      const tbl = l.tableName ?? l.table_name;
+      const fld = l.fieldName ?? l.field_name;
+      const row = l.rowUuid ?? l.row_uuid;
+      const nv = l.newValue ?? l.new_value;
+      syncDiag(`PUSH sample[${i}]: table=${tbl}, field=${fld}, row=${row}, oldNull=${(l.oldValue ?? l.old_value) === null}, newValue=${nv ? String(nv).substring(0, 80) : 'NULL'}`);
+    });
     // Capture logUuids so the caller can mark them as synced after COMPLETE succeeds
     const pushedLogUuids = fieldLogs.map(l => l.logUuid ?? (l as any).log_uuid);
 
@@ -374,6 +395,15 @@ export class SyncEngine {
       lastCheckpoint: lastCheckpoint ? lastCheckpoint.toISOString() : null,
     });
 
+    // Diagnostic breakdown of pull data
+    const pullOneWay: Record<string, number> = {};
+    (pullData.oneWayRows || []).forEach((r: any) => { pullOneWay[r.tableName] = r.rows?.length || 0; });
+    const pullFields: Record<string, number> = {};
+    (pullData.fieldLogs || []).forEach((l: any) => { pullFields[l.tableName] = (pullFields[l.tableName] || 0) + 1; });
+    syncDiag(`PULL RECEIVED: ${pullData.oneWayRows?.length || 0} one-way table batches, ${pullData.fieldLogs?.length || 0} field logs`);
+    if (Object.keys(pullOneWay).length > 0) syncDiag(`PULL one-way tables:`, pullOneWay);
+    if (Object.keys(pullFields).length > 0) syncDiag(`PULL field log tables:`, pullFields);
+
     // B. Apply ONE_WAY rows (remote is master, overwrite local)
     if (pullData.oneWayRows && pullData.oneWayRows.length > 0) {
       // Pre-cleanup: clear seeded RBAC/rank data so shore UUIDs import cleanly.
@@ -396,8 +426,10 @@ export class SyncEngine {
           await pool.query('DELETE FROM adm_menumaster_ac WHERE parent_menu IS NOT NULL');
           await pool.query('DELETE FROM adm_menumaster_ac');
           await pool.query('DELETE FROM admn_role_master');
+          syncDiag(`PULL: RBAC cleanup done`);
           console.log('[SyncEngine] RBAC cleanup complete');
         } catch (cleanupErr: any) {
+          syncDiag(`PULL: RBAC cleanup FAILED: ${cleanupErr.message}`);
           console.error(`[SyncEngine] RBAC cleanup failed: ${cleanupErr.message}`);
         }
       }
@@ -408,8 +440,10 @@ export class SyncEngine {
           await pool.query('DELETE FROM adm_vessel_org_chart');
           await pool.query('DELETE FROM vessel_org_chart_nodes');
           await pool.query('DELETE FROM adm_available_ranks');
+          syncDiag(`PULL: Ranks cleanup done`);
           console.log('[SyncEngine] Ranks cleanup complete');
         } catch (cleanupErr: any) {
+          syncDiag(`PULL: Ranks cleanup FAILED: ${cleanupErr.message}`);
           console.warn(`[SyncEngine] Ranks cleanup partial: ${cleanupErr.message}`);
         }
       }
@@ -417,9 +451,11 @@ export class SyncEngine {
       for (const tableData of pullData.oneWayRows) {
         try {
           const result = await applyOneWayRows(tableData.tableName, tableData.rows);
+          syncDiag(`PULL ONE-WAY: ${tableData.tableName} — inserted=${result.inserted}, updated=${result.updated}, deleted=${result.softDeleted}, errors=${result.errors.length}`);
           totalPulled += result.inserted + result.updated + result.softDeleted;
           totalApplyErrors += result.errors.length;
           if (result.errors.length > 0) {
+            result.errors.slice(0, 3).forEach((e) => syncDiag(`PULL ONE-WAY ERROR: ${tableData.tableName}[${e.rowIndex}]: ${String(e.error).substring(0, 150)}`));
             // Collect first 5 error details for batch record
             const errorSamples = result.errors.slice(0, 5).map(
               (e) => `${tableData.tableName}[${e.rowIndex}]: ${e.error}`
@@ -430,6 +466,7 @@ export class SyncEngine {
             allErrors.push(...errorSamples);
           }
         } catch (err: any) {
+          syncDiag(`PULL ONE-WAY EXCEPTION: ${tableData.tableName}: ${err.message.substring(0, 150)}`);
           console.error(`[SyncEngine] Failed to apply one-way rows for ${tableData.tableName}:`, err.message);
           allErrors.push(`${tableData.tableName}: ${err.message}`);
         }
@@ -440,6 +477,10 @@ export class SyncEngine {
     if (pullData.fieldLogs && pullData.fieldLogs.length > 0) {
       // Phase 1: Detect INSERT groups (all oldValue=null) and insert new rows
       const insertResult = await applyFieldLogInserts(pullData.fieldLogs);
+      syncDiag(`PULL FIELD-LOG INSERT: inserted=${insertResult.insertedRows}, updateRemaining=${insertResult.updateLogs.length}, errors=${insertResult.errors.length}`);
+      if (insertResult.errors.length > 0) {
+        insertResult.errors.slice(0, 5).forEach((e: string) => syncDiag(`PULL INSERT ERROR: ${e.substring(0, 150)}`));
+      }
       totalPulled += insertResult.insertedRows;
       if (insertResult.errors.length > 0) {
         totalApplyErrors += insertResult.errors.length;
@@ -447,16 +488,21 @@ export class SyncEngine {
       }
 
       // Phase 2: Apply remaining UPDATE field logs (non-INSERT groups + existing rows)
+      let updateApplied = 0;
+      let updateErrors = 0;
       for (const log of insertResult.updateLogs) {
         try {
           await this.applyFieldLog(log);
           totalPulled++;
+          updateApplied++;
         } catch (err: any) {
           totalApplyErrors++;
+          updateErrors++;
           allErrors.push(`${log.tableName}.${log.fieldName}: ${err.message}`);
           console.error(`[SyncEngine] Failed to apply field log ${log.tableName}.${log.fieldName}:`, err.message);
         }
       }
+      syncDiag(`PULL FIELD-LOG UPDATE: total=${insertResult.updateLogs.length}, applied=${updateApplied}, errors=${updateErrors}`);
     }
 
     // D. Handle conflicts

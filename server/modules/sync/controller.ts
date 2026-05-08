@@ -3,6 +3,8 @@
  */
 
 import { Request, Response } from 'express';
+import * as fs from 'fs';
+import * as path from 'path';
 import * as syncService from './service';
 import * as syncRepo from './repository';
 import * as provisioningService from './provisioningService';
@@ -11,6 +13,7 @@ import { FileSyncProcessor } from './fileSyncProcessor';
 import { runPruning } from './pruningService';
 import { runHealthCheck, getTableStats } from './healthMonitor';
 import { getPool } from '../../db';
+import { getSyncLogPath, getSyncLogDir } from './syncDiagLogger';
 
 // ── POST /sync/initiate ──
 
@@ -499,5 +502,55 @@ export async function fleetOverviewHandler(req: Request, res: Response) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] fleet overview error:', error);
     res.status(500).json({ error: 'Failed to get fleet sync overview' });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// Diagnostic Log endpoints
+// ══════════════════════════════════════════════════════════════
+
+// ── GET /sync/diag-log ── (today's log file as plain text)
+
+export async function diagLogHandler(req: Request, res: Response) {
+  try {
+    const logPath = getSyncLogPath();
+    if (fs.existsSync(logPath)) {
+      res.setHeader('Content-Type', 'text/plain');
+      res.sendFile(path.resolve(logPath));
+    } else {
+      res.json({ message: 'No diagnostic log for today', path: logPath });
+    }
+  } catch (error: any) {
+    console.error('[Sync] diag-log error:', error);
+    res.status(500).json({ error: 'Failed to get diagnostic log' });
+  }
+}
+
+// ── GET /sync/diag-logs ── (list all available log files with dates + sizes)
+
+export async function diagLogsListHandler(req: Request, res: Response) {
+  try {
+    const logDir = getSyncLogDir();
+    if (!fs.existsSync(logDir)) {
+      return res.json({ logs: [], directory: logDir });
+    }
+    const files = fs.readdirSync(logDir)
+      .filter(f => f.startsWith('sync-diag-') && f.endsWith('.log'))
+      .map(f => {
+        const filePath = path.join(logDir, f);
+        const stat = fs.statSync(filePath);
+        return {
+          filename: f,
+          date: f.replace('sync-diag-', '').replace('.log', ''),
+          sizeBytes: stat.size,
+          sizeKB: Math.round(stat.size / 1024),
+          modifiedAt: stat.mtime.toISOString(),
+        };
+      })
+      .sort((a, b) => b.date.localeCompare(a.date)); // newest first
+    res.json({ logs: files, directory: logDir });
+  } catch (error: any) {
+    console.error('[Sync] diag-logs error:', error);
+    res.status(500).json({ error: 'Failed to list diagnostic logs' });
   }
 }

@@ -21,6 +21,7 @@
 import { getDb } from '../../db';
 import { syncFieldLog } from '../../../shared/schema';
 import { requiresFieldLogging } from '../../../shared/syncConfig';
+import { syncDiag } from './syncDiagLogger';
 
 // Fields to NEVER log — these are meta fields managed by the system, not user data.
 // NOTE: 'id' was previously skipped here (assumed to be an integer auto-PK).
@@ -149,6 +150,7 @@ export async function logFieldChanges(
   }
 
   if (logCount > 0) {
+    syncDiag(`FIELD-LOGGER: ${tableName} row=${rowUuid} — ${logCount} fields changed, isInsert=${oldRow === null}`);
     console.log(`[FieldLogger] Logged ${logCount} field change(s) for ${tableName}.${rowUuid}`);
   }
 

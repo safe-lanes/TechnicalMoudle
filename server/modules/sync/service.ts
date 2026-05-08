@@ -19,6 +19,7 @@ import {
 } from '../../../shared/syncConfig';
 import { getPool } from '../../db';
 import { getTableStats } from './healthMonitor';
+import { syncDiag } from './syncDiagLogger';
 
 // ═══════════════════════════════════════════════════════════════
 // HELPER — Vessel UUID ↔ vessel_code lookup
@@ -98,6 +99,8 @@ export async function receivePushData(
     }>;
   }
 ) {
+  syncDiag(`RECEIVE-PUSH START: batch=${batchUuid}, vessel=${vesselId}, fieldLogs=${payload.fieldLogs?.length || 0}, oneWayRows=${payload.oneWayRows?.length || 0}`);
+
   // Validate batch
   const batch = await repo.getBatch(batchUuid);
   if (!batch) {
@@ -175,6 +178,7 @@ export async function receivePushData(
           instanceId: log.instanceId,
         }))
       );
+      syncDiag(`RECEIVE-PUSH: ${fieldLogsStored} field logs stored in sync_field_log`);
 
       // 3. Apply field logs to actual data tables — ship's changes must update shore's DB.
       //    Without this step, field logs are stored for conflict detection but the actual
@@ -213,6 +217,7 @@ export async function receivePushData(
             const localUpdatedAt = new Date(freshCheck.rows[0].updated_at);
             if (logChangedAt < localUpdatedAt) {
               // Incoming log is older than local row — skip to prevent stale overwrite
+              syncDiag(`RECEIVE-PUSH STALE SKIP: ${log.tableName}.${log.fieldName} row=${log.rowUuid} — log ${logChangedAt.toISOString()} < row ${localUpdatedAt.toISOString()}`);
               console.log(
                 `[Sync Push] Skipping stale field log ${log.tableName}.${log.fieldName} for ${log.rowUuid} ` +
                 `(log ${logChangedAt.toISOString()} < row ${localUpdatedAt.toISOString()})`
@@ -253,6 +258,7 @@ export async function receivePushData(
     recordsReceived: (batch.recordsReceived ?? 0) + totalReceived,
   });
 
+  syncDiag(`RECEIVE-PUSH DONE: stored=${fieldLogsStored}, applied=${fieldLogsApplied}, errors=${fieldLogApplyErrors}, oneWayTables=${oneWaySummary.length}`);
   console.log(
     `[Sync Push] Batch ${batchUuid}: ${fieldLogsStored} field logs stored, ` +
     `${fieldLogsApplied} applied, ${fieldLogApplyErrors} apply errors, ` +
@@ -292,6 +298,7 @@ export async function preparePullData(
 
   // Pre-resolve vessel_code for tables that use vessel_code scope
   const vesselCode = await getVesselCodeForUuid(vesselId);
+  syncDiag(`PREPARE-PULL START: vessel=${vesselId}, vesselCode=${vesselCode}, checkpoint=${lastCheckpoint ? lastCheckpoint.toISOString() : 'NONE'}`);
 
   // 1. Gather ONE_WAY_SHORE_TO_SHIP full-row snapshots
   const oneWayRows = await gatherOneWayShoreRows(vesselId, lastCheckpoint);
@@ -305,6 +312,7 @@ export async function preparePullData(
     vesselCode
   );
   const shoreFieldLogs = shoreFieldLogsRaw.map(normalizeFieldLog);
+  syncDiag(`PREPARE-PULL FIELD LOGS: ${shoreFieldLogs.length} shore logs for vessel`);
 
   // 3. Detect conflicts — ship pushed its field logs in step 2 (PUSH),
   //    now compare: did ship AND shore both change the same field on the same row?
@@ -381,6 +389,11 @@ export async function preparePullData(
     recordsSent: nonConflictingLogs.length + oneWayRows.reduce((sum, t) => sum + t.rows.length, 0),
     conflictsFound: conflicts.length,
   });
+
+  const totalOneWayRows = oneWayRows.reduce((sum, t) => sum + t.rows.length, 0);
+  syncDiag(`PREPARE-PULL DONE: ${totalOneWayRows} one-way rows across ${oneWayRows.length} tables, ${nonConflictingLogs.length} field logs, ${conflicts.length} conflicts`);
+  // Per-table one-way breakdown
+  oneWayRows.forEach(t => syncDiag(`PREPARE-PULL ONE-WAY: ${t.tableName} — ${t.rows.length} rows`));
 
   console.log(
     `[Sync Pull] Batch ${batchUuid}: ${nonConflictingLogs.length} field logs, ` +

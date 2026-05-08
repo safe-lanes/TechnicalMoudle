@@ -10,6 +10,7 @@
 
 import { getPool } from '../../db';
 import { getTableSyncConfig, getIdentityColumn } from '../../../shared/syncConfig';
+import { syncDiag } from './syncDiagLogger';
 
 interface ApplyResult {
   inserted: number;
@@ -77,6 +78,8 @@ export async function applyOneWayRows(
   rows: any[]
 ): Promise<ApplyResult> {
   if (rows.length === 0) return { inserted: 0, updated: 0, softDeleted: 0, errors: [] };
+
+  syncDiag(`ONE-WAY-APPLY START: ${tableName} — ${rows.length} rows`);
 
   const config = getTableSyncConfig(tableName);
   if (!config) {
@@ -199,9 +202,12 @@ export async function applyOneWayRows(
         }
       }
     } catch (err: any) {
+      syncDiag(`ONE-WAY-APPLY ROW ERROR: ${tableName} row[${i}]: ${err.message.substring(0, 150)}`);
       result.errors.push({ rowIndex: i, error: err.message });
     }
   }
+
+  syncDiag(`ONE-WAY-APPLY DONE: ${tableName} — inserted=${result.inserted}, updated=${result.updated}, deleted=${result.softDeleted}, errors=${result.errors.length}`);
 
   // Advance sequences for GENERATED ALWAYS identity columns so future
   // INSERTs (via UI or next sync) don't collide with imported integer PKs.
@@ -367,6 +373,8 @@ export async function applyFieldLogInserts(
     return { insertedRows: 0, updateLogs: [], errors: [] };
   }
 
+  syncDiag(`FIELD-LOG-INSERT START: ${fieldLogs.length} logs`);
+
   const pool = await getPool();
   let insertedRows = 0;
   const updateLogs: FieldLogEntry[] = [];
@@ -381,6 +389,7 @@ export async function applyFieldLogInserts(
   }
 
   // 2. Classify each group as INSERT or UPDATE
+  syncDiag(`FIELD-LOG-INSERT: ${groups.size} groups from ${fieldLogs.length} logs`);
   const groupKeys = Array.from(groups.keys());
   for (const groupKey of groupKeys) {
     const logs = groups.get(groupKey)!;
@@ -492,6 +501,7 @@ export async function applyFieldLogInserts(
 
       await pool.query(insertSQL, values);
       insertedRows++;
+      syncDiag(`FIELD-LOG-INSERT OK: ${tableName} row=${rowUuid} (${columns.length} columns)`);
       console.log(`[FieldLogInsert] Inserted new row ${tableName}.${rowUuid} (${columns.length} columns)`);
     } catch (err: any) {
       // 23505 = unique_violation — another unique constraint (not the identity column)
@@ -603,11 +613,13 @@ export async function applyFieldLogInserts(
           console.error(`[FieldLogInsert] Conflict fallback error for ${tableName}.${rowUuid}:`, fallbackErr.message);
         }
       } else {
+        syncDiag(`FIELD-LOG-INSERT FAIL: ${tableName} row=${rowUuid} — ${err.message.substring(0, 150)}`);
         errors.push(`${tableName}.${rowUuid}: ${err.message}`);
         console.error(`[FieldLogInsert] Failed to insert ${tableName}.${rowUuid}:`, err.message);
       }
     }
   }
 
+  syncDiag(`FIELD-LOG-INSERT DONE: inserted=${insertedRows}, updatePassthrough=${updateLogs.length}, errors=${errors.length}`);
   return { insertedRows, updateLogs, errors };
 }
