@@ -372,7 +372,9 @@ export interface FieldLogEntry {
  * - errors: any errors during INSERT
  */
 export async function applyFieldLogInserts(
-  fieldLogs: FieldLogEntry[]
+  fieldLogs: FieldLogEntry[],
+  /** Optional pg client to reuse (for transactional SET LOCAL sync.bypass_trigger) */
+  externalClient?: { query: (text: string, values?: any[]) => Promise<any> }
 ): Promise<{
   insertedRows: number;
   updateLogs: FieldLogEntry[];
@@ -384,7 +386,7 @@ export async function applyFieldLogInserts(
 
   syncDiag(`FIELD-LOG-INSERT START: ${fieldLogs.length} logs`);
 
-  const pool = await getPool();
+  const pool = externalClient || await getPool();
   let insertedRows = 0;
   const updateLogs: FieldLogEntry[] = [];
   const errors: string[] = [];

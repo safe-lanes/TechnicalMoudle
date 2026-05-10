@@ -184,76 +184,93 @@ export async function receivePushData(
       //    Without this step, field logs are stored for conflict detection but the actual
       //    tables (work_orders, spares, stores, etc.) never get updated.
       //    Mirrors applyFieldLog() in syncEngine.ts.
-
-      // Phase 1: Detect INSERT groups (all oldValue=null) and insert new rows
-      const insertResult = await applyFieldLogInserts(acceptedLogs);
-      fieldLogsApplied += insertResult.insertedRows;
-      fieldLogApplyErrors += insertResult.errors.length;
-      if (insertResult.errors.length > 0) {
-        insertResult.errors.forEach(e => console.error(`[Sync Push] INSERT error: ${e}`));
-      }
-
-      // Phase 2: Apply remaining UPDATE field logs (non-INSERT groups + existing rows)
-      // Defence: skip stale logs where local row was updated MORE RECENTLY than the
-      // incoming changedAt.  This prevents re-pushed (duplicate) field logs from
-      // reverting newer shore edits.  A per-row query is unavoidable but cheap.
       //
-      // IMPORTANT: Use the log's changedAt (not NOW()) for updated_at when applying.
-      // Using NOW() would cause subsequent fields from the same batch to be stale-skipped
-      // because applying field A would set updated_at=NOW() > changedAt for field B.
+      //    Wrapped in a transaction with SET LOCAL sync.bypass_trigger = 'true' so that
+      //    the set_updated_at() BEFORE UPDATE trigger does NOT override the application-
+      //    supplied log.changedAt value. Without this, the trigger sets updated_at = NOW(),
+      //    causing subsequent same-batch field logs to fail the stale-skip guard.
       const pool = await getPool();
-      for (const log of insertResult.updateLogs) {
-        const config = getTableSyncConfig(log.tableName);
-        if (!config) continue;
-        const identityCol = config.identityColumn || 'id';
-        const fieldNameSnake = toSnakeCase(log.fieldName);
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
+        syncDiag(`SYNC-APPLY TRIGGER BYPASS active for batch=${batchUuid}`);
 
-        try {
-          // Stale-log guard: only apply if the incoming change is at least as new as
-          // the row's current updated_at.  This prevents old re-pushed logs from
-          // overwriting newer local edits (e.g., category revert scenario).
-          const logChangedAt = log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt));
-          const freshCheck = await pool.query(
-            `SELECT "updated_at" FROM "${log.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
-            [log.rowUuid]
-          );
-          if (freshCheck.rows.length > 0) {
-            const localUpdatedAt = new Date(freshCheck.rows[0].updated_at);
-            if (logChangedAt < localUpdatedAt) {
-              // Incoming log is older than local row — skip to prevent stale overwrite
-              syncDiag(`RECEIVE-PUSH STALE SKIP: ${log.tableName}.${log.fieldName} row=${log.rowUuid} — log ${logChangedAt.toISOString()} < row ${localUpdatedAt.toISOString()}`);
-              console.log(
-                `[Sync Push] Skipping stale field log ${log.tableName}.${log.fieldName} for ${log.rowUuid} ` +
-                `(log ${logChangedAt.toISOString()} < row ${localUpdatedAt.toISOString()})`
-              );
-              continue;
-            }
-          }
-
-          // JSON coercion for json/jsonb columns
-          const meta = await getColumnMeta(pool, log.tableName);
-          let valueToApply: any = log.newValue;
-          if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
-            try {
-              JSON.parse(valueToApply);
-              // Valid JSON string — pass as-is (pg accepts for json/jsonb)
-            } catch {
-              // Not valid JSON (corrupted like "[object Object]") — reset to empty
-              valueToApply = '[]';
-            }
-          }
-
-          // Use the log's changedAt for updated_at — NOT NOW() — so that subsequent
-          // fields from the same batch (same changedAt) don't get stale-skipped.
-          await pool.query(
-            `UPDATE "${log.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
-            [valueToApply, log.rowUuid, logChangedAt]
-          );
-          fieldLogsApplied++;
-        } catch (err: any) {
-          fieldLogApplyErrors++;
-          console.error(`[Sync Push] Failed to apply field log ${log.tableName}.${log.fieldName} for ${log.rowUuid}: ${err.message}`);
+        // Phase 1: Detect INSERT groups (all oldValue=null) and insert new rows
+        const insertResult = await applyFieldLogInserts(acceptedLogs, client);
+        fieldLogsApplied += insertResult.insertedRows;
+        fieldLogApplyErrors += insertResult.errors.length;
+        if (insertResult.errors.length > 0) {
+          insertResult.errors.forEach(e => console.error(`[Sync Push] INSERT error: ${e}`));
         }
+
+        // Phase 2: Apply remaining UPDATE field logs (non-INSERT groups + existing rows)
+        // Defence: skip stale logs where local row was updated MORE RECENTLY than the
+        // incoming changedAt.  This prevents re-pushed (duplicate) field logs from
+        // reverting newer shore edits.  A per-row query is unavoidable but cheap.
+        //
+        // IMPORTANT: Use the log's changedAt (not NOW()) for updated_at when applying.
+        // The trigger bypass ensures the supplied value is preserved in the row.
+        for (const log of insertResult.updateLogs) {
+          const config = getTableSyncConfig(log.tableName);
+          if (!config) continue;
+          const identityCol = config.identityColumn || 'id';
+          const fieldNameSnake = toSnakeCase(log.fieldName);
+
+          try {
+            // Stale-log guard: only apply if the incoming change is at least as new as
+            // the row's current updated_at.  This prevents old re-pushed logs from
+            // overwriting newer local edits (e.g., category revert scenario).
+            const logChangedAt = log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt));
+            const freshCheck = await client.query(
+              `SELECT "updated_at" FROM "${log.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+              [log.rowUuid]
+            );
+            if (freshCheck.rows.length > 0) {
+              const localUpdatedAt = new Date(freshCheck.rows[0].updated_at);
+              if (logChangedAt < localUpdatedAt) {
+                // Incoming log is older than local row — skip to prevent stale overwrite
+                syncDiag(`RECEIVE-PUSH STALE SKIP: ${log.tableName}.${log.fieldName} row=${log.rowUuid} — log ${logChangedAt.toISOString()} < row ${localUpdatedAt.toISOString()}`);
+                console.log(
+                  `[Sync Push] Skipping stale field log ${log.tableName}.${log.fieldName} for ${log.rowUuid} ` +
+                  `(log ${logChangedAt.toISOString()} < row ${localUpdatedAt.toISOString()})`
+                );
+                continue;
+              }
+            }
+
+            // JSON coercion for json/jsonb columns
+            const meta = await getColumnMeta(client, log.tableName);
+            let valueToApply: any = log.newValue;
+            if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
+              try {
+                JSON.parse(valueToApply);
+                // Valid JSON string — pass as-is (pg accepts for json/jsonb)
+              } catch {
+                // Not valid JSON (corrupted like "[object Object]") — reset to empty
+                valueToApply = '[]';
+              }
+            }
+
+            // Use the log's changedAt for updated_at — trigger bypass ensures it sticks.
+            await client.query(
+              `UPDATE "${log.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
+              [valueToApply, log.rowUuid, logChangedAt]
+            );
+            fieldLogsApplied++;
+          } catch (err: any) {
+            fieldLogApplyErrors++;
+            console.error(`[Sync Push] Failed to apply field log ${log.tableName}.${log.fieldName} for ${log.rowUuid}: ${err.message}`);
+          }
+        }
+
+        await client.query('COMMIT');
+      } catch (txErr: any) {
+        await client.query('ROLLBACK');
+        console.error(`[Sync Push] Transaction error during field log apply: ${txErr.message}`);
+        throw txErr;
+      } finally {
+        client.release();
       }
     }
     totalReceived += fieldLogsStored;

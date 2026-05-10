@@ -474,35 +474,53 @@ export class SyncEngine {
     }
 
     // C. Apply BOTH_EDITABLE field logs (INSERT new rows + UPDATE existing fields)
+    //    Wrapped in a transaction with SET LOCAL sync.bypass_trigger = 'true' so the
+    //    set_updated_at() BEFORE UPDATE trigger preserves the supplied log.changedAt.
     if (pullData.fieldLogs && pullData.fieldLogs.length > 0) {
-      // Phase 1: Detect INSERT groups (all oldValue=null) and insert new rows
-      const insertResult = await applyFieldLogInserts(pullData.fieldLogs);
-      syncDiag(`PULL FIELD-LOG INSERT: inserted=${insertResult.insertedRows}, updateRemaining=${insertResult.updateLogs.length}, errors=${insertResult.errors.length}`);
-      if (insertResult.errors.length > 0) {
-        insertResult.errors.slice(0, 5).forEach((e: string) => syncDiag(`PULL INSERT ERROR: ${e.substring(0, 150)}`));
-      }
-      totalPulled += insertResult.insertedRows;
-      if (insertResult.errors.length > 0) {
-        totalApplyErrors += insertResult.errors.length;
-        allErrors.push(...insertResult.errors);
-      }
+      const pool = await getPool();
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(`SET LOCAL sync.bypass_trigger = 'true'`);
+        syncDiag(`SYNC-APPLY TRIGGER BYPASS active for pull`);
 
-      // Phase 2: Apply remaining UPDATE field logs (non-INSERT groups + existing rows)
-      let updateApplied = 0;
-      let updateErrors = 0;
-      for (const log of insertResult.updateLogs) {
-        try {
-          await this.applyFieldLog(log);
-          totalPulled++;
-          updateApplied++;
-        } catch (err: any) {
-          totalApplyErrors++;
-          updateErrors++;
-          allErrors.push(`${log.tableName}.${log.fieldName}: ${err.message}`);
-          console.error(`[SyncEngine] Failed to apply field log ${log.tableName}.${log.fieldName}:`, err.message);
+        // Phase 1: Detect INSERT groups (all oldValue=null) and insert new rows
+        const insertResult = await applyFieldLogInserts(pullData.fieldLogs, client);
+        syncDiag(`PULL FIELD-LOG INSERT: inserted=${insertResult.insertedRows}, updateRemaining=${insertResult.updateLogs.length}, errors=${insertResult.errors.length}`);
+        if (insertResult.errors.length > 0) {
+          insertResult.errors.slice(0, 5).forEach((e: string) => syncDiag(`PULL INSERT ERROR: ${e.substring(0, 150)}`));
         }
+        totalPulled += insertResult.insertedRows;
+        if (insertResult.errors.length > 0) {
+          totalApplyErrors += insertResult.errors.length;
+          allErrors.push(...insertResult.errors);
+        }
+
+        // Phase 2: Apply remaining UPDATE field logs (non-INSERT groups + existing rows)
+        let updateApplied = 0;
+        let updateErrors = 0;
+        for (const log of insertResult.updateLogs) {
+          try {
+            await this.applyFieldLog(log, client);
+            totalPulled++;
+            updateApplied++;
+          } catch (err: any) {
+            totalApplyErrors++;
+            updateErrors++;
+            allErrors.push(`${log.tableName}.${log.fieldName}: ${err.message}`);
+            console.error(`[SyncEngine] Failed to apply field log ${log.tableName}.${log.fieldName}:`, err.message);
+          }
+        }
+        syncDiag(`PULL FIELD-LOG UPDATE: total=${insertResult.updateLogs.length}, applied=${updateApplied}, errors=${updateErrors}`);
+
+        await client.query('COMMIT');
+      } catch (txErr: any) {
+        await client.query('ROLLBACK');
+        console.error(`[SyncEngine] Transaction error during pull field log apply: ${txErr.message}`);
+        throw txErr;
+      } finally {
+        client.release();
       }
-      syncDiag(`PULL FIELD-LOG UPDATE: total=${insertResult.updateLogs.length}, applied=${updateApplied}, errors=${updateErrors}`);
     }
 
     // D. Handle conflicts
@@ -537,16 +555,20 @@ export class SyncEngine {
   // FIELD LOG APPLIER — Merge a single field change into local DB
   // ═══════════════════════════════════════════════════════════════
 
-  private async applyFieldLog(log: {
-    tableName: string;
-    rowUuid: string;
-    fieldName: string;
-    oldValue: string | null;
-    newValue: string | null;
-    changedAt?: string | Date;
-    changedByUserId?: string | null;
-    instanceId?: string;
-  }): Promise<void> {
+  private async applyFieldLog(
+    log: {
+      tableName: string;
+      rowUuid: string;
+      fieldName: string;
+      oldValue: string | null;
+      newValue: string | null;
+      changedAt?: string | Date;
+      changedByUserId?: string | null;
+      instanceId?: string;
+    },
+    /** Optional pg client to reuse (for transactional SET LOCAL sync.bypass_trigger) */
+    client?: { query: (text: string, values?: any[]) => Promise<any> }
+  ): Promise<void> {
     const config = getTableSyncConfig(log.tableName);
     if (!config) {
       console.warn(`[SyncEngine] Unknown table in field log: ${log.tableName}`);
@@ -565,13 +587,13 @@ export class SyncEngine {
     const identityCol = config.identityColumn || 'id';
     const fieldNameSnake = camelToSnake(log.fieldName);
 
-    const pool = await getPool();
+    const conn = client || await getPool();
 
     // JSON coercion: if the column is json/jsonb, ensure the value is valid JSON.
     // The field logger stores JSON values as JSON strings (e.g., '[{"spareId":"abc"}]').
     // For json/jsonb columns, we must pass a parsed object so pg serializes it correctly,
     // OR pass the raw JSON string which pg accepts directly for json/jsonb types.
-    const meta = await getColumnMeta(pool, log.tableName);
+    const meta = await getColumnMeta(conn, log.tableName);
     let valueToApply: any = log.newValue;
     if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
       try {
@@ -585,11 +607,10 @@ export class SyncEngine {
       }
     }
 
-    // Use the log's changedAt for updated_at — NOT NOW() — so that subsequent
-    // fields from the same batch (same changedAt) don't get stale-skipped.
+    // Use the log's changedAt for updated_at — trigger bypass ensures it sticks.
     const logTs = log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt));
     // Let errors bubble up to the caller for proper counting (Defect D fix)
-    await pool.query(
+    await conn.query(
       `UPDATE "${log.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
       [valueToApply, log.rowUuid, logTs]
     );
