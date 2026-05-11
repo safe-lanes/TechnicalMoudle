@@ -205,12 +205,26 @@ export async function receivePushData(
         }
 
         // Phase 2: Apply remaining UPDATE field logs (non-INSERT groups + existing rows)
-        // Defence: skip stale logs where local row was updated MORE RECENTLY than the
-        // incoming changedAt.  This prevents re-pushed (duplicate) field logs from
-        // reverting newer shore edits.  A per-row query is unavoidable but cheap.
+        //
+        // Per-field stale-skip guard (Option 2c):
+        // Instead of comparing against row.updated_at (which mixes ALL field edits and
+        // trigger stamps), we check sync_field_log for a newer RECEIVER-side edit on the
+        // SAME field only.  This prevents false positives where an unrelated local edit
+        // bumps row.updated_at and causes all incoming logs to appear stale.
+        //
+        // INSERT-origin logs (oldValue === null) ALWAYS apply (defence-in-depth from 58c33ad2).
+        //
+        // True conflicts (receiver has newer same-field edit) are recorded in
+        // sync_conflict_log for visibility and future resolution UI.
         //
         // IMPORTANT: Use the log's changedAt (not NOW()) for updated_at when applying.
         // The trigger bypass ensures the supplied value is preserved in the row.
+        const receiverInstanceId = process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
+        if (receiverInstanceId === 'UNKNOWN') {
+          syncDiag('WARNING: SYNC_INSTANCE_ID not set — per-field stale-skip protection degraded');
+          console.error('[Sync Push] CRITICAL: SYNC_INSTANCE_ID env var not configured — stale-skip guard cannot distinguish receiver-local edits');
+        }
+
         for (const log of insertResult.updateLogs) {
           const config = getTableSyncConfig(log.tableName);
           if (!config) continue;
@@ -218,37 +232,67 @@ export async function receivePushData(
           const fieldNameSnake = toSnakeCase(log.fieldName);
 
           try {
-            // Stale-log guard: only apply to UPDATE logs where the incoming change is
-            // older than the row's current updated_at.  This prevents old re-pushed logs
-            // from overwriting newer local edits (e.g., category revert scenario).
-            //
-            // INSERT-origin logs (oldValue === null) ALWAYS apply regardless of
-            // row.updated_at.  When a row is created on ship, the INSERT field logs may
-            // have changedAt older than a subsequent local edit that bumped updated_at.
-            // Without this bypass, the INSERT logs would all be stale-skipped and the
-            // row would never receive its initial field values on the receiver.
             const logChangedAt = log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt));
             const isInsertLog = log.oldValue === null || log.oldValue === undefined;
 
-            const freshCheck = await client.query(
-              `SELECT "updated_at" FROM "${log.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
-              [log.rowUuid]
-            );
-            if (freshCheck.rows.length > 0) {
-              const localUpdatedAt = new Date(freshCheck.rows[0].updated_at);
+            // INSERT-origin logs ALWAYS apply — row needs these fields to exist
+            if (isInsertLog) {
+              syncDiag(`INSERT-LOG ALLOWED: ${log.tableName}.${log.fieldName} row=${log.rowUuid}`);
+              // fall through to apply below
+            } else {
+              // Per-field stale-skip: check if the RECEIVER has a newer log for this
+              // exact (table, row, field). Only receiver-local logs count — we compare
+              // against instance_id = receiverInstanceId, NOT against the sender's logs.
+              const fieldCheck = await client.query(
+                `SELECT changed_at, instance_id FROM sync_field_log
+                 WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
+                   AND instance_id = $4 AND changed_at > $5
+                 ORDER BY changed_at DESC LIMIT 1`,
+                [log.tableName, log.rowUuid, log.fieldName, receiverInstanceId, logChangedAt]
+              );
 
-              if (isInsertLog && logChangedAt < localUpdatedAt) {
-                // INSERT-origin log is older than row — allow anyway (row needs these fields)
-                syncDiag(`INSERT-LOG ALLOWED (stale-skip bypass for insert): ${log.tableName}.${log.fieldName} row=${log.rowUuid} — log ${logChangedAt.toISOString()} < row ${localUpdatedAt.toISOString()}`);
-              } else if (!isInsertLog && logChangedAt < localUpdatedAt) {
-                // UPDATE log is older than local row — skip to prevent stale overwrite
-                syncDiag(`RECEIVE-PUSH STALE SKIP: ${log.tableName}.${log.fieldName} row=${log.rowUuid} — log ${logChangedAt.toISOString()} < row ${localUpdatedAt.toISOString()}`);
-                console.log(
-                  `[Sync Push] Skipping stale field log ${log.tableName}.${log.fieldName} for ${log.rowUuid} ` +
-                  `(log ${logChangedAt.toISOString()} < row ${localUpdatedAt.toISOString()})`
-                );
-                continue;
+              if (fieldCheck.rows.length > 0) {
+                // REAL CONFLICT: receiver edited this SAME field more recently.
+                const winner = fieldCheck.rows[0];
+                const winnerChangedAt = new Date(winner.changed_at);
+
+                // Read current value from data table for the conflict log
+                let currentValue: string | null = null;
+                try {
+                  const curRow = await client.query(
+                    `SELECT "${fieldNameSnake}" FROM "${log.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+                    [log.rowUuid]
+                  );
+                  if (curRow.rows.length > 0) {
+                    const raw = curRow.rows[0][fieldNameSnake];
+                    currentValue = raw === null || raw === undefined ? null : String(raw);
+                  }
+                } catch { /* best-effort — don't fail the loop for logging */ }
+
+                // Record in sync_conflict_log
+                try {
+                  await client.query(
+                    `INSERT INTO sync_conflict_log
+                       (batch_uuid, table_name, row_uuid, field_name,
+                        incoming_sender_instance, incoming_changed_at,
+                        incoming_old_value, incoming_new_value,
+                        receiver_winner_instance, receiver_winner_changed_at,
+                        receiver_current_value)
+                     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+                    [batchUuid, log.tableName, log.rowUuid, log.fieldName,
+                     log.instanceId, logChangedAt,
+                     log.oldValue, log.newValue,
+                     receiverInstanceId, winnerChangedAt,
+                     currentValue]
+                  );
+                } catch (clErr: any) {
+                  console.error(`[Sync Push] Failed to write sync_conflict_log: ${clErr.message}`);
+                }
+
+                syncDiag(`CONFLICT LOGGED: ${log.tableName}.${log.fieldName} row=${log.rowUuid} — incoming ${logChangedAt.toISOString()} rejected by receiver ${winnerChangedAt.toISOString()}`);
+                continue; // skip apply — receiver's edit wins
               }
+              // No receiver-side conflict → fall through to apply
             }
 
             // JSON coercion for json/jsonb columns
