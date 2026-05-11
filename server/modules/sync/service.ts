@@ -20,6 +20,8 @@ import {
 import { getPool } from '../../db';
 import { getTableStats } from './healthMonitor';
 import { syncDiag } from './syncDiagLogger';
+import * as alertsRepo from '../alerts/repositories/alertsRepository';
+import { getFieldDisplayName } from './conflictReviewRepository';
 
 // ═══════════════════════════════════════════════════════════════
 // HELPER — Vessel UUID ↔ vessel_code lookup
@@ -285,6 +287,55 @@ export async function receivePushData(
                      receiverInstanceId, winnerChangedAt,
                      currentValue]
                   );
+                  // ── Conflict notification (fire-and-forget) ──
+                  try {
+                    // Look up the rejected user from the incoming sender's field log
+                    const rejectedUserQuery = await client.query(
+                      `SELECT changed_by_user_id FROM sync_field_log
+                       WHERE table_name = $1 AND row_uuid = $2 AND field_name = $3
+                         AND instance_id = $4
+                       ORDER BY changed_at DESC LIMIT 1`,
+                      [log.tableName, log.rowUuid, log.fieldName, log.instanceId]
+                    );
+                    const rejectedUserId = rejectedUserQuery.rows[0]?.changed_by_user_id;
+
+                    // Only notify real users, not 'system'
+                    if (rejectedUserId && rejectedUserId !== 'system') {
+                      const fieldLabel = getFieldDisplayName(log.fieldName);
+                      const event = await alertsRepo.createAlertEvent({
+                        alertType: 'sync_conflict_detected',
+                        priority: 'medium',
+                        objectType: log.tableName,
+                        objectId: log.rowUuid,
+                        vesselId: log.vesselId || null,
+                        dedupeKey: `sync_conflict:${log.tableName}:${log.rowUuid}:${log.fieldName}:${logChangedAt.toISOString()}`,
+                        state: 'open',
+                        payload: JSON.stringify({
+                          alertMessage: `Sync conflict: your change to "${fieldLabel}" was rejected — the other side has a newer edit`,
+                          tableName: log.tableName,
+                          fieldName: log.fieldName,
+                          targetUserId: rejectedUserId,
+                          link: `/admin/sync-conflicts`,
+                        }),
+                      });
+
+                      if (event) {
+                        await alertsRepo.createAlertDelivery({
+                          eventId: event.id,
+                          eventUuid: event.aeuuid,
+                          channel: 'in_app',
+                          recipient: rejectedUserId,
+                          status: 'sent',
+                        });
+                        syncDiag(`CONFLICT NOTIFICATION: sent to user=${rejectedUserId} for ${log.tableName}.${log.fieldName}`);
+                      }
+                    }
+                  } catch (notifyErr: any) {
+                    // Dedupe key collision is normal — ignore. Other errors are non-fatal.
+                    if (!notifyErr.message?.includes('unique') && !notifyErr.message?.includes('duplicate')) {
+                      syncDiag(`CONFLICT NOTIFICATION FAILED: ${notifyErr.message} — conflict still logged`);
+                    }
+                  }
                 } catch (clErr: any) {
                   console.error(`[Sync Push] Failed to write sync_conflict_log: ${clErr.message}`);
                 }

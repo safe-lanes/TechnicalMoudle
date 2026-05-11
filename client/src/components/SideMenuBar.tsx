@@ -36,6 +36,7 @@ import {
   Cloud,
   HardDrive,
   Globe,
+  GitPullRequest,
 } from "lucide-react";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 
@@ -89,6 +90,7 @@ const menuConfigs: Record<string, MenuItem[]> = {
     { id: "ranks", label: "Ranks", icon: UserCog },
     { id: "access-control", label: "Access Control", icon: ShieldCheck },
     { id: "sync-dashboard", label: "Sync Dashboard", icon: Cloud },
+    { id: "sync-conflicts", label: "Conflict Review", icon: GitPullRequest },
     { id: "sync-provisioning", label: "Ship Provisioning", icon: HardDrive },
     // sync-fleet is conditionally added at runtime (shore-only)
   ],

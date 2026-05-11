@@ -12,6 +12,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { VesselContext } from "@/contexts/VesselContext";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -169,6 +170,7 @@ export default function SyncDashboard() {
   const { toast } = useToast();
   const vesselCtx = useContext(VesselContext);
   const vessels = vesselCtx?.vessels ?? [];
+  const [, setLocation] = useLocation();
 
   const [selectedVesselId, setSelectedVesselId] = useState<string>("");
   const [syncProgress, setSyncProgress] = useState(0);
@@ -222,6 +224,18 @@ export default function SyncDashboard() {
     enabled: !!selectedVesselId,
     refetchInterval: 30_000,
   });
+
+  // ── Combined Conflict Count (from conflict review endpoint) ──
+  const conflictCountQuery = useQuery<{ total: number; fromLog: number; fromOld: number }>({
+    queryKey: ["/technical/api/sync/conflicts/review/count"],
+    queryFn: async () => {
+      const res = await fetch("/technical/api/sync/conflicts/review/count");
+      if (!res.ok) return { total: 0, fromLog: 0, fromOld: 0 };
+      return res.json();
+    },
+    refetchInterval: 30_000,
+  });
+  const totalConflictCount = conflictCountQuery.data?.total ?? 0;
 
   // ── Sync Trigger ──
   const syncMutation = useMutation({
@@ -391,15 +405,18 @@ export default function SyncDashboard() {
             <div className="mt-1">{lastBatch ? statusBadge(lastBatch.status) : <Badge variant="outline">N/A</Badge>}</div>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-amber-500">
+        <Card
+          className="border-l-4 border-l-amber-500 cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => setLocation("/admin/sync-conflicts")}
+        >
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <AlertTriangle className="h-4 w-4" />
               Conflicts
             </div>
             <div className="text-lg font-semibold mt-1">
-              {conflicts.length}
-              {conflicts.length > 0 && (
+              {totalConflictCount}
+              {totalConflictCount > 0 && (
                 <span className="text-xs text-amber-600 ml-1">need resolution</span>
               )}
             </div>

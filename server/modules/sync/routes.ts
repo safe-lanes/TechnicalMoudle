@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../shared/middleware';
 import * as syncController from './controller';
+import * as conflictReviewCtrl from './conflictReviewController';
 import { requireOfflineAdmin } from './middleware';
 
 const router = Router();
@@ -16,6 +17,15 @@ router.get('/sync/status', asyncHandler(syncController.statusHandler));
 // Sync admin endpoints (for shore-side management)
 router.get('/sync/batches', asyncHandler(syncController.recentBatchesHandler));
 router.get('/sync/conflicts', asyncHandler(syncController.unresolvedConflictsHandler));
+
+// Conflict Review endpoints (unified view over sync_conflict_log + sync_conflicts)
+// Static paths MUST come before :id to avoid Express matching "count"/"tables" as an :id
+router.get('/sync/conflicts/review/count', asyncHandler(conflictReviewCtrl.countConflictsHandler));
+router.get('/sync/conflicts/review/tables', asyncHandler(conflictReviewCtrl.conflictTablesHandler));
+router.get('/sync/conflicts/review', asyncHandler(conflictReviewCtrl.listConflictsHandler));
+router.get('/sync/conflicts/review/:id', asyncHandler(conflictReviewCtrl.getConflictHandler));
+router.post('/sync/conflicts/review/:id/apply-incoming', asyncHandler(conflictReviewCtrl.applyIncomingHandler));
+router.post('/sync/conflicts/review/:id/dismiss', asyncHandler(conflictReviewCtrl.dismissHandler));
 
 // Sync engine trigger (manual or scheduled)
 router.post('/sync/trigger', asyncHandler(syncController.triggerSyncHandler));

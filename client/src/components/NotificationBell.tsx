@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell } from 'lucide-react';
+import { Bell, ExternalLink } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 
 interface AlertEvent {
@@ -29,6 +30,7 @@ const alertTypeLabels: Record<string, string> = {
   critical_job_overdue: 'Job Overdue',
   low_critical_spares: 'Low Spares',
   critical_job_cycle_skipped: 'Cycle Skipped',
+  sync_conflict_detected: 'Sync Conflict',
 };
 
 function getHighestPriority(events: AlertEvent[]): string {
@@ -52,6 +54,7 @@ export const NotificationBell: React.FC = () => {
   const { currentUser } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [, setLocation] = useLocation();
 
   const role = currentUser?.role || 'Office';
   const vesselId = currentUser?.vesselId || '';
@@ -145,14 +148,24 @@ export const NotificationBell: React.FC = () => {
                 try { payload = JSON.parse(event.payload || '{}'); } catch {}
                 const message = payload.alertMessage || `${alertTypeLabels[event.alertType] || event.alertType} alert`;
                 const requiresCoAck = payload.requiresCoAck === true;
+                const deepLink = payload.link || null;
 
                 return (
                   <div
                     key={event.aeuuid}
                     className={cn(
                       'px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors',
+                      deepLink && 'cursor-pointer',
                       colors.bg
                     )}
+                    onClick={() => {
+                      if (deepLink) {
+                        // Acknowledge + navigate
+                        acknowledgeMutation.mutate({ eventId: event.aeuuid });
+                        setIsOpen(false);
+                        setLocation(deepLink);
+                      }
+                    }}
                   >
                     <div className="flex items-start gap-3">
                       {/* Priority dot */}
@@ -171,6 +184,13 @@ export const NotificationBell: React.FC = () => {
 
                         {/* Message */}
                         <p className="text-sm text-gray-700 mt-0.5 line-clamp-2">{message}</p>
+
+                        {/* Deep link indicator */}
+                        {deepLink && (
+                          <span className="inline-flex items-center gap-0.5 mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">
+                            <ExternalLink className="h-2.5 w-2.5" /> View details
+                          </span>
+                        )}
 
                         {/* Co-ack badge */}
                         {requiresCoAck && (

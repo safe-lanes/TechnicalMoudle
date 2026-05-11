@@ -34,6 +34,7 @@ import AccessControl from "./admin/AccessControl";
 import RanksAdmin from "./admin/RanksAdmin";
 import AddEditFleetComponent from "./admin/AddEditFleetComponent";
 import SyncDashboard from "./admin/SyncDashboard";
+import SyncConflictReview from "./admin/SyncConflictReview";
 import SyncProvisioning from "./admin/SyncProvisioning";
 import SyncFleetOverview from "./admin/SyncFleetOverview";
 // ====== NOON REPORT MODULE — START (remove to disable) ======
@@ -244,6 +245,8 @@ export const TechnicalModule = () => {
             </div>
           ) : selectedSubModule === "admin" && selectedMenuItem === "sync-dashboard" ? (
             <SyncDashboard />
+          ) : selectedSubModule === "admin" && selectedMenuItem === "sync-conflicts" ? (
+            <SyncConflictReview />
           ) : selectedSubModule === "admin" && selectedMenuItem === "sync-provisioning" ? (
             <SyncProvisioning />
           ) : selectedSubModule === "admin" && selectedMenuItem === "sync-fleet" ? (
