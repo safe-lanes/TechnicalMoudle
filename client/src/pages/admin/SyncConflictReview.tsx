@@ -117,7 +117,6 @@ export default function SyncConflictReview() {
   // Filter state
   const [statusFilter, setStatusFilter] = useState<string>("unresolved");
   const [tableFilter, setTableFilter] = useState<string>("all");
-  const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
@@ -135,14 +134,12 @@ export default function SyncConflictReview() {
       "/technical/api/sync/conflicts/review",
       statusFilter,
       tableFilter,
-      sourceFilter,
       page,
     ],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.set("resolved", statusFilter === "resolved" ? "true" : "false");
       if (tableFilter !== "all") params.set("tableName", tableFilter);
-      if (sourceFilter !== "all") params.set("source", sourceFilter);
       params.set("limit", String(pageSize));
       params.set("offset", String(page * pageSize));
 
@@ -290,23 +287,6 @@ export default function SyncConflictReview() {
           </SelectContent>
         </Select>
 
-        <Select
-          value={sourceFilter}
-          onValueChange={(v) => {
-            setSourceFilter(v);
-            setPage(0);
-          }}
-        >
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Source" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Sources</SelectItem>
-            <SelectItem value="log">New (Field Log)</SelectItem>
-            <SelectItem value="old">Legacy</SelectItem>
-          </SelectContent>
-        </Select>
-
         <Button
           variant="ghost"
           size="icon"
@@ -357,12 +337,6 @@ export default function SyncConflictReview() {
               <CardContent className="pt-5 pb-4">
                 {/* Header row */}
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] font-normal text-gray-500"
-                  >
-                    {conflict.source === "log" ? "NEW" : "LEGACY"}
-                  </Badge>
                   <Badge variant="secondary" className="text-xs">
                     {conflict.tableDisplayName}
                   </Badge>
