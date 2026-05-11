@@ -406,8 +406,13 @@ export default function SyncDashboard() {
           </CardContent>
         </Card>
         <Card
-          className="border-l-4 border-l-amber-500 cursor-pointer hover:shadow-md transition-shadow"
+          className="border-l-4 border-l-amber-500 cursor-pointer hover:shadow-md hover:bg-amber-50/40 transition-all"
           onClick={() => setLocation("/admin/sync-conflicts")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setLocation("/admin/sync-conflicts"); } }}
+          role="link"
+          tabIndex={0}
+          aria-label={`Conflicts — ${totalConflictCount} need resolution. Click to review.`}
+          data-testid="tile-conflicts-nav"
         >
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
