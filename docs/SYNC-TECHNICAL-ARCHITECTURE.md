@@ -1,7 +1,7 @@
 # Ship-Shore Sync — Technical Architecture
 
-> **Version:** 1.3  
-> **Last Updated:** 2026-05-07  
+> **Version:** 1.4  
+> **Last Updated:** 2026-05-10  
 > **Domain Sign-Off:** Jeevan Naik, Rahul Singh Sisodiya, Sahil Puri (24-Apr-2026)  
 > **Source of Truth:** `shared/syncConfig.ts`
 
@@ -60,13 +60,14 @@ All sync code lives under `server/modules/sync/`:
 
 | File | Purpose |
 |------|---------|
-| `syncEngine.ts` | Orchestrates a complete sync cycle (INITIATE → PUSH → PULL → COMPLETE) |
-| `service.ts` | Business logic for each protocol step |
+| `syncEngine.ts` | Orchestrates a complete sync cycle (INITIATE → PUSH → PULL → COMPLETE). Pull field-log section runs inside a trigger-bypass transaction (v1.4). |
+| `service.ts` | Business logic for each protocol step. `receivePushData()` runs field-log apply inside a trigger-bypass transaction (v1.4). |
 | `repository.ts` | Database operations for sync infrastructure tables |
 | `controller.ts` | Express request handlers (22 endpoints) |
 | `routes.ts` | Route registration with middleware |
 | `fieldLogger.ts` | Logs field-level changes for BOTH_EDITABLE tables |
-| `oneWayApplier.ts` | Upserts rows by UUID for one-way sync |
+| `oneWayApplier.ts` | Upserts rows by UUID for one-way sync. `applyFieldLogInserts()` accepts optional `externalClient` for trigger-bypass transactions (v1.4). |
+| `syncDiagLogger.ts` | Persistent diagnostic logging — writes to console AND daily files at `.private/sync-logs/sync-diag-YYYY-MM-DD.log` (v1.3) |
 | `fileSyncProcessor.ts` | Chunked binary file transfer (256KB chunks, SHA-256 verification) |
 | `provisioningService.ts` | Generates/imports vessel data bundles for initial ship deployment |
 | `pruningService.ts` | Automated cleanup of sync infrastructure tables |
@@ -324,14 +325,16 @@ Ship SyncEngine                           Shore API
 - Ship sends its BOTH_EDITABLE field logs (unsynced changes) — stored in shore's `sync_field_log`
 - Business rules enforced: e.g., defect verification from ship is rejected
 - **Stale-log guard (v1.2):** UPDATE field logs are skipped if `changedAt < row.updated_at` to prevent old re-pushed logs from overwriting newer local edits
+- **Trigger bypass (v1.4):** Field log apply (Phase 1 INSERTs + Phase 2 UPDATE passthrough) runs inside a `BEGIN / SET LOCAL sync.bypass_trigger = 'true' / COMMIT` transaction using a dedicated `pool.connect()` client. This prevents the `set_updated_at()` trigger from overriding `updated_at` with `NOW()`, preserving the original `changedAt` timestamp from the field log. See §4.1.
 - Data sent in chunks of 200 records (`CHUNK_SIZE` in `syncEngine.ts`)
 
-**3. PULL** (`service.ts → preparePullData`)
+**3. PULL** (`service.ts → preparePullData` + `syncEngine.ts → executePull`)
 - **Vessel-code resolution (v1.3):** Resolves `vesselId` (UUID) → `vesselCode` (e.g. "V001") via `getVesselCodeForUuid()`. Tables with `vesselScopeColumn='vessel_code'` (e.g. `fleet_vessel_mapping`, `master_data`) use the resolved code for queries. Field log queries use `IN (vesselId, vesselCode)` to match logs stored with either identifier.
 - Shore gathers ONE_WAY_SHORE_TO_SHIP rows changed since checkpoint (`gatherOneWayShoreRows`)
 - Shore gathers its own BOTH_EDITABLE field logs (excluding ship's own changes)
 - **Conflict detection:** If both ship and shore changed the same field on the same row, a `sync_conflicts` record is created
 - Non-conflicting shore changes are sent as field logs for ship to apply
+- **Trigger bypass (v1.4):** Ship's `executePull()` applies received field logs inside a `BEGIN / SET LOCAL sync.bypass_trigger = 'true' / COMMIT` transaction. Both `applyFieldLogInserts()` and `applyFieldLog()` receive the transactional client so all UPDATEs preserve `changedAt` as the row's `updated_at`. See §4.1.
 
 **4. RESOLVE** (`service.ts → resolveConflictAction`)
 - Resolution options: `ship_wins`, `shore_wins`, `manual` (custom value)
@@ -368,6 +371,82 @@ From `syncEngine.ts`:
 ### Local Mode
 
 When `SYNC_LOCAL_MODE=true` or `SYNC_SHORE_URL` is empty, the `SyncEngine` calls service functions directly (no HTTP). This enables development and testing on a single server.
+
+---
+
+## 4.1 Database Trigger Bypass (v1.4)
+
+**Migration:** `migrations/110_sync_trigger_bypass.sql`  
+**Commit:** `cc193830`
+
+### Problem
+
+All 108 tables have a `BEFORE UPDATE` trigger calling `set_updated_at()`, which unconditionally sets `NEW.updated_at = NOW()`. This was created in migrations 099/100/101 for sync change detection. However, when the sync apply pipeline writes field logs to data tables, it needs to preserve the original `changedAt` timestamp as the row's `updated_at` — otherwise the trigger overrides it with the current server time.
+
+This caused a critical failure in multi-field UPDATE batches: when a batch contains multiple field logs for the same row (e.g., `rob`, `robLocationA`, `robLocationB` on `stores_items`), applying field A triggers `updated_at = NOW()`. When field B is applied next, the stale-skip guard compares `log.changedAt < row.updated_at` — since `NOW()` is always newer than the original `changedAt`, field B is incorrectly skipped as stale.
+
+### Solution
+
+The `set_updated_at()` trigger function was updated to check a PostgreSQL session variable:
+
+```sql
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF current_setting('sync.bypass_trigger', true) = 'true' THEN
+        RETURN NEW;  -- preserve application-supplied updated_at
+    END IF;
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+The second argument `true` in `current_setting('sync.bypass_trigger', true)` means "return NULL instead of error if the variable doesn't exist" — so normal (non-sync) operations are completely unaffected.
+
+### Apply Path Transaction Pattern
+
+All three sync apply paths use the same pattern:
+
+```typescript
+const pool = await getPool();
+const client = await pool.connect();
+try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL sync.bypass_trigger = 'true'");
+
+    // Phase 1: applyFieldLogInserts(acceptedLogs, client)
+    // Phase 2: applyFieldLog(log, client) for each UPDATE log
+
+    await client.query('COMMIT');
+} catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+} finally {
+    client.release();
+}
+```
+
+**Safety guarantees:**
+- `SET LOCAL` only affects the current transaction — it is automatically discarded on `COMMIT` or `ROLLBACK`
+- The bypass never leaks to other sessions, other queries, or even other transactions on the same connection (since `client.release()` returns it to the pool)
+- Normal application writes (outside sync apply) never set this variable, so the trigger behaves exactly as before
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `service.ts` | `receivePushData()` — Phase 1 + Phase 2 wrapped in bypass transaction using `pool.connect()` client |
+| `syncEngine.ts` | `executePull()` — field log section wrapped in bypass transaction; `applyFieldLog()` accepts optional `client` parameter |
+| `oneWayApplier.ts` | `applyFieldLogInserts()` accepts optional `externalClient` parameter, uses it for all queries when provided |
+
+### Known Limitation — Bug B (components RH direction)
+
+The `components` table is classified as `ONE_WAY_SHORE_TO_SHIP` in `syncConfig.ts`. When the Running Hours module on ship updates `components.currentCumulativeRH` (in `runningHoursService.ts`), this change never syncs to shore because one-way tables only flow from shore to ship.
+
+The `running_hours_audit` table IS `BOTH_EDITABLE` and its INSERT records DO sync successfully. The proposed fix (option B2) is to derive the component's cumulative RH from `running_hours_audit` on the shore side, rather than changing the sync direction of the entire `components` table. This is tracked but not yet implemented.
+
+**Affected QA tests:** #1 (RH updates not visible on shore), #8 (RH history mismatch)
 
 ---
 
@@ -1076,6 +1155,25 @@ All fixes applied after the initial sync system merge to `replit_dev` (2026-04-2
 | 20 | `05b87ed3` | Vessel-code scope mismatch — ONE_WAY tables with `vesselScopeColumn='vessel_code'` returned 0 rows | `gatherOneWayShoreRows()` always passed `vesselId` (UUID) regardless of whether the table used `vessel_code` or `vessel_id`. Tables like `fleet_vessel_mapping`, `master_data`, `component_class_regulatory` got 0 rows. Fix: resolve `vesselId→vesselCode` via new `getVesselCodeForUuid()` cached helper, pass correct value per table. Also updated `getUnsyncedFieldLogs`, `getFieldLogsSinceCheckpoint`, `getFieldLogCount` to accept optional `vesselCode` and query with `IN (vesselId, vesselCode)` for field logs stored with either identifier. Added `normalizeFieldLog()` helper for snake_case→camelCase from raw SQL. Threaded vesselCode through `preparePullData`, `completeSyncSession`, `executePush`. |
 | 21 | `05b87ed3` | `planner_dates` not syncing (classified as NO_SYNC) | Reclassified from `NO_SYNC` to `BOTH_EDITABLE` with `direction: 'bidirectional'` in `syncConfig.ts`. Wired `logFieldChanges('planner_dates', ...)` to all 4 write paths in `workOrderPlannerService.ts`: `savePlannedDate` UPDATE + INSERT, `bulkSavePlannedDate` UPDATE + INSERT (bulk passes `tx` for transaction safety). |
 | 22 | `876b8d18` | Binary file transfer — receiving side silently discarded assembled files | `receiveChunk()` called `getFileQueueEntry(chunk.queueUuid)` to find `fileKey`/`tableName` for saving, but the queue entry only exists in the SENDER's DB — the receiver had no matching row. `fileEntry` was `undefined`, so the file was assembled and hash-verified but never saved to disk. Fix: (a) extended `FileChunk` interface with file metadata (`fileKey`, `tableName`, `fileName`, `fileSizeBytes`, `vesselId`); (b) `processQueue()` populates metadata in every chunk; (c) `receiveChunk()` creates mirror queue entry via new `queueFileWithUuid()` (ON CONFLICT DO NOTHING); (d) resolves save location from chunk metadata first, queue entry fallback for backward compat; (e) `FileSyncProcessor` constructor accepts `shoreUrl` from `SyncEngine` (DB-loaded settings, not just env var). |
+
+### Round 7 — QA Regression Sync Fixes (2026-05-08)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 23 | `1b3097cf` | Composite-key lookup for applicability tables + spare ROB field logging | `vessel_certificate_applicability` and `vessel_survey_applicability` use composite key `(vessel_id, master_id)` instead of integer `id`. Ship generates own sequence value for integer PK on INSERT. `performInventoryTransaction()` now calls `logFieldChanges` for `rob`/`robLocationA`/`robLocationB` updates. |
+
+### Round 8 — SyncDiag Logging + 3-Bug QA Fix (2026-05-08)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 24 | `b944960f` | Persistent SyncDiag logging | New `syncDiagLogger.ts` writes to console AND daily files. New API endpoints for log retrieval. |
+| 25 | `5de26eac` | 3-root-cause fix resolving 8 QA issues | (a) `getColumnMeta` identity detection: `attidentity IN ('a','d')` catches GENERATED BY DEFAULT. (b) `toSnakeCase` acronym-aware regex (16 fields across 7 tables). (c) Stale-skip uses `log.changedAt` instead of `NOW()` for `updated_at`. |
+
+### Round 9 — Trigger Bypass (2026-05-10)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 26 | `cc193830` | Session-variable trigger bypass for sync apply paths | `set_updated_at()` trigger on all 108 tables unconditionally set `updated_at = NOW()`, overriding FIX 25c's `changedAt` value. Migration `110_sync_trigger_bypass.sql` adds `current_setting('sync.bypass_trigger', true)` check to trigger function. Three apply paths (`receivePushData`, `executePull`, `applyFieldLog`) wrapped in `BEGIN / SET LOCAL sync.bypass_trigger = 'true' / COMMIT` using dedicated `pool.connect()` client. `applyFieldLogInserts()` accepts optional `externalClient`. `SET LOCAL` scope ensures bypass never leaks. Resolves QA tests #2, #3. Bug B (components RH direction, QA #1, #8) remains open — see §4.1. |
 
 ### Investigated & Confirmed No-Op
 

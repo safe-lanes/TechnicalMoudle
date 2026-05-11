@@ -1,6 +1,6 @@
 # Backend Module Architecture
 
-**Last updated:** 2026-02-23
+**Last updated:** 2026-05-10
 
 ## Overview
 
@@ -247,9 +247,9 @@ that table is never used by this codebase):
    - **MUST be created manually**, not at runtime — see "Server startup
      behavior" below.
 
-3. **Hand-written SQL** (`migrations/0XX_*.sql`, 3-digit prefix) — 29 files,
+3. **Hand-written SQL** (`migrations/0XX_*.sql`, 3-digit prefix) — 30+ files,
    running from `001_date_reported_to_office.sql` through
-   `085_master_list_types.sql`.
+   `110_sync_trigger_bypass.sql`.
    - Used for anything Drizzle can't express: data seeds, partial indexes,
      `DO $$ ... $$` constraint repairs, cross-table backfills.
    - Applied by the same `runDrizzleMigrations()` as the 4-digit files.
@@ -332,7 +332,7 @@ has already been through the migration pipeline.
    or partial indexes — you'll need step 4 for those.
 4. If the change needs seed data, backfills, partial indexes, or constraint
    repairs that Drizzle can't express, hand-write a follow-up file using the
-   **next 3-digit prefix** (current max is `085_`). Use idempotency guards
+   **next 3-digit prefix** (current max is `110_`). Use idempotency guards
    (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`, `DO $$ ... $$` blocks).
 5. Commit both files together in the same PR. Reviewer verifies the generated
    SQL matches the schema change intent and the hand-written follow-up is

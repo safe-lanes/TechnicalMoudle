@@ -218,18 +218,30 @@ export async function receivePushData(
           const fieldNameSnake = toSnakeCase(log.fieldName);
 
           try {
-            // Stale-log guard: only apply if the incoming change is at least as new as
-            // the row's current updated_at.  This prevents old re-pushed logs from
-            // overwriting newer local edits (e.g., category revert scenario).
+            // Stale-log guard: only apply to UPDATE logs where the incoming change is
+            // older than the row's current updated_at.  This prevents old re-pushed logs
+            // from overwriting newer local edits (e.g., category revert scenario).
+            //
+            // INSERT-origin logs (oldValue === null) ALWAYS apply regardless of
+            // row.updated_at.  When a row is created on ship, the INSERT field logs may
+            // have changedAt older than a subsequent local edit that bumped updated_at.
+            // Without this bypass, the INSERT logs would all be stale-skipped and the
+            // row would never receive its initial field values on the receiver.
             const logChangedAt = log.changedAt instanceof Date ? log.changedAt : new Date(String(log.changedAt));
+            const isInsertLog = log.oldValue === null || log.oldValue === undefined;
+
             const freshCheck = await client.query(
               `SELECT "updated_at" FROM "${log.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
               [log.rowUuid]
             );
             if (freshCheck.rows.length > 0) {
               const localUpdatedAt = new Date(freshCheck.rows[0].updated_at);
-              if (logChangedAt < localUpdatedAt) {
-                // Incoming log is older than local row — skip to prevent stale overwrite
+
+              if (isInsertLog && logChangedAt < localUpdatedAt) {
+                // INSERT-origin log is older than row — allow anyway (row needs these fields)
+                syncDiag(`INSERT-LOG ALLOWED (stale-skip bypass for insert): ${log.tableName}.${log.fieldName} row=${log.rowUuid} — log ${logChangedAt.toISOString()} < row ${localUpdatedAt.toISOString()}`);
+              } else if (!isInsertLog && logChangedAt < localUpdatedAt) {
+                // UPDATE log is older than local row — skip to prevent stale overwrite
                 syncDiag(`RECEIVE-PUSH STALE SKIP: ${log.tableName}.${log.fieldName} row=${log.rowUuid} — log ${logChangedAt.toISOString()} < row ${localUpdatedAt.toISOString()}`);
                 console.log(
                   `[Sync Push] Skipping stale field log ${log.tableName}.${log.fieldName} for ${log.rowUuid} ` +
