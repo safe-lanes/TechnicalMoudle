@@ -5,6 +5,7 @@ import * as fs from "fs";
 import * as path from "path";
 import moduleRouter from "./modules";
 import { mockAuthMiddleware, initMockAuthRankId } from "./middleware/auth";
+import { requestContextMiddleware } from "./middleware/requestContext";
 import { ensureMaintenanceHistoryImmutability, ensureCertApplicabilityIndex } from "./initDb";
 import { getSeedDefectsData, ALL_SEED_IDS } from "./modules/defects/services/seedData";
 
@@ -34,6 +35,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // This populates req.user with an admin user for testing purposes
   await initMockAuthRankId();
   app.use('/technical/api', mockAuthMiddleware);
+  app.use('/technical/api', requestContextMiddleware);
   console.log('🔒 Mock authentication enabled for /technical/api/* routes');
 
   // Mount modular architecture router (modules extracted from routes.ts go here)

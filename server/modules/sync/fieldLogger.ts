@@ -22,6 +22,7 @@ import { getDb } from '../../db';
 import { syncFieldLog } from '../../../shared/schema';
 import { requiresFieldLogging } from '../../../shared/syncConfig';
 import { syncDiag } from './syncDiagLogger';
+import { getRequestContext } from '../../middleware/requestContext';
 
 // Fields to NEVER log — these are meta fields managed by the system, not user data.
 // NOTE: 'id' was previously skipped here (assumed to be an integer auto-PK).
@@ -86,6 +87,23 @@ export async function logFieldChanges(
   const changedAt = new Date();
   let logCount = 0;
 
+  // Resolve userId: prefer explicit parameter, fall back to AsyncLocalStorage request context.
+  // This avoids modifying 65+ callers that hardcode 'system' — the middleware captures the
+  // real authenticated user automatically for any call originating from an HTTP request.
+  const PLACEHOLDER_USER_IDS = new Set(['system', 'admin', 'System', '']);
+  let resolvedUserId = userId;
+  if (!resolvedUserId || PLACEHOLDER_USER_IDS.has(resolvedUserId)) {
+    const ctx = getRequestContext();
+    if (ctx?.userId) {
+      resolvedUserId = ctx.userId;
+    } else if (!resolvedUserId) {
+      syncDiag(`WARNING: logFieldChanges called without userId and no request context for ${tableName}.${rowUuid} — using 'system' fallback`);
+      resolvedUserId = 'system';
+    }
+    // If resolvedUserId is still a placeholder (e.g. 'system') but no request context found,
+    // keep the original value — this happens for cron jobs, sync engine, startup tasks.
+  }
+
   if (oldRow === null && newRow !== null) {
     // === INSERT — log all non-skip fields with old=null ===
     const entries = Object.entries(newRow)
@@ -101,7 +119,7 @@ export async function logFieldChanges(
           newValue: serializeFieldValue(newValue),
           vesselId,
           changedAt,
-          changedByUserId: userId,
+          changedByUserId: resolvedUserId,
           instanceId,
           isSynced: false,
         });
@@ -135,7 +153,7 @@ export async function logFieldChanges(
           newValue: newStr,
           vesselId,
           changedAt,
-          changedByUserId: userId,
+          changedByUserId: resolvedUserId,
           instanceId,
           isSynced: false,
         });
