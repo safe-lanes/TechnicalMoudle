@@ -1,12 +1,12 @@
 # Backend Module Architecture
 
-**Last updated:** 2026-05-10
+**Last updated:** 2026-05-11
 
 ## Overview
 
 The backend has undergone two major restructuring phases:
 
-1. **Modularization** — Monolithic `server/routes.ts` (21,144 lines) decomposed into 18 domain modules under `server/modules/`
+1. **Modularization** — Monolithic `server/routes.ts` (21,144 lines) decomposed into 19 domain modules under `server/modules/`
 2. **FK Identity Restructure** — All major tables migrated from integer PKs to UUID identifiers with 72 enforced FK constraints
 
 ## Refactoring Impact
@@ -48,7 +48,8 @@ All modules are registered in `server/modules/index.ts` and mounted at `/technic
 | 15 | forms | 4 | 299 | 10 | Form definitions, versioning, runtime |
 | 16 | chatbot | 2 | 59 | 1 | AI chatbot integration |
 | 17 | misc | 3 | 637 | 10 | Document storage, admin utilities |
-| 18 | dashboard | - | - | - | Dashboard metrics |
+| 18 | sync | 16 | 6,375 | 33 | Ship-shore sync engine, field logging, conflict review, provisioning |
+| 19 | dashboard | - | - | - | Dashboard metrics |
 | | **shared** | 2 | 77 | - | `asyncHandler` middleware, `AppError` class |
 
 ### Layer Structure

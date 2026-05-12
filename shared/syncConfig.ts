@@ -1124,15 +1124,15 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
   },
   locations: {
     tableName: 'locations',
-    category: 'NO_SYNC',
-    direction: 'none',
-    identityColumn: null,
+    category: 'BOTH_EDITABLE',
+    direction: 'bidirectional',
+    identityColumn: 'luuid',
     vesselScopeColumn: 'vessel_id',
     vesselScopeJoinPath: null,
     isGlobal: false,
-    isConfigurable: false,
+    isConfigurable: true,
     businessRules: null,
-    notes: 'Provisioned from SAILERP. Integer PK, no UUID.',
+    notes: 'Location registry. Integer PK + UUID sync key (luuid). FK target for spare_location_stock.location_id and inventory_transactions.location_id — both have companion location_uuid column for cross-instance FK resolution.',
   },
 
   // ── Sync engine internal tables (future — will be created in next task) ──
@@ -1298,15 +1298,15 @@ export const SYNC_CONFIG: Record<string, TableSyncConfig> = {
   },
   superintendent_notifications: {
     tableName: 'superintendent_notifications',
-    category: 'NO_SYNC',
-    direction: 'none',
-    identityColumn: null,
-    vesselScopeColumn: null,
+    category: 'BOTH_EDITABLE',
+    direction: 'bidirectional',
+    identityColumn: 'snuuid',
+    vesselScopeColumn: 'vessel_id',
     vesselScopeJoinPath: null,
-    isGlobal: true,
-    isConfigurable: false,
+    isGlobal: false,
+    isConfigurable: true,
     businessRules: null,
-    notes: 'Local notifications.',
+    notes: 'WO approval-tier notifications. Ship creates, shore acknowledges.',
   },
 
   // ── Local alert state ──
@@ -1480,14 +1480,15 @@ export function getSyncPhaseOrder(): string[][] {
      'certificates', 'surveys', 'vessel_certificate_data', 'vessel_survey_data',
      'running_hours_audit', 'component_running_hours_log',
      'component_maintenance_history', 'ihm_items', 'defect_sequences',
-     'planner_dates'],
+     'planner_dates', 'locations'],
     // Phase 4: Child entities (FK to parent rows in Phase 3)
     ['work_order_executions', 'work_order_execution_details', 'work_order_postponements',
      'work_order_documents', 'defect_actions', 'defect_attachments',
      'spares_history', 'spare_location_stock', 'spare_component_links',
      'stores_ledger', 'inventory_transactions',
      'change_request_attachment', 'change_request_comment',
-     'ihm_maintenance_log', 'component_documents', 'component_requisitions'],
+     'ihm_maintenance_log', 'component_documents', 'component_requisitions',
+     'superintendent_notifications'],
     // Phase 5: SHIP_ONLY tables
     getTablesByCategory('SHIP_ONLY').map(t => t.tableName),
     // Phase 6: Files (processed after all field data synced)

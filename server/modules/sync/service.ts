@@ -346,9 +346,37 @@ export async function receivePushData(
               // No receiver-side conflict → fall through to apply
             }
 
+            // ── Integer FK interception: location_id on spare_location_stock / inventory_transactions ──
+            // The sender's integer location_id is auto-increment-specific and meaningless on the receiver.
+            // If the row already has a location_uuid, we recompute location_id from local locations table.
+            // If no location_uuid, we accept the incoming integer as-is (legacy / same-instance scenario).
+            let effectiveNewValue = log.newValue;
+            if (fieldNameSnake === 'location_id' &&
+                (log.tableName === 'spare_location_stock' || log.tableName === 'inventory_transactions')) {
+              try {
+                const rowCheck = await client.query(
+                  `SELECT location_uuid FROM "${log.tableName}" WHERE "${identityCol}" = $1 LIMIT 1`,
+                  [log.rowUuid]
+                );
+                const existingLocUuid = rowCheck.rows[0]?.location_uuid;
+                if (existingLocUuid) {
+                  const locLookup = await client.query(
+                    `SELECT id FROM locations WHERE luuid = $1 LIMIT 1`,
+                    [existingLocUuid]
+                  );
+                  if (locLookup.rows.length > 0) {
+                    syncDiag(`FK-REMAP: ${log.tableName} row=${log.rowUuid} incoming location_id=${log.newValue} → recomputed to local ${locLookup.rows[0].id} via location_uuid=${existingLocUuid}`);
+                    effectiveNewValue = String(locLookup.rows[0].id);
+                  }
+                }
+              } catch (fkErr: any) {
+                syncDiag(`FK-REMAP location_id check error: ${fkErr.message}`);
+              }
+            }
+
             // JSON coercion for json/jsonb columns
             const meta = await getColumnMeta(client, log.tableName);
-            let valueToApply: any = log.newValue;
+            let valueToApply: any = effectiveNewValue;
             if (valueToApply !== null && meta.jsonCols.has(fieldNameSnake)) {
               try {
                 JSON.parse(valueToApply);
@@ -364,6 +392,35 @@ export async function receivePushData(
               `UPDATE "${log.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
               [valueToApply, log.rowUuid, logChangedAt]
             );
+
+            // ── Cross-instance integer FK resolution for location_uuid → location_id ──
+            // When a location_uuid field is applied on spare_location_stock or inventory_transactions,
+            // the sender's integer location_id is meaningless on the receiver (different auto-increment
+            // sequences). We resolve it by looking up the local locations row with matching luuid.
+            // If the location hasn't synced yet, we log a warning — it will self-heal on next sync cycle
+            // when the location row arrives and a subsequent upsert backfills location_id.
+            if (fieldNameSnake === 'location_uuid' && valueToApply &&
+                (log.tableName === 'spare_location_stock' || log.tableName === 'inventory_transactions')) {
+              try {
+                const locLookup = await client.query(
+                  `SELECT id FROM locations WHERE luuid = $1 LIMIT 1`,
+                  [valueToApply]
+                );
+                if (locLookup.rows.length > 0) {
+                  const localLocId = locLookup.rows[0].id;
+                  await client.query(
+                    `UPDATE "${log.tableName}" SET "location_id" = $1 WHERE "${identityCol}" = $2`,
+                    [localLocId, log.rowUuid]
+                  );
+                  syncDiag(`FK-REMAP: ${log.tableName} row=${log.rowUuid} location_uuid=${valueToApply} → local location_id=${localLocId}`);
+                } else {
+                  syncDiag(`FK-REMAP DEFERRED: ${log.tableName} row=${log.rowUuid} location_uuid=${valueToApply} — location not yet synced, location_id left as-is`);
+                }
+              } catch (fkErr: any) {
+                syncDiag(`FK-REMAP ERROR: ${log.tableName} row=${log.rowUuid}: ${fkErr.message}`);
+              }
+            }
+
             fieldLogsApplied++;
           } catch (err: any) {
             fieldLogApplyErrors++;

@@ -514,6 +514,30 @@ export async function applyFieldLogInserts(
       insertedRows++;
       syncDiag(`FIELD-LOG-INSERT OK: ${tableName} row=${rowUuid} (${columns.length} columns)`);
       console.log(`[FieldLogInsert] Inserted new row ${tableName}.${rowUuid} (${columns.length} columns)`);
+
+      // ── Post-INSERT: Cross-instance integer FK resolution for location_uuid → location_id ──
+      // When a new spare_location_stock or inventory_transactions row is inserted from a remote
+      // instance, the sender's integer location_id may not match the receiver's auto-increment.
+      // If location_uuid is present, resolve to the local locations.id.
+      if ((tableName === 'spare_location_stock' || tableName === 'inventory_transactions') && rowData['location_uuid']) {
+        try {
+          const locLookup = await pool.query(
+            `SELECT id FROM locations WHERE luuid = $1 LIMIT 1`,
+            [rowData['location_uuid']]
+          );
+          if (locLookup.rows.length > 0) {
+            await pool.query(
+              `UPDATE "${tableName}" SET "location_id" = $1 WHERE "${identityCol}" = $2`,
+              [locLookup.rows[0].id, rowUuid]
+            );
+            syncDiag(`FK-REMAP INSERT: ${tableName} row=${rowUuid} location_uuid=${rowData['location_uuid']} → local location_id=${locLookup.rows[0].id}`);
+          } else {
+            syncDiag(`FK-REMAP INSERT DEFERRED: ${tableName} row=${rowUuid} location_uuid=${rowData['location_uuid']} — location not yet synced`);
+          }
+        } catch (fkErr: any) {
+          syncDiag(`FK-REMAP INSERT ERROR: ${tableName} row=${rowUuid}: ${fkErr.message}`);
+        }
+      }
     } catch (err: any) {
       // 23505 = unique_violation — another unique constraint (not the identity column)
       // was violated. This happens when both ship and shore independently created rows

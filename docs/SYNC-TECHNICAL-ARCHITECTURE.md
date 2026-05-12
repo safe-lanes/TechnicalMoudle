@@ -1,7 +1,7 @@
 # Ship-Shore Sync — Technical Architecture
 
-> **Version:** 1.4  
-> **Last Updated:** 2026-05-10  
+> **Version:** 1.5  
+> **Last Updated:** 2026-05-11  
 > **Domain Sign-Off:** Jeevan Naik, Rahul Singh Sisodiya, Sahil Puri (24-Apr-2026)  
 > **Source of Truth:** `shared/syncConfig.ts`
 
@@ -22,7 +22,7 @@ The Ship-Shore Sync system enables bidirectional data synchronization between a 
 - 31 BOTH_EDITABLE tables (planner_dates reclassified from NO_SYNC in v1.3)
 - 6 SHIP_ONLY tables
 - 30 NO_SYNC tables
-- 22 API endpoints across 6 functional groups
+- 33 API endpoints across 8 functional groups
 
 ---
 
@@ -72,6 +72,8 @@ All sync code lives under `server/modules/sync/`:
 | `provisioningService.ts` | Generates/imports vessel data bundles for initial ship deployment |
 | `pruningService.ts` | Automated cleanup of sync infrastructure tables |
 | `healthMonitor.ts` | Detects sync health issues (stale syncs, stuck files, etc.) |
+| `conflictReviewRepository.ts` | Queries both conflict tables, apply/dismiss logic, audit trail (v1.5) |
+| `conflictReviewController.ts` | 6 HTTP handlers for conflict review API (v1.5) |
 | `middleware.ts` | Role-based access control (`requireOfflineAdmin`) |
 
 ### Shared Configuration
@@ -86,6 +88,7 @@ All sync code lives under `server/modules/sync/`:
 |------|-------|---------|
 | `client/src/pages/admin/SyncDashboard.tsx` | `/admin/sync-dashboard` | Sync status, manual trigger, batch history, conflicts |
 | `client/src/pages/admin/SyncProvisioning.tsx` | `/admin/sync-provisioning` | Ship provisioning bundle generation/import |
+| `client/src/pages/admin/SyncConflictReview.tsx` | `/admin/sync-conflicts` | Conflict review: unified view, apply/dismiss, bulk actions |
 | `client/src/pages/admin/SyncFleetOverview.tsx` | `/admin/sync-fleet` | Shore-only: fleet-wide sync overview + settings |
 | `client/src/hooks/useSyncInstanceInfo.ts` | — | Hook: caches ship/shore detection |
 
@@ -609,6 +612,20 @@ If both sides changed to **the same value**, the conflict is auto-resolved as `a
 | `shore_wins` | Shore's value is applied to the data table |
 | `manual` | A custom `resolvedValue` is applied |
 
+### Conflict Review UI (v1.5)
+
+The admin page at `/admin/sync-conflicts` provides a unified view over both conflict sources:
+- **`sync_conflicts`** — detected during PULL when both sides edit the same field on the same row
+- **`sync_conflict_log`** — recorded by the per-field stale-skip guard when an incoming UPDATE is rejected
+
+Both are queried by `conflictReviewRepository.ts` and merged into a common shape. Users can:
+- **Apply incoming** — accept the sender's value, overwrite local, and create an audit trail in `sync_field_log`
+- **Dismiss** — keep the local value, mark the conflict as resolved
+- **Bulk dismiss** — resolve multiple conflicts at once
+- **Filter** by status (pending/applied/dismissed), table name, or search by field/row UUID
+
+The SyncDashboard Conflicts tile shows a live count from `getConflictStats()` and links to the review page. `sync_conflict_detected` alerts deep-link from the NotificationBell.
+
 ### Business Rules
 
 From `shared/syncConfig.ts`, the `defects` table has a business rule:
@@ -924,6 +941,35 @@ Records field-level conflicts for manual resolution.
 | `sync_batch_id` | text | Batch that detected the conflict |
 | `is_deleted` | boolean | Soft delete flag |
 
+### sync_conflict_log (v1.5, migration 111)
+
+Records per-field stale-skip rejections where the receiver wins. Created by the per-field guard (Option 2c) when an incoming UPDATE is rejected because the receiver has a newer edit on the same field.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | serial PK | Auto-increment |
+| `table_name` | text | Target table |
+| `row_uuid` | text | Row identity |
+| `field_name` | text | Conflicting field |
+| `incoming_instance_id` | text | Sender instance (e.g., `SHIP-VESSEL01`) |
+| `incoming_old_value` | text | Sender's old value |
+| `incoming_new_value` | text | Sender's new value |
+| `incoming_changed_at` | timestamp | When sender changed it |
+| `incoming_changed_by` | text | Who on sender changed it |
+| `local_instance_id` | text | Receiver instance |
+| `local_value` | text | Receiver's current value |
+| `local_changed_at` | timestamp | When receiver last changed it |
+| `local_changed_by` | text | Who on receiver changed it |
+| `status` | text | `pending`, `applied`, `dismissed` |
+| `resolved_by` | text | Who resolved it (via Conflict Review UI) |
+| `resolved_at` | timestamp | When resolved |
+| `created_at` | timestamp | When conflict was logged |
+
+**Indexes:**
+- `idx_scl_recent` — `created_at DESC` (for recency queries)
+- `idx_scl_unresolved` — `status` where `status = 'pending'` (for pending count)
+- `idx_scl_table_row` — `(table_name, row_uuid)` (for per-row conflict lookup)
+
 ### sync_file_queue
 
 Queues binary file transfers.
@@ -1039,6 +1085,17 @@ All endpoints are prefixed with `/technical/api` and registered in `server/modul
 | POST | `/sync/settings/test-connection` | `requireOfflineAdmin` | Test shore URL connectivity |
 | GET | `/sync/fleet-overview` | `requireOfflineAdmin` | Fleet-wide sync status (shore) |
 | GET | `/sync/instance-info` | None | Ship vs shore detection |
+
+### Conflict Review (6 endpoints, v1.5)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/sync/conflicts/review/count` | None | Count conflicts by status |
+| GET | `/sync/conflicts/review/tables` | None | Distinct table names for filter dropdown |
+| GET | `/sync/conflicts/review` | None | Paginated list with filters (status, table, search) |
+| GET | `/sync/conflicts/review/:id` | None | Single conflict detail |
+| POST | `/sync/conflicts/review/:id/apply-incoming` | None | Accept incoming value, UPDATE data table, write audit trail |
+| POST | `/sync/conflicts/review/:id/dismiss` | None | Reject incoming, mark resolved |
 
 ### Provisioning (5 endpoints)
 
@@ -1174,6 +1231,28 @@ All fixes applied after the initial sync system merge to `replit_dev` (2026-04-2
 | # | Commit | Fix | Impact |
 |---|--------|-----|--------|
 | 26 | `cc193830` | Session-variable trigger bypass for sync apply paths | `set_updated_at()` trigger on all 108 tables unconditionally set `updated_at = NOW()`, overriding FIX 25c's `changedAt` value. Migration `110_sync_trigger_bypass.sql` adds `current_setting('sync.bypass_trigger', true)` check to trigger function. Three apply paths (`receivePushData`, `executePull`, `applyFieldLog`) wrapped in `BEGIN / SET LOCAL sync.bypass_trigger = 'true' / COMMIT` using dedicated `pool.connect()` client. `applyFieldLogInserts()` accepts optional `externalClient`. `SET LOCAL` scope ensures bypass never leaks. Resolves QA tests #2, #3. Bug B (components RH direction, QA #1, #8) remains open — see §4.1. |
+
+### Round 10 — INSERT Stale-Skip Bypass (2026-05-11)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 27 | `58c33ad2` | INSERT-origin field logs bypass stale-skip guard in `receivePushData` | INSERT logs (`oldValue===null`) were incorrectly subject to `changedAt < localUpdatedAt` freshness check. When a row was created on ship and a subsequent local edit bumped `updated_at` before sync, ALL INSERT logs were stale-skipped — row never got its initial field values on receiver. Fix: INSERT logs always pass through; only UPDATE logs are subject to freshness check. |
+
+### Round 11 — Per-Field Stale-Skip + Conflict Log (2026-05-11)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 28 | `eb880b4a` | Per-field stale-skip guard (Option 2c) + `sync_conflict_log` table | Row-level `updated_at` comparison mixed ALL field edits + trigger stamps. Scenario: ship edits `status`, shore edits `remarks` — shore's `updated_at` bump caused incoming `status` to appear stale even though shore never touched `status`. Fix: replace row-level comparison with per-field lookup in `sync_field_log` using receiver's `instance_id`. Migration `111_sync_conflict_log_and_field_index.sql` adds composite index + new `sync_conflict_log` table (17 cols) for recording true conflicts. |
+| 29 | `787e66bc` | AsyncLocalStorage userId capture in `fieldLogger.ts` | 65 of 82 `logFieldChanges` callers hardcoded `'system'` as userId. New `server/middleware/requestContext.ts` uses AsyncLocalStorage to capture `req.user.id` per-request. fieldLogger resolves real userId when caller passes placeholder. |
+
+### Round 12 — Conflict Review UI + Fixes (2026-05-11)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 30 | `5724708c` | Conflict Review feature — unified UI + backend + notifications | New `conflictReviewRepository.ts` (814 lines) queries both `sync_conflict_log` + `sync_conflicts`, merges into unified list. Apply logic: reads current value from data table, UPDATEs field, manually INSERTs audit trail into `sync_field_log` (raw SQL bypasses Drizzle middleware). Controller (6 routes), frontend page (`SyncConflictReview.tsx`, ~690 lines), NotificationBell deep-link, SyncDashboard live conflict count tile. Migration `112_sync_conflicts_menu_and_alert_policy.sql`. |
+| 31 | `2175e514` | Remove LEGACY/NEW source badge and source filter | Internal table distinction confused end users. Removed `sourceFilter` state, dropdown, and badge from conflict cards. |
+| 32 | `b709c2a8` | Migration 112 rewrite — name-based lookups | Original used hardcoded integer ids (`VALUES (34, ...)`, `ON CONFLICT (id)`, `WHERE id = 34`). Rewritten with computed `MAX(id)+1`, `WHERE name = 'admin-sync-conflicts'`, correct UUID columns (`muid`, `role_ruid`), explicit conflict targets. |
+| 33 | `e2a9cf1a` | SyncDashboard Conflicts tile hardening | Added `role="link"`, `tabIndex={0}`, keyboard nav, hover feedback, `aria-label`, `data-testid`. |
 
 ### Investigated & Confirmed No-Op
 

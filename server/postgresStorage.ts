@@ -8372,11 +8372,28 @@ export class PostgresStorage {
 
   async upsertSpareLocationStock(data: InsertSpareLocationStock, txConn?: any): Promise<SpareLocationStock> {
     const conn = txConn || await getDb();
+
+    // Auto-resolve locationUuid from locations.luuid if not provided
+    // This ensures every spare_location_stock row has the UUID companion FK for cross-instance sync
+    if (!data.locationUuid && data.locationId) {
+      try {
+        const loc = await this.getLocationById(data.locationId);
+        if (loc && (loc as any).luuid) {
+          data = { ...data, locationUuid: (loc as any).luuid };
+        }
+      } catch (_) { /* best-effort — locationUuid is nullable */ }
+    }
+
     const existing = await this.getSpareLocationStockItem(data.spareId, data.locationId);
 
     if (existing) {
+      const updateSet: any = { qty: data.qty };
+      // Backfill locationUuid on existing rows that don't have it yet
+      if (data.locationUuid && !existing.locationUuid) {
+        updateSet.locationUuid = data.locationUuid;
+      }
       const result = await conn.update(spareLocationStock)
-        .set({ qty: data.qty })
+        .set(updateSet)
         .where(eq(spareLocationStock.id, existing.id))
         .returning();
       // Sync field logging — UPDATE
@@ -8518,14 +8535,26 @@ export class PostgresStorage {
   // ============= INVENTORY MANAGEMENT: TRANSACTIONS =============
 
   async createInventoryTransaction(txn: InsertInventoryTransaction, txConn?: any): Promise<InventoryTransaction> {
+    // Auto-resolve locationUuid from locations.luuid if not provided
+    // This ensures every inventory_transaction row has the UUID companion FK for cross-instance sync
+    let enrichedTxn = txn;
+    if (!(txn as any).locationUuid && txn.locationId) {
+      try {
+        const loc = await this.getLocationById(txn.locationId);
+        if (loc && (loc as any).luuid) {
+          enrichedTxn = { ...txn, locationUuid: (loc as any).luuid } as any;
+        }
+      } catch (_) { /* best-effort — locationUuid is nullable */ }
+    }
+
     let created: InventoryTransaction;
     if (txConn) {
-      const result = await txConn.insert(inventoryTransactions).values(txn).returning();
+      const result = await txConn.insert(inventoryTransactions).values(enrichedTxn).returning();
       created = result[0];
     } else {
       created = await this.insertWithSequenceRepair('inventory_transactions', async () => {
         const db = await getDb();
-        const result = await db.insert(inventoryTransactions).values(txn).returning();
+        const result = await db.insert(inventoryTransactions).values(enrichedTxn).returning();
         return result[0];
       });
     }

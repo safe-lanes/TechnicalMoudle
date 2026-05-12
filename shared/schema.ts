@@ -1293,11 +1293,13 @@ export type WorkOrderWithLeadTime = WorkOrder & {
 // === Superintendent Notifications (Layer 5) ===
 export const superintendentNotifications = pgTable("superintendent_notifications", {
   id: serial("id").primaryKey(),
+  snuuid: text("snuuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   workOrderId: text("work_order_id").notNull(),
   workOrderCode: text("work_order_code"),
   jobTitle: text("job_title"),
   componentName: text("component_name"),
   vesselName: text("vessel_name"),
+  vesselId: text("vessel_id"), // FK-style vessel scope for sync (backfilled from vessel_name via vessels table)
   daysLate: integer("days_late").default(0),
   missedCycles: integer("missed_cycles").default(0),
   backdatingDays: integer("backdating_days").default(0),
@@ -1315,6 +1317,7 @@ export const superintendentNotifications = pgTable("superintendent_notifications
 
 export const insertSuperintendentNotificationSchema = createInsertSchema(superintendentNotifications).omit({
   id: true,
+  snuuid: true,
   createdAt: true,
 });
 
@@ -2855,10 +2858,12 @@ export const ihmEvidenceTypeEnum = pgEnum("ihm_evidence_type", ["NONE", "DOC", "
 // B4) LOCATIONS - Location registry for SIRE mapping
 export const locations = pgTable("locations", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  luuid: text("luuid").notNull().unique().default(sql`gen_random_uuid()::text`), // Canonical UUID identity — sync key
   vesselId: text("vessel_id").notNull().references(() => vessels.vuuid),
   locationName: text("location_name").notNull(), // Unique per vessel, trimmed + case-normalized
   locationType: text("location_type"), // STORE/LOCKER/BOX/etc.
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
   createdBy: text("created_by").notNull(),
   isSync: boolean("is_sync").default(false),
   createdByUuid: text("created_by_uuid"),
@@ -2872,6 +2877,7 @@ export const locations = pgTable("locations", {
 
 export const insertLocationSchema = createInsertSchema(locations).omit({
   id: true,
+  luuid: true,
   createdAt: true,
 });
 
@@ -2917,6 +2923,7 @@ export const spareLocationStock = pgTable("spare_location_stock", {
   spareId: integer("spare_id").notNull(), // Legacy integer FK — kept during transition
   spareUuid: text("spare_uuid").notNull().references(() => spares.suuid), // FK → spares.suuid
   locationId: integer("location_id").notNull(), // FK → locations.id
+  locationUuid: text("location_uuid"), // Companion UUID FK for cross-instance sync resolution → locations.luuid
   qty: integer("qty").notNull().default(0), // Must never go negative,
   isSync: boolean("is_sync").default(false),
   createdByUuid: text("created_by_uuid"),
@@ -2947,6 +2954,7 @@ export const inventoryTransactions = pgTable("inventory_transactions", {
   spareId: integer("spare_id").notNull(), // Legacy integer FK — kept during transition
   spareUuid: text("spare_uuid").notNull().references(() => spares.suuid), // FK → spares.suuid
   locationId: integer("location_id"), // Nullable only if non-location specific; for consume/receive MUST set
+  locationUuid: text("location_uuid"), // Companion UUID FK for cross-instance sync resolution → locations.luuid
   eventType: text("event_type").notNull(), // RECEIVE | CONSUME | ADJUST_OPENING_BALANCE | ADJUST_CORRECTION
   qtyChange: integer("qty_change").notNull(), // Positive for receive, negative for consume
   robTotalBefore: integer("rob_total_before").notNull(),

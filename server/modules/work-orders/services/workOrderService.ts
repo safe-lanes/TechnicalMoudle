@@ -181,12 +181,13 @@ export async function createSuperintendentNotificationForWO(wo: any, daysLate: n
       jobTitle: wo.jobTitle || '',
       componentName: wo.componentCode || wo.component || '',
       vesselName,
+      vesselId: wo.vesselId || null, // Populate vessel_id for sync vessel-scoping
       daysLate,
       missedCycles,
       backdatingDays,
       approvalTier,
     });
-    console.log(`📢 Superintendent notification created for WO ${wo.workOrderNo || wo.id} (tier: ${approvalTier}, vessel: ${vesselName})`);
+    console.log(`📢 Superintendent notification created for WO ${wo.workOrderNo || wo.id} (tier: ${approvalTier}, vessel: ${vesselName}, vesselId: ${wo.vesselId})`);
   } catch (err: any) {
     console.error(`⚠️ Failed to create superintendent notification: ${err.message}`);
   }
