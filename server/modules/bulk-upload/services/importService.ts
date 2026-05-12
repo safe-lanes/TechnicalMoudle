@@ -18,7 +18,7 @@ import {
 import { createRecordSnapshot } from './undoService';
 import { saveImportHistory } from '../../../services/fileBasedImportHistory';
 import { applyAssignmentSync } from '../../work-orders/services/workOrderService';
-import { logFieldChanges } from '../../sync';
+import { logFieldChangesBatch } from '../../sync';
 
 
 export async function processSpareInventory(params: {
@@ -1135,6 +1135,8 @@ export async function performImport(
     const workOrdersByTemplateCode = await storage.getWorkOrdersByTemplateIds(allTemplateCodes, vesselId);
     
     // Step 2: Process each row individually with authoritative state capture
+    // Collect field log entries for batch flush after the loop (logFieldChangesBatch)
+    const woFieldLogBatch: Array<{ tableName: string; rowUuid: string; vesselId: string | null; oldRow: Record<string, any>; newRow: Record<string, any>; userId: string }> = [];
     for (let _woIdx = 0; _woIdx < data.length; _woIdx++) {
       const row = data[_woIdx];
       const _woRowNum = row['__meta']?.rowNumber || (_woIdx + 1);
@@ -1169,7 +1171,9 @@ export async function performImport(
             workOrdersByTemplateCode.set(templateCode, updatedWorkOrder);
             result.updated++;
             result.rowResults.push({ rowNumber: _woRowNum, primaryIdentifier: templateCode, action: 'updated' });
-            
+            // Collect field log entry for batch flush
+            woFieldLogBatch.push({ tableName: 'work_orders', rowUuid: existingWorkOrder.wouuid, vesselId: existingWorkOrder.vesselId || null, oldRow: existingWorkOrder as any, newRow: updatedWorkOrder as any, userId: 'system' });
+
             if (importHistoryId) {
               await trackChange(importHistoryId, 'updated', 'workOrder', updatedWorkOrder.id, existingWorkOrder, updatedWorkOrder);
             }
@@ -1184,7 +1188,9 @@ export async function performImport(
             workOrdersByTemplateCode.set(templateCode, updatedWorkOrder);
             result.updated++;
             result.rowResults.push({ rowNumber: _woRowNum, primaryIdentifier: templateCode, action: 'updated' });
-            
+            // Collect field log entry for batch flush
+            woFieldLogBatch.push({ tableName: 'work_orders', rowUuid: existingWorkOrder.wouuid, vesselId: existingWorkOrder.vesselId || null, oldRow: existingWorkOrder as any, newRow: updatedWorkOrder as any, userId: 'system' });
+
             if (importHistoryId) {
               await trackChange(importHistoryId, 'updated', 'workOrder', updatedWorkOrder.id, existingWorkOrder, updatedWorkOrder);
             }
@@ -1208,7 +1214,17 @@ export async function performImport(
         _emitProgress('Processing Work Orders…');
       }
     }
-    
+
+    // Flush accumulated field log entries in one batch INSERT (best-effort)
+    if (woFieldLogBatch.length > 0) {
+      try {
+        const batchCount = await logFieldChangesBatch(woFieldLogBatch);
+        console.log(`[BulkImport] Flushed ${batchCount} field log entries from ${woFieldLogBatch.length} WO updates`);
+      } catch (e) {
+        console.error('[BulkImport] Field log batch flush failed (best-effort, import already applied):', e);
+      }
+    }
+
     // Step 3: Archive missing work orders if requested
     if (archiveMissing) {
       const importedTemplateCodes = new Set(allTemplateCodes);
@@ -2582,13 +2598,8 @@ export async function updateWorkOrderFromRow(workOrderId: string, row: any) {
   if ('assignedTo' in updateData) {
     await applyAssignmentSync(updateData);
   }
-  const existingWO = await storage.getWorkOrder(workOrderId);
-  const updated = await storage.updateWorkOrder(workOrderId, updateData);
-  // Sync field logging — bulk import updateWorkOrderFromRow
-  if (existingWO) {
-    try { await logFieldChanges('work_orders', existingWO.wouuid, existingWO.vesselId || null, existingWO, updated, 'system'); } catch (e) { console.error('[FieldLogger] WO bulk import:', e); }
-  }
-  return updated;
+  // Field logging moved to caller — import loop collects entries and flushes via logFieldChangesBatch
+  return await storage.updateWorkOrder(workOrderId, updateData);
 }
 
 // Store import history - NOW USES FILE-BASED STORAGE
