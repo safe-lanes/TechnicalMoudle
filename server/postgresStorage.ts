@@ -5335,6 +5335,8 @@ export class PostgresStorage {
       });
       
       console.log(`[CR_APPLY] Successfully approved and applied CR ${id}`);
+      // Sync field logging — CR status change (outside tx, best-effort)
+      try { await logFieldChanges('change_request', existing.cruuid, (existing as any).vesselId || null, existing, result, reviewerId || 'system'); } catch (e) { console.error('[FieldLogger] CR approve:', e); }
       return result;
     } catch (error: any) {
       console.error(`[CR_APPLY] Transaction failed for CR ${id}, all changes rolled back:`, error);
@@ -5608,6 +5610,8 @@ export class PostgresStorage {
       const success = String(applied) === String(expected);
       console.log(`  - ${field}: "${applied}" (${success ? 'OK' : 'MISMATCH - expected: ' + expected})`);
     }
+    // Sync field logging — WO entity changes applied by CR approval (best-effort)
+    try { await logFieldChanges('work_orders', resolvedWouuid, beforeState.vesselId || null, beforeState, afterState, 'system'); } catch (e) { console.error('[FieldLogger] CR apply work_order:', e); }
   }
 
   /**
@@ -5669,6 +5673,8 @@ export class PostgresStorage {
       const success = String(applied) === String(expected);
       console.log(`  - ${field}: "${applied}" (${success ? 'OK' : 'MISMATCH - expected: ' + expected})`);
     }
+    // Sync field logging — spare entity changes applied by CR approval (best-effort)
+    try { await logFieldChanges('spares', resolvedSuuid, beforeState.vesselId || null, beforeState, afterState, 'system'); } catch (e) { console.error('[FieldLogger] CR apply spare:', e); }
   }
 
   /**
@@ -5730,6 +5736,8 @@ export class PostgresStorage {
       const success = String(applied) === String(expected);
       console.log(`  - ${field}: "${applied}" (${success ? 'OK' : 'MISMATCH - expected: ' + expected})`);
     }
+    // Sync field logging — store entity changes applied by CR approval (best-effort)
+    try { await logFieldChanges('stores_items', resolvedStuuid, beforeState.vesselId || null, beforeState, afterState, 'system'); } catch (e) { console.error('[FieldLogger] CR apply store:', e); }
   }
 
   async rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {

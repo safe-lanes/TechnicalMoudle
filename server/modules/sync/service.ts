@@ -499,7 +499,13 @@ export async function preparePullData(
     vesselCode
   );
   const shoreFieldLogs = shoreFieldLogsRaw.map(normalizeFieldLog);
-  syncDiag(`PREPARE-PULL FIELD LOGS: ${shoreFieldLogs.length} shore logs for vessel`);
+  syncDiag(`PREPARE-PULL FIELD LOGS: ${shoreFieldLogs.length} shore logs for vessel=${vesselId} (excluded instance=${shipInstanceId})`);
+  if (shoreFieldLogs.length > 0) {
+    // Per-table breakdown for diagnostics
+    const tableBreakdown: Record<string, number> = {};
+    for (const log of shoreFieldLogs) { tableBreakdown[log.tableName] = (tableBreakdown[log.tableName] || 0) + 1; }
+    syncDiag(`PREPARE-PULL FIELD LOG TABLES: ${JSON.stringify(tableBreakdown)}`);
+  }
 
   // 3. Detect conflicts — ship pushed its field logs in step 2 (PUSH),
   //    now compare: did ship AND shore both change the same field on the same row?
