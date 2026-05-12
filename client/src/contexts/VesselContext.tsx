@@ -41,10 +41,25 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
     const roleChanged = lastAppliedRoleRef.current !== uiRole;
 
     if (adminDefaultsToAll) {
+      // Wait for vessel list before defaulting
+      if (vessels.length === 0) {
+        lastAppliedRoleRef.current = uiRole;
+        return;
+      }
+
       if (roleChanged || !userTouchedRef.current) {
-        if (vesselId !== 'all') {
-          console.log(`🚢 Forcing "All Vessels" default for admin role (${uiRole})`);
-          setVesselIdState('all');
+        const stored = localStorage.getItem('selectedVesselId');
+        let target: string;
+        if (stored && (stored === 'all' || vessels.some(v => v.id === stored))) {
+          target = stored;
+          console.log(`🚢 Restoring stored vessel for admin: ${stored} (${uiRole})`);
+        } else {
+          const firstVessel = vessels[0];
+          target = firstVessel.id;
+          console.log(`🚢 Defaulting admin to first vessel: ${firstVessel.id} (${firstVessel.name}) for role ${uiRole}`);
+        }
+        if (vesselId !== target) {
+          setVesselIdState(target);
         }
         if (roleChanged) {
           userTouchedRef.current = false;
@@ -80,11 +95,8 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!vesselId) return;
-    if (isSailAdmin || isClientAdmin) {
-      return;
-    }
     localStorage.setItem('selectedVesselId', vesselId);
-  }, [vesselId, isSailAdmin, isClientAdmin]);
+  }, [vesselId]);
 
   const setVesselId = (id: string) => {
     userTouchedRef.current = true;

@@ -16,7 +16,7 @@ export async function listJobs(vesselId?: string, componentId?: string) {
   let jobLinksMap = new Map<string, string[]>();
   let jobLinkTrackingMap = new Map<string, any>();
 
-  if (vesselId) {
+  if (vesselId && vesselId !== 'all') {
     const allLinks = await repo.findJobComponentLinks(vesselId);
     for (const link of allLinks) {
       const existing = jobLinksMap.get(link.jobId) || [];
