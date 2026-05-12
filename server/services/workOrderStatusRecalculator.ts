@@ -1,5 +1,6 @@
 import { storage } from "../storage";
 import type { WorkOrder, Job, Component, PmsVesselSettings } from "@shared/schema";
+import { logFieldChanges } from '../modules/sync';
 import { computeWorkOrderStatus, VesselGraceSettings, ComputedWorkOrderStatus, CompanyStandardGraceConfig, buildCompanyGraceConfig } from "@shared/workOrders/status";
 import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 
@@ -247,7 +248,9 @@ export class WorkOrderStatusRecalculatorService {
 
         // Only update if status has changed
         if (computedStatus !== wo.status) {
-          await storage.updateWorkOrder(wo.wouuid, { status: computedStatus });
+          const updated = await storage.updateWorkOrder(wo.wouuid, { status: computedStatus });
+          // Sync field logging — workOrderStatusRecalculator
+          try { await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updated, 'system'); } catch (e) { console.error('[FieldLogger] WO status recalc:', e); }
           results.statusesUpdated++;
           console.log(`📝 [StatusRecalculator] Updated WO ${wo.workOrderNo}: ${wo.status} → ${computedStatus}`);
         }

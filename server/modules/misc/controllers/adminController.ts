@@ -4,6 +4,7 @@ import { getDb } from '../../../db';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { buildExternalMasterDataUrl } from '../../../config/externalApi';
+import { logFieldChanges } from '../../sync';
 import { sql, eq, and } from 'drizzle-orm';
 import {
   vessels as vesselsTable,
@@ -278,7 +279,9 @@ export async function syncWorkOrderStatus(req: Request, res: Response) {
         });
 
         if (!dryRun) {
-          await storage.updateWorkOrder(wo.wouuid, { status: computedStatus });
+          const updated = await storage.updateWorkOrder(wo.wouuid, { status: computedStatus });
+          // Sync field logging — admin status sync
+          try { await logFieldChanges('work_orders', wo.wouuid, (wo as any).vesselId || null, wo, updated, 'system'); } catch (e) { console.error('[FieldLogger] WO admin status sync:', e); }
         }
         stats.statusUpdated++;
       } else {

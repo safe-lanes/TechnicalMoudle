@@ -18,6 +18,7 @@ import {
 import { createRecordSnapshot } from './undoService';
 import { saveImportHistory } from '../../../services/fileBasedImportHistory';
 import { applyAssignmentSync } from '../../work-orders/services/workOrderService';
+import { logFieldChanges } from '../../sync';
 
 
 export async function processSpareInventory(params: {
@@ -2581,7 +2582,13 @@ export async function updateWorkOrderFromRow(workOrderId: string, row: any) {
   if ('assignedTo' in updateData) {
     await applyAssignmentSync(updateData);
   }
-  return await storage.updateWorkOrder(workOrderId, updateData);
+  const existingWO = await storage.getWorkOrder(workOrderId);
+  const updated = await storage.updateWorkOrder(workOrderId, updateData);
+  // Sync field logging — bulk import updateWorkOrderFromRow
+  if (existingWO) {
+    try { await logFieldChanges('work_orders', existingWO.wouuid, existingWO.vesselId || null, existingWO, updated, 'system'); } catch (e) { console.error('[FieldLogger] WO bulk import:', e); }
+  }
+  return updated;
 }
 
 // Store import history - NOW USES FILE-BASED STORAGE

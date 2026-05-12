@@ -3748,12 +3748,18 @@ export class PostgresStorage {
 
   async inactivateStoresItem(id: string, vesselId?: string): Promise<void> {
     const db = await getDb();
+    const existingItem = await this.getStoresItem(id);
     const numId = Number(id);
     const idCondition = or(eq(storesItems.stuuid, id), ...(Number.isInteger(numId) && numId > 0 ? [eq(storesItems.id, numId)] : []));
     const condition = vesselId ? and(idCondition, eq(storesItems.vesselId, vesselId)) : idCondition;
-    await db.update(storesItems)
+    const [result] = await db.update(storesItems)
       .set({ isActive: false, updatedAt: new Date() })
-      .where(condition);
+      .where(condition)
+      .returning();
+    // Sync field logging — inactivateStoresItem
+    if (existingItem && result) {
+      try { await logFieldChanges('stores_items', existingItem.stuuid, existingItem.vesselId || null, existingItem, result, 'system'); } catch (e) { console.error('[FieldLogger] stores inactivate:', e); }
+    }
   }
 
   async getStoresItem(id: string): Promise<StoresItem | undefined> {
@@ -4537,6 +4543,9 @@ export class PostgresStorage {
       .where(eq(defects.duuid, defect.duuid))
       .returning();
 
+    // Sync field logging — addDefectNote
+    try { await logFieldChanges('defects', defect.duuid, defect.vesselId || null, defect, result[0], note.createdBy || 'system'); } catch (e) { console.error('[FieldLogger] defect addNote:', e); }
+
     return result[0];
   }
 
@@ -4554,6 +4563,9 @@ export class PostgresStorage {
       .set({ linkedDefects: mergedLinks, updatedAt: new Date() })
       .where(eq(defects.duuid, defect.duuid))
       .returning();
+
+    // Sync field logging — linkDefects
+    try { await logFieldChanges('defects', defect.duuid, defect.vesselId || null, defect, result[0], 'system'); } catch (e) { console.error('[FieldLogger] defect linkDefects:', e); }
 
     return result[0];
   }
@@ -6429,10 +6441,15 @@ export class PostgresStorage {
 
   async acknowledgeSuperintendentNotification(id: number): Promise<SuperintendentNotification> {
     const db = await getDb();
+    const [existing] = await db.select().from(superintendentNotifications).where(eq(superintendentNotifications.id, id));
     const [result] = await db.update(superintendentNotifications)
       .set({ isAcknowledged: true, acknowledgedAt: new Date() })
       .where(eq(superintendentNotifications.id, id))
       .returning();
+    // Sync field logging — acknowledgeSuperintendentNotification
+    if (existing && result) {
+      try { await logFieldChanges('superintendent_notifications', (existing as any).snuuid || String(id), (existing as any).vesselId || null, existing, result, 'system'); } catch (e) { console.error('[FieldLogger] supn ack:', e); }
+    }
     return result;
   }
 
@@ -6646,9 +6663,15 @@ export class PostgresStorage {
 
   async deleteCertificate(id: string): Promise<void> {
     const db = await getDb();
-    await db.update(certificates)
+    const existingCert = await this.getCertificate(id);
+    const [result] = await db.update(certificates)
       .set({ isActive: false, updatedAt: new Date() })
-      .where(eq(certificates.id, id));
+      .where(eq(certificates.id, id))
+      .returning();
+    // Sync field logging — deleteCertificate (soft-delete)
+    if (existingCert && result) {
+      try { await logFieldChanges('certificates', id, (existingCert as any).vesselId || null, existingCert, result, 'system'); } catch (e) { console.error('[FieldLogger] cert delete:', e); }
+    }
   }
 
   // ============= SURVEYS =============
@@ -6700,9 +6723,15 @@ export class PostgresStorage {
 
   async deleteSurvey(id: string): Promise<void> {
     const db = await getDb();
-    await db.update(surveys)
+    const existingSurvey = await this.getSurvey(id);
+    const [result] = await db.update(surveys)
       .set({ isActive: false, updatedAt: new Date() })
-      .where(eq(surveys.id, id));
+      .where(eq(surveys.id, id))
+      .returning();
+    // Sync field logging — deleteSurvey (soft-delete)
+    if (existingSurvey && result) {
+      try { await logFieldChanges('surveys', id, (existingSurvey as any).vesselId || null, existingSurvey, result, 'system'); } catch (e) { console.error('[FieldLogger] survey delete:', e); }
+    }
   }
 
   // ============= WORK ORDER EXECUTION DETAILS =============
@@ -7295,12 +7324,17 @@ export class PostgresStorage {
 
   async archiveWorkOrder(id: string): Promise<WorkOrder> {
     const db = await getDb();
+    const existingWO = await this.getWorkOrder(id);
     const result = await db.update(workOrders)
       .set({ isActive: false })
       .where(or(eq(workOrders.wouuid, id), eq(workOrders.id, id)))
       .returning();
     if (result.length === 0) {
       throw new Error(`WorkOrder not found: ${id}`);
+    }
+    // Sync field logging — archiveWorkOrder (soft-delete)
+    if (existingWO) {
+      try { await logFieldChanges('work_orders', result[0].wouuid, result[0].vesselId || null, existingWO, result[0], 'system'); } catch (e) { console.error('[FieldLogger] WO archive:', e); }
     }
     return result[0];
   }
@@ -7326,9 +7360,14 @@ export class PostgresStorage {
     for (const [key, group] of defectGroups) {
       if (group.length >= 2) {
         for (const defect of group) {
-          await db.update(defects)
-            .set({ isRecurring: true })
-            .where(eq(defects.duuid, defect.duuid));
+          const [updated] = await db.update(defects)
+            .set({ isRecurring: true, updatedAt: new Date() })
+            .where(eq(defects.duuid, defect.duuid))
+            .returning();
+          // Sync field logging — calculateAndUpdateRecurringDefects
+          if (updated) {
+            try { await logFieldChanges('defects', defect.duuid, defect.vesselId || null, defect, updated, 'system'); } catch (e) { console.error('[FieldLogger] defect recurring:', e); }
+          }
         }
       }
     }
@@ -7755,16 +7794,18 @@ export class PostgresStorage {
       // Check if postponed date has passed
       if (wo.postponedDate && wo.postponedDate <= todayStr) {
         const result = await db.update(workOrders)
-          .set({ 
+          .set({
             status: 'Pending',
             postponedDate: null,
             updatedAt: new Date()
           })
           .where(eq(workOrders.wouuid, wo.wouuid))
           .returning();
-        
+
         if (result.length > 0) {
           revertedWorkOrders.push(result[0]);
+          // Sync field logging — checkAndRevertPostponedWorkOrders
+          try { await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, result[0], 'system'); } catch (e) { console.error('[FieldLogger] WO revert postponed:', e); }
         }
       }
     }
@@ -7976,12 +8017,17 @@ export class PostgresStorage {
 
   async updateLocation(id: number, data: Partial<Location>): Promise<Location> {
     const db = await getDb();
+    const existingLoc = await this.getLocationById(id);
     const result = await db.update(locations)
       .set(data)
       .where(eq(locations.id, id))
       .returning();
     if (!result[0]) {
       throw new Error(`Location ${id} not found`);
+    }
+    // Sync field logging — updateLocation
+    if (existingLoc) {
+      try { await logFieldChanges('locations', (existingLoc as any).luuid || String(id), existingLoc.vesselId || null, existingLoc, result[0], 'system'); } catch (e) { console.error('[FieldLogger] location update:', e); }
     }
     return result[0];
   }
