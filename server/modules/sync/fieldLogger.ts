@@ -176,6 +176,122 @@ export async function logFieldChanges(
 }
 
 /**
+ * Batch-aware field change logger for high-volume operations (e.g., bulk imports).
+ *
+ * Behavioral parity: a call to logFieldChangesBatch([{table, uuid, vessel, oldRow, newRow, userId}])
+ * inserts IDENTICAL rows to sequential calls of logFieldChanges(table, uuid, vessel, oldRow, newRow, userId).
+ * Same instance_id, same SKIP_FIELDS filtering, same serializeFieldValue, same requiresFieldLogging guard,
+ * same AsyncLocalStorage user-context resolution. The only difference is performance: one multi-row INSERT
+ * per chunk instead of N sequential INSERTs.
+ *
+ * Designed for UPDATE comparisons (both oldRow and newRow present). For INSERT logging
+ * (oldRow=null), use the sequential logFieldChanges function directly.
+ *
+ * If the accumulated change rows exceed 1,000, chunks into INSERTs of 1,000 to stay within
+ * Postgres parameter limits (~65,535 params; 9 columns per row → ~7,200 rows max safe).
+ */
+export async function logFieldChangesBatch(
+  entries: Array<{
+    tableName: string;
+    rowUuid: string;
+    vesselId: string | null;
+    oldRow: Record<string, any>;
+    newRow: Record<string, any>;
+    userId: string;
+  }>,
+  txOrDb?: any
+): Promise<number> {
+  if (entries.length === 0) return 0;
+
+  const db = txOrDb || await getDb();
+  const instanceId = getInstanceId();
+  const changedAt = new Date();
+
+  // Resolve userId context once — same logic as logFieldChanges
+  const PLACEHOLDER_USER_IDS_BATCH = new Set(['system', 'admin', 'System', '']);
+  const ctx = getRequestContext();
+
+  // Accumulate all insert rows
+  const allRows: Array<{
+    tableName: string;
+    rowUuid: string;
+    fieldName: string;
+    oldValue: string | null;
+    newValue: string | null;
+    vesselId: string | null;
+    changedAt: Date;
+    changedByUserId: string;
+    instanceId: string;
+    isSynced: boolean;
+  }> = [];
+
+  for (const entry of entries) {
+    // Guard: only BOTH_EDITABLE tables
+    if (!requiresFieldLogging(entry.tableName)) continue;
+    if (!entry.rowUuid) continue;
+
+    // Resolve userId per entry — same fallback as logFieldChanges
+    let resolvedUserId = entry.userId;
+    if (!resolvedUserId || PLACEHOLDER_USER_IDS_BATCH.has(resolvedUserId)) {
+      if (ctx?.userId) {
+        resolvedUserId = ctx.userId;
+      } else if (!resolvedUserId) {
+        resolvedUserId = 'system';
+      }
+    }
+
+    // Compute changed fields (UPDATE mode — both oldRow and newRow present)
+    const allKeys = Array.from(new Set([...Object.keys(entry.oldRow), ...Object.keys(entry.newRow)]));
+
+    for (const key of allKeys) {
+      if (SKIP_FIELDS.has(key)) continue;
+
+      const oldStr = serializeFieldValue(entry.oldRow[key]);
+      const newStr = serializeFieldValue(entry.newRow[key]);
+
+      if (oldStr === newStr) continue; // No change — skip
+
+      allRows.push({
+        tableName: entry.tableName,
+        rowUuid: entry.rowUuid,
+        fieldName: key,
+        oldValue: oldStr,
+        newValue: newStr,
+        vesselId: entry.vesselId,
+        changedAt,
+        changedByUserId: resolvedUserId,
+        instanceId,
+        isSynced: false,
+      });
+    }
+  }
+
+  if (allRows.length === 0) return 0;
+
+  // Chunk into batches of 1,000 to stay within Postgres parameter limits
+  const CHUNK_SIZE = 1000;
+  let totalInserted = 0;
+
+  for (let i = 0; i < allRows.length; i += CHUNK_SIZE) {
+    const chunk = allRows.slice(i, i + CHUNK_SIZE);
+    try {
+      await db.insert(syncFieldLog).values(chunk);
+      totalInserted += chunk.length;
+    } catch (error: any) {
+      console.error(`[FieldLogger] Batch insert error (chunk ${Math.floor(i / CHUNK_SIZE) + 1}):`, error.message);
+      // Best-effort — don't throw, don't rollback
+    }
+  }
+
+  if (totalInserted > 0) {
+    syncDiag(`FIELD-LOGGER-BATCH: ${totalInserted} field logs from ${entries.length} entries`);
+    console.log(`[FieldLogger] Batch logged ${totalInserted} field change(s) from ${entries.length} entries`);
+  }
+
+  return totalInserted;
+}
+
+/**
  * Convenience function for logging soft-delete
  */
 export async function logSoftDelete(

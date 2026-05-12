@@ -439,11 +439,9 @@ export interface IStorage {
   bulkUpdateComponents(components: Array<{ id: string; data: Partial<Component> }>): Promise<Component[]>;
   bulkUpsertComponents(components: InsertComponent[]): Promise<{ created: number; updated: number }>;
   bulkCreateSpares(spares: InsertSpare[]): Promise<Spare[]>;
-  bulkUpdateSparesByROB(spares: Array<{ robId: string; data: Partial<Spare> }>): Promise<Spare[]>;
   bulkUpsertSpares(spares: InsertSpare[]): Promise<{ created: number; updated: number }>;
   archiveComponentsByIds(ids: string[]): Promise<number>;
-  archiveSparesByIds(ids: number[]): Promise<number>;
-  
+
   // Bulk prefetch methods for performance
   getComponentsByCodes(codes: string[], vesselId?: string): Promise<Map<string, Component>>;
   getJobsByJobNos(jobNos: string[], vesselId?: string): Promise<Map<string, Job>>;
@@ -555,10 +553,7 @@ export interface IStorage {
   updateWorkOrder(id: string, updates: Partial<InsertWorkOrder>): Promise<WorkOrder>;
   deleteWorkOrder(id: string): Promise<void>;
   bulkCreateWorkOrders(workOrders: InsertWorkOrder[]): Promise<WorkOrder[]>;
-  bulkUpdateWorkOrders(workOrders: Array<{ templateCode: string; data: Partial<WorkOrder> }>): Promise<WorkOrder[]>;
-  bulkUpsertWorkOrders(workOrders: InsertWorkOrder[]): Promise<{ created: number; updated: number }>;
-  
-  
+
   // Superintendent Notification methods
   createSuperintendentNotification(notification: InsertSuperintendentNotification): Promise<SuperintendentNotification>;
   getSuperintendentNotifications(vesselName?: string): Promise<SuperintendentNotification[]>;

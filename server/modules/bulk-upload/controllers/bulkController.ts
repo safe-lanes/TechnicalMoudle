@@ -36,6 +36,7 @@ import { performImport, storeImportHistory } from '../services/importService';
 import { getImportHistory, getHistoryFile } from '../services/historyService';
 import { createRecordSnapshot } from '../services/undoService';
 import { getSparesExcelColumns } from '@shared/sparesTemplateFields';
+import { logFieldChanges } from '../../sync';
 
 // ── File Storage Helper ──
 // Stores uploaded import files. On Replit, uses Replit Object Storage.
@@ -1403,11 +1404,19 @@ export async function undoImport(req: Request, res: Response) {
             console.log(`  ✓ Archived work order ${log.entityId}`);
           } else if (log.operation === 'updated') {
             const previousData = log.previousData as any;
-            await storage.updateWorkOrder(log.entityId, previousData);
+            const updated = await storage.updateWorkOrder(log.entityId, previousData);
+            // Sync field logging — undo import restore
+            if (currentState) {
+              try { await logFieldChanges('work_orders', (currentState as any).wouuid, (currentState as any).vesselId || null, currentState, updated, 'system'); } catch (e) { console.error('[FieldLogger] WO undo restore:', e); }
+            }
             result.restored++;
             console.log(`  ✓ Restored work order ${log.entityId}`);
           } else if (log.operation === 'archived') {
-            await storage.updateWorkOrder(log.entityId, { isActive: true });
+            const updated = await storage.updateWorkOrder(log.entityId, { isActive: true });
+            // Sync field logging — undo import unarchive
+            if (currentState) {
+              try { await logFieldChanges('work_orders', (currentState as any).wouuid, (currentState as any).vesselId || null, currentState, updated, 'system'); } catch (e) { console.error('[FieldLogger] WO undo unarchive:', e); }
+            }
             result.unarchived++;
             console.log(`  ✓ Unarchived work order ${log.entityId}`);
           }
@@ -1483,7 +1492,9 @@ export async function undoImport(req: Request, res: Response) {
               await storage.updateJob(change.log.entityId, change.previousState);
               console.log(`  ↩️ Rolled back job ${change.log.entityId}`);
             } else if (change.log.entityType === 'workOrder') {
-              await storage.updateWorkOrder(change.log.entityId, change.previousState);
+              const rollbackUpdated = await storage.updateWorkOrder(change.log.entityId, change.previousState);
+              // Sync field logging — undo rollback
+              try { await logFieldChanges('work_orders', (change.previousState as any).wouuid || change.log.entityId, (change.previousState as any).vesselId || null, change.previousState, rollbackUpdated, 'system'); } catch (e) { console.error('[FieldLogger] WO undo rollback:', e); }
               console.log(`  ↩️ Rolled back work order ${change.log.entityId}`);
             } else if (change.log.entityType === 'storesItem') {
               await storage.updateStoresItem(change.log.entityId, change.previousState);

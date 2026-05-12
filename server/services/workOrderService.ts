@@ -561,19 +561,6 @@ export class WorkOrderService {
     return storage.bulkCreateWorkOrders(workOrders);
   }
 
-  /**
-   * Bulk update work orders
-   */
-  async bulkUpdateWorkOrders(workOrders: Array<{ templateCode: string; data: Partial<WorkOrder> }>): Promise<WorkOrder[]> {
-    return storage.bulkUpdateWorkOrders(workOrders);
-  }
-
-  /**
-   * Bulk upsert work orders
-   */
-  async bulkUpsertWorkOrders(workOrders: InsertWorkOrder[]): Promise<{ created: number; updated: number }> {
-    return storage.bulkUpsertWorkOrders(workOrders);
-  }
 }
 
 // Export singleton instance

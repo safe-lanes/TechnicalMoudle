@@ -2343,51 +2343,6 @@ export class PostgresStorage {
     return results;
   }
 
-  async bulkUpdateWorkOrders(updates: Array<{ templateCode: string; data: Partial<WorkOrder> }>): Promise<WorkOrder[]> {
-    const db = await getDb();
-    const results: WorkOrder[] = [];
-    
-    for (const { templateCode, data } of updates) {
-      const result = await db.update(workOrders)
-        .set({ ...data, updatedAt: new Date() })
-        .where(eq(workOrders.templateId, templateCode))
-        .returning();
-      if (result[0]) {
-        results.push(result[0]);
-      }
-    }
-    
-    return results;
-  }
-
-  async bulkUpsertWorkOrders(woList: InsertWorkOrder[]): Promise<{ created: number; updated: number }> {
-    const db = await getDb();
-    let created = 0;
-    let updated = 0;
-    
-    for (const wo of woList) {
-      const existing = wo.workOrderNo ? await this.getWorkOrderByWorkOrderNo(wo.workOrderNo) : null;
-      
-      if (existing) {
-        await db.update(workOrders)
-          .set({ ...wo, updatedAt: new Date() })
-          .where(eq(workOrders.wouuid, existing.wouuid));
-        updated++;
-      } else {
-        const id = wo.id || `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        await db.insert(workOrders).values({
-          ...wo,
-          id,
-          wouuid: randomUUID(),
-          dataScope: wo.dataScope || 'vessel',
-        });
-        created++;
-      }
-    }
-    
-    return { created, updated };
-  }
-
   async getWorkOrdersByTemplateIds(templateIds: string[], vesselId?: string): Promise<Map<string, WorkOrder>> {
     if (templateIds.length === 0) return new Map();
     const db = await getDb();
@@ -3536,30 +3491,6 @@ export class PostgresStorage {
             console.warn(`[bulkCreateSpares] Failed to sync Location B spare_location_stock for spare ${createdSpare.id}: ${syncError.message}`);
           }
         }
-      }
-    }
-
-    return results;
-  }
-
-  async bulkUpdateSparesByROB(updates: Array<{ robId: string; data: Partial<Spare> }>): Promise<Spare[]> {
-    const db = await getDb();
-    const results: Spare[] = [];
-
-    for (const { robId, data } of updates) {
-      const numId = parseInt(robId, 10);
-      if (isNaN(numId)) continue;
-
-      // Filter out undefined/null partCode to prevent NOT NULL constraint violation
-      const { partCode, ...restData } = data;
-      const updateData = partCode != null ? { ...restData, partCode, updatedAt: new Date() } : { ...restData, updatedAt: new Date() };
-
-      const result = await db.update(spares)
-        .set(updateData)
-        .where(or(eq(spares.id, numId), eq(spares.suuid, robId)))
-        .returning();
-      if (result[0]) {
-        results.push(result[0]);
       }
     }
 
@@ -7259,16 +7190,6 @@ export class PostgresStorage {
     const result = await db.update(components)
       .set({ isActive: false })
       .where(inArray(components.cuuid, ids))
-      .returning();
-    return result.length;
-  }
-
-  async archiveSparesByIds(ids: number[]): Promise<number> {
-    if (ids.length === 0) return 0;
-    const db = await getDb();
-    const result = await db.update(spares)
-      .set({ isActive: false })
-      .where(inArray(spares.id, ids))
       .returning();
     return result.length;
   }
