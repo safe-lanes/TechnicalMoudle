@@ -18,23 +18,44 @@
  *   await logFieldChanges('work_orders', row.wouuid, vesselId, { is_deleted: false }, { is_deleted: true }, userId);
  */
 
-import { getDb } from '../../db';
+import { getDb, getPool } from '../../db';
 import { syncFieldLog } from '../../../shared/schema';
 import { requiresFieldLogging } from '../../../shared/syncConfig';
 import { syncDiag } from './syncDiagLogger';
 import { getRequestContext } from '../../middleware/requestContext';
+import { getColumnMeta } from './oneWayApplier';
 
-// Fields to NEVER log — these are meta fields managed by the system, not user data.
-// NOTE: 'id' was previously skipped here (assumed to be an integer auto-PK).
-// Many BOTH_EDITABLE tables have text PK 'id' (defects, work_orders, work_order_executions,
-// work_order_documents, work_order_postponements, etc.) — those values are essential for
-// INSERT replication via applyFieldLogInserts(). For tables with GENERATED ALWAYS integer id,
-// the column is already filtered out by getColumnMeta().identityAlwaysCols in oneWayApplier.
 const SKIP_FIELDS = new Set([
   'updated_at', 'updatedAt',
   'created_at', 'createdAt',
   'is_sync', 'isSync',
 ]);
+
+// Cache: tableName → true if its `id` column is GENERATED ALWAYS / BY DEFAULT (serial).
+// Tables with serial `id` get it added to the skip set; tables with text `id` do not.
+const serialIdCache = new Map<string, boolean>();
+
+async function hasSerialId(tableName: string): Promise<boolean> {
+  if (serialIdCache.has(tableName)) return serialIdCache.get(tableName)!;
+  try {
+    const pool = await getPool();
+    const meta = await getColumnMeta(pool, tableName);
+    const result = meta.identityAlwaysCols.has('id');
+    serialIdCache.set(tableName, result);
+    return result;
+  } catch {
+    return false;
+  }
+}
+
+async function getEffectiveSkipFields(tableName: string): Promise<Set<string>> {
+  if (await hasSerialId(tableName)) {
+    const extended = new Set(SKIP_FIELDS);
+    extended.add('id');
+    return extended;
+  }
+  return SKIP_FIELDS;
+}
 
 /**
  * JSON-aware serialization for field values.
@@ -86,6 +107,7 @@ export async function logFieldChanges(
   const instanceId = getInstanceId();
   const changedAt = new Date();
   let logCount = 0;
+  const skipFields = await getEffectiveSkipFields(tableName);
 
   // Resolve userId: prefer explicit parameter, fall back to AsyncLocalStorage request context.
   // This avoids modifying 65+ callers that hardcode 'system' — the middleware captures the
@@ -107,7 +129,7 @@ export async function logFieldChanges(
   if (oldRow === null && newRow !== null) {
     // === INSERT — log all non-skip fields with old=null ===
     const entries = Object.entries(newRow)
-      .filter(([key, value]) => !SKIP_FIELDS.has(key) && value !== null && value !== undefined);
+      .filter(([key, value]) => !skipFields.has(key) && value !== null && value !== undefined);
 
     for (const [fieldName, newValue] of entries) {
       try {
@@ -133,7 +155,7 @@ export async function logFieldChanges(
     const allKeys = Array.from(new Set([...Object.keys(oldRow), ...Object.keys(newRow)]));
 
     for (const key of allKeys) {
-      if (SKIP_FIELDS.has(key)) continue;
+      if (skipFields.has(key)) continue;
 
       const oldVal = oldRow[key];
       const newVal = newRow[key];
@@ -180,9 +202,9 @@ export async function logFieldChanges(
  *
  * Behavioral parity: a call to logFieldChangesBatch([{table, uuid, vessel, oldRow, newRow, userId}])
  * inserts IDENTICAL rows to sequential calls of logFieldChanges(table, uuid, vessel, oldRow, newRow, userId).
- * Same instance_id, same SKIP_FIELDS filtering, same serializeFieldValue, same requiresFieldLogging guard,
- * same AsyncLocalStorage user-context resolution. The only difference is performance: one multi-row INSERT
- * per chunk instead of N sequential INSERTs.
+ * Same instance_id, same skip-fields filtering (including serial `id` detection), same serializeFieldValue,
+ * same requiresFieldLogging guard, same AsyncLocalStorage user-context resolution. The only difference is
+ * performance: one multi-row INSERT per chunk instead of N sequential INSERTs.
  *
  * Designed for UPDATE comparisons (both oldRow and newRow present). For INSERT logging
  * (oldRow=null), use the sequential logFieldChanges function directly.
@@ -225,10 +247,18 @@ export async function logFieldChangesBatch(
     isSynced: boolean;
   }> = [];
 
+  // Pre-resolve per-table skip fields (batch may span multiple tables)
+  const skipFieldsByTable = new Map<string, Set<string>>();
+
   for (const entry of entries) {
     // Guard: only BOTH_EDITABLE tables
     if (!requiresFieldLogging(entry.tableName)) continue;
     if (!entry.rowUuid) continue;
+
+    if (!skipFieldsByTable.has(entry.tableName)) {
+      skipFieldsByTable.set(entry.tableName, await getEffectiveSkipFields(entry.tableName));
+    }
+    const skipFields = skipFieldsByTable.get(entry.tableName)!;
 
     // Resolve userId per entry — same fallback as logFieldChanges
     let resolvedUserId = entry.userId;
@@ -244,7 +274,7 @@ export async function logFieldChangesBatch(
     const allKeys = Array.from(new Set([...Object.keys(entry.oldRow), ...Object.keys(entry.newRow)]));
 
     for (const key of allKeys) {
-      if (SKIP_FIELDS.has(key)) continue;
+      if (skipFields.has(key)) continue;
 
       const oldStr = serializeFieldValue(entry.oldRow[key]);
       const newStr = serializeFieldValue(entry.newRow[key]);
