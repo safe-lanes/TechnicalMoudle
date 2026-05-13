@@ -190,7 +190,10 @@ export class SyncEngine {
       // In remote mode, completeSyncSession marks logs in SHORE's DB but the ship's
       // local DB still has them as is_synced=false. Without this step, the same logs
       // would be re-pushed on the next sync cycle, overwriting newer shore values.
-      if (pushedLogUuids.length > 0) {
+      // IMPORTANT: Only SHIP instances mark their own logs as synced here. Shore's
+      // field logs are marked synced later by completeSyncSession when the ship pulls them.
+      const isShip = this.instanceId.toUpperCase().startsWith('SHIP');
+      if (pushedLogUuids.length > 0 && isShip) {
         try {
           await syncRepo.markFieldLogsSynced(pushedLogUuids, batchUuid!);
           syncDiag(`PUSH DONE: marked ${pushedLogUuids.length} field logs as synced locally`);
@@ -307,10 +310,17 @@ export class SyncEngine {
 
     // B. Gather BOTH_EDITABLE field logs (unsynced, from this instance)
     //    Pass vesselCode so logs stored with vessel_code (for vessel_code-scoped tables) are also found
+    //    IMPORTANT: Only SHIP instances push field logs. Shore's field logs remain in
+    //    sync_field_log (is_synced=false) until the ship pulls them via preparePullData.
+    //    If shore pushes to itself in LOCAL mode, the logs get marked is_synced=true
+    //    and the ship can never pull them — breaking shore→ship bidirectional sync.
+    const isShipInstance = this.instanceId.toUpperCase().startsWith('SHIP');
     const vesselCode = await this.getVesselCode(vesselId);
     syncDiag(`PUSH START: gathering field logs for vessel=${vesselId}, vesselCode=${vesselCode}`);
-    const fieldLogs = await syncRepo.getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode);
-    syncDiag(`PUSH: found ${fieldLogs.length} unsynced field logs`);
+    const fieldLogs = isShipInstance
+      ? await syncRepo.getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode)
+      : [];
+    syncDiag(`PUSH: found ${fieldLogs.length} unsynced field logs${!isShipInstance ? ' (shore skips field log push)' : ''}`);
     // Table breakdown
     const pushTables: Record<string, number> = {};
     fieldLogs.forEach((l: any) => { pushTables[l.tableName ?? l.table_name] = (pushTables[l.tableName ?? l.table_name] || 0) + 1; });
