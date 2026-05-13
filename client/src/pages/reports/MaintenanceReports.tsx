@@ -21,7 +21,8 @@ import {
   Settings,
   Eye,
   Loader2,
-  Download
+  Download,
+  ClipboardList
 } from "lucide-react";
 import { format } from "date-fns";
 import { pdfReportGenerator, fetchReportData, formatDate, formatReportDateRange } from "@/lib/pdfReportGenerator";
@@ -234,6 +235,20 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       icon: CheckCircle,
       priority: "medium",
       lastGenerated: "1 day ago",
+      estimatedTime: "2-3 min"
+    },
+    {
+      id: "all-jobs",
+      name: "All Jobs / Work Orders Register",
+      description: "Comprehensive register of every work order regardless of status",
+      purpose: "Full PMS overview (Audits/Office/Vessel)",
+      frequency: "On Demand",
+      fields: ["WO No", "Component", "Job Title", "Job Type", "Dept", "Assigned To", "Frequency", "Due Date", "Completion Date", "Status", "Man Hours", "Remarks"],
+      filters: ["Vessel", "Dept", "Date Range", "Component"],
+      outputs: ["PDF", "Excel"],
+      icon: ClipboardList,
+      priority: "medium",
+      lastGenerated: "—",
       estimatedTime: "2-3 min"
     },
     {
@@ -606,6 +621,63 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to)
           },
           completedColumns,
+          data
+        );
+        break;
+      }
+
+      case 'all-jobs': {
+        let allJobsUrl = `/technical/api/reports/all-jobs/preview?vesselId=${activeVesselId}${vesselIdsParam}`;
+        if (effectiveDateRange?.from) {
+          allJobsUrl += `&dateFrom=${toLocalDateStr(effectiveDateRange.from)}`;
+        }
+        if (effectiveDateRange?.to) {
+          allJobsUrl += `&dateTo=${toLocalDateStr(effectiveDateRange.to)}`;
+        }
+        const allJobsResponse = await fetch(allJobsUrl);
+        if (!allJobsResponse.ok) {
+          throw new Error('Failed to fetch all jobs data');
+        }
+        const { data: allJobsRawAll, vesselName: allJobsVessel, summary: allJobsSummary } = await allJobsResponse.json();
+        const allJobsRaw = applyDepartmentFilter(applyComponentFilter(allJobsRawAll));
+
+        const allJobsColumns = [
+          { header: 'S.No', field: 'sNo', width: 8 },
+          ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 22 }] : []),
+          { header: 'WO No', field: 'workOrderNo', width: 22 },
+          { header: 'Component', field: 'componentName', width: 28 },
+          { header: 'Job Title', field: 'jobTitle', width: 30 },
+          { header: 'Job Type', field: 'jobType', width: 14 },
+          { header: 'Dept', field: 'department', width: 12 },
+          { header: 'Assigned To', field: 'assignedTo', width: 18 },
+          { header: 'Frequency', field: 'frequency', width: 14 },
+          { header: 'Due Date', field: 'dueDate', width: 16 },
+          { header: 'Completion Date', field: 'completionDate', width: 16 },
+          { header: 'Status', field: 'status', width: 14 },
+          { header: 'Man Hours', field: 'manHours', width: 12 },
+          { header: 'Remarks', field: 'remarks', width: 30 }
+        ];
+
+        const data = allJobsRaw;
+
+        if (mode === 'preview') {
+          const counts = (allJobsSummary?.statusCounts || {}) as Record<string, number>;
+          const summaryRows = [
+            { label: 'Total Jobs', value: data.length },
+            ...Object.entries(counts).map(([s, c]) => ({ label: s, value: c as number }))
+          ];
+          return { title: 'ALL JOBS / WORK ORDERS REGISTER', subtitle: `Vessel: ${allJobsVessel || vesselName}`, vessel: allJobsVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns: allJobsColumns, data, summary: summaryRows } as ReportPreviewData;
+        }
+
+        pdfReportGenerator.generateReport(
+          {
+            title: 'ALL JOBS / WORK ORDERS REGISTER',
+            subtitle: `${data.length} work orders`,
+            vessel: allJobsVessel || vesselName,
+            orientation: 'landscape',
+            dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to)
+          },
+          allJobsColumns,
           data
         );
         break;
@@ -1037,6 +1109,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       'due-jobs-7': '/technical/api/reports/due-jobs-7-days',
       'overdue-jobs': '/technical/api/reports/overdue-jobs',
       'completed-jobs': '/technical/api/reports/completed-jobs',
+      'all-jobs': '/technical/api/reports/all-jobs',
       'unplanned-jobs': '/technical/api/reports/unplanned-breakdown-jobs/excel',
       'postponement-log': '/technical/api/reports/postponement-log',
       'monthly-summary': '/technical/api/reports/maintenance/monthly-summary/excel',
@@ -1060,14 +1133,14 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     }
 
     if (globalFilters?.department) {
-      const deptReports = ['overdue-jobs', 'completed-jobs', 'postponement-log', 'critical-equipment'];
+      const deptReports = ['overdue-jobs', 'completed-jobs', 'all-jobs', 'postponement-log', 'critical-equipment'];
       if (deptReports.includes(reportId)) {
         requestBody.departmentFilter = globalFilters.department;
       }
     }
     
     // Add date range for reports that support it
-    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'postponement-log' || reportId === 'critical-equipment' || reportId === 'overdue-jobs') {
+    if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'all-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'postponement-log' || reportId === 'critical-equipment' || reportId === 'overdue-jobs') {
       const dateFrom = categoryFilters.dateRange?.from;
       const dateTo = categoryFilters.dateRange?.to;
       
