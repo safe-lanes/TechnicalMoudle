@@ -6349,6 +6349,8 @@ export class PostgresStorage {
   async createSuperintendentNotification(notification: InsertSuperintendentNotification): Promise<SuperintendentNotification> {
     const db = await getDb();
     const [result] = await db.insert(superintendentNotifications).values(notification).returning();
+    // Sync field logging — INSERT (enables ship→shore sync of new notification rows)
+    try { await logFieldChanges('superintendent_notifications', (result as any).snuuid || String(result.id), (notification as any).vesselId || (result as any).vesselId || null, null, result, 'system'); } catch (e) { console.error('[FieldLogger] supn create:', e); }
     return result;
   }
 
