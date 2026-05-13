@@ -556,11 +556,13 @@ export async function applyFieldLogInserts(
               [compId]
             );
             const oldVal = oldRow.rows[0]?.current_cumulative_rh || oldRow.rows[0]?.rh_current_master || '(not found)';
+            // Also propagate rh_master_updated_at so "Last Updated Date" reflects on shore
+            const rhUpdatedAt = rowData['entered_at_utc'] || new Date();
             await pool.query(
-              `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, updated_at = NOW() WHERE cuuid = $2`,
-              [String(newRH), compId]
+              `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, rh_master_updated_at = $3, updated_at = NOW() WHERE cuuid = $2`,
+              [String(newRH), compId, rhUpdatedAt]
             );
-            syncDiag(`RH-APPLY INSERT: component=${compId} current_cumulative_rh updated from ${oldVal} to ${newRH} from audit row ${rowUuid}`);
+            syncDiag(`RH-APPLY INSERT: component=${compId} current_cumulative_rh updated from ${oldVal} to ${newRH}, rh_master_updated_at=${rhUpdatedAt} from audit row ${rowUuid}`);
           }
         } catch (rhErr: any) {
           syncDiag(`RH-APPLY INSERT ERROR: component=${rowData['component_id']} audit=${rowUuid}: ${rhErr.message}`);

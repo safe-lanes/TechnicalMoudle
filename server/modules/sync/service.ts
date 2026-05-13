@@ -401,21 +401,23 @@ export async function receivePushData(
                 valueToApply !== null) {
               try {
                 const auditRow = await client.query(
-                  `SELECT component_id FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
+                  `SELECT component_id, entered_at_utc FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
                   [log.rowUuid]
                 );
                 if (auditRow.rows.length > 0) {
                   const compId = auditRow.rows[0].component_id;
+                  const rhUpdatedAt = auditRow.rows[0].entered_at_utc || new Date();
                   const oldRow = await client.query(
                     `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
                     [compId]
                   );
                   const oldVal = oldRow.rows[0]?.current_cumulative_rh || oldRow.rows[0]?.rh_current_master || '(not found)';
+                  // Also propagate rh_master_updated_at so "Last Updated Date" reflects on shore
                   await client.query(
-                    `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, updated_at = NOW() WHERE cuuid = $2`,
-                    [String(valueToApply), compId]
+                    `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, rh_master_updated_at = $3, updated_at = NOW() WHERE cuuid = $2`,
+                    [String(valueToApply), compId, rhUpdatedAt]
                   );
-                  syncDiag(`RH-APPLY UPDATE: component=${compId} current_cumulative_rh updated from ${oldVal} to ${valueToApply} from audit row ${log.rowUuid}`);
+                  syncDiag(`RH-APPLY UPDATE: component=${compId} current_cumulative_rh updated from ${oldVal} to ${valueToApply}, rh_master_updated_at=${rhUpdatedAt} from audit row ${log.rowUuid}`);
                 }
               } catch (rhErr: any) {
                 syncDiag(`RH-APPLY UPDATE ERROR: audit=${log.rowUuid}: ${rhErr.message}`);
