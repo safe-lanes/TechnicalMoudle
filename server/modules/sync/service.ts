@@ -412,12 +412,16 @@ export async function receivePushData(
                     [compId]
                   );
                   const oldVal = oldRow.rows[0]?.current_cumulative_rh || oldRow.rows[0]?.rh_current_master || '(not found)';
-                  // Also propagate rh_master_updated_at so "Last Updated Date" reflects on shore
+                  // Also propagate rh_master_updated_at + last_updated so "Last Updated Date" reflects on shore.
+                  // The API reads: component.lastUpdated || component.rhMasterUpdatedAt || component.updatedAt
+                  // last_updated (TEXT) has highest priority, so it MUST be set here.
+                  // Components is ONE_WAY_SHORE_TO_SHIP — vessel's last_updated change never syncs back.
+                  const lastUpdatedText = (rhUpdatedAt instanceof Date ? rhUpdatedAt : new Date(String(rhUpdatedAt))).toISOString();
                   await client.query(
-                    `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, rh_master_updated_at = $3, updated_at = NOW() WHERE cuuid = $2`,
-                    [String(valueToApply), compId, rhUpdatedAt]
+                    `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, rh_master_updated_at = $3, last_updated = $4, updated_at = NOW() WHERE cuuid = $2`,
+                    [String(valueToApply), compId, rhUpdatedAt, lastUpdatedText]
                   );
-                  syncDiag(`RH-APPLY UPDATE: component=${compId} current_cumulative_rh updated from ${oldVal} to ${valueToApply}, rh_master_updated_at=${rhUpdatedAt} from audit row ${log.rowUuid}`);
+                  syncDiag(`RH-APPLY UPDATE: component=${compId} current_cumulative_rh updated from ${oldVal} to ${valueToApply}, last_updated=${lastUpdatedText} from audit row ${log.rowUuid}`);
                 }
               } catch (rhErr: any) {
                 syncDiag(`RH-APPLY UPDATE ERROR: audit=${log.rowUuid}: ${rhErr.message}`);
