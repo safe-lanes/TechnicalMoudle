@@ -181,6 +181,7 @@ export async function detectAndLogAnomalies(
             jobTitle: workOrder.jobTitle || 'Unknown Job',
             componentName: workOrder.component || workOrder.componentCode || 'Unknown',
             vesselName,
+            vesselId: workOrder.vesselId || null, // Sync scoping — null vessel_id prevents sync pickup
             daysLate,
             missedCycles,
             backdatingDays,
