@@ -560,8 +560,10 @@ export async function applyFieldLogInserts(
             // The API reads: component.lastUpdated || component.rhMasterUpdatedAt || component.updatedAt
             // last_updated (TEXT) has highest priority, so it MUST be set here.
             // Components is ONE_WAY_SHORE_TO_SHIP — vessel's last_updated change never syncs back.
+            // IMPORTANT: Vessel sets last_updated = date_updated_local (user-selected date, e.g. "13-May-2026 10:30").
+            // We must use the same field here — NOT entered_at_utc which is a system timestamp.
             const rhUpdatedAt = rowData['entered_at_utc'] || new Date();
-            const lastUpdatedText = (rhUpdatedAt instanceof Date ? rhUpdatedAt : new Date(String(rhUpdatedAt))).toISOString();
+            const lastUpdatedText = rowData['date_updated_local'] || (rhUpdatedAt instanceof Date ? rhUpdatedAt : new Date(String(rhUpdatedAt))).toISOString();
             await pool.query(
               `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, rh_master_updated_at = $3, last_updated = $4, updated_at = NOW() WHERE cuuid = $2`,
               [String(newRH), compId, rhUpdatedAt, lastUpdatedText]
