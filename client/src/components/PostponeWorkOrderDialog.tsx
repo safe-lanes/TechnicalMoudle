@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2 } from "lucide-react";
+import { Loader2, Paperclip, ArrowUpRight } from "lucide-react";
 import { POSTPONEMENT_REASONS } from "@shared/postponementReasons";
 
 const OTHER_REASON = "Other Reason";
@@ -257,7 +257,40 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
                   readOnly
                 />
               </div>
-              <div></div>
+              <div className="space-y-1">
+                <Label className="text-sm">Attach or Link Risk Assessment</Label>
+                <div className="flex items-center gap-2">
+                  <Paperclip className="h-4 w-4 text-gray-500" />
+                  <div className="inline-flex items-center h-9 rounded-md border border-gray-200 bg-gray-50 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => {}}
+                      data-testid="button-risk-assessment-upload"
+                      className="px-3 h-full text-xs font-semibold text-[#52baf3] hover:bg-gray-100"
+                    >
+                      UPLOAD
+                    </button>
+                    <div className="h-5 w-px bg-gray-300" />
+                    <button
+                      type="button"
+                      onClick={() => {}}
+                      data-testid="button-risk-assessment-view"
+                      className="px-3 h-full text-xs font-semibold text-[#52baf3] hover:bg-gray-100"
+                    >
+                      VIEW
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {}}
+                    data-testid="button-risk-assessment-link"
+                    className="inline-flex items-center gap-1 h-9 px-3 rounded-md border border-gray-200 bg-white text-xs font-semibold text-[#52baf3] hover:bg-gray-50"
+                  >
+                    LINK
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Row 4: Reason for Postponement — mandatory dropdown */}
