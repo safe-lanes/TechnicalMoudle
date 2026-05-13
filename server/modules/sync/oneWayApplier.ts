@@ -52,6 +52,22 @@ export async function getColumnMeta(pool: any, tableName: string): Promise<Colum
       [tableName]
     );
     identityAlwaysCols = new Set((identityResult.rows || []).map((r: any) => r.attname));
+
+    // Also detect serial/bigserial columns — these use nextval() DEFAULT but do NOT set
+    // attidentity. Without this, ship's auto-increment id (e.g., id=5) is included in
+    // INSERT, hitting PK conflict when shore already has its own id=5.
+    const serialResult = await pool.query(
+      `SELECT a.attname FROM pg_attribute a
+       JOIN pg_class c ON a.attrelid = c.oid
+       JOIN pg_namespace n ON c.relnamespace = n.oid
+       JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+       WHERE n.nspname = 'public' AND c.relname = $1
+       AND pg_get_expr(d.adbin, d.adrelid) LIKE 'nextval(%'`,
+      [tableName]
+    );
+    for (const r of (serialResult.rows || [])) {
+      identityAlwaysCols.add(r.attname);
+    }
   } catch { /* ignore — table may not exist yet */ }
 
   try {
@@ -429,6 +445,15 @@ export async function applyFieldLogInserts(
     let meta: Awaited<ReturnType<typeof getColumnMeta>> | null = null;
     let rowData: Record<string, any> = {};
 
+    // SAVEPOINT isolation: if this INSERT fails (e.g., PK conflict from serial id),
+    // we ROLLBACK TO SAVEPOINT so the PostgreSQL transaction stays valid for
+    // subsequent groups. Without this, one failed INSERT aborts the entire transaction
+    // and all later UPDATEs silently fail ("current transaction is aborted").
+    const savepointName = `ins_${tableName.replace(/[^a-z0-9_]/gi, '')}_${rowUuid.replace(/[^a-z0-9]/gi, '').substring(0, 8)}`;
+    if (externalClient) {
+      try { await pool.query(`SAVEPOINT ${savepointName}`); } catch { /* non-fatal */ }
+    }
+
     try {
       // Idempotency check — does row already exist?
       const existCheck = await pool.query(
@@ -565,12 +590,22 @@ export async function applyFieldLogInserts(
           syncDiag(`FK-REMAP INSERT ERROR: ${tableName} row=${rowUuid}: ${fkErr.message}`);
         }
       }
+
+      // Release savepoint on success — keeps transaction clean
+      if (externalClient) {
+        try { await pool.query(`RELEASE SAVEPOINT ${savepointName}`); } catch { /* non-fatal */ }
+      }
     } catch (err: any) {
+      // Rollback to savepoint so the transaction stays valid for subsequent groups
+      if (externalClient) {
+        try { await pool.query(`ROLLBACK TO SAVEPOINT ${savepointName}`); } catch { /* non-fatal */ }
+      }
       // 23505 = unique_violation — another unique constraint (not the identity column)
       // was violated. This happens when both ship and shore independently created rows
       // for the same logical entity (e.g., same vessel_id + master_id in vessel_certificate_data).
       // Fallback: find the conflicting row and apply updates to it.
       if (err.code === '23505') {
+        syncDiag(`FIELD-LOG-INSERT CONFLICT (23505): ${tableName} row=${rowUuid} constraint=${err.constraint || 'unknown'} — attempting fallback UPDATE`);
         console.warn(
           `[FieldLogInsert] Unique constraint hit for ${tableName}.${rowUuid} — ` +
           `falling back to field-level UPDATE (constraint: ${err.constraint || 'unknown'})`
