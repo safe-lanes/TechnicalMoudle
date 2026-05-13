@@ -964,6 +964,13 @@ export async function exportAllJobs(vesselId: string, dateFrom?: string, dateTo?
 
   const { data: rowsRaw, vesselName, summary } = await getAllJobsData(vesselId, dateFrom, dateTo);
   const rows = filterByDepartment(filterByComponent(rowsRaw, componentFilter), departmentFilter);
+  const isMultiVessel = vesselId === 'all';
+  // Recompute status counts against the post-filter row set so the header summary matches the data
+  const filteredStatusCounts: Record<string, number> = {};
+  for (const r of rows) {
+    const s = (r as any).status || 'Active';
+    filteredStatusCounts[s] = (filteredStatusCounts[s] || 0) + 1;
+  }
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'PMS System';
@@ -975,6 +982,7 @@ export async function exportAllJobs(vesselId: string, dateFrom?: string, dateTo?
 
   const columns: ColumnDef[] = [
     { header: 'S.No', key: 'sNo', width: 8 },
+    ...(isMultiVessel ? [{ header: 'Vessel', key: 'vesselName', width: 22 }] as ColumnDef[] : []),
     { header: 'WO No', key: 'workOrderNo', width: 22 },
     { header: 'Component', key: 'componentName', width: 28 },
     { header: 'Job Title', key: 'jobTitle', width: 30 },
@@ -1027,8 +1035,9 @@ export async function exportAllJobs(vesselId: string, dateFrom?: string, dateTo?
   worksheet.getRow(5).height = 5;
   worksheet.getRow(6).height = 5;
 
-  // Status summary line
-  const statusCounts = summary.statusCounts || {};
+  // Status summary line (computed against filtered rows)
+  const statusCounts = filteredStatusCounts;
+  void summary;
   const statusSummary = Object.entries(statusCounts)
     .map(([s, c]) => `${s}: ${c}`)
     .join(' | ') || `Total: ${rows.length}`;
