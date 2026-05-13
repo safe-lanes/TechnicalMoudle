@@ -515,6 +515,33 @@ export async function applyFieldLogInserts(
       syncDiag(`FIELD-LOG-INSERT OK: ${tableName} row=${rowUuid} (${columns.length} columns)`);
       console.log(`[FieldLogInsert] Inserted new row ${tableName}.${rowUuid} (${columns.length} columns)`);
 
+      // ── Post-INSERT: Derived RH update — propagate running_hours_audit to components current state ──
+      // When a running_hours_audit row arrives via sync, the audit row is BOTH_EDITABLE but
+      // components is ONE_WAY_SHORE_TO_SHIP. The current-state fields (current_cumulative_rh,
+      // rh_current_master) on the receiving side stay stale. Fix: read new_rh + cumulative_rh
+      // from the inserted audit row and UPDATE the corresponding component.
+      if (tableName === 'running_hours_audit' && rowData['component_id']) {
+        try {
+          const compId = rowData['component_id'];
+          const newRH = rowData['cumulative_rh'] || rowData['new_rh'];
+          if (newRH !== undefined && newRH !== null) {
+            // Read old value for diag
+            const oldRow = await pool.query(
+              `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
+              [compId]
+            );
+            const oldVal = oldRow.rows[0]?.current_cumulative_rh || oldRow.rows[0]?.rh_current_master || '(not found)';
+            await pool.query(
+              `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, updated_at = NOW() WHERE cuuid = $2`,
+              [String(newRH), compId]
+            );
+            syncDiag(`RH-APPLY INSERT: component=${compId} current_cumulative_rh updated from ${oldVal} to ${newRH} from audit row ${rowUuid}`);
+          }
+        } catch (rhErr: any) {
+          syncDiag(`RH-APPLY INSERT ERROR: component=${rowData['component_id']} audit=${rowUuid}: ${rhErr.message}`);
+        }
+      }
+
       // ── Post-INSERT: Cross-instance integer FK resolution for location_uuid → location_id ──
       // When a new spare_location_stock or inventory_transactions row is inserted from a remote
       // instance, the sender's integer location_id may not match the receiver's auto-increment.

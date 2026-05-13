@@ -614,6 +614,35 @@ export class SyncEngine {
       `UPDATE "${log.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
       [valueToApply, log.rowUuid, logTs]
     );
+
+    // ── Derived RH update — propagate running_hours_audit field changes to components current state ──
+    // Same pattern as service.ts receivePushData: when an RH audit field is applied during PULL,
+    // update the corresponding component's current_cumulative_rh and rh_current_master.
+    if (log.tableName === 'running_hours_audit' &&
+        (fieldNameSnake === 'new_rh' || fieldNameSnake === 'cumulative_rh') &&
+        valueToApply !== null) {
+      try {
+        const auditRow = await conn.query(
+          `SELECT component_id FROM running_hours_audit WHERE rhauuid = $1 LIMIT 1`,
+          [log.rowUuid]
+        );
+        if (auditRow.rows.length > 0) {
+          const compId = auditRow.rows[0].component_id;
+          const oldRow = await conn.query(
+            `SELECT current_cumulative_rh, rh_current_master FROM components WHERE cuuid = $1 LIMIT 1`,
+            [compId]
+          );
+          const oldVal = oldRow.rows[0]?.current_cumulative_rh || oldRow.rows[0]?.rh_current_master || '(not found)';
+          await conn.query(
+            `UPDATE components SET current_cumulative_rh = $1, rh_current_master = $1, updated_at = NOW() WHERE cuuid = $2`,
+            [String(valueToApply), compId]
+          );
+          syncDiag(`RH-APPLY PULL: component=${compId} current_cumulative_rh updated from ${oldVal} to ${valueToApply} from audit row ${log.rowUuid}`);
+        }
+      } catch (rhErr: any) {
+        syncDiag(`RH-APPLY PULL ERROR: audit=${log.rowUuid}: ${rhErr.message}`);
+      }
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════
