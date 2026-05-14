@@ -623,6 +623,7 @@ export async function preparePullData(
         fieldName: shoreLog.fieldName,
         oldValue: shoreLog.oldValue,
         newValue: shoreLog.newValue,
+        vesselId: shoreLog.vesselId,
         changedAt: shoreLog.changedAt,
         changedByUserId: shoreLog.changedByUserId,
         instanceId: shoreLog.instanceId,
