@@ -754,6 +754,88 @@ export async function applyFieldLogInserts(
           errors.push(`${tableName}.${rowUuid}: conflict fallback failed: ${fallbackErr.message}`);
           console.error(`[FieldLogInsert] Conflict fallback error for ${tableName}.${rowUuid}:`, fallbackErr.message);
         }
+      } else if (err.code === '23503') {
+        // 23503 = foreign_key_violation — the row references a FK target that doesn't
+        // exist on this instance. Common case: defect created on ship references a
+        // component_id that was soft-deleted or not yet synced to shore.
+        //
+        // Strategy: Extract the offending column from the constraint name (convention:
+        // tableName_columnName_targetTable_targetCol_fk), NULL it out, and retry INSERT.
+        // The FK column is typically nullable. Future sync UPDATE logs will fill it in
+        // once the referenced row arrives.
+        const constraintName = err.constraint || '';
+        syncDiag(`FIELD-LOG-INSERT FK-VIOLATION (23503): ${tableName} row=${rowUuid} constraint=${constraintName} — attempting NULL-FK retry`);
+
+        // Parse column from constraint name: e.g. "defects_component_id_components_cuuid_fk"
+        // Convention: <table>_<column>_<ref_table>_<ref_col>_fk
+        let fkColumn: string | null = null;
+        if (constraintName.startsWith(`${tableName}_`) && constraintName.endsWith('_fk')) {
+          // Remove table prefix and _fk suffix, then take the first segment(s) before the ref table
+          const inner = constraintName.slice(tableName.length + 1, -3); // e.g. "component_id_components_cuuid"
+          // The FK column is everything before the last two segments (ref_table + ref_col)
+          const parts = inner.split('_');
+          // Try progressively: the FK column name could be 1 or 2 segments
+          // e.g. "component_id" (2 segments) + "components" (1) + "cuuid" (1)
+          for (let i = 1; i <= Math.min(3, parts.length - 2); i++) {
+            const candidate = parts.slice(0, i).join('_');
+            if (rowData[candidate] !== undefined) {
+              fkColumn = candidate;
+              break;
+            }
+          }
+        }
+
+        // Fallback: extract from error detail if constraint parsing fails
+        if (!fkColumn && err.detail) {
+          // Detail format: 'Key (component_id)=(some-uuid) is not present in table "components".'
+          const detailMatch = err.detail.match(/Key \((\w+)\)=/);
+          if (detailMatch) fkColumn = detailMatch[1];
+        }
+
+        if (fkColumn && rowData[fkColumn] !== undefined) {
+          syncDiag(`FK-NULL RETRY: ${tableName} row=${rowUuid} — setting ${fkColumn}=NULL and retrying INSERT`);
+          try {
+            // Rollback to savepoint, null out the FK column, and retry
+            if (externalClient) {
+              try { await pool.query(`ROLLBACK TO SAVEPOINT ${savepointName}`); } catch { /* non-fatal */ }
+              try { await pool.query(`SAVEPOINT ${savepointName}`); } catch { /* non-fatal */ }
+            }
+
+            rowData[fkColumn] = null;
+
+            // Rebuild INSERT with nulled FK
+            if (!meta) meta = await getColumnMeta(pool, tableName);
+            const cols2: string[] = [];
+            const phs2: string[] = [];
+            const vals2: any[] = [];
+            let pi2 = 1;
+            for (const [col, val] of Object.entries(rowData)) {
+              if (meta.identityAlwaysCols.has(col)) continue;
+              cols2.push(`"${col}"`);
+              phs2.push(`$${pi2}`);
+              vals2.push(val instanceof Date ? val : val);
+              pi2++;
+            }
+
+            const retrySQL = `INSERT INTO "${tableName}" (${cols2.join(', ')}) VALUES (${phs2.join(', ')}) ON CONFLICT ("${identityCol}") DO NOTHING`;
+            await pool.query(retrySQL, vals2);
+            insertedRows++;
+            syncDiag(`FK-NULL RETRY OK: ${tableName} row=${rowUuid} — inserted with ${fkColumn}=NULL (will be filled by future sync)`);
+
+            if (externalClient) {
+              try { await pool.query(`RELEASE SAVEPOINT ${savepointName}`); } catch { /* non-fatal */ }
+            }
+          } catch (retryErr: any) {
+            if (externalClient) {
+              try { await pool.query(`ROLLBACK TO SAVEPOINT ${savepointName}`); } catch { /* non-fatal */ }
+            }
+            syncDiag(`FK-NULL RETRY FAIL: ${tableName} row=${rowUuid} — ${retryErr.message.substring(0, 150)}`);
+            errors.push(`${tableName}.${rowUuid}: FK retry failed: ${retryErr.message}`);
+          }
+        } else {
+          syncDiag(`FIELD-LOG-INSERT FK-VIOLATION: ${tableName} row=${rowUuid} — could not identify FK column from constraint=${constraintName}`);
+          errors.push(`${tableName}.${rowUuid}: FK violation: ${err.message}`);
+        }
       } else {
         syncDiag(`FIELD-LOG-INSERT FAIL: ${tableName} row=${rowUuid} — ${err.message.substring(0, 150)}`);
         errors.push(`${tableName}.${rowUuid}: ${err.message}`);
