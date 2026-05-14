@@ -7,6 +7,7 @@
 import { eq, and, ne, gt, desc, asc, inArray, isNull, sql } from 'drizzle-orm';
 import { getDb } from '../../db';
 import { getPool } from '../../db';
+import { syncDiag } from './syncDiagLogger';
 import {
   syncMetadata, syncFieldLog, syncConflicts, syncFileQueue, syncBatches, syncSettings,
   type InsertSyncMetadata, type SyncMetadata,
@@ -131,6 +132,43 @@ export async function getFieldLogsSinceCheckpoint(
   query += ` ORDER BY changed_at ASC LIMIT ${limit}`;
 
   const result = await pool.query(query, params);
+
+  // Diagnostic: if 0 results, run progressively relaxed counts to pinpoint which filter eliminates rows
+  if (result.rows.length === 0) {
+    try {
+      const vp = vesselValues.map((_, i) => `$${i + 1}`).join(', ');
+
+      // Count ALL logs for this vessel (no filters except vessel_id)
+      const totalCount = await pool.query(
+        `SELECT count(*)::int AS c FROM sync_field_log WHERE vessel_id IN (${vp})`,
+        vesselValues
+      );
+      const total = totalCount.rows[0]?.c || 0;
+
+      if (total > 0) {
+        // There ARE logs for this vessel — find which filter eliminates them
+        const unsyncedCount = await pool.query(
+          `SELECT count(*)::int AS c FROM sync_field_log WHERE vessel_id IN (${vp}) AND is_synced = false`,
+          vesselValues
+        );
+        const instanceCount = await pool.query(
+          `SELECT count(*)::int AS c FROM sync_field_log WHERE vessel_id IN (${vp}) AND is_synced = false AND instance_id != $${vesselValues.length + 1}`,
+          [...vesselValues, excludeInstanceId]
+        );
+        // Sample instance_ids to see what's actually stored
+        const instanceSample = await pool.query(
+          `SELECT DISTINCT instance_id, count(*)::int AS c FROM sync_field_log WHERE vessel_id IN (${vp}) AND is_synced = false GROUP BY instance_id LIMIT 10`,
+          vesselValues
+        );
+        const instanceInfo = instanceSample.rows.map((r: any) => `${r.instance_id}:${r.c}`).join(', ');
+
+        syncDiag(`PREPARE-PULL DIAG: vessel=${vesselId} total_logs=${total} unsynced=${unsyncedCount.rows[0]?.c || 0} after_instance_filter=${instanceCount.rows[0]?.c || 0} exclude=${excludeInstanceId} since=${sinceTimestamp?.toISOString() || 'NONE'} instances=[${instanceInfo}]`);
+      }
+    } catch (diagErr) {
+      // Non-fatal diagnostic
+    }
+  }
+
   return result.rows;
 }
 

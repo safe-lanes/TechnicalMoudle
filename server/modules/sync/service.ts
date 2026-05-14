@@ -530,7 +530,15 @@ export async function preparePullData(
 
   // Pre-resolve vessel_code for tables that use vessel_code scope
   const vesselCode = await getVesselCodeForUuid(vesselId);
-  syncDiag(`PREPARE-PULL START: vessel=${vesselId}, vesselCode=${vesselCode}, checkpoint=${lastCheckpoint ? lastCheckpoint.toISOString() : 'NONE'}`);
+  const shoreInstanceId = process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
+  syncDiag(`PREPARE-PULL START: vessel=${vesselId}, vesselCode=${vesselCode}, checkpoint=${lastCheckpoint ? lastCheckpoint.toISOString() : 'NONE'}, shoreInstanceId=${shoreInstanceId}`);
+
+  // Safety check: if shore's SYNC_INSTANCE_ID matches the ship's, shore's own logs
+  // will be excluded by the instance_id != filter, causing 0 results silently.
+  if (shoreInstanceId === shipInstanceId) {
+    syncDiag(`PREPARE-PULL CRITICAL WARNING: shore SYNC_INSTANCE_ID '${shoreInstanceId}' matches ship instanceId '${shipInstanceId}' — shore field logs will be SELF-EXCLUDED!`);
+    console.error(`[Sync Pull] CRITICAL: SYNC_INSTANCE_ID='${shoreInstanceId}' matches ship '${shipInstanceId}'. Shore's field logs will NOT be sent to ship. Fix SYNC_INSTANCE_ID in shore's environment!`);
+  }
 
   // 1. Gather ONE_WAY_SHORE_TO_SHIP full-row snapshots
   const oneWayRows = await gatherOneWayShoreRows(vesselId, lastCheckpoint);
@@ -742,6 +750,7 @@ export async function completeSyncSession(
 
   // 1. Mark all field logs sent in this session as synced
   //    - Shore's logs that were sent to ship
+  syncDiag(`COMPLETE-SESSION: marking shore logs synced for vessel=${vesselId} checkpointBefore=${batch.checkpointBefore?.toISOString?.() || batch.checkpointBefore || 'NONE'} excludeInstance=${instanceId}`);
   const shoreLogsRaw = await repo.getFieldLogsSinceCheckpoint(
     vesselId,
     batch.checkpointBefore,
@@ -749,6 +758,7 @@ export async function completeSyncSession(
     vesselCode
   );
   const shoreLogs = shoreLogsRaw.map(normalizeFieldLog);
+  syncDiag(`COMPLETE-SESSION: found ${shoreLogs.length} shore logs to mark synced`);
   if (shoreLogs.length > 0) {
     await repo.markFieldLogsSynced(
       shoreLogs.map(l => l.logUuid),
@@ -759,6 +769,7 @@ export async function completeSyncSession(
   //    - Ship's logs that were received by shore
   const shipLogsRaw = await repo.getUnsyncedFieldLogs(instanceId, vesselId, vesselCode);
   const shipLogs = shipLogsRaw.map(normalizeFieldLog);
+  syncDiag(`COMPLETE-SESSION: found ${shipLogs.length} ship logs to mark synced`);
   if (shipLogs.length > 0) {
     await repo.markFieldLogsSynced(
       shipLogs.map(l => l.logUuid),

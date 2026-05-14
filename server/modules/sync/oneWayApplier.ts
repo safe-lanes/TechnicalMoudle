@@ -649,7 +649,7 @@ export async function applyFieldLogInserts(
       // for the same logical entity (e.g., same vessel_id + master_id in vessel_certificate_data).
       // Fallback: find the conflicting row and apply updates to it.
       if (err.code === '23505') {
-        syncDiag(`FIELD-LOG-INSERT CONFLICT (23505): ${tableName} row=${rowUuid} constraint=${err.constraint || 'unknown'} — attempting fallback UPDATE`);
+        syncDiag(`FIELD-LOG-INSERT CONFLICT (23505): ${tableName} row=${rowUuid} constraint=${err.constraint || 'unknown'} detail=${err.detail || 'none'} — attempting fallback UPDATE`);
         console.warn(
           `[FieldLogInsert] Unique constraint hit for ${tableName}.${rowUuid} — ` +
           `falling back to field-level UPDATE (constraint: ${err.constraint || 'unknown'})`
@@ -659,26 +659,45 @@ export async function applyFieldLogInserts(
           if (!meta) meta = await getColumnMeta(pool, tableName);
 
           // Apply each field log as an UPDATE against the existing row.
-          // Since we don't know the conflicting row's identity column value,
-          // query for it using fields we know are part of the row.
+          // Strategy: Parse PostgreSQL's error detail to extract the exact conflicting
+          // column names and values, then use ONLY those for the lookup.
+          // This avoids the old bug where using all non-null rowData fields failed because
+          // the conflicting row had different values for non-constraint columns.
           const vesselScopeCol = config.vesselScopeColumn;
           const vesselIdVal = logs[0].vesselId;
 
-          // Try to find the existing row by querying with vessel scope + non-null fields
-          // that are likely part of the unique constraint
           let existingIdentity: string | null = null;
-          if (vesselScopeCol && vesselIdVal) {
-            // Build a lookup query using unique-looking fields from the rowData
+
+          // Strategy 1: Parse PostgreSQL error detail to get exact conflict key
+          // Format: "Key (col1, col2)=(val1, val2) already exists."
+          const detailMatch = err.detail?.match(/Key \(([^)]+)\)=\(([^)]+)\)/);
+          if (detailMatch) {
+            const constraintCols = detailMatch[1].split(',').map((c: string) => c.trim());
+            const constraintVals = detailMatch[2].split(',').map((v: string) => v.trim());
+            syncDiag(`FIELD-LOG-INSERT CONFLICT LOOKUP: using constraint cols=[${constraintCols.join(',')}] vals=[${constraintVals.join(',')}]`);
+
+            if (constraintCols.length > 0 && constraintCols.length === constraintVals.length) {
+              const whereParts = constraintCols.map((col: string, i: number) => `"${col}" = $${i + 1}`);
+              const lookupSQL = `SELECT "${identityCol}" FROM "${tableName}" WHERE ${whereParts.join(' AND ')} LIMIT 1`;
+              const constraintResult = await pool.query(lookupSQL, constraintVals);
+              if (constraintResult.rows.length > 0) {
+                existingIdentity = constraintResult.rows[0][identityCol];
+                syncDiag(`FIELD-LOG-INSERT CONFLICT FOUND: ${tableName} existing identity=${existingIdentity} via constraint columns`);
+              }
+            }
+          }
+
+          // Strategy 2 (fallback): vessel scope → single row or multi-field lookup
+          if (!existingIdentity && vesselScopeCol && vesselIdVal) {
             const lookupResult = await pool.query(
               `SELECT "${identityCol}" FROM "${tableName}" WHERE "${vesselScopeCol}" = $1 LIMIT 2`,
               [vesselIdVal]
             );
-            // If exactly 1 row matches, use it. Otherwise try a more specific query.
             if (lookupResult.rows.length === 1) {
               existingIdentity = lookupResult.rows[0][identityCol];
+              syncDiag(`FIELD-LOG-INSERT CONFLICT FOUND: ${tableName} existing identity=${existingIdentity} via single vessel-scope row`);
             } else {
-              // For tables with composite unique keys (e.g., vessel_id + master_id),
-              // use all available non-null fields from rowData for the lookup
+              // Use only a few key columns from rowData — prefer columns likely in unique constraints
               const lookupCols: string[] = [];
               const lookupVals: any[] = [];
               let pIdx = 1;
@@ -688,7 +707,7 @@ export async function applyFieldLogInserts(
                 lookupCols.push(`"${col}" = $${pIdx}`);
                 lookupVals.push(val);
                 pIdx++;
-                if (pIdx > 5) break; // Limit to 5 columns for lookup efficiency
+                if (pIdx > 5) break;
               }
               if (lookupCols.length > 0) {
                 const lookupSQL = `SELECT "${identityCol}" FROM "${tableName}" WHERE ${lookupCols.join(' AND ')} LIMIT 1`;
@@ -744,10 +763,12 @@ export async function applyFieldLogInserts(
 
             if (fieldsApplied > 0) {
               insertedRows++; // Count as successfully synced
+              syncDiag(`FIELD-LOG-INSERT CONFLICT RESOLVED: ${tableName} row=${rowUuid} → updated ${fieldsApplied} fields on existing row (identity: ${existingIdentity}→${rowUuid})`);
               console.log(`[FieldLogInsert] Conflict resolved: updated ${fieldsApplied} fields on existing ${tableName} row (identity: ${existingIdentity})`);
             }
           } else {
             // Could not find conflicting row — log as error
+            syncDiag(`FIELD-LOG-INSERT CONFLICT FAILED: ${tableName} row=${rowUuid} — could not locate existing row despite 23505 conflict`);
             errors.push(`${tableName}.${rowUuid}: unique constraint conflict but could not find existing row`);
           }
         } catch (fallbackErr: any) {
