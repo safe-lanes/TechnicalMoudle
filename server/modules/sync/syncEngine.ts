@@ -186,6 +186,28 @@ export class SyncEngine {
 
       syncDiag(`SYNC COMPLETE: checkpoint=${completeResult.newCheckpoint}`);
 
+      // Step 4a: Save new checkpoint LOCALLY.
+      // In remote mode, completeSyncSession updates SHORE's sync_metadata — but the
+      // ship reads its checkpoint from its OWN local DB. Without this step, the ship's
+      // checkpoint never advances, causing shore to re-send all one-way rows since the
+      // original checkpoint on every sync cycle (massive bandwidth waste).
+      if (!this.isLocalMode()) {
+        try {
+          await syncRepo.upsertInstanceMetadata({
+            instanceId: this.instanceId,
+            vesselId,
+            lastSyncCheckpoint: new Date(completeResult.newCheckpoint),
+            lastSyncStatus: 'success',
+            lastSyncAt: new Date(),
+          });
+          syncDiag(`CHECKPOINT SAVED LOCALLY: ${completeResult.newCheckpoint}`);
+        } catch (cpErr: any) {
+          // Non-fatal: checkpoint stuck means re-sending data but no data loss
+          syncDiag(`CHECKPOINT LOCAL SAVE FAILED: ${cpErr.message}`);
+          console.warn(`[SyncEngine] Failed to save local checkpoint: ${cpErr.message}`);
+        }
+      }
+
       // Step 4b: Mark local field logs as synced.
       // In remote mode, completeSyncSession marks logs in SHORE's DB but the ship's
       // local DB still has them as is_synced=false. Without this step, the same logs
