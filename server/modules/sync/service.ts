@@ -388,10 +388,18 @@ export async function receivePushData(
             }
 
             // Use the log's changedAt for updated_at — trigger bypass ensures it sticks.
-            await client.query(
+            const updateResult = await client.query(
               `UPDATE "${log.tableName}" SET "${fieldNameSnake}" = $1, "updated_at" = $3 WHERE "${identityCol}" = $2`,
               [valueToApply, log.rowUuid, logChangedAt]
             );
+
+            // Defence-in-depth: if UPDATE matched 0 rows, the row doesn't exist.
+            // This happens when applyFieldLogInserts misclassifies a mixed INSERT+UPDATE
+            // group (all logs routed to UPDATE path but row was never created).
+            // Log it so we can detect the pattern in syncDiag.
+            if (updateResult.rowCount === 0) {
+              syncDiag(`UPDATE-MISS: ${log.tableName}.${fieldNameSnake} row=${log.rowUuid} — row not found, UPDATE had no effect`);
+            }
 
             // ── Derived RH update — propagate running_hours_audit field changes to components current state ──
             // When running_hours_audit fields (new_rh, cumulative_rh) are applied via UPDATE,

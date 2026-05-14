@@ -429,19 +429,32 @@ export async function applyFieldLogInserts(
   }
 
   // 2. Classify each group as INSERT or UPDATE
+  //
+  // BUG FIX (2026-05-14): Previously only groups where ALL logs had oldValue===null
+  // were treated as INSERT candidates. But when a user creates a cert and immediately
+  // edits dates/attachments, the group has MIXED logs (INSERT + UPDATE). The old check
+  // `logs.every(l => l.oldValue === null)` returned false, routing everything to UPDATE.
+  // The UPDATE path does `UPDATE ... WHERE identity = $1` — but the row doesn't exist
+  // on the receiving side, so 0 rows are updated and data is silently lost.
+  //
+  // Fix: Check if ANY log has oldValue===null (indicating at least part of the group
+  // originated from an INSERT). If yes AND the row doesn't exist → INSERT using the
+  // latest newValue for each field. After INSERT, only route non-INSERT logs that
+  // have newer values (they'll be UPDATE'd by the caller if needed).
   syncDiag(`FIELD-LOG-INSERT: ${groups.size} groups from ${fieldLogs.length} logs`);
   const groupKeys = Array.from(groups.keys());
   for (const groupKey of groupKeys) {
     const logs = groups.get(groupKey)!;
     const isInsertGroup = logs.every((l: FieldLogEntry) => l.oldValue === null);
+    const hasAnyInsertLogs = logs.some((l: FieldLogEntry) => l.oldValue === null);
 
-    if (!isInsertGroup) {
-      // Standard UPDATE — pass back to caller for per-field application
+    if (!isInsertGroup && !hasAnyInsertLogs) {
+      // Pure UPDATE group (no INSERT-origin logs) — pass to per-field UPDATE
       updateLogs.push(...logs);
       continue;
     }
 
-    // INSERT group — all oldValues are null → new row
+    // Has INSERT-origin logs (either pure or mixed group) — check if row needs creation
     const tableName = logs[0].tableName;
     const rowUuid = logs[0].rowUuid;
 
@@ -480,7 +493,10 @@ export async function applyFieldLogInserts(
         continue;
       }
 
-      // Build the row object from field logs
+      // Build the row object from field logs.
+      // For mixed groups (INSERT + UPDATE logs), sort by changedAt so we take the
+      // LATEST value for each field — a subsequent UPDATE log may have a newer value
+      // than the initial INSERT log for the same field.
       meta = await getColumnMeta(pool, tableName);
       rowData = {};
 
@@ -492,8 +508,15 @@ export async function applyFieldLogInserts(
         rowData[config.vesselScopeColumn] = logs[0].vesselId;
       }
 
-      // Set all logged fields
-      for (const log of logs) {
+      // Sort logs by changedAt ascending so later values overwrite earlier ones
+      const sortedLogs = [...logs].sort((a, b) => {
+        const aTime = a.changedAt instanceof Date ? a.changedAt.getTime() : new Date(String(a.changedAt)).getTime();
+        const bTime = b.changedAt instanceof Date ? b.changedAt.getTime() : new Date(String(b.changedAt)).getTime();
+        return aTime - bTime;
+      });
+
+      // Set all logged fields (latest value wins per field)
+      for (const log of sortedLogs) {
         const snakeField = toSnakeCase(log.fieldName);
 
         // Skip GENERATED ALWAYS columns
