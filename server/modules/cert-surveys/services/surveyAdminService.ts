@@ -1,5 +1,8 @@
 import * as surveyAdminRepo from '../repositories/surveyAdminRepository';
 import { ensureVesselExists } from './vesselEnsureService';
+import { getPostgresClient } from '../../../postgresClient';
+import { vesselSurveyData } from '@shared/schema';
+import { logFieldChanges } from '../../sync/fieldLogger';
 
 // ══════════════════════════════════════════════════════════
 // Master Survey Admin
@@ -216,6 +219,70 @@ export async function saveMasterSurveys(body: any) {
   if (staleApplicabilityMasterIds.length > 0) {
     await surveyAdminRepo.softDeleteApplicabilityByMasterIds(staleApplicabilityMasterIds);
     console.log(`Soft-deleted ${staleApplicabilityMasterIds.length} stale non-company applicability master IDs: ${staleApplicabilityMasterIds.join(', ')}`);
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // FIX 57: Create placeholder vessel_survey_data rows for sync
+  // When ship admin creates new surveys, master+applicability are
+  // ONE_WAY_SHORE_TO_SHIP (won't sync to shore). By creating an
+  // empty data row (BOTH_EDITABLE), the sync engine pushes it to
+  // shore where FIX 55+56 auto-creates master + applicability.
+  // ════════════════════════════════════════════════════════════════
+  if (newlyInsertedMasterIds.length > 0) {
+    const postgres = getPostgresClient();
+    if (postgres) {
+      const db = postgres.db;
+
+      // Classify new master IDs same way as applicability logic above
+      const vesselSpecificNewIds = newlyInsertedMasterIds.filter(
+        id => vesselSpecificSet.has(id) || id.startsWith('VES-')
+      );
+      const companyNewIds = newlyInsertedMasterIds.filter(id => {
+        if (vesselSpecificSet.has(id) || id.startsWith('VES-')) return false;
+        if (id.startsWith('CMP-')) return true;
+        const s = surveys.find((x: any) => x.masterId === id);
+        return s?.applicableToCompany === true;
+      });
+
+      const dataRowsToCreate: Array<{ vesselId: string; vesselName: string; masterId: string }> = [];
+
+      for (const masterId of companyNewIds) {
+        for (const vessel of allVessels) {
+          dataRowsToCreate.push({ vesselId: vessel.id, vesselName: vessel.name, masterId });
+        }
+      }
+      for (const masterId of vesselSpecificNewIds) {
+        for (const vessel of targetVessels) {
+          dataRowsToCreate.push({ vesselId: vessel.id, vesselName: vessel.name, masterId });
+        }
+      }
+
+      let dataRowsCreated = 0;
+      for (const row of dataRowsToCreate) {
+        try {
+          const inserted = await db.insert(vesselSurveyData)
+            .values({ vesselId: row.vesselId, vesselName: row.vesselName, masterId: row.masterId })
+            .onConflictDoNothing({ target: [vesselSurveyData.vesselId, vesselSurveyData.masterId] })
+            .returning();
+
+          if (inserted.length > 0) {
+            const newRow = inserted[0] as any;
+            await logFieldChanges(
+              'vessel_survey_data',
+              newRow.vsduuid || String(newRow.id),
+              row.vesselId, null, newRow, 'system'
+            );
+            dataRowsCreated++;
+          }
+        } catch (err: any) {
+          console.error(`[SurveyAdmin] FIX 57 placeholder error ${row.masterId}/${row.vesselId}:`, err.message);
+        }
+      }
+
+      if (dataRowsCreated > 0) {
+        console.log(`[SurveyAdmin] FIX 57: Created ${dataRowsCreated} placeholder vessel_survey_data row(s) for sync`);
+      }
+    }
   }
 
   console.log(`Ship surveys master saved: ${insertedCount} inserted, ${updatedCount} updated`);

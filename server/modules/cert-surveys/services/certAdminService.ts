@@ -1,6 +1,8 @@
 import * as certAdminRepo from '../repositories/certAdminRepository';
 import { ensureVesselExists } from './vesselEnsureService';
 import { getPostgresClient } from '../../../postgresClient';
+import { vesselCertificateData } from '@shared/schema';
+import { logFieldChanges } from '../../sync/fieldLogger';
 
 // ══════════════════════════════════════════════════════════
 // Master Certificate Admin
@@ -255,6 +257,64 @@ export async function saveMasterCertificates(body: any) {
   if (staleApplicabilityMasterIds.length > 0) {
     await certAdminRepo.softDeleteApplicabilityByMasterIds(staleApplicabilityMasterIds, tx);
     console.log(`Soft-deleted ${staleApplicabilityMasterIds.length} stale non-company applicability master IDs: ${staleApplicabilityMasterIds.join(', ')}`);
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // FIX 57: Create placeholder vessel_certificate_data rows for sync
+  // Same rationale as surveys — master+applicability are ONE_WAY
+  // (won't sync ship→shore). An empty data row (BOTH_EDITABLE)
+  // gives the sync engine something to push, triggering FIX 55+56
+  // on shore to auto-create master + applicability placeholders.
+  // ════════════════════════════════════════════════════════════════
+  if (newlyInsertedMasterIds.length > 0) {
+    // Classify new master IDs same way as applicability logic above
+    const vesselSpecificNewIds = newlyInsertedMasterIds.filter(
+      id => vesselSpecificSet.has(id) || id.startsWith('VES-')
+    );
+    const companyNewIds = newlyInsertedMasterIds.filter(id => {
+      if (vesselSpecificSet.has(id) || id.startsWith('VES-')) return false;
+      const c = certificates.find((x: any) => x.masterId === id);
+      return c?.applicableToCompany === true;
+    });
+
+    const dataRowsToCreate: Array<{ vesselId: string; vesselName: string; masterId: string }> = [];
+
+    for (const masterId of companyNewIds) {
+      for (const vessel of allVessels) {
+        dataRowsToCreate.push({ vesselId: vessel.id, vesselName: vessel.name, masterId });
+      }
+    }
+    for (const masterId of vesselSpecificNewIds) {
+      for (const vessel of targetVessels) {
+        dataRowsToCreate.push({ vesselId: vessel.id, vesselName: vessel.name, masterId });
+      }
+    }
+
+    let dataRowsCreated = 0;
+    for (const row of dataRowsToCreate) {
+      try {
+        const inserted = await tx.insert(vesselCertificateData)
+          .values({ vesselId: row.vesselId, vesselName: row.vesselName, masterId: row.masterId })
+          .onConflictDoNothing()
+          .returning();
+
+        if (inserted.length > 0) {
+          const newRow = inserted[0] as any;
+          await logFieldChanges(
+            'vessel_certificate_data',
+            newRow.vcduuid || String(newRow.id),
+            row.vesselId, null, newRow, 'system'
+          );
+          dataRowsCreated++;
+        }
+      } catch (err: any) {
+        console.error(`[CertAdmin] FIX 57 placeholder error ${row.masterId}/${row.vesselId}:`, err.message);
+      }
+    }
+
+    if (dataRowsCreated > 0) {
+      console.log(`[CertAdmin] FIX 57: Created ${dataRowsCreated} placeholder vessel_certificate_data row(s) for sync`);
+    }
   }
 
   console.log(`Ship certificates master saved: ${insertedCount} inserted, ${updatedCount} updated, ${deletedCount} deleted`);
