@@ -206,6 +206,65 @@ export async function receivePushData(
           insertResult.errors.forEach(e => console.error(`[Sync Push] INSERT error: ${e}`));
         }
 
+        // ── Derived applicability creation (FIX 52) ──────────────────────────
+        // When vessel_survey_data or vessel_certificate_data rows are INSERTed
+        // from ship, ensure the corresponding applicability record exists on
+        // shore.  Shore's UI uses applicability as the entry point:
+        //   getSurveys()  → queries vessel_survey_applicability  first
+        //   getCertificates() → queries vessel_certificate_applicability first
+        // Applicability tables are ONE_WAY_SHORE_TO_SHIP, so ship-created
+        // records don't sync back — we derive them here from the data INSERT.
+        if (insertResult.insertedRows > 0) {
+          const DERIVED_APPLICABILITY_MAP: Record<string, string> = {
+            vessel_survey_data: 'vessel_survey_applicability',
+            vessel_certificate_data: 'vessel_certificate_applicability',
+          };
+
+          // Collect unique (tableName, rowUuid) → { vesselId, masterId, vesselName }
+          // from INSERT-origin logs for the two data tables.
+          const appNeeded = new Map<string, { appTable: string; vesselId: string; masterId: string; vesselName: string }>();
+
+          for (const log of acceptedLogs) {
+            if (!DERIVED_APPLICABILITY_MAP[log.tableName]) continue;
+            if (log.oldValue !== null) continue; // Only INSERT-origin logs
+
+            const groupKey = `${log.tableName}::${log.rowUuid}`;
+            if (!appNeeded.has(groupKey)) {
+              appNeeded.set(groupKey, {
+                appTable: DERIVED_APPLICABILITY_MAP[log.tableName],
+                vesselId: log.vesselId || '',
+                masterId: '',
+                vesselName: '',
+              });
+            }
+
+            const entry = appNeeded.get(groupKey)!;
+            // Field names are camelCase from Drizzle ORM's fieldLogger
+            if (log.fieldName === 'masterId' && log.newValue) entry.masterId = log.newValue;
+            if (log.fieldName === 'vesselName' && log.newValue) entry.vesselName = log.newValue;
+            if (log.vesselId && !entry.vesselId) entry.vesselId = log.vesselId;
+          }
+
+          for (const [, entry] of Array.from(appNeeded)) {
+            if (!entry.vesselId || !entry.masterId) continue;
+            try {
+              // Partial unique index: uniq_vessel_*_applicability_live ON (vessel_id, master_id) WHERE is_deleted = false
+              const appResult = await client.query(
+                `INSERT INTO "${entry.appTable}" (vessel_id, vessel_name, master_id, is_applicable, is_deleted)
+                 VALUES ($1, $2, $3, true, false)
+                 ON CONFLICT (vessel_id, master_id) WHERE is_deleted = false DO NOTHING`,
+                [entry.vesselId, entry.vesselName || 'Unknown', entry.masterId]
+              );
+              if ((appResult.rowCount ?? 0) > 0) {
+                syncDiag(`DERIVED-APPLICABILITY: created ${entry.appTable} vesselId=${entry.vesselId} masterId=${entry.masterId}`);
+              }
+            } catch (appErr: any) {
+              // Non-fatal — data is still synced, just won't show in UI until admin configures
+              syncDiag(`DERIVED-APPLICABILITY ERROR: ${entry.appTable} vesselId=${entry.vesselId} masterId=${entry.masterId}: ${appErr.message}`);
+            }
+          }
+        }
+
         // Phase 2: Apply remaining UPDATE field logs (non-INSERT groups + existing rows)
         //
         // Per-field stale-skip guard (Option 2c):
