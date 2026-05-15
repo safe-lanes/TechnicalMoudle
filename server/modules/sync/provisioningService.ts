@@ -609,7 +609,81 @@ async function exportAndAdd(
 ): Promise<void> {
   try {
     let rows: any[];
-    if (vesselScopeColumn && (vesselId || vesselCode)) {
+    let orphanSkipNote = '';
+
+    // ── Special case: planner_dates references components.cuuid via FK
+    // (planner_dates_component_id_components_cuuid_f). The shore DB can
+    // contain planner_dates rows whose component is soft-deleted, hard-
+    // deleted, or scoped to a different vessel — those rows would fail
+    // the FK on the ship because the corresponding components row is
+    // (correctly) excluded from the bundle. Filter them out at export
+    // time and log the skips so the manifest is referentially consistent.
+    if (
+      tc.tableName === 'planner_dates' &&
+      vesselScopeColumn &&
+      (vesselId || vesselCode)
+    ) {
+      const scopeValue =
+        vesselScopeColumn === 'vessel_code' ? vesselCode : vesselId;
+
+      // Identify orphans first so we can log them precisely (one query;
+      // small result sets in practice — bounded by the vessel's planner
+      // backlog, not the whole table).
+      const orphanResult = await pool.query(
+        `SELECT pd.pduuid, pd.component_id,
+                CASE WHEN c.cuuid IS NULL THEN 'component missing'
+                     WHEN COALESCE(c.is_deleted, false) = true THEN 'component soft-deleted'
+                     WHEN c.vessel_id IS DISTINCT FROM pd.vessel_id THEN 'component vessel mismatch'
+                     ELSE 'unknown'
+                END AS reason
+         FROM "planner_dates" pd
+         LEFT JOIN "components" c ON c.cuuid = pd.component_id
+         WHERE pd."${vesselScopeColumn}" = $1
+           AND COALESCE(pd.is_deleted, false) = false
+           AND (
+             c.cuuid IS NULL
+             OR COALESCE(c.is_deleted, false) = true
+             OR c.vessel_id IS DISTINCT FROM pd.vessel_id
+           )`,
+        [scopeValue]
+      );
+      const orphans: { pduuid: string; component_id: string; reason: string }[] =
+        orphanResult.rows;
+
+      if (orphans.length > 0) {
+        const reasonCounts: Record<string, number> = {};
+        for (const o of orphans) {
+          reasonCounts[o.reason] = (reasonCounts[o.reason] || 0) + 1;
+          console.warn(
+            `[Provisioning] Skipping orphan planner_dates row pduuid=${o.pduuid} ` +
+              `component_id=${o.component_id} reason="${o.reason}"`
+          );
+        }
+        const reasonSummary = Object.entries(reasonCounts)
+          .map(([r, n]) => `${n} ${r}`)
+          .join(', ');
+        orphanSkipNote = ` — ${orphans.length} orphans skipped (${reasonSummary})`;
+        console.warn(
+          `[Provisioning] planner_dates: skipped ${orphans.length} orphan row(s) for vessel ${scopeValue} (${reasonSummary})`
+        );
+      }
+
+      // Export only rows whose referenced component exists, is not
+      // soft-deleted, and belongs to the same vessel — i.e. rows that
+      // will be part of the bundle's components set.
+      rows = await pool
+        .query(
+          `SELECT pd.* FROM "planner_dates" pd
+           INNER JOIN "components" c ON c.cuuid = pd.component_id
+           WHERE pd."${vesselScopeColumn}" = $1
+             AND COALESCE(pd.is_deleted, false) = false
+             AND COALESCE(c.is_deleted, false) = false
+             AND c.vessel_id = pd.vessel_id
+           ORDER BY COALESCE(pd.created_at, NOW()) ASC`,
+          [scopeValue]
+        )
+        .then((r: any) => r.rows);
+    } else if (vesselScopeColumn && (vesselId || vesselCode)) {
       // Determine correct scope value
       const scopeValue =
         vesselScopeColumn === 'vessel_code' ? vesselCode : vesselId;
@@ -631,7 +705,7 @@ async function exportAndAdd(
     bundle.manifest.tables.push({
       tableName: tc.tableName,
       rowCount: rows.length,
-      category: categoryLabel,
+      category: `${categoryLabel}${orphanSkipNote}`,
     });
     bundle.manifest.totalRows += rows.length;
   } catch (err: any) {
