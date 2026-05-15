@@ -1,3 +1,27 @@
+-- Task #138 cleanup (2026-05-15): the trailing one-off INSERT block that
+-- backfilled A1-003, A1-004, A1-006 was removed after a precondition audit
+-- confirmed all 71 starter-kit master_ids already exist on every reachable
+-- environment. Audit evidence and post-edit idempotency verification are
+-- recorded in docs/cert-master-audit-task-138.md.
+--
+-- Cross-environment audit summary (2026-05-15):
+--   * DEV (this Repl)         : 71/71 present, 71 is_system_defined=true,
+--                               71 is_deleted=false, 0 missing IDs.
+--                               Re-run of the surviving UPDATE returned 0
+--                               rows, confirming idempotency.
+--   * Production / fork DBs   : NOT directly reachable from this Repl.
+--                               Migration 080 was already recorded in
+--                               schema_migrations on those environments
+--                               (per the original Task #35 deployment), so
+--                               this source edit cannot trigger any new SQL
+--                               execution there. Operators must re-run the
+--                               same audit query (see docs file) on each
+--                               environment that has not yet applied 080
+--                               BEFORE deploying this change.
+--
+-- The surviving UPDATE below is fully idempotent (the AND is_system_defined
+-- = false predicate guarantees zero rows on a second run).
+
 UPDATE ship_certificates_master
 SET is_system_defined = true
 WHERE master_id IN (
