@@ -1,0 +1,179 @@
+[2026-05-09T09:55:04.999Z] [SyncDiag] RECEIVE-PUSH START: batch=ecaa5e23-1978-4fbd-8519-ef79b4014217, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
+[2026-05-09T09:55:05.005Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
+[2026-05-09T09:55:07.039Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-04T11:18:08.589Z
+[2026-05-09T09:55:07.603Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel
+[2026-05-09T09:55:07.787Z] [SyncDiag] PREPARE-PULL DONE: 329 one-way rows across 10 tables, 0 field logs, 0 conflicts
+[2026-05-09T09:55:07.789Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 12 rows
+[2026-05-09T09:55:07.789Z] [SyncDiag] PREPARE-PULL ONE-WAY: jobs — 2 rows
+[2026-05-09T09:55:07.790Z] [SyncDiag] PREPARE-PULL ONE-WAY: fleet_groups — 13 rows
+[2026-05-09T09:55:07.790Z] [SyncDiag] PREPARE-PULL ONE-WAY: maker_list — 2 rows
+[2026-05-09T09:55:07.791Z] [SyncDiag] PREPARE-PULL ONE-WAY: master_lists — 6 rows
+[2026-05-09T09:55:07.791Z] [SyncDiag] PREPARE-PULL ONE-WAY: pms_vessel_settings — 1 rows
+[2026-05-09T09:55:07.792Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_certificates_master — 129 rows
+[2026-05-09T09:55:07.792Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_surveys_master — 58 rows
+[2026-05-09T09:55:07.792Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_certificate_applicability — 71 rows
+[2026-05-09T09:55:07.793Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_survey_applicability — 35 rows
+[2026-05-09T09:55:25.075Z] [SyncDiag] === SYNC START === vessel=7446783c-841a-11ed-aa7c-7003bca91a86, instance=SHORE-PROD, mode=LOCAL
+[2026-05-09T09:55:25.101Z] [SyncDiag] PUSH START: gathering field logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null
+[2026-05-09T09:55:25.181Z] [SyncDiag] PUSH: found 0 unsynced field logs
+[2026-05-09T09:55:25.182Z] [SyncDiag] RECEIVE-PUSH START: batch=58593587-1858-40e4-8931-eaa6ffbb581a, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
+[2026-05-09T09:55:25.186Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
+[2026-05-09T09:55:25.189Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-08T12:21:43.374Z
+[2026-05-09T09:55:25.428Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel
+[2026-05-09T09:55:25.548Z] [SyncDiag] PREPARE-PULL DONE: 6 one-way rows across 1 tables, 0 field logs, 0 conflicts
+[2026-05-09T09:55:25.549Z] [SyncDiag] PREPARE-PULL ONE-WAY: master_lists — 6 rows
+[2026-05-09T09:55:25.549Z] [SyncDiag] PULL RECEIVED: 1 one-way table batches, 0 field logs
+[2026-05-09T09:55:25.550Z] [SyncDiag] PULL one-way tables: {"master_lists":6}
+[2026-05-09T09:55:25.551Z] [SyncDiag] ONE-WAY-APPLY START: master_lists — 6 rows
+[2026-05-09T09:55:25.607Z] [SyncDiag] ONE-WAY-APPLY DONE: master_lists — inserted=0, updated=6, deleted=0, errors=0
+[2026-05-09T09:55:25.615Z] [SyncDiag] PULL ONE-WAY: master_lists — inserted=0, updated=6, deleted=0, errors=0
+[2026-05-09T09:55:25.791Z] [SyncDiag] SYNC COMPLETE: checkpoint=2026-05-09T09:55:25.617Z
+[2026-05-09T09:55:25.797Z] [SyncDiag] FILE-SYNC START: 0 pending files for vessel=7446783c-841a-11ed-aa7c-7003bca91a86, direction=shore_to_ship
+[2026-05-09T09:55:25.798Z] [SyncDiag] FILE-SYNC DONE: processed=0, failed=0, bytes=0
+[2026-05-09T09:55:25.798Z] [SyncDiag] === SYNC END === vessel=7446783c-841a-11ed-aa7c-7003bca91a86, duration=723ms, status=success, pushed=0, pulled=6, conflicts=0, files=0+0
+[2026-05-09T14:58:47.240Z] [SyncDiag] RECEIVE-PUSH START: batch=92c3d019-b225-4486-9a7c-1169ccc0469b, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=15, oneWayRows=0
+[2026-05-09T14:58:47.287Z] [SyncDiag] RECEIVE-PUSH: 15 field logs stored in sync_field_log
+[2026-05-09T14:58:47.288Z] [SyncDiag] FIELD-LOG-INSERT START: 15 logs
+[2026-05-09T14:58:47.288Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 15 logs
+[2026-05-09T14:58:47.352Z] [SyncDiag] FIELD-LOG-INSERT OK: change_request row=6e1df903-e276-481d-a31a-c5248578ffb7 (16 columns)
+[2026-05-09T14:58:47.353Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
+[2026-05-09T14:58:47.356Z] [SyncDiag] RECEIVE-PUSH DONE: stored=15, applied=1, errors=0, oneWayTables=0
+[2026-05-09T14:58:49.394Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-04T11:18:08.589Z
+[2026-05-09T14:58:49.808Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel
+[2026-05-09T14:58:49.979Z] [SyncDiag] PREPARE-PULL DONE: 329 one-way rows across 10 tables, 0 field logs, 0 conflicts
+[2026-05-09T14:58:49.980Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 12 rows
+[2026-05-09T14:58:49.980Z] [SyncDiag] PREPARE-PULL ONE-WAY: jobs — 2 rows
+[2026-05-09T14:58:49.981Z] [SyncDiag] PREPARE-PULL ONE-WAY: fleet_groups — 13 rows
+[2026-05-09T14:58:49.981Z] [SyncDiag] PREPARE-PULL ONE-WAY: maker_list — 2 rows
+[2026-05-09T14:58:49.981Z] [SyncDiag] PREPARE-PULL ONE-WAY: master_lists — 6 rows
+[2026-05-09T14:58:49.982Z] [SyncDiag] PREPARE-PULL ONE-WAY: pms_vessel_settings — 1 rows
+[2026-05-09T14:58:49.982Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_certificates_master — 129 rows
+[2026-05-09T14:58:49.983Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_surveys_master — 58 rows
+[2026-05-09T14:58:49.983Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_certificate_applicability — 71 rows
+[2026-05-09T14:58:49.984Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_survey_applicability — 35 rows
+[2026-05-09T15:00:50.620Z] [SyncDiag] RECEIVE-PUSH START: batch=cbe082e4-02ff-443b-8bc7-c956ecfd3b70, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=15, oneWayRows=0
+[2026-05-09T15:00:50.664Z] [SyncDiag] RECEIVE-PUSH: 15 field logs stored in sync_field_log
+[2026-05-09T15:00:50.665Z] [SyncDiag] FIELD-LOG-INSERT START: 15 logs
+[2026-05-09T15:00:50.665Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 15 logs
+[2026-05-09T15:00:50.674Z] [SyncDiag] FIELD-LOG-INSERT OK: change_request row=07ea031e-39db-4c5a-9425-87fb2947622a (16 columns)
+[2026-05-09T15:00:50.675Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
+[2026-05-09T15:00:50.678Z] [SyncDiag] RECEIVE-PUSH DONE: stored=15, applied=1, errors=0, oneWayTables=0
+[2026-05-09T15:00:50.686Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-04T11:18:08.589Z
+[2026-05-09T15:00:50.995Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel
+[2026-05-09T15:00:51.077Z] [SyncDiag] PREPARE-PULL DONE: 329 one-way rows across 10 tables, 0 field logs, 0 conflicts
+[2026-05-09T15:00:51.078Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 12 rows
+[2026-05-09T15:00:51.078Z] [SyncDiag] PREPARE-PULL ONE-WAY: jobs — 2 rows
+[2026-05-09T15:00:51.079Z] [SyncDiag] PREPARE-PULL ONE-WAY: fleet_groups — 13 rows
+[2026-05-09T15:00:51.079Z] [SyncDiag] PREPARE-PULL ONE-WAY: maker_list — 2 rows
+[2026-05-09T15:00:51.080Z] [SyncDiag] PREPARE-PULL ONE-WAY: master_lists — 6 rows
+[2026-05-09T15:00:51.080Z] [SyncDiag] PREPARE-PULL ONE-WAY: pms_vessel_settings — 1 rows
+[2026-05-09T15:00:51.080Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_certificates_master — 129 rows
+[2026-05-09T15:00:51.081Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_surveys_master — 58 rows
+[2026-05-09T15:00:51.081Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_certificate_applicability — 71 rows
+[2026-05-09T15:00:51.082Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_survey_applicability — 35 rows
+[2026-05-09T15:02:21.538Z] [SyncDiag] RECEIVE-PUSH START: batch=54068ab1-e834-4586-b893-4e8b3c813efd, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=18, oneWayRows=0
+[2026-05-09T15:02:21.566Z] [SyncDiag] RECEIVE-PUSH: 18 field logs stored in sync_field_log
+[2026-05-09T15:02:21.566Z] [SyncDiag] FIELD-LOG-INSERT START: 18 logs
+[2026-05-09T15:02:21.567Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 18 logs
+[2026-05-09T15:02:21.611Z] [SyncDiag] FIELD-LOG-INSERT OK: stores_items row=2bf4b6bc-db66-48f5-a8d6-5c9c7872d7e9 (19 columns)
+[2026-05-09T15:02:21.612Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
+[2026-05-09T15:02:21.614Z] [SyncDiag] RECEIVE-PUSH DONE: stored=18, applied=1, errors=0, oneWayTables=0
+[2026-05-09T15:02:23.644Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-04T11:18:08.589Z
+[2026-05-09T15:02:23.943Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel
+[2026-05-09T15:02:24.025Z] [SyncDiag] PREPARE-PULL DONE: 329 one-way rows across 10 tables, 0 field logs, 0 conflicts
+[2026-05-09T15:02:24.025Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 12 rows
+[2026-05-09T15:02:24.026Z] [SyncDiag] PREPARE-PULL ONE-WAY: jobs — 2 rows
+[2026-05-09T15:02:24.026Z] [SyncDiag] PREPARE-PULL ONE-WAY: fleet_groups — 13 rows
+[2026-05-09T15:02:24.027Z] [SyncDiag] PREPARE-PULL ONE-WAY: maker_list — 2 rows
+[2026-05-09T15:02:24.027Z] [SyncDiag] PREPARE-PULL ONE-WAY: master_lists — 6 rows
+[2026-05-09T15:02:24.027Z] [SyncDiag] PREPARE-PULL ONE-WAY: pms_vessel_settings — 1 rows
+[2026-05-09T15:02:24.028Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_certificates_master — 129 rows
+[2026-05-09T15:02:24.028Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_surveys_master — 58 rows
+[2026-05-09T15:02:24.029Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_certificate_applicability — 71 rows
+[2026-05-09T15:02:24.029Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_survey_applicability — 35 rows
+[2026-05-09T15:03:26.716Z] [SyncDiag] RECEIVE-PUSH START: batch=03fdafa9-c38d-4fdc-9534-7816f6892950, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=21, oneWayRows=0
+[2026-05-09T15:03:26.788Z] [SyncDiag] RECEIVE-PUSH: 21 field logs stored in sync_field_log
+[2026-05-09T15:03:26.788Z] [SyncDiag] FIELD-LOG-INSERT START: 21 logs
+[2026-05-09T15:03:26.789Z] [SyncDiag] FIELD-LOG-INSERT: 2 groups from 21 logs
+[2026-05-09T15:03:26.830Z] [SyncDiag] FIELD-LOG-INSERT OK: stores_ledger row=3ff6122a-c110-4a66-9d76-14af169b564a (19 columns)
+[2026-05-09T15:03:26.831Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=3, errors=0
+[2026-05-09T15:03:26.834Z] [SyncDiag] RECEIVE-PUSH STALE SKIP: stores_items.robLocationA row=2bf4b6bc-db66-48f5-a8d6-5c9c7872d7e9 — log 2026-05-09T15:03:18.552Z < row 2026-05-09T15:03:26.831Z
+[2026-05-09T15:03:26.835Z] [SyncDiag] RECEIVE-PUSH STALE SKIP: stores_items.robLocationB row=2bf4b6bc-db66-48f5-a8d6-5c9c7872d7e9 — log 2026-05-09T15:03:18.552Z < row 2026-05-09T15:03:26.831Z
+[2026-05-09T15:03:26.838Z] [SyncDiag] RECEIVE-PUSH DONE: stored=21, applied=2, errors=0, oneWayTables=0
+[2026-05-09T15:03:28.854Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-04T11:18:08.589Z
+[2026-05-09T15:03:29.226Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel
+[2026-05-09T15:03:29.359Z] [SyncDiag] PREPARE-PULL DONE: 329 one-way rows across 10 tables, 0 field logs, 0 conflicts
+[2026-05-09T15:03:29.360Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 12 rows
+[2026-05-09T15:03:29.360Z] [SyncDiag] PREPARE-PULL ONE-WAY: jobs — 2 rows
+[2026-05-09T15:03:29.361Z] [SyncDiag] PREPARE-PULL ONE-WAY: fleet_groups — 13 rows
+[2026-05-09T15:03:29.361Z] [SyncDiag] PREPARE-PULL ONE-WAY: maker_list — 2 rows
+[2026-05-09T15:03:29.361Z] [SyncDiag] PREPARE-PULL ONE-WAY: master_lists — 6 rows
+[2026-05-09T15:03:29.362Z] [SyncDiag] PREPARE-PULL ONE-WAY: pms_vessel_settings — 1 rows
+[2026-05-09T15:03:29.362Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_certificates_master — 129 rows
+[2026-05-09T15:03:29.363Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_surveys_master — 58 rows
+[2026-05-09T15:03:29.363Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_certificate_applicability — 71 rows
+[2026-05-09T15:03:29.363Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_survey_applicability — 35 rows
+[2026-05-09T15:05:09.002Z] [SyncDiag] RECEIVE-PUSH START: batch=b518476a-0a75-4494-8061-a99d1879929c, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=22, oneWayRows=0
+[2026-05-09T15:05:09.081Z] [SyncDiag] RECEIVE-PUSH: 22 field logs stored in sync_field_log
+[2026-05-09T15:05:09.083Z] [SyncDiag] FIELD-LOG-INSERT START: 22 logs
+[2026-05-09T15:05:09.083Z] [SyncDiag] FIELD-LOG-INSERT: 2 groups from 22 logs
+[2026-05-09T15:05:09.099Z] [SyncDiag] FIELD-LOG-INSERT OK: stores_ledger row=65f58284-bec2-49e8-85fd-afb63140b042 (20 columns)
+[2026-05-09T15:05:09.100Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=3, errors=0
+[2026-05-09T15:05:09.110Z] [SyncDiag] RECEIVE-PUSH STALE SKIP: stores_items.robLocationA row=8b803075-d27a-40b5-bb51-88e4416c8ef4 — log 2026-05-09T15:05:00.305Z < row 2026-05-09T15:05:09.102Z
+[2026-05-09T15:05:09.113Z] [SyncDiag] RECEIVE-PUSH STALE SKIP: stores_items.robLocationB row=8b803075-d27a-40b5-bb51-88e4416c8ef4 — log 2026-05-09T15:05:00.305Z < row 2026-05-09T15:05:09.102Z
+[2026-05-09T15:05:09.117Z] [SyncDiag] RECEIVE-PUSH DONE: stored=22, applied=2, errors=0, oneWayTables=0
+[2026-05-09T15:05:09.128Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-04T11:18:08.589Z
+[2026-05-09T15:05:09.464Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel
+[2026-05-09T15:05:09.548Z] [SyncDiag] PREPARE-PULL DONE: 329 one-way rows across 10 tables, 0 field logs, 0 conflicts
+[2026-05-09T15:05:09.548Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 12 rows
+[2026-05-09T15:05:09.549Z] [SyncDiag] PREPARE-PULL ONE-WAY: jobs — 2 rows
+[2026-05-09T15:05:09.550Z] [SyncDiag] PREPARE-PULL ONE-WAY: fleet_groups — 13 rows
+[2026-05-09T15:05:09.551Z] [SyncDiag] PREPARE-PULL ONE-WAY: maker_list — 2 rows
+[2026-05-09T15:05:09.551Z] [SyncDiag] PREPARE-PULL ONE-WAY: master_lists — 6 rows
+[2026-05-09T15:05:09.552Z] [SyncDiag] PREPARE-PULL ONE-WAY: pms_vessel_settings — 1 rows
+[2026-05-09T15:05:09.553Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_certificates_master — 129 rows
+[2026-05-09T15:05:09.554Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_surveys_master — 58 rows
+[2026-05-09T15:05:09.554Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_certificate_applicability — 71 rows
+[2026-05-09T15:05:09.555Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_survey_applicability — 35 rows
+[2026-05-09T15:12:53.672Z] [SyncDiag] RECEIVE-PUSH START: batch=79bcc2f7-be67-4eaa-9e99-65277b4fda25, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=20, oneWayRows=0
+[2026-05-09T15:12:53.701Z] [SyncDiag] RECEIVE-PUSH: 20 field logs stored in sync_field_log
+[2026-05-09T15:12:53.701Z] [SyncDiag] FIELD-LOG-INSERT START: 20 logs
+[2026-05-09T15:12:53.702Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 20 logs
+[2026-05-09T15:12:53.738Z] [SyncDiag] FIELD-LOG-INSERT OK: running_hours_audit row=3fe36615-356d-406a-ba7a-2137222da9d3 (21 columns)
+[2026-05-09T15:12:53.738Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
+[2026-05-09T15:12:53.741Z] [SyncDiag] RECEIVE-PUSH DONE: stored=20, applied=1, errors=0, oneWayTables=0
+[2026-05-09T15:12:53.749Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-04T11:18:08.589Z
+[2026-05-09T15:12:54.135Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel
+[2026-05-09T15:12:54.271Z] [SyncDiag] PREPARE-PULL DONE: 329 one-way rows across 10 tables, 0 field logs, 0 conflicts
+[2026-05-09T15:12:54.271Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 12 rows
+[2026-05-09T15:12:54.272Z] [SyncDiag] PREPARE-PULL ONE-WAY: jobs — 2 rows
+[2026-05-09T15:12:54.272Z] [SyncDiag] PREPARE-PULL ONE-WAY: fleet_groups — 13 rows
+[2026-05-09T15:12:54.273Z] [SyncDiag] PREPARE-PULL ONE-WAY: maker_list — 2 rows
+[2026-05-09T15:12:54.273Z] [SyncDiag] PREPARE-PULL ONE-WAY: master_lists — 6 rows
+[2026-05-09T15:12:54.273Z] [SyncDiag] PREPARE-PULL ONE-WAY: pms_vessel_settings — 1 rows
+[2026-05-09T15:12:54.274Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_certificates_master — 129 rows
+[2026-05-09T15:12:54.274Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_surveys_master — 58 rows
+[2026-05-09T15:12:54.275Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_certificate_applicability — 71 rows
+[2026-05-09T15:12:54.275Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_survey_applicability — 35 rows
+[2026-05-09T15:18:22.544Z] [SyncDiag] RECEIVE-PUSH START: batch=ccedf45e-fba0-4736-adac-cb137bd30782, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=23, oneWayRows=0
+[2026-05-09T15:18:22.575Z] [SyncDiag] RECEIVE-PUSH: 23 field logs stored in sync_field_log
+[2026-05-09T15:18:22.575Z] [SyncDiag] FIELD-LOG-INSERT START: 23 logs
+[2026-05-09T15:18:22.576Z] [SyncDiag] FIELD-LOG-INSERT: 3 groups from 23 logs
+[2026-05-09T15:18:22.611Z] [SyncDiag] FIELD-LOG-INSERT OK: spares_history row=a7c4f27d-05b7-49ed-acfc-46a21c41ef2d (20 columns)
+[2026-05-09T15:18:22.611Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=4, errors=0
+[2026-05-09T15:18:22.619Z] [SyncDiag] RECEIVE-PUSH STALE SKIP: spares.robLocationA row=6a4d067a-c727-41eb-befa-74cdf2a4a753 — log 2026-05-09T15:17:46.391Z < row 2026-05-09T15:18:22.617Z
+[2026-05-09T15:18:22.621Z] [SyncDiag] RECEIVE-PUSH STALE SKIP: spares.robLocationB row=6a4d067a-c727-41eb-befa-74cdf2a4a753 — log 2026-05-09T15:17:46.391Z < row 2026-05-09T15:18:22.617Z
+[2026-05-09T15:18:22.634Z] [SyncDiag] RECEIVE-PUSH DONE: stored=23, applied=3, errors=0, oneWayTables=0
+[2026-05-09T15:18:22.642Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-04T11:18:08.589Z
+[2026-05-09T15:18:23.041Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel
+[2026-05-09T15:18:23.170Z] [SyncDiag] PREPARE-PULL DONE: 329 one-way rows across 10 tables, 0 field logs, 0 conflicts
+[2026-05-09T15:18:23.170Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 12 rows
+[2026-05-09T15:18:23.171Z] [SyncDiag] PREPARE-PULL ONE-WAY: jobs — 2 rows
+[2026-05-09T15:18:23.171Z] [SyncDiag] PREPARE-PULL ONE-WAY: fleet_groups — 13 rows
+[2026-05-09T15:18:23.171Z] [SyncDiag] PREPARE-PULL ONE-WAY: maker_list — 2 rows
+[2026-05-09T15:18:23.172Z] [SyncDiag] PREPARE-PULL ONE-WAY: master_lists — 6 rows
+[2026-05-09T15:18:23.172Z] [SyncDiag] PREPARE-PULL ONE-WAY: pms_vessel_settings — 1 rows
+[2026-05-09T15:18:23.173Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_certificates_master — 129 rows
+[2026-05-09T15:18:23.173Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_surveys_master — 58 rows
+[2026-05-09T15:18:23.173Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_certificate_applicability — 71 rows
+[2026-05-09T15:18:23.174Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_survey_applicability — 35 rows

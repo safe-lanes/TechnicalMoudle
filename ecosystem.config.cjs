@@ -11,7 +11,8 @@ module.exports = {
 		env: {
 			APP_ENV: "dev",
 			NODE_ENV: "development",
-			EXTERNAL_MASTER_DATA_URL_DEV:"https://dev.sl-sail.com/b/api/v1/crewmasterdata/getallmasterdata"
+			EXTERNAL_MASTER_DATA_URL_DEV:"https://dev.sl-sail.com/b/api/v1/crewmasterdata/getallmasterdata",
+            SYNC_INSTANCE_ID:"SHORE-PROD"
 		},
 		env_production: {
 			APP_ENV: "production",
