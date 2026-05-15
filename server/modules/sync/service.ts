@@ -99,6 +99,7 @@ export async function receivePushData(
       changedByUserId: string | null;
       instanceId: string;
     }>;
+    masterRecordHints?: Array<{ tableName: string; rows: any[] }>;
   }
 ) {
   syncDiag(`RECEIVE-PUSH START: batch=${batchUuid}, vessel=${vesselId}, fieldLogs=${payload.fieldLogs?.length || 0}, oneWayRows=${payload.oneWayRows?.length || 0}`);
@@ -584,6 +585,62 @@ export async function receivePushData(
             } catch (appErr: any) {
               // Non-fatal — data is still synced, applicability can be created via migration/next cycle
               syncDiag(`ENSURE-APPLICABILITY ERROR: ${pair.appTable} vessel=${vesselId}: ${appErr.message}`);
+            }
+          }
+        }
+
+        // ── Apply masterRecordHints (FIX 58) ────────────────────────────
+        // Ship sends real master record data (names, requirement_ref, etc.)
+        // so shore can update placeholder masters that ENSURE-MASTER created
+        // with master_id as name. This runs AFTER ensure-master/applicability
+        // so the rows exist by the time we UPDATE them.
+        if (payload.masterRecordHints && payload.masterRecordHints.length > 0) {
+          const HINT_TABLE_MAP: Record<string, { table: string; nameCol: string; labelCol: string }> = {
+            ship_surveys_master: { table: 'ship_surveys_master', nameCol: 'survey_name', labelCol: 'survey_label' },
+            ship_certificates_master: { table: 'ship_certificates_master', nameCol: 'certificate_name', labelCol: 'certificate_label' },
+          };
+
+          for (const hint of payload.masterRecordHints) {
+            const mapping = HINT_TABLE_MAP[hint.tableName];
+            if (!mapping) continue;
+
+            for (const row of (hint.rows || [])) {
+              if (!row.master_id) continue;
+              try {
+                const updateResult = await client.query(
+                  `UPDATE "${mapping.table}" SET
+                     "${mapping.nameCol}"    = COALESCE($2, "${mapping.nameCol}"),
+                     "${mapping.labelCol}"   = COALESCE($3, "${mapping.labelCol}"),
+                     category                = COALESCE($4, category),
+                     "group"                 = COALESCE($5, "group"),
+                     requirement_ref         = COALESCE($6, requirement_ref),
+                     company_id              = COALESCE($7, company_id),
+                     company_group           = COALESCE($8, company_group),
+                     company_sequence        = COALESCE($9, company_sequence),
+                     applicable_to_company   = COALESCE($10, applicable_to_company),
+                     sequence                = COALESCE($11, sequence),
+                     updated_at              = NOW()
+                   WHERE master_id = $1`,
+                  [
+                    row.master_id,
+                    row[mapping.nameCol] || null,
+                    row[mapping.labelCol] || null,
+                    row.category || null,
+                    row.group || null,
+                    row.requirement_ref || null,
+                    row.company_id || null,
+                    row.company_group || null,
+                    row.company_sequence != null ? row.company_sequence : null,
+                    row.applicable_to_company != null ? row.applicable_to_company : null,
+                    row.sequence != null ? row.sequence : null,
+                  ]
+                );
+                if ((updateResult.rowCount ?? 0) > 0) {
+                  syncDiag(`MASTER-HINT APPLIED: ${mapping.table} master_id=${row.master_id} name=${row[mapping.nameCol]}`);
+                }
+              } catch (hintErr: any) {
+                syncDiag(`MASTER-HINT ERROR: ${mapping.table} master_id=${row.master_id}: ${hintErr.message}`);
+              }
             }
           }
         }

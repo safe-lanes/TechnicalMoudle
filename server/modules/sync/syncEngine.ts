@@ -374,6 +374,51 @@ export class SyncEngine {
       instanceId: log.instanceId ?? log.instance_id,
     }));
 
+    // ── FIX 58: Gather master record hints ──────────────────────────
+    // ship_surveys_master / ship_certificates_master are ONE_WAY_SHORE_TO_SHIP
+    // so they can't travel to shore via field logs or one-way rows.
+    // Include the real master record data as hints so shore's ENSURE-MASTER
+    // placeholders get the actual names, requirement_ref, company_group, etc.
+    const masterRecordHints: Array<{ tableName: string; rows: any[] }> = [];
+    if (isShipInstance && fieldLogPayloads.length > 0) {
+      const surveyMasterIds = new Set<string>();
+      const certMasterIds = new Set<string>();
+      for (const log of fieldLogPayloads) {
+        if (log.tableName === 'vessel_survey_data' && log.fieldName === 'masterId' && log.newValue) {
+          surveyMasterIds.add(log.newValue);
+        }
+        if (log.tableName === 'vessel_certificate_data' && log.fieldName === 'masterId' && log.newValue) {
+          certMasterIds.add(log.newValue);
+        }
+      }
+      const pool = await getPool();
+      if (surveyMasterIds.size > 0) {
+        try {
+          const r = await pool.query(
+            `SELECT master_id, survey_name, category, "group", requirement_ref,
+                    applicable_to_company, survey_label, company_id, company_group, company_sequence, sequence
+             FROM ship_surveys_master WHERE master_id = ANY($1) AND is_deleted = false`,
+            [Array.from(surveyMasterIds)]
+          );
+          if (r.rows.length > 0) masterRecordHints.push({ tableName: 'ship_surveys_master', rows: r.rows });
+        } catch (err: any) { console.warn('[SyncEngine] FIX 58 survey master hints:', err.message); }
+      }
+      if (certMasterIds.size > 0) {
+        try {
+          const r = await pool.query(
+            `SELECT master_id, certificate_name, category, "group", requirement_ref,
+                    applicable_to_company, certificate_label, company_id, company_group, company_sequence, sequence
+             FROM ship_certificates_master WHERE master_id = ANY($1) AND is_deleted = false`,
+            [Array.from(certMasterIds)]
+          );
+          if (r.rows.length > 0) masterRecordHints.push({ tableName: 'ship_certificates_master', rows: r.rows });
+        } catch (err: any) { console.warn('[SyncEngine] FIX 58 cert master hints:', err.message); }
+      }
+      if (masterRecordHints.length > 0) {
+        syncDiag(`FIX 58: sending ${masterRecordHints.reduce((s, h) => s + h.rows.length, 0)} master record hint(s) to shore`);
+      }
+    }
+
     if (fieldLogPayloads.length > 0 || shipOnlyRows.length > 0) {
       for (let i = 0; i < Math.max(fieldLogPayloads.length, 1); i += CHUNK_SIZE) {
         const chunk = fieldLogPayloads.slice(i, i + CHUNK_SIZE);
@@ -382,6 +427,7 @@ export class SyncEngine {
           vesselId,
           oneWayRows: i === 0 ? shipOnlyRows : [], // One-way rows with first chunk only
           fieldLogs: chunk,
+          masterRecordHints: i === 0 ? masterRecordHints : [], // Hints with first chunk only
         });
         totalPushed += result.received || 0;
       }

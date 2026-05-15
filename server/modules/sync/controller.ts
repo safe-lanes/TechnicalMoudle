@@ -41,7 +41,7 @@ export async function initiateSyncHandler(req: Request, res: Response) {
 
 export async function pushHandler(req: Request, res: Response) {
   try {
-    const { batchUuid, vesselId, oneWayRows, fieldLogs } = req.body;
+    const { batchUuid, vesselId, oneWayRows, fieldLogs, masterRecordHints } = req.body;
     if (!batchUuid || !vesselId) {
       return res.status(400).json({ error: 'batchUuid and vesselId are required' });
     }
@@ -49,6 +49,7 @@ export async function pushHandler(req: Request, res: Response) {
     const result = await syncService.receivePushData(batchUuid, vesselId, {
       oneWayRows,
       fieldLogs,
+      masterRecordHints,
     });
     res.json(result);
   } catch (error: any) {
