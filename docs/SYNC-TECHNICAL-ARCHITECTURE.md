@@ -1,6 +1,6 @@
 # Ship-Shore Sync — Technical Architecture
 
-> **Version:** 1.6  
+> **Version:** 1.7  
 > **Last Updated:** 2026-05-15  
 > **Domain Sign-Off:** Jeevan Naik, Rahul Singh Sisodiya, Sahil Puri (24-Apr-2026)  
 > **Source of Truth:** `shared/syncConfig.ts`
@@ -336,6 +336,7 @@ Ship SyncEngine                           Shore API
 - Business rules enforced: e.g., defect verification from ship is rejected
 - **Stale-log guard (v1.2):** UPDATE field logs are skipped if `changedAt < row.updated_at` to prevent old re-pushed logs from overwriting newer local edits
 - **Trigger bypass (v1.4):** Field log apply (Phase 1 INSERTs + Phase 2 UPDATE passthrough) runs inside a `BEGIN / SET LOCAL sync.bypass_trigger = 'true' / COMMIT` transaction using a dedicated `pool.connect()` client. This prevents the `set_updated_at()` trigger from overriding `updated_at` with `NOW()`, preserving the original `changedAt` timestamp from the field log. See §4.1.
+- **Master record hints (v1.7, FIX 58):** Ship includes `masterRecordHints` in the push payload — real data from `ship_surveys_master` and `ship_certificates_master` for any master_ids found in pushed field logs. Shore's `receivePushData` uses these hints to UPDATE placeholder master records (created by ENSURE-MASTER, FIX 55) with real names, labels, requirement_ref, company_group, etc. See §4.3.
 - Data sent in chunks of 200 records (`CHUNK_SIZE` in `syncEngine.ts`)
 
 **3. PULL** (`service.ts → preparePullData` + `syncEngine.ts → executePull`)
@@ -461,6 +462,66 @@ The `components` table is classified as `ONE_WAY_SHORE_TO_SHIP` in `syncConfig.t
 
 **Date propagation chain:** `date_updated_local` (user-selected) → component `last_updated` (TEXT, highest API priority). Fixes 44-46 ensure shore displays the date the user picked, not a system timestamp.
 
+### 4.3 Ship-Created Certificates & Surveys Sync (v1.7, FIX 55-58)
+
+When a ship admin creates new surveys or certificates, the data must reach shore through a three-layer visibility chain:
+
+| Layer | Table(s) | Sync Category | Direction |
+|-------|----------|---------------|-----------|
+| 1. Master record | `ship_surveys_master`, `ship_certificates_master` | ONE_WAY_SHORE_TO_SHIP | Shore → Ship only |
+| 2. Applicability | `vessel_survey_applicability`, `vessel_certificate_applicability` | ONE_WAY_SHORE_TO_SHIP | Shore → Ship only |
+| 3. Data | `vessel_survey_data`, `vessel_certificate_data` | BOTH_EDITABLE | Bidirectional |
+
+**Problem:** Only Layer 3 (data) syncs bidirectionally. Layers 1+2 are one-way shore→ship — ship-created master records and applicability rows never reach shore.
+
+**Solution (4 fixes):**
+
+1. **FIX 55+56** (`d607978b`) — **Shore auto-creates placeholder master + applicability.** In `receivePushData()`, after field log processing, runs `INSERT INTO ... SELECT ... WHERE NOT EXISTS` to create missing master records (using `master_id` as placeholder name) and applicability rows for any `vessel_survey_data`/`vessel_certificate_data` touched by the push. Idempotent via `ON CONFLICT DO NOTHING`.
+
+2. **FIX 57** (`f0976b55`) — **Ship admin creates placeholder data rows.** When the ship admin saves new surveys/certificates, `surveyAdminService.ts` and `certAdminService.ts` also create placeholder `vessel_survey_data`/`vessel_certificate_data` rows with field logging. This gives the sync engine BOTH_EDITABLE records to push (master + applicability are one-way and can't be pushed).
+
+3. **FIX 58** (`1bb02a2b`) — **Ship sends real master record data as hints.** Ship's `syncEngine.ts` gathers full master record data (name, label, category, requirement_ref, company_group, etc.) from `ship_surveys_master`/`ship_certificates_master` for any `masterId` values found in the pushed field logs. These are sent as `masterRecordHints` in the push payload. Shore's `receivePushData()` uses the hints to UPDATE the placeholder master records with real data.
+
+**Data flow (ship creates survey "Surv 2Nilesh Ship"):**
+```
+Ship Admin Save (FIX 57)
+  → Creates ship_surveys_master row (local only, ONE_WAY)
+  → Creates vessel_survey_applicability row (local only, ONE_WAY)  
+  → Creates vessel_survey_data placeholder + field logs (BOTH_EDITABLE → syncs!)
+
+Ship Sync Push (FIX 58)
+  → Gathers field logs for vessel_survey_data
+  → Finds masterId in field logs → queries ship_surveys_master for real data
+  → Sends fieldLogs + masterRecordHints to shore
+
+Shore receivePushData (FIX 55+56 + FIX 58)
+  → Applies field logs → vessel_survey_data row created on shore
+  → ENSURE-MASTER: creates placeholder ship_surveys_master (name = master_id)
+  → ENSURE-APPLICABILITY: creates vessel_survey_applicability
+  → MASTER-HINT APPLIED: updates placeholder with real name, labels, fields from hints
+  → Shore UI now shows "Surv 2Nilesh Ship" with correct name + requirement_ref + company_group
+```
+
+**Files modified:**
+| File | Change |
+|------|--------|
+| `syncEngine.ts` | Ship-side: gather masterRecordHints from master tables for pushed masterId values |
+| `controller.ts` | Extract `masterRecordHints` from req.body, pass to receivePushData |
+| `service.ts` | Add `masterRecordHints` to payload type; after ENSURE-MASTER/APPLICABILITY, UPDATE placeholders with real data from hints |
+| `surveyAdminService.ts` | Create placeholder `vessel_survey_data` rows + field logs on admin save |
+| `certAdminService.ts` | Create placeholder `vessel_certificate_data` rows + field logs on admin save |
+
+### 4.4 Provisioning Bundle Referential Integrity (v1.7, Task #142)
+
+The provisioning bundle exporter (`exportAndAdd` in `provisioningService.ts`) applies a per-table `COALESCE(is_deleted, false) = false` filter. This can produce referentially inconsistent bundles when a parent row is soft-deleted but its child rows remain active.
+
+**Known vulnerable relationship (fixed):**
+- `planner_dates.component_id` → `components.cuuid` (NOT NULL FK, no CASCADE)
+
+**Fix (Replit Task #142, commit `283755886`):** Special-case `planner_dates` in `exportAndAdd()` with an `INNER JOIN` against `components` to only export rows whose parent component exists, is active, and belongs to the same vessel. Orphans are detected via a separate `LEFT JOIN` query and logged with reason (component missing / soft-deleted / vessel mismatch). Skip count is appended to the manifest category label.
+
+**Pending:** The `jobs` FK (`planner_dates.job_id` → `jobs.juuid`) needs the same treatment — identified in review but not yet included in the fix. 28 other FK relationships across BOTH_EDITABLE tables have the same latent vulnerability (generic fix deferred as architectural work).
+
 ---
 
 ## 5. Field Change Logging
@@ -551,8 +612,8 @@ Every BOTH_EDITABLE table has `logFieldChanges()` wired to all write paths. The 
 |-------|-------------|--------|--------|--------|---------|
 | `certificates` | text PK `id` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
 | `surveys` | text PK `id` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
-| `vessel_certificate_data` | `vcduuid` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
-| `vessel_survey_data` | `vsduuid` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+| `vessel_certificate_data` | `vcduuid` | `postgresStorage.ts`, `certAdminService.ts` (FIX 57) | `postgresStorage.ts` | — | Central storage + admin placeholder |
+| `vessel_survey_data` | `vsduuid` | `postgresStorage.ts`, `surveyAdminService.ts` (FIX 57) | `postgresStorage.ts` | — | Central storage + admin placeholder |
 
 #### Running Hours & Maintenance
 
@@ -727,7 +788,9 @@ Provisioning creates a vessel-specific data bundle for initial ship server deplo
 | — | Vessel identity row from `vessels` table | `IDENTITY (vessel self)` |
 
 **Phase 3 parent tables:**
-`work_orders`, `defects`, `spares`, `stores_items`, `change_request`, `certificates`, `surveys`, `vessel_certificate_data`, `vessel_survey_data`, `running_hours_audit`, `component_running_hours_log`, `component_maintenance_history`, `ihm_items`, `defect_sequences`
+`work_orders`, `defects`, `spares`, `stores_items`, `change_request`, `certificates`, `surveys`, `vessel_certificate_data`, `vessel_survey_data`, `running_hours_audit`, `component_running_hours_log`, `component_maintenance_history`, `ihm_items`, `defect_sequences`, `planner_dates`, `locations`
+
+> **Referential integrity (v1.7):** `planner_dates` has NOT NULL FKs to `components.cuuid` and `jobs.juuid`. The exporter special-cases `planner_dates` with an INNER JOIN against `components` to exclude rows whose parent is soft-deleted, hard-deleted, or scoped to a different vessel. Orphans are logged with reason and skip count is shown in the manifest. See §4.4. **Note:** the `jobs` FK is not yet covered — pending Replit Task #142 update.
 
 **Phase 4 child tables:**
 `work_order_executions`, `work_order_execution_details`, `work_order_postponements`, `work_order_documents`, `defect_actions`, `defect_attachments`, `spares_history`, `spare_location_stock`, `spare_component_links`, `stores_ledger`, `inventory_transactions`, `change_request_attachment`, `change_request_comment`, `ihm_maintenance_log`, `component_documents`, `component_requisitions`
@@ -1327,6 +1390,15 @@ All fixes applied after the initial sync system merge to `replit_dev` (2026-04-2
 |---|--------|-----|--------|
 | 54 | `351bcc1a` | Derived applicability creation in `receivePushData()` after INSERT | When ship creates a new certificate/survey, the data row syncs (BOTH_EDITABLE) but the applicability row doesn't (ONE_WAY_SHORE_TO_SHIP). Shore UI queries applicability as entry point → data invisible. FIX: after `applyFieldLogInserts()`, scan INSERT-origin logs for `vessel_certificate_data`/`vessel_survey_data`, create derived applicability with ON CONFLICT DO NOTHING. **Superseded by fix 55 — INSERT-only check too narrow.** |
 | 55 | *(pending)* | Ensure-applicability SQL after ALL field log processing + backfill migration 114 | FIX 54 only fired for INSERT-origin logs. Data rows synced BEFORE fix 54 deployment had no applicability (orphans). New approach: after BOTH insert and update phases, run `INSERT INTO ... SELECT` from data table where applicability is missing, scoped to the push vessel. Migration 114 backfills all existing orphans. Handles all cases: new inserts, pre-fix orphans, conflict-resolved rows. |
+
+### Round 20 — Ship-Created Cert/Survey Sync + Provisioning FK Fix (2026-05-15, Nilesh testing round 3)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 55+56 | `d607978b` | Auto-create placeholder master records + applicability for ship-created surveys/certs | Shore's `receivePushData` runs ENSURE-MASTER (`INSERT INTO ship_surveys_master/ship_certificates_master ... WHERE NOT EXISTS`) and ENSURE-APPLICABILITY (`INSERT INTO vessel_survey_applicability/vessel_certificate_applicability ... WHERE NOT EXISTS`) after field log processing. Placeholder masters use `master_id` as name. Idempotent via `ON CONFLICT DO NOTHING`. |
+| 57 | `f0976b55` | Create placeholder data rows when ship admin adds surveys/certs | `surveyAdminService.ts` and `certAdminService.ts` now create placeholder `vessel_survey_data`/`vessel_certificate_data` rows with field logging when admin saves. This gives the sync engine BOTH_EDITABLE records to push (master + applicability are ONE_WAY and can't be pushed). |
+| 58 | `1bb02a2b` | Ship sends real master record names to shore via `masterRecordHints` | Ship's `syncEngine.ts` gathers full master data (name, label, category, requirement_ref, company_group, etc.) from `ship_surveys_master`/`ship_certificates_master` for pushed `masterId` values. Sent as `masterRecordHints` in push payload. Shore's `receivePushData` UPDATEs placeholder masters with real data. `controller.ts` passes hints through. Fixes placeholder names showing `master_id` instead of actual survey/certificate names. |
+| — | `283755886` (Replit) | Drop orphan `planner_dates` rows from provisioning bundle (Task #142) | `exportAndAdd` special-cases `planner_dates` with `INNER JOIN components` to exclude rows whose component is soft-deleted/missing/vessel-mismatched. Orphans logged with reason + count appended to manifest. **Pending:** `jobs` FK not yet covered. |
 
 ### Investigated & Confirmed No-Op
 
