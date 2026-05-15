@@ -1,7 +1,7 @@
 # Ship-Shore Sync — Technical Architecture
 
-> **Version:** 1.5  
-> **Last Updated:** 2026-05-11  
+> **Version:** 1.6  
+> **Last Updated:** 2026-05-15  
 > **Domain Sign-Off:** Jeevan Naik, Rahul Singh Sisodiya, Sahil Puri (24-Apr-2026)  
 > **Source of Truth:** `shared/syncConfig.ts`
 
@@ -19,9 +19,9 @@ The Ship-Shore Sync system enables bidirectional data synchronization between a 
 **Key numbers:**
 - 108 tables classified across 4 sync categories
 - 41 ONE_WAY_SHORE_TO_SHIP tables
-- 31 BOTH_EDITABLE tables (planner_dates reclassified from NO_SYNC in v1.3)
+- 33 BOTH_EDITABLE tables (planner_dates reclassified in v1.3, locations + superintendent_notifications in v1.6)
 - 6 SHIP_ONLY tables
-- 30 NO_SYNC tables
+- 28 NO_SYNC tables
 - 33 API endpoints across 8 functional groups
 
 ---
@@ -153,7 +153,7 @@ Shore is the authoritative source. Ship receives read-only copies. No conflict p
 | `vessel_survey_applicability` | `vsauuid` | `vessel_id` | Survey applicability |
 | `adm_vessel_org_chart` | `avocuuid` | `vessel_id` | Vessel org chart |
 
-### 3.2 BOTH_EDITABLE (31 tables)
+### 3.2 BOTH_EDITABLE (33 tables)
 
 Both ship and shore can edit these tables. Uses field-level delta sync via `sync_field_log`. Conflicts are detected when both sides change the same field on the same row.
 
@@ -230,6 +230,13 @@ Both ship and shore can edit these tables. Uses field-level delta sync via `sync
 |-------|----------------|-------------|-------|
 | `planner_dates` | `pduuid` | `vessel_id` | Maintenance planner dates. Shore sets planned dates, ship can adjust. Reclassified from NO_SYNC in v1.3 (fix 21, commit `05b87ed3`). Field logging wired to all 4 write paths in `workOrderPlannerService.ts`. |
 
+#### Operational (added v1.6)
+
+| Table | Identity Column | Vessel Scope | Notes |
+|-------|----------------|-------------|-------|
+| `locations` | `luuid` | `vessel_id` | Storage/equipment locations. Reclassified from NO_SYNC to BOTH_EDITABLE in v1.6 (fix 34, commit `ee8c9abf`). |
+| `superintendent_notifications` | `snuuid` | `vessel_id` | WO approval notifications. Reclassified from NO_SYNC to BOTH_EDITABLE in v1.6 (fix 34, commit `ee8c9abf`). |
+
 ### 3.3 SHIP_ONLY (6 tables)
 
 Ship is the authoritative source. Shore receives overwrites. All are noon report tables.
@@ -243,18 +250,18 @@ Ship is the authoritative source. Shore receives overwrites. All are noon report
 | `nr_fuel_rob` | `nfruuid` | `vessel_id` | Fuel ROB per vessel/fuel type |
 | `nr_voyage_legs` | `nvluuid` | `vessel_id` | Voyage leg tracking |
 
-### 3.4 NO_SYNC (30 tables)
+### 3.4 NO_SYNC (28 tables)
 
 Never synced. Instance-local data only.
 
 **Platform-provisioned (managed by SAILERP):**
-`users`, `master_users`, `vessels`, `fleets`, `vessel_types`, `additional_groups`, `ports`, `locations`
+`users`, `master_users`, `vessels`, `fleets`, `vessel_types`, `additional_groups`, `ports`
 
 **Sync engine internal:**
 `sync_metadata`, `sync_field_log`, `sync_conflicts`, `sync_file_queue`, `sync_batches`
 
 **Local audit/import/reporting:**
-`audit_log`, `import_history`, `import_change_log`, `bulk_import_history`, `bulk_import_errors`, `report_snapshots`, `report_favorites`, `monthly_snapshots`, `superintendent_notifications`
+`audit_log`, `import_history`, `import_change_log`, `bulk_import_history`, `bulk_import_errors`, `report_snapshots`, `report_favorites`, `monthly_snapshots`
 
 **Local alert state:**
 `alert_events`, `alert_deliveries`, `alert_acknowledgements`
@@ -443,13 +450,16 @@ try {
 | `syncEngine.ts` | `executePull()` — field log section wrapped in bypass transaction; `applyFieldLog()` accepts optional `client` parameter |
 | `oneWayApplier.ts` | `applyFieldLogInserts()` accepts optional `externalClient` parameter, uses it for all queries when provided |
 
-### Known Limitation — Bug B (components RH direction)
+### Derived Running Hours Propagation (v1.6, Bug B — RESOLVED)
 
-The `components` table is classified as `ONE_WAY_SHORE_TO_SHIP` in `syncConfig.ts`. When the Running Hours module on ship updates `components.currentCumulativeRH` (in `runningHoursService.ts`), this change never syncs to shore because one-way tables only flow from shore to ship.
+The `components` table is classified as `ONE_WAY_SHORE_TO_SHIP` in `syncConfig.ts`. When the Running Hours module on ship updates `components.currentCumulativeRH` (in `runningHoursService.ts`), this change doesn't sync directly because one-way tables only flow from shore to ship.
 
-The `running_hours_audit` table IS `BOTH_EDITABLE` and its INSERT records DO sync successfully. The proposed fix (option B2) is to derive the component's cumulative RH from `running_hours_audit` on the shore side, rather than changing the sync direction of the entire `components` table. This is tracked but not yet implemented.
+**Solution (fix 39, commit `31c2d729`):** The `running_hours_audit` table IS `BOTH_EDITABLE` and its INSERT records sync successfully. Post-apply derived updates in all 3 sync paths read `new_rh` from the audit row and update the component's `current_cumulative_rh`, `rh_current_master`, `rh_master_updated_at` (fix 44), and `last_updated` (fix 45-46) on the receiving side:
+- `oneWayApplier.ts` — after INSERT of `running_hours_audit` row
+- `service.ts` — after UPDATE of `new_rh`/`cumulative_rh` fields in `receivePushData`
+- `syncEngine.ts` — after UPDATE in `applyFieldLog` (PULL path)
 
-**Affected QA tests:** #1 (RH updates not visible on shore), #8 (RH history mismatch)
+**Date propagation chain:** `date_updated_local` (user-selected) → component `last_updated` (TEXT, highest API priority). Fixes 44-46 ensure shore displays the date the user picked, not a system timestamp.
 
 ---
 
@@ -493,7 +503,7 @@ const SKIP_FIELDS = ['updated_at', 'updatedAt', 'created_at', 'createdAt', 'is_s
 | Soft-DELETE | `{is_deleted: false}` | `{is_deleted: true}` | Single entry for `is_deleted` field |
 | Hard DELETE | `{...}` | `null` | Warning logged, no field log entry (system uses soft-delete) |
 
-### Wiring Coverage (all 31 BOTH_EDITABLE tables)
+### Wiring Coverage (all 33 BOTH_EDITABLE tables)
 
 Every BOTH_EDITABLE table has `logFieldChanges()` wired to all write paths. The table below shows where each table's logging calls live.
 
@@ -571,6 +581,13 @@ Every BOTH_EDITABLE table has `logFieldChanges()` wired to all write paths. The 
 | Table | Identity Col | INSERT | UPDATE | DELETE | File(s) |
 |-------|-------------|--------|--------|--------|---------|
 | `planner_dates` | `pduuid` | `workOrderPlannerService.ts` | `workOrderPlannerService.ts` | — | WO planner service (single + bulk, 4 paths total) |
+
+#### Operational (added v1.6)
+
+| Table | Identity Col | INSERT | UPDATE | DELETE | File(s) |
+|-------|-------------|--------|--------|--------|---------|
+| `locations` | `luuid` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage |
+| `superintendent_notifications` | `snuuid` | `postgresStorage.ts` | `postgresStorage.ts` | — | Central storage (INSERT wired in fix 40, ack UPDATE in fix 36) |
 
 > **Note:** `component_running_hours_log` has no write paths anywhere in the server codebase. Data appears to be written externally or via a mechanism not yet implemented. When write paths are added, field logging must be wired.
 
@@ -1253,6 +1270,56 @@ All fixes applied after the initial sync system merge to `replit_dev` (2026-04-2
 | 31 | `2175e514` | Remove LEGACY/NEW source badge and source filter | Internal table distinction confused end users. Removed `sourceFilter` state, dropdown, and badge from conflict cards. |
 | 32 | `b709c2a8` | Migration 112 rewrite — name-based lookups | Original used hardcoded integer ids (`VALUES (34, ...)`, `ON CONFLICT (id)`, `WHERE id = 34`). Rewritten with computed `MAX(id)+1`, `WHERE name = 'admin-sync-conflicts'`, correct UUID columns (`muid`, `role_ruid`), explicit conflict targets. |
 | 33 | `e2a9cf1a` | SyncDashboard Conflicts tile hardening | Added `role="link"`, `tabIndex={0}`, keyboard nav, hover feedback, `aria-label`, `data-testid`. |
+
+### Round 13 — Bidirectional Sync Enablement + Field Logging Audit (2026-05-12)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 34 | `ee8c9abf` | Enable bidirectional sync for `locations` + `superintendent_notifications` | Both tables reclassified from NO_SYNC to BOTH_EDITABLE in `syncConfig.ts`. Enables ship↔shore edits on location names and notification ack states. |
+| 35 | `bfb9373b` | Field logging for CR approval round-trip | `approveChangeRequest()` used direct `tx.update()` bypassing `updateChangeRequest()` which had `logFieldChanges`. Added logging to approval (status/reviewer/reviewedAt), and to applyWorkOrderChangesInTx, applySpareChangesInTx, applyStoreChangesInTx. Added per-table breakdown diag logging to `preparePullData`. |
+| 36 | `3dd316c7` | Close 14 logFieldChanges gaps across 8 BOTH_EDITABLE tables | 10 gaps in `postgresStorage.ts` (addDefectNote, linkDefects, deleteCertificate, deleteSurvey, acknowledgeSuperintendentNotification, archiveWorkOrder, calculateAndUpdateRecurringDefects, checkAndRevertPostponedWorkOrders, updateLocation, inactivateStoresItem). 4 in external files (workOrderStatusRecalculator, adminController, importService, fleetAdminRepository). Deleted 4 dead-code methods: `bulkUpdateWorkOrders`, `bulkUpsertWorkOrders`, `archiveSparesByIds`, `bulkUpdateSparesByROB` (-79 lines). |
+| 37 | `3dc5b41a` | Close all remaining logFieldChanges audit items | Added `logFieldChangesBatch()` helper — multi-row INSERT, 1000-row chunking. Fixed 3 bulk undo logging gaps in `bulkController.ts`. Only remaining deferred: `repairRhTracking` (adminController.ts) — needs arch restructure. |
+| 38 | `b05c1901` | Wire `logFieldChangesBatch` into bulk import loop | `importService.ts` WO import loop restructured: collect entries during row processing, flush via one batch INSERT. Performance: O(rows × fields) round-trips → O(ceil(changed_fields / 1000)). |
+
+### Round 14 — Running Hours Derived Propagation (2026-05-12, Bug B resolution)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 39 | `31c2d729` | Propagate running hours from audit row to component current-state on sync receive | **Resolves Bug B.** Ship RH updates write to both `components` (ONE_WAY) and `running_hours_audit` (BOTH_EDITABLE). Post-apply derived UPDATE in all 3 sync paths (oneWayApplier after INSERT, service.ts after UPDATE in receivePushData, syncEngine after UPDATE in applyFieldLog). Each reads `new_rh` from audit row and updates `current_cumulative_rh` + `rh_current_master`. |
+| 40 | `59842c96` | Add `logFieldChanges` to superintendent notification creation | Ship-side WO approval creates superintendent_notifications rows, but INSERT had no logFieldChanges → never synced to shore. |
+| 41 | `bc30e0ef` | Pass vesselId in anomaly detection superintendent notification creation | Anomaly-created notifications had null `vessel_id` → never matched sync queries (`WHERE vessel_id IN (...)`). |
+
+### Round 15 — Serial Column Detection + SAVEPOINT Isolation (2026-05-13)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 42 | `61abd584` | Detect serial columns in `getColumnMeta` + SAVEPOINT isolation in INSERT pipeline | **Root cause:** `getColumnMeta` only checked `attidentity` — missed serial columns (`nextval(%)` DEFAULT). Ship's auto-increment `id` included in INSERT → shore PK conflict (23505). **Cascade:** 23505 error aborted PostgreSQL transaction → ALL subsequent UPDATE statements in same batch silently failed ("current transaction is aborted"). **Fix A:** query `pg_attrdef` for `nextval(%)` defaults. **Fix B:** Each INSERT group wrapped in SAVEPOINT/ROLLBACK TO SAVEPOINT. |
+| 43 | `a05cc96c` | Skip field logging for serial id columns | Reduces wasted sync bandwidth — serial id values are auto-generated per-instance and shouldn't sync. |
+
+### Round 16 — Running Hours Date Propagation (2026-05-13)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 44 | `1a51da23` | Propagate `rh_master_updated_at` in derived RH component update | Previous fix (39) only set `current_cumulative_rh` + `rh_current_master` but not `rh_master_updated_at` → "Last Updated Date" not showing on shore. |
+| 45 | `9fae8097` | Set `last_updated` (TEXT) in derived RH component update | API reads `lastUpdated` first (highest priority), not `rhMasterUpdatedAt` → needed in derived update since components is ONE_WAY. |
+| 46 | `6359429f` | Use `date_updated_local` for RH `last_updated` | Previous fix used `entered_at_utc` (system timestamp) → shore displayed UTC ISO string instead of user-selected date stored in `date_updated_local`. |
+
+### Round 17 — Shore Deploy Safety + Identity Column Fixes (2026-05-14, Nilesh live testing)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 47 | `750be4ac` | Prevent shore LOCAL mode from marking field logs as synced before ship pulls | Shore's LOCAL mode test was marking its own field logs as `is_synced=true` before ship ever pulled them. |
+| 48 | `f5ab3e08` | Remove destructive RBAC/ranks cleanup from every pull cycle | Pre-import RBAC cleanup was running on EVERY pull, not just provisioning — deleted and re-created RBAC data unnecessarily. |
+| 49 | `6e0e10c3` | Identity column + composite key fixes for 17 tables + ship checkpoint local save | Extended identity column detection for tables with non-standard PK patterns. Ship now saves checkpoint locally after sync complete. |
+| 50 | `fb860631` | Mixed INSERT+UPDATE field log groups silently dropped new rows | When a group of field logs for one row contained a mix of INSERT-origin (`oldValue=null`) and UPDATE-origin (`oldValue!=null`) logs, `applyFieldLogInserts` classified the entire group as UPDATE → skipped the INSERT → row never created. |
+| 51 | `6b1d0da7` | Handle FK violation on field-log INSERT by nulling missing FK and retrying | When INSERT creates a row but references an FK that doesn't exist on receiver yet, nulls the FK column and retries. |
+
+### Round 18 — 23505 Conflict Fallback + vesselId Fix (2026-05-14, Nilesh live testing round 2)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 52 | `97e3a2ea` | 23505 conflict fallback parse `err.detail` + diagnostic logging | Old 23505 fallback used ALL non-null fields to find conflicting row. Shore's existing row had different `survey_date` → 0 matches → "could not find existing row". Fix: parse PostgreSQL `err.detail` via regex `/Key \(([^)]+)\)=\(([^)]+)\)/` to extract exact constraint columns (Strategy 1). Added progressive count diagnostics in `getFieldLogsSinceCheckpoint`, enhanced fieldLogger output, `completeSyncSession` trace logging, SYNC_INSTANCE_ID mismatch detection. |
+| 53 | `05a4f68a` | **THE CRITICAL FIX** — Missing `vesselId` in pulled field logs | In `preparePullData()`, `nonConflictingLogs.push({...})` built object with 9 fields but OMITTED `vesselId: shoreLog.vesselId`. On ship, `applyFieldLogInserts` reads `logs[0].vesselId` to set `vessel_id` in the INSERT → was `undefined` → NOT-NULL constraint violation. Affects ALL BOTH_EDITABLE tables. Single-line fix. Discovered from Nilesh's ship 5 logs showing `FIELD-LOG-INSERT FAIL: vessel_survey_data row=588f7548 — null value in column "vessel_id"`. |
 
 ### Investigated & Confirmed No-Op
 
