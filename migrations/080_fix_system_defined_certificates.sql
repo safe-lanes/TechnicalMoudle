@@ -18,14 +18,3 @@ WHERE master_id IN (
   'B10-001','B10-002','B10-003','B10-004'
 )
 AND is_system_defined = false;
-
-INSERT INTO ship_certificates_master (master_id, certificate_name, category, "group", requirement_ref, applicable_to_company, certificate_label, is_active, is_system_defined, is_deleted, sequence)
-SELECT v.master_id, v.certificate_name, v.category, v.grp, v.requirement_ref, false, '', true, true, false, v.seq
-FROM (VALUES
-  ('A1-003', 'International Tonnage Certificate (1969)', 'A', '1', 'Tonnage 1969, Article 7', 3),
-  ('A1-004', 'International Load Line Certificate', 'A', '1', 'LL 1966, Article 16; LL PROT 1988, Article 16', 4),
-  ('A1-006', 'Load Line 1966 - Conditions of Freeboard Assignment', 'A', '1', 'LL 1966, Article 16; LL PROT 1988, Article 16', 6)
-) AS v(master_id, certificate_name, category, grp, requirement_ref, seq)
-WHERE NOT EXISTS (
-  SELECT 1 FROM ship_certificates_master scm WHERE scm.master_id = v.master_id
-);
