@@ -1321,6 +1321,13 @@ All fixes applied after the initial sync system merge to `replit_dev` (2026-04-2
 | 52 | `97e3a2ea` | 23505 conflict fallback parse `err.detail` + diagnostic logging | Old 23505 fallback used ALL non-null fields to find conflicting row. Shore's existing row had different `survey_date` → 0 matches → "could not find existing row". Fix: parse PostgreSQL `err.detail` via regex `/Key \(([^)]+)\)=\(([^)]+)\)/` to extract exact constraint columns (Strategy 1). Added progressive count diagnostics in `getFieldLogsSinceCheckpoint`, enhanced fieldLogger output, `completeSyncSession` trace logging, SYNC_INSTANCE_ID mismatch detection. |
 | 53 | `05a4f68a` | **THE CRITICAL FIX** — Missing `vesselId` in pulled field logs | In `preparePullData()`, `nonConflictingLogs.push({...})` built object with 9 fields but OMITTED `vesselId: shoreLog.vesselId`. On ship, `applyFieldLogInserts` reads `logs[0].vesselId` to set `vessel_id` in the INSERT → was `undefined` → NOT-NULL constraint violation. Affects ALL BOTH_EDITABLE tables. Single-line fix. Discovered from Nilesh's ship 5 logs showing `FIELD-LOG-INSERT FAIL: vessel_survey_data row=588f7548 — null value in column "vessel_id"`. |
 
+### Round 19 — Derived Applicability for Ship-Created Certs/Surveys (2026-05-15)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| 54 | `351bcc1a` | Derived applicability creation in `receivePushData()` after INSERT | When ship creates a new certificate/survey, the data row syncs (BOTH_EDITABLE) but the applicability row doesn't (ONE_WAY_SHORE_TO_SHIP). Shore UI queries applicability as entry point → data invisible. FIX: after `applyFieldLogInserts()`, scan INSERT-origin logs for `vessel_certificate_data`/`vessel_survey_data`, create derived applicability with ON CONFLICT DO NOTHING. **Superseded by fix 55 — INSERT-only check too narrow.** |
+| 55 | *(pending)* | Ensure-applicability SQL after ALL field log processing + backfill migration 114 | FIX 54 only fired for INSERT-origin logs. Data rows synced BEFORE fix 54 deployment had no applicability (orphans). New approach: after BOTH insert and update phases, run `INSERT INTO ... SELECT` from data table where applicability is missing, scoped to the push vessel. Migration 114 backfills all existing orphans. Handles all cases: new inserts, pre-fix orphans, conflict-resolved rows. |
+
 ### Investigated & Confirmed No-Op
 
 | Item | Investigation Result |

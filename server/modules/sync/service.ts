@@ -206,62 +206,13 @@ export async function receivePushData(
           insertResult.errors.forEach(e => console.error(`[Sync Push] INSERT error: ${e}`));
         }
 
-        // ── Derived applicability creation (FIX 52) ──────────────────────────
-        // When vessel_survey_data or vessel_certificate_data rows are INSERTed
-        // from ship, ensure the corresponding applicability record exists on
-        // shore.  Shore's UI uses applicability as the entry point:
-        //   getSurveys()  → queries vessel_survey_applicability  first
-        //   getCertificates() → queries vessel_certificate_applicability first
-        // Applicability tables are ONE_WAY_SHORE_TO_SHIP, so ship-created
-        // records don't sync back — we derive them here from the data INSERT.
-        if (insertResult.insertedRows > 0) {
-          const DERIVED_APPLICABILITY_MAP: Record<string, string> = {
-            vessel_survey_data: 'vessel_survey_applicability',
-            vessel_certificate_data: 'vessel_certificate_applicability',
-          };
-
-          // Collect unique (tableName, rowUuid) → { vesselId, masterId, vesselName }
-          // from INSERT-origin logs for the two data tables.
-          const appNeeded = new Map<string, { appTable: string; vesselId: string; masterId: string; vesselName: string }>();
-
-          for (const log of acceptedLogs) {
-            if (!DERIVED_APPLICABILITY_MAP[log.tableName]) continue;
-            if (log.oldValue !== null) continue; // Only INSERT-origin logs
-
-            const groupKey = `${log.tableName}::${log.rowUuid}`;
-            if (!appNeeded.has(groupKey)) {
-              appNeeded.set(groupKey, {
-                appTable: DERIVED_APPLICABILITY_MAP[log.tableName],
-                vesselId: log.vesselId || '',
-                masterId: '',
-                vesselName: '',
-              });
-            }
-
-            const entry = appNeeded.get(groupKey)!;
-            // Field names are camelCase from Drizzle ORM's fieldLogger
-            if (log.fieldName === 'masterId' && log.newValue) entry.masterId = log.newValue;
-            if (log.fieldName === 'vesselName' && log.newValue) entry.vesselName = log.newValue;
-            if (log.vesselId && !entry.vesselId) entry.vesselId = log.vesselId;
-          }
-
-          for (const [, entry] of Array.from(appNeeded)) {
-            if (!entry.vesselId || !entry.masterId) continue;
-            try {
-              // Partial unique index: uniq_vessel_*_applicability_live ON (vessel_id, master_id) WHERE is_deleted = false
-              const appResult = await client.query(
-                `INSERT INTO "${entry.appTable}" (vessel_id, vessel_name, master_id, is_applicable, is_deleted)
-                 VALUES ($1, $2, $3, true, false)
-                 ON CONFLICT (vessel_id, master_id) WHERE is_deleted = false DO NOTHING`,
-                [entry.vesselId, entry.vesselName || 'Unknown', entry.masterId]
-              );
-              if ((appResult.rowCount ?? 0) > 0) {
-                syncDiag(`DERIVED-APPLICABILITY: created ${entry.appTable} vesselId=${entry.vesselId} masterId=${entry.masterId}`);
-              }
-            } catch (appErr: any) {
-              // Non-fatal — data is still synced, just won't show in UI until admin configures
-              syncDiag(`DERIVED-APPLICABILITY ERROR: ${entry.appTable} vesselId=${entry.vesselId} masterId=${entry.masterId}: ${appErr.message}`);
-            }
+        // ── Detect whether cert/survey data tables were touched in this batch ──
+        // Used after all field-log processing (INSERT + UPDATE) to ensure
+        // applicability rows exist.  See "Ensure applicability" block below.
+        const touchedDataTables = new Set<string>();
+        for (const log of acceptedLogs) {
+          if (log.tableName === 'vessel_certificate_data' || log.tableName === 'vessel_survey_data') {
+            touchedDataTables.add(log.tableName);
           }
         }
 
@@ -529,6 +480,111 @@ export async function receivePushData(
           } catch (err: any) {
             fieldLogApplyErrors++;
             console.error(`[Sync Push] Failed to apply field log ${log.tableName}.${log.fieldName} for ${log.rowUuid}: ${err.message}`);
+          }
+        }
+
+        // ── Ensure master records (FIX 56) ────────────────────────────────────
+        // ship_surveys_master and ship_certificates_master are ONE_WAY_SHORE_TO_SHIP,
+        // so definitions created on ship never sync back. When vessel_survey_data or
+        // vessel_certificate_data arrives from ship referencing a master_id that
+        // doesn't exist on shore, the UI can't display it (getMasterSurveysByIds /
+        // getMasterCertificatesByIds filter by master table).
+        //
+        // Create placeholder master records so the data is visible. Admins can
+        // update the name/category later via the shore admin UI.
+        //
+        // master_id format: "A1-007" (letter+digit+"-"+seq) or "VES-013"/"CMP-001"
+        if (touchedDataTables.size > 0) {
+          const ENSURE_MASTER_PAIRS: Array<{
+            dataTable: string; masterTable: string; nameCol: string;
+          }> = [
+            { dataTable: 'vessel_certificate_data', masterTable: 'ship_certificates_master', nameCol: 'certificate_name' },
+            { dataTable: 'vessel_survey_data', masterTable: 'ship_surveys_master', nameCol: 'survey_name' },
+          ];
+
+          for (const mp of ENSURE_MASTER_PAIRS) {
+            if (!touchedDataTables.has(mp.dataTable)) continue;
+            try {
+              const masterResult = await client.query(
+                `INSERT INTO "${mp.masterTable}" (
+                   sequence, master_id, "${mp.nameCol}", category, "group",
+                   applicable_to_company, is_active, is_deleted, created_at, updated_at
+                 )
+                 SELECT DISTINCT
+                   COALESCE(
+                     NULLIF(SPLIT_PART(d.master_id, '-', 2), '')::int,
+                     0
+                   ),
+                   d.master_id,
+                   d.master_id,
+                   CASE
+                     WHEN d.master_id ~ '^[A-Z][0-9]+-' THEN LEFT(d.master_id, 1)
+                     ELSE SPLIT_PART(d.master_id, '-', 1)
+                   END,
+                   CASE
+                     WHEN d.master_id ~ '^[A-Z][0-9]+-' THEN SUBSTRING(d.master_id, 2, 1)
+                     ELSE ''
+                   END,
+                   false, true, false, NOW(), NOW()
+                 FROM "${mp.dataTable}" d
+                 WHERE d.is_deleted = false
+                   AND d.vessel_id = $1
+                   AND d.master_id IS NOT NULL
+                   AND NOT EXISTS (
+                     SELECT 1 FROM "${mp.masterTable}" m
+                     WHERE m.master_id = d.master_id
+                   )
+                 ON CONFLICT (master_id) DO NOTHING`,
+                [vesselId]
+              );
+              const created = masterResult.rowCount ?? 0;
+              if (created > 0) {
+                syncDiag(`ENSURE-MASTER: created ${created} ${mp.masterTable} placeholder(s) for vessel=${vesselId}`);
+              }
+            } catch (masterErr: any) {
+              syncDiag(`ENSURE-MASTER ERROR: ${mp.masterTable} vessel=${vesselId}: ${masterErr.message}`);
+            }
+          }
+        }
+
+        // ── Ensure applicability (FIX 55) ───────────────────────────────────
+        // After master records are ensured, also ensure applicability rows exist.
+        // Shore UI queries applicability as entry point (getSurveys/getCertificates).
+        // Applicability tables are ONE_WAY_SHORE_TO_SHIP — ship-created records
+        // never travel back. We derive them from the data row.
+        // Idempotent via ON CONFLICT DO NOTHING. Scoped to this vessel.
+        if (touchedDataTables.size > 0) {
+          const ENSURE_APP_PAIRS: Array<{ dataTable: string; appTable: string }> = [
+            { dataTable: 'vessel_certificate_data', appTable: 'vessel_certificate_applicability' },
+            { dataTable: 'vessel_survey_data', appTable: 'vessel_survey_applicability' },
+          ];
+
+          for (const pair of ENSURE_APP_PAIRS) {
+            if (!touchedDataTables.has(pair.dataTable)) continue;
+            try {
+              const ensureResult = await client.query(
+                `INSERT INTO "${pair.appTable}" (vessel_id, vessel_name, master_id, is_applicable, is_deleted, created_at, updated_at)
+                 SELECT DISTINCT d.vessel_id, COALESCE(d.vessel_name, 'Unknown'), d.master_id, true, false, NOW(), NOW()
+                 FROM "${pair.dataTable}" d
+                 WHERE d.is_deleted = false
+                   AND d.vessel_id = $1
+                   AND d.vessel_id IS NOT NULL
+                   AND d.master_id IS NOT NULL
+                   AND NOT EXISTS (
+                     SELECT 1 FROM "${pair.appTable}" a
+                     WHERE a.vessel_id = d.vessel_id AND a.master_id = d.master_id AND a.is_deleted = false
+                   )
+                 ON CONFLICT (vessel_id, master_id) WHERE is_deleted = false DO NOTHING`,
+                [vesselId]
+              );
+              const created = ensureResult.rowCount ?? 0;
+              if (created > 0) {
+                syncDiag(`ENSURE-APPLICABILITY: created ${created} ${pair.appTable} row(s) for vessel=${vesselId}`);
+              }
+            } catch (appErr: any) {
+              // Non-fatal — data is still synced, applicability can be created via migration/next cycle
+              syncDiag(`ENSURE-APPLICABILITY ERROR: ${pair.appTable} vessel=${vesselId}: ${appErr.message}`);
+            }
           }
         }
 
