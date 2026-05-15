@@ -1,0 +1,35 @@
+import type { BeanCollection } from 'ag-grid-community';
+import { Component } from 'ag-grid-community';
+import type { FormatPanelOptions } from '../formatPanel';
+export declare class SeriesPanel extends Component {
+    private readonly options;
+    private readonly seriesGroup;
+    private chartTranslation;
+    wireBeans(beans: BeanCollection): void;
+    private chartMenuUtils;
+    private readonly activePanels;
+    private seriesType;
+    private readonly widgetFuncs;
+    private readonly seriesWidgetMappings;
+    constructor(options: FormatPanelOptions);
+    postConstruct(): void;
+    private refreshWidgets;
+    private initSeriesSelect;
+    private initLineColor;
+    private initStrokeWidth;
+    private initLineDash;
+    private initOpacity;
+    private initDropOff;
+    private initLabels;
+    private initSectorLabels;
+    private initStageLabels;
+    private initBins;
+    private initShape;
+    private initSize;
+    private getSeriesSelectOptions;
+    private updateSeriesType;
+    private getActiveSeriesTypes;
+    private translate;
+    private destroyActivePanels;
+    destroy(): void;
+}

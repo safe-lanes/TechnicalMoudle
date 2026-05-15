@@ -1,0 +1,125 @@
+import type { AgPromise, ComponentSelector, ElementParams, FilterDisplayParams, IAfterGuiAttachedParams, ISetFilter, SetFilterHandler as ISetFilterHandler, ISetFilterParams, SetFilterModel, SetFilterModelValue, SetFilterParams, SetFilterUi } from 'ag-grid-community';
+import { ProvidedFilter } from 'ag-grid-community';
+import type { SetFilterHandler } from './setFilterHandler';
+/** @param V type of value in the Set Filter */
+export declare class SetFilter<V = string> extends ProvidedFilter<SetFilterModel, V, ISetFilterParams<any, V> & FilterDisplayParams<any, any, SetFilterModel>> implements ISetFilter<V>, SetFilterUi<V> {
+    readonly filterType: "set";
+    private readonly eMiniFilter;
+    private readonly eFilterLoading;
+    private readonly eFilterLoadingIcon;
+    private readonly eSetFilterList;
+    private readonly eFilterNoMatches;
+    private virtualList;
+    private hardRefreshVirtualList;
+    handler: SetFilterHandler<V>;
+    private handlerDestroyFuncs?;
+    private formatter;
+    private displayValueModel;
+    private miniFilterText;
+    /** When true, in excelMode = 'windows', it adds previously selected filter items to newly checked filter selection */
+    private addCurrentSelectionToFilter;
+    /** Keys that have been selected for this filter. */
+    private selectedKeys;
+    constructor();
+    protected setParams(params: ISetFilterParams<any, V> & FilterDisplayParams<any, any, SetFilterModel>): void;
+    refresh(legacyNewParams: SetFilterParams<any, V>): boolean;
+    protected updateParams(newParams: ISetFilterParams<any, V> & FilterDisplayParams<any, any, SetFilterModel>, oldParams: ISetFilterParams<any, V> & FilterDisplayParams<any, any, SetFilterModel>): void;
+    private updateHandler;
+    protected updateUiVisibility(): void;
+    protected createBodyTemplate(): ElementParams | null;
+    protected getAgComponents(): ComponentSelector[];
+    protected handleKeyDown(e: KeyboardEvent): void;
+    private handleKeyEnter;
+    private setModelAndRefresh;
+    protected setModelIntoUi(model: SetFilterModel | null): AgPromise<void>;
+    getModelFromUi(): SetFilterModel | null;
+    protected areNonNullModelsEqual(a: SetFilterModel, b: SetFilterModel): boolean;
+    private setIsLoading;
+    private initialiseFilterBodyUi;
+    private initLoading;
+    private initVirtualList;
+    private createVirtualListModel;
+    private getSelectAllLabel;
+    private getAddSelectionToFilterLabel;
+    private createSetListItem;
+    private newSetTreeItemAttributes;
+    private newSetListItemAttributes;
+    private updateSetListItem;
+    private isSelectedExpanded;
+    private isSetFilterModelTreeItem;
+    private initMiniFilter;
+    private updateMiniFilter;
+    afterGuiAttached(params?: IAfterGuiAttachedParams): void;
+    afterGuiDetached(): void;
+    protected canApply(model: SetFilterModel | null): boolean;
+    /**
+     * @deprecated v34 Internal method - should only be called by the grid.
+     */
+    onNewRowsLoaded(): void;
+    /**
+     * @deprecated v34 Use the same method on the filter handler (`api.getColumnFilterHandler()`) instead.
+     */
+    setFilterValues(values: (V | null)[]): void;
+    /**
+     * @deprecated v34 Use the same method on the filter handler (`api.getColumnFilterHandler()`) instead.
+     */
+    resetFilterValues(): void;
+    /**
+     * @deprecated v34 Use the same method on the filter handler (`api.getColumnFilterHandler()`) instead.
+     */
+    refreshFilterValues(): void;
+    private doRefreshFilterValues;
+    /**
+     * @deprecated v34 Internal method - should only be called by the grid.
+     */
+    onAnyFilterChanged(): void;
+    private onMiniFilterInput;
+    private updateUiAfterMiniFilterChange;
+    private showOrHideResults;
+    private resetMiniFilter;
+    private onMiniFilterKeyDown;
+    private focusRowIfAlive;
+    private onSelectAll;
+    private onGroupItemSelected;
+    private onItemSelected;
+    private onExpandAll;
+    private onExpandedChanged;
+    private refreshAfterExpansion;
+    private refreshAfterSelection;
+    setMiniFilter(newMiniFilter: string | null, silent?: boolean): void;
+    /** Sets mini filter value. Returns true if it changed from last value, otherwise false. */
+    private doSetMiniFilter;
+    getMiniFilter(): string | null;
+    protected getUiChangeEventParams(): any;
+    protected getState(): any;
+    private checkAndRefreshVirtualList;
+    /**
+     * @deprecated v34 Use the same method on the filter handler (`api.getColumnFilterHandler()`) instead.
+     */
+    getFilterKeys(): SetFilterModelValue;
+    /**
+     * @deprecated v34 Use the same method on the filter handler (`api.getColumnFilterHandler()`) instead.
+     */
+    getFilterValues(): (V | null)[];
+    private refreshVirtualList;
+    private isSelectAllSelected;
+    private areAllChildrenSelected;
+    private resetExpansion;
+    getModelAsString(model: SetFilterModel | null): string;
+    protected getPositionableElement(): HTMLElement;
+    private updateDisplayedValues;
+    private hasSelections;
+    private isInWindowsExcelMode;
+    private isAddCurrentSelectionToFilterChecked;
+    private showAddCurrentSelectionToFilter;
+    private selectAllMatchingMiniFilter;
+    private deselectAllMatchingMiniFilter;
+    private setKeySelected;
+    private isEverythingVisibleSelected;
+    private isNothingVisibleSelected;
+    private getSelectedModel;
+    private setSelectedModel;
+    private resetSelectionState;
+    getFilterHandler(): ISetFilterHandler<V>;
+    destroy(): void;
+}

@@ -1,0 +1,50 @@
+import type { ElementID } from 'ag-charts-core';
+import type { CollapseMode } from './collapseMode';
+export type CollapseWidgetEvent = {
+    type: 'collapse-widget';
+    mode: CollapseMode;
+    sourceEvent?: never;
+};
+export type ExpandWidgetEvent = {
+    type: 'expand-widget';
+    sourceEvent?: never;
+};
+export type ExpandControlledWidgetEvent = {
+    type: 'expand-controlled-widget';
+    controlled: ExpandableWidget;
+    sourceEvent?: never;
+};
+export type ExpandOpts = {
+    readonly sourceEvent: Event;
+    readonly controller?: never;
+    readonly overrideFocusVisible?: boolean;
+} | {
+    readonly sourceEvent?: never;
+    readonly controller: ExpansionControllerWidget<HTMLElement>;
+    readonly overrideFocusVisible?: boolean;
+};
+export type ExpandControlledOpts = {
+    readonly overrideFocusVisible?: boolean;
+};
+export type CollapseOpts = {
+    readonly mode: CollapseMode;
+};
+interface WidgetProps<TElement extends HTMLElement> {
+    destroy(): void;
+    getElement(): TElement;
+    addListener(type: 'collapse-widget', listener: (ev: CollapseWidgetEvent, current: this) => unknown): () => void;
+    addListener(type: 'expand-widget', listener: (ev: ExpandWidgetEvent, current: this) => unknown): () => void;
+    removeListener(type: 'collapse-widget', listener: (ev: CollapseWidgetEvent, current: this) => unknown): void;
+    removeListener(type: 'expand-widget', listener: (ev: ExpandWidgetEvent, current: this) => unknown): void;
+}
+export interface ExpandableWidget<TElement extends HTMLElement = HTMLElement> extends WidgetProps<TElement> {
+    id?: ElementID;
+    expand(opts: ExpandOpts): void;
+    collapse(opts?: CollapseOpts): void;
+}
+export interface ExpansionControllerWidget<TElement extends HTMLElement = HTMLElement> {
+    setControlled(controls: ExpandableWidget<TElement> | undefined): void;
+    getControlled(): ExpandableWidget<TElement> | undefined;
+    expandControlled(opts?: ExpandControlledOpts): void;
+}
+export {};

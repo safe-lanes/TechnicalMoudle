@@ -1,0 +1,13 @@
+import type { AgComponentSelectorType, AgInputTextFieldParams, BeanCollection } from 'ag-grid-community';
+import type { AgSliderParams } from '../../../../widgets/agSlider';
+import { TitlePanel } from './titlePanel';
+export declare class ChartTitlePanel extends TitlePanel {
+    private chartMenuSvc;
+    wireBeans(beans: BeanCollection): void;
+    private titlePlaceholder;
+    postConstruct(): void;
+    protected getTextInputParams(): AgInputTextFieldParams<AgComponentSelectorType>;
+    protected getSpacingSliderParams(): AgSliderParams;
+    protected onEnableChange(enabled: boolean): void;
+    private shouldOverrideTextWithPlaceholder;
+}

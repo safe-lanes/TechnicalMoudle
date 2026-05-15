@@ -1,0 +1,19 @@
+import type { InternalAgColorType, RequireOptional } from 'ag-charts-core';
+import type { AgMarkerShape, AgSeriesMarkerStyle, AgSeriesMarkerStylerParams, Styler } from 'ag-charts-types';
+import { ChangeDetectableProperties } from '../../scene/util/changeDetectableProperties';
+export declare class SeriesMarker<TParams = never> extends ChangeDetectableProperties {
+    enabled: boolean;
+    /** One of the predefined marker names, or a marker shape function (for user-defined markers). */
+    shape: AgMarkerShape;
+    size: number;
+    fill?: InternalAgColorType;
+    fillOpacity: number;
+    stroke?: string;
+    strokeWidth: number;
+    strokeOpacity: number;
+    lineDash: number[];
+    lineDashOffset: number;
+    itemStyler?: Styler<AgSeriesMarkerStylerParams<unknown, unknown> & RequireOptional<Omit<TParams, 'context'>>, AgSeriesMarkerStyle>;
+    getStyle(): AgSeriesMarkerStyle;
+    getDiameter(): number;
+}

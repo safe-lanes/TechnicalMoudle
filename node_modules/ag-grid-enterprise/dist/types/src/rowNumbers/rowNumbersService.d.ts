@@ -1,0 +1,34 @@
+import { AgColumn, BeanStub } from 'ag-grid-community';
+import type { BeanCollection, CellCtrl, CellPosition, IRowNumbersRowResizeFeature, IRowNumbersService, NamedBean, PropertyValueChangedEvent, _ColumnCollections, _HeaderComp } from 'ag-grid-community';
+export declare class RowNumbersService extends BeanStub implements NamedBean, IRowNumbersService {
+    beanName: "rowNumbersSvc";
+    columns: _ColumnCollections | null;
+    private isIntegratedWithSelection;
+    private isSuppressCellSelectionIntegration;
+    private rowNumberOverrides;
+    private lastColumnResized;
+    postConstruct(): void;
+    addColumns(cols: _ColumnCollections): void;
+    createColumns(cols: _ColumnCollections, updateOrders: (callback: (cols: AgColumn[] | null) => AgColumn[] | null) => void): void;
+    handleMouseDownOnCell(cellPosition: CellPosition, mouseEvent: MouseEvent): boolean;
+    updateColumns(event: PropertyValueChangedEvent<any>): void;
+    getColumn(): AgColumn | null;
+    getColumns(): AgColumn[] | null;
+    setupForHeader(comp: _HeaderComp): void;
+    createRowNumbersRowResizerFeature(beans: BeanCollection, ctrl: CellCtrl): IRowNumbersRowResizeFeature | undefined;
+    private refreshSelectionIntegration;
+    private refreshRowNumberOverrides;
+    private onHeaderFocus;
+    private onHeaderKeyDown;
+    private onHeaderClick;
+    private handleFocusAllCellsFromHeader;
+    private refreshCells;
+    private createDummyElement;
+    private createRowNumbersColDef;
+    private valueGetter;
+    private getHeaderClass;
+    private getCellClass;
+    private generateRowNumberCols;
+    private focusFirstRenderedCellAtRowPosition;
+    destroy(): void;
+}

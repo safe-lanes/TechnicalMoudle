@@ -1,0 +1,37 @@
+import type { AgColumn } from 'ag-grid-community';
+import { Component } from 'ag-grid-community';
+type ToolPanelFilterCompEvent = 'filterChanged';
+export declare class ToolPanelFilterComp extends Component<ToolPanelFilterCompEvent> {
+    private readonly hideHeader;
+    private readonly expandedCallback;
+    private readonly eFilterToolPanelHeader;
+    private readonly eFilterName;
+    private readonly agFilterToolPanelBody;
+    private readonly eFilterIcon;
+    private readonly eExpand;
+    private eExpandChecked;
+    private eExpandUnchecked;
+    private column;
+    private expanded;
+    private underlyingFilter;
+    private filterComp?;
+    constructor(hideHeader: boolean, expandedCallback: () => void);
+    postConstruct(): void;
+    setColumn(column: AgColumn): void;
+    private onKeyDown;
+    getColumn(): AgColumn;
+    getColumnFilterName(): string | null;
+    addCssClassToTitleBar(cssClass: string): void;
+    private addInIcon;
+    isFilterActive(): boolean;
+    private onFilterChanged;
+    toggleExpanded(): void;
+    expand(): void;
+    private addFilterElement;
+    collapse(): void;
+    private removeFilterElement;
+    isExpanded(): boolean;
+    onPanelHidden(): void;
+    private onFilterOpened;
+}
+export {};
