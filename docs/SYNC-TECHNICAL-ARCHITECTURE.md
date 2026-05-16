@@ -1,7 +1,7 @@
 # Ship-Shore Sync — Technical Architecture
 
-> **Version:** 1.7  
-> **Last Updated:** 2026-05-15  
+> **Version:** 1.8  
+> **Last Updated:** 2026-05-16  
 > **Domain Sign-Off:** Jeevan Naik, Rahul Singh Sisodiya, Sahil Puri (24-Apr-2026)  
 > **Source of Truth:** `shared/syncConfig.ts`
 
@@ -882,13 +882,65 @@ Four health checks, each returning `ok`, `warning`, or `critical`:
 
 **Scheduler:** Initial check deferred 60 seconds after boot, then every 6 hours.
 
+### Auto-Sync Scheduler (v1.8, GAP 1 + GAP 4)
+
+**File:** `server/modules/sync/autoSyncScheduler.ts`
+
+Autonomous ship-shore sync on a configurable timer. Designed for VSAT-resilient operation — ships run sync cycles automatically without crew intervention.
+
+**Features:**
+
+| Feature | Description |
+|---------|-------------|
+| Timer-driven sync | Calls `SyncEngine.runSync(vesselId)` every N minutes (default 360 = 6h). Reads `auto_sync_enabled` + `sync_interval_minutes` from `sync_settings` on every tick. |
+| Re-entrancy guard | Per-vessel `Map<string, boolean>` lock. If a sync cycle is already in progress for a vessel, the tick is skipped and logged as `skipped_reentrant`. |
+| Extended-outage catch-up | After each successful cycle, checks `getUnsyncedFieldLogCount()`. If remaining > 0, immediately runs another cycle. Capped by `catch_up_max_cycles` setting (default 20, = 20,000 records max). |
+| Connectivity logging | Every attempt (success, failure, skip) is inserted into `sync_connectivity_log` table with error category, latency, batch UUID, record counts, and trigger type. |
+
+**Scheduler lifecycle:** Boot delay 3 minutes → initial tick → setInterval at 6h. Registered in `routes.ts`, cleaned up in SIGTERM/SIGINT handlers.
+
+**Error classification:** Network errors are categorized by inspecting `error.message` strings:
+
+| Error Pattern | Category |
+|---------------|----------|
+| ECONNREFUSED, ENOTFOUND, ENETUNREACH | `network_unreachable` |
+| timeout, abort, ETIMEDOUT | `timeout` |
+| HTTP 5xx | `server_error` |
+| HTTP 4xx | `client_error` |
+| Other | `unknown_error` |
+
+### Connectivity Log Table (v1.8, migration 115)
+
+**Table:** `sync_connectivity_log`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | SERIAL PK | Auto-increment |
+| `log_uuid` | TEXT | Unique identifier |
+| `instance_id` | TEXT | Ship instance ID |
+| `vessel_id` | TEXT | Vessel UUID |
+| `attempted_at` | TIMESTAMPTZ | When sync was attempted |
+| `outcome` | TEXT | success, network_unreachable, timeout, server_error, client_error, unknown_error, skipped_reentrant, skipped_disabled |
+| `error_message` | TEXT | Error text (truncated to 500 chars) |
+| `error_category` | TEXT | Classified error category |
+| `latency_ms` | INTEGER | Round-trip time |
+| `batch_uuid` | TEXT | Linked sync_batches entry |
+| `records_pushed` | INTEGER | Count pushed this cycle |
+| `records_pulled` | INTEGER | Count pulled this cycle |
+| `catch_up_cycle` | INTEGER | 0 = primary, 1..N = catch-up |
+| `trigger_type` | TEXT | auto, manual, catch_up |
+
+**Indexes:** `(vessel_id, attempted_at DESC)` for time-range queries, `(outcome, attempted_at DESC)` for filtering.
+
+**Repository functions:** `insertConnectivityLog()`, `getConnectivityLogs(vesselId, limit, sinceHoursAgo)`, `getUnsyncedFieldLogCount()`.
+
 ---
 
 ## 10. Sync Settings
 
 ### Database Table: `sync_settings`
 
-10 default settings seeded by migration `103_sync_settings_seed.sql`:
+11 default settings seeded by migrations `103_sync_settings_seed.sql` and `115_sync_connectivity_log.sql`:
 
 | Key | Default | Type | Description |
 |-----|---------|------|-------------|
@@ -902,6 +954,7 @@ Four health checks, each returning `ok`, `warning`, or `critical`:
 | `request_timeout_seconds` | `30` | `number` | HTTP request timeout |
 | `field_log_retention_days` | `90` | `number` | Pruning: field log retention |
 | `batch_retention_days` | `365` | `number` | Pruning: batch retention |
+| `catch_up_max_cycles` | `20` | `number` | Max consecutive catch-up sync cycles (v1.8) |
 
 ### Settings Loading
 
@@ -1399,6 +1452,14 @@ All fixes applied after the initial sync system merge to `replit_dev` (2026-04-2
 | 57 | `f0976b55` | Create placeholder data rows when ship admin adds surveys/certs | `surveyAdminService.ts` and `certAdminService.ts` now create placeholder `vessel_survey_data`/`vessel_certificate_data` rows with field logging when admin saves. This gives the sync engine BOTH_EDITABLE records to push (master + applicability are ONE_WAY and can't be pushed). |
 | 58 | `1bb02a2b` | Ship sends real master record names to shore via `masterRecordHints` | Ship's `syncEngine.ts` gathers full master data (name, label, category, requirement_ref, company_group, etc.) from `ship_surveys_master`/`ship_certificates_master` for pushed `masterId` values. Sent as `masterRecordHints` in push payload. Shore's `receivePushData` UPDATEs placeholder masters with real data. `controller.ts` passes hints through. Fixes placeholder names showing `master_id` instead of actual survey/certificate names. |
 | — | `283755886` (Replit) | Drop orphan `planner_dates` rows from provisioning bundle (Task #142) | `exportAndAdd` special-cases `planner_dates` with `INNER JOIN components` to exclude rows whose component is soft-deleted/missing/vessel-mismatched. Orphans logged with reason + count appended to manifest. **Pending:** `jobs` FK not yet covered. |
+
+### Round 21 — Auto-Sync Scheduler + VSAT Resilience (2026-05-16)
+
+| # | Commit | Fix | Impact |
+|---|--------|-----|--------|
+| GAP 1 | *(pending commit)* | SyncAutoScheduler — autonomous ship-shore sync | New `autoSyncScheduler.ts` class following `SyncPruningScheduler` pattern. 6-hour default cadence, reads `auto_sync_enabled` + `sync_interval_minutes` from `sync_settings` on every tick. Per-vessel re-entrancy guard via `Map<string, boolean>`. Registered in `routes.ts`, cleanup in SIGTERM/SIGINT handlers. |
+| GAP 4 | *(pending commit)* | Extended-outage catch-up | After each successful sync cycle, checks `getUnsyncedFieldLogCount()`. If unsynced records remain, immediately runs another cycle. Capped by `catch_up_max_cycles` setting (default 20 = 20,000 records). Stops on first failure. Each catch-up cycle logged as `trigger_type='catch_up'`. |
+| NEW | *(pending commit)* | Connectivity logging to dedicated `sync_connectivity_log` table | Migration 115 creates table + indexes. Every auto-sync attempt (success, failure, skip) logged with outcome, error category, latency, batch UUID, record counts. Repository: `insertConnectivityLog()`, `getConnectivityLogs()`, `getUnsyncedFieldLogCount()`. New setting: `catch_up_max_cycles`. |
 
 ### Investigated & Confirmed No-Op
 

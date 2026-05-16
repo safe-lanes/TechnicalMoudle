@@ -518,3 +518,84 @@ export async function updateSettings(settings: Record<string, string>, userId?: 
     await updateSetting(key, value, userId);
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// sync_connectivity_log
+// ═══════════════════════════════════════════════════════════════
+
+export interface ConnectivityLogEntry {
+  instanceId: string;
+  vesselId: string | null;
+  outcome: 'success' | 'network_unreachable' | 'timeout' | 'server_error' | 'client_error' | 'unknown_error' | 'skipped_reentrant' | 'skipped_disabled';
+  errorMessage?: string | null;
+  errorCategory?: string | null;
+  latencyMs?: number | null;
+  batchUuid?: string | null;
+  recordsPushed?: number;
+  recordsPulled?: number;
+  catchUpCycle?: number;
+  triggerType?: 'auto' | 'manual' | 'catch_up';
+}
+
+export async function insertConnectivityLog(entry: ConnectivityLogEntry): Promise<void> {
+  const pool = await getPool();
+  await pool.query(
+    `INSERT INTO sync_connectivity_log
+       (instance_id, vessel_id, outcome, error_message, error_category, latency_ms,
+        batch_uuid, records_pushed, records_pulled, catch_up_cycle, trigger_type)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [
+      entry.instanceId,
+      entry.vesselId,
+      entry.outcome,
+      entry.errorMessage ?? null,
+      entry.errorCategory ?? null,
+      entry.latencyMs ?? null,
+      entry.batchUuid ?? null,
+      entry.recordsPushed ?? 0,
+      entry.recordsPulled ?? 0,
+      entry.catchUpCycle ?? 0,
+      entry.triggerType ?? 'auto',
+    ]
+  );
+}
+
+export async function getConnectivityLogs(
+  vesselId: string,
+  limit: number = 100,
+  sinceHoursAgo?: number,
+): Promise<any[]> {
+  const pool = await getPool();
+  let query = `SELECT * FROM sync_connectivity_log WHERE vessel_id = $1`;
+  const params: any[] = [vesselId];
+  if (sinceHoursAgo) {
+    query += ` AND attempted_at >= NOW() - interval '${sinceHoursAgo} hours'`;
+  }
+  query += ` ORDER BY attempted_at DESC LIMIT $${params.length + 1}`;
+  params.push(limit);
+  const result = await pool.query(query, params);
+  return result.rows;
+}
+
+/**
+ * Count unsynced field logs for a vessel — used by catch-up logic to decide
+ * whether another consecutive sync cycle is needed.
+ */
+export async function getUnsyncedFieldLogCount(
+  instanceId: string,
+  vesselId: string,
+  vesselCode?: string | null,
+): Promise<number> {
+  const pool = await getPool();
+  const vesselValues = [vesselId];
+  if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
+  const placeholders = vesselValues.map((_, i) => `$${i + 2}`).join(', ');
+  const result = await pool.query(
+    `SELECT count(*)::int AS c FROM sync_field_log
+     WHERE instance_id = $1
+       AND vessel_id IN (${placeholders})
+       AND is_synced = false`,
+    [instanceId, ...vesselValues]
+  );
+  return result.rows[0]?.c ?? 0;
+}

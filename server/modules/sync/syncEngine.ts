@@ -270,15 +270,17 @@ export class SyncEngine {
       };
     } catch (error: any) {
       const durationMs = Date.now() - startTime;
-      syncDiag(`=== SYNC END === vessel=${vesselId}, duration=${durationMs}ms, status=FAILED, error=${error.message}`);
-      console.error(`[SyncEngine] Sync failed for vessel ${vesselId}:`, error.message);
+      // Enrich error string with cause.code (Node fetch wraps real error in cause)
+      const errorDetail = error.message + (error.cause?.code ? ` [${error.cause.code}]` : '');
+      syncDiag(`=== SYNC END === vessel=${vesselId}, duration=${durationMs}ms, status=FAILED, error=${errorDetail}`);
+      console.error(`[SyncEngine] Sync failed for vessel ${vesselId}:`, errorDetail);
 
       // Mark batch as failed if it was created
       if (batchUuid) {
         try {
           await syncRepo.updateBatch(batchUuid, {
             status: 'failed',
-            errorMessage: error.message,
+            errorMessage: errorDetail,
             completedAt: new Date(),
             durationMs,
           });
@@ -296,7 +298,7 @@ export class SyncEngine {
         conflictsAutoResolved,
         filesQueued: 0,
         durationMs,
-        error: error.message,
+        error: errorDetail,
         newCheckpoint: null,
       };
     }

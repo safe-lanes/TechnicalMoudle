@@ -123,6 +123,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   syncHealthScheduler.start(6 * 60 * 60 * 1000); // Run every 6 hours
   console.log('[SyncHealth] Health monitor started - will check stale syncs, conflicts, stuck files, log overflow');
 
+  // Start Auto-Sync Scheduler - autonomous ship-shore sync (GAP 1 + GAP 4)
+  // Reads auto_sync_enabled + sync_interval_minutes from sync_settings on every tick.
+  // Default: 6-hour cadence. Includes re-entrancy guard and extended-outage catch-up.
+  const { syncAutoScheduler } = await import("./modules/sync/autoSyncScheduler");
+  syncAutoScheduler.start(6 * 60 * 60 * 1000); // 6-hour tick cadence (overridable via sync_interval_minutes setting)
+  console.log('[AutoSync] Scheduler started - autonomous sync with catch-up and connectivity logging');
+
   // Dev-only seed endpoint for recurring defects testing
   if (process.env.NODE_ENV === 'development') {
     // Seed recurring defects test data
@@ -533,12 +540,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     clearInterval(postponementCheckInterval);
     syncPruningScheduler.stop();
     syncHealthScheduler.stop();
+    syncAutoScheduler.stop();
   });
   process.on('SIGINT', () => {
     console.log('Cleaning up scheduled tasks...');
     clearInterval(postponementCheckInterval);
     syncPruningScheduler.stop();
     syncHealthScheduler.stop();
+    syncAutoScheduler.stop();
   });
 
   return httpServer;
