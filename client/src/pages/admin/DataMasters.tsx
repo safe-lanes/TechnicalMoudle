@@ -8,6 +8,8 @@ import { Search, Loader2, RefreshCw, Plus, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { useUIRole } from "@/contexts/UIRoleContext";
 import {
   useExternalNationalities,
   useExternalVessels,
@@ -202,6 +204,8 @@ export default function DataMasters() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<{ id?: number; name: string; sortOrder: number } | null>(null);
   const { toast } = useToast();
+  const { isHeadOfDept, isVessel } = useUIRole();
+  const isShipRole = isHeadOfDept || isVessel;
 
   // Equipment Categories - local editable master
   const equipmentCategoriesQuery = useQuery<{ id: number; name: string; sortOrder: number; isActive: boolean }[]>({
@@ -487,24 +491,37 @@ export default function DataMasters() {
       <div className="flex-shrink-0 space-y-6 mb-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900" data-testid="text-page-title">Data Masters</h1>
-          <Button
-            onClick={() => syncMastersMutation.mutate()}
-            disabled={syncMastersMutation.isPending}
-            className="bg-[#52baf3] hover:bg-[#3da8e0]"
-            data-testid="btn-sync-all"
-          >
-            {syncMastersMutation.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Syncing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Sync All
-              </>
-            )}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className={isShipRole ? "cursor-not-allowed" : undefined}>
+                  <Button
+                    onClick={() => syncMastersMutation.mutate()}
+                    disabled={syncMastersMutation.isPending || isShipRole}
+                    className="bg-[#52baf3] hover:bg-[#3da8e0]"
+                    data-testid="btn-sync-all"
+                  >
+                    {syncMastersMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Syncing...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Sync All
+                      </>
+                    )}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {isShipRole && (
+                <TooltipContent side="bottom">
+                  <p>Available on shore only</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
         <div className="relative max-w-sm">
