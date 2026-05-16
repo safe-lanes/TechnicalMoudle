@@ -11,6 +11,7 @@
 import { getPool } from '../../db';
 import { SYNC_CONFIG, getIdentityColumn } from '../../../shared/syncConfig';
 import { syncDiag } from './syncDiagLogger';
+import { isShipInstanceId } from './syncRole';
 
 // ── Types ──
 
@@ -127,11 +128,10 @@ export function getFieldDisplayName(fieldName: string): string {
 /** Location label from instance ID */
 export function getInstanceLabel(instanceId: string, vesselName?: string | null): string {
   if (!instanceId) return 'Unknown';
-  const upper = instanceId.toUpperCase();
-  if (upper.startsWith('SHIP')) {
+  if (isShipInstanceId(instanceId)) {
     return vesselName ? `Ship — ${vesselName}` : `Ship (${instanceId})`;
   }
-  if (upper.startsWith('SHORE')) {
+  if (instanceId.toUpperCase().startsWith('SHORE')) {
     return 'Shore — Office';
   }
   return instanceId;

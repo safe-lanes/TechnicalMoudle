@@ -13,6 +13,7 @@ import { FileSyncProcessor } from './fileSyncProcessor';
 import { runPruning } from './pruningService';
 import { runHealthCheck, getTableStats } from './healthMonitor';
 import { getPool } from '../../db';
+import { isShipInstanceId, isShipInstance } from './syncRole';
 import { getSyncLogPath, getSyncLogDir } from './syncDiagLogger';
 
 // ── POST /sync/initiate ──
@@ -186,6 +187,13 @@ export async function unresolvedConflictsHandler(req: Request, res: Response) {
 
 export async function triggerSyncHandler(req: Request, res: Response) {
   try {
+    // Ship-only guard: sync is always ship-initiated. Shore is the responder.
+    if (!(await isShipInstance())) {
+      return res.status(400).json({
+        error: 'Sync can only be triggered from a vessel (ship) instance. Shore is the responder in ship-initiated sync.',
+      });
+    }
+
     const { vesselId } = req.body;
     if (!vesselId) {
       return res.status(400).json({ error: 'vesselId is required' });
@@ -478,7 +486,7 @@ export async function instanceInfoHandler(req: Request, res: Response) {
     } catch {}
 
     const effectiveId = (dbInstanceId && dbInstanceId.trim()) || envInstanceId;
-    const isShip = effectiveId.startsWith('SHIP-');
+    const isShip = isShipInstanceId(effectiveId);
     const isShore = !isShip;
 
     res.json({

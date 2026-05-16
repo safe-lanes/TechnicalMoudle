@@ -233,21 +233,8 @@ export default function SyncFleetOverview() {
     },
   });
 
-  const syncTriggerMutation = useMutation({
-    mutationFn: async (vesselId: string) => {
-      const res = await apiRequest("POST", "/technical/api/sync/trigger", {
-        vesselId,
-      });
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Sync triggered" });
-      refetchFleet();
-    },
-    onError: (err: any) => {
-      toast({ title: "Sync failed", description: err.message, variant: "destructive" });
-    },
-  });
+  // Per-vessel sync trigger removed — sync is ship-initiated. A future 'Request Sync'
+  // feature (shore sets a flag, ship's scheduler honors it) is tracked separately.
 
   const vessels = fleetData?.vessels ?? [];
   const settings = settingsData?.settings ?? [];
@@ -492,18 +479,6 @@ export default function SyncFleetOverview() {
                           title="View Dashboard"
                         >
                           <Eye className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={() =>
-                            syncTriggerMutation.mutate(v.vessel_id)
-                          }
-                          disabled={syncTriggerMutation.isPending}
-                          title="Sync Now"
-                        >
-                          <RefreshCw className="h-3 w-3" />
                         </Button>
                         <Button
                           variant="ghost"

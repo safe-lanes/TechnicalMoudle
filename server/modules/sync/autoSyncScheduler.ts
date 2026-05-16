@@ -18,6 +18,7 @@
 import * as syncRepo from './repository';
 import { getSyncEngine, type SyncResult } from './syncEngine';
 import { syncDiag } from './syncDiagLogger';
+import { isShipInstance } from './syncRole';
 import { getPool } from '../../db';
 
 // ── Defaults ──
@@ -129,6 +130,13 @@ export class SyncAutoScheduler {
 
   private async tick(): Promise<void> {
     try {
+      // Defense-in-depth: auto-sync is ship-only. If the scheduler was somehow
+      // started on shore (e.g. via tests or future code changes), bail out.
+      if (!(await isShipInstance())) {
+        syncDiag('[AutoSync] Shore instance detected in tick() — skipping (sync is ship-initiated)');
+        return;
+      }
+
       // 1. Read settings on every tick (hot-reloadable)
       const settings = await syncRepo.getAllSettings();
 

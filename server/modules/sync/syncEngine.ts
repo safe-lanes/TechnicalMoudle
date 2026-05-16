@@ -31,6 +31,7 @@ import {
 } from '../../../shared/syncConfig';
 import { getPool } from '../../db';
 import { syncDiag } from './syncDiagLogger';
+import { isShipInstanceId } from './syncRole';
 
 // ── Configuration ──
 
@@ -214,7 +215,7 @@ export class SyncEngine {
       // would be re-pushed on the next sync cycle, overwriting newer shore values.
       // IMPORTANT: Only SHIP instances mark their own logs as synced here. Shore's
       // field logs are marked synced later by completeSyncSession when the ship pulls them.
-      const isShip = this.instanceId.toUpperCase().startsWith('SHIP');
+      const isShip = isShipInstanceId(this.instanceId);
       if (pushedLogUuids.length > 0 && isShip) {
         try {
           await syncRepo.markFieldLogsSynced(pushedLogUuids, batchUuid!);
@@ -317,7 +318,7 @@ export class SyncEngine {
 
     // A. Gather SHIP_ONLY rows changed since checkpoint (only from ship instances)
     const shipOnlyRows: Array<{ tableName: string; rows: any[] }> = [];
-    if (this.instanceId.toUpperCase().startsWith('SHIP')) {
+    if (isShipInstanceId(this.instanceId)) {
       const shipOnlyTables = getTablesByCategory('SHIP_ONLY');
       for (const tableConfig of shipOnlyTables) {
         try {
@@ -338,13 +339,13 @@ export class SyncEngine {
     //    sync_field_log (is_synced=false) until the ship pulls them via preparePullData.
     //    If shore pushes to itself in LOCAL mode, the logs get marked is_synced=true
     //    and the ship can never pull them — breaking shore→ship bidirectional sync.
-    const isShipInstance = this.instanceId.toUpperCase().startsWith('SHIP');
+    const isShip = isShipInstanceId(this.instanceId);
     const vesselCode = await this.getVesselCode(vesselId);
     syncDiag(`PUSH START: gathering field logs for vessel=${vesselId}, vesselCode=${vesselCode}`);
-    const fieldLogs = isShipInstance
+    const fieldLogs = isShip
       ? await syncRepo.getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode)
       : [];
-    syncDiag(`PUSH: found ${fieldLogs.length} unsynced field logs${!isShipInstance ? ' (shore skips field log push)' : ''}`);
+    syncDiag(`PUSH: found ${fieldLogs.length} unsynced field logs${!isShip ? ' (shore skips field log push)' : ''}`);
     // Table breakdown
     const pushTables: Record<string, number> = {};
     fieldLogs.forEach((l: any) => { pushTables[l.tableName ?? l.table_name] = (pushTables[l.tableName ?? l.table_name] || 0) + 1; });
@@ -382,7 +383,7 @@ export class SyncEngine {
     // Include the real master record data as hints so shore's ENSURE-MASTER
     // placeholders get the actual names, requirement_ref, company_group, etc.
     const masterRecordHints: Array<{ tableName: string; rows: any[] }> = [];
-    if (isShipInstance && fieldLogPayloads.length > 0) {
+    if (isShip && fieldLogPayloads.length > 0) {
       const surveyMasterIds = new Set<string>();
       const certMasterIds = new Set<string>();
       for (const log of fieldLogPayloads) {
@@ -623,7 +624,7 @@ export class SyncEngine {
 
     // Business rule enforcement
     if (config.businessRules && log.tableName === 'defects' && log.fieldName === 'status') {
-      if (log.newValue === 'verified' && !this.instanceId.toUpperCase().startsWith('SHIP')) {
+      if (log.newValue === 'verified' && !isShipInstanceId(this.instanceId)) {
         // Shore receiving ship's verification — reject
         console.warn(`[SyncEngine] Business rule: ship cannot verify defects. Skipping.`);
         return;

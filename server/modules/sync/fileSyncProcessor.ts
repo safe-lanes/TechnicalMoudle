@@ -31,6 +31,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import * as syncRepo from './repository';
 import { syncDiag } from './syncDiagLogger';
+import { isShipInstanceId } from './syncRole';
 
 const CHUNK_SIZE_BYTES = 256 * 1024; // 256KB per chunk
 const MAX_FILE_RETRIES = 3;
@@ -99,7 +100,7 @@ export class FileSyncProcessor {
     let bytesTransferred = 0;
 
     // Determine direction based on instance identity
-    const direction = this.instanceId.toUpperCase().startsWith('SHIP')
+    const direction = isShipInstanceId(this.instanceId)
       ? 'ship_to_shore'
       : 'shore_to_ship';
     const pendingFiles = await syncRepo.getPendingFiles(vesselId, direction, 50);
@@ -235,7 +236,7 @@ export class FileSyncProcessor {
       const existing = await syncRepo.getFileQueueEntry(chunk.queueUuid);
       if (!existing && chunk.fileKey && chunk.tableName) {
         // Create a receiving-side queue entry with the same queueUuid
-        const reverseDirection = this.instanceId.toUpperCase().startsWith('SHIP')
+        const reverseDirection = isShipInstanceId(this.instanceId)
           ? 'shore_to_ship'
           : 'ship_to_shore';
         await syncRepo.queueFileWithUuid({
@@ -450,7 +451,7 @@ export class FileSyncProcessor {
   ): Promise<void> {
     try {
       const instanceId = process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
-      const direction = instanceId.toUpperCase().startsWith('SHIP')
+      const direction = isShipInstanceId(instanceId)
         ? 'ship_to_shore'
         : 'shore_to_ship';
 

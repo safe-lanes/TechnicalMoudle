@@ -49,6 +49,7 @@ import {
   Activity,
   GitPullRequest,
 } from "lucide-react";
+import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 
 // ── Types ──
 
@@ -168,6 +169,7 @@ function statusBadge(status: string) {
 
 export default function SyncDashboard() {
   const { toast } = useToast();
+  const { isShip } = useSyncInstanceInfo();
   const vesselCtx = useContext(VesselContext);
   const vessels = vesselCtx?.vessels ?? [];
   const [, setLocation] = useLocation();
@@ -438,8 +440,8 @@ export default function SyncDashboard() {
         </Card>
       </div>
 
-      {/* ── Section B: Sync Now ── */}
-      {selectedVesselId && (
+      {/* ── Section B: Sync Now (ship-only — sync is ship-initiated) ── */}
+      {isShip && selectedVesselId && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
