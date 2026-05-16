@@ -257,13 +257,6 @@ export const TechnicalModule = () => {
             <PMSAdmin />
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (
             <ReportsModule />
-          ) : selectedSubModule === "defects" && !isSailAdmin ? (
-            <div className="flex items-center justify-center h-full min-h-[400px]" data-testid="defects-coming-soon">
-              <div className="text-center">
-                <h2 className="text-2xl font-semibold text-gray-600 mb-2" data-testid="text-coming-soon-title">Feature coming soon</h2>
-                <p className="text-gray-500" data-testid="text-coming-soon-description">The Defects module is currently under development.</p>
-              </div>
-            </div>
           ) : selectedSubModule === "defects" && (selectedMenuItem === "new" || selectedMenuItem === "edit") ? (
             <DefectFormWizard />
           ) : selectedSubModule === "defects" && selectedMenuItem === "dashboard" ? (
