@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import { useUIRole } from "@/contexts/UIRoleContext";
 import {
   useExternalNationalities,
+  useLocalVessels,
   useExternalVessels,
   useExternalVesselTypes,
   useExternalLicenses,
@@ -53,7 +54,7 @@ const masterTypes: MasterType[] = [
   {
     id: "vessel",
     name: "Vessel Master",
-    idFields: ["vuid", "vesselId"],
+    idFields: ["vuid", "vuuid", "vesselId", "id"],
     columns: [
       { header: "Vessel", fields: ["vessel", "vesselName", "name"] },
       { header: "IMO Number", fields: ["imo_number", "imoNumber", "imo_no", "imo"] },
@@ -399,7 +400,22 @@ export default function DataMasters() {
   });
 
   const nationalitiesQuery = useExternalNationalities({ enabled: selectedMaster === "nationality" });
-  const vesselsQuery = useExternalVessels({ enabled: selectedMaster === "vessel" });
+  // Vessel Master tab: local-primary, external fallback (mirrors useVessels()
+  // inversion from Task #147). External Master Data is only hit when the
+  // local vessels table is empty.
+  const localVesselsQuery = useLocalVessels({ enabled: selectedMaster === "vessel" });
+  const localVesselsResolved = !localVesselsQuery.isLoading;
+  const localVesselsHasData = (localVesselsQuery.data?.length ?? 0) > 0;
+  const externalVesselsEnabled =
+    selectedMaster === "vessel" && localVesselsResolved && !localVesselsHasData;
+  const externalVesselsQuery = useExternalVessels({ enabled: externalVesselsEnabled });
+  const vesselsQuery = {
+    data: localVesselsHasData ? localVesselsQuery.data : externalVesselsQuery.data,
+    isLoading:
+      localVesselsQuery.isLoading ||
+      (externalVesselsEnabled && externalVesselsQuery.isLoading),
+    error: localVesselsHasData ? localVesselsQuery.error : externalVesselsQuery.error,
+  };
   const vesselTypesQuery = useExternalVesselTypes({ enabled: selectedMaster === "vesselType" });
   const licensesQuery = useExternalLicenses({ enabled: selectedMaster === "licenseDce" });
   const additionalGroupsQuery = useExternalAdditionalGroups({ enabled: selectedMaster === "additionalGroup" });

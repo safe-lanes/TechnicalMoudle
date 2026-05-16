@@ -33,7 +33,7 @@ export async function getVesselsByFleet(fleetId: string): Promise<Vessel[]> {
 
 // ── Vessel methods ──
 
-export async function getVessels(): Promise<Array<{ id: string; vuuid: string; name: string; code: string }>> {
+export async function getVessels(): Promise<Array<{ id: string; vuuid: string; name: string; code: string; imoNumber: string | null; vesselType: string | null }>> {
   return storage.getVessels();
 }
 
