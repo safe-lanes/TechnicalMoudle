@@ -25,50 +25,61 @@ function mapEntriesToVessels(entries: any[]): Vessel[] {
 }
 
 export function useVessels() {
-  const {
-    data: externalVesselEntries = [],
-    isLoading: isLoadingExternal,
-    error: externalError,
-    isSuccess: externalIsSuccess,
-  } = useExternalVessels();
-
-  const externalVessels = useMemo(
-    () => mapEntriesToVessels(externalVesselEntries),
-    [externalVesselEntries]
-  );
-
-  const externalResolved = !isLoadingExternal;
-  const useExternal = externalIsSuccess && externalVessels.length > 0;
-  const externalFailed = externalResolved && !useExternal;
-
+  // Local is the primary source — always fetched.
   const {
     data: localVesselEntries = [],
     isLoading: isLoadingLocal,
     error: localError,
-  } = useLocalVessels({
-    enabled: true,
-  });
+  } = useLocalVessels({ enabled: true });
 
   const localVessels = useMemo(
     () => mapEntriesToVessels(localVesselEntries),
     [localVesselEntries]
   );
 
-  const isLoading = isLoadingExternal || (externalFailed && isLoadingLocal);
-  const error = useExternal ? externalError : localError;
+  const localResolved = !isLoadingLocal;
+  // Data-driven check: any usable rows means we keep using local even if a
+  // background refetch later errors out (cached data must not trigger the
+  // external fallback).
+  const localHasData = localVessels.length > 0;
+  // Fall back to external only when local has resolved with zero usable
+  // vessels (empty success or error). On a healthy install this never fires,
+  // so dropdowns avoid the external Master Data round-trip entirely.
+  const shouldUseExternal = localResolved && !localHasData;
+
+  const {
+    data: externalVesselEntries = [],
+    isLoading: isLoadingExternal,
+    error: externalError,
+  } = useExternalVessels({ enabled: shouldUseExternal });
+
+  const externalVessels = useMemo(
+    () => mapEntriesToVessels(externalVesselEntries),
+    [externalVesselEntries]
+  );
+
+  const isLoading = isLoadingLocal || (shouldUseExternal && isLoadingExternal);
+  const error = localHasData ? localError : (shouldUseExternal ? externalError : localError);
 
   const vessels: Vessel[] = useMemo(() => {
-    if (!useExternal) return localVessels;
-    // Merge: external is authoritative; include any local-only vessels so
-    // work orders / records referencing vessels not yet synced to the
-    // external master list still resolve to a name.
-    const externalIds = new Set(externalVessels.map(v => v.id));
-    const localOnly = localVessels.filter(v => !externalIds.has(v.id));
-    if (localOnly.length === 0) return externalVessels;
-    return [...externalVessels, ...localOnly].sort((a, b) =>
+    if (!localHasData) {
+      // Local empty/errored → external is the only source.
+      return externalVessels;
+    }
+    if (externalVessels.length === 0) {
+      // External not fetched (or returned empty) → local-only.
+      return localVessels;
+    }
+    // Both available: local is authoritative; merge in any external-only
+    // vessels so historical references not yet mirrored locally still
+    // resolve to a name in dropdowns.
+    const localIds = new Set(localVessels.map(v => v.id));
+    const externalOnly = externalVessels.filter(v => !localIds.has(v.id));
+    if (externalOnly.length === 0) return localVessels;
+    return [...localVessels, ...externalOnly].sort((a, b) =>
       a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
     );
-  }, [useExternal, externalVessels, localVessels]);
+  }, [localHasData, localVessels, externalVessels]);
 
   return { data: vessels, isLoading, error };
 }
