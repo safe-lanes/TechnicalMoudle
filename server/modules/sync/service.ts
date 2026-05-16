@@ -607,6 +607,11 @@ export async function receivePushData(
             for (const row of (hint.rows || [])) {
               if (!row.master_id) continue;
               try {
+                // applicable_to_company intentionally NOT synced from ship —
+                // only shore admin decides company-wide applicability (domain decision).
+                // FIX 56 creates synced masters with applicable_to_company = false;
+                // that default is preserved here so ship-created masters stay vessel-specific
+                // and don't trigger the admin-save fan-out to all vessels.
                 const updateResult = await client.query(
                   `UPDATE "${mapping.table}" SET
                      "${mapping.nameCol}"    = COALESCE($2, "${mapping.nameCol}"),
@@ -617,8 +622,7 @@ export async function receivePushData(
                      company_id              = COALESCE($7, company_id),
                      company_group           = COALESCE($8, company_group),
                      company_sequence        = COALESCE($9, company_sequence),
-                     applicable_to_company   = COALESCE($10, applicable_to_company),
-                     sequence                = COALESCE($11, sequence),
+                     sequence                = COALESCE($10, sequence),
                      updated_at              = NOW()
                    WHERE master_id = $1`,
                   [
@@ -631,7 +635,6 @@ export async function receivePushData(
                     row.company_id || null,
                     row.company_group || null,
                     row.company_sequence != null ? row.company_sequence : null,
-                    row.applicable_to_company != null ? row.applicable_to_company : null,
                     row.sequence != null ? row.sequence : null,
                   ]
                 );
