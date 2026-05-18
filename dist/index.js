@@ -7285,6 +7285,42 @@ async function updateSettings(settings, userId) {
     await updateSetting(key, value, userId);
   }
 }
+async function insertConnectivityLog(entry) {
+  const pool2 = await getPool();
+  await pool2.query(
+    `INSERT INTO sync_connectivity_log
+       (instance_id, vessel_id, outcome, error_message, error_category, latency_ms,
+        batch_uuid, records_pushed, records_pulled, catch_up_cycle, trigger_type)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [
+      entry.instanceId,
+      entry.vesselId,
+      entry.outcome,
+      entry.errorMessage ?? null,
+      entry.errorCategory ?? null,
+      entry.latencyMs ?? null,
+      entry.batchUuid ?? null,
+      entry.recordsPushed ?? 0,
+      entry.recordsPulled ?? 0,
+      entry.catchUpCycle ?? 0,
+      entry.triggerType ?? "auto"
+    ]
+  );
+}
+async function getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode) {
+  const pool2 = await getPool();
+  const vesselValues = [vesselId];
+  if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
+  const placeholders = vesselValues.map((_, i) => `$${i + 2}`).join(", ");
+  const result = await pool2.query(
+    `SELECT count(*)::int AS c FROM sync_field_log
+     WHERE instance_id = $1
+       AND vessel_id IN (${placeholders})
+       AND is_synced = false`,
+    [instanceId, ...vesselValues]
+  );
+  return result.rows[0]?.c ?? 0;
+}
 var init_repository = __esm({
   "server/modules/sync/repository.ts"() {
     "use strict";
@@ -7292,6 +7328,39 @@ var init_repository = __esm({
     init_db();
     init_syncDiagLogger();
     init_schema();
+  }
+});
+
+// server/modules/sync/syncRole.ts
+var syncRole_exports = {};
+__export(syncRole_exports, {
+  getEffectiveInstanceId: () => getEffectiveInstanceId,
+  getInstanceRole: () => getInstanceRole,
+  isShipInstance: () => isShipInstance,
+  isShipInstanceId: () => isShipInstanceId
+});
+function isShipInstanceId(instanceId) {
+  return instanceId.toUpperCase().startsWith("SHIP-");
+}
+async function getEffectiveInstanceId() {
+  let dbInstanceId = null;
+  try {
+    dbInstanceId = await getSetting("instance_id");
+  } catch {
+  }
+  return dbInstanceId && dbInstanceId.trim() || process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+}
+async function isShipInstance() {
+  const id = await getEffectiveInstanceId();
+  return isShipInstanceId(id);
+}
+async function getInstanceRole() {
+  return await isShipInstance() ? "ship" : "shore";
+}
+var init_syncRole = __esm({
+  "server/modules/sync/syncRole.ts"() {
+    "use strict";
+    init_repository();
   }
 });
 
@@ -7317,6 +7386,7 @@ var init_fileSyncProcessor = __esm({
     "use strict";
     init_repository();
     init_syncDiagLogger();
+    init_syncRole();
     CHUNK_SIZE_BYTES = 256 * 1024;
     MAX_FILE_RETRIES = 3;
     TEMP_DIR = path2.resolve(process.cwd(), ".private", "sync-temp");
@@ -7342,7 +7412,7 @@ var init_fileSyncProcessor = __esm({
         let filesProcessed = 0;
         let filesFailed = 0;
         let bytesTransferred = 0;
-        const direction = this.instanceId.toUpperCase().startsWith("SHIP") ? "ship_to_shore" : "shore_to_ship";
+        const direction = isShipInstanceId(this.instanceId) ? "ship_to_shore" : "shore_to_ship";
         const pendingFiles = await getPendingFiles(vesselId, direction, 50);
         syncDiag(`FILE-SYNC START: ${pendingFiles.length} pending files for vessel=${vesselId}, direction=${direction}`);
         console.log(
@@ -7439,7 +7509,7 @@ var init_fileSyncProcessor = __esm({
         try {
           const existing = await getFileQueueEntry(chunk.queueUuid);
           if (!existing && chunk.fileKey && chunk.tableName) {
-            const reverseDirection = this.instanceId.toUpperCase().startsWith("SHIP") ? "shore_to_ship" : "ship_to_shore";
+            const reverseDirection = isShipInstanceId(this.instanceId) ? "shore_to_ship" : "ship_to_shore";
             await queueFileWithUuid({
               queueUuid: chunk.queueUuid,
               tableName: chunk.tableName,
@@ -7595,7 +7665,7 @@ var init_fileSyncProcessor = __esm({
       static async queueFileForSync(tableName, rowUuid, fileKey, fileName, fileSizeBytes, vesselId) {
         try {
           const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-          const direction = instanceId.toUpperCase().startsWith("SHIP") ? "ship_to_shore" : "shore_to_ship";
+          const direction = isShipInstanceId(instanceId) ? "ship_to_shore" : "shore_to_ship";
           let priority = 0;
           if (fileSizeBytes) {
             if (fileSizeBytes < 100 * 1024) priority = 10;
@@ -8054,11 +8124,10 @@ function getFieldDisplayName(fieldName) {
 }
 function getInstanceLabel(instanceId, vesselName) {
   if (!instanceId) return "Unknown";
-  const upper = instanceId.toUpperCase();
-  if (upper.startsWith("SHIP")) {
+  if (isShipInstanceId(instanceId)) {
     return vesselName ? `Ship \u2014 ${vesselName}` : `Ship (${instanceId})`;
   }
-  if (upper.startsWith("SHORE")) {
+  if (instanceId.toUpperCase().startsWith("SHORE")) {
     return "Shore \u2014 Office";
   }
   return instanceId;
@@ -8621,6 +8690,7 @@ var init_conflictReviewRepository = __esm({
     init_db();
     init_syncConfig();
     init_syncDiagLogger();
+    init_syncRole();
   }
 });
 
@@ -8750,44 +8820,10 @@ async function receivePushData(batchUuid, vesselId, payload) {
         if (insertResult.errors.length > 0) {
           insertResult.errors.forEach((e) => console.error(`[Sync Push] INSERT error: ${e}`));
         }
-        if (insertResult.insertedRows > 0) {
-          const DERIVED_APPLICABILITY_MAP = {
-            vessel_survey_data: "vessel_survey_applicability",
-            vessel_certificate_data: "vessel_certificate_applicability"
-          };
-          const appNeeded = /* @__PURE__ */ new Map();
-          for (const log2 of acceptedLogs) {
-            if (!DERIVED_APPLICABILITY_MAP[log2.tableName]) continue;
-            if (log2.oldValue !== null) continue;
-            const groupKey = `${log2.tableName}::${log2.rowUuid}`;
-            if (!appNeeded.has(groupKey)) {
-              appNeeded.set(groupKey, {
-                appTable: DERIVED_APPLICABILITY_MAP[log2.tableName],
-                vesselId: log2.vesselId || "",
-                masterId: "",
-                vesselName: ""
-              });
-            }
-            const entry = appNeeded.get(groupKey);
-            if (log2.fieldName === "masterId" && log2.newValue) entry.masterId = log2.newValue;
-            if (log2.fieldName === "vesselName" && log2.newValue) entry.vesselName = log2.newValue;
-            if (log2.vesselId && !entry.vesselId) entry.vesselId = log2.vesselId;
-          }
-          for (const [, entry] of Array.from(appNeeded)) {
-            if (!entry.vesselId || !entry.masterId) continue;
-            try {
-              const appResult = await client.query(
-                `INSERT INTO "${entry.appTable}" (vessel_id, vessel_name, master_id, is_applicable, is_deleted)
-                 VALUES ($1, $2, $3, true, false)
-                 ON CONFLICT (vessel_id, master_id) WHERE is_deleted = false DO NOTHING`,
-                [entry.vesselId, entry.vesselName || "Unknown", entry.masterId]
-              );
-              if ((appResult.rowCount ?? 0) > 0) {
-                syncDiag(`DERIVED-APPLICABILITY: created ${entry.appTable} vesselId=${entry.vesselId} masterId=${entry.masterId}`);
-              }
-            } catch (appErr) {
-              syncDiag(`DERIVED-APPLICABILITY ERROR: ${entry.appTable} vesselId=${entry.vesselId} masterId=${entry.masterId}: ${appErr.message}`);
-            }
+        const touchedDataTables = /* @__PURE__ */ new Set();
+        for (const log2 of acceptedLogs) {
+          if (log2.tableName === "vessel_certificate_data" || log2.tableName === "vessel_survey_data") {
+            touchedDataTables.add(log2.tableName);
           }
         }
         const receiverInstanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
@@ -8988,6 +9024,133 @@ async function receivePushData(batchUuid, vesselId, payload) {
           } catch (err) {
             fieldLogApplyErrors++;
             console.error(`[Sync Push] Failed to apply field log ${log2.tableName}.${log2.fieldName} for ${log2.rowUuid}: ${err.message}`);
+          }
+        }
+        if (touchedDataTables.size > 0) {
+          const ENSURE_MASTER_PAIRS = [
+            { dataTable: "vessel_certificate_data", masterTable: "ship_certificates_master", nameCol: "certificate_name" },
+            { dataTable: "vessel_survey_data", masterTable: "ship_surveys_master", nameCol: "survey_name" }
+          ];
+          for (const mp of ENSURE_MASTER_PAIRS) {
+            if (!touchedDataTables.has(mp.dataTable)) continue;
+            try {
+              const masterResult = await client.query(
+                `INSERT INTO "${mp.masterTable}" (
+                   sequence, master_id, "${mp.nameCol}", category, "group",
+                   applicable_to_company, is_active, is_deleted, created_at, updated_at
+                 )
+                 SELECT DISTINCT
+                   COALESCE(
+                     NULLIF(SPLIT_PART(d.master_id, '-', 2), '')::int,
+                     0
+                   ),
+                   d.master_id,
+                   d.master_id,
+                   CASE
+                     WHEN d.master_id ~ '^[A-Z][0-9]+-' THEN LEFT(d.master_id, 1)
+                     ELSE SPLIT_PART(d.master_id, '-', 1)
+                   END,
+                   CASE
+                     WHEN d.master_id ~ '^[A-Z][0-9]+-' THEN SUBSTRING(d.master_id, 2, 1)
+                     ELSE ''
+                   END,
+                   false, true, false, NOW(), NOW()
+                 FROM "${mp.dataTable}" d
+                 WHERE d.is_deleted = false
+                   AND d.vessel_id = $1
+                   AND d.master_id IS NOT NULL
+                   AND NOT EXISTS (
+                     SELECT 1 FROM "${mp.masterTable}" m
+                     WHERE m.master_id = d.master_id
+                   )
+                 ON CONFLICT (master_id) DO NOTHING`,
+                [vesselId]
+              );
+              const created = masterResult.rowCount ?? 0;
+              if (created > 0) {
+                syncDiag(`ENSURE-MASTER: created ${created} ${mp.masterTable} placeholder(s) for vessel=${vesselId}`);
+              }
+            } catch (masterErr) {
+              syncDiag(`ENSURE-MASTER ERROR: ${mp.masterTable} vessel=${vesselId}: ${masterErr.message}`);
+            }
+          }
+        }
+        if (touchedDataTables.size > 0) {
+          const ENSURE_APP_PAIRS = [
+            { dataTable: "vessel_certificate_data", appTable: "vessel_certificate_applicability" },
+            { dataTable: "vessel_survey_data", appTable: "vessel_survey_applicability" }
+          ];
+          for (const pair of ENSURE_APP_PAIRS) {
+            if (!touchedDataTables.has(pair.dataTable)) continue;
+            try {
+              const ensureResult = await client.query(
+                `INSERT INTO "${pair.appTable}" (vessel_id, vessel_name, master_id, is_applicable, is_deleted, created_at, updated_at)
+                 SELECT DISTINCT d.vessel_id, COALESCE(d.vessel_name, 'Unknown'), d.master_id, true, false, NOW(), NOW()
+                 FROM "${pair.dataTable}" d
+                 WHERE d.is_deleted = false
+                   AND d.vessel_id = $1
+                   AND d.vessel_id IS NOT NULL
+                   AND d.master_id IS NOT NULL
+                   AND NOT EXISTS (
+                     SELECT 1 FROM "${pair.appTable}" a
+                     WHERE a.vessel_id = d.vessel_id AND a.master_id = d.master_id AND a.is_deleted = false
+                   )
+                 ON CONFLICT (vessel_id, master_id) WHERE is_deleted = false DO NOTHING`,
+                [vesselId]
+              );
+              const created = ensureResult.rowCount ?? 0;
+              if (created > 0) {
+                syncDiag(`ENSURE-APPLICABILITY: created ${created} ${pair.appTable} row(s) for vessel=${vesselId}`);
+              }
+            } catch (appErr) {
+              syncDiag(`ENSURE-APPLICABILITY ERROR: ${pair.appTable} vessel=${vesselId}: ${appErr.message}`);
+            }
+          }
+        }
+        if (payload.masterRecordHints && payload.masterRecordHints.length > 0) {
+          const HINT_TABLE_MAP = {
+            ship_surveys_master: { table: "ship_surveys_master", nameCol: "survey_name", labelCol: "survey_label" },
+            ship_certificates_master: { table: "ship_certificates_master", nameCol: "certificate_name", labelCol: "certificate_label" }
+          };
+          for (const hint of payload.masterRecordHints) {
+            const mapping = HINT_TABLE_MAP[hint.tableName];
+            if (!mapping) continue;
+            for (const row of hint.rows || []) {
+              if (!row.master_id) continue;
+              try {
+                const updateResult = await client.query(
+                  `UPDATE "${mapping.table}" SET
+                     "${mapping.nameCol}"    = COALESCE($2, "${mapping.nameCol}"),
+                     "${mapping.labelCol}"   = COALESCE($3, "${mapping.labelCol}"),
+                     category                = COALESCE($4, category),
+                     "group"                 = COALESCE($5, "group"),
+                     requirement_ref         = COALESCE($6, requirement_ref),
+                     company_id              = COALESCE($7, company_id),
+                     company_group           = COALESCE($8, company_group),
+                     company_sequence        = COALESCE($9, company_sequence),
+                     sequence                = COALESCE($10, sequence),
+                     updated_at              = NOW()
+                   WHERE master_id = $1`,
+                  [
+                    row.master_id,
+                    row[mapping.nameCol] || null,
+                    row[mapping.labelCol] || null,
+                    row.category || null,
+                    row.group || null,
+                    row.requirement_ref || null,
+                    row.company_id || null,
+                    row.company_group || null,
+                    row.company_sequence != null ? row.company_sequence : null,
+                    row.sequence != null ? row.sequence : null
+                  ]
+                );
+                if ((updateResult.rowCount ?? 0) > 0) {
+                  syncDiag(`MASTER-HINT APPLIED: ${mapping.table} master_id=${row.master_id} name=${row[mapping.nameCol]}`);
+                }
+              } catch (hintErr) {
+                syncDiag(`MASTER-HINT ERROR: ${mapping.table} master_id=${row.master_id}: ${hintErr.message}`);
+              }
+            }
           }
         }
         await client.query("COMMIT");
@@ -9806,7 +9969,53 @@ async function verifyProvisioning(manifest) {
 async function exportAndAdd(pool2, bundle, tc, vesselId, vesselCode, vesselScopeColumn, categoryLabel) {
   try {
     let rows;
-    if (vesselScopeColumn && (vesselId || vesselCode)) {
+    let orphanSkipNote = "";
+    if (tc.tableName === "planner_dates" && vesselScopeColumn && (vesselId || vesselCode)) {
+      const scopeValue = vesselScopeColumn === "vessel_code" ? vesselCode : vesselId;
+      const orphanResult = await pool2.query(
+        `SELECT pd.pduuid, pd.component_id,
+                CASE WHEN c.cuuid IS NULL THEN 'component missing'
+                     WHEN COALESCE(c.is_deleted, false) = true THEN 'component soft-deleted'
+                     WHEN c.vessel_id IS DISTINCT FROM pd.vessel_id THEN 'component vessel mismatch'
+                     ELSE 'unknown'
+                END AS reason
+         FROM "planner_dates" pd
+         LEFT JOIN "components" c ON c.cuuid = pd.component_id
+         WHERE pd."${vesselScopeColumn}" = $1
+           AND COALESCE(pd.is_deleted, false) = false
+           AND (
+             c.cuuid IS NULL
+             OR COALESCE(c.is_deleted, false) = true
+             OR c.vessel_id IS DISTINCT FROM pd.vessel_id
+           )`,
+        [scopeValue]
+      );
+      const orphans = orphanResult.rows;
+      if (orphans.length > 0) {
+        const reasonCounts = {};
+        for (const o of orphans) {
+          reasonCounts[o.reason] = (reasonCounts[o.reason] || 0) + 1;
+          console.warn(
+            `[Provisioning] Skipping orphan planner_dates row pduuid=${o.pduuid} component_id=${o.component_id} reason="${o.reason}"`
+          );
+        }
+        const reasonSummary = Object.entries(reasonCounts).map(([r, n]) => `${n} ${r}`).join(", ");
+        orphanSkipNote = ` \u2014 ${orphans.length} orphans skipped (${reasonSummary})`;
+        console.warn(
+          `[Provisioning] planner_dates: skipped ${orphans.length} orphan row(s) for vessel ${scopeValue} (${reasonSummary})`
+        );
+      }
+      rows = await pool2.query(
+        `SELECT pd.* FROM "planner_dates" pd
+           INNER JOIN "components" c ON c.cuuid = pd.component_id
+           WHERE pd."${vesselScopeColumn}" = $1
+             AND COALESCE(pd.is_deleted, false) = false
+             AND COALESCE(c.is_deleted, false) = false
+             AND c.vessel_id = pd.vessel_id
+           ORDER BY COALESCE(pd.created_at, NOW()) ASC`,
+        [scopeValue]
+      ).then((r) => r.rows);
+    } else if (vesselScopeColumn && (vesselId || vesselCode)) {
       const scopeValue = vesselScopeColumn === "vessel_code" ? vesselCode : vesselId;
       rows = await pool2.query(
         `SELECT * FROM "${tc.tableName}" WHERE "${vesselScopeColumn}" = $1 AND COALESCE(is_deleted, false) = false ORDER BY COALESCE(created_at, NOW()) ASC`,
@@ -9821,7 +10030,7 @@ async function exportAndAdd(pool2, bundle, tc, vesselId, vesselCode, vesselScope
     bundle.manifest.tables.push({
       tableName: tc.tableName,
       rowCount: rows.length,
-      category: categoryLabel
+      category: `${categoryLabel}${orphanSkipNote}`
     });
     bundle.manifest.totalRows += rows.length;
   } catch (err) {
@@ -9900,6 +10109,7 @@ var init_syncEngine = __esm({
     init_syncConfig();
     init_db();
     init_syncDiagLogger();
+    init_syncRole();
     CHUNK_SIZE = 200;
     MAX_RETRIES = 3;
     RETRY_DELAYS = [5e3, 15e3, 45e3];
@@ -10020,7 +10230,7 @@ var init_syncEngine = __esm({
               console.warn(`[SyncEngine] Failed to save local checkpoint: ${cpErr.message}`);
             }
           }
-          const isShip = this.instanceId.toUpperCase().startsWith("SHIP");
+          const isShip = isShipInstanceId(this.instanceId);
           if (pushedLogUuids.length > 0 && isShip) {
             try {
               await markFieldLogsSynced(pushedLogUuids, batchUuid);
@@ -10067,13 +10277,14 @@ var init_syncEngine = __esm({
           };
         } catch (error) {
           const durationMs = Date.now() - startTime;
-          syncDiag(`=== SYNC END === vessel=${vesselId}, duration=${durationMs}ms, status=FAILED, error=${error.message}`);
-          console.error(`[SyncEngine] Sync failed for vessel ${vesselId}:`, error.message);
+          const errorDetail = error.message + (error.cause?.code ? ` [${error.cause.code}]` : "");
+          syncDiag(`=== SYNC END === vessel=${vesselId}, duration=${durationMs}ms, status=FAILED, error=${errorDetail}`);
+          console.error(`[SyncEngine] Sync failed for vessel ${vesselId}:`, errorDetail);
           if (batchUuid) {
             try {
               await updateBatch(batchUuid, {
                 status: "failed",
-                errorMessage: error.message,
+                errorMessage: errorDetail,
                 completedAt: /* @__PURE__ */ new Date(),
                 durationMs
               });
@@ -10090,7 +10301,7 @@ var init_syncEngine = __esm({
             conflictsAutoResolved,
             filesQueued: 0,
             durationMs,
-            error: error.message,
+            error: errorDetail,
             newCheckpoint: null
           };
         }
@@ -10101,7 +10312,7 @@ var init_syncEngine = __esm({
       async executePush(batchUuid, vesselId, lastCheckpoint) {
         let totalPushed = 0;
         const shipOnlyRows = [];
-        if (this.instanceId.toUpperCase().startsWith("SHIP")) {
+        if (isShipInstanceId(this.instanceId)) {
           const shipOnlyTables = getTablesByCategory("SHIP_ONLY");
           for (const tableConfig of shipOnlyTables) {
             try {
@@ -10114,11 +10325,11 @@ var init_syncEngine = __esm({
             }
           }
         }
-        const isShipInstance = this.instanceId.toUpperCase().startsWith("SHIP");
+        const isShip = isShipInstanceId(this.instanceId);
         const vesselCode = await this.getVesselCode(vesselId);
         syncDiag(`PUSH START: gathering field logs for vessel=${vesselId}, vesselCode=${vesselCode}`);
-        const fieldLogs = isShipInstance ? await getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode) : [];
-        syncDiag(`PUSH: found ${fieldLogs.length} unsynced field logs${!isShipInstance ? " (shore skips field log push)" : ""}`);
+        const fieldLogs = isShip ? await getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode) : [];
+        syncDiag(`PUSH: found ${fieldLogs.length} unsynced field logs${!isShip ? " (shore skips field log push)" : ""}`);
         const pushTables = {};
         fieldLogs.forEach((l) => {
           pushTables[l.tableName ?? l.table_name] = (pushTables[l.tableName ?? l.table_name] || 0) + 1;
@@ -10143,6 +10354,49 @@ var init_syncEngine = __esm({
           changedByUserId: log2.changedByUserId ?? log2.changed_by_user_id,
           instanceId: log2.instanceId ?? log2.instance_id
         }));
+        const masterRecordHints = [];
+        if (isShip && fieldLogPayloads.length > 0) {
+          const surveyMasterIds = /* @__PURE__ */ new Set();
+          const certMasterIds = /* @__PURE__ */ new Set();
+          for (const log2 of fieldLogPayloads) {
+            if (log2.tableName === "vessel_survey_data" && log2.fieldName === "masterId" && log2.newValue) {
+              surveyMasterIds.add(log2.newValue);
+            }
+            if (log2.tableName === "vessel_certificate_data" && log2.fieldName === "masterId" && log2.newValue) {
+              certMasterIds.add(log2.newValue);
+            }
+          }
+          const pool2 = await getPool();
+          if (surveyMasterIds.size > 0) {
+            try {
+              const r = await pool2.query(
+                `SELECT master_id, survey_name, category, "group", requirement_ref,
+                    applicable_to_company, survey_label, company_id, company_group, company_sequence, sequence
+             FROM ship_surveys_master WHERE master_id = ANY($1) AND is_deleted = false`,
+                [Array.from(surveyMasterIds)]
+              );
+              if (r.rows.length > 0) masterRecordHints.push({ tableName: "ship_surveys_master", rows: r.rows });
+            } catch (err) {
+              console.warn("[SyncEngine] FIX 58 survey master hints:", err.message);
+            }
+          }
+          if (certMasterIds.size > 0) {
+            try {
+              const r = await pool2.query(
+                `SELECT master_id, certificate_name, category, "group", requirement_ref,
+                    applicable_to_company, certificate_label, company_id, company_group, company_sequence, sequence
+             FROM ship_certificates_master WHERE master_id = ANY($1) AND is_deleted = false`,
+                [Array.from(certMasterIds)]
+              );
+              if (r.rows.length > 0) masterRecordHints.push({ tableName: "ship_certificates_master", rows: r.rows });
+            } catch (err) {
+              console.warn("[SyncEngine] FIX 58 cert master hints:", err.message);
+            }
+          }
+          if (masterRecordHints.length > 0) {
+            syncDiag(`FIX 58: sending ${masterRecordHints.reduce((s, h) => s + h.rows.length, 0)} master record hint(s) to shore`);
+          }
+        }
         if (fieldLogPayloads.length > 0 || shipOnlyRows.length > 0) {
           for (let i = 0; i < Math.max(fieldLogPayloads.length, 1); i += CHUNK_SIZE) {
             const chunk = fieldLogPayloads.slice(i, i + CHUNK_SIZE);
@@ -10151,7 +10405,9 @@ var init_syncEngine = __esm({
               vesselId,
               oneWayRows: i === 0 ? shipOnlyRows : [],
               // One-way rows with first chunk only
-              fieldLogs: chunk
+              fieldLogs: chunk,
+              masterRecordHints: i === 0 ? masterRecordHints : []
+              // Hints with first chunk only
             });
             totalPushed += result.received || 0;
           }
@@ -10289,7 +10545,7 @@ var init_syncEngine = __esm({
           return;
         }
         if (config.businessRules && log2.tableName === "defects" && log2.fieldName === "status") {
-          if (log2.newValue === "verified" && !this.instanceId.toUpperCase().startsWith("SHIP")) {
+          if (log2.newValue === "verified" && !isShipInstanceId(this.instanceId)) {
             console.warn(`[SyncEngine] Business rule: ship cannot verify defects. Skipping.`);
             return;
           }
@@ -10606,13 +10862,14 @@ async function initiateSyncHandler(req, res) {
 }
 async function pushHandler(req, res) {
   try {
-    const { batchUuid, vesselId, oneWayRows, fieldLogs } = req.body;
+    const { batchUuid, vesselId, oneWayRows, fieldLogs, masterRecordHints } = req.body;
     if (!batchUuid || !vesselId) {
       return res.status(400).json({ error: "batchUuid and vesselId are required" });
     }
     const result = await receivePushData(batchUuid, vesselId, {
       oneWayRows,
-      fieldLogs
+      fieldLogs,
+      masterRecordHints
     });
     res.json(result);
   } catch (error) {
@@ -10722,6 +10979,11 @@ async function unresolvedConflictsHandler(req, res) {
 }
 async function triggerSyncHandler(req, res) {
   try {
+    if (!await isShipInstance()) {
+      return res.status(400).json({
+        error: "Sync can only be triggered from a vessel (ship) instance. Shore is the responder in ship-initiated sync."
+      });
+    }
     const { vesselId } = req.body;
     if (!vesselId) {
       return res.status(400).json({ error: "vesselId is required" });
@@ -10941,7 +11203,7 @@ async function instanceInfoHandler(req, res) {
     } catch {
     }
     const effectiveId = dbInstanceId && dbInstanceId.trim() || envInstanceId;
-    const isShip = effectiveId.startsWith("SHIP-");
+    const isShip = isShipInstanceId(effectiveId);
     const isShore = !isShip;
     res.json({
       instanceId: effectiveId,
@@ -11011,6 +11273,7 @@ var init_controller = __esm({
     init_fileSyncProcessor();
     init_pruningService();
     init_healthMonitor();
+    init_syncRole();
     init_syncDiagLogger();
   }
 });
@@ -11963,7 +12226,9 @@ var init_postgresStorage = __esm({
           id: v.id,
           vuuid: v.vuuid,
           name: v.name,
-          code: v.code
+          code: v.code,
+          imoNumber: v.imoNumber ?? null,
+          vesselType: v.vesselType ?? null
         }));
       }
       async getVessel(id) {
@@ -22736,6 +23001,242 @@ var init_alertEngine = __esm({
     init_schema();
     init_fuelConversionFactors();
     CII_ORDER = { A: 1, B: 2, C: 3, D: 4, E: 5 };
+  }
+});
+
+// server/modules/sync/autoSyncScheduler.ts
+var autoSyncScheduler_exports = {};
+__export(autoSyncScheduler_exports, {
+  SyncAutoScheduler: () => SyncAutoScheduler,
+  syncAutoScheduler: () => syncAutoScheduler
+});
+function classifyError(error) {
+  const msg = (error?.message || "").toLowerCase();
+  const causeCode = (error?.cause?.code || "").toLowerCase();
+  const causeMsg = (error?.cause?.message || "").toLowerCase();
+  const all = `${msg} ${causeCode} ${causeMsg}`;
+  if (/econnrefused|enotfound|enetunreach|ehostunreach|eai_again/.test(all)) {
+    return "network_unreachable";
+  }
+  if (/timeout|abort|timedout|etimedout|econnaborted|und_err_connect_timeout/.test(all)) {
+    return "timeout";
+  }
+  if (/\b5\d{2}\b|server error/.test(all)) {
+    return "server_error";
+  }
+  if (/\b4\d{2}\b|client error/.test(all)) {
+    return "client_error";
+  }
+  return "unknown_error";
+}
+async function getVesselCode(vesselId) {
+  if (vesselCodeCache2.has(vesselId)) return vesselCodeCache2.get(vesselId);
+  try {
+    const pool2 = await getPool();
+    const result = await pool2.query(
+      `SELECT vessel_code FROM vessels WHERE vuuid = $1 LIMIT 1`,
+      [vesselId]
+    );
+    const code = result.rows[0]?.vessel_code || null;
+    vesselCodeCache2.set(vesselId, code);
+    return code;
+  } catch {
+    return null;
+  }
+}
+var DEFAULT_INTERVAL_MINUTES, BOOT_DELAY_MS, DEFAULT_CATCH_UP_MAX_CYCLES, vesselCodeCache2, SyncAutoScheduler, syncAutoScheduler;
+var init_autoSyncScheduler = __esm({
+  "server/modules/sync/autoSyncScheduler.ts"() {
+    "use strict";
+    init_repository();
+    init_syncEngine();
+    init_syncDiagLogger();
+    init_syncRole();
+    init_db();
+    DEFAULT_INTERVAL_MINUTES = 360;
+    BOOT_DELAY_MS = 18e4;
+    DEFAULT_CATCH_UP_MAX_CYCLES = 20;
+    vesselCodeCache2 = /* @__PURE__ */ new Map();
+    SyncAutoScheduler = class {
+      isRunning = false;
+      intervalId = null;
+      tickIntervalMs = DEFAULT_INTERVAL_MINUTES * 60 * 1e3;
+      /** Per-vessel re-entrancy guard */
+      syncInProgress = /* @__PURE__ */ new Map();
+      start(intervalMs) {
+        if (this.isRunning) {
+          console.log("[AutoSync] Scheduler already running");
+          return;
+        }
+        if (intervalMs) {
+          this.tickIntervalMs = intervalMs;
+        }
+        const intervalHours = (this.tickIntervalMs / 1e3 / 60 / 60).toFixed(1);
+        console.log(`[AutoSync] Starting scheduler (tick interval: ${intervalHours}h, boot delay: ${BOOT_DELAY_MS / 1e3}s)`);
+        setTimeout(() => {
+          this.tick().catch((err) => {
+            console.error("[AutoSync] Error during initial tick:", err);
+          });
+        }, BOOT_DELAY_MS);
+        this.intervalId = setInterval(() => {
+          this.tick().catch((err) => {
+            console.error("[AutoSync] Error during scheduled tick:", err);
+          });
+        }, this.tickIntervalMs);
+        this.isRunning = true;
+      }
+      stop() {
+        if (this.intervalId) {
+          clearInterval(this.intervalId);
+          this.intervalId = null;
+        }
+        this.isRunning = false;
+        console.log("[AutoSync] Scheduler stopped");
+      }
+      // ────────────────────────────────────────────────
+      // Tick — one scheduler wake-up
+      // ────────────────────────────────────────────────
+      async tick() {
+        try {
+          if (!await isShipInstance()) {
+            syncDiag("[AutoSync] Shore instance detected in tick() \u2014 skipping (sync is ship-initiated)");
+            return;
+          }
+          const settings = await getAllSettings();
+          const enabled = settings["auto_sync_enabled"] === "true";
+          if (!enabled) {
+            syncDiag("[AutoSync] auto_sync_enabled=false \u2014 skipping tick");
+            return;
+          }
+          const intervalMinutes = parseInt(settings["sync_interval_minutes"] || "0", 10);
+          if (intervalMinutes > 0) {
+            const newIntervalMs = intervalMinutes * 60 * 1e3;
+            if (newIntervalMs !== this.tickIntervalMs) {
+              console.log(`[AutoSync] Interval changed: ${this.tickIntervalMs / 6e4}min \u2192 ${intervalMinutes}min (takes effect next restart)`);
+            }
+          }
+          const instanceId = settings["instance_id"] || process.env.SYNC_INSTANCE_ID || "";
+          if (!instanceId) {
+            console.warn("[AutoSync] No instance_id configured \u2014 cannot determine vessel. Skipping.");
+            return;
+          }
+          const metadata = await getInstanceMetadata(instanceId);
+          const vesselId = metadata?.vesselId;
+          if (!vesselId) {
+            console.warn(`[AutoSync] No vesselId in sync_metadata for instance ${instanceId}. Skipping.`);
+            return;
+          }
+          const maxCatchUp = parseInt(settings["catch_up_max_cycles"] || String(DEFAULT_CATCH_UP_MAX_CYCLES), 10);
+          await this.runWithCatchUp(instanceId, vesselId, maxCatchUp);
+        } catch (error) {
+          console.error("[AutoSync] Tick failed:", error.message);
+        }
+      }
+      // ────────────────────────────────────────────────
+      // Run sync + catch-up cycles
+      // ────────────────────────────────────────────────
+      async runWithCatchUp(instanceId, vesselId, maxCatchUpCycles) {
+        if (this.syncInProgress.get(vesselId)) {
+          console.log(`[AutoSync] Sync already in progress for vessel ${vesselId} \u2014 skipping`);
+          await insertConnectivityLog({
+            instanceId,
+            vesselId,
+            outcome: "skipped_reentrant",
+            triggerType: "auto"
+          });
+          return;
+        }
+        this.syncInProgress.set(vesselId, true);
+        let cycleNumber = 0;
+        try {
+          const primaryResult = await this.executeSingleCycle(instanceId, vesselId, cycleNumber, "auto");
+          if (!primaryResult.success) {
+            return;
+          }
+          if (maxCatchUpCycles <= 0) return;
+          const vesselCode = await getVesselCode(vesselId);
+          let remaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
+          while (remaining > 0 && cycleNumber < maxCatchUpCycles) {
+            cycleNumber++;
+            console.log(`[AutoSync] Catch-up cycle ${cycleNumber}/${maxCatchUpCycles} \u2014 ${remaining} unsynced records remain`);
+            syncDiag(`[AutoSync] catch-up cycle=${cycleNumber}, remaining=${remaining}, cap=${maxCatchUpCycles}`);
+            const catchUpResult = await this.executeSingleCycle(instanceId, vesselId, cycleNumber, "catch_up");
+            if (!catchUpResult.success) {
+              console.log(`[AutoSync] Catch-up cycle ${cycleNumber} failed \u2014 stopping catch-up`);
+              break;
+            }
+            remaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
+          }
+          if (cycleNumber > 0) {
+            const finalRemaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
+            console.log(`[AutoSync] Catch-up complete \u2014 ran ${cycleNumber} extra cycle(s), ${finalRemaining} records still unsynced`);
+          }
+        } finally {
+          this.syncInProgress.set(vesselId, false);
+        }
+      }
+      // ────────────────────────────────────────────────
+      // Execute one sync cycle + log connectivity
+      // ────────────────────────────────────────────────
+      async executeSingleCycle(instanceId, vesselId, cycleNumber, triggerType) {
+        const startMs = Date.now();
+        let result;
+        try {
+          const engine = getSyncEngine();
+          result = await engine.runSync(vesselId);
+        } catch (error) {
+          const latencyMs2 = Date.now() - startMs;
+          const outcome2 = classifyError(error);
+          await insertConnectivityLog({
+            instanceId,
+            vesselId,
+            outcome: outcome2,
+            errorMessage: error.message?.substring(0, 500),
+            errorCategory: outcome2,
+            latencyMs: latencyMs2,
+            catchUpCycle: cycleNumber,
+            triggerType
+          });
+          console.error(`[AutoSync] Cycle ${cycleNumber} threw: ${error.message}`);
+          syncDiag(`[AutoSync] EXCEPTION cycle=${cycleNumber}, outcome=${outcome2}, latency=${latencyMs2}ms, err=${error.message}`);
+          return {
+            success: false,
+            batchUuid: null,
+            recordsPushed: 0,
+            recordsPulled: 0,
+            conflictsFound: 0,
+            conflictsAutoResolved: 0,
+            filesQueued: 0,
+            durationMs: latencyMs2,
+            error: error.message,
+            newCheckpoint: null
+          };
+        }
+        const latencyMs = Date.now() - startMs;
+        const outcome = result.success ? "success" : classifyError({ message: result.error || "" });
+        await insertConnectivityLog({
+          instanceId,
+          vesselId,
+          outcome,
+          errorMessage: result.error?.substring(0, 500) ?? null,
+          errorCategory: result.success ? null : outcome,
+          latencyMs,
+          batchUuid: result.batchUuid,
+          recordsPushed: result.recordsPushed,
+          recordsPulled: result.recordsPulled,
+          catchUpCycle: cycleNumber,
+          triggerType
+        });
+        if (result.success) {
+          console.log(`[AutoSync] Cycle ${cycleNumber} OK \u2014 pushed=${result.recordsPushed}, pulled=${result.recordsPulled}, duration=${result.durationMs}ms`);
+        } else {
+          console.warn(`[AutoSync] Cycle ${cycleNumber} FAILED \u2014 ${result.error}`);
+        }
+        syncDiag(`[AutoSync] cycle=${cycleNumber}, trigger=${triggerType}, outcome=${outcome}, pushed=${result.recordsPushed}, pulled=${result.recordsPulled}, latency=${latencyMs}ms`);
+        return result;
+      }
+    };
+    syncAutoScheduler = new SyncAutoScheduler();
   }
 });
 
@@ -35729,6 +36230,8 @@ async function ensureVesselExists(vesselId, vesselName) {
 
 // server/modules/cert-surveys/services/certAdminService.ts
 init_postgresClient();
+init_schema();
+init_fieldLogger();
 async function getMasterCertificates2() {
   const result = await getMasterCertificates();
   if (result === null) {
@@ -35925,6 +36428,50 @@ async function saveMasterCertificates(body) {
     if (staleApplicabilityMasterIds.length > 0) {
       await softDeleteApplicabilityByMasterIds(staleApplicabilityMasterIds, tx);
       console.log(`Soft-deleted ${staleApplicabilityMasterIds.length} stale non-company applicability master IDs: ${staleApplicabilityMasterIds.join(", ")}`);
+    }
+    if (newlyInsertedMasterIds.length > 0) {
+      const vesselSpecificNewIds = newlyInsertedMasterIds.filter(
+        (id) => vesselSpecificSet.has(id) || id.startsWith("VES-")
+      );
+      const companyNewIds = newlyInsertedMasterIds.filter((id) => {
+        if (vesselSpecificSet.has(id) || id.startsWith("VES-")) return false;
+        const c = certificates2.find((x) => x.masterId === id);
+        return c?.applicableToCompany === true;
+      });
+      const dataRowsToCreate = [];
+      for (const masterId of companyNewIds) {
+        for (const vessel of allVessels) {
+          dataRowsToCreate.push({ vesselId: vessel.id, vesselName: vessel.name, masterId });
+        }
+      }
+      for (const masterId of vesselSpecificNewIds) {
+        for (const vessel of targetVessels) {
+          dataRowsToCreate.push({ vesselId: vessel.id, vesselName: vessel.name, masterId });
+        }
+      }
+      let dataRowsCreated = 0;
+      for (const row of dataRowsToCreate) {
+        try {
+          const inserted = await tx.insert(vesselCertificateData).values({ vesselId: row.vesselId, vesselName: row.vesselName, masterId: row.masterId }).onConflictDoNothing().returning();
+          if (inserted.length > 0) {
+            const newRow = inserted[0];
+            await logFieldChanges(
+              "vessel_certificate_data",
+              newRow.vcduuid || String(newRow.id),
+              row.vesselId,
+              null,
+              newRow,
+              "system"
+            );
+            dataRowsCreated++;
+          }
+        } catch (err) {
+          console.error(`[CertAdmin] FIX 57 placeholder error ${row.masterId}/${row.vesselId}:`, err.message);
+        }
+      }
+      if (dataRowsCreated > 0) {
+        console.log(`[CertAdmin] FIX 57: Created ${dataRowsCreated} placeholder vessel_certificate_data row(s) for sync`);
+      }
     }
     console.log(`Ship certificates master saved: ${insertedCount} inserted, ${updatedCount} updated, ${deletedCount} deleted`);
     return {
@@ -36408,6 +36955,9 @@ async function softDeleteApplicabilityByMasterIds2(masterIds) {
 }
 
 // server/modules/cert-surveys/services/surveyAdminService.ts
+init_postgresClient();
+init_schema();
+init_fieldLogger();
 async function getMasterSurveys2() {
   const result = await getMasterSurveys();
   if (result === null) {
@@ -36571,6 +37121,55 @@ async function saveMasterSurveys(body) {
   if (staleApplicabilityMasterIds.length > 0) {
     await softDeleteApplicabilityByMasterIds2(staleApplicabilityMasterIds);
     console.log(`Soft-deleted ${staleApplicabilityMasterIds.length} stale non-company applicability master IDs: ${staleApplicabilityMasterIds.join(", ")}`);
+  }
+  if (newlyInsertedMasterIds.length > 0) {
+    const postgres = getPostgresClient();
+    if (postgres) {
+      const db2 = postgres.db;
+      const vesselSpecificNewIds = newlyInsertedMasterIds.filter(
+        (id) => vesselSpecificSet.has(id) || id.startsWith("VES-")
+      );
+      const companyNewIds = newlyInsertedMasterIds.filter((id) => {
+        if (vesselSpecificSet.has(id) || id.startsWith("VES-")) return false;
+        if (id.startsWith("CMP-")) return true;
+        const s = surveys2.find((x) => x.masterId === id);
+        return s?.applicableToCompany === true;
+      });
+      const dataRowsToCreate = [];
+      for (const masterId of companyNewIds) {
+        for (const vessel of allVessels) {
+          dataRowsToCreate.push({ vesselId: vessel.id, vesselName: vessel.name, masterId });
+        }
+      }
+      for (const masterId of vesselSpecificNewIds) {
+        for (const vessel of targetVessels) {
+          dataRowsToCreate.push({ vesselId: vessel.id, vesselName: vessel.name, masterId });
+        }
+      }
+      let dataRowsCreated = 0;
+      for (const row of dataRowsToCreate) {
+        try {
+          const inserted = await db2.insert(vesselSurveyData).values({ vesselId: row.vesselId, vesselName: row.vesselName, masterId: row.masterId }).onConflictDoNothing({ target: [vesselSurveyData.vesselId, vesselSurveyData.masterId] }).returning();
+          if (inserted.length > 0) {
+            const newRow = inserted[0];
+            await logFieldChanges(
+              "vessel_survey_data",
+              newRow.vsduuid || String(newRow.id),
+              row.vesselId,
+              null,
+              newRow,
+              "system"
+            );
+            dataRowsCreated++;
+          }
+        } catch (err) {
+          console.error(`[SurveyAdmin] FIX 57 placeholder error ${row.masterId}/${row.vesselId}:`, err.message);
+        }
+      }
+      if (dataRowsCreated > 0) {
+        console.log(`[SurveyAdmin] FIX 57: Created ${dataRowsCreated} placeholder vessel_survey_data row(s) for sync`);
+      }
+    }
   }
   console.log(`Ship surveys master saved: ${insertedCount} inserted, ${updatedCount} updated`);
   return {
@@ -62919,6 +63518,14 @@ async function registerRoutes(app2) {
   const { syncHealthScheduler: syncHealthScheduler2 } = await Promise.resolve().then(() => (init_healthMonitor(), healthMonitor_exports));
   syncHealthScheduler2.start(6 * 60 * 60 * 1e3);
   console.log("[SyncHealth] Health monitor started - will check stale syncs, conflicts, stuck files, log overflow");
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  const { syncAutoScheduler: syncAutoScheduler2 } = await Promise.resolve().then(() => (init_autoSyncScheduler(), autoSyncScheduler_exports));
+  if (await isShipInstance2()) {
+    syncAutoScheduler2.start(6 * 60 * 60 * 1e3);
+    console.log("[AutoSync] Ship instance \u2014 scheduler started (autonomous sync with catch-up and connectivity logging)");
+  } else {
+    console.log("[AutoSync] Shore instance detected \u2014 auto-sync scheduler not started (sync is ship-initiated)");
+  }
   if (process.env.NODE_ENV === "development") {
     app2.post("/dev/seed/recurring-defects", async (req, res) => {
       try {
@@ -63239,12 +63846,14 @@ async function registerRoutes(app2) {
     clearInterval(postponementCheckInterval);
     syncPruningScheduler2.stop();
     syncHealthScheduler2.stop();
+    syncAutoScheduler2.stop();
   });
   process.on("SIGINT", () => {
     console.log("Cleaning up scheduled tasks...");
     clearInterval(postponementCheckInterval);
     syncPruningScheduler2.stop();
     syncHealthScheduler2.stop();
+    syncAutoScheduler2.stop();
   });
   return httpServer;
 }

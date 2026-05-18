@@ -4,3 +4,5 @@ vite.config.ts.*
 *.tar.gz
 backup
 uploads
+env
+ecosystem.config.cjs

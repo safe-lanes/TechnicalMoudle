@@ -1,445 +1,224 @@
-[2026-05-15T00:00:09.879Z] [SyncDiag] FIELD-LOGGER: work_orders row=20d306e6-f17d-4020-b2d2-9a0dd490b79a — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:40:12.079Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=61549039-6805-4728-849a-e345625f0005 — 9 fields changed, isInsert=true, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:40:33.701Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=61549039-6805-4728-849a-e345625f0005 — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:40:41.550Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=61549039-6805-4728-849a-e345625f0005 — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:41:37.026Z] [SyncDiag] RECEIVE-PUSH START: batch=318154d4-dda0-4f8c-b5af-71df801072ad, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=1, oneWayRows=0
-[2026-05-15T03:41:37.034Z] [SyncDiag] RECEIVE-PUSH: 1 field logs stored in sync_field_log
-[2026-05-15T03:41:37.035Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=318154d4-dda0-4f8c-b5af-71df801072ad
-[2026-05-15T03:41:37.037Z] [SyncDiag] FIELD-LOG-INSERT START: 1 logs
-[2026-05-15T03:41:37.037Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 1 logs
-[2026-05-15T03:41:37.038Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=0, updatePassthrough=1, errors=0
-[2026-05-15T03:41:37.071Z] [SyncDiag] RECEIVE-PUSH DONE: stored=1, applied=1, errors=0, oneWayTables=0
-[2026-05-15T03:41:37.091Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-14T14:34:53.441Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:41:37.202Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 12 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:41:37.203Z] [SyncDiag] PREPARE-PULL FIELD LOG TABLES: {"work_orders":1,"vessel_survey_data":11}
-[2026-05-15T03:41:37.438Z] [SyncDiag] PREPARE-PULL DONE: 6 one-way rows across 1 tables, 11 field logs, 1 conflicts
-[2026-05-15T03:41:37.438Z] [SyncDiag] PREPARE-PULL ONE-WAY: master_lists — 6 rows
-[2026-05-15T03:41:37.631Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-14T14:34:53.441Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:41:37.646Z] [SyncDiag] COMPLETE-SESSION: found 12 shore logs to mark synced
-[2026-05-15T03:41:37.840Z] [SyncDiag] COMPLETE-SESSION: found 1 ship logs to mark synced
-[2026-05-15T03:42:19.151Z] [SyncDiag] RECEIVE-PUSH START: batch=df13897d-4e77-42cf-a6b4-4dcb4478dc49, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
-[2026-05-15T03:42:19.157Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
-[2026-05-15T03:42:19.164Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:41:37.630Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:42:19.335Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64479 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:41:37.630Z instances=[]
-[2026-05-15T03:42:19.336Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:42:19.501Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
-[2026-05-15T03:42:19.510Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:41:37.630Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:42:19.574Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64479 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:41:37.630Z instances=[]
-[2026-05-15T03:42:19.575Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T03:42:19.680Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
-[2026-05-15T03:43:56.551Z] [SyncDiag] RECEIVE-PUSH START: batch=b32c38bd-aa14-4ae2-80f1-550dd1ca3161, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
-[2026-05-15T03:43:56.557Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
-[2026-05-15T03:43:56.566Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:42:19.509Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:43:56.673Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64479 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:42:19.509Z instances=[]
-[2026-05-15T03:43:56.673Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:43:56.786Z] [SyncDiag] PREPARE-PULL DONE: 1 one-way rows across 1 tables, 0 field logs, 0 conflicts
-[2026-05-15T03:43:56.787Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 1 rows
-[2026-05-15T03:43:56.835Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:42:19.509Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:43:56.857Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64479 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:42:19.509Z instances=[]
-[2026-05-15T03:43:56.857Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T03:43:56.963Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
-[2026-05-15T03:44:40.719Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=ee313b4f-a863-443f-bbbb-6545fa49c671 — 2 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:44:46.476Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=ee313b4f-a863-443f-bbbb-6545fa49c671 — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:44:59.174Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=8ea9b012-5c74-4c18-bfcd-0cc2db957f7d — 9 fields changed, isInsert=true, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:45:06.000Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=8ea9b012-5c74-4c18-bfcd-0cc2db957f7d — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:45:12.535Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=8ea9b012-5c74-4c18-bfcd-0cc2db957f7d — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:45:16.984Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=8ea9b012-5c74-4c18-bfcd-0cc2db957f7d — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:45:22.116Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=8ea9b012-5c74-4c18-bfcd-0cc2db957f7d — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:45:25.880Z] [SyncDiag] RECEIVE-PUSH START: batch=9de24855-7928-4244-9459-0faf3fc1b729, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
-[2026-05-15T03:45:25.886Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
-[2026-05-15T03:45:25.894Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:43:56.834Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:45:26.086Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 16 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:45:26.087Z] [SyncDiag] PREPARE-PULL FIELD LOG TABLES: {"vessel_survey_data":16}
-[2026-05-15T03:45:26.290Z] [SyncDiag] PREPARE-PULL DONE: 1 one-way rows across 1 tables, 16 field logs, 0 conflicts
-[2026-05-15T03:45:26.291Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 1 rows
-[2026-05-15T03:45:26.330Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:43:56.834Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:45:26.381Z] [SyncDiag] COMPLETE-SESSION: found 16 shore logs to mark synced
-[2026-05-15T03:45:26.497Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
-[2026-05-15T03:45:27.948Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=8ea9b012-5c74-4c18-bfcd-0cc2db957f7d — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:45:49.332Z] [SyncDiag] RECEIVE-PUSH START: batch=3504ca23-5c49-4549-8702-80121c419dcb, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
-[2026-05-15T03:45:49.338Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
-[2026-05-15T03:45:49.347Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:45:26.329Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:45:49.468Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 1 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:45:49.469Z] [SyncDiag] PREPARE-PULL FIELD LOG TABLES: {"vessel_survey_data":1}
-[2026-05-15T03:45:49.663Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 1 field logs, 0 conflicts
-[2026-05-15T03:45:49.920Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:45:26.329Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:45:49.936Z] [SyncDiag] COMPLETE-SESSION: found 1 shore logs to mark synced
-[2026-05-15T03:45:50.049Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
-[2026-05-15T03:47:22.345Z] [SyncDiag] RECEIVE-PUSH START: batch=852a802a-f7ff-47d9-94eb-9059422de91c, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
-[2026-05-15T03:47:22.352Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
-[2026-05-15T03:47:22.363Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:45:49.919Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:47:22.565Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64496 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:45:49.919Z instances=[]
-[2026-05-15T03:47:22.566Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:47:22.679Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
-[2026-05-15T03:47:22.687Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:45:49.919Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:47:22.753Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64496 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:45:49.919Z instances=[]
-[2026-05-15T03:47:22.754Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T03:47:22.860Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
-[2026-05-15T03:51:03.306Z] [SyncDiag] RECEIVE-PUSH START: batch=ec7e4d49-725c-40ba-93b2-f22b5c2b5c8e, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
-[2026-05-15T03:51:03.312Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
-[2026-05-15T03:51:03.319Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:47:22.686Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:51:03.426Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64496 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:47:22.686Z instances=[]
-[2026-05-15T03:51:03.427Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:51:03.619Z] [SyncDiag] PREPARE-PULL DONE: 1 one-way rows across 1 tables, 0 field logs, 0 conflicts
-[2026-05-15T03:51:03.619Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 1 rows
-[2026-05-15T03:51:03.637Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:47:22.686Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:51:03.704Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64496 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:47:22.686Z instances=[]
-[2026-05-15T03:51:03.705Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T03:51:03.811Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
-[2026-05-15T03:51:11.225Z] [SyncDiag] RECEIVE-PUSH START: batch=de2a55bd-5edb-46fe-9076-8c42eb16716e, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
-[2026-05-15T03:51:11.229Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
-[2026-05-15T03:51:11.237Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:51:03.637Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:51:11.344Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64496 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:51:03.637Z instances=[]
-[2026-05-15T03:51:11.345Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:51:11.457Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
-[2026-05-15T03:51:11.465Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:51:03.637Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:51:11.486Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64496 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:51:03.637Z instances=[]
-[2026-05-15T03:51:11.487Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T03:51:11.592Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
-[2026-05-15T03:51:57.255Z] [SyncDiag] RECEIVE-PUSH START: batch=84b22d10-a088-41d5-a34e-f5bd2d484c88, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=5, oneWayRows=0
-[2026-05-15T03:51:57.272Z] [SyncDiag] RECEIVE-PUSH: 5 field logs stored in sync_field_log
-[2026-05-15T03:51:57.273Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=84b22d10-a088-41d5-a34e-f5bd2d484c88
-[2026-05-15T03:51:57.274Z] [SyncDiag] FIELD-LOG-INSERT START: 5 logs
-[2026-05-15T03:51:57.274Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 5 logs
-[2026-05-15T03:51:57.308Z] [SyncDiag] FIELD-LOG-INSERT OK: planner_dates row=1d702015-73f9-414c-866c-0ad8840c0b01 (7 columns)
-[2026-05-15T03:51:57.309Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
-[2026-05-15T03:51:57.313Z] [SyncDiag] RECEIVE-PUSH DONE: stored=5, applied=1, errors=0, oneWayTables=0
-[2026-05-15T03:51:59.348Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:51:11.464Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:51:59.537Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64501 unsynced=5 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:51:11.464Z instances=[SHIP-Vessel 5:5]
-[2026-05-15T03:51:59.538Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:51:59.652Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
-[2026-05-15T03:51:59.661Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:51:11.464Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:51:59.728Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64501 unsynced=5 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:51:11.464Z instances=[SHIP-Vessel 5:5]
-[2026-05-15T03:51:59.728Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T03:51:59.835Z] [SyncDiag] COMPLETE-SESSION: found 5 ship logs to mark synced
-[2026-05-15T03:53:02.713Z] [SyncDiag] RECEIVE-PUSH START: batch=97eaed84-b4c6-4f6a-a5c0-b3c419236eeb, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=67, oneWayRows=0
-[2026-05-15T03:53:02.793Z] [SyncDiag] RECEIVE-PUSH: 67 field logs stored in sync_field_log
-[2026-05-15T03:53:02.794Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=97eaed84-b4c6-4f6a-a5c0-b3c419236eeb
-[2026-05-15T03:53:02.794Z] [SyncDiag] FIELD-LOG-INSERT START: 67 logs
-[2026-05-15T03:53:02.795Z] [SyncDiag] FIELD-LOG-INSERT: 3 groups from 67 logs
-[2026-05-15T03:53:02.808Z] [SyncDiag] FIELD-LOG-INSERT OK: planner_dates row=fb44519e-3b9e-4e14-b59f-ca6f204b5d93 (7 columns)
-[2026-05-15T03:53:02.833Z] [SyncDiag] FIELD-LOG-INSERT OK: defects row=2c7d41b4-854f-41cf-8b3d-551c86899a1d (63 columns)
-[2026-05-15T03:53:02.834Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=2, updatePassthrough=1, errors=0
-[2026-05-15T03:53:02.865Z] [SyncDiag] RECEIVE-PUSH DONE: stored=67, applied=3, errors=0, oneWayTables=0
-[2026-05-15T03:53:02.873Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:51:59.660Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:53:03.069Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64568 unsynced=67 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:51:59.660Z instances=[SHIP-Vessel 5:67]
-[2026-05-15T03:53:03.070Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:53:03.184Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
-[2026-05-15T03:53:03.192Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:51:59.660Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:53:03.259Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64568 unsynced=67 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:51:59.660Z instances=[SHIP-Vessel 5:67]
-[2026-05-15T03:53:03.260Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T03:53:03.367Z] [SyncDiag] COMPLETE-SESSION: found 67 ship logs to mark synced
-[2026-05-15T03:53:04.865Z] [SyncDiag] RECEIVE-PUSH START: batch=5428fdc1-f350-4b61-bfed-f8755f6b53ca, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
-[2026-05-15T03:53:04.869Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
-[2026-05-15T03:53:04.876Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:53:03.191Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:53:05.072Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64568 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:53:03.191Z instances=[]
-[2026-05-15T03:53:05.073Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:53:05.186Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
-[2026-05-15T03:53:05.195Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:53:03.191Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:53:05.259Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64568 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:53:03.191Z instances=[]
-[2026-05-15T03:53:05.260Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T03:53:05.367Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
-[2026-05-15T03:54:20.727Z] [SyncDiag] RECEIVE-PUSH START: batch=042ca59f-0728-490f-ba56-530ccce9d58e, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=50, oneWayRows=0
-[2026-05-15T03:54:20.780Z] [SyncDiag] RECEIVE-PUSH: 50 field logs stored in sync_field_log
-[2026-05-15T03:54:20.782Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=042ca59f-0728-490f-ba56-530ccce9d58e
-[2026-05-15T03:54:20.782Z] [SyncDiag] FIELD-LOG-INSERT START: 50 logs
-[2026-05-15T03:54:20.782Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 50 logs
-[2026-05-15T03:54:20.793Z] [SyncDiag] FIELD-LOG-INSERT OK: work_orders row=255fcd0c-272e-42b5-aa8d-5ebac7e2cd01 (51 columns)
-[2026-05-15T03:54:20.794Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
-[2026-05-15T03:54:20.798Z] [SyncDiag] RECEIVE-PUSH DONE: stored=50, applied=1, errors=0, oneWayTables=0
-[2026-05-15T03:54:20.806Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:53:05.193Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:54:20.917Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64618 unsynced=50 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:53:05.193Z instances=[SHIP-Vessel 5:50]
-[2026-05-15T03:54:20.918Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:54:21.031Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
-[2026-05-15T03:54:21.039Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:53:05.193Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:54:21.060Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64618 unsynced=50 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:53:05.193Z instances=[SHIP-Vessel 5:50]
-[2026-05-15T03:54:21.061Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T03:54:21.167Z] [SyncDiag] COMPLETE-SESSION: found 50 ship logs to mark synced
-[2026-05-15T03:55:19.995Z] [SyncDiag] RECEIVE-PUSH START: batch=d9a2b905-3822-42e5-bf54-9882e85c4538, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=19, oneWayRows=0
-[2026-05-15T03:55:20.029Z] [SyncDiag] RECEIVE-PUSH: 19 field logs stored in sync_field_log
-[2026-05-15T03:55:20.031Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=d9a2b905-3822-42e5-bf54-9882e85c4538
-[2026-05-15T03:55:20.031Z] [SyncDiag] FIELD-LOG-INSERT START: 19 logs
-[2026-05-15T03:55:20.032Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 19 logs
-[2026-05-15T03:55:20.075Z] [SyncDiag] FIELD-LOG-INSERT OK: running_hours_audit row=1978f76a-abe6-41a6-9252-c2876c61c26a (21 columns)
-[2026-05-15T03:55:20.077Z] [SyncDiag] RH-APPLY INSERT: component=1cd918c9-b0e5-490f-b343-a70e990dc4da current_cumulative_rh updated from 333.00 to 500.00, last_updated=12 Jun 2025 05:30 from audit row 1978f76a-abe6-41a6-9252-c2876c61c26a
-[2026-05-15T03:55:20.078Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
-[2026-05-15T03:55:20.082Z] [SyncDiag] RECEIVE-PUSH DONE: stored=19, applied=1, errors=0, oneWayTables=0
-[2026-05-15T03:55:22.126Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:54:21.038Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:55:22.322Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64637 unsynced=19 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:54:21.038Z instances=[SHIP-Vessel 5:19]
-[2026-05-15T03:55:22.323Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:55:22.437Z] [SyncDiag] PREPARE-PULL DONE: 1 one-way rows across 1 tables, 0 field logs, 0 conflicts
-[2026-05-15T03:55:22.438Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 1 rows
-[2026-05-15T03:55:22.453Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:54:21.038Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:55:22.519Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64637 unsynced=19 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:54:21.038Z instances=[SHIP-Vessel 5:19]
-[2026-05-15T03:55:22.519Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T03:55:22.627Z] [SyncDiag] COMPLETE-SESSION: found 19 ship logs to mark synced
-[2026-05-15T03:55:45.552Z] [SyncDiag] FIELD-LOGGER: defects row=2c7d41b4-854f-41cf-8b3d-551c86899a1d — 5 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:55:47.338Z] [SyncDiag] FIELD-LOGGER: running_hours_audit row=70ac3c0c-33fb-4f22-a5ba-e2b0eaba92f7 — 20 fields changed, isInsert=true, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:55:52.001Z] [SyncDiag] RECEIVE-PUSH START: batch=d9fdf357-98cd-4c6a-9ea4-addb643f6566, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
-[2026-05-15T03:55:52.006Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
-[2026-05-15T03:55:52.014Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:55:22.452Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:55:52.104Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 25 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:55:52.105Z] [SyncDiag] PREPARE-PULL FIELD LOG TABLES: {"defects":5,"running_hours_audit":20}
-[2026-05-15T03:55:52.219Z] [SyncDiag] PREPARE-PULL DONE: 1 one-way rows across 1 tables, 25 field logs, 0 conflicts
-[2026-05-15T03:55:52.220Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 1 rows
-[2026-05-15T03:55:52.259Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:55:22.452Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:55:52.266Z] [SyncDiag] COMPLETE-SESSION: found 25 shore logs to mark synced
-[2026-05-15T03:55:52.381Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
-[2026-05-15T03:56:32.963Z] [SyncDiag] RECEIVE-PUSH START: batch=f9a4a0cd-d9cf-4f47-b802-760b787061d4, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=20, oneWayRows=0
-[2026-05-15T03:56:33.000Z] [SyncDiag] RECEIVE-PUSH: 20 field logs stored in sync_field_log
-[2026-05-15T03:56:33.002Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=f9a4a0cd-d9cf-4f47-b802-760b787061d4
-[2026-05-15T03:56:33.002Z] [SyncDiag] FIELD-LOG-INSERT START: 20 logs
-[2026-05-15T03:56:33.003Z] [SyncDiag] FIELD-LOG-INSERT: 3 groups from 20 logs
-[2026-05-15T03:56:33.056Z] [SyncDiag] FIELD-LOG-INSERT OK: spares_history row=fa093f94-9284-48be-a109-3f43f4fdf2fe (19 columns)
-[2026-05-15T03:56:33.057Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=3, errors=0
-[2026-05-15T03:56:33.110Z] [SyncDiag] RECEIVE-PUSH DONE: stored=20, applied=4, errors=0, oneWayTables=0
-[2026-05-15T03:56:33.117Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:55:52.258Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:56:33.219Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64682 unsynced=20 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:55:52.258Z instances=[SHIP-Vessel 5:20]
-[2026-05-15T03:56:33.220Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:56:33.368Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
-[2026-05-15T03:56:33.376Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:55:52.258Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:56:33.445Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64682 unsynced=20 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:55:52.258Z instances=[SHIP-Vessel 5:20]
-[2026-05-15T03:56:33.446Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T03:56:33.568Z] [SyncDiag] COMPLETE-SESSION: found 20 ship logs to mark synced
-[2026-05-15T03:56:37.297Z] [SyncDiag] RECEIVE-PUSH START: batch=4143370d-c9b0-42af-973b-e2467302b25a, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
-[2026-05-15T03:56:37.301Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
-[2026-05-15T03:56:39.328Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:56:33.375Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:56:39.526Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64682 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:56:33.375Z instances=[]
-[2026-05-15T03:56:39.527Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:56:39.641Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
-[2026-05-15T03:56:39.682Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:56:33.375Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:56:40.116Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64682 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:56:33.375Z instances=[]
-[2026-05-15T03:56:40.117Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T03:56:40.257Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
-[2026-05-15T03:57:27.667Z] [SyncDiag] RECEIVE-PUSH START: batch=79037479-2920-47b6-b2b6-d92504f11cee, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=28, oneWayRows=0
-[2026-05-15T03:57:27.711Z] [SyncDiag] RECEIVE-PUSH: 28 field logs stored in sync_field_log
-[2026-05-15T03:57:27.713Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=79037479-2920-47b6-b2b6-d92504f11cee
-[2026-05-15T03:57:27.713Z] [SyncDiag] FIELD-LOG-INSERT START: 28 logs
-[2026-05-15T03:57:27.714Z] [SyncDiag] FIELD-LOG-INSERT: 3 groups from 28 logs
-[2026-05-15T03:57:27.731Z] [SyncDiag] FIELD-LOG-INSERT OK: spares_history row=5471aced-b9ce-412b-a824-ea869d9b85aa (19 columns)
-[2026-05-15T03:57:27.741Z] [SyncDiag] FIELD-LOG-INSERT OK: spare_location_stock row=bc2defc6-40e2-45ac-83c8-ddc1bbe89525 (10 columns)
-[2026-05-15T03:57:27.746Z] [SyncDiag] FK-REMAP INSERT: spare_location_stock row=bc2defc6-40e2-45ac-83c8-ddc1bbe89525 location_uuid=5c3d328b-fedd-4ae4-91c6-8f22f87251c6 → local location_id=93
-[2026-05-15T03:57:27.746Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=2, updatePassthrough=3, errors=0
-[2026-05-15T03:57:27.762Z] [SyncDiag] INSERT-LOG ALLOWED: spares.location2 row=cf3eaadb-d7bc-4db2-9875-1deba21493aa
-[2026-05-15T03:57:27.766Z] [SyncDiag] RECEIVE-PUSH DONE: stored=28, applied=4, errors=1, oneWayTables=0
-[2026-05-15T03:57:27.785Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:56:39.681Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:57:27.998Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64710 unsynced=28 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:56:39.681Z instances=[SHIP-Vessel 5:28]
-[2026-05-15T03:57:27.999Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:57:28.186Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
-[2026-05-15T03:57:28.194Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:56:39.681Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:57:28.263Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64710 unsynced=28 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:56:39.681Z instances=[SHIP-Vessel 5:28]
-[2026-05-15T03:57:28.264Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T03:57:28.377Z] [SyncDiag] COMPLETE-SESSION: found 28 ship logs to mark synced
-[2026-05-15T03:58:01.306Z] [SyncDiag] RECEIVE-PUSH START: batch=661865e9-1ce8-4df1-9bd1-067ff240b945, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=62, oneWayRows=0
-[2026-05-15T03:58:01.366Z] [SyncDiag] RECEIVE-PUSH: 62 field logs stored in sync_field_log
-[2026-05-15T03:58:01.367Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=661865e9-1ce8-4df1-9bd1-067ff240b945
-[2026-05-15T03:58:01.367Z] [SyncDiag] FIELD-LOG-INSERT START: 62 logs
-[2026-05-15T03:58:01.368Z] [SyncDiag] FIELD-LOG-INSERT: 2 groups from 62 logs
-[2026-05-15T03:58:01.375Z] [SyncDiag] FIELD-LOG-INSERT OK: defects row=06236a8d-9914-494e-961b-8d22511ad5d2 (63 columns)
-[2026-05-15T03:58:01.376Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=1, errors=0
-[2026-05-15T03:58:01.384Z] [SyncDiag] RECEIVE-PUSH DONE: stored=62, applied=2, errors=0, oneWayTables=0
-[2026-05-15T03:58:02.997Z] [SyncDiag] FIELD-LOGGER: spares_history row=cf2f668f-6310-44a9-8f56-3761b4116104 — 18 fields changed, isInsert=true, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:58:03.004Z] [SyncDiag] FIELD-LOGGER: spares row=cf3eaadb-d7bc-4db2-9875-1deba21493aa — 2 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:58:03.121Z] [SyncDiag] FIELD-LOGGER: spares row=cf3eaadb-d7bc-4db2-9875-1deba21493aa — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:58:03.153Z] [SyncDiag] FIELD-LOGGER: spare_location_stock row=5d099f95-5f17-4c0d-9985-df3da570632c — 9 fields changed, isInsert=true, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:58:03.405Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:57:28.193Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:58:03.559Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 30 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:58:03.560Z] [SyncDiag] PREPARE-PULL FIELD LOG TABLES: {"spares_history":18,"spares":3,"spare_location_stock":9}
-[2026-05-15T03:58:03.729Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 30 field logs, 0 conflicts
-[2026-05-15T03:58:03.767Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:57:28.193Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:58:03.824Z] [SyncDiag] COMPLETE-SESSION: found 30 shore logs to mark synced
-[2026-05-15T03:58:03.982Z] [SyncDiag] COMPLETE-SESSION: found 62 ship logs to mark synced
-[2026-05-15T03:58:10.491Z] [SyncDiag] RECEIVE-PUSH START: batch=18aab039-15d5-4188-a1e5-19c82b442e8e, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
-[2026-05-15T03:58:10.495Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
-[2026-05-15T03:58:10.503Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:58:03.766Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:58:10.713Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64802 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:58:03.766Z instances=[]
-[2026-05-15T03:58:10.714Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:58:10.828Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
-[2026-05-15T03:58:10.837Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:58:03.766Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:58:10.904Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=64802 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T03:58:03.766Z instances=[]
-[2026-05-15T03:58:10.905Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T03:58:11.011Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
-[2026-05-15T03:58:35.444Z] [SyncDiag] FIELD-LOGGER: defects row=06236a8d-9914-494e-961b-8d22511ad5d2 — 2 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T03:59:34.429Z] [SyncDiag] RECEIVE-PUSH START: batch=9c3f3fee-5a23-48cd-8a44-741d2d3e17df, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
-[2026-05-15T03:59:34.436Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
-[2026-05-15T03:59:34.445Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:58:10.836Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T03:59:34.635Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 2 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T03:59:34.636Z] [SyncDiag] PREPARE-PULL FIELD LOG TABLES: {"defects":2}
-[2026-05-15T03:59:34.752Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 2 field logs, 0 conflicts
-[2026-05-15T03:59:34.777Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:58:10.836Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T03:59:34.828Z] [SyncDiag] COMPLETE-SESSION: found 2 shore logs to mark synced
-[2026-05-15T03:59:34.942Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
-[2026-05-15T04:00:10.036Z] [SyncDiag] FIELD-LOGGER: defect_sequences row=4 — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:00:10.176Z] [SyncDiag] FIELD-LOGGER: defects row=726e1095-f599-4b70-ae73-b44905504c74 — 58 fields changed, isInsert=true, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:00:42.573Z] [SyncDiag] FIELD-LOGGER: defect_sequences row=4 — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:00:51.246Z] [SyncDiag] FIELD-LOGGER: defect_sequences row=4 — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:00:51.409Z] [SyncDiag] FIELD-LOGGER: defects row=dbf211ef-b305-4e79-bb76-67577a9cccb5 — 57 fields changed, isInsert=true, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:01:00.941Z] [SyncDiag] RECEIVE-PUSH START: batch=ce18a094-5cbf-4584-b5f9-566856838370, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=14, oneWayRows=0
-[2026-05-15T04:01:00.963Z] [SyncDiag] RECEIVE-PUSH: 14 field logs stored in sync_field_log
-[2026-05-15T04:01:00.964Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=ce18a094-5cbf-4584-b5f9-566856838370
-[2026-05-15T04:01:00.965Z] [SyncDiag] FIELD-LOG-INSERT START: 14 logs
-[2026-05-15T04:01:00.965Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 14 logs
-[2026-05-15T04:01:01.015Z] [SyncDiag] FIELD-LOG-INSERT OK: change_request row=1767f656-9ad3-418d-a17e-468b8ea18168 (16 columns)
-[2026-05-15T04:01:01.016Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
-[2026-05-15T04:01:01.020Z] [SyncDiag] RECEIVE-PUSH DONE: stored=14, applied=1, errors=0, oneWayTables=0
-[2026-05-15T04:01:01.028Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T03:59:34.776Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T04:01:01.181Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 118 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T04:01:01.182Z] [SyncDiag] PREPARE-PULL FIELD LOG TABLES: {"defect_sequences":3,"defects":115}
-[2026-05-15T04:01:01.298Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 118 field logs, 0 conflicts
-[2026-05-15T04:01:01.327Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T03:59:34.776Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T04:01:01.380Z] [SyncDiag] COMPLETE-SESSION: found 118 shore logs to mark synced
-[2026-05-15T04:01:01.534Z] [SyncDiag] COMPLETE-SESSION: found 14 ship logs to mark synced
-[2026-05-15T04:01:19.662Z] [SyncDiag] FIELD-LOGGER: change_request row=1767f656-9ad3-418d-a17e-468b8ea18168 — 5 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:01:24.983Z] [SyncDiag] RECEIVE-PUSH START: batch=2d880551-7778-464e-9453-8131a6f70ea2, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=62, oneWayRows=0
-[2026-05-15T04:01:25.044Z] [SyncDiag] RECEIVE-PUSH: 62 field logs stored in sync_field_log
-[2026-05-15T04:01:25.046Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=2d880551-7778-464e-9453-8131a6f70ea2
-[2026-05-15T04:01:25.046Z] [SyncDiag] FIELD-LOG-INSERT START: 62 logs
-[2026-05-15T04:01:25.047Z] [SyncDiag] FIELD-LOG-INSERT: 2 groups from 62 logs
-[2026-05-15T04:01:25.054Z] [SyncDiag] FIELD-LOG-INSERT OK: defects row=513213be-f604-45c5-ba3b-ed77025e7e6f (63 columns)
-[2026-05-15T04:01:25.055Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=1, errors=0
-[2026-05-15T04:01:25.064Z] [SyncDiag] RECEIVE-PUSH DONE: stored=62, applied=2, errors=0, oneWayTables=0
-[2026-05-15T04:01:27.086Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T04:01:01.326Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T04:01:27.238Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 5 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T04:01:27.239Z] [SyncDiag] PREPARE-PULL FIELD LOG TABLES: {"change_request":5}
-[2026-05-15T04:01:27.434Z] [SyncDiag] PREPARE-PULL DONE: 1 one-way rows across 1 tables, 5 field logs, 0 conflicts
-[2026-05-15T04:01:27.434Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 1 rows
-[2026-05-15T04:01:27.478Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T04:01:01.326Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T04:01:27.539Z] [SyncDiag] COMPLETE-SESSION: found 5 shore logs to mark synced
-[2026-05-15T04:01:27.655Z] [SyncDiag] COMPLETE-SESSION: found 62 ship logs to mark synced
-[2026-05-15T04:04:43.995Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=d63f645c-0f11-4e6a-bc78-d9cccde1a389 — 9 fields changed, isInsert=true, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:04:45.423Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=d63f645c-0f11-4e6a-bc78-d9cccde1a389 — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:04:49.103Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=d63f645c-0f11-4e6a-bc78-d9cccde1a389 — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:04:52.809Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=d63f645c-0f11-4e6a-bc78-d9cccde1a389 — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:04:57.148Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=d63f645c-0f11-4e6a-bc78-d9cccde1a389 — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:05:04.478Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=d63f645c-0f11-4e6a-bc78-d9cccde1a389 — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:05:10.369Z] [SyncDiag] RECEIVE-PUSH START: batch=9fa7deaa-ade5-4672-812f-82c3d80f3579, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=10, oneWayRows=0
-[2026-05-15T04:05:10.389Z] [SyncDiag] RECEIVE-PUSH: 10 field logs stored in sync_field_log
-[2026-05-15T04:05:10.390Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=9fa7deaa-ade5-4672-812f-82c3d80f3579
-[2026-05-15T04:05:10.391Z] [SyncDiag] FIELD-LOG-INSERT START: 10 logs
-[2026-05-15T04:05:10.391Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 10 logs
-[2026-05-15T04:05:10.400Z] [SyncDiag] FIELD-LOG-INSERT OK: vessel_certificate_data row=96c17d0a-2620-48fd-8271-4b8c9b25282b (11 columns)
-[2026-05-15T04:05:10.401Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
-[2026-05-15T04:05:10.405Z] [SyncDiag] RECEIVE-PUSH DONE: stored=10, applied=1, errors=0, oneWayTables=0
-[2026-05-15T04:05:10.419Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T04:01:27.477Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T04:05:10.626Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 14 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T04:05:10.627Z] [SyncDiag] PREPARE-PULL FIELD LOG TABLES: {"vessel_certificate_data":14}
-[2026-05-15T04:05:10.822Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 14 field logs, 0 conflicts
-[2026-05-15T04:05:11.095Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T04:01:27.477Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T04:05:11.158Z] [SyncDiag] COMPLETE-SESSION: found 14 shore logs to mark synced
-[2026-05-15T04:05:11.278Z] [SyncDiag] COMPLETE-SESSION: found 10 ship logs to mark synced
-[2026-05-15T04:07:46.682Z] [SyncDiag] RECEIVE-PUSH START: batch=ab1a3c48-b4c5-4d12-9575-d7741c9cb1dc, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
-[2026-05-15T04:07:46.688Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
-[2026-05-15T04:07:48.706Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T04:05:11.094Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T04:07:48.941Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65027 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T04:05:11.094Z instances=[]
-[2026-05-15T04:07:48.942Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T04:07:49.128Z] [SyncDiag] PREPARE-PULL DONE: 12 one-way rows across 2 tables, 0 field logs, 0 conflicts
-[2026-05-15T04:07:49.129Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_surveys_master — 9 rows
-[2026-05-15T04:07:49.129Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_survey_applicability — 3 rows
-[2026-05-15T04:07:49.204Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T04:05:11.094Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T04:07:49.280Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65027 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T04:05:11.094Z instances=[]
-[2026-05-15T04:07:49.281Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T04:07:49.387Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
-[2026-05-15T04:08:55.611Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=cec536f7-8be3-4f2e-9643-f0c1b01a380e — 9 fields changed, isInsert=true, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:08:59.562Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=cec536f7-8be3-4f2e-9643-f0c1b01a380e — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:09:05.266Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=cec536f7-8be3-4f2e-9643-f0c1b01a380e — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:09:10.823Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=cec536f7-8be3-4f2e-9643-f0c1b01a380e — 1 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:09:15.953Z] [SyncDiag] RECEIVE-PUSH START: batch=d730f993-7112-44bb-8fdd-739fa55a4333, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=12, oneWayRows=0
-[2026-05-15T04:09:15.990Z] [SyncDiag] RECEIVE-PUSH: 12 field logs stored in sync_field_log
-[2026-05-15T04:09:16.027Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=d730f993-7112-44bb-8fdd-739fa55a4333
-[2026-05-15T04:09:16.028Z] [SyncDiag] FIELD-LOG-INSERT START: 12 logs
-[2026-05-15T04:09:16.028Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 12 logs
-[2026-05-15T04:09:16.050Z] [SyncDiag] FIELD-LOG-INSERT OK: vessel_survey_data row=4ae0602e-38ac-4521-be62-a43813374c22 (12 columns)
-[2026-05-15T04:09:16.051Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
-[2026-05-15T04:09:16.072Z] [SyncDiag] RECEIVE-PUSH DONE: stored=12, applied=1, errors=0, oneWayTables=0
-[2026-05-15T04:09:16.083Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T04:07:49.202Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T04:09:16.369Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 12 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T04:09:16.370Z] [SyncDiag] PREPARE-PULL FIELD LOG TABLES: {"vessel_survey_data":12}
-[2026-05-15T04:09:16.490Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 12 field logs, 0 conflicts
-[2026-05-15T04:09:16.984Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T04:07:49.202Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T04:09:17.027Z] [SyncDiag] COMPLETE-SESSION: found 12 shore logs to mark synced
-[2026-05-15T04:09:17.144Z] [SyncDiag] COMPLETE-SESSION: found 12 ship logs to mark synced
-[2026-05-15T04:10:41.532Z] [SyncDiag] RECEIVE-PUSH START: batch=329c994e-afed-409c-b781-049d0d9be07b, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=132, oneWayRows=0
-[2026-05-15T04:10:41.653Z] [SyncDiag] RECEIVE-PUSH: 132 field logs stored in sync_field_log
-[2026-05-15T04:10:41.659Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=329c994e-afed-409c-b781-049d0d9be07b
-[2026-05-15T04:10:41.660Z] [SyncDiag] FIELD-LOG-INSERT START: 132 logs
-[2026-05-15T04:10:41.661Z] [SyncDiag] FIELD-LOG-INSERT: 10 groups from 132 logs
-[2026-05-15T04:10:41.708Z] [SyncDiag] FIELD-LOG-INSERT OK: superintendent_notifications row=cfabc37f-9f32-4e5e-954f-b2d925a0aa0f (16 columns)
-[2026-05-15T04:10:41.758Z] [SyncDiag] FIELD-LOG-INSERT OK: inventory_transactions row=33204110-982f-46dd-ba17-7bbefde49686 (20 columns)
-[2026-05-15T04:10:41.764Z] [SyncDiag] FK-REMAP INSERT: inventory_transactions row=33204110-982f-46dd-ba17-7bbefde49686 location_uuid=66fa1627-de58-4bb5-b539-7c700ddcdd65 → local location_id=87
-[2026-05-15T04:10:41.776Z] [SyncDiag] FIELD-LOG-INSERT OK: spares_history row=aec35bff-f7d8-4298-8fc7-99fb9f186222 (22 columns)
-[2026-05-15T04:10:41.786Z] [SyncDiag] FIELD-LOG-INSERT OK: inventory_transactions row=c3297b04-019f-4433-a4c4-7c80b2d747fb (20 columns)
-[2026-05-15T04:10:41.789Z] [SyncDiag] FK-REMAP INSERT: inventory_transactions row=c3297b04-019f-4433-a4c4-7c80b2d747fb location_uuid=c223a04f-c006-4220-82c4-90523e06f8ef → local location_id=92
-[2026-05-15T04:10:41.794Z] [SyncDiag] FIELD-LOG-INSERT OK: spares_history row=872edb49-569f-4732-a3b6-ebbb8afe44e3 (22 columns)
-[2026-05-15T04:10:41.796Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=5, updatePassthrough=42, errors=0
-[2026-05-15T04:10:41.797Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.operationalFormsStatus row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.799Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.startDateTime row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.804Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.completionDateTime row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.807Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.executionAssignedTo row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.809Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.performedBy row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.811Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.noOfPersons row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.813Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.totalTimeHours row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.815Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.manhours row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.817Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.workCarriedOut row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.821Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.jobExperienceNotes row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.823Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.previousReading row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.825Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.runningHours row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.827Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.runningHoursDifference row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.828Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.readingDate row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.829Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.woExecutionId row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.834Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.remarks row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.836Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.completionRemarks row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.838Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.originalDueDate row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.846Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.superintendentNotifiedAt row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.848Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.approvalBlockReason row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.850Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.submittedDate row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.855Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.dateCompleted row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.857Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.maintenanceType row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.859Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.approver row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.861Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.nextDueDate row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.863Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.nextDueReading row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.865Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.currentReading row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.867Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.jobCategory row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.869Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.sfiCode row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.871Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.criticality row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.876Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.riskAssessmentStatus row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.878Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.safetyChecklistsStatus row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:10:41.914Z] [SyncDiag] RECEIVE-PUSH DONE: stored=132, applied=47, errors=0, oneWayTables=0
-[2026-05-15T04:10:43.942Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T04:09:16.983Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T04:10:44.302Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65183 unsynced=132 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T04:09:16.983Z instances=[SHIP-Vessel 5:132]
-[2026-05-15T04:10:44.303Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T04:10:44.496Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
-[2026-05-15T04:10:44.507Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T04:09:16.983Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T04:10:44.588Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65183 unsynced=132 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T04:09:16.983Z instances=[SHIP-Vessel 5:132]
-[2026-05-15T04:10:44.589Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T04:10:44.697Z] [SyncDiag] COMPLETE-SESSION: found 132 ship logs to mark synced
-[2026-05-15T04:10:58.359Z] [SyncDiag] FIELD-LOGGER: work_orders row=cf508b04-10f0-48f6-ad43-3d817fcf47c3 — 4 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:10:58.387Z] [SyncDiag] FIELD-LOGGER: superintendent_notifications row=cfabc37f-9f32-4e5e-954f-b2d925a0aa0f — 2 fields changed, isInsert=false, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
-[2026-05-15T04:11:06.529Z] [SyncDiag] RECEIVE-PUSH START: batch=a3203b1f-32c9-427c-ad2d-7e8f41e293c4, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
-[2026-05-15T04:11:06.534Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
-[2026-05-15T04:11:06.541Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T04:10:44.505Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T04:11:06.721Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 6 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T04:11:06.722Z] [SyncDiag] PREPARE-PULL FIELD LOG TABLES: {"work_orders":4,"superintendent_notifications":2}
-[2026-05-15T04:11:06.837Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 6 field logs, 0 conflicts
-[2026-05-15T04:11:06.867Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T04:10:44.505Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T04:11:06.918Z] [SyncDiag] COMPLETE-SESSION: found 6 shore logs to mark synced
-[2026-05-15T04:11:07.043Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
-[2026-05-15T04:14:36.872Z] [SyncDiag] RECEIVE-PUSH START: batch=25ded753-8ad2-4b92-9ef6-0b73ae882065, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=36, oneWayRows=0
-[2026-05-15T04:14:36.914Z] [SyncDiag] RECEIVE-PUSH: 36 field logs stored in sync_field_log
-[2026-05-15T04:14:36.915Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=25ded753-8ad2-4b92-9ef6-0b73ae882065
-[2026-05-15T04:14:36.916Z] [SyncDiag] FIELD-LOG-INSERT START: 36 logs
-[2026-05-15T04:14:36.916Z] [SyncDiag] FIELD-LOG-INSERT: 4 groups from 36 logs
-[2026-05-15T04:14:36.975Z] [SyncDiag] FIELD-LOG-INSERT OK: component_maintenance_history row=2676f015-e8e8-438c-9bb7-ed1bc8f238cb (25 columns)
-[2026-05-15T04:14:36.989Z] [SyncDiag] FIELD-LOG-INSERT OK: spare_location_stock row=7a195b06-f62c-40c1-9cba-1a2a9bc33c4d (10 columns)
-[2026-05-15T04:14:36.992Z] [SyncDiag] FK-REMAP INSERT DEFERRED: spare_location_stock row=7a195b06-f62c-40c1-9cba-1a2a9bc33c4d location_uuid=3bfab95f-4da9-4a08-bd96-fa49b2e0d4de — location not yet synced
-[2026-05-15T04:14:36.993Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=2, updatePassthrough=5, errors=0
-[2026-05-15T04:14:36.999Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.approvalAction row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:14:37.000Z] [SyncDiag] INSERT-LOG ALLOWED: work_orders.ceApprovalRemarks row=cf508b04-10f0-48f6-ad43-3d817fcf47c3
-[2026-05-15T04:14:37.007Z] [SyncDiag] RECEIVE-PUSH DONE: stored=36, applied=7, errors=0, oneWayTables=0
-[2026-05-15T04:14:39.051Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T04:11:06.866Z, shoreInstanceId=SHORE-PROD
-[2026-05-15T04:14:39.251Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65225 unsynced=36 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T04:11:06.866Z instances=[SHIP-Vessel 5:36]
-[2026-05-15T04:14:39.252Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
-[2026-05-15T04:14:39.366Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
-[2026-05-15T04:14:39.374Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T04:11:06.866Z excludeInstance=SHIP-Vessel 5
-[2026-05-15T04:14:39.443Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65225 unsynced=36 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T04:11:06.866Z instances=[SHIP-Vessel 5:36]
-[2026-05-15T04:14:39.444Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
-[2026-05-15T04:14:39.551Z] [SyncDiag] COMPLETE-SESSION: found 36 ship logs to mark synced
+[2026-05-15T11:24:49.691Z] [SyncDiag] RECEIVE-PUSH START: batch=245dfab1-f05a-4509-8275-0d96726aaab0, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
+[2026-05-15T11:24:49.698Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
+[2026-05-15T11:24:49.710Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T10:56:07.807Z, shoreInstanceId=SHORE-PROD
+[2026-05-15T11:24:49.932Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65243 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T10:56:07.807Z instances=[]
+[2026-05-15T11:24:49.934Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
+[2026-05-15T11:24:50.159Z] [SyncDiag] PREPARE-PULL DONE: 137 one-way rows across 6 tables, 0 field logs, 0 conflicts
+[2026-05-15T11:24:50.159Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 4 rows
+[2026-05-15T11:24:50.160Z] [SyncDiag] PREPARE-PULL ONE-WAY: master_lists — 6 rows
+[2026-05-15T11:24:50.160Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_certificates_master — 78 rows
+[2026-05-15T11:24:50.161Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_surveys_master — 25 rows
+[2026-05-15T11:24:50.161Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_certificate_applicability — 4 rows
+[2026-05-15T11:24:50.162Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_survey_applicability — 20 rows
+[2026-05-15T11:24:50.537Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T10:56:07.807Z excludeInstance=SHIP-Vessel 5
+[2026-05-15T11:24:50.604Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65243 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T10:56:07.807Z instances=[]
+[2026-05-15T11:24:50.605Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
+[2026-05-15T11:24:50.714Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
+[2026-05-15T11:26:51.206Z] [SyncDiag] RECEIVE-PUSH START: batch=8750e82d-3535-4796-83e5-468de5c7041a, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
+[2026-05-15T11:26:51.213Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
+[2026-05-15T11:26:51.222Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T11:24:50.536Z, shoreInstanceId=SHORE-PROD
+[2026-05-15T11:26:51.428Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65243 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T11:24:50.536Z instances=[]
+[2026-05-15T11:26:51.428Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
+[2026-05-15T11:26:51.541Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
+[2026-05-15T11:26:51.550Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T11:24:50.536Z excludeInstance=SHIP-Vessel 5
+[2026-05-15T11:26:51.614Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65243 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T11:24:50.536Z instances=[]
+[2026-05-15T11:26:51.614Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
+[2026-05-15T11:26:51.720Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
+[2026-05-15T12:58:16.867Z] [SyncDiag] RECEIVE-PUSH START: batch=7332e34d-962a-41b5-9120-d626e57de977, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
+[2026-05-15T12:58:16.873Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
+[2026-05-15T12:58:18.897Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T11:26:51.549Z, shoreInstanceId=SHORE-PROD
+[2026-05-15T12:58:19.118Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65243 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T11:26:51.549Z instances=[]
+[2026-05-15T12:58:19.119Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
+[2026-05-15T12:58:19.334Z] [SyncDiag] PREPARE-PULL DONE: 6 one-way rows across 1 tables, 0 field logs, 0 conflicts
+[2026-05-15T12:58:19.335Z] [SyncDiag] PREPARE-PULL ONE-WAY: master_lists — 6 rows
+[2026-05-15T12:58:19.390Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T11:26:51.549Z excludeInstance=SHIP-Vessel 5
+[2026-05-15T12:58:19.457Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65243 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T11:26:51.549Z instances=[]
+[2026-05-15T12:58:19.458Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
+[2026-05-15T12:58:19.574Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
+[2026-05-15T12:59:26.447Z] [SyncDiag] RECEIVE-PUSH START: batch=6ba56c4b-18cc-4645-bb28-41d5ec2c63ed, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=7, oneWayRows=0
+[2026-05-15T12:59:26.480Z] [SyncDiag] RECEIVE-PUSH: 7 field logs stored in sync_field_log
+[2026-05-15T12:59:26.481Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=6ba56c4b-18cc-4645-bb28-41d5ec2c63ed
+[2026-05-15T12:59:26.483Z] [SyncDiag] FIELD-LOG-INSERT START: 7 logs
+[2026-05-15T12:59:26.483Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 7 logs
+[2026-05-15T12:59:26.517Z] [SyncDiag] FIELD-LOG-INSERT OK: vessel_survey_data row=2d317a59-765a-4b34-8493-2495d84816c8 (9 columns)
+[2026-05-15T12:59:26.518Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
+[2026-05-15T12:59:26.524Z] [SyncDiag] ENSURE-MASTER: created 1 ship_surveys_master placeholder(s) for vessel=7446783c-841a-11ed-aa7c-7003bca91a86
+[2026-05-15T12:59:26.537Z] [SyncDiag] ENSURE-APPLICABILITY: created 1 vessel_survey_applicability row(s) for vessel=7446783c-841a-11ed-aa7c-7003bca91a86
+[2026-05-15T12:59:26.541Z] [SyncDiag] RECEIVE-PUSH DONE: stored=7, applied=1, errors=0, oneWayTables=0
+[2026-05-15T12:59:26.551Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T12:58:19.388Z, shoreInstanceId=SHORE-PROD
+[2026-05-15T12:59:26.756Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65250 unsynced=7 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T12:58:19.388Z instances=[SHIP-Vessel 5:7]
+[2026-05-15T12:59:26.756Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
+[2026-05-15T12:59:26.870Z] [SyncDiag] PREPARE-PULL DONE: 2 one-way rows across 2 tables, 0 field logs, 0 conflicts
+[2026-05-15T12:59:26.870Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_surveys_master — 1 rows
+[2026-05-15T12:59:26.871Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_survey_applicability — 1 rows
+[2026-05-15T12:59:26.937Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T12:58:19.388Z excludeInstance=SHIP-Vessel 5
+[2026-05-15T12:59:27.005Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65250 unsynced=7 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T12:58:19.388Z instances=[SHIP-Vessel 5:7]
+[2026-05-15T12:59:27.006Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
+[2026-05-15T12:59:27.113Z] [SyncDiag] COMPLETE-SESSION: found 7 ship logs to mark synced
+[2026-05-15T13:00:50.210Z] [SyncDiag] RECEIVE-PUSH START: batch=a8eb9475-d73e-4432-a423-498f5eef1a5f, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=7, oneWayRows=0
+[2026-05-15T13:00:50.229Z] [SyncDiag] RECEIVE-PUSH: 7 field logs stored in sync_field_log
+[2026-05-15T13:00:50.230Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=a8eb9475-d73e-4432-a423-498f5eef1a5f
+[2026-05-15T13:00:50.231Z] [SyncDiag] FIELD-LOG-INSERT START: 7 logs
+[2026-05-15T13:00:50.231Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 7 logs
+[2026-05-15T13:00:50.260Z] [SyncDiag] FIELD-LOG-INSERT OK: vessel_certificate_data row=09e8199e-2eaa-4c53-8ab5-f5019d46ee5e (9 columns)
+[2026-05-15T13:00:50.261Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
+[2026-05-15T13:00:50.276Z] [SyncDiag] ENSURE-MASTER: created 1 ship_certificates_master placeholder(s) for vessel=7446783c-841a-11ed-aa7c-7003bca91a86
+[2026-05-15T13:00:50.293Z] [SyncDiag] ENSURE-APPLICABILITY: created 1 vessel_certificate_applicability row(s) for vessel=7446783c-841a-11ed-aa7c-7003bca91a86
+[2026-05-15T13:00:50.297Z] [SyncDiag] RECEIVE-PUSH DONE: stored=7, applied=1, errors=0, oneWayTables=0
+[2026-05-15T13:00:52.317Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T12:59:26.936Z, shoreInstanceId=SHORE-PROD
+[2026-05-15T13:00:52.473Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65257 unsynced=7 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T12:59:26.936Z instances=[SHIP-Vessel 5:7]
+[2026-05-15T13:00:52.474Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
+[2026-05-15T13:00:52.586Z] [SyncDiag] PREPARE-PULL DONE: 2 one-way rows across 2 tables, 0 field logs, 0 conflicts
+[2026-05-15T13:00:52.587Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_certificates_master — 1 rows
+[2026-05-15T13:00:52.587Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_certificate_applicability — 1 rows
+[2026-05-15T13:00:52.631Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T12:59:26.936Z excludeInstance=SHIP-Vessel 5
+[2026-05-15T13:00:52.696Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65257 unsynced=7 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T12:59:26.936Z instances=[SHIP-Vessel 5:7]
+[2026-05-15T13:00:52.697Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
+[2026-05-15T13:00:52.804Z] [SyncDiag] COMPLETE-SESSION: found 7 ship logs to mark synced
+[2026-05-15T13:15:32.679Z] [SyncDiag] RECEIVE-PUSH START: batch=782170d2-b7db-4e4c-b60f-6dbb14b26408, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=7, oneWayRows=0
+[2026-05-15T13:15:32.704Z] [SyncDiag] RECEIVE-PUSH: 7 field logs stored in sync_field_log
+[2026-05-15T13:15:32.705Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=782170d2-b7db-4e4c-b60f-6dbb14b26408
+[2026-05-15T13:15:32.705Z] [SyncDiag] FIELD-LOG-INSERT START: 7 logs
+[2026-05-15T13:15:32.706Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 7 logs
+[2026-05-15T13:15:32.714Z] [SyncDiag] FIELD-LOG-INSERT OK: vessel_survey_data row=c6455087-ca29-4814-87da-589edbec234d (9 columns)
+[2026-05-15T13:15:32.715Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
+[2026-05-15T13:15:32.722Z] [SyncDiag] ENSURE-MASTER: created 1 ship_surveys_master placeholder(s) for vessel=7446783c-841a-11ed-aa7c-7003bca91a86
+[2026-05-15T13:15:32.735Z] [SyncDiag] ENSURE-APPLICABILITY: created 1 vessel_survey_applicability row(s) for vessel=7446783c-841a-11ed-aa7c-7003bca91a86
+[2026-05-15T13:15:32.740Z] [SyncDiag] RECEIVE-PUSH DONE: stored=7, applied=1, errors=0, oneWayTables=0
+[2026-05-15T13:15:34.786Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T13:00:52.630Z, shoreInstanceId=SHORE-PROD
+[2026-05-15T13:15:35.001Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65264 unsynced=7 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T13:00:52.630Z instances=[SHIP-Vessel 5:7]
+[2026-05-15T13:15:35.002Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
+[2026-05-15T13:15:35.205Z] [SyncDiag] PREPARE-PULL DONE: 2 one-way rows across 2 tables, 0 field logs, 0 conflicts
+[2026-05-15T13:15:35.206Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_surveys_master — 1 rows
+[2026-05-15T13:15:35.207Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_survey_applicability — 1 rows
+[2026-05-15T13:15:35.242Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T13:00:52.630Z excludeInstance=SHIP-Vessel 5
+[2026-05-15T13:15:35.310Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65264 unsynced=7 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T13:00:52.630Z instances=[SHIP-Vessel 5:7]
+[2026-05-15T13:15:35.310Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
+[2026-05-15T13:15:35.463Z] [SyncDiag] COMPLETE-SESSION: found 7 ship logs to mark synced
+[2026-05-15T13:23:45.824Z] [SyncDiag] RECEIVE-PUSH START: batch=e7a3b891-52b2-4f4f-a182-181be723cea2, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=7, oneWayRows=0
+[2026-05-15T13:23:45.854Z] [SyncDiag] RECEIVE-PUSH: 7 field logs stored in sync_field_log
+[2026-05-15T13:23:45.856Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=e7a3b891-52b2-4f4f-a182-181be723cea2
+[2026-05-15T13:23:45.856Z] [SyncDiag] FIELD-LOG-INSERT START: 7 logs
+[2026-05-15T13:23:45.857Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 7 logs
+[2026-05-15T13:23:45.867Z] [SyncDiag] FIELD-LOG-INSERT OK: vessel_survey_data row=a974d531-5fa6-4184-9ede-47a4e5a356ca (9 columns)
+[2026-05-15T13:23:45.869Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
+[2026-05-15T13:23:45.876Z] [SyncDiag] ENSURE-MASTER: created 1 ship_surveys_master placeholder(s) for vessel=7446783c-841a-11ed-aa7c-7003bca91a86
+[2026-05-15T13:23:45.881Z] [SyncDiag] ENSURE-APPLICABILITY: created 1 vessel_survey_applicability row(s) for vessel=7446783c-841a-11ed-aa7c-7003bca91a86
+[2026-05-15T13:23:45.887Z] [SyncDiag] RECEIVE-PUSH DONE: stored=7, applied=1, errors=0, oneWayTables=0
+[2026-05-15T13:23:45.897Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T13:15:35.241Z, shoreInstanceId=SHORE-PROD
+[2026-05-15T13:23:46.083Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65271 unsynced=7 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T13:15:35.241Z instances=[SHIP-Vessel 5:7]
+[2026-05-15T13:23:46.084Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
+[2026-05-15T13:23:46.276Z] [SyncDiag] PREPARE-PULL DONE: 2 one-way rows across 2 tables, 0 field logs, 0 conflicts
+[2026-05-15T13:23:46.276Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_surveys_master — 1 rows
+[2026-05-15T13:23:46.277Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_survey_applicability — 1 rows
+[2026-05-15T13:23:46.305Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T13:15:35.241Z excludeInstance=SHIP-Vessel 5
+[2026-05-15T13:23:46.379Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65271 unsynced=7 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T13:15:35.241Z instances=[SHIP-Vessel 5:7]
+[2026-05-15T13:23:46.380Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
+[2026-05-15T13:23:46.486Z] [SyncDiag] COMPLETE-SESSION: found 7 ship logs to mark synced
+[2026-05-15T13:24:55.528Z] [SyncDiag] RECEIVE-PUSH START: batch=8332d52c-df51-4d3a-b262-dc786ad89a85, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
+[2026-05-15T13:24:55.534Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
+[2026-05-15T13:24:55.546Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T13:23:46.304Z, shoreInstanceId=SHORE-PROD
+[2026-05-15T13:24:55.701Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65271 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T13:23:46.304Z instances=[]
+[2026-05-15T13:24:55.702Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
+[2026-05-15T13:24:55.815Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
+[2026-05-15T13:24:55.824Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T13:23:46.304Z excludeInstance=SHIP-Vessel 5
+[2026-05-15T13:24:55.893Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65271 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T13:23:46.304Z instances=[]
+[2026-05-15T13:24:55.893Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
+[2026-05-15T13:24:55.999Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
+[2026-05-15T13:48:15.842Z] [SyncDiag] RECEIVE-PUSH START: batch=645c2b7a-aea0-44b5-bc15-d8e603c2154b, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=7, oneWayRows=0
+[2026-05-15T13:48:15.871Z] [SyncDiag] RECEIVE-PUSH: 7 field logs stored in sync_field_log
+[2026-05-15T13:48:15.872Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=645c2b7a-aea0-44b5-bc15-d8e603c2154b
+[2026-05-15T13:48:15.874Z] [SyncDiag] FIELD-LOG-INSERT START: 7 logs
+[2026-05-15T13:48:15.874Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 7 logs
+[2026-05-15T13:48:15.902Z] [SyncDiag] FIELD-LOG-INSERT OK: vessel_survey_data row=9d95dd86-260c-4c1c-91ee-6d467aeb9f2d (9 columns)
+[2026-05-15T13:48:15.903Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
+[2026-05-15T13:48:15.910Z] [SyncDiag] ENSURE-MASTER: created 1 ship_surveys_master placeholder(s) for vessel=7446783c-841a-11ed-aa7c-7003bca91a86
+[2026-05-15T13:48:15.915Z] [SyncDiag] ENSURE-APPLICABILITY: created 1 vessel_survey_applicability row(s) for vessel=7446783c-841a-11ed-aa7c-7003bca91a86
+[2026-05-15T13:48:15.917Z] [SyncDiag] MASTER-HINT APPLIED: ship_surveys_master master_id=VES-022 name=New Test survey---nw--1
+[2026-05-15T13:48:15.921Z] [SyncDiag] RECEIVE-PUSH DONE: stored=7, applied=1, errors=0, oneWayTables=0
+[2026-05-15T13:48:15.934Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T13:24:55.823Z, shoreInstanceId=SHORE-PROD
+[2026-05-15T13:48:16.151Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65278 unsynced=7 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T13:24:55.823Z instances=[SHIP-Vessel 5:7]
+[2026-05-15T13:48:16.151Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
+[2026-05-15T13:48:16.364Z] [SyncDiag] PREPARE-PULL DONE: 8 one-way rows across 3 tables, 0 field logs, 0 conflicts
+[2026-05-15T13:48:16.364Z] [SyncDiag] PREPARE-PULL ONE-WAY: master_lists — 6 rows
+[2026-05-15T13:48:16.365Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_surveys_master — 1 rows
+[2026-05-15T13:48:16.365Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_survey_applicability — 1 rows
+[2026-05-15T13:48:16.444Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T13:24:55.823Z excludeInstance=SHIP-Vessel 5
+[2026-05-15T13:48:16.512Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65278 unsynced=7 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T13:24:55.823Z instances=[SHIP-Vessel 5:7]
+[2026-05-15T13:48:16.512Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
+[2026-05-15T13:48:16.618Z] [SyncDiag] COMPLETE-SESSION: found 7 ship logs to mark synced
+[2026-05-15T13:50:47.983Z] [SyncDiag] RECEIVE-PUSH START: batch=f5872767-4942-4bfa-90ee-dcd24cff8d83, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=7, oneWayRows=0
+[2026-05-15T13:50:48.006Z] [SyncDiag] RECEIVE-PUSH: 7 field logs stored in sync_field_log
+[2026-05-15T13:50:48.007Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=f5872767-4942-4bfa-90ee-dcd24cff8d83
+[2026-05-15T13:50:48.008Z] [SyncDiag] FIELD-LOG-INSERT START: 7 logs
+[2026-05-15T13:50:48.008Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 7 logs
+[2026-05-15T13:50:48.041Z] [SyncDiag] FIELD-LOG-INSERT OK: vessel_certificate_data row=fa884324-04ec-4fce-9b69-05ca5c54618a (9 columns)
+[2026-05-15T13:50:48.042Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
+[2026-05-15T13:50:48.062Z] [SyncDiag] ENSURE-MASTER: created 1 ship_certificates_master placeholder(s) for vessel=7446783c-841a-11ed-aa7c-7003bca91a86
+[2026-05-15T13:50:48.075Z] [SyncDiag] ENSURE-APPLICABILITY: created 1 vessel_certificate_applicability row(s) for vessel=7446783c-841a-11ed-aa7c-7003bca91a86
+[2026-05-15T13:50:48.077Z] [SyncDiag] MASTER-HINT APPLIED: ship_certificates_master master_id=VES-010 name=Cert Test Nil 12
+[2026-05-15T13:50:48.081Z] [SyncDiag] RECEIVE-PUSH DONE: stored=7, applied=1, errors=0, oneWayTables=0
+[2026-05-15T13:50:48.095Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T13:48:16.443Z, shoreInstanceId=SHORE-PROD
+[2026-05-15T13:50:48.260Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65285 unsynced=7 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T13:48:16.443Z instances=[SHIP-Vessel 5:7]
+[2026-05-15T13:50:48.260Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
+[2026-05-15T13:50:48.449Z] [SyncDiag] PREPARE-PULL DONE: 2 one-way rows across 2 tables, 0 field logs, 0 conflicts
+[2026-05-15T13:50:48.449Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_certificates_master — 1 rows
+[2026-05-15T13:50:48.450Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_certificate_applicability — 1 rows
+[2026-05-15T13:50:48.488Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T13:48:16.443Z excludeInstance=SHIP-Vessel 5
+[2026-05-15T13:50:48.553Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65285 unsynced=7 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T13:48:16.443Z instances=[SHIP-Vessel 5:7]
+[2026-05-15T13:50:48.553Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
+[2026-05-15T13:50:48.660Z] [SyncDiag] COMPLETE-SESSION: found 7 ship logs to mark synced
+[2026-05-15T14:43:20.335Z] [SyncDiag] RECEIVE-PUSH START: batch=8d1befba-cac7-459c-b154-f9ef61b430a0, vessel=744535d0-841a-11ed-aa7c-7003bca91a86, fieldLogs=7, oneWayRows=0
+[2026-05-15T14:43:20.361Z] [SyncDiag] RECEIVE-PUSH: 7 field logs stored in sync_field_log
+[2026-05-15T14:43:20.362Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=8d1befba-cac7-459c-b154-f9ef61b430a0
+[2026-05-15T14:43:20.364Z] [SyncDiag] FIELD-LOG-INSERT START: 7 logs
+[2026-05-15T14:43:20.364Z] [SyncDiag] FIELD-LOG-INSERT: 1 groups from 7 logs
+[2026-05-15T14:43:20.394Z] [SyncDiag] FIELD-LOG-INSERT OK: vessel_certificate_data row=130a924c-90c7-42a4-b286-d4beb4fdc4f4 (9 columns)
+[2026-05-15T14:43:20.395Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=1, updatePassthrough=0, errors=0
+[2026-05-15T14:43:20.402Z] [SyncDiag] ENSURE-MASTER: created 1 ship_certificates_master placeholder(s) for vessel=744535d0-841a-11ed-aa7c-7003bca91a86
+[2026-05-15T14:43:20.407Z] [SyncDiag] ENSURE-APPLICABILITY: created 1 vessel_certificate_applicability row(s) for vessel=744535d0-841a-11ed-aa7c-7003bca91a86
+[2026-05-15T14:43:20.409Z] [SyncDiag] MASTER-HINT APPLIED: ship_certificates_master master_id=VES-011 name=Vess 4 test
+[2026-05-15T14:43:20.413Z] [SyncDiag] RECEIVE-PUSH DONE: stored=7, applied=1, errors=0, oneWayTables=0
+[2026-05-15T14:43:22.429Z] [SyncDiag] PREPARE-PULL START: vessel=744535d0-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T14:35:05.473Z, shoreInstanceId=SHORE-PROD
+[2026-05-15T14:43:22.622Z] [SyncDiag] PREPARE-PULL DIAG: vessel=744535d0-841a-11ed-aa7c-7003bca91a86 total_logs=7 unsynced=7 after_instance_filter=0 exclude=SHIP-Vessel 4 since=2026-05-15T14:35:05.473Z instances=[SHIP-Vessel 4:7]
+[2026-05-15T14:43:22.623Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=744535d0-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 4)
+[2026-05-15T14:43:22.631Z] [SyncDiag] PREPARE-PULL DONE: 3 one-way rows across 3 tables, 0 field logs, 0 conflicts
+[2026-05-15T14:43:22.632Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 1 rows
+[2026-05-15T14:43:22.632Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_certificates_master — 1 rows
+[2026-05-15T14:43:22.633Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_certificate_applicability — 1 rows
+[2026-05-15T14:43:22.708Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=744535d0-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T14:35:05.473Z excludeInstance=SHIP-Vessel 4
+[2026-05-15T14:43:22.761Z] [SyncDiag] PREPARE-PULL DIAG: vessel=744535d0-841a-11ed-aa7c-7003bca91a86 total_logs=7 unsynced=7 after_instance_filter=0 exclude=SHIP-Vessel 4 since=2026-05-15T14:35:05.473Z instances=[SHIP-Vessel 4:7]
+[2026-05-15T14:43:22.761Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
+[2026-05-15T14:43:22.763Z] [SyncDiag] COMPLETE-SESSION: found 7 ship logs to mark synced
+[2026-05-15T14:49:30.879Z] [SyncDiag] RECEIVE-PUSH START: batch=2b0a9fd6-6f51-43a3-84c7-f7cf5acaf1f8, vessel=744535d0-841a-11ed-aa7c-7003bca91a86, fieldLogs=50, oneWayRows=0
+[2026-05-15T14:49:30.940Z] [SyncDiag] RECEIVE-PUSH: 50 field logs stored in sync_field_log
+[2026-05-15T14:49:30.941Z] [SyncDiag] SYNC-APPLY TRIGGER BYPASS active for batch=2b0a9fd6-6f51-43a3-84c7-f7cf5acaf1f8
+[2026-05-15T14:49:30.942Z] [SyncDiag] FIELD-LOG-INSERT START: 50 logs
+[2026-05-15T14:49:30.942Z] [SyncDiag] FIELD-LOG-INSERT: 3 groups from 50 logs
+[2026-05-15T14:49:30.989Z] [SyncDiag] FIELD-LOG-INSERT OK: running_hours_audit row=4eb63540-6c26-4a3a-ba4c-011c44053f28 (21 columns)
+[2026-05-15T14:49:30.991Z] [SyncDiag] RH-APPLY INSERT: component=0811fa37-e0cf-40e1-ae54-a918f2fe3ea4 current_cumulative_rh updated from 0.00 to 1000.00, last_updated=15 May 2026 05:30 from audit row 4eb63540-6c26-4a3a-ba4c-011c44053f28
+[2026-05-15T14:49:31.020Z] [SyncDiag] FIELD-LOG-INSERT OK: stores_items row=f6aea1ce-259f-4e43-aa47-37ac022e3d27 (19 columns)
+[2026-05-15T14:49:31.046Z] [SyncDiag] FIELD-LOG-INSERT OK: change_request row=2914e378-02a1-4c71-ac20-d6d10d7257ca (16 columns)
+[2026-05-15T14:49:31.047Z] [SyncDiag] FIELD-LOG-INSERT DONE: inserted=3, updatePassthrough=0, errors=0
+[2026-05-15T14:49:31.051Z] [SyncDiag] RECEIVE-PUSH DONE: stored=50, applied=3, errors=0, oneWayTables=0
+[2026-05-15T14:49:33.062Z] [SyncDiag] PREPARE-PULL START: vessel=744535d0-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T14:43:22.707Z, shoreInstanceId=SHORE-PROD
+[2026-05-15T14:49:33.257Z] [SyncDiag] PREPARE-PULL DIAG: vessel=744535d0-841a-11ed-aa7c-7003bca91a86 total_logs=57 unsynced=50 after_instance_filter=0 exclude=SHIP-Vessel 4 since=2026-05-15T14:43:22.707Z instances=[SHIP-Vessel 4:50]
+[2026-05-15T14:49:33.257Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=744535d0-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 4)
+[2026-05-15T14:49:33.267Z] [SyncDiag] PREPARE-PULL DONE: 1 one-way rows across 1 tables, 0 field logs, 0 conflicts
+[2026-05-15T14:49:33.267Z] [SyncDiag] PREPARE-PULL ONE-WAY: components — 1 rows
+[2026-05-15T14:49:33.285Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=744535d0-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T14:43:22.707Z excludeInstance=SHIP-Vessel 4
+[2026-05-15T14:49:33.339Z] [SyncDiag] PREPARE-PULL DIAG: vessel=744535d0-841a-11ed-aa7c-7003bca91a86 total_logs=57 unsynced=50 after_instance_filter=0 exclude=SHIP-Vessel 4 since=2026-05-15T14:43:22.707Z instances=[SHIP-Vessel 4:50]
+[2026-05-15T14:49:33.340Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
+[2026-05-15T14:49:33.342Z] [SyncDiag] COMPLETE-SESSION: found 50 ship logs to mark synced
+[2026-05-15T14:50:29.352Z] [SyncDiag] RECEIVE-PUSH START: batch=57f7ee81-f0fb-49f4-ab5a-e080746c1482, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
+[2026-05-15T14:50:29.359Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
+[2026-05-15T14:50:31.371Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-05-15T13:50:48.487Z, shoreInstanceId=SHORE-PROD
+[2026-05-15T14:50:31.597Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65285 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T13:50:48.487Z instances=[]
+[2026-05-15T14:50:31.597Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
+[2026-05-15T14:50:31.816Z] [SyncDiag] PREPARE-PULL DONE: 7 one-way rows across 2 tables, 0 field logs, 0 conflicts
+[2026-05-15T14:50:31.816Z] [SyncDiag] PREPARE-PULL ONE-WAY: master_lists — 6 rows
+[2026-05-15T14:50:31.817Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_certificates_master — 1 rows
+[2026-05-15T14:50:31.892Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-05-15T13:50:48.487Z excludeInstance=SHIP-Vessel 5
+[2026-05-15T14:50:31.967Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65285 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-05-15T13:50:48.487Z instances=[]
+[2026-05-15T14:50:31.968Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
+[2026-05-15T14:50:32.153Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
