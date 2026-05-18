@@ -1,0 +1,1 @@
+ALTER TABLE "report_favorites" ALTER COLUMN "rfuuid" SET DEFAULT gen_random_uuid()::text;
