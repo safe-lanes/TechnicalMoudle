@@ -116,7 +116,6 @@ interface VesselCertificate {
   requirementRef: string;
   companyGroup: string;
   applicable: boolean;
-  isNew?: boolean;
 }
 
 // Starter Kit Master Certificate Data - loaded from CSV
@@ -302,7 +301,7 @@ export default function ShipsCertificatesAdmin() {
             ranking: "-",
             sequence: cert.companySequence || cert.company_sequence || cert.sequence || undefined,
           });
-        } else if ((category === 'Vessel' || masterId?.startsWith('VES-')) && masterId?.startsWith('VES-')) {
+        } else if (category === 'Vessel' || masterId?.startsWith('VES-')) {
           vesselRecords.push({
             id: cert.id,
             masterId: masterId,
@@ -311,7 +310,6 @@ export default function ShipsCertificatesAdmin() {
             requirementRef: cert.requirementRef || cert.requirement_ref || "",
             companyGroup: cert.companyGroup || cert.company_group || "",
             applicable: true,
-            isNew: false,
           });
         } else {
           masterRecords.push({
@@ -1217,7 +1215,6 @@ export default function ShipsCertificatesAdmin() {
       requirementRef: newVesselEntryData.requirementRef || "",
       companyGroup: newVesselEntryData.companyGroup || "",
       applicable: newVesselEntryData.applicable ?? true,
-      isNew: true,
     };
     
     setVesselOnlyCerts(prev => [...prev, newCert]);
@@ -2314,10 +2311,11 @@ export default function ShipsCertificatesAdmin() {
                 
                 {/* Vessel-only certificates (not from Company) — filtered by vessel applicability */}
                 {selectedVessels.length > 0 && vesselOnlyCerts.filter(cert => {
-                  if (cert.isNew) return true;
+                  if (cert.id >= 2000) return true;
+                  if (viewModes.vessel === "edit") return true;
                   const vesselIds = getSelectedVesselIds();
                   return vesselIds.some(vesselId =>
-                    vesselApplicabilityData.some((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId && a.isApplicable === true)
+                    vesselApplicabilityData.some((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId)
                   );
                 }).map((cert, idx) => {
                   const companyGroupLabel = companyGroupLabels.find(g => g.key === cert.companyGroup)?.label || "";
