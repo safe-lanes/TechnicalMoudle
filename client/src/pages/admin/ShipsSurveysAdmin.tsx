@@ -104,6 +104,7 @@ interface VesselSurvey {
   requirementRef: string;
   companyGroup: string;
   applicable: boolean;
+  isNew?: boolean;
 }
 
 export default function ShipsSurveysAdmin() {
@@ -214,7 +215,7 @@ export default function ShipsSurveysAdmin() {
         const mid = s.masterId || '';
         if (s.category === 'Company' || mid.startsWith('CMP-')) {
           companyOnly.push(s);
-        } else if (s.category === 'Vessel' || mid.startsWith('VES-')) {
+        } else if ((s.category === 'Vessel' || mid.startsWith('VES-')) && mid.startsWith('VES-')) {
           vesselOnly.push(s);
         } else {
           masterOnly.push(s);
@@ -228,6 +229,7 @@ export default function ShipsSurveysAdmin() {
       setVesselOnlySurveys(vesselOnly.map(s => ({
         ...s,
         surveyLabel: s.surveyLabel || s.surveyName,
+        isNew: false,
       })));
 
       const companyItems = masterOnly.filter((s: any) => s.applicableToCompany);
@@ -1116,6 +1118,7 @@ export default function ShipsSurveysAdmin() {
       requirementRef: newVesselSurvey.requirementRef || "",
       companyGroup: newVesselSurvey.companyGroup || "",
       applicable: true,
+      isNew: true,
     };
 
     setVesselOnlySurveys(prev => [...prev, newSurvey]);
@@ -1940,7 +1943,7 @@ export default function ShipsSurveysAdmin() {
                     
                     {/* Vessel-only surveys (VES-) — filtered by vessel applicability */}
                     {selectedVessels.length > 0 && vesselOnlySurveys.filter(survey => {
-                      if (survey.id >= 2000) return true;
+                      if (survey.isNew) return true;
                       const vesselIds = getSelectedVesselIdsArray();
                       return vesselIds.some(vesselId =>
                         vesselApplicabilityData?.some((a: any) => a.vesselId === vesselId && a.masterId === survey.masterId && a.isApplicable === true)
