@@ -422,7 +422,7 @@ export default function ShipsSurveysAdmin() {
       
       const fallbackSeq = dataToSave.length + idx + 1;
       const preservedSeq = survey.sequence ?? survey.companySequence ?? fallbackSeq;
-      const preservedCompanySeq = survey.companySequence ?? survey.sequence ?? fallbackSeq;
+      const preservedCompanySeq = survey.sequence ?? survey.companySequence ?? fallbackSeq;
       return {
         ...survey,
         masterId: newMasterId,
