@@ -1532,26 +1532,31 @@ export async function getClassItemsJobsStatus(
 
   let allComponents: any[] = [];
   let allJobs: any[] = [];
-  let allLinks: any[] = [];
+  let allWorkOrders: any[] = [];
   for (const v of scopedVessels) {
     allComponents = allComponents.concat(await repo.getComponents(v.id));
     allJobs = allJobs.concat(await repo.getJobs(v.id));
-    allLinks = allLinks.concat(await repo.getJobComponentLinks(v.id));
+    allWorkOrders = allWorkOrders.concat(await repo.getWorkOrders(v.id));
   }
 
   const isClassRelated = (val: any) => val === true || val === 'Yes' || val === 'true';
-  const classJobs = allJobs.filter((j: any) =>
-    isClassRelated(j.classRelated) &&
-    j.isDeleted !== true &&
-    (j.isActive === undefined || j.isActive === true)
-  );
 
-  const componentByCuuid = new Map<string, any>(allComponents.filter(c => c.isDeleted !== true).map(c => [c.cuuid, c]));
-  const linksByJobId = new Map<string, string[]>();
-  for (const link of allLinks) {
-    const arr = linksByJobId.get(link.jobId) || [];
-    arr.push(link.componentId);
-    linksByJobId.set(link.jobId, arr);
+  // Build set of class-related job IDs and a job lookup map
+  const classJobIds = new Set<string>();
+  const jobMap = new Map<string, any>();
+  for (const j of allJobs) {
+    jobMap.set(j.juuid, j);
+    if (isClassRelated(j.classRelated) && j.isDeleted !== true && (j.isActive === undefined || j.isActive === true)) {
+      classJobIds.add(j.juuid);
+    }
+  }
+
+  // Build component lookup by componentCode (primary WO→component join key)
+  const componentByCode = new Map<string, any>();
+  for (const c of allComponents) {
+    if (c.isDeleted !== true && c.componentCode && !componentByCode.has(c.componentCode)) {
+      componentByCode.set(c.componentCode, c);
+    }
   }
 
   const jobSearchQ = (jobSearch || '').toLowerCase().trim();
@@ -1559,65 +1564,55 @@ export async function getClassItemsJobsStatus(
   const dateFromTs = dateFrom ? Date.parse(dateFrom) : NaN;
   const dateToTs = dateTo ? Date.parse(dateTo) : NaN;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayTs = today.getTime();
-  const thirtyDaysTs = 30 * 24 * 60 * 60 * 1000;
-
-  const deriveStatus = (nextDueDate: string | null | undefined): string => {
-    if (!nextDueDate || nextDueDate === '-') return '-';
-    const t = _ciParseDate(nextDueDate);
-    if (!isFinite(t)) return '-';
-    if (t < todayTs) return 'Overdue';
-    if (t - todayTs <= thirtyDaysTs) return 'Due';
-    return 'Upcoming';
-  };
-
   const rows: any[] = [];
-  for (const job of classJobs) {
-    const directCompId = job.componentId || null;
-    const linkCompIds = linksByJobId.get(job.juuid) || [];
-    const representativeCompId = directCompId || linkCompIds[0] || null;
-    const comp = representativeCompId ? componentByCuuid.get(representativeCompId) : null;
+
+  for (const wo of allWorkOrders) {
+    // Only include WOs whose source job is class-related
+    if (!wo.jobId || !classJobIds.has(wo.jobId)) continue;
+
+    const job = jobMap.get(wo.jobId);
+    const comp = wo.componentCode ? componentByCode.get(wo.componentCode) : null;
 
     if (jobSearchQ) {
-      const jc = (job.jobNo || '').toLowerCase();
-      const jt = (job.jobTitle || '').toLowerCase();
+      const jc = (wo.workOrderNo || job?.jobNo || '').toLowerCase();
+      const jt = (wo.jobTitle || job?.jobTitle || '').toLowerCase();
       if (!jc.includes(jobSearchQ) && !jt.includes(jobSearchQ)) continue;
     }
     if (deptQ && deptQ !== 'all') {
-      const d = ((job.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || '') as string).toLowerCase();
+      const d = ((wo.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || '') as string).toLowerCase();
       if (d !== deptQ) continue;
     }
     if (!isNaN(dateFromTs) || !isNaN(dateToTs)) {
-      const dueTs = _ciParseDate(job.nextDueDate);
+      const dueTs = _ciParseDate(wo.dueDate);
       if (!isFinite(dueTs)) continue;
       if (!isNaN(dateFromTs) && dueTs < dateFromTs) continue;
       if (!isNaN(dateToTs) && dueTs > dateToTs) continue;
     }
 
-    const freq = [job.frequencyValue, job.frequencyUnit].filter(Boolean).join(' ');
+    const freq = [wo.frequencyValue || job?.frequencyValue, wo.frequencyUnit || job?.frequencyUnit].filter(Boolean).join(' ');
 
     rows.push({
-      jobCode: job.jobNo || '-',
-      jobTitle: job.jobTitle || '-',
-      componentCode: comp?.componentCode || '-',
-      componentName: comp?.name || '-',
-      department: job.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || '-',
-      taskType: job.maintenanceType || '-',
-      maintenanceBasis: job.maintenanceBasis || '-',
+      wouuid: wo.wouuid,
+      jobCode: job?.jobNo || '-',
+      jobTitle: wo.jobTitle || job?.jobTitle || '-',
+      componentCode: wo.componentCode || comp?.componentCode || '-',
+      componentName: wo.component || comp?.name || '-',
+      department: wo.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || '-',
+      taskType: wo.taskType || wo.maintenanceType || job?.maintenanceType || '-',
+      maintenanceBasis: wo.maintenanceBasis || job?.maintenanceBasis || '-',
       frequency: freq || '-',
-      assignedTo: job.assignedTo || '-',
-      approver: job.approver || '-',
-      jobPriority: job.jobPriority || '-',
-      criticality: job.criticality || (comp?.critical === true ? 'Yes' : (comp?.critical === false ? 'No' : '-')),
-      lastDoneDate: job.lastDoneDate || '-',
-      lastDoneRH: job.lastDoneRH || job.lastDoneRunningHours || '-',
-      nextDueDate: job.nextDueDate || '-',
-      nextDueRH: job.nextDueRH || job.nextDueRunningHours || '-',
-      status: deriveStatus(job.nextDueDate),
-      vesselName: vesselNameMap.get(comp?.vesselId || job.vesselId || '') || '-',
-      vesselId: comp?.vesselId || job.vesselId || '',
+      assignedTo: wo.assignedTo || job?.assignedTo || '-',
+      approver: wo.approver || job?.approver || '-',
+      jobPriority: wo.jobPriority || job?.jobPriority || '-',
+      criticality: comp?.critical === true ? 'Yes' : (comp?.critical === false ? 'No' : '-'),
+      lastDoneDate: wo.dateCompleted || '-',
+      lastDoneRH: wo.completedRunningHours || '-',
+      nextDueDate: wo.dueDate || '-',
+      nextDueRH: wo.dueRunningHours || '-',
+      workOrderNo: wo.workOrderNo || '-',
+      status: wo.status || 'Active',
+      vesselName: vesselNameMap.get(wo.vesselId || comp?.vesselId || '') || '-',
+      vesselId: wo.vesselId || comp?.vesselId || '',
     });
   }
 
@@ -1626,9 +1621,15 @@ export async function getClassItemsJobsStatus(
 
   const isMultiVessel = scopedVessels.length > 1 || vesselId === 'all';
 
+  const overdueCount = rows.filter(r => r.status === 'Overdue').length;
+  const dueCount = rows.filter(r => r.status === 'Due' || r.status === 'Due (Grace P)').length;
+  const activeCount = rows.filter(r => r.status === 'Active').length;
+  const completedCount = rows.filter(r => r.status === 'Completed').length;
+
   if (format === 'excel') {
     const columns: ColumnDef[] = [
       { key: 'sno', header: 'Sr. No.', width: 6, type: 'number', align: 'center' },
+      { key: 'workOrderNo', header: 'WO Number', width: 24, type: 'text' },
       { key: 'jobCode', header: 'Job Code', width: 16, type: 'text' },
       { key: 'jobTitle', header: 'Job Title', width: 32, type: 'text' },
       { key: 'componentCode', header: 'Component Code', width: 16, type: 'text' },
@@ -1641,21 +1642,26 @@ export async function getClassItemsJobsStatus(
       { key: 'approver', header: 'Approver', width: 14, type: 'text' },
       { key: 'jobPriority', header: 'Job Priority', width: 12, type: 'text', align: 'center' },
       { key: 'criticality', header: 'Criticality', width: 12, type: 'text', align: 'center' },
-      { key: 'lastDoneDate', header: 'Last Done Date', width: 14, type: 'text' },
-      { key: 'lastDoneRH', header: 'Last Done RH', width: 12, type: 'text', align: 'right' },
-      { key: 'nextDueDate', header: 'Next Due Date', width: 14, type: 'text' },
-      { key: 'nextDueRH', header: 'Next Due RH', width: 12, type: 'text', align: 'right' },
-      { key: 'status', header: 'Status', width: 12, type: 'text', align: 'center' },
+      { key: 'lastDoneDate', header: 'Completed Date', width: 16, type: 'text' },
+      { key: 'lastDoneRH', header: 'Completed RH', width: 14, type: 'text', align: 'right' },
+      { key: 'nextDueDate', header: 'Due Date', width: 14, type: 'text' },
+      { key: 'nextDueRH', header: 'Due RH', width: 12, type: 'text', align: 'right' },
+      { key: 'status', header: 'Status', width: 16, type: 'text', align: 'center' },
       ...(isMultiVessel ? [{ key: 'vesselName', header: 'Vessel', width: 22, type: 'text' as const }] : []),
+    ];
+
+    const conditionalStyles: ConditionalStyle[] = [
+      { condition: (row: any) => row.status === 'Overdue', style: 'danger' },
+      { condition: (row: any) => row.status === 'Due' || row.status === 'Due (Grace P)', style: 'warning' },
     ];
 
     const vesselName = vesselId !== 'all' ? (allVessels.find(v => v.id === vesselId)?.name || vesselId) : 'All Vessels';
     const lastCol = getLastColumnLetter(columns.length);
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Class Items Jobs');
-    applyStandardHeader(ws, 'Class Items Jobs Status', `${rows.length} class-related jobs`, vesselName, rows.length, lastCol);
+    applyStandardHeader(ws, 'Class Items Jobs Status', `${rows.length} work orders`, vesselName, rows.length, lastCol);
     applyStandardTableHeader(ws, columns);
-    applyStandardDataRows(ws, rows, columns);
+    applyStandardDataRows(ws, rows, columns, 8, conditionalStyles);
     const lastDataRow = 7 + rows.length;
     applyStandardPageSetup(ws, 7, columns.length, lastDataRow, vesselName);
     const buffer = await wb.xlsx.writeBuffer();
@@ -1671,10 +1677,10 @@ export async function getClassItemsJobsStatus(
     rows,
     summary: {
       total: rows.length,
-      jobs: classJobs.length,
-      overdue: rows.filter(r => r.status === 'Overdue').length,
-      due: rows.filter(r => r.status === 'Due').length,
-      upcoming: rows.filter(r => r.status === 'Upcoming').length,
+      overdue: overdueCount,
+      due: dueCount,
+      active: activeCount,
+      completed: completedCount,
     },
   };
 }

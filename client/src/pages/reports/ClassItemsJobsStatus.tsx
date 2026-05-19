@@ -138,10 +138,11 @@ const ClassItemsJobsStatus: React.FC<Props> = ({ onBack, globalFilters, embedded
       columns,
       data: finalData,
       summary: [
-        { label: 'Total Jobs', value: summary.total ?? rows.length },
+        { label: 'Total WOs', value: summary.total ?? rows.length },
         { label: 'Overdue', value: summary.overdue ?? 0 },
-        { label: 'Due (≤30d)', value: summary.due ?? 0 },
-        { label: 'Upcoming', value: summary.upcoming ?? 0 },
+        { label: 'Due', value: summary.due ?? 0 },
+        { label: 'Active', value: summary.active ?? 0 },
+        { label: 'Completed', value: summary.completed ?? 0 },
       ],
     };
   };
