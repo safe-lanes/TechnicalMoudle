@@ -37,6 +37,29 @@ export class JobService {
       if (!jobData.intervalRunningHour) {
         throw new Error('Running Hours-based jobs require intervalRunningHour');
       }
+    } else if (jobData.maintenanceBasis === 'Dual Frequency') {
+      // Dual Frequency requires BOTH calendar fields AND RH interval
+      if (!jobData.frequencyValue || !jobData.frequencyUnit) {
+        throw new Error('Dual Frequency jobs require frequencyValue and frequencyUnit for the calendar leg');
+      }
+      if (!jobData.intervalRunningHour) {
+        throw new Error('Dual Frequency jobs require intervalRunningHour for the running hours leg');
+      }
+      // D3: Block unless component RH Counter Type is Master or Inherited
+      if (jobData.componentId) {
+        const component = await storage.getComponent(jobData.componentId);
+        if (!component) {
+          throw new Error('Dual Frequency jobs require a valid component');
+        }
+        const rhType = component.rhCounterType;
+        if (rhType !== 'MASTER' && rhType !== 'INHERITED') {
+          throw new Error(
+            `Dual Frequency maintenance basis requires a component with RH Counter Type set to Master or Inherited. ` +
+            `Component "${component.name}" has RH Counter Type "${rhType || 'not set'}". ` +
+            `Please update the component's RH Counter Type first, or choose Calendar or Running Hours basis.`
+          );
+        }
+      }
     }
 
     // Auto-generate job number if not provided (format: MKR-XX-NNNNN)
@@ -81,6 +104,29 @@ export class JobService {
       throw new Error(`Job ${id} not found`);
     }
 
+    // D3: Block Dual Frequency if component RH Counter Type is not Master/Inherited
+    const effectiveBasis = updates.maintenanceBasis ?? existingJob.maintenanceBasis;
+    const effectiveComponentId = updates.componentId ?? existingJob.componentId;
+    const basisChangingToDual = updates.maintenanceBasis === 'Dual Frequency' && existingJob.maintenanceBasis !== 'Dual Frequency';
+    const componentChangingOnDual = effectiveBasis === 'Dual Frequency' && updates.componentId !== undefined && updates.componentId !== existingJob.componentId;
+
+    if (basisChangingToDual || componentChangingOnDual) {
+      if (effectiveComponentId) {
+        const component = await storage.getComponent(effectiveComponentId);
+        if (!component) {
+          throw new Error('Dual Frequency jobs require a valid component');
+        }
+        const rhType = component.rhCounterType;
+        if (rhType !== 'MASTER' && rhType !== 'INHERITED') {
+          throw new Error(
+            `Dual Frequency maintenance basis requires a component with RH Counter Type set to Master or Inherited. ` +
+            `Component "${component.name}" has RH Counter Type "${rhType || 'not set'}". ` +
+            `Please update the component's RH Counter Type first, or choose Calendar or Running Hours basis.`
+          );
+        }
+      }
+    }
+
     // Rule #15: Check if frequency-related fields are being changed
     const isFrequencyChange = 
       (updates.frequencyValue !== undefined && updates.frequencyValue !== existingJob.frequencyValue) ||
@@ -115,10 +161,11 @@ export class JobService {
       }
     }
 
-    // Recalculate nextDueDate if Calendar-based and relevant fields changed
+    // Recalculate nextDueDate if Calendar-based (or Dual Frequency) and relevant fields changed
     // CRITICAL: Guard against overwriting valid nextDueDate with null
+    const effectiveBasisForRecalc = updates.maintenanceBasis ?? existingJob.maintenanceBasis;
     if (
-      (updates.maintenanceBasis === 'Calendar' || existingJob.maintenanceBasis === 'Calendar') &&
+      (effectiveBasisForRecalc === 'Calendar' || effectiveBasisForRecalc === 'Dual Frequency') &&
       (updates.lastDoneDate || updates.frequencyValue || updates.frequencyUnit)
     ) {
       const lastDone = updates.lastDoneDate || existingJob.lastDoneDate;
@@ -141,9 +188,9 @@ export class JobService {
       }
     }
 
-    // For Running Hours jobs, recalculate nextDueRH if interval changed and no active WO
+    // For Running Hours (or Dual Frequency) jobs, recalculate nextDueRH if interval changed and no active WO
     if (
-      (updates.maintenanceBasis === 'Running Hours' || existingJob.maintenanceBasis === 'Running Hours') &&
+      (effectiveBasisForRecalc === 'Running Hours' || effectiveBasisForRecalc === 'Dual Frequency') &&
       updates.intervalRunningHour
     ) {
       const lastDoneRH = parseFloat(existingJob.lastDoneRH || '0');
@@ -173,6 +220,13 @@ export class JobService {
       if (job.maintenanceBasis === 'Calendar') {
         if (!job.frequencyValue || !job.frequencyUnit) {
           throw new Error(`Job ${job.jobNo} is Calendar-based but missing frequency data`);
+        }
+      } else if (job.maintenanceBasis === 'Dual Frequency') {
+        if (!job.frequencyValue || !job.frequencyUnit) {
+          throw new Error(`Job ${job.jobNo} is Dual Frequency but missing calendar frequency data`);
+        }
+        if (!job.intervalRunningHour) {
+          throw new Error(`Job ${job.jobNo} is Dual Frequency but missing intervalRunningHour`);
         }
       }
     }
@@ -265,6 +319,20 @@ export class JobService {
     if (jobData.maintenanceBasis === 'Running Hours') {
       if (!jobData.intervalRunningHour) {
         errors.push('Interval running hour is required for Running Hours-based jobs');
+      } else if (jobData.intervalRunningHour <= 0) {
+        errors.push('Interval running hour must be positive');
+      }
+    }
+
+    if (jobData.maintenanceBasis === 'Dual Frequency') {
+      if (!jobData.frequencyValue) {
+        errors.push('Frequency value is required for Dual Frequency jobs (calendar leg)');
+      }
+      if (!jobData.frequencyUnit) {
+        errors.push('Frequency unit is required for Dual Frequency jobs (calendar leg)');
+      }
+      if (!jobData.intervalRunningHour) {
+        errors.push('Interval running hour is required for Dual Frequency jobs (RH leg)');
       } else if (jobData.intervalRunningHour <= 0) {
         errors.push('Interval running hour must be positive');
       }
