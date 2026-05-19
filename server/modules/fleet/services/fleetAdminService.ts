@@ -764,6 +764,7 @@ export async function copyVessel(body: any) {
   const copyResults = { components: 0, jobs: 0, spares: 0, spareComponentLinks: 0, stores: 0, errors: [] as string[], warnings: [] as string[] };
   const componentIdMap = new Map<string, string>();
   const spareIdMap = new Map<number, number>();
+  const spareUuidMap = new Map<number, string>(); // source spare.id → target spare.suuid
 
   const generateId = (prefix: string) => {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 13)}`;
@@ -924,8 +925,10 @@ export async function copyVessel(body: any) {
     const targetSpareList = await db.select().from(spares)
       .where(eq(spares.vesselId, data.targetVesselCode));
     const existingSpareKeyMap = new Map<string, number>();
+    const existingSpareUuidMap = new Map<number, string>(); // target spare id → suuid
     for (const s of targetSpareList) {
       existingSpareKeyMap.set(`${s.partCode}|${s.componentCode}`, s.id);
+      if (s.suuid) existingSpareUuidMap.set(s.id, s.suuid);
     }
 
     for (const spare of sourceSpareList) {
@@ -933,6 +936,8 @@ export async function copyVessel(body: any) {
       const existingId = existingSpareKeyMap.get(spareKey);
       if (existingId !== undefined) {
         spareIdMap.set(spare.id, existingId);
+        const existingSuuid = existingSpareUuidMap.get(existingId);
+        if (existingSuuid) spareUuidMap.set(spare.id, existingSuuid);
         continue;
       }
 
@@ -968,8 +973,9 @@ export async function copyVessel(body: any) {
           drawingNo: spare.drawingNo,
           location2: null,
           remarks: spare.remarks,
-        }).returning({ id: spares.id });
+        }).returning({ id: spares.id, suuid: spares.suuid });
         spareIdMap.set(spare.id, inserted.id);
+        spareUuidMap.set(spare.id, inserted.suuid);
         copyResults.spares++;
       } catch (e: any) {
         copyResults.errors.push(`Spare ${spare.partCode}: ${e.message}`);
@@ -989,6 +995,8 @@ export async function copyVessel(body: any) {
       const newComponentId = componentIdMap.get(link.componentId) || link.componentId;
 
       if (newSpareId === undefined) continue;
+      const newSpareUuid = spareUuidMap.get(link.spareId);
+      if (!newSpareUuid) continue; // Can't link without the spare's suuid
 
       const linkKey = `${newSpareId}|${newComponentId}`;
       if (existingLinkKeys.has(linkKey)) continue;
@@ -997,6 +1005,7 @@ export async function copyVessel(body: any) {
         await db.insert(spareComponentLinks).values({
           vesselId: data.targetVesselCode,
           spareId: newSpareId,
+          spareUuid: newSpareUuid,
           componentId: newComponentId,
           linkedBy: 'system-copy-vessel',
         });
