@@ -1141,11 +1141,16 @@ export async function getCriticalEquipmentSchedule(
   format: string,
   startDate?: string,
   endDate?: string,
+  vesselIds?: string[],
 ) {
   const allVessels = await repo.getVessels();
+  const scopedVessels = vesselId === 'all' && vesselIds?.length
+    ? allVessels.filter(v => vesselIds.includes(v.id))
+    : allVessels;
+
   let allComponents: any[] = [];
   if (vesselId === 'all') {
-    for (const v of allVessels) {
+    for (const v of scopedVessels) {
       allComponents = allComponents.concat(await repo.getComponents(v.id));
     }
   } else {
@@ -1157,12 +1162,18 @@ export async function getCriticalEquipmentSchedule(
     criticalComponents = criticalComponents.filter((c: any) => c.category === category);
   }
 
-  const criticalComponentIds = new Set(criticalComponents.map((c: any) => c.cuuid));
-  const criticalComponentMap = new Map(criticalComponents.map((c: any) => [c.cuuid, c]));
+  // Build lookup: componentCode → component (WOs are vessel-scoped so code lookup is safe)
+  const criticalCompByCode = new Map<string, any>();
+  for (const comp of criticalComponents) {
+    if (comp.componentCode && !criticalCompByCode.has(comp.componentCode)) {
+      criticalCompByCode.set(comp.componentCode, comp);
+    }
+  }
 
+  // Fetch jobs — used only for jobNo (job code) lookup via wo.jobId
   let allJobs: any[] = [];
   if (vesselId === 'all') {
-    for (const v of allVessels) {
+    for (const v of scopedVessels) {
       const vJobs = await repo.getJobs(v.id);
       allJobs = allJobs.concat(vJobs);
     }
@@ -1171,34 +1182,18 @@ export async function getCriticalEquipmentSchedule(
   }
   const jobMap = new Map(allJobs.map((j: any) => [j.juuid, j]));
 
-  let allLinks: any[] = [];
-  if (vesselId === 'all') {
-    for (const v of allVessels) {
-      const links = await repo.getJobComponentLinks(v.id);
-      allLinks.push(...links);
-    }
-  } else {
-    allLinks = await repo.getJobComponentLinks(vesselId);
-  }
-
+  // Fetch all work orders — primary data source
   let allWorkOrders: any[] = [];
   if (vesselId === 'all') {
-    for (const v of allVessels) {
+    for (const v of scopedVessels) {
       const wos = await repo.getWorkOrders(v.id);
       allWorkOrders = allWorkOrders.concat(wos);
     }
   } else {
     allWorkOrders = await repo.getWorkOrders(vesselId);
   }
-  const woByJobId = new Map<string, any[]>();
-  for (const wo of allWorkOrders) {
-    const jobId = wo.jobId;
-    if (jobId) {
-      const existing = woByJobId.get(jobId) || [];
-      existing.push(wo);
-      woByJobId.set(jobId, existing);
-    }
-  }
+
+  const vesselMap = new Map(allVessels.map(v => [v.id, v.name || v.id]));
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -1215,63 +1210,48 @@ export async function getCriticalEquipmentSchedule(
 
   const scheduleItems: any[] = [];
 
-  for (const link of allLinks) {
-    if (!criticalComponentIds.has(link.componentId)) continue;
+  for (const wo of allWorkOrders) {
+    if (!wo.componentCode) continue;
 
-    const comp = criticalComponentMap.get(link.componentId);
-    const job = jobMap.get(link.jobId);
-    if (!comp || !job) continue;
+    const comp = criticalCompByCode.get(wo.componentCode);
+    if (!comp) continue;
 
-    const nextDueDateStr = link.nextDueDate || job.nextDueDate;
+    // Optional job lookup for job code only
+    const job = wo.jobId ? jobMap.get(wo.jobId) : undefined;
+
+    const dueDateStr = wo.dueDate;
     let daysUntilDue: number | null = null;
-    let status = 'On Schedule';
 
-    if (nextDueDateStr) {
-      const nextDueDate = new Date(nextDueDateStr);
-      if (!isNaN(nextDueDate.getTime())) {
-        nextDueDate.setHours(0, 0, 0, 0);
-        daysUntilDue = Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysUntilDue < 0) {
-          status = 'Overdue';
-        } else if (daysUntilDue <= 7) {
-          status = 'Due Soon';
-        } else {
-          status = 'On Schedule';
+    if (dueDateStr) {
+      try {
+        const dueDate = new Date(dueDateStr);
+        if (!isNaN(dueDate.getTime())) {
+          dueDate.setHours(0, 0, 0, 0);
+          daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
         }
-      }
+      } catch { /* ignore */ }
     }
 
-    const jobWorkOrders = woByJobId.get(job.juuid) || [];
-    const sortedWOs = jobWorkOrders.sort((a: any, b: any) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateB - dateA;
-    });
-    const lastWO = sortedWOs[0];
-
-    const lastDoneDateStr = link.lastDoneDate || job.lastDoneDate;
-    const freq = job.frequencyValue ? `${job.frequencyValue} ${job.frequencyUnit || ''}`.trim() : '-';
+    const freq = wo.frequencyValue ? `${wo.frequencyValue} ${wo.frequencyUnit || ''}`.trim() : '-';
 
     scheduleItems.push({
-      componentId: comp.cuuid,
-      jobId: job.juuid,
-      componentCode: comp.componentCode || '-',
-      componentName: comp.name || '-',
+      wouuid: wo.wouuid,
+      componentCode: wo.componentCode || '-',
+      componentName: wo.component || comp.name || '-',
       location: comp.location || '-',
-      jobCode: job.jobNo || '-',
-      jobTitle: job.jobTitle || '-',
-      taskType: job.maintenanceType || '-',
-      maintenanceBasis: job.maintenanceBasis || '-',
+      jobCode: job?.jobNo || '-',
+      jobTitle: wo.jobTitle || '-',
+      taskType: wo.taskType || wo.maintenanceType || '-',
+      maintenanceBasis: wo.maintenanceBasis || '-',
       frequency: freq,
-      nextDueDate: formatDateStr(nextDueDateStr),
+      nextDueDate: formatDateStr(dueDateStr),
       daysUntilDue: daysUntilDue !== null ? daysUntilDue : '-',
-      status,
-      lastDoneDate: formatDateStr(lastDoneDateStr),
-      lastWONumber: lastWO?.workOrderNo || '-',
-      lastWOStatus: lastWO?.status || '-',
-      assignedTo: job.assignedTo || '-',
-      estimatedManHours: '-',
-      runningHours: comp.currentCumulativeRH || '-'
+      status: wo.status || 'Active',
+      lastDoneDate: formatDateStr(wo.dateCompleted),
+      lastWONumber: wo.workOrderNo || '-',
+      assignedTo: wo.assignedTo || '-',
+      vesselId: wo.vesselId,
+      vesselName: vesselMap.get(wo.vesselId || '') || '-',
     });
   }
 
@@ -1293,14 +1273,17 @@ export async function getCriticalEquipmentSchedule(
   }
 
   if (statusFilter && statusFilter !== 'all') {
-    const statusMap: Record<string, string> = {
-      'on-schedule': 'On Schedule',
-      'due-soon': 'Due Soon',
-      'overdue': 'Overdue'
+    const statusMap: Record<string, string[]> = {
+      'overdue':          ['Overdue'],
+      'due':              ['Due', 'Due (Grace P)'],
+      'active':           ['Active'],
+      'completed':        ['Completed'],
+      'pending-approval': ['Pending Approval'],
+      'postponed':        ['Postponed'],
     };
-    const filterValue = statusMap[statusFilter];
-    if (filterValue) {
-      const filtered = scheduleItems.filter(item => item.status === filterValue);
+    const filterValues = statusMap[statusFilter];
+    if (filterValues) {
+      const filtered = scheduleItems.filter(item => filterValues.includes(item.status));
       scheduleItems.length = 0;
       scheduleItems.push(...filtered);
     }
@@ -1315,9 +1298,10 @@ export async function getCriticalEquipmentSchedule(
 
   scheduleItems.forEach((item, i) => { item.sno = i + 1; });
 
-  const onScheduleCount = scheduleItems.filter(i => i.status === 'On Schedule').length;
-  const dueSoonCount = scheduleItems.filter(i => i.status === 'Due Soon').length;
   const overdueCount = scheduleItems.filter(i => i.status === 'Overdue').length;
+  const dueCount = scheduleItems.filter(i => i.status === 'Due' || i.status === 'Due (Grace P)').length;
+  const activeCount = scheduleItems.filter(i => i.status === 'Active').length;
+  const completedCount = scheduleItems.filter(i => i.status === 'Completed').length;
   const numericDays = scheduleItems.filter(i => typeof i.daysUntilDue === 'number').map(i => i.daysUntilDue as number);
   const avgDaysUntilDue = numericDays.length > 0 ? Math.round(numericDays.reduce((a: number, b: number) => a + b, 0) / numericDays.length) : 0;
 
@@ -1332,15 +1316,12 @@ export async function getCriticalEquipmentSchedule(
       { key: 'taskType', header: 'Task Type', width: 16, type: 'text' },
       { key: 'maintenanceBasis', header: 'Maint. Basis', width: 14, type: 'text' },
       { key: 'frequency', header: 'Frequency', width: 14, type: 'text' },
-      { key: 'nextDueDate', header: 'Next Due Date', width: 16, type: 'text' },
+      { key: 'nextDueDate', header: 'Due Date', width: 16, type: 'text' },
       { key: 'daysUntilDue', header: 'Days Until Due', width: 14, type: 'number', align: 'center' },
-      { key: 'status', header: 'Status', width: 14, type: 'text', align: 'center' },
-      { key: 'lastDoneDate', header: 'Last Done', width: 16, type: 'text' },
-      { key: 'lastWONumber', header: 'Last WO No', width: 18, type: 'text' },
-      { key: 'lastWOStatus', header: 'Last WO Status', width: 14, type: 'text' },
+      { key: 'status', header: 'Status', width: 16, type: 'text', align: 'center' },
+      { key: 'lastDoneDate', header: 'Completed Date', width: 16, type: 'text' },
+      { key: 'lastWONumber', header: 'WO Number', width: 22, type: 'text' },
       { key: 'assignedTo', header: 'Assigned To', width: 16, type: 'text' },
-      { key: 'estimatedManHours', header: 'Man-Hours', width: 12, type: 'number', align: 'center' },
-      { key: 'runningHours', header: 'Running Hours', width: 14, type: 'text' }
     ];
 
     const conditionalStyles: ConditionalStyle[] = [
@@ -1349,7 +1330,7 @@ export async function getCriticalEquipmentSchedule(
         style: 'danger'
       },
       {
-        condition: (row: any) => row.status === 'Due Soon',
+        condition: (row: any) => row.status === 'Due' || row.status === 'Due (Grace P)',
         style: 'warning'
       }
     ];
@@ -1360,7 +1341,7 @@ export async function getCriticalEquipmentSchedule(
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Critical Equipment Schedule');
 
-    applyStandardHeader(ws, 'Critical Equipment Maintenance Schedule', `${scheduleItems.length} schedule items`, vesselName, scheduleItems.length, lastCol);
+    applyStandardHeader(ws, 'Critical Equipment Maintenance Schedule', `${scheduleItems.length} work orders`, vesselName, scheduleItems.length, lastCol);
     applyStandardTableHeader(ws, columns);
     applyStandardDataRows(ws, scheduleItems, columns, 8, conditionalStyles);
 
@@ -1382,9 +1363,10 @@ export async function getCriticalEquipmentSchedule(
     scheduleItems,
     summary: {
       total: scheduleItems.length,
-      onSchedule: onScheduleCount,
-      dueSoon: dueSoonCount,
       overdue: overdueCount,
+      due: dueCount,
+      active: activeCount,
+      completed: completedCount,
       avgDaysUntilDue
     }
   };

@@ -308,12 +308,13 @@ export async function getCriticalEquipmentSchedule(req: Request, res: Response) 
     const format = (req.query.format as string) || 'json';
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
 
     if (!vesselId) {
       return res.status(400).json({ error: "vesselId is required" });
     }
 
-    const result = await equipmentReportService.getCriticalEquipmentSchedule(vesselId, statusFilter, category, format, startDate, endDate);
+    const result = await equipmentReportService.getCriticalEquipmentSchedule(vesselId, statusFilter, category, format, startDate, endDate, vesselIds);
 
     if (result.type === 'excel') {
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
