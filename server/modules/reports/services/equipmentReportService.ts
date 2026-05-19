@@ -1541,21 +1541,23 @@ export async function getClassItemsJobsStatus(
 
   const isClassRelated = (val: any) => val === true || val === 'Yes' || val === 'true';
 
-  // Build set of class-related job IDs and a job lookup map
-  const classJobIds = new Set<string>();
+  // Job lookup map — for job code (jobNo) display only
   const jobMap = new Map<string, any>();
   for (const j of allJobs) {
     jobMap.set(j.juuid, j);
-    if (isClassRelated(j.classRelated) && j.isDeleted !== true && (j.isActive === undefined || j.isActive === true)) {
-      classJobIds.add(j.juuid);
-    }
   }
 
-  // Build component lookup by componentCode (primary WO→component join key)
+  // Build component lookup by componentCode and a Set of class-item component codes
   const componentByCode = new Map<string, any>();
+  const classCompCodes = new Set<string>();
   for (const c of allComponents) {
-    if (c.isDeleted !== true && c.componentCode && !componentByCode.has(c.componentCode)) {
-      componentByCode.set(c.componentCode, c);
+    if (c.isDeleted !== true && c.componentCode) {
+      if (!componentByCode.has(c.componentCode)) {
+        componentByCode.set(c.componentCode, c);
+      }
+      if (c.classItem === true) {
+        classCompCodes.add(c.componentCode);
+      }
     }
   }
 
@@ -1566,9 +1568,17 @@ export async function getClassItemsJobsStatus(
 
   const rows: any[] = [];
 
+  const seenWoIds = new Set<string>();
+
   for (const wo of allWorkOrders) {
-    // Only include WOs whose source job is class-related
-    if (!wo.jobId || !classJobIds.has(wo.jobId)) continue;
+    // OR logic: WO itself is class-related OR its component is a class item
+    const woIsClass = isClassRelated(wo.classRelated);
+    const compIsClass = wo.componentCode ? classCompCodes.has(wo.componentCode) : false;
+    if (!woIsClass && !compIsClass) continue;
+
+    // Deduplicate (a WO satisfying both conditions appears only once)
+    if (wo.wouuid && seenWoIds.has(wo.wouuid)) continue;
+    if (wo.wouuid) seenWoIds.add(wo.wouuid);
 
     const job = jobMap.get(wo.jobId);
     const comp = wo.componentCode ? componentByCode.get(wo.componentCode) : null;
