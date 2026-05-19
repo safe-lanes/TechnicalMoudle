@@ -869,6 +869,7 @@ export async function copyVessel(body: any) {
       try {
         await db.insert(jobs).values({
           id: newId,
+          juuid: randomUUID(),
           vesselId: data.targetVesselCode,
           componentId: newComponentId,
           componentCode: job.componentCode,
@@ -939,6 +940,7 @@ export async function copyVessel(body: any) {
 
       try {
         const [inserted] = await db.insert(spares).values({
+          suuid: randomUUID(),
           partCode: spare.partCode,
           partName: spare.partName,
           componentId: newComponentId,
@@ -1023,6 +1025,7 @@ export async function copyVessel(body: any) {
 
       try {
         await db.insert(storesItems).values({
+          stuuid: randomUUID(),
           vesselId: data.targetVesselCode,
           itemType: item.itemType,
           itemCode: item.itemCode,
@@ -1073,9 +1076,18 @@ export async function copyVessel(body: any) {
   const totalCopied = copyResults.components + copyResults.jobs + copyResults.spares + copyResults.spareComponentLinks + copyResults.stores;
   console.log(`[Copy Vessel] ${data.sourceVesselCode} → ${data.targetVesselCode}: ${copyResults.components} components, ${copyResults.jobs} jobs, ${copyResults.spares} spares, ${copyResults.stores} stores copied`);
 
+  const hasErrors = copyResults.errors.length > 0;
+  const hasWarnings = copyResults.warnings.length > 0;
+  const success = hasErrors ? (totalCopied > 0 ? 'partial' : false) : true;
+  const message = hasErrors
+    ? `Vessel copy completed with ${copyResults.errors.length} error(s). ${totalCopied} record(s) copied.`
+    : hasWarnings
+      ? `Vessel data replicated with ${copyResults.warnings.length} warning(s). ${totalCopied} record(s) copied.`
+      : `Vessel data successfully replicated. ${totalCopied} record(s) copied.`;
+
   return {
-    success: true,
-    message: `Vessel data successfully replicated. ${totalCopied} record(s) copied.`,
+    success,
+    message,
     results: copyResults,
   };
 }
