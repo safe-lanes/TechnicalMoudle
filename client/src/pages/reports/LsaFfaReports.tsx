@@ -108,15 +108,10 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
 
   useEffect(() => {
     if (embedded && selectedReportId) {
-      const version = ++previewVersionRef.current;
       setPreviewData(null);
       initialLoadRef.current = false;
-      generateReport(selectedReportId, 'preview').then((data) => {
-        if (previewVersionRef.current === version) {
-          if (data) setPreviewData(data);
-          initialLoadRef.current = true;
-        }
-      }).catch((err) => { console.error('Report preview load failed:', err); });
+      pendingPreviewRef.current = true;
+      ++previewVersionRef.current;
     }
   }, [embedded, selectedReportId]);
 
@@ -226,19 +221,23 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
   }, [scheduleData, globalVessels, globalFilters?.component, vessels.length, categoryFilters.dateRange]);
 
   useEffect(() => {
-    if (!embedded || !selectedReportId || !initialLoadRef.current || !pendingPreviewRef.current) return;
+    if (!embedded || !selectedReportId || !pendingPreviewRef.current) return;
     if (isFetching) return;
     pendingPreviewRef.current = false;
     const version = ++previewVersionRef.current;
     generateReport(selectedReportId, 'preview').then((data) => {
       if (previewVersionRef.current === version) {
         if (data) setPreviewData(data);
+        initialLoadRef.current = true;
         setIsFilterRefreshing(false);
       }
     }).catch(() => {
-      if (previewVersionRef.current === version) setIsFilterRefreshing(false);
+      if (previewVersionRef.current === version) {
+        initialLoadRef.current = true;
+        setIsFilterRefreshing(false);
+      }
     });
-  }, [filteredMasterList, filteredScheduleData, isFetching]);
+  }, [selectedReportId, filteredMasterList, filteredScheduleData, isFetching]);
 
   const reports: LsaFfaReport[] = [
     {
