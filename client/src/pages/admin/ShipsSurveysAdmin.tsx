@@ -420,16 +420,19 @@ export default function ShipsSurveysAdmin() {
         ? survey.masterId 
         : `CMP-${String(nextCmpSeq++).padStart(3, '0')}`;
       
+      const fallbackSeq = dataToSave.length + idx + 1;
+      const preservedSeq = survey.sequence ?? survey.companySequence ?? fallbackSeq;
+      const preservedCompanySeq = survey.companySequence ?? survey.sequence ?? fallbackSeq;
       return {
         ...survey,
         masterId: newMasterId,
-        sequence: dataToSave.length + idx + 1,
+        sequence: preservedSeq,
         category: 'Company',
         group: survey.companyGroup || 'Company Specific',
         surveyName: survey.surveyLabel,
         applicableToCompany: true,
         companyId: survey.companyId || newMasterId.replace('CMP-', 'CV'),
-        companySequence: dataToSave.length + idx + 1,
+        companySequence: preservedCompanySeq,
       };
     });
     
@@ -775,11 +778,13 @@ export default function ShipsSurveysAdmin() {
       const surveyOldSeq = s.sequence ?? 999999;
       if (newSequence < oldSequence) {
         if (surveyOldSeq >= newSequence && surveyOldSeq < oldSequence) {
-          return { ...s, sequence: surveyOldSeq + 1 };
+          const shifted = surveyOldSeq + 1;
+          return { ...s, sequence: shifted, companySequence: shifted };
         }
       } else {
         if (surveyOldSeq > oldSequence && surveyOldSeq <= newSequence) {
-          return { ...s, sequence: surveyOldSeq - 1 };
+          const shifted = surveyOldSeq - 1;
+          return { ...s, sequence: shifted, companySequence: shifted };
         }
       }
       return s;
@@ -821,15 +826,17 @@ export default function ShipsSurveysAdmin() {
     setCompanyOnlySurveys(prev => prev.map(s => {
       const surveyOldSeq = s.sequence ?? 999999;
       if (s.id === surveyId) {
-        return { ...s, sequence: newSequence };
+        return { ...s, sequence: newSequence, companySequence: newSequence };
       }
       if (newSequence < oldSequence) {
         if (surveyOldSeq >= newSequence && surveyOldSeq < oldSequence) {
-          return { ...s, sequence: surveyOldSeq + 1 };
+          const shifted = surveyOldSeq + 1;
+          return { ...s, sequence: shifted, companySequence: shifted };
         }
       } else {
         if (surveyOldSeq > oldSequence && surveyOldSeq <= newSequence) {
-          return { ...s, sequence: surveyOldSeq - 1 };
+          const shifted = surveyOldSeq - 1;
+          return { ...s, sequence: shifted, companySequence: shifted };
         }
       }
       return s;
