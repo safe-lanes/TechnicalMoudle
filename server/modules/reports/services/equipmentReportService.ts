@@ -1571,14 +1571,18 @@ export async function getClassItemsJobsStatus(
   const seenWoIds = new Set<string>();
 
   for (const wo of allWorkOrders) {
-    // OR logic: WO itself is class-related OR its component is a class item
+    // Inclusion: OR logic — WO-level flag (class_related = 'Yes') OR component flag (class_item = true)
     const woIsClass = isClassRelated(wo.classRelated);
     const compIsClass = wo.componentCode ? classCompCodes.has(wo.componentCode) : false;
     if (!woIsClass && !compIsClass) continue;
 
-    // Deduplicate (a WO satisfying both conditions appears only once)
-    if (wo.wouuid && seenWoIds.has(wo.wouuid)) continue;
-    if (wo.wouuid) seenWoIds.add(wo.wouuid);
+    // Deduplicate — WOs satisfying both conditions appear only once.
+    // Use wouuid as primary key; fall back to workOrderNo if wouuid is absent.
+    const dedupKey = wo.wouuid || wo.workOrderNo;
+    if (dedupKey) {
+      if (seenWoIds.has(dedupKey)) continue;
+      seenWoIds.add(dedupKey);
+    }
 
     const job = jobMap.get(wo.jobId);
     const comp = wo.componentCode ? componentByCode.get(wo.componentCode) : null;
