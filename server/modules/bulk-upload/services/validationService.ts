@@ -765,7 +765,7 @@ export async function validateData(type: string, data: any[], mode: string, vess
       }
 
       // Validate Schedule_Type (formerly Maintenance Basis)
-      const validScheduleTypes = ['Calendar', 'Running Hours'];
+      const validScheduleTypes = ['Calendar', 'Running Hours', 'Dual Frequency'];
       if (row['Schedule_Type'] && !validScheduleTypes.includes(row['Schedule_Type'])) {
         errors.push(`Row ${rowNum}: Invalid Schedule_Type. Allowed: ${validScheduleTypes.join(', ')}`);
       } else if (row['Schedule_Type']) {
@@ -904,11 +904,11 @@ export async function validateData(type: string, data: any[], mode: string, vess
 
       // Maintenance Basis - required (Calendar or Running Hours only)
       // CRITICAL: Frequency is the foundation of PMS scheduling - cannot be empty
-      const validMaintenanceBasis = ['Calendar', 'Running Hours'];
+      const validMaintenanceBasis = ['Calendar', 'Running Hours', 'Dual Frequency'];
       if (!row['Maintenance Basis']) {
-        errors.push(`Row ${rowNum}: Maintenance Basis is required (must be 'Calendar' or 'Running Hours')`);
+        errors.push(`Row ${rowNum}: Maintenance Basis is required (must be 'Calendar', 'Running Hours', or 'Dual Frequency')`);
       } else if (!validMaintenanceBasis.includes(row['Maintenance Basis'])) {
-        errors.push(`Row ${rowNum}: Invalid Maintenance Basis '${row['Maintenance Basis']}'. Must be 'Calendar' or 'Running Hours'`);
+        errors.push(`Row ${rowNum}: Invalid Maintenance Basis '${row['Maintenance Basis']}'. Must be 'Calendar', 'Running Hours', or 'Dual Frequency'`);
       } else {
         normalized['Maintenance Basis'] = row['Maintenance Basis'];
       }

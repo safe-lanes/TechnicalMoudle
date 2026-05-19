@@ -1234,7 +1234,8 @@ export const workOrders = pgTable("work_orders", {
 
   // === WO Generation Cycle Snapshots (for duplicate protection and audit) ===
   // Driver type determines which cycle fields apply
-  driverType: text("driver_type"), // 'RH' | 'CALENDAR' - from job's maintenanceBasis
+  driverType: text("driver_type"), // 'RH' | 'CALENDAR' | 'DUAL_CALENDAR' | 'DUAL_RH' - from job's maintenanceBasis
+  dualTriggerLeg: text("dual_trigger_leg"), // 'CALENDAR' | 'RH' — which leg triggered this Dual Frequency WO (D5)
   
   // RH-based WO cycle snapshots (Trigger 1)
   cycleDueRhSnapshot: decimal("cycle_due_rh_snapshot", { precision: 10, scale: 2 }), // RH_due = RH_last_done + F
@@ -2343,6 +2344,7 @@ export const fleetJobs = pgTable("fleet_jobs", {
   ppeRequirements: text("ppe_requirements"),
   permitRequirements: text("permit_requirements"),
   otherSafetyRequirements: text("other_safety_requirements"),
+  intervalRunningHour: integer("interval_running_hour"), // RH interval for Dual Frequency jobs
   sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),

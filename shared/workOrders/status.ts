@@ -285,7 +285,99 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
   }
   
   // Branch based on maintenance basis for status calculation
-  if (maintenanceBasis === 'Running Hours') {
+  if (maintenanceBasis === 'Dual Frequency') {
+    // Dual Frequency: compute BOTH calendar and RH statuses, return the WORST
+    const STATUS_SEVERITY: Record<string, number> = {
+      'Overdue': 4,
+      'Due (Grace P)': 3,
+      'Due': 2,
+      'Active': 1,
+    };
+
+    // Compute RH status (if data available)
+    let rhStatus: ComputedWorkOrderStatus = 'Active';
+    if (dueRH != null && currentRH != null) {
+      let leadTime: number;
+      if (rhLeadTimeHours !== undefined && rhLeadTimeHours !== null) {
+        leadTime = rhLeadTimeHours;
+      } else if (vesselGraceSettings?.rhLeadTimeHours !== undefined && vesselGraceSettings?.rhLeadTimeHours !== null) {
+        leadTime = vesselGraceSettings.rhLeadTimeHours;
+      } else {
+        leadTime = GRACE_PERIOD_CONSTANTS.DEFAULT_RH_LEAD_TIME;
+      }
+
+      let graceHours: number;
+      if (vesselGraceSettings?.vesselRhGraceConfig) {
+        const rhCfg = vesselGraceSettings.vesselRhGraceConfig;
+        if (rhCfg.scope === 'ALL_WORK_ORDERS') {
+          graceHours = rhCfg.graceMethod === 'FIXED_HOURS' ? (rhCfg.graceValue ?? GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS) : GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+        } else {
+          let inLastWeek = false;
+          if (dueDate) {
+            const dueDateObj = parseDate(dueDate);
+            if (dueDateObj) {
+              const endOfMonth = new Date(dueDateObj.getFullYear(), dueDateObj.getMonth() + 1, 0);
+              inLastWeek = (endOfMonth.getDate() - dueDateObj.getDate()) <= 7;
+            }
+          }
+          if (inLastWeek) {
+            graceHours = rhCfg.graceMethod === 'FIXED_HOURS' ? (rhCfg.graceValue ?? GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS) : GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+          } else if (rhCfg.fallbackMethod === 'FIXED_HOURS') {
+            graceHours = rhCfg.fallbackGraceHours ?? GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+          } else {
+            graceHours = GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+          }
+        }
+      } else {
+        graceHours = vesselGraceSettings?.rhGraceHours ?? GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+      }
+
+      const rhCategory = computeRHStatusCategory(dueRH, currentRH, leadTime, graceHours);
+      rhStatus = rhCategoryToDisplayStatus(rhCategory);
+    }
+
+    // Compute Calendar status (if data available)
+    let calStatus: ComputedWorkOrderStatus = 'Active';
+    if (dueDate) {
+      const dueDateObj = parseDate(dueDate);
+      if (dueDateObj) {
+        const today = input.referenceDate ? new Date(input.referenceDate) : new Date();
+        today.setUTCHours(0, 0, 0, 0);
+        const dueDateTime = new Date(dueDateObj);
+        dueDateTime.setUTCHours(0, 0, 0, 0);
+        const diffTime = dueDateTime.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        let graceEndDate: Date;
+        if (vesselGraceSettings?.calendarGraceMode === 'CUSTOM_DAYS') {
+          if (vesselGraceSettings.vesselCalendarGraceConfig) {
+            graceEndDate = calculateCompanyStandardGraceEnd(dueDateTime, vesselGraceSettings.vesselCalendarGraceConfig);
+          } else {
+            graceEndDate = new Date(dueDateTime);
+            graceEndDate.setDate(graceEndDate.getDate() + (vesselGraceSettings.calendarGraceDays || GRACE_PERIOD_CONSTANTS.GRACE_PERIOD_DAYS));
+            graceEndDate.setUTCHours(0, 0, 0, 0);
+          }
+        } else {
+          graceEndDate = calculateCompanyStandardGraceEnd(dueDateTime, companyGraceConfig);
+        }
+
+        const effectiveLeadDays = (calendarLeadTimeDays !== undefined && calendarLeadTimeDays !== null)
+          ? calendarLeadTimeDays
+          : GRACE_PERIOD_CONSTANTS.DUE_HORIZON_DAYS;
+
+        if (diffDays < 0) {
+          calStatus = today > graceEndDate ? 'Overdue' : 'Due (Grace P)';
+        } else if (diffDays <= effectiveLeadDays) {
+          calStatus = 'Due';
+        } else {
+          calStatus = 'Active';
+        }
+      }
+    }
+
+    // Return the WORST (most urgent) of the two
+    return (STATUS_SEVERITY[rhStatus] || 1) >= (STATUS_SEVERITY[calStatus] || 1) ? rhStatus : calStatus;
+  } else if (maintenanceBasis === 'Running Hours') {
     // Running Hours-based status calculation
     if (dueRH == null || currentRH == null) return 'Active';
     

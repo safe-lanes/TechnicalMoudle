@@ -190,9 +190,9 @@ export class WorkOrderStatusRecalculatorService {
         let dueRH: number | null = null;
         let job: Job | undefined;
 
-        // For RH-based work orders, get the current running hours from the component
+        // For RH-based or Dual Frequency work orders, get the current running hours from the component
         // FALLBACK: If component data is missing, use work order's own currentReading
-        if (wo.maintenanceBasis === 'Running Hours') {
+        if (wo.maintenanceBasis === 'Running Hours' || wo.maintenanceBasis === 'Dual Frequency') {
           if (wo.jobId) {
             job = jobsCache.get(wo.jobId);
             if (job?.componentId) {
@@ -217,15 +217,20 @@ export class WorkOrderStatusRecalculatorService {
         const vesselSettings = wo.vesselId ? vesselSettingsCache.get(wo.vesselId) : null;
 
         // Determine RH lead time based on job criticality (for Planned → Due transition)
+        // Needed for Running Hours AND Dual Frequency WOs
+        if (!job && wo.jobId) {
+          job = jobsCache.get(wo.jobId);
+        }
         const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === 'true' || String(job?.classRelated) === 'true';
-        const rhLeadTimeHours = wo.maintenanceBasis === 'Running Hours' 
-          ? (isJobCritical 
+        const rhLeadTimeHours = (wo.maintenanceBasis === 'Running Hours' || wo.maintenanceBasis === 'Dual Frequency')
+          ? (isJobCritical
               ? (vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL)
               : (vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL))
           : undefined;
 
         // Determine calendar lead time based on job criticality (for Planned → Due transition)
-        const calendarLeadTimeDays = wo.maintenanceBasis !== 'Running Hours' && vesselSettings
+        // Needed for Calendar AND Dual Frequency WOs
+        const calendarLeadTimeDays = (wo.maintenanceBasis !== 'Running Hours') && vesselSettings
           ? (isJobCritical
               ? vesselSettings.calendarLeadDaysCritical
               : vesselSettings.calendarLeadDaysNonCritical)
