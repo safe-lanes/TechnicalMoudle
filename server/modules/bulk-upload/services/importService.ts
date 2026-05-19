@@ -578,6 +578,13 @@ export async function performImport(
           const criticalVal = row['Criticality'] || row['Critical Yes/No'] || row['Criticality (Yes/No)'];
           const isActiveVal = row['Is Active'] || row['IS Active'];
           const ihmVal = row['IHM (Inventory of Hazardous Materials)'];
+          const rotationVal = row['Rotation Item'];
+          const rotationProvided = rotationVal !== undefined && rotationVal !== null && rotationVal !== '';
+          const parsedRotation = rotationProvided
+            ? (typeof rotationVal === 'boolean'
+                ? rotationVal
+                : ['yes', 'y', 'true', '1'].includes(String(rotationVal).toLowerCase().trim()))
+            : false;
           
           // Calculate Total ROB from Location A - ROB and Location B - ROB if not provided
           let totalRob = 0;
@@ -622,6 +629,7 @@ export async function performImport(
             ihm: ihmVal === 'Yes' || ihmVal === true ? 'Yes' : 'No',
             remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : null,
             fleetEquipmentCode: row['Fleet Equipment Code'] ? String(row['Fleet Equipment Code']).trim() : null,
+            isRotationItem: parsedRotation,
             dataScope: 'vessel'
           }, true);
           
@@ -664,6 +672,13 @@ export async function performImport(
           const criticalValUpdate = row['Criticality'] || row['Critical Yes/No'] || row['Criticality (Yes/No)'];
           const isActiveValUpdate = row['Is Active'] || row['IS Active'];
           const ihmValUpdate = row['IHM (Inventory of Hazardous Materials)'];
+          const rotationValUpdate = row['Rotation Item'];
+          const rotationProvidedUpdate = rotationValUpdate !== undefined && rotationValUpdate !== null && rotationValUpdate !== '';
+          const parsedRotationUpdate = rotationProvidedUpdate
+            ? (typeof rotationValUpdate === 'boolean'
+                ? rotationValUpdate
+                : ['yes', 'y', 'true', '1'].includes(String(rotationValUpdate).toLowerCase().trim()))
+            : existingSpare.isRotationItem;
           
           // Calculate Total ROB from Location A - ROB and Location B - ROB if not provided
           let totalRobUpdate = existingSpare.rob;
@@ -704,7 +719,8 @@ export async function performImport(
             isActive: isActiveValUpdate === 'Yes' || isActiveValUpdate === true ? true : (isActiveValUpdate === 'No' ? false : existingSpare.isActive),
             ihm: ihmValUpdate === 'Yes' || ihmValUpdate === true ? 'Yes' : (ihmValUpdate === 'No' ? 'No' : existingSpare.ihm),
             remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : existingSpare.remarks,
-            fleetEquipmentCode: row['Fleet Equipment Code'] ? String(row['Fleet Equipment Code']).trim() : existingSpare.fleetEquipmentCode
+            fleetEquipmentCode: row['Fleet Equipment Code'] ? String(row['Fleet Equipment Code']).trim() : existingSpare.fleetEquipmentCode,
+            isRotationItem: parsedRotationUpdate
           }, true);
           
           sparesByPartCode.set(partCode, updatedSpare);
@@ -738,6 +754,13 @@ export async function performImport(
           const criticalValUpsert = row['Criticality'] || row['Critical Yes/No'] || row['Criticality (Yes/No)'];
           const isActiveValUpsert = row['Is Active'] || row['IS Active'];
           const ihmValUpsert = row['IHM (Inventory of Hazardous Materials)'];
+          const rotationValUpsert = row['Rotation Item'];
+          const rotationProvidedUpsert = rotationValUpsert !== undefined && rotationValUpsert !== null && rotationValUpsert !== '';
+          const parsedRotationUpsert = rotationProvidedUpsert
+            ? (typeof rotationValUpsert === 'boolean'
+                ? rotationValUpsert
+                : ['yes', 'y', 'true', '1'].includes(String(rotationValUpsert).toLowerCase().trim()))
+            : null;
           
           // Calculate Total ROB from Location A - ROB and Location B - ROB if not provided
           let totalRobUpsert = 0;
@@ -799,7 +822,8 @@ export async function performImport(
                 isActive: isActiveValUpsert === 'Yes' || isActiveValUpsert === true ? true : (isActiveValUpsert === 'No' ? false : existingSpare.isActive),
                 ihm: ihmValUpsert === 'Yes' || ihmValUpsert === true ? 'Yes' : (ihmValUpsert === 'No' ? 'No' : existingSpare.ihm),
                 remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : existingSpare.remarks,
-                fleetEquipmentCode: row['Fleet Equipment Code'] ? String(row['Fleet Equipment Code']).trim() : existingSpare.fleetEquipmentCode
+                fleetEquipmentCode: row['Fleet Equipment Code'] ? String(row['Fleet Equipment Code']).trim() : existingSpare.fleetEquipmentCode,
+                isRotationItem: parsedRotationUpsert !== null ? parsedRotationUpsert : existingSpare.isRotationItem
               }, true);
               
               sparesByPartCode.set(partCode, updatedSpare);
@@ -861,6 +885,7 @@ export async function performImport(
               ihm: ihmValUpsert === 'Yes' || ihmValUpsert === true ? 'Yes' : 'No',
               remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : null,
               fleetEquipmentCode: row['Fleet Equipment Code'] ? String(row['Fleet Equipment Code']).trim() : null,
+              isRotationItem: parsedRotationUpsert === true,
               dataScope: 'vessel'
             }, true);
             

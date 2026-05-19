@@ -174,7 +174,7 @@ export async function getTemplate(req: Request, res: Response) {
         'Note', 'Specification', 'Maker', 'Maker Code', 'Manual Name', 'Page Number',
         'Criticality', 'Total ROB', 'Location A', 'Location A - ROB',
         'Location B', 'Location B - ROB', 'Minimum Stock', 'Is Active',
-        'IHM (Inventory of Hazardous Materials)', 'Evidence Type'
+        'IHM (Inventory of Hazardous Materials)', 'Evidence Type', 'Rotation Item'
       ];
 
       validValues = [
@@ -183,7 +183,7 @@ export async function getTemplate(req: Request, res: Response) {
         'Text (Notes)', 'Text (Specs)', 'Text (Manufacturer)', 'Text (Maker ID)', 'Text (Manual name)', 'Text (Page #)',
         'Yes/No', 'Number >= 0', 'Text (Location A)', 'Number >= 0',
         'Text (Location B)', 'Number >= 0', 'Number >= 0', 'Yes/No',
-        'Yes/No', 'Text (Evidence type)'
+        'Yes/No', 'Text (Evidence type)', 'Yes/No'
       ];
 
       example = [];

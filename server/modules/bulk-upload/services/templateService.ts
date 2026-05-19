@@ -480,6 +480,12 @@ export async function generateFleetMasterTemplate(): Promise<Buffer> {
       allowBlank: true,
       formulae: ["'Master Data'!$G$2:$G$3"]
     };
+    // Rotation Item Yes/No (col 28)
+    vesselSpareSheet.getCell(row, 28).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
     // IS Active (col 25)
     vesselSpareSheet.getCell(row, 25).dataValidation = {
       type: 'list',
@@ -1060,10 +1066,17 @@ export async function generateSparesTemplate(vesselId: string): Promise<Buffer> 
       allowBlank: true,
       formulae: ['=Lists!$B$2:$B$3']
     };
+
+    // Column AB (Rotation Item) - Column 28
+    sparesSheet.getCell(row, 28).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ['=Lists!$B$2:$B$3']
+    };
   }
   
-  // Spares template has 27 data columns (A through AA), version goes in column 28 (AB)
-  addVersionInfoToSheet(sparesSheet, 28);
+  // Spares template has 28 data columns (A through AB, including Rotation Item), version goes in column 29 (AC)
+  addVersionInfoToSheet(sparesSheet, 29);
   
   // Write to buffer and return
   const buffer = await workbook.xlsx.writeBuffer();
