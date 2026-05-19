@@ -1534,7 +1534,23 @@ export async function performImport(
       // This allows the same jobNo to exist for different components
       const compositeKey = getJobUniqueKey(canonicalVesselId, componentCode, jobData.jobNo);
       const existingJob = jobsByCompositeKey.get(compositeKey);
-      
+
+      // D3: Block Dual Frequency if component RH Counter Type is not MASTER/INHERITED
+      if (maintenanceBasis === 'Dual Frequency') {
+        const rhType = component.rhCounterType;
+        if (rhType !== 'MASTER' && rhType !== 'INHERITED') {
+          console.warn(`⚠️ D3 BLOCK: Job ${jobData.jobNo} row ${_jobRowNum} — Dual Frequency requires component RH Counter Type MASTER or INHERITED, got "${rhType || 'not set'}"`);
+          result.skipped++;
+          result.rowResults.push({
+            rowNumber: _jobRowNum,
+            primaryIdentifier: jobData.jobNo,
+            action: 'skipped',
+            error: `Dual Frequency requires component "${component.name}" to have RH Counter Type Master or Inherited (current: ${rhType || 'not set'})`
+          });
+          continue;
+        }
+      }
+
       if (mode === 'add') {
         if (!existingJob) {
           const newJobData = { ...jobData, ...componentFields };

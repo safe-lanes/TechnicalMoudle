@@ -162,6 +162,18 @@ export async function createJob(body: any) {
       jobData = { ...jobData, componentCode: component.componentCode };
       console.log(`✅ Auto-resolved job componentCode: ${component.componentCode} for component "${component.name}"`);
     }
+
+    // D3: Block Dual Frequency unless component RH Counter Type is MASTER or INHERITED
+    if (jobData.maintenanceBasis === 'Dual Frequency') {
+      const rhType = component.rhCounterType;
+      if (rhType !== 'MASTER' && rhType !== 'INHERITED') {
+        throw new ValidationError(
+          `Dual Frequency maintenance basis requires a component with RH Counter Type set to Master or Inherited. ` +
+          `Component "${component.name}" has RH Counter Type "${rhType || 'not set'}". ` +
+          `Please update the component's RH Counter Type first, or choose Calendar or Running Hours basis.`
+        );
+      }
+    }
   }
 
   // Auto-generate job number
@@ -241,6 +253,47 @@ export async function createJob(body: any) {
     }
   }
 
+  // Dual Frequency: requires BOTH calendar fields AND RH interval, plus RH calculation
+  if (jobData.maintenanceBasis === 'Dual Frequency') {
+    // Calendar leg validation
+    if (!jobData.frequencyValue || !jobData.frequencyUnit) {
+      throw new ValidationError('Dual Frequency jobs require frequencyValue and frequencyUnit for the calendar leg');
+    }
+    // RH leg validation and calculation (mirrors Running Hours logic above)
+    const intervalRH = Number(jobData.intervalRunningHour);
+    if (isNaN(intervalRH) || intervalRH <= 0) {
+      throw new ValidationError('Dual Frequency jobs require a valid numeric intervalRunningHour greater than 0 for the running hours leg');
+    }
+
+    const userProvidedLastDoneRH = jobData.lastDoneRH !== null && jobData.lastDoneRH !== undefined && jobData.lastDoneRH !== '';
+    const rawLastDoneRH = userProvidedLastDoneRH ? jobData.lastDoneRH : (component?.runningHours != null ? String(component.runningHours) : null);
+    if (rawLastDoneRH) {
+      const lastRH = Number(rawLastDoneRH);
+      if (!isNaN(lastRH)) {
+        jobData = {
+          ...jobData,
+          nextDueRH: String(lastRH + intervalRH),
+          lastDoneRH: String(lastRH)
+        };
+      }
+    }
+
+    // Calendar leg calculation
+    if (!jobData.nextDueDate) {
+      const { normalizeDateToDDMMMYYYY: normDate, calculateNextDueDate: calcNext } = await import('@shared/dateUtils');
+      const rawLastDone = jobData.lastDoneDate || (component?.installationDate);
+      if (rawLastDone && jobData.frequencyValue && jobData.frequencyUnit) {
+        const lastDone = normDate(rawLastDone);
+        if (lastDone) {
+          const calculatedNextDue = calcNext(lastDone, jobData.frequencyValue, jobData.frequencyUnit);
+          if (calculatedNextDue) {
+            jobData = { ...jobData, nextDueDate: calculatedNextDue };
+          }
+        }
+      }
+    }
+  }
+
   const job = await repo.create(jobData);
   return job;
 }
@@ -270,6 +323,29 @@ export async function updateJob(id: string, body: any) {
   const existingJob = await repo.findById(id);
   if (!existingJob) {
     throw new NotFoundError('Job not found');
+  }
+
+  // D3: Block Dual Frequency if component RH Counter Type is not MASTER/INHERITED
+  const effectiveBasis = updateData.maintenanceBasis ?? existingJob.maintenanceBasis;
+  const effectiveComponentId = updateData.componentId ?? existingJob.componentId;
+  const basisChangingToDual = updateData.maintenanceBasis === 'Dual Frequency' && existingJob.maintenanceBasis !== 'Dual Frequency';
+  const componentChangingOnDual = effectiveBasis === 'Dual Frequency' && updateData.componentId !== undefined && updateData.componentId !== existingJob.componentId;
+
+  if (basisChangingToDual || componentChangingOnDual) {
+    // Ensure we have the component for D3 check
+    if (!component && effectiveComponentId) {
+      component = await repo.findComponent(effectiveComponentId);
+    }
+    if (component) {
+      const rhType = component.rhCounterType;
+      if (rhType !== 'MASTER' && rhType !== 'INHERITED') {
+        throw new ValidationError(
+          `Dual Frequency maintenance basis requires a component with RH Counter Type set to Master or Inherited. ` +
+          `Component "${component.name}" has RH Counter Type "${rhType || 'not set'}". ` +
+          `Please update the component's RH Counter Type first, or choose Calendar or Running Hours basis.`
+        );
+      }
+    }
   }
 
   const mergedData = { ...existingJob, ...updateData };

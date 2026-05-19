@@ -761,7 +761,7 @@ export async function copyVessel(body: any) {
   const db = await repo.getCopyVesselDb();
   const { components, jobs, spares, spareComponentLinks, storesItems } = repo;
 
-  const copyResults = { components: 0, jobs: 0, spares: 0, spareComponentLinks: 0, stores: 0, errors: [] as string[] };
+  const copyResults = { components: 0, jobs: 0, spares: 0, spareComponentLinks: 0, stores: 0, errors: [] as string[], warnings: [] as string[] };
   const componentIdMap = new Map<string, string>();
   const spareIdMap = new Map<number, number>();
 
@@ -851,6 +851,20 @@ export async function copyVessel(body: any) {
 
       const newId = generateId('JOB');
       const newComponentId = componentIdMap.get(job.componentId || '') || job.componentId;
+
+      // D3: For Dual Frequency jobs, validate the TARGET component's RH Counter Type
+      if (job.maintenanceBasis === 'Dual Frequency' && newComponentId) {
+        const [targetComp] = await db.select().from(components)
+          .where(eq(components.cuuid, newComponentId));
+        if (!targetComp || (targetComp.rhCounterType !== 'MASTER' && targetComp.rhCounterType !== 'INHERITED')) {
+          const compName = targetComp?.name || job.componentName || newComponentId;
+          const rhType = targetComp?.rhCounterType || 'not set';
+          copyResults.warnings.push(
+            `Job ${job.jobNo} (Dual Frequency) skipped: target component "${compName}" has RH Counter Type "${rhType}" (requires Master or Inherited)`
+          );
+          continue;
+        }
+      }
 
       try {
         await db.insert(jobs).values({
