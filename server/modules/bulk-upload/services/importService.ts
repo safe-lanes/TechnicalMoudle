@@ -22,6 +22,87 @@ import * as woRepo from '../../work-orders/repositories/workOrderRepository';
 import { logFieldChangesBatch } from '../../sync';
 
 
+export interface SpareInventoryResult {
+  linkCreated: boolean;
+  stockRowsCreated: number;
+  stockRowsUpdated: number;
+  txCreated: number;
+}
+
+async function writeOneLocation(
+  spareId: number,
+  spareUuid: string,
+  vesselId: string,
+  locationName: string,
+  delta: number | null,
+  userId: string,
+  touchedStockKeys: Set<string>,
+  recordOpeningBalance: boolean,
+  out: SpareInventoryResult,
+): Promise<void> {
+  if (delta == null) return; // ROB not provided → don't touch stock for this location.
+  const loc = await storage.findOrCreateLocation(vesselId, locationName.trim(), userId);
+  const key = `${spareId}:${loc.id}`;
+  const existingStock = await storage.getSpareLocationStockItem(spareId, loc.id);
+  const preQty = existingStock?.qty ?? 0;
+  const alreadyTouched = touchedStockKeys.has(key);
+
+  let newQty: number;
+  let createTx: boolean;
+  if (alreadyTouched) {
+    // Additive contribution within the same import. The stock row already exists (we wrote it
+    // earlier in this loop). We still emit a tx so the audit trail records this row's contribution
+    // — the "Opening balance" label is preserved because the import as a whole is establishing
+    // the opening balance, even though strictly speaking the row already existed at this point.
+    newQty = preQty + delta;
+    createTx = recordOpeningBalance && delta > 0;
+  } else {
+    // First touch in this import. Overwrite to the row's value. Only emit a tx if the stock row
+    // didn't exist in the DB pre-import (true opening balance). If a pre-existing stock row is
+    // being updated to a new value, that's a plain UPDATE — no opening-balance tx.
+    newQty = delta;
+    createTx = recordOpeningBalance && existingStock == null && delta > 0;
+  }
+  if (newQty < 0) newQty = 0;
+
+  const totalBefore = await storage.getSpareRobTotal(spareId);
+  await storage.upsertSpareLocationStock({
+    vesselId,
+    spareId,
+    spareUuid,
+    locationId: loc.id,
+    qty: newQty,
+  });
+  touchedStockKeys.add(key);
+
+  if (existingStock == null && !alreadyTouched) {
+    out.stockRowsCreated++;
+  } else {
+    out.stockRowsUpdated++;
+  }
+
+  if (createTx) {
+    const qtyChange = newQty - preQty;
+    await storage.createInventoryTransaction({
+      vesselId,
+      spareId,
+      spareUuid,
+      locationId: loc.id,
+      eventType: 'ADJUST',
+      qtyChange,
+      robTotalBefore: totalBefore,
+      robTotalAfter: totalBefore + qtyChange,
+      robLocationBefore: preQty,
+      robLocationAfter: newQty,
+      referenceType: 'OTHER',
+      referenceNote: 'Opening balance from Excel import',
+      userId,
+    });
+    out.txCreated++;
+    console.log(`📊 Opening-balance tx for spare ${spareId} at ${locationName}: ${preQty} → ${newQty} (Δ${qtyChange})`);
+  }
+}
+
 export async function processSpareInventory(params: {
   spareId: number;
   spareUuid: string;
@@ -29,13 +110,22 @@ export async function processSpareInventory(params: {
   componentId: string;
   locationAName: string | null;
   locationBName: string | null;
-  robLocationA: number;
-  robLocationB: number;
-  isNewSpare: boolean;
+  // Pass `null` when the row did NOT provide a ROB for this location — that way an absent value
+  // doesn't silently overwrite existing stock to zero. Pass an integer (including 0) only when
+  // the value is intentional.
+  robLocationA: number | null;
+  robLocationB: number | null;
   userId: string;
-}): Promise<{ linkCreated: boolean }> {
-  const { spareId, spareUuid, vesselId, componentId, locationAName, locationBName, robLocationA, robLocationB, isNewSpare, userId } = params;
-  let linkCreated = false;
+  touchedStockKeys?: Set<string>;
+  recordOpeningBalance?: boolean;
+}): Promise<SpareInventoryResult> {
+  const {
+    spareId, spareUuid, vesselId, componentId,
+    locationAName, locationBName, robLocationA, robLocationB, userId,
+  } = params;
+  const touchedStockKeys = params.touchedStockKeys ?? new Set<string>();
+  const recordOpeningBalance = params.recordOpeningBalance ?? true;
+  const out: SpareInventoryResult = { linkCreated: false, stockRowsCreated: 0, stockRowsUpdated: 0, txCreated: 0 };
 
   try {
     const existingLinks = await storage.getSpareComponentLinksBySpare(spareId);
@@ -48,7 +138,7 @@ export async function processSpareInventory(params: {
         vesselId,
         linkedBy: userId,
       }, true);
-      linkCreated = true;
+      out.linkCreated = true;
       console.log(`🔗 Linked spare ${spareId} to component ${componentId}`);
     }
   } catch (linkError: any) {
@@ -57,85 +147,16 @@ export async function processSpareInventory(params: {
   }
 
   try {
-    if (locationAName && locationAName.trim()) {
-      const locationA = await storage.findOrCreateLocation(vesselId, locationAName.trim(), userId);
-
-      const currentTotalRobA = await storage.getSpareRobTotal(spareId);
-      const currentLocStockA = await storage.getSpareLocationStockItem(spareId, locationA.id);
-      const currentLocQtyA = currentLocStockA?.qty ?? 0;
-
-      if (robLocationA >= 0) {
-        await storage.upsertSpareLocationStock({
-          vesselId,
-          spareId,
-          spareUuid,
-          locationId: locationA.id,
-          qty: robLocationA,
-        });
-
-        if (isNewSpare && robLocationA > 0) {
-          const newTotalRobA = currentTotalRobA + robLocationA;
-          await storage.createInventoryTransaction({
-            vesselId,
-            spareId,
-            spareUuid,
-            locationId: locationA.id,
-            eventType: 'ADJUST',
-            qtyChange: robLocationA,
-            robTotalBefore: currentTotalRobA,
-            robTotalAfter: newTotalRobA,
-            robLocationBefore: currentLocQtyA,
-            robLocationAfter: robLocationA,
-            referenceType: 'OTHER',
-            referenceNote: 'Opening balance from Excel import',
-            userId,
-          });
-          console.log(`📊 Created opening balance for spare ${spareId} at ${locationAName}: ${robLocationA}`);
-        }
-      }
+    if (locationAName && locationAName.trim() && robLocationA != null && robLocationA >= 0) {
+      await writeOneLocation(spareId, spareUuid, vesselId, locationAName, robLocationA, userId, touchedStockKeys, recordOpeningBalance, out);
     }
-
-    if (locationBName && locationBName.trim()) {
-      const locationB = await storage.findOrCreateLocation(vesselId, locationBName.trim(), userId);
-
-      const currentTotalRobB = await storage.getSpareRobTotal(spareId);
-      const currentLocStockB = await storage.getSpareLocationStockItem(spareId, locationB.id);
-      const currentLocQtyB = currentLocStockB?.qty ?? 0;
-
-      if (robLocationB >= 0) {
-        await storage.upsertSpareLocationStock({
-          vesselId,
-          spareId,
-          spareUuid,
-          locationId: locationB.id,
-          qty: robLocationB,
-        });
-
-        if (isNewSpare && robLocationB > 0) {
-          const newTotalRobB = currentTotalRobB + robLocationB;
-          await storage.createInventoryTransaction({
-            vesselId,
-            spareId,
-            spareUuid,
-            locationId: locationB.id,
-            eventType: 'ADJUST',
-            qtyChange: robLocationB,
-            robTotalBefore: currentTotalRobB,
-            robTotalAfter: newTotalRobB,
-            robLocationBefore: currentLocQtyB,
-            robLocationAfter: robLocationB,
-            referenceType: 'OTHER',
-            referenceNote: 'Opening balance from Excel import',
-            userId,
-          });
-          console.log(`📊 Created opening balance for spare ${spareId} at ${locationBName}: ${robLocationB}`);
-        }
-      }
+    if (locationBName && locationBName.trim() && robLocationB != null && robLocationB >= 0) {
+      await writeOneLocation(spareId, spareUuid, vesselId, locationBName, robLocationB, userId, touchedStockKeys, recordOpeningBalance, out);
     }
   } catch (error: any) {
-    console.error(`⚠️ Error processing location/stock for spare ${spareId} (link was ${linkCreated ? 'created' : 'skipped'}):`, error.message);
+    console.error(`⚠️ Error processing location/stock for spare ${spareId} (link was ${out.linkCreated ? 'created' : 'skipped'}):`, error.message);
   }
-  return { linkCreated };
+  return out;
 }
 
 export async function trackChange(
@@ -166,8 +187,9 @@ export async function trackChange(
 export interface RowResult {
   rowNumber: number;
   primaryIdentifier: string;
-  action: 'created' | 'updated' | 'skipped' | 'failed';
+  action: 'created' | 'updated' | 'linked' | 'skipped' | 'failed';
   error?: string;
+  info?: string;
 }
 
 export type ProgressCallback = (info: {
@@ -199,6 +221,9 @@ export async function performImport(
     spareComponentLinksExpected: 0,
     spareComponentLinksDbTotal: 0,
     spareComponentLinksDbDelta: 0,
+    spareLocationStockRowsCreated: 0,
+    spareLocationStockRowsUpdated: 0,
+    inventoryTransactionsCreated: 0,
     rowResults: [] as RowResult[],
     warnings: [] as string[]
   };
@@ -513,7 +538,30 @@ export async function performImport(
     console.log(`🔢 Next auto-generated Part Code will be: PT-${String(nextPartCodeNum).padStart(6, '0')}`);
     
     const preImportLinkCount = await storage.getSpareComponentLinkCountByVessel(sparesVesselId);
-    
+
+    // Task #157: track in-import state so that rows sharing a partCode merge instead of overwriting.
+    //  - processedPartCodes: partCodes that have already had a spare-row write (create or update) in this import.
+    //    Subsequent rows for the same partCode become "link-only + inventory" and never re-touch the spare row.
+    //  - touchedStockKeys: `${spareId}:${locationId}` pairs already written in this import. First touch in this
+    //    import sets the qty; subsequent touches add to it, so two rows that put stock in the same physical
+    //    location accumulate rather than the later row overwriting the earlier one.
+    const processedPartCodes = new Set<string>();
+    const touchedStockKeys = new Set<string>();
+    // Parse a ROB cell into a number, or `null` if the cell is missing/blank. Passing `null`
+    // downstream means "don't touch stock for this location" — avoiding the data-loss regression
+    // where an absent ROB cell would silently overwrite existing stock to zero.
+    const parseRowRob = (val: any): number | null => {
+      if (val === undefined || val === null || val === '') return null;
+      const n = parseInt(val);
+      return Number.isFinite(n) ? n : null;
+    };
+    const accumulateInventory = (r: SpareInventoryResult) => {
+      if (r.linkCreated) result.spareComponentLinksCreated++;
+      result.spareLocationStockRowsCreated += r.stockRowsCreated;
+      result.spareLocationStockRowsUpdated += r.stockRowsUpdated;
+      result.inventoryTransactionsCreated += r.txCreated;
+    };
+
     for (let _spareIdx = 0; _spareIdx < data.length; _spareIdx++) {
       const row = data[_spareIdx];
       const _spareRowNum = row['__meta']?.rowNumber || (_spareIdx + 1);
@@ -542,32 +590,45 @@ export async function performImport(
         
         if (mode === 'add') {
           if (existingSpare) {
-            // MANY-TO-MANY SUPPORT: Check via spareComponentLinks (source of truth) if spare is already linked to this component
+            // Task #157: ADD-mode link-only branch — the spare already exists but this row carries
+            // additional per-location stock data that must NOT be silently dropped. Delegate to
+            // processSpareInventory so the link AND the stock contribution are both written.
             try {
-              const existingLinks = await storage.getSpareComponentLinksBySpare(existingSpare.id);
-              const linkAlreadyExists = existingLinks.some(link => link.componentId === component.cuuid);
-              
               result.spareComponentLinksExpected++;
-              if (!linkAlreadyExists) {
-                await storage.createSpareComponentLink({
-                  vesselId: sparesVesselId,
-                  spareId: existingSpare.id,
-                  spareUuid: existingSpare.suuid,
-                  componentId: component.cuuid,
-                  linkedBy: 'system-bulk-import',
-                }, true);
-                result.spareComponentLinksCreated++;
-                console.log(`🔗 Linked spare ${partCode} to additional component ${componentCode}`);
-                
+              const inv = await processSpareInventory({
+                spareId: existingSpare.id,
+                spareUuid: existingSpare.suuid,
+                vesselId: sparesVesselId,
+                componentId: component.cuuid,
+                locationAName: row['Location A'] ? String(row['Location A']).trim() : null,
+                locationBName: row['Location B'] ? String(row['Location B']).trim() : null,
+                robLocationA: parseRowRob(row['Location A - ROB']),
+                robLocationB: parseRowRob(row['Location B - ROB']),
+                userId: 'system-import',
+                touchedStockKeys,
+              });
+              accumulateInventory(inv);
+
+              if (row['Minimum Stock'] !== undefined && row['Minimum Stock'] !== null && row['Minimum Stock'] !== '') {
+                result.warnings.push(`Row ${_spareRowNum}: 'Minimum Stock' was provided for partCode '${partCode}' on a link-only row, but minimum stock lives on the spare row itself (not per component or per location). The existing spare's minimum was NOT modified.`);
+              }
+
+              const stocked = (inv.stockRowsCreated + inv.stockRowsUpdated) > 0;
+              if (inv.linkCreated || stocked) {
                 result.updated++;
-                result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'updated' });
+                const parts: string[] = [];
+                if (inv.linkCreated) parts.push(`linked to ${componentCode}`); else parts.push(`already linked to ${componentCode}`);
+                if (inv.stockRowsCreated > 0) parts.push(`${inv.stockRowsCreated} stock row(s) created`);
+                if (inv.stockRowsUpdated > 0) parts.push(`${inv.stockRowsUpdated} stock row(s) updated`);
+                if (inv.txCreated > 0) parts.push(`${inv.txCreated} opening-balance tx`);
+                result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'linked', info: parts.join('; ') });
+                console.log(`🔗 Spare ${partCode}: ${parts.join('; ')}`);
               } else {
-                console.log(`⏭️ Spare ${partCode} already linked to component ${componentCode}, skipping`);
                 result.skipped++;
-                result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'skipped', error: 'Already linked to component' });
+                result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'skipped', error: 'Already linked to component; no stock changes from this row' });
               }
             } catch (linkError: any) {
-              console.warn(`⚠️ Failed to create spare-component link for ${partCode} -> ${componentCode}: ${linkError.message}`);
+              console.warn(`⚠️ Failed to process link/stock for ${partCode} -> ${componentCode}: ${linkError.message}`);
               result.skipped++;
               result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'failed', error: linkError.message });
             }
@@ -597,8 +658,8 @@ export async function performImport(
           }
           
           // Parse individual ROB values for each location
-          const robLocationAVal = parseInt(row['Location A - ROB']) || 0;
-          const robLocationBVal = parseInt(row['Location B - ROB']) || 0;
+          const robLocationAVal = parseRowRob(row['Location A - ROB']);
+          const robLocationBVal = parseRowRob(row['Location B - ROB']);
           
           const newSpare = await storage.createSpare({
             partCode: partCode,
@@ -609,8 +670,8 @@ export async function performImport(
             componentSpareCode: `SP-${componentCode}-${String(result.created + 1).padStart(3, '0')}`,
             critical: criticalVal === 'Yes' || criticalVal === true ? 'Yes' : 'No',
             rob: totalRob,
-            robLocationA: robLocationAVal,
-            robLocationB: robLocationBVal,
+            robLocationA: robLocationAVal ?? 0,
+            robLocationB: robLocationBVal ?? 0,
             min: row['Minimum Stock'] ? parseInt(row['Minimum Stock']) : 0,
             location: row['Location A'] ? String(row['Location A']).trim() : null,
             location2: row['Location B'] ? String(row['Location B']).trim() : null,
@@ -634,6 +695,7 @@ export async function performImport(
           }, true);
           
           sparesByPartCode.set(partCode, newSpare);
+          processedPartCodes.add(partCode);
           result.created++;
           
           // Track change if history tracking is enabled
@@ -652,10 +714,10 @@ export async function performImport(
             locationBName: row['Location B'] ? String(row['Location B']).trim() : null,
             robLocationA: robLocationAVal,
             robLocationB: robLocationBVal,
-            isNewSpare: true,
             userId: 'system-import',
+            touchedStockKeys,
           });
-          if (addNewResult.linkCreated) result.spareComponentLinksCreated++;
+          accumulateInventory(addNewResult);
           result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'created' });
           
           console.log(`✅ Created spare: ${partCode} - ${newSpare.partName}`);
@@ -665,6 +727,36 @@ export async function performImport(
             console.log(`⏭️ Part Code ${partCode} not found for update, skipping`);
             result.skipped++;
             result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'skipped', error: 'Part Code not found for update' });
+            continue;
+          }
+
+          // Task #157: second-or-later row for this partCode — don't re-write the spare row's
+          // location/ROB/min fields (that would clobber Row 1's values). Just ensure the link to
+          // this component exists and accumulate this row's stock contribution.
+          if (processedPartCodes.has(partCode)) {
+            result.spareComponentLinksExpected++;
+            const subResult = await processSpareInventory({
+              spareId: existingSpare.id,
+              spareUuid: existingSpare.suuid,
+              vesselId: sparesVesselId,
+              componentId: component.cuuid,
+              locationAName: row['Location A'] ? String(row['Location A']).trim() : null,
+              locationBName: row['Location B'] ? String(row['Location B']).trim() : null,
+              robLocationA: parseRowRob(row['Location A - ROB']),
+              robLocationB: parseRowRob(row['Location B - ROB']),
+              userId: 'system-import',
+              touchedStockKeys,
+            });
+            accumulateInventory(subResult);
+            if (row['Minimum Stock'] !== undefined && row['Minimum Stock'] !== null && row['Minimum Stock'] !== '') {
+              result.warnings.push(`Row ${_spareRowNum}: 'Minimum Stock' was provided for partCode '${partCode}' but was NOT applied — spare row was already updated by an earlier row in this import (minimum stock is a single per-spare value).`);
+            }
+            result.updated++;
+            const parts: string[] = [`linked to ${componentCode}${subResult.linkCreated ? '' : ' (already linked)'}`];
+            if (subResult.stockRowsCreated > 0) parts.push(`${subResult.stockRowsCreated} stock row(s) created`);
+            if (subResult.stockRowsUpdated > 0) parts.push(`${subResult.stockRowsUpdated} stock row(s) updated`);
+            if (subResult.txCreated > 0) parts.push(`${subResult.txCreated} opening-balance tx`);
+            result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'linked', info: `subsequent row for ${partCode}: ${parts.join('; ')}` });
             continue;
           }
           
@@ -691,8 +783,10 @@ export async function performImport(
           }
           
           // Parse individual ROB values for each location
-          const robLocationAUpdate = row['Location A - ROB'] !== undefined ? (parseInt(row['Location A - ROB']) || 0) : existingSpare.robLocationA;
-          const robLocationBUpdate = row['Location B - ROB'] !== undefined ? (parseInt(row['Location B - ROB']) || 0) : existingSpare.robLocationB;
+          // First-row UPDATE: if the row provided a ROB use it, else fall back to the existing
+          // spare's canonical ROB (legacy behavior — preserves stock when the column is omitted).
+          const robLocationAUpdate = parseRowRob(row['Location A - ROB']) ?? existingSpare.robLocationA ?? null;
+          const robLocationBUpdate = parseRowRob(row['Location B - ROB']) ?? existingSpare.robLocationB ?? null;
           
           const updatedSpare = await storage.updateSpare(existingSpare.suuid, {
             partName: String(row['Part Name']).trim(),
@@ -724,6 +818,7 @@ export async function performImport(
           }, true);
           
           sparesByPartCode.set(partCode, updatedSpare);
+          processedPartCodes.add(partCode);
           result.updated++;
           
           if (importHistoryId) {
@@ -741,10 +836,10 @@ export async function performImport(
             locationBName: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
             robLocationA: robLocationAUpdate,
             robLocationB: robLocationBUpdate,
-            isNewSpare: false,
             userId: 'system-import',
+            touchedStockKeys,
           });
-          if (updateResult.linkCreated) result.spareComponentLinksCreated++;
+          accumulateInventory(updateResult);
           
           result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'updated' });
           console.log(`🔄 Updated spare: ${partCode} - ${updatedSpare.partName}`);
@@ -773,10 +868,46 @@ export async function performImport(
           }
           
           // Parse individual ROB values for each location
-          const robLocationAUpsert = parseInt(row['Location A - ROB']) || 0;
-          const robLocationBUpsert = parseInt(row['Location B - ROB']) || 0;
+          const robLocationAUpsert = parseRowRob(row['Location A - ROB']);
+          const robLocationBUpsert = parseRowRob(row['Location B - ROB']);
           
           if (existingSpare) {
+            // Task #157: second-or-later upsert row for this partCode — don't re-write the spare
+            // row (that would clobber an earlier row's fields). Just ensure the new component
+            // link exists and accumulate this row's stock contribution.
+            if (processedPartCodes.has(partCode)) {
+              try {
+                result.spareComponentLinksExpected++;
+                const subUpsert = await processSpareInventory({
+                  spareId: existingSpare.id,
+                  spareUuid: existingSpare.suuid,
+                  vesselId: sparesVesselId,
+                  componentId: component.cuuid,
+                  locationAName: row['Location A'] ? String(row['Location A']).trim() : null,
+                  locationBName: row['Location B'] ? String(row['Location B']).trim() : null,
+                  robLocationA: robLocationAUpsert,
+                  robLocationB: robLocationBUpsert,
+                  userId: 'system-import',
+                  touchedStockKeys,
+                });
+                accumulateInventory(subUpsert);
+                if (row['Minimum Stock'] !== undefined && row['Minimum Stock'] !== null && row['Minimum Stock'] !== '') {
+                  result.warnings.push(`Row ${_spareRowNum}: 'Minimum Stock' was provided for partCode '${partCode}' but was NOT applied — spare row was already updated by an earlier row in this import (minimum stock is a single per-spare value).`);
+                }
+                result.updated++;
+                const parts: string[] = [`linked to ${componentCode}${subUpsert.linkCreated ? '' : ' (already linked)'}`];
+                if (subUpsert.stockRowsCreated > 0) parts.push(`${subUpsert.stockRowsCreated} stock row(s) created`);
+                if (subUpsert.stockRowsUpdated > 0) parts.push(`${subUpsert.stockRowsUpdated} stock row(s) updated`);
+                if (subUpsert.txCreated > 0) parts.push(`${subUpsert.txCreated} opening-balance tx`);
+                result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'linked', info: `subsequent row for ${partCode}: ${parts.join('; ')}` });
+              } catch (subErr: any) {
+                console.warn(`⚠️ Failed subsequent-row processing for ${partCode} -> ${componentCode}: ${subErr.message}`);
+                result.skipped++;
+                result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'failed', error: subErr.message });
+              }
+              continue;
+            }
+
             // MANY-TO-MANY SUPPORT: Check via spareComponentLinks (source of truth) if spare is already linked to this component
             try {
               const existingLinks = await storage.getSpareComponentLinksBySpare(existingSpare.id);
@@ -804,8 +935,8 @@ export async function performImport(
                 componentName: component.name || '',
                 critical: criticalValUpsert === 'Yes' || criticalValUpsert === true ? 'Yes' : 'No',
                 rob: totalRobUpsert || existingSpare.rob,
-                robLocationA: row['Location A - ROB'] !== undefined ? robLocationAUpsert : existingSpare.robLocationA,
-                robLocationB: row['Location B - ROB'] !== undefined ? robLocationBUpsert : existingSpare.robLocationB,
+                robLocationA: robLocationAUpsert ?? existingSpare.robLocationA,
+                robLocationB: robLocationBUpsert ?? existingSpare.robLocationB,
                 min: row['Minimum Stock'] ? parseInt(row['Minimum Stock']) : existingSpare.min,
                 location: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
                 location2: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
@@ -827,6 +958,7 @@ export async function performImport(
               }, true);
               
               sparesByPartCode.set(partCode, updatedSpare);
+              processedPartCodes.add(partCode);
               result.updated++;
               
               if (importHistoryId) {
@@ -834,18 +966,24 @@ export async function performImport(
               }
               
               // Process inventory for upsert-updated spare
-              await processSpareInventory({
+              const upsertExistingInv = await processSpareInventory({
                 spareId: updatedSpare.id,
                 spareUuid: updatedSpare.suuid,
                 vesselId: sparesVesselId,
                 componentId: component.cuuid,
                 locationAName: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
                 locationBName: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
-                robLocationA: row['Location A - ROB'] !== undefined ? robLocationAUpsert : existingSpare.robLocationA,
-                robLocationB: row['Location B - ROB'] !== undefined ? robLocationBUpsert : existingSpare.robLocationB,
-                isNewSpare: false,
+                robLocationA: robLocationAUpsert ?? existingSpare.robLocationA ?? null,
+                robLocationB: robLocationBUpsert ?? existingSpare.robLocationB ?? null,
                 userId: 'system-import',
+                touchedStockKeys,
               });
+              // linkCreated already counted above via direct createSpareComponentLink call; only
+              // accumulate stock + tx counters (and any redundant link the helper might create,
+              // which onConflictDoNothing makes a no-op).
+              result.spareLocationStockRowsCreated += upsertExistingInv.stockRowsCreated;
+              result.spareLocationStockRowsUpdated += upsertExistingInv.stockRowsUpdated;
+              result.inventoryTransactionsCreated += upsertExistingInv.txCreated;
               
               result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'updated' });
               console.log(`🔄 Updated spare (upsert): ${partCode} - ${updatedSpare.partName}`);
@@ -865,8 +1003,8 @@ export async function performImport(
               componentSpareCode: `SP-${componentCode}-${String(result.created + 1).padStart(3, '0')}`,
               critical: criticalValUpsert === 'Yes' || criticalValUpsert === true ? 'Yes' : 'No',
               rob: totalRobUpsert,
-              robLocationA: robLocationAUpsert,
-              robLocationB: robLocationBUpsert,
+              robLocationA: robLocationAUpsert ?? 0,
+              robLocationB: robLocationBUpsert ?? 0,
               min: row['Minimum Stock'] ? parseInt(row['Minimum Stock']) : 0,
               location: row['Location A'] ? String(row['Location A']).trim() : null,
               location2: row['Location B'] ? String(row['Location B']).trim() : null,
@@ -890,6 +1028,7 @@ export async function performImport(
             }, true);
             
             sparesByPartCode.set(partCode, newSpare);
+            processedPartCodes.add(partCode);
             result.created++;
             
             if (importHistoryId) {
@@ -907,10 +1046,10 @@ export async function performImport(
               locationBName: row['Location B'] ? String(row['Location B']).trim() : null,
               robLocationA: robLocationAUpsert,
               robLocationB: robLocationBUpsert,
-              isNewSpare: true,
               userId: 'system-import',
+              touchedStockKeys,
             });
-            if (upsertNewResult.linkCreated) result.spareComponentLinksCreated++;
+            accumulateInventory(upsertNewResult);
             result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: 'created' });
             
             console.log(`✅ Created spare (upsert): ${partCode} - ${newSpare.partName}`);

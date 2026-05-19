@@ -530,10 +530,10 @@ export default function UniformBulkUpload({
         rows.push({
           rowNumber: rr.rowNumber,
           primaryIdentifier: rr.primaryIdentifier || '',
-          status: rr.action === 'created' || rr.action === 'updated' ? 'success'
+          status: rr.action === 'created' || rr.action === 'updated' || rr.action === 'linked' ? 'success'
             : rr.action === 'failed' ? 'failed'
             : 'skipped',
-          error: rr.error || undefined,
+          error: rr.error || rr.info || undefined,
           data: dryRunRow?.normalized,
         });
       }
