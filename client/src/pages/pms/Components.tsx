@@ -906,13 +906,15 @@ const JobRow: React.FC<{
         <td className={`py-3 px-3 ${inactiveClass}`} data-testid={`job-title-${job.jobNo}`}>{job.jobTitle}{isInactive && isAdminRole ? ' (Inactive)' : ''}</td>
         <td className={`py-3 px-3 ${inactiveClass}`}>{job.maintenanceType}</td>
         <td className={`py-3 px-3 ${inactiveClass}`}>
-          {job.maintenanceBasis === 'Running Hours' 
-            ? `${job.intervalRunningHour || 0} RH` 
-            : `${job.frequencyValue} ${job.frequencyUnit}`}
+          {job.maintenanceBasis === 'Running Hours'
+            ? `${job.intervalRunningHour || 0} RH`
+            : job.maintenanceBasis === 'Dual Frequency'
+              ? `${job.frequencyValue} ${job.frequencyUnit} / ${job.intervalRunningHour || 0} RH`
+              : `${job.frequencyValue} ${job.frequencyUnit}`}
         </td>
         <td className={`py-3 px-3 ${inactiveClass}`}>{formatProfessionalDate(effectiveLastDoneDate) || '-'}</td>
         <td className={`py-3 px-3 ${inactiveClass}`}>
-          {job.maintenanceBasis === 'Running Hours' 
+          {job.maintenanceBasis === 'Running Hours'
             ? (() => {
                 const frequency = parseFloat(job.intervalRunningHour || '0');
                 const currentRH = parseFloat(job.componentCurrentRH || '0');
@@ -920,7 +922,17 @@ const JobRow: React.FC<{
                 const remainingRH = frequency - (currentRH - lastDoneRH);
                 return remainingRH > 0 ? `${remainingRH.toFixed(0)} RH` : 'Due';
               })()
-            : formatProfessionalDate(effectiveNextDueDate) || '-'}
+            : job.maintenanceBasis === 'Dual Frequency'
+              ? (() => {
+                  const datePart = formatProfessionalDate(effectiveNextDueDate) || '-';
+                  const frequency = parseFloat(job.intervalRunningHour || '0');
+                  const currentRH = parseFloat(job.componentCurrentRH || '0');
+                  const lastDoneRH = parseFloat(effectiveLastDoneRH || '0');
+                  const remainingRH = frequency > 0 ? frequency - (currentRH - lastDoneRH) : 0;
+                  const rhPart = remainingRH > 0 ? `${remainingRH.toFixed(0)} RH` : 'Due';
+                  return `${datePart} / ${rhPart}`;
+                })()
+              : formatProfessionalDate(effectiveNextDueDate) || '-'}
         </td>
         <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
           {!isInactive && (

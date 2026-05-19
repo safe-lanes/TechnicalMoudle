@@ -157,6 +157,14 @@ const JobsFormPage: React.FC = () => {
     enabled: !!jobId
   });
 
+  // Fetch full component to get rhCounterType for D3 validation
+  const componentCuuid = (jobContext as any)?.component?.id;
+  const { data: fullComponent } = useQuery({
+    queryKey: [`/technical/api/components/${componentCuuid}`],
+    enabled: !!componentCuuid
+  });
+  const componentRhCounterType = (fullComponent as any)?.rhCounterType || '';
+
   const [, setLocation] = useLocation();
 
   const inactivateMutation = useMutation({
@@ -189,6 +197,7 @@ const JobsFormPage: React.FC = () => {
     maintenanceBasis: "Calendar",
     frequencyValue: "",
     frequencyUnit: "Months",
+    intervalRunningHour: "",
     taskType: "Inspection",
     assignedTo: "",
     approver: "",
@@ -214,18 +223,26 @@ const JobsFormPage: React.FC = () => {
     if (jobContext) {
       const context = jobContext as any;
       if (context.templateData) {
-        const isRunningHours = context.templateData.maintenanceBasis === 'Running Hours';
+        const basis = context.templateData.maintenanceBasis;
+        const isRunningHours = basis === 'Running Hours';
+        const isDualFrequency = basis === 'Dual Frequency';
         let normalizedFrequencyUnit = context.templateData.frequencyUnit;
-        
+
         if (isRunningHours) {
           normalizedFrequencyUnit = 'Hours';
         } else if (!normalizedFrequencyUnit || normalizedFrequencyUnit === 'Hours') {
           normalizedFrequencyUnit = 'Months';
         }
-        
+
+        // For RH-only jobs, map intervalRunningHour into frequencyValue
+        // For Dual Frequency, keep them separate (calendar leg in frequencyValue, RH leg in intervalRunningHour)
         const frequencyValue = isRunningHours
           ? (context.templateData.intervalRunningHour || context.templateData.frequencyValue || '')
           : (context.templateData.frequencyValue || '');
+
+        const intervalRunningHour = isDualFrequency
+          ? (context.templateData.intervalRunningHour || '')
+          : '';
         
         // IMPORTANT: Use activeComponentCode from URL if provided (for multi-linked jobs),
         // otherwise fall back to the job's stored componentCode
@@ -240,6 +257,7 @@ const JobsFormPage: React.FC = () => {
           componentCode: effectiveComponentCode,
           frequencyValue: String(frequencyValue),
           frequencyUnit: normalizedFrequencyUnit,
+          intervalRunningHour: String(intervalRunningHour),
           taskType: context.templateData.maintenanceType || context.templateData.taskType || 'Inspection',
           nextDueReading: context.templateData.nextDueRH || '',
           briefWorkDescription: context.templateData.briefWorkDescription || context.templateData.jobDescription || ''
@@ -264,7 +282,7 @@ const JobsFormPage: React.FC = () => {
 
   const getChangedFields = (): string[] => {
     const changedFields: string[] = [];
-    const fieldsToCheck = ['woTitle', 'assignedTo', 'approver', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'taskType', 'isActive'];
+    const fieldsToCheck = ['woTitle', 'assignedTo', 'approver', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive'];
     
     for (const field of fieldsToCheck) {
       if (templateData[field as keyof typeof templateData] !== originalData[field]) {
@@ -350,7 +368,28 @@ const JobsFormPage: React.FC = () => {
 
   const handleSaveChanges = async () => {
     if (!jobId) return;
-    
+
+    // D3 form-level block: prevent saving Dual Frequency on incompatible component
+    if (templateData.maintenanceBasis === 'Dual Frequency') {
+      if (componentRhCounterType !== 'MASTER' && componentRhCounterType !== 'INHERITED') {
+        toast({
+          title: "Dual Frequency not allowed",
+          description: "Dual Frequency requires the component to have an RH Counter Type of Master or Inherited. Set up the component's RH Counter first.",
+          variant: "destructive"
+        });
+        return;
+      }
+      // Both legs required for Dual
+      if (!templateData.frequencyValue || !templateData.frequencyUnit) {
+        toast({ title: "Validation Error", description: "Dual Frequency requires a calendar frequency (value and unit).", variant: "destructive" });
+        return;
+      }
+      if (!templateData.intervalRunningHour || parseInt(templateData.intervalRunningHour, 10) <= 0) {
+        toast({ title: "Validation Error", description: "Dual Frequency requires a Running Hours interval greater than 0.", variant: "destructive" });
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       const updatePayload: Record<string, any> = {};
@@ -381,6 +420,12 @@ const JobsFormPage: React.FC = () => {
       }
       if (templateData.frequencyUnit !== originalData.frequencyUnit) {
         updatePayload.frequencyUnit = templateData.frequencyUnit;
+      }
+      if (templateData.maintenanceBasis !== originalData.maintenanceBasis) {
+        updatePayload.maintenanceBasis = templateData.maintenanceBasis;
+      }
+      if (templateData.intervalRunningHour !== originalData.intervalRunningHour) {
+        updatePayload.intervalRunningHour = templateData.intervalRunningHour ? parseInt(templateData.intervalRunningHour, 10) : null;
       }
       if (templateData.taskType !== originalData.taskType) {
         updatePayload.maintenanceType = templateData.taskType;
@@ -994,15 +1039,62 @@ const JobsFormPage: React.FC = () => {
                   <ReadOnlyField label="Component Name" value={templateData.componentName || templateData.component} labelMarker="JF.A1.5" valueMarker="JF.A1.6" />
                   <ReadOnlyField label="Component Code" value={templateData.componentCode} labelMarker="JF.A1.7" valueMarker="JF.A1.8" />
                   <ReadOnlyField label="Job Code" value={templateData.woTemplateCode} labelMarker="JF.A1.9" valueMarker="JF.A1.10" />
-                  <ReadOnlyField label="Maintenance Basis" value={templateData.maintenanceBasis} labelMarker="JF.A1.11" valueMarker="JF.A1.12" />
+                  {/* Maintenance Basis — editable in edit mode, read-only otherwise */}
                   {(() => {
+                    const basisChanged = isModifyMode && templateData.maintenanceBasis !== originalData.maintenanceBasis;
+                    const isDualBlocked = templateData.maintenanceBasis === 'Dual Frequency' &&
+                      componentRhCounterType !== 'MASTER' && componentRhCounterType !== 'INHERITED';
+                    return (
+                      <div className="space-y-2">
+                        <Label className={`text-sm ${basisChanged ? 'text-red-600 font-semibold' : 'text-[#8798ad]'}`} data-testid="JF.A1.11">
+                          <Marker id="JF.A1.11" />Maintenance Basis {basisChanged && '(Modified)'}
+                        </Label>
+                        {isEditMode ? (
+                          <Select
+                            value={templateData.maintenanceBasis}
+                            onValueChange={(val) => handleFieldChange('maintenanceBasis', val)}
+                          >
+                            <SelectTrigger className="text-sm" data-testid="JF.A1.12">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Calendar">Calendar</SelectItem>
+                              <SelectItem value="Running Hours">Running Hours</SelectItem>
+                              <SelectItem value="Dual Frequency">Dual Frequency</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div className="relative" data-testid="JF.A1.12">
+                            <Marker id="JF.A1.12" />
+                            <Input disabled value={templateData.maintenanceBasis || '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default" />
+                          </div>
+                        )}
+                        {isDualBlocked && isEditMode && (
+                          <p className="text-xs text-red-600 flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            Dual Frequency requires the component to have an RH Counter Type of Master or Inherited. Set up the component's RH Counter first.
+                          </p>
+                        )}
+                        {basisChanged && (
+                          <p className="text-xs text-gray-500">Original: {originalData.maintenanceBasis || '-'}</p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {/* Calendar frequency fields — shown for Calendar and Dual Frequency */}
+                  {(() => {
+                    const showCalendarFields = templateData.maintenanceBasis === 'Calendar' || templateData.maintenanceBasis === 'Dual Frequency';
+                    const showRhOnlyField = templateData.maintenanceBasis === 'Running Hours';
                     const freqValueChanged = isModifyMode && templateData.frequencyValue !== originalData.frequencyValue;
                     const freqUnitChanged = isModifyMode && templateData.frequencyUnit !== originalData.frequencyUnit;
                     const isFreqModified = freqValueChanged || freqUnitChanged;
+                    if (!showCalendarFields && !showRhOnlyField) return null;
                     return (
                       <div className="space-y-2">
                         <Label className={`text-sm ${isFreqModified ? 'text-red-600 font-semibold' : 'text-[#8798ad]'}`} data-testid="JF.A1.13">
-                          <Marker id="JF.A1.13" />Frequency {isFreqModified && '(Modified)'}
+                          <Marker id="JF.A1.13" />
+                          {showRhOnlyField ? 'Frequency (Hours)' : templateData.maintenanceBasis === 'Dual Frequency' ? 'Calendar Frequency' : 'Frequency'}
+                          {isFreqModified && ' (Modified)'}
                         </Label>
                         <div className="flex gap-2">
                           {(isModifyMode || isEditMode) ? (
@@ -1015,7 +1107,7 @@ const JobsFormPage: React.FC = () => {
                           ) : (
                             <Input disabled value={templateData.frequencyValue || '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default flex-1" data-testid="JF.A1.14" />
                           )}
-                          {templateData.maintenanceBasis === 'Running Hours' ? (
+                          {showRhOnlyField ? (
                             <Input disabled value="Hours" className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default w-24" />
                           ) : (isModifyMode || isEditMode) ? (
                             <Select value={templateData.frequencyUnit || 'Months'} onValueChange={(val) => handleFieldChange('frequencyUnit', val)}>
@@ -1034,6 +1126,34 @@ const JobsFormPage: React.FC = () => {
                         </div>
                         {isFreqModified && (
                           <p className="text-xs text-gray-500">Original: {originalData.frequencyValue || '-'} {originalData.frequencyUnit || 'Months'}</p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {/* RH interval field — shown for Dual Frequency only (RH-only uses the main frequency field above) */}
+                  {templateData.maintenanceBasis === 'Dual Frequency' && (() => {
+                    const rhChanged = isModifyMode && templateData.intervalRunningHour !== originalData.intervalRunningHour;
+                    return (
+                      <div className="space-y-2">
+                        <Label className={`text-sm ${rhChanged ? 'text-red-600 font-semibold' : 'text-[#8798ad]'}`}>
+                          Running Hours Interval {rhChanged && '(Modified)'}
+                        </Label>
+                        <div className="flex gap-2">
+                          {(isModifyMode || isEditMode) ? (
+                            <Input
+                              type="number"
+                              value={templateData.intervalRunningHour || ''}
+                              onChange={(e) => handleFieldChange('intervalRunningHour', e.target.value)}
+                              placeholder="e.g., 1000"
+                              className={`text-sm flex-1 ${rhChanged ? 'border-red-500 bg-red-50 text-red-700' : ''}`}
+                            />
+                          ) : (
+                            <Input disabled value={templateData.intervalRunningHour || '-'} className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default flex-1" />
+                          )}
+                          <Input disabled value="Hours" className="text-sm font-medium text-gray-900 bg-gray-50 disabled:opacity-100 disabled:cursor-default w-24" />
+                        </div>
+                        {rhChanged && (
+                          <p className="text-xs text-gray-500">Original: {originalData.intervalRunningHour || '-'} Hours</p>
                         )}
                       </div>
                     );
@@ -1106,16 +1226,24 @@ const JobsFormPage: React.FC = () => {
                     valueMarker="JF.A1.24"
                   />
                   {templateData.maintenanceBasis === 'Running Hours' ? (
-                    <ReadOnlyField 
-                      label="Next Due RH" 
-                      value={templateData.nextDueReading ? `${templateData.nextDueReading} Hours` : '-'} 
+                    <ReadOnlyField
+                      label="Next Due RH"
+                      value={templateData.nextDueReading ? `${templateData.nextDueReading} Hours` : '-'}
                       labelMarker="JF.A1.25"
                       valueMarker="JF.A1.26"
                     />
+                  ) : templateData.maintenanceBasis === 'Dual Frequency' ? (
+                    <>
+                      <ReadOnlyField label="Next Due Date (Calendar)" value={formatDate(templateData.nextDueDate)} labelMarker="JF.A1.25" valueMarker="JF.A1.26" />
+                      <ReadOnlyField
+                        label="Next Due RH"
+                        value={templateData.nextDueReading ? `${templateData.nextDueReading} Hours` : '-'}
+                      />
+                    </>
                   ) : (
                     <ReadOnlyField label="Next Due Date" value={formatDate(templateData.nextDueDate)} labelMarker="JF.A1.25" valueMarker="JF.A1.26" />
                   )}
-                  {templateData.maintenanceBasis === 'Running Hours' && (() => {
+                  {(templateData.maintenanceBasis === 'Running Hours' || templateData.maintenanceBasis === 'Dual Frequency') && (() => {
                     const td = (jobContext as Record<string, Record<string, unknown>> | undefined)?.templateData;
                     const lastRH = (td?.lastCompletedRH ?? td?.lastDoneRH) as number | undefined;
                     return (
