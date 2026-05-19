@@ -208,7 +208,10 @@ const COLUMN_MAPPINGS: { [key: string]: { [variant: string]: string } } = {
     'uom': 'UOM',
     'totalrob': 'Total ROB',
     'total_rob': 'Total ROB',
-    'total rob': 'Total ROB'
+    'total rob': 'Total ROB',
+    'rotationitem': 'Rotation Item',
+    'rotation_item': 'Rotation Item',
+    'rotation item': 'Rotation Item'
   },
   'spare-history': {
     // Part Code

@@ -641,6 +641,19 @@ export async function validateData(type: string, data: any[], mode: string, vess
         }
       }
 
+      // Validate Rotation Item (optional boolean: blank | Yes/Y/true/1 | No/N/false/0)
+      const rotationField = row['Rotation Item'];
+      if (rotationField !== undefined && rotationField !== null && rotationField !== '') {
+        const rawRotation = typeof rotationField === 'boolean'
+          ? (rotationField ? 'yes' : 'no')
+          : String(rotationField).toLowerCase().trim();
+        if (!['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'].includes(rawRotation)) {
+          errors.push(`Row ${rowNum}: Rotation Item must be Yes or No`);
+        } else {
+          normalized['Rotation Item'] = ['yes', 'y', 'true', '1'].includes(rawRotation) ? 'Yes' : 'No';
+        }
+      }
+
       // Validate Fleet Equipment Code if provided
       if (row['Fleet Equipment Code']) {
         const fleetCode = String(row['Fleet Equipment Code']).trim();
