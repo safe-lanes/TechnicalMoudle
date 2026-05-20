@@ -3020,7 +3020,7 @@ export type InventoryTransactionInput = z.infer<typeof inventoryTransactionInput
 export type SpareWithInventory = {
   spare: Spare;
   robTotal: number;
-  stockStatus: "OK" | "At Min";
+  stockStatus: "OK" | "At Min" | "Low";
   locations: Array<{
     locationId: number;
     locationName: string;

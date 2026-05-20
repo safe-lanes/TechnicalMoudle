@@ -25,7 +25,7 @@ interface ComponentNode {
   children?: ComponentNode[];
   [key: string]: any;
 }
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -1124,21 +1124,71 @@ const Spares: React.FC = () => {
     );
   }, [editMakerSearch, makerListData]);
 
-  const { data: sparesData = [], isLoading, refetch } = useQuery({
-    queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId],
+  // Debounce search term so every keystroke doesn't trigger a request
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  // Server-side pagination is used whenever no component is selected from the tree.
+  // When a component is selected we fall back to the legacy unpaginated fetch so
+  // the existing hierarchical/linkedComponents matching keeps working client-side.
+  const activeOnlyForRole = (isVessel || isHeadOfDept) && !isExternal;
+  const useServerPagination = !selectedComponentId;
+
+  const { data: sparesResponse, isLoading, refetch } = useQuery<{ items: any[]; total?: number }>({
+    queryKey: useServerPagination
+      ? [
+          '/technical/api/inventory/spares-with-inventory',
+          vesselId,
+          'paged',
+          currentPage,
+          itemsPerPage,
+          debouncedSearchTerm,
+          criticalityFilter,
+          rotationItemFilter,
+          stockFilter,
+          activeOnlyForRole,
+        ]
+      : ['/technical/api/inventory/spares-with-inventory', vesselId],
     queryFn: async () => {
-      const response = await fetch(`/technical/api/inventory/spares-with-inventory/${vesselId}`);
+      const params = new URLSearchParams();
+      if (useServerPagination) {
+        params.set('page', String(currentPage));
+        params.set('pageSize', String(itemsPerPage));
+        if (debouncedSearchTerm) params.set('search', debouncedSearchTerm);
+        if (criticalityFilter && criticalityFilter !== 'All') params.set('criticality', criticalityFilter);
+        if (rotationItemFilter && rotationItemFilter !== 'All') params.set('rotation', rotationItemFilter);
+        if (stockFilter && stockFilter !== 'All') params.set('stockStatus', stockFilter);
+        if (activeOnlyForRole) params.set('activeOnly', 'true');
+      }
+      const qs = params.toString();
+      const response = await fetch(
+        `/technical/api/inventory/spares-with-inventory/${vesselId}${qs ? `?${qs}` : ''}`
+      );
       if (!response.ok) throw new Error('Failed to fetch spares');
       const json = await response.json();
-      // Extract spare data with linkedComponents for filtering
-      return (json.data || []).map((item: any) => ({
+      const mapItem = (item: any) => ({
         ...item.spare,
         linkedComponents: item.linkedComponents || [],
         robTotal: item.robTotal,
         stockStatus: item.stockStatus,
-      }));
-    }
+      });
+      if (useServerPagination) {
+        const payload = json.data || {};
+        return {
+          items: (payload.items || []).map(mapItem),
+          total: typeof payload.total === 'number' ? payload.total : 0,
+        };
+      }
+      return { items: (json.data || []).map(mapItem) };
+    },
+    placeholderData: keepPreviousData,
   });
+
+  const sparesData = sparesResponse?.items ?? [];
+  const serverTotal = sparesResponse?.total;
 
   // Fetch history data
   const { data: historyData = [] } = useQuery({
@@ -1781,10 +1831,17 @@ const Spares: React.FC = () => {
     return false;
   };
 
-  // Filter spares based on all criteria
+  // Filter spares based on all criteria.
+  // In server-paginated mode, the server already applied search/criticality/rotation/
+  // stockStatus/activeOnly filters and ORDER BY part_code ASC — so we skip those
+  // client-side filters and return the page as-is. The legacy in-memory filter chain
+  // is only used in the component-selected fallback path.
   const filteredSpares = useMemo(() => {
-    // Defensive check: ensure sparesData is an array
     if (!sparesData || !Array.isArray(sparesData)) return [];
+    if (useServerPagination) {
+      return sparesData;
+    }
+
     let filtered = sparesData;
 
     // Filter by selected component (including children)
@@ -1795,7 +1852,7 @@ const Spares: React.FC = () => {
     // Filter by search term
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
-      filtered = filtered.filter((spare: Spare) => 
+      filtered = filtered.filter((spare: Spare) =>
         spare.partCode.toLowerCase().includes(search) ||
         spare.partName.toLowerCase().includes(search) ||
         spare.componentName.toLowerCase().includes(search) ||
@@ -1842,14 +1899,19 @@ const Spares: React.FC = () => {
     });
 
     return filtered;
-  }, [sparesData, selectedComponentId, searchTerm, criticalityFilter, rotationItemFilter, stockFilter, isVessel, isHeadOfDept, isExternal]);
+  }, [sparesData, useServerPagination, selectedComponentId, searchTerm, criticalityFilter, rotationItemFilter, stockFilter, isVessel, isHeadOfDept, isExternal]);
 
   // Pagination calculations
-  const totalPages = Math.ceil(filteredSpares.length / itemsPerPage);
+  // In server-paginated mode: totalPages derives from server `total`, and
+  // `paginatedSpares` is the server-returned page as-is.
+  const totalPages = useServerPagination
+    ? Math.max(1, Math.ceil((serverTotal ?? 0) / itemsPerPage))
+    : Math.max(1, Math.ceil(filteredSpares.length / itemsPerPage));
   const paginatedSpares = useMemo(() => {
+    if (useServerPagination) return filteredSpares;
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredSpares.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredSpares, currentPage, itemsPerPage]);
+  }, [filteredSpares, currentPage, itemsPerPage, useServerPagination]);
 
   // Reset page when filters change
   useEffect(() => {
@@ -1860,10 +1922,8 @@ const Spares: React.FC = () => {
   useEffect(() => {
     if (totalPages > 0 && currentPage > totalPages) {
       setCurrentPage(totalPages);
-    } else if (totalPages === 0 && filteredSpares.length === 0) {
-      setCurrentPage(1);
     }
-  }, [totalPages, currentPage, filteredSpares.length]);
+  }, [totalPages, currentPage]);
 
   const collectAllNodeIds = (nodes: ComponentNode[]): string[] => {
     const ids: string[] = [];

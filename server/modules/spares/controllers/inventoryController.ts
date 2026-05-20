@@ -264,8 +264,52 @@ export async function getTransactions(req: Request, res: Response) {
 
 export async function getSparesWithInventory(req: Request, res: Response) {
   try {
-    const spares = await inventoryService.getSparesWithInventoryByVessel(req.params.vesselId);
-    res.json({ success: true, data: spares });
+    const { vesselId } = req.params;
+    const pageRaw = req.query.page;
+
+    // Backward compat: no `page` param => return full array as before.
+    if (pageRaw === undefined || pageRaw === null || pageRaw === '') {
+      const spares = await inventoryService.getSparesWithInventoryByVessel(vesselId);
+      return res.json({ success: true, data: spares });
+    }
+
+    const page = Math.max(1, parseInt(String(pageRaw), 10) || 1);
+    const pageSize = Math.min(200, Math.max(1, parseInt(String(req.query.pageSize ?? '50'), 10) || 50));
+
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+
+    const criticalityRaw = typeof req.query.criticality === 'string' ? req.query.criticality : undefined;
+    const criticality = criticalityRaw === 'Critical' || criticalityRaw === 'Non-critical' ? criticalityRaw : undefined;
+
+    const rotationRaw = typeof req.query.rotation === 'string' ? req.query.rotation : undefined;
+    const rotation =
+      rotationRaw === 'Rotation Items' || rotationRaw === 'Non-Rotation Items' ? rotationRaw : undefined;
+
+    const stockRaw = typeof req.query.stockStatus === 'string' ? req.query.stockStatus : undefined;
+    const stockStatus =
+      stockRaw === 'OK' || stockRaw === 'Low' || stockRaw === 'At Min' ? stockRaw : undefined;
+
+    const sortByRaw = typeof req.query.sortBy === 'string' ? req.query.sortBy : 'partCode';
+    const sortBy = sortByRaw === 'partCode' ? ('partCode' as const) : ('partCode' as const);
+
+    const sortDirRaw = typeof req.query.sortDir === 'string' ? req.query.sortDir.toLowerCase() : 'asc';
+    const sortDir = sortDirRaw === 'desc' ? ('desc' as const) : ('asc' as const);
+
+    const activeOnly = String(req.query.activeOnly ?? '').toLowerCase() === 'true';
+
+    const result = await inventoryService.getSparesWithInventoryByVesselPaged(vesselId, {
+      page,
+      pageSize,
+      search,
+      criticality,
+      rotation,
+      stockStatus,
+      sortBy,
+      sortDir,
+      activeOnly,
+    });
+
+    res.json({ success: true, data: result });
   } catch (error: any) {
     console.error("Error fetching spares with inventory:", error);
     res.status(500).json({ success: false, error: error.message });

@@ -110,6 +110,23 @@ export async function getSparesWithInventoryByVessel(vesselId: string): Promise<
   return storage.getSparesWithInventoryByVessel(vesselId);
 }
 
+export async function getSparesWithInventoryByVesselPaged(
+  vesselId: string,
+  opts: {
+    page: number;
+    pageSize: number;
+    search?: string;
+    criticality?: 'Critical' | 'Non-critical';
+    rotation?: 'Rotation Items' | 'Non-Rotation Items';
+    stockStatus?: 'OK' | 'Low' | 'At Min';
+    sortBy?: 'partCode';
+    sortDir?: 'asc' | 'desc';
+    activeOnly?: boolean;
+  }
+): Promise<{ items: SpareWithInventory[]; total: number; page: number; pageSize: number }> {
+  return storage.getSparesWithInventoryByVesselPaged(vesselId, opts);
+}
+
 export async function getSpareWithInventory(spareId: string): Promise<SpareWithInventory | null> {
   return storage.getSpareWithInventory(spareId);
 }
