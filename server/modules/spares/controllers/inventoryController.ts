@@ -297,6 +297,9 @@ export async function getSparesWithInventory(req: Request, res: Response) {
 
     const activeOnly = String(req.query.activeOnly ?? '').toLowerCase() === 'true';
 
+    const componentIdRaw = typeof req.query.componentId === 'string' ? req.query.componentId.trim() : '';
+    const componentId = componentIdRaw ? componentIdRaw : undefined;
+
     const result = await inventoryService.getSparesWithInventoryByVesselPaged(vesselId, {
       page,
       pageSize,
@@ -307,6 +310,7 @@ export async function getSparesWithInventory(req: Request, res: Response) {
       sortBy,
       sortDir,
       activeOnly,
+      componentId,
     });
 
     res.json({ success: true, data: result });

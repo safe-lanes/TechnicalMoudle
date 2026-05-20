@@ -8995,6 +8995,7 @@ export class PostgresStorage {
       sortBy?: 'partCode';
       sortDir?: 'asc' | 'desc';
       activeOnly?: boolean;
+      componentId?: string;
     }
   ): Promise<{ items: SpareWithInventory[]; total: number; page: number; pageSize: number }> {
     const db = await getDb();
@@ -9045,6 +9046,26 @@ export class PostgresStorage {
 
     if (opts.activeOnly) {
       filters.push(sql`(s.is_active IS NULL OR s.is_active = true)`);
+    }
+
+    // Component scope filter — mirrors client isComponentMatch:
+    // matches when the spare's primary component_code equals the selected id
+    // or is a dotted descendant of it, OR when ANY linked component (via
+    // spare_component_links) has a component_code matching the same rule.
+    if (opts.componentId && opts.componentId.trim()) {
+      const cid = opts.componentId.trim();
+      const cidPrefix = `${cid}.%`;
+      filters.push(sql`(
+        s.component_code = ${cid}
+        OR s.component_code LIKE ${cidPrefix}
+        OR EXISTS (
+          SELECT 1 FROM spare_component_links scl
+          JOIN components c ON c.cuuid = scl.component_id
+          WHERE scl.spare_id = s.id
+            AND c.vessel_id = s.vessel_id
+            AND (c.component_code = ${cid} OR c.component_code LIKE ${cidPrefix})
+        )
+      )`);
     }
 
     // Join filters with AND

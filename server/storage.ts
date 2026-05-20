@@ -989,6 +989,7 @@ export interface IStorage {
     sortBy?: 'partCode';
     sortDir?: 'asc' | 'desc';
     activeOnly?: boolean;
+    componentId?: string;
   }): Promise<{ items: SpareWithInventory[]; total: number; page: number; pageSize: number }>;
   getSparesWithInventoryByComponent(componentId: string): Promise<SpareWithInventory[]>;
   getSparesWithInventoryByComponentCode(vesselId: string, componentCode: string): Promise<SpareWithInventory[]>;
