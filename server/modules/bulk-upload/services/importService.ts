@@ -1328,9 +1328,9 @@ export async function performImport(
       const frequencyUnit = row['Unit'] ? String(row['Unit']).trim() : null;
       const maintenanceBasis = row['Maintenance Basis'];
       
-      // Calculate Next Due Date for Calendar-based jobs
+      // Calculate Next Due Date for Calendar-based and Dual Frequency jobs
       let nextDueDate = null;
-      if (maintenanceBasis === 'Calendar' && lastDoneDate && frequencyValue && frequencyUnit) {
+      if ((maintenanceBasis === 'Calendar' || maintenanceBasis === 'Dual Frequency') && lastDoneDate && frequencyValue && frequencyUnit) {
         nextDueDate = calculateNextDueDate(lastDoneDate, frequencyValue, frequencyUnit);
       }
       
@@ -1356,16 +1356,17 @@ export async function performImport(
         intervalRH = Number(frequencyValue);
       }
       
-      if (maintenanceBasis === 'Running Hours') {
-        // Validate intervalRunningHour is present and valid for RH jobs
+      if (maintenanceBasis === 'Running Hours' || maintenanceBasis === 'Dual Frequency') {
+        // Validate intervalRunningHour is present and valid for RH and Dual Frequency jobs
         if (intervalRH === null || isNaN(intervalRH) || intervalRH <= 0) {
           result.skipped++;
           const _jobCode2 = row['Job Code'] ? String(row['Job Code']).trim() : `row-${_jobRowNum}`;
-          result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: _jobCode2, action: 'skipped', error: 'Invalid or missing Interval Running Hours (must be > 0)' });
-          console.warn(`⚠️ Skipping RH job for component ${componentCode}: Invalid or missing Interval Running Hours (must be > 0)`);
+          const basisLabel = maintenanceBasis === 'Dual Frequency' ? 'Dual Frequency' : 'RH';
+          result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: _jobCode2, action: 'skipped', error: `Invalid or missing Interval Running Hours (must be > 0 for ${basisLabel} jobs)` });
+          console.warn(`⚠️ Skipping ${basisLabel} job for component ${componentCode}: Invalid or missing Interval Running Hours (must be > 0)`);
           continue;
         }
-        
+
         // Get lastDoneRH from Excel or use component's current RH as starting point
         // If neither is available, default to 0 (component starts fresh)
         const rawLastDoneRH = row['Last Done RH'];
@@ -1379,7 +1380,7 @@ export async function performImport(
           lastDoneRH = '0';
           console.log(`ℹ️ Component ${componentCode} has no running hours - defaulting Last Done RH to 0`);
         }
-        
+
         const lastRH = Number(lastDoneRH);
         if (isNaN(lastRH)) {
           result.skipped++;
@@ -1388,7 +1389,7 @@ export async function performImport(
           console.warn(`⚠️ Skipping RH job for component ${componentCode}: lastDoneRH is not a valid number`);
           continue;
         }
-        
+
         // Calculate nextDueRH = lastDoneRH + interval (guaranteed to succeed)
         nextDueRH = String(lastRH + intervalRH);
       }

@@ -954,10 +954,33 @@ export async function validateData(type: string, data: any[], mode: string, vess
           }
         }
         normalized['Unit'] = 'Hours';
-        
+
         // Auto-derive Interval Running Hours from Interval Value when Unit = Hours and no explicit value provided
         if (!row['Interval Running Hours'] && row['Interval Value']) {
           normalized['Interval Running Hours'] = String(row['Interval Value']).trim();
+        }
+      } else if (maintenanceBasis === 'Dual Frequency') {
+        // Dual Frequency requires BOTH calendar unit AND Interval Running Hours
+        // Calendar leg: Interval Value + Unit define the calendar frequency
+        const validCalendarUnits = ['Hours', 'Days', 'Weeks', 'Months', 'Years'];
+        if (!row['Unit']) {
+          errors.push(`Row ${rowNum}: Unit is REQUIRED for Dual Frequency (calendar leg). Allowed: ${validCalendarUnits.join(', ')}`);
+        } else if (!validCalendarUnits.includes(row['Unit'])) {
+          errors.push(`Row ${rowNum}: Invalid Unit '${row['Unit']}' for Dual Frequency. Allowed: ${validCalendarUnits.join(', ')}`);
+        } else {
+          normalized['Unit'] = row['Unit'];
+        }
+        // RH leg: Interval Running Hours must be present and > 0
+        const dualIntervalRH = row['Interval Running Hours'];
+        if (!dualIntervalRH || String(dualIntervalRH).trim() === '') {
+          errors.push(`Row ${rowNum}: Interval Running Hours is REQUIRED for Dual Frequency jobs (RH leg)`);
+        } else {
+          const dualRH = parseFloat(String(dualIntervalRH).trim());
+          if (isNaN(dualRH) || dualRH <= 0) {
+            errors.push(`Row ${rowNum}: Interval Running Hours must be a positive number for Dual Frequency (got: '${dualIntervalRH}')`);
+          } else {
+            normalized['Interval Running Hours'] = String(dualRH);
+          }
         }
       }
 
