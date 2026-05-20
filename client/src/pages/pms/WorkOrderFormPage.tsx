@@ -101,6 +101,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const resolvedMode = modeFromUrl || mode;
   const isUnplannedCreate = mode === 'unplanned-create';
 
+  // D3: Fetch full component to get rhCounterType for Dual Frequency validation
+  const d3ComponentCuuid = urlParams.get('componentCuuid') || '';
+  const { data: d3FullComponent, isLoading: isD3ComponentLoading } = useQuery({
+    queryKey: [`/technical/api/components/${d3ComponentCuuid}`],
+    enabled: !!d3ComponentCuuid && isNewJobCreation
+  });
+  const d3RhCounterType = ((d3FullComponent as any)?.rhCounterType || '').toUpperCase();
+
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isUnplannedSaving, setIsUnplannedSaving] = useState(false);
@@ -235,6 +243,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     maintenanceBasis: "Calendar",
     frequencyValue: "",
     frequencyUnit: "Months",
+    intervalRunningHour: "",
     taskType: "Inspection",
     assignedTo: "",
     approver: "",
@@ -1154,6 +1163,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       if (field === 'maintenanceBasis') {
         if (value === 'Running Hours') {
           newData.frequencyUnit = 'Hours';
+        } else if (value === 'Dual Frequency') {
+          // Dual uses calendar units for the calendar leg; RH leg is separate field
+          if (prev.frequencyUnit === 'Hours') {
+            newData.frequencyUnit = lastCalendarUnit || 'Months';
+          }
         } else if (prev.frequencyUnit === 'Hours') {
           // Restore the last Calendar unit (fallback to Months if cache is empty)
           newData.frequencyUnit = lastCalendarUnit || 'Months';
@@ -2660,6 +2674,31 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         return;
       }
 
+      // D3: Block Dual Frequency on incompatible component
+      if (templateData.maintenanceBasis === 'Dual Frequency') {
+        if (isD3ComponentLoading) {
+          toast({ title: "Please wait", description: "Loading component data — please try again in a moment.", variant: "default" });
+          return;
+        }
+        if (d3RhCounterType !== 'MASTER' && d3RhCounterType !== 'INHERITED') {
+          toast({
+            title: "Dual Frequency not allowed",
+            description: "Dual Frequency requires the component to have an RH Counter Type of Master or Inherited. Set up the component's RH Counter first.",
+            variant: "destructive"
+          });
+          return;
+        }
+        // Both legs required
+        if (!templateData.frequencyValue || !templateData.frequencyUnit) {
+          toast({ title: "Validation Error", description: "Dual Frequency requires a calendar frequency (value and unit).", variant: "destructive" });
+          return;
+        }
+        if (!templateData.intervalRunningHour || parseInt(templateData.intervalRunningHour, 10) <= 0) {
+          toast({ title: "Validation Error", description: "Dual Frequency requires a Running Hours interval greater than 0.", variant: "destructive" });
+          return;
+        }
+      }
+
       // Validate frequency value
       const normalizedFrequency = normalizeFrequencyValue(templateData.frequencyValue);
       if (!normalizedFrequency) {
@@ -2707,6 +2746,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         requiredTools: templateData.requiredTools || [],
         safetyRequirements: templateData.safetyRequirements || {ppeRequirements: [], permitRequirements: [], otherRequirements: []},
         isActive: templateData.isActive === 'Yes',
+        intervalRunningHour: templateData.maintenanceBasis === 'Dual Frequency'
+          ? parseInt(templateData.intervalRunningHour, 10)
+          : undefined,
         dataScope: 'vessel', // Jobs created from UI are vessel-specific
       };
 
@@ -3696,28 +3738,42 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </div>
                 )}
 
-                {!isUnplannedCreate && (
-                  <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.11"><Marker id="WOF.A1.11" />Maintenance Basis</Label>
-                    <Select
-                      value={templateData.maintenanceBasis}
-                      onValueChange={(value) => handleTemplateChange('maintenanceBasis', value)}
-                      disabled={isPartAReadOnly}
-                    >
-                      <SelectTrigger className="text-sm" data-testid="WOF.A1.12">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Calendar">Calendar</SelectItem>
-                        <SelectItem value="Running Hours">Running Hours</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+                {!isUnplannedCreate && (() => {
+                  const isDualBlocked = templateData.maintenanceBasis === 'Dual Frequency' &&
+                    d3RhCounterType !== 'MASTER' && d3RhCounterType !== 'INHERITED';
+                  return (
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.11"><Marker id="WOF.A1.11" />Maintenance Basis</Label>
+                      <Select
+                        value={templateData.maintenanceBasis}
+                        onValueChange={(value) => handleTemplateChange('maintenanceBasis', value)}
+                        disabled={isPartAReadOnly}
+                      >
+                        <SelectTrigger className="text-sm" data-testid="WOF.A1.12">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Calendar">Calendar</SelectItem>
+                          <SelectItem value="Running Hours">Running Hours</SelectItem>
+                          <SelectItem value="Dual Frequency">Dual Frequency</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {isDualBlocked && (
+                        <p className="text-xs text-red-600 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Dual Frequency requires the component to have an RH Counter Type of Master or Inherited.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {!isUnplannedCreate && (
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.13"><Marker id="WOF.A1.13" />Frequency</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.13">
+                      <Marker id="WOF.A1.13" />
+                      {templateData.maintenanceBasis === 'Dual Frequency' ? 'Calendar Frequency' : 'Frequency'}
+                    </Label>
                     <div className="flex gap-2">
                       <Input
                         type="number"
@@ -3750,6 +3806,25 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           )}
                         </SelectContent>
                       </Select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Running Hours Interval — shown for Dual Frequency only (RH-only uses the frequency field above) */}
+                {!isUnplannedCreate && templateData.maintenanceBasis === 'Dual Frequency' && (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Running Hours Interval</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        min="1"
+                        value={templateData.intervalRunningHour}
+                        onChange={(e) => handleTemplateChange('intervalRunningHour', e.target.value)}
+                        className="text-sm flex-1"
+                        placeholder="Hours interval"
+                        disabled={isPartAReadOnly}
+                      />
+                      <div className="flex items-center text-sm text-gray-500 w-32 px-3">Hours</div>
                     </div>
                   </div>
                 )}
