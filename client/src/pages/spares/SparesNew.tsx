@@ -3806,7 +3806,7 @@ const Spares: React.FC = () => {
                         max={totalPages || 1}
                         value={currentPage}
                         onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) goToInventoryPage(v); }}
-                        className="w-14 h-8 text-center"
+                        className="w-20 h-8 text-center"
                         data-testid="input-inventory-page-number"
                       />
                       <span className="text-sm text-gray-600">of {totalPages || 1}</span>
