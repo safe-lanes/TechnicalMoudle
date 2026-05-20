@@ -176,19 +176,6 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
   }, [embedded, selectedReportId]);
 
   useEffect(() => {
-    if (!embedded || !selectedReportId) return;
-    if (!reportData) return;
-    if (initialLoadRef.current) return;
-    const version = ++previewVersionRef.current;
-    initialLoadRef.current = true;
-    generateChangeRequestReport(selectedReportId, 'preview').then((data) => {
-      if (previewVersionRef.current === version) {
-        if (data) setPreviewData(data);
-      }
-    }).catch((err) => { console.error('Report preview load failed:', err); });
-  }, [reportData, embedded, selectedReportId]);
-
-  useEffect(() => {
     if (!embedded || !selectedReportId || !initialLoadRef.current) return;
     setIsFilterRefreshing(true);
     setPreviewData(null);
@@ -245,6 +232,19 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
     }
     return result;
   }, [reportData?.requests, globalVessels, globalFilters?.component, vessels.length]);
+
+  useEffect(() => {
+    if (!embedded || !selectedReportId) return;
+    if (!reportData) return;
+    if (initialLoadRef.current) return;
+    const version = ++previewVersionRef.current;
+    initialLoadRef.current = true;
+    generateChangeRequestReport(selectedReportId, 'preview').then((data) => {
+      if (previewVersionRef.current === version) {
+        if (data) setPreviewData(data);
+      }
+    }).catch((err) => { console.error('Report preview load failed:', err); });
+  }, [reportData, embedded, selectedReportId]);
 
   useEffect(() => {
     if (!embedded || !selectedReportId || !initialLoadRef.current || !pendingPreviewRef.current) return;
