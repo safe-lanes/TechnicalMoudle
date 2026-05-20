@@ -27,6 +27,7 @@ router.post('/bulk/export-summary', asyncHandler(ctrl.exportSummary));
 
 // ── History (specific routes before parameterized) ──
 router.get('/bulk/history', asyncHandler(ctrl.getHistoryList));
+router.get('/bulk/import-status/:id', asyncHandler(ctrl.getImportStatus));
 router.get('/bulk/history/:id/download-original', asyncHandler(ctrl.downloadOriginal));
 router.get('/bulk/history/:id/:fileType', asyncHandler(ctrl.getHistoryFileHandler));
 

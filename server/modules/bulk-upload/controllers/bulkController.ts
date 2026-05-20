@@ -960,6 +960,19 @@ export async function doImportStream(req: Request, res: Response) {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
 
+  // Heartbeat: send an SSE comment every 15s so intermediate proxies don't
+  // close an idle connection during long server-side processing. Comments
+  // (lines starting with ':') are ignored by the EventSource spec on the
+  // client but keep the TCP connection warm.
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(`: keepalive ${Date.now()}\n\n`);
+    } catch (_e) {
+      // socket already torn down — interval will be cleared in finally
+    }
+  }, 15000);
+  req.on('close', () => clearInterval(heartbeat));
+
   try {
     const { fileToken, type, mode, archiveMissing, vesselId, rowIndices, storeType } = req.body;
     console.log(`📦 [IMPORT_STREAM] Type: ${type}, Mode: ${mode}, VesselId: ${vesselId}, FileToken: ${fileToken ? 'present' : 'missing'}`);
@@ -985,7 +998,9 @@ export async function doImportStream(req: Request, res: Response) {
     const effectiveType = cachedData.type || type;
     const totalRows = dataToImport.length;
 
-    sendEvent('progress', { processed: 0, total: totalRows, remaining: totalRows, percent: 0, status: 'Initializing Import…', errors: 0 });
+    // Send historyId on the very first progress event so the client can
+    // poll the status endpoint if the SSE stream is severed mid-import.
+    sendEvent('progress', { processed: 0, total: totalRows, remaining: totalRows, percent: 0, status: 'Initializing Import…', errors: 0, historyId });
 
     await storeImportHistory({
       id: historyId,
@@ -1059,6 +1074,8 @@ export async function doImportStream(req: Request, res: Response) {
 
     sendEvent('error', { message: error?.message || 'Unknown error' });
     res.end();
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 
@@ -1073,6 +1090,15 @@ export async function doLocationsImportStream(req: Request, res: Response) {
   const sendEvent = (event: string, data: any) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
+
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(`: keepalive ${Date.now()}\n\n`);
+    } catch (_e) {
+      // socket already torn down
+    }
+  }, 15000);
+  req.on('close', () => clearInterval(heartbeat));
 
   try {
     const file = req.file;
@@ -1162,6 +1188,37 @@ export async function doLocationsImportStream(req: Request, res: Response) {
     console.error('Error importing locations (stream):', error);
     sendEvent('error', { message: error?.message || 'Failed to import locations' });
     res.end();
+  } finally {
+    clearInterval(heartbeat);
+  }
+}
+
+// ── Import Status (poll-by-id, used by client to recover from a dropped SSE stream) ──
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+export async function getImportStatus(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    if (!id || !UUID_RE.test(id)) {
+      return res.status(400).json({ error: 'Invalid import id' });
+    }
+    const history = await getFileBasedHistoryById(id);
+    if (!history) {
+      return res.status(404).json({ error: 'Import history not found' });
+    }
+    res.json({
+      id: history.id,
+      status: history.status,
+      created: history.created ?? 0,
+      updated: history.updated ?? 0,
+      skipped: history.skipped ?? 0,
+      archived: history.archived ?? 0,
+      startedAt: history.startedAt,
+      completedAt: history.completedAt ?? null,
+      originalName: history.originalName,
+    });
+  } catch (error: any) {
+    console.error('getImportStatus error:', error);
+    res.status(500).json({ error: 'Failed to fetch import status' });
   }
 }
 
