@@ -1536,16 +1536,17 @@ export async function performImport(
       const existingJob = jobsByCompositeKey.get(compositeKey);
 
       // D3: Block Dual Frequency if component RH Counter Type is not MASTER/INHERITED
+      // Normalize to uppercase — DB column is unconstrained text with inconsistent casing
       if (maintenanceBasis === 'Dual Frequency') {
-        const rhType = component.rhCounterType;
+        const rhType = (component.rhCounterType || '').toUpperCase();
         if (rhType !== 'MASTER' && rhType !== 'INHERITED') {
-          console.warn(`⚠️ D3 BLOCK: Job ${jobData.jobNo} row ${_jobRowNum} — Dual Frequency requires component RH Counter Type MASTER or INHERITED, got "${rhType || 'not set'}"`);
+          console.warn(`⚠️ D3 BLOCK: Job ${jobData.jobNo} row ${_jobRowNum} — Dual Frequency requires component RH Counter Type MASTER or INHERITED, got "${component.rhCounterType || 'not set'}"`);
           result.skipped++;
           result.rowResults.push({
             rowNumber: _jobRowNum,
             primaryIdentifier: jobData.jobNo,
             action: 'skipped',
-            error: `Dual Frequency requires component "${component.name}" to have RH Counter Type Master or Inherited (current: ${rhType || 'not set'})`
+            error: `Dual Frequency requires component "${component.name}" to have RH Counter Type Master or Inherited (current: ${component.rhCounterType || 'not set'})`
           });
           continue;
         }

@@ -854,14 +854,15 @@ export async function copyVessel(body: any) {
       const newComponentId = componentIdMap.get(job.componentId || '') || job.componentId;
 
       // D3: For Dual Frequency jobs, validate the TARGET component's RH Counter Type
+      // Normalize to uppercase — DB column is unconstrained text with inconsistent casing
       if (job.maintenanceBasis === 'Dual Frequency' && newComponentId) {
         const [targetComp] = await db.select().from(components)
           .where(eq(components.cuuid, newComponentId));
-        if (!targetComp || (targetComp.rhCounterType !== 'MASTER' && targetComp.rhCounterType !== 'INHERITED')) {
+        const targetRhType = (targetComp?.rhCounterType || '').toUpperCase();
+        if (!targetComp || (targetRhType !== 'MASTER' && targetRhType !== 'INHERITED')) {
           const compName = targetComp?.name || job.componentName || newComponentId;
-          const rhType = targetComp?.rhCounterType || 'not set';
           copyResults.warnings.push(
-            `Job ${job.jobNo} (Dual Frequency) skipped: target component "${compName}" has RH Counter Type "${rhType}" (requires Master or Inherited)`
+            `Job ${job.jobNo} (Dual Frequency) skipped: target component "${compName}" has RH Counter Type "${targetComp?.rhCounterType || 'not set'}" (requires Master or Inherited)`
           );
           continue;
         }

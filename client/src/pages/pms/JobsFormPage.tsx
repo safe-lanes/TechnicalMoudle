@@ -159,11 +159,11 @@ const JobsFormPage: React.FC = () => {
 
   // Fetch full component to get rhCounterType for D3 validation
   const componentCuuid = (jobContext as any)?.component?.id;
-  const { data: fullComponent } = useQuery({
+  const { data: fullComponent, isLoading: isComponentLoading } = useQuery({
     queryKey: [`/technical/api/components/${componentCuuid}`],
     enabled: !!componentCuuid
   });
-  const componentRhCounterType = (fullComponent as any)?.rhCounterType || '';
+  const componentRhCounterType = ((fullComponent as any)?.rhCounterType || '').toUpperCase();
 
   const [, setLocation] = useLocation();
 
@@ -369,7 +369,14 @@ const JobsFormPage: React.FC = () => {
   const handleSaveChanges = async () => {
     if (!jobId) return;
 
+    // Loading guard: block save while component data is still loading (prevents false D3 rejections)
+    if (templateData.maintenanceBasis === 'Dual Frequency' && isComponentLoading) {
+      toast({ title: "Please wait", description: "Loading component data — please try again in a moment.", variant: "default" });
+      return;
+    }
+
     // D3 form-level block: prevent saving Dual Frequency on incompatible component
+    // componentRhCounterType is already normalized to UPPERCASE at derivation
     if (templateData.maintenanceBasis === 'Dual Frequency') {
       if (componentRhCounterType !== 'MASTER' && componentRhCounterType !== 'INHERITED') {
         toast({

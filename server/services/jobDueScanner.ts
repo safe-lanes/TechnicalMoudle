@@ -481,7 +481,8 @@ export class JobDueScannerService {
       }
 
       // D3: RH counter type must be MASTER or INHERITED
-      const rhCounterType = component.rhCounterType;
+      // Normalize to uppercase — DB column is unconstrained text with inconsistent casing
+      const rhCounterType = (component.rhCounterType || '').toUpperCase();
       if (rhCounterType !== 'MASTER' && rhCounterType !== 'INHERITED') {
         skipReasons.wrongCounterType++;
         continue;

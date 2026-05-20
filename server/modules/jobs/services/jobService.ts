@@ -164,12 +164,13 @@ export async function createJob(body: any) {
     }
 
     // D3: Block Dual Frequency unless component RH Counter Type is MASTER or INHERITED
+    // Normalize to uppercase — DB column is unconstrained text with inconsistent casing
     if (jobData.maintenanceBasis === 'Dual Frequency') {
-      const rhType = component.rhCounterType;
+      const rhType = (component.rhCounterType || '').toUpperCase();
       if (rhType !== 'MASTER' && rhType !== 'INHERITED') {
         throw new ValidationError(
           `Dual Frequency maintenance basis requires a component with RH Counter Type set to Master or Inherited. ` +
-          `Component "${component.name}" has RH Counter Type "${rhType || 'not set'}". ` +
+          `Component "${component.name}" has RH Counter Type "${component.rhCounterType || 'not set'}". ` +
           `Please update the component's RH Counter Type first, or choose Calendar or Running Hours basis.`
         );
       }
@@ -337,11 +338,11 @@ export async function updateJob(id: string, body: any) {
       component = await repo.findComponent(effectiveComponentId);
     }
     if (component) {
-      const rhType = component.rhCounterType;
+      const rhType = (component.rhCounterType || '').toUpperCase();
       if (rhType !== 'MASTER' && rhType !== 'INHERITED') {
         throw new ValidationError(
           `Dual Frequency maintenance basis requires a component with RH Counter Type set to Master or Inherited. ` +
-          `Component "${component.name}" has RH Counter Type "${rhType || 'not set'}". ` +
+          `Component "${component.name}" has RH Counter Type "${component.rhCounterType || 'not set'}". ` +
           `Please update the component's RH Counter Type first, or choose Calendar or Running Hours basis.`
         );
       }
