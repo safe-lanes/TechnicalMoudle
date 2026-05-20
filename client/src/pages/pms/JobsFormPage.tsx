@@ -160,7 +160,7 @@ const JobsFormPage: React.FC = () => {
   // Fetch full component to get rhCounterType for D3 validation
   const componentCuuid = (jobContext as any)?.component?.id;
   const { data: fullComponent, isLoading: isComponentLoading } = useQuery({
-    queryKey: [`/technical/api/components/${componentCuuid}`],
+    queryKey: [`/technical/api/components/details/${componentCuuid}`],
     enabled: !!componentCuuid
   });
   const componentRhCounterType = ((fullComponent as any)?.rhCounterType || '').toUpperCase();

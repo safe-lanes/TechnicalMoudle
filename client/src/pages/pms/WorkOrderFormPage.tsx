@@ -104,7 +104,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // D3: Fetch full component to get rhCounterType for Dual Frequency validation
   const d3ComponentCuuid = urlParams.get('componentCuuid') || '';
   const { data: d3FullComponent, isLoading: isD3ComponentLoading } = useQuery({
-    queryKey: [`/technical/api/components/${d3ComponentCuuid}`],
+    queryKey: [`/technical/api/components/details/${d3ComponentCuuid}`],
     enabled: !!d3ComponentCuuid && isNewJobCreation
   });
   const d3RhCounterType = ((d3FullComponent as any)?.rhCounterType || '').toUpperCase();

@@ -36,10 +36,11 @@ router.post('/components/upload', upload.single('file'), asyncHandler(uploadCtrl
 router.get('/components', asyncHandler(componentCtrl.listAll));
 router.post('/components', asyncHandler(componentCtrl.create));
 
-// GET    /components/:id — get by ID
 // PATCH  /components/:id — update
 // DELETE /components/:id — delete
-router.get('/components/:id', asyncHandler(componentCtrl.getById));
+// NOTE: GET /components/:id was removed — it was permanently shadowed by
+// GET /components/:vesselId (line 25) which Express matched first.
+// Use GET /components/details/:id instead (line 28).
 router.patch('/components/:id', asyncHandler(componentCtrl.update));
 router.delete('/components/:id', asyncHandler(componentCtrl.remove));
 
