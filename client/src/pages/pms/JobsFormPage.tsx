@@ -157,13 +157,8 @@ const JobsFormPage: React.FC = () => {
     enabled: !!jobId
   });
 
-  // Fetch full component to get rhCounterType for D3 validation
-  const componentCuuid = (jobContext as any)?.component?.id;
-  const { data: fullComponent, isLoading: isComponentLoading } = useQuery({
-    queryKey: [`/technical/api/components/details/${componentCuuid}`],
-    enabled: !!componentCuuid
-  });
-  const componentRhCounterType = ((fullComponent as any)?.rhCounterType || '').toUpperCase();
+  // D3 validation: read rhCounterType directly from jobContext (no second HTTP fetch needed)
+  const componentRhCounterType = ((jobContext as any)?.component?.rhCounterType || '').toUpperCase();
 
   const [, setLocation] = useLocation();
 
@@ -369,8 +364,8 @@ const JobsFormPage: React.FC = () => {
   const handleSaveChanges = async () => {
     if (!jobId) return;
 
-    // Loading guard: block save while component data is still loading (prevents false D3 rejections)
-    if (templateData.maintenanceBasis === 'Dual Frequency' && isComponentLoading) {
+    // Loading guard: block save while job context is still loading (prevents false D3 rejections)
+    if (templateData.maintenanceBasis === 'Dual Frequency' && isLoading) {
       toast({ title: "Please wait", description: "Loading component data — please try again in a moment.", variant: "default" });
       return;
     }

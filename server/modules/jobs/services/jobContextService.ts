@@ -196,7 +196,8 @@ export async function getJobContext(jobId: string) {
       name: component.name,
       parentId: component.parentId,
       currentCumulativeRH: component.currentCumulativeRH,
-      lastUpdated: component.lastUpdated
+      lastUpdated: component.lastUpdated,
+      rhCounterType: component.rhCounterType,
     } : null,
     parentComponent: parentComponent ? {
       id: parentComponent.id,
