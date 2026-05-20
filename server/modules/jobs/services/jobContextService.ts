@@ -26,8 +26,11 @@ export async function getJobContext(jobId: string) {
     throw new NotFoundError('Job not found');
   }
 
-  // Get component data
-  const component = job.componentId ? await repo.findComponent(job.componentId) : null;
+  // Get component data — fallback to code+vessel lookup when componentId is null (deprecated column)
+  let component = job.componentId ? await repo.findComponent(job.componentId) : null;
+  if (!component && job.componentCode && job.vesselId) {
+    component = await repo.findComponentByCode(job.componentCode, job.vesselId as string) ?? null;
+  }
 
   // Get parent component
   let parentComponent = null;
