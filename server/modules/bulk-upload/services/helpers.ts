@@ -693,7 +693,7 @@ export const RESPONSIBLE_RANKS = [
 ];
 
 // Schedule types
-export const SCHEDULE_TYPES = ['Running Hours', 'Calendar', 'Both'];
+export const SCHEDULE_TYPES = ['Running Hours', 'Calendar', 'Dual Frequency'];
 
 // Interval units for calendar-based schedules
 export const INTERVAL_UNITS = ['Days', 'Weeks', 'Months', 'Years'];

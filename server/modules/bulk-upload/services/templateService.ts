@@ -734,8 +734,8 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
   // Create main "jobs" sheet with 26-column structure (includes Part A fields)
   const jobsSheet = workbook.addWorksheet('Vessel_Job');
   
-  // Add headers matching the 25-column specification (20 original + 5 Part A fields)
-  // NOTE: "Interval Running Hours" column removed - when Unit = "Hours", Interval Value is used as the running hours interval
+  // Add headers matching the 26-column specification (21 original + 5 Part A fields)
+  // NOTE: "Interval Running Hours" column restored for Dual Frequency support
   jobsSheet.columns = [
     { header: 'Job Code', key: 'jobCode', width: 18 },
     { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 22 },
@@ -746,6 +746,7 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Maintenance Basis', key: 'maintenanceBasis', width: 18 },
     { header: 'Interval Value', key: 'intervalValue', width: 15 },
     { header: 'Unit', key: 'unit', width: 12 },
+    { header: 'Interval Running Hours', key: 'intervalRunningHours', width: 22 },
     { header: 'Task Type', key: 'taskType', width: 20 },
     { header: 'Assigned To', key: 'assignedTo', width: 20 },
     { header: 'Approver', key: 'approver', width: 20 },
@@ -778,6 +779,7 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       maintenanceBasis: '',
       intervalValue: '',
       unit: '',
+      intervalRunningHours: '',
       taskType: '',
       assignedTo: '',
       approver: '',
@@ -811,11 +813,11 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Yes_No', key: 'yesNo', width: 10 }
   ];
   
-  // Add dropdown values (Only Calendar and Running Hours - interval is REQUIRED for PMS)
+  // Add dropdown values (Calendar, Running Hours, and Dual Frequency)
   const listValues = [
     { maintenanceBasis: 'Calendar', intervalUnit: 'Days', taskType: 'Inspection', jobPriority: 'Low', department: 'Engine', yesNo: 'Yes' },
     { maintenanceBasis: 'Running Hours', intervalUnit: 'Weeks', taskType: 'Overhaul', jobPriority: 'Medium', department: 'Deck', yesNo: 'No' },
-    { maintenanceBasis: '', intervalUnit: 'Months', taskType: 'Service', jobPriority: 'High', department: 'Electrical', yesNo: '' },
+    { maintenanceBasis: 'Dual Frequency', intervalUnit: 'Months', taskType: 'Service', jobPriority: 'High', department: 'Electrical', yesNo: '' },
     { maintenanceBasis: '', intervalUnit: 'Years', taskType: 'Testing', jobPriority: 'Critical', department: 'C/E', yesNo: '' },
     { maintenanceBasis: '', intervalUnit: 'Hours', taskType: 'Repair', jobPriority: '', department: '2/E', yesNo: '' },
     { maintenanceBasis: '', intervalUnit: '', taskType: 'Replacement', jobPriority: '', department: '3/E', yesNo: '' },
@@ -825,19 +827,19 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
   
   listValues.forEach(row => listsSheet.addRow(row));
   
-  // Add data validations to jobs sheet (20-column layout, removed Interval Running Hours)
-  // Column G (Maintenance Basis) - row 2 onwards (Only Calendar and Running Hours allowed)
+  // Add data validations to jobs sheet (26-column layout, with Interval Running Hours restored)
+  // Column G (Maintenance Basis) - row 2 onwards (Calendar, Running Hours, Dual Frequency)
   jobsSheet.getColumn(7).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
         allowBlank: true,
-        formulae: ['=Lists!$A$2:$A$3']  // Only Calendar and Running Hours
+        formulae: ['=Lists!$A$2:$A$4']  // Calendar, Running Hours, Dual Frequency
       };
     }
   });
   
-  // Column I (Unit - was J before removing Interval Running Hours column)
+  // Column I (Unit)
   jobsSheet.getColumn(9).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
@@ -847,9 +849,11 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       };
     }
   });
-  
-  // Column J (Task Type - was K before)
-  jobsSheet.getColumn(10).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+
+  // Column J (Interval Running Hours) - no validation, free-form number
+
+  // Column K (Task Type) - shifted +1 from col 10
+  jobsSheet.getColumn(11).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -858,9 +862,9 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       };
     }
   });
-  
-  // Column M (Job Priority - was N before)
-  jobsSheet.getColumn(13).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+
+  // Column N (Job Priority) - shifted +1 from col 13
+  jobsSheet.getColumn(14).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -869,9 +873,9 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       };
     }
   });
-  
-  // Column N (Class Related - was O before) - Yes/No
-  jobsSheet.getColumn(14).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+
+  // Column O (Class Related) - shifted +1 from col 14 - Yes/No
+  jobsSheet.getColumn(15).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -880,9 +884,9 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       };
     }
   });
-  
-  // Column Q (Department - was R before)
-  jobsSheet.getColumn(17).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+
+  // Column R (Department) - shifted +1 from col 17
+  jobsSheet.getColumn(18).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -891,9 +895,9 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       };
     }
   });
-  
-  // Column R (Criticality - was S before) - Yes/No
-  jobsSheet.getColumn(18).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+
+  // Column S (Criticality) - shifted +1 from col 18 - Yes/No
+  jobsSheet.getColumn(19).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -902,9 +906,9 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       };
     }
   });
-  
-  // Column S (Is Active - was T before) - Yes/No
-  jobsSheet.getColumn(19).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+
+  // Column T (Is Active) - shifted +1 from col 19 - Yes/No
+  jobsSheet.getColumn(20).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
