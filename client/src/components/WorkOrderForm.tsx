@@ -552,6 +552,18 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         setOriginalSnapshot(initialData);
       }
       
+      // Auto-populate B3 Running Hours "Previous Reading" from the WO's stored component RH snapshot
+      // This applies to both Running Hours and Dual Frequency WOs
+      if (workOrder.maintenanceBasis === 'Running Hours' || workOrder.maintenanceBasis === 'Dual Frequency') {
+        const storedRH = workOrder.currentReading || '';
+        if (storedRH) {
+          setExecutionData(prev => ({
+            ...prev,
+            previousReading: storedRH
+          }));
+        }
+      }
+
       // If in execution mode, switch to Part B and generate execution ID
       if (executionMode) {
         setActiveSection('partB');
