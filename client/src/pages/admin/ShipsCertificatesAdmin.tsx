@@ -1972,7 +1972,7 @@ export default function ShipsCertificatesAdmin() {
                           }}
                         >
                           <SelectTrigger className="h-8 text-sm" data-testid={`select-companygroup-${testIdSuffix}`}>
-                            <SelectValue placeholder={getFormattedCompanyGroupLabel("A")} />
+                            <SelectValue placeholder="Select Group" />
                           </SelectTrigger>
                           <SelectContent>
                             {companyGroupLabels.map((grp: LabelConfig) => (
