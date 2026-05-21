@@ -1960,14 +1960,15 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-sm">
                       {viewModes.company === "edit" ? (
                         <Select 
-                          defaultValue={cert.companyGroup}
+                          value={cert.companyGroup || "__none__"}
                           onValueChange={(value) => {
+                            const normalized = value === "__none__" ? "" : value;
                             if (isCompanyOnly) {
                               setCompanyOnlyCerts(prev => prev.map(c => 
-                                c.id === cert.id ? { ...c, companyGroup: value } : c
+                                c.id === cert.id ? { ...c, companyGroup: normalized } : c
                               ));
                             } else {
-                              updateCompanyField(cert.id, 'companyGroup', value);
+                              updateCompanyField(cert.id, 'companyGroup', normalized);
                             }
                           }}
                         >
@@ -1975,6 +1976,7 @@ export default function ShipsCertificatesAdmin() {
                             <SelectValue placeholder="Select Group" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="__none__">— None —</SelectItem>
                             {companyGroupLabels.map((grp: LabelConfig) => (
                               <SelectItem key={grp.key} value={grp.key}>
                                 {getFormattedCompanyGroupLabel(grp.key)}
@@ -2026,13 +2028,14 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-sm">
                       <div className="flex items-center gap-2">
                         <Select 
-                          value={newCompanyEntryData.companyGroup || ""}
-                          onValueChange={(value) => setNewCompanyEntryData(prev => ({ ...prev, companyGroup: value }))}
+                          value={newCompanyEntryData.companyGroup || "__none__"}
+                          onValueChange={(value) => setNewCompanyEntryData(prev => ({ ...prev, companyGroup: value === "__none__" ? "" : value }))}
                         >
                           <SelectTrigger className="h-8 text-sm flex-1" data-testid="select-new-company-group">
                             <SelectValue placeholder="Select Group" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="__none__">— None —</SelectItem>
                             {companyGroupLabels.map((grp: LabelConfig) => (
                               <SelectItem key={grp.key} value={grp.key}>
                                 {getFormattedCompanyGroupLabel(grp.key)}
@@ -2387,10 +2390,11 @@ export default function ShipsCertificatesAdmin() {
                       <td className="px-3 py-3 text-sm">
                         {viewModes.vessel === "edit" ? (
                           <Select 
-                            defaultValue={cert.companyGroup}
+                            value={cert.companyGroup || "__none__"}
                             onValueChange={(value) => {
+                              const normalized = value === "__none__" ? "" : value;
                               setVesselOnlyCerts(prev => prev.map(c => 
-                                c.id === cert.id ? { ...c, companyGroup: value } : c
+                                c.id === cert.id ? { ...c, companyGroup: normalized } : c
                               ));
                             }}
                           >
@@ -2398,6 +2402,7 @@ export default function ShipsCertificatesAdmin() {
                               <SelectValue placeholder="Select Group" />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="__none__">— None —</SelectItem>
                               {companyGroupLabels.map((grp: LabelConfig) => (
                                 <SelectItem key={grp.key} value={grp.key}>
                                   {getFormattedCompanyGroupLabel(grp.key)}
@@ -2448,13 +2453,14 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-sm">
                       <div className="flex items-center gap-2">
                         <Select 
-                          value={newVesselEntryData.companyGroup || ""}
-                          onValueChange={(value) => setNewVesselEntryData(prev => ({ ...prev, companyGroup: value }))}
+                          value={newVesselEntryData.companyGroup || "__none__"}
+                          onValueChange={(value) => setNewVesselEntryData(prev => ({ ...prev, companyGroup: value === "__none__" ? "" : value }))}
                         >
                           <SelectTrigger className="h-8 text-sm flex-1" data-testid="select-new-vessel-group">
                             <SelectValue placeholder="Select Group" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="__none__">— None —</SelectItem>
                             {companyGroupLabels.map((grp: LabelConfig) => (
                               <SelectItem key={grp.key} value={grp.key}>
                                 {getFormattedCompanyGroupLabel(grp.key)}
