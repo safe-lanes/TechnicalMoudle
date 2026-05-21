@@ -3529,7 +3529,7 @@ const Components: React.FC = () => {
                 }}
                 data-testid="B5"
               >
-                <Marker id="B5" /> <Plus className="h-4 w-4 mr-1" /> Add / Edit Component
+                <Marker id="B5" /> <Plus className="h-4 w-4 mr-1" /> Add Component
               </Button>
             )}
           </div>
