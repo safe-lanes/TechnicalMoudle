@@ -2309,10 +2309,12 @@ export default function ShipsCertificatesAdmin() {
                   );
                 })}
                 
-                {/* Vessel-only certificates (not from Company) — filtered by vessel applicability */}
+                {/* Vessel-only certificates (not from Company) — filtered by vessel applicability.
+                    The same filter runs in both View and Edit modes so the row set, count, and
+                    sequence numbers stay identical. Newly added in-memory rows (id >= 2000) are
+                    still shown so unsaved "Add New" entries remain visible while editing. */}
                 {selectedVessels.length > 0 && vesselOnlyCerts.filter(cert => {
-                  if (cert.id >= 2000) return true;
-                  if (viewModes.vessel === "edit") return true;
+                  if (cert.id >= 2000) return viewModes.vessel === "edit";
                   const vesselIds = getSelectedVesselIds();
                   return vesselIds.some(vesselId =>
                     vesselApplicabilityData.some((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId)
