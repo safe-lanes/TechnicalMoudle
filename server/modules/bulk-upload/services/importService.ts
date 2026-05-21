@@ -283,6 +283,22 @@ export async function performImport(
       }
     });
     
+    // Step 1b: Verify inferred parents against DB before creating
+    // The initial prefetch (Step 1) only contains codes from the Excel file.
+    // Inferred parent codes may already exist in the DB but not in the map.
+    // Fetch them now to avoid duplicate INSERT on unique constraint.
+    const parentCodesToCheck = Array.from(parentsToCreate);
+    if (parentCodesToCheck.length > 0) {
+      const existingParents = await storage.getComponentsByCodes(parentCodesToCheck, vesselId);
+      existingParents.forEach((comp, code) => {
+        existingComponentsMap.set(code, comp);
+        parentsToCreate.delete(code);
+      });
+      if (existingParents.size > 0) {
+        console.log(`📋 Found ${existingParents.size} inferred parents already in DB — skipping creation`);
+      }
+    }
+
     // Step 2: Create missing parent nodes (sorted by depth, shallowest first) with tracking
     const sortedParents = Array.from(parentsToCreate).sort((a, b) => {
       const aDepth = (a.match(/\./g) || []).length;
