@@ -264,6 +264,7 @@ export default function BulkDataImport() {
     { id: 'spares' as VesselTemplateType, number: 3, name: 'Spares' },
     { id: 'stores' as VesselTemplateType, number: 4, name: 'Stores' },
     { id: 'locations' as VesselTemplateType, number: 5, name: 'Locations' },
+    { id: 'wo-history' as VesselTemplateType, number: 6, name: 'History' },
   ];
 
   const fleetTemplates = [
@@ -354,33 +355,6 @@ export default function BulkDataImport() {
             })}
           </div>
 
-          {/* History Section — below Templates (vessel mode only) */}
-          {!isFleetMode && (
-            <div className="border-t border-gray-200">
-              <div className="bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm" data-testid="I1.6F.sidebar-header">
-                HISTORY
-              </div>
-              <div className="px-3 py-3 space-y-2">
-                <p className="text-xs text-gray-500 font-medium">History Type</p>
-                <Select
-                  value={selectedHistorySubType}
-                  onValueChange={(value) => {
-                    setSelectedHistorySubType(value);
-                    setSelectedVesselTemplate('wo-history');
-                  }}
-                >
-                  <SelectTrigger className="w-full text-sm h-8" data-testid="I1.6F.sidebar-dropdown">
-                    <SelectValue placeholder="Select type..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="work-order">Work Order</SelectItem>
-                    <SelectItem value="spares">Spares</SelectItem>
-                    <SelectItem value="stores">Stores</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
