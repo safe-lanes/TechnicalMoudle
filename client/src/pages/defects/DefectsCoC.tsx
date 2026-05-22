@@ -752,6 +752,7 @@ export default function DefectsCoC() {
               value={vesselFilterValue}
               onChange={handleVesselFilterChange}
               showClearButton={false}
+              vesselOnly
             />
 
             <Select value={filters.status || 'active'} onValueChange={(value) => handleFilterChange('status', value)}>
