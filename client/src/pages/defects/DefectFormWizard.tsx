@@ -384,11 +384,31 @@ export default function DefectFormWizard({
     const partDFilled = Object.values(partDFields).some(val => 
       typeof val === 'boolean' ? val : val !== ''
     );
-    
+
+    const partDComplete = partDFields.verified
+      && partDFields.dateVerified !== ''
+      && partDFields.verifiedByName !== ''
+      && partDFields.verifiedByOfficePosition !== '';
+
     if (partDFilled && !partCComplete) {
       toast({
         title: "Part D cannot be saved",
         description: "Part C (Closeout) must be fully completed before filling Part D (Verification)",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    if (partDFilled && !partDComplete) {
+      const missingPartD: string[] = [];
+      if (!partDFields.verified) missingPartD.push('Verified');
+      if (!partDFields.dateVerified) missingPartD.push('Date Verified');
+      if (!partDFields.verifiedByName) missingPartD.push('Verified By (Name)');
+      if (!partDFields.verifiedByOfficePosition) missingPartD.push('Verified By (Office Position)');
+
+      toast({
+        title: "Part C2 incomplete",
+        description: `Once started, all C2 Verification fields are required: ${missingPartD.join(', ')}`,
         variant: "destructive"
       });
       return false;
