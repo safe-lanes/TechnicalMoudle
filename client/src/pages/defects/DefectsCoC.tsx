@@ -43,8 +43,8 @@ import LinkDefectsModal from "./LinkDefectsModal";
 import { cn } from "@/lib/utils";
 import { PeriodPicker, type PeriodValue } from "@/components/filters/PeriodPicker";
 import { VesselFleetGroupFilter, type VesselFleetGroupFilterValue } from "@/components/filters/VesselFleetGroupFilter";
-import { useToast } from "@/hooks/use-toast";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useToast } from "@/hooks/use-toast";
 import type { Defect } from "@shared/schema";
 import AgGridTable from "@/components/AgGrid/AgGridTable";
 import AgGridTableActions from "@/components/AgGrid/AgGridTableActions";
@@ -244,8 +244,9 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
 
 export default function DefectsCoC() {
   const { toast } = useToast();
-  const { isClientAdmin } = useUIRole();
   const { currentUser } = useAuth();
+  const { isVessel, isExternal } = useUIRole();
+  const canFilterVessel = !isVessel && !isExternal;
   const [filters, setFilters] = useState<DefectsFilters>({ status: 'active' });
   const [showFilters, setShowFilters] = useState(true);
   const [showNewDefectForm, setShowNewDefectForm] = useState(false);
@@ -750,7 +751,7 @@ export default function DefectsCoC() {
               />
             </div>
 
-            {isClientAdmin && (
+            {canFilterVessel && (
               <VesselFleetGroupFilter 
                 value={vesselFilterValue}
                 onChange={handleVesselFilterChange}
