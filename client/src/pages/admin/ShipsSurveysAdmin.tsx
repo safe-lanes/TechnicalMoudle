@@ -1937,7 +1937,7 @@ export default function ShipsSurveysAdmin() {
                           </td>
                           <td className="px-3 py-3 text-sm">{idx + 1}</td>
                           <td className="px-3 py-3 text-sm font-medium text-blue-600">{survey.masterId}</td>
-                          <td className="px-3 py-3 text-sm">{survey.companyId || "-"}</td>
+                          <td className="px-3 py-3 text-sm">{survey.companyId || (survey.masterId ? `C${survey.masterId}` : "-")}</td>
                           <td className="px-3 py-3 text-sm">{survey.surveyLabel || survey.surveyName}</td>
                           <td className="px-3 py-3 text-sm">{survey.requirementRef}</td>
                           <td className="px-3 py-3 text-sm">{displayCompanyGroup}</td>
