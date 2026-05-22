@@ -343,7 +343,42 @@ export default function DefectFormWizard({
       });
       return false;
     }
-    
+
+    // Part B5 (Target Date Extension) dirty-state guard:
+    // If the user typed into the B5 form (currentExtension) but did NOT click
+    // the section-level Submit (which is what pushes the entry into
+    // targetDateExtensions), block the save and explain what to do. Comparing
+    // against the last committed extension avoids false positives in edit mode,
+    // where currentExtension is prefilled from the latest saved extension.
+    const lastExt = targetDateExtensions[targetDateExtensions.length - 1];
+    const b5Touched = !!(currentExtension.newTargetDate || currentExtension.reasonForExtension?.trim());
+    const matchesLast = !!lastExt &&
+      (lastExt.newTargetDate || '') === (currentExtension.newTargetDate || '') &&
+      (lastExt.reasonForExtension || '') === (currentExtension.reasonForExtension || '') &&
+      (lastExt.submitForApprovalTo || '') === (currentExtension.submitForApprovalTo || '') &&
+      (lastExt.approved ?? null) === (currentExtension.approved ?? null) &&
+      (lastExt.approvalDate || '') === (currentExtension.approvalDate || '') &&
+      (lastExt.approverComments || '') === (currentExtension.approverComments || '');
+    if (b5Touched && !matchesLast) {
+      const missingB5: string[] = [];
+      if (!currentExtension.newTargetDate) missingB5.push('New Target Date');
+      if (!currentExtension.reasonForExtension?.trim()) missingB5.push('Reason for Extension');
+      if (missingB5.length > 0) {
+        toast({
+          title: 'Part B5 incomplete',
+          description: `Please fill in: ${missingB5.join(', ')}`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Part B5 has an unsaved extension',
+          description: 'Click the Submit button inside the B5 section to save the extension, or clear the fields before submitting.',
+          variant: 'destructive',
+        });
+      }
+      return false;
+    }
+
     // Part C (C1. Closeout) validation: if any field is filled, all must be filled
     const partCFields = {
       confirmCompleted: data.confirmCompleted || false,
@@ -1742,7 +1777,7 @@ export default function DefectFormWizard({
                             />
                           </div>
                           <div className="flex flex-col">
-                            <label className="text-sm text-gray-600 mb-1.5">New Target Date</label>
+                            <label className="text-sm text-gray-600 mb-1.5">New Target Date<span className="text-red-500">*</span></label>
                             <Input 
                               type="date"
                               value={currentExtension.newTargetDate}
@@ -1771,7 +1806,7 @@ export default function DefectFormWizard({
 
                         <div className="grid grid-cols-2 gap-6">
                           <div className="flex flex-col">
-                            <label className="text-sm text-gray-600 mb-1.5">Reason for Extension</label>
+                            <label className="text-sm text-gray-600 mb-1.5">Reason for Extension<span className="text-red-500">*</span></label>
                             <Textarea 
                               value={currentExtension.reasonForExtension}
                               onChange={(e) => setCurrentExtension(prev => ({ ...prev, reasonForExtension: e.target.value }))}
@@ -1886,8 +1921,24 @@ export default function DefectFormWizard({
                               onClick={async () => {
                                 // Prevent duplicate submissions
                                 if (isSubmittingExtension) return;
+
+                                // Validate B5 mandatory fields up front and show
+                                // a clear message rather than relying on a silently
+                                // disabled button.
+                                const missingB5: string[] = [];
+                                if (!currentExtension.newTargetDate) missingB5.push('New Target Date');
+                                if (!currentExtension.reasonForExtension?.trim()) missingB5.push('Reason for Extension');
+                                if (missingB5.length > 0) {
+                                  toast({
+                                    title: 'Part B5 incomplete',
+                                    description: `Please fill in: ${missingB5.join(', ')}`,
+                                    variant: 'destructive',
+                                  });
+                                  return;
+                                }
+
                                 setIsSubmittingExtension(true);
-                                
+
                                 try {
                                   // Validate form before saving
                                   const isValid = await form.trigger();
@@ -1955,7 +2006,7 @@ export default function DefectFormWizard({
                               }}
                               className="bg-blue-600 hover:bg-blue-700 text-white px-6"
                               data-testid="button-submit-extension"
-                              disabled={!currentExtension.newTargetDate || !currentExtension.reasonForExtension || isSubmittingExtension}
+                              disabled={isSubmittingExtension}
                             >
                               {isSubmittingExtension ? 'Saving...' : 'Submit'}
                             </Button>
