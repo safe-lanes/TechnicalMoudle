@@ -405,6 +405,17 @@ export default function DefectsCoC() {
 
   const handleClearFilters = () => {
     setFilters({ status: 'active' });
+    // The VesselFleetGroupFilter is a controlled component driven by
+    // vesselFilterValue. Without this reset, the dropdown chip keeps
+    // showing the previously selected vessel even though filters.vesselId
+    // (which actually drives the API query) has been cleared, so the chip
+    // and the grid get out of sync.
+    setVesselFilterValue({
+      mode: 'vessel',
+      selectedVessels: [],
+      selectedFleets: [],
+      selectedGroups: [],
+    });
   };
 
   const handleExportPdf = () => {
