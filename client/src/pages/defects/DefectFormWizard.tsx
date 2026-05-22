@@ -362,13 +362,24 @@ export default function DefectFormWizard({
     // fire so we don't silently drop their input with a false "submitted
     // successfully" toast. `approved` is tri-state — undefined means
     // untouched; both true and false count as touched.
+    //
+    // Also treat the case where the user clicked "+ Extend Target Date" to
+    // open the extension form but didn't type anything yet as touched, so
+    // long as no prior extension is committed. Opening the form is itself a
+    // declaration of intent to add an extension; the red-`*` mandatories
+    // must be enforced. In edit mode the form is rendered automatically
+    // whenever `targetDateExtensions.length > 0`, so we exclude that case to
+    // avoid a false-positive block on every Submit/SAVE of a defect that
+    // already has a saved extension (the `matchesLast` short-circuit below
+    // handles that path).
     const b5Touched = !!(
       currentExtension.newTargetDate ||
       currentExtension.reasonForExtension?.trim() ||
       currentExtension.submitForApprovalTo ||
       currentExtension.approved !== undefined ||
       currentExtension.approvalDate ||
-      currentExtension.approverComments?.trim()
+      currentExtension.approverComments?.trim() ||
+      (showExtensionForm && effectiveExtensions.length === 0)
     );
     const matchesLast = !!lastExt &&
       (lastExt.newTargetDate || '') === (currentExtension.newTargetDate || '') &&
