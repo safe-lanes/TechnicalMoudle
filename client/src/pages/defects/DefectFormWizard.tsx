@@ -350,7 +350,12 @@ export default function DefectFormWizard({
     // targetDateExtensions), block the save and explain what to do. Comparing
     // against the last committed extension avoids false positives in edit mode,
     // where currentExtension is prefilled from the latest saved extension.
-    const lastExt = targetDateExtensions[targetDateExtensions.length - 1];
+    // Use the same extensions source that will actually be persisted so that
+    // when the B5 section-Submit calls saveDefect(..., updatedExtensions)
+    // right after setTargetDateExtensions (state still stale), the guard
+    // sees the just-added entry and matchesLast becomes true.
+    const effectiveExtensions = extensionsOverride ?? targetDateExtensions;
+    const lastExt = effectiveExtensions[effectiveExtensions.length - 1];
     const b5Touched = !!(currentExtension.newTargetDate || currentExtension.reasonForExtension?.trim());
     const matchesLast = !!lastExt &&
       (lastExt.newTargetDate || '') === (currentExtension.newTargetDate || '') &&
