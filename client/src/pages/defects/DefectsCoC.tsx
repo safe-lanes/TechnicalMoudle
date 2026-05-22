@@ -43,7 +43,6 @@ import LinkDefectsModal from "./LinkDefectsModal";
 import { cn } from "@/lib/utils";
 import { PeriodPicker, type PeriodValue } from "@/components/filters/PeriodPicker";
 import { VesselFleetGroupFilter, type VesselFleetGroupFilterValue } from "@/components/filters/VesselFleetGroupFilter";
-import { useUIRole } from "@/contexts/UIRoleContext";
 import { useToast } from "@/hooks/use-toast";
 import type { Defect } from "@shared/schema";
 import AgGridTable from "@/components/AgGrid/AgGridTable";
@@ -245,8 +244,6 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
 export default function DefectsCoC() {
   const { toast } = useToast();
   const { currentUser } = useAuth();
-  const { isVessel, isExternal } = useUIRole();
-  const canFilterVessel = !isVessel && !isExternal;
   const [filters, setFilters] = useState<DefectsFilters>({ status: 'active' });
   const [showFilters, setShowFilters] = useState(true);
   const [showNewDefectForm, setShowNewDefectForm] = useState(false);
@@ -751,13 +748,11 @@ export default function DefectsCoC() {
               />
             </div>
 
-            {canFilterVessel && (
-              <VesselFleetGroupFilter 
-                value={vesselFilterValue}
-                onChange={handleVesselFilterChange}
-                showClearButton={false}
-              />
-            )}
+            <VesselFleetGroupFilter 
+              value={vesselFilterValue}
+              onChange={handleVesselFilterChange}
+              showClearButton={false}
+            />
 
             <Select value={filters.status || 'active'} onValueChange={(value) => handleFilterChange('status', value)}>
               <SelectTrigger className="w-[100px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">
