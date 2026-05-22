@@ -140,6 +140,8 @@ interface UniformBulkUploadProps {
   previewColumns?: string[];
   storeTypes?: StoreTypeOption[];
   historySubTypes?: StoreTypeOption[];
+  selectedHistorySubType?: string;
+  onHistorySubTypeChange?: (value: string) => void;
   onRefreshData?: () => void;
   markers?: MarkerConfig;
 }
@@ -155,6 +157,8 @@ export default function UniformBulkUpload({
   previewColumns,
   storeTypes,
   historySubTypes,
+  selectedHistorySubType: selectedHistorySubTypeProp,
+  onHistorySubTypeChange,
   onRefreshData,
   markers
 }: UniformBulkUploadProps) {
@@ -162,7 +166,12 @@ export default function UniformBulkUpload({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<'add' | 'update' | 'upsert'>('upsert');
   const [selectedStoreType, setSelectedStoreType] = useState<string>('');
-  const [selectedHistorySubType, setSelectedHistorySubType] = useState<string>('work-order');
+  const [internalHistorySubType, setInternalHistorySubType] = useState<string>(selectedHistorySubTypeProp ?? 'work-order');
+  const selectedHistorySubType = selectedHistorySubTypeProp ?? internalHistorySubType;
+  const setSelectedHistorySubType = (value: string) => {
+    setInternalHistorySubType(value);
+    onHistorySubTypeChange?.(value);
+  };
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -348,6 +357,9 @@ export default function UniformBulkUpload({
     if (templateType === 'stores' && selectedStoreType) {
       formData.append('storeType', selectedStoreType);
     }
+    if (historySubTypes && selectedHistorySubType) {
+      formData.append('historySubType', selectedHistorySubType);
+    }
 
     try {
       const response = await fetch('/technical/api/bulk/dry-run', {
@@ -418,6 +430,9 @@ export default function UniformBulkUpload({
 
     if (templateType === 'stores' && selectedStoreType) {
       requestBody.storeType = selectedStoreType;
+    }
+    if (historySubTypes && selectedHistorySubType) {
+      requestBody.historySubType = selectedHistorySubType;
     }
 
     setSseProgress(null);

@@ -256,7 +256,7 @@ export default function BulkDataImport() {
   const [selectedFleetTemplate, setSelectedFleetTemplate] = useState<FleetTemplateType>('maker-list');
   const [selectedVessel, setSelectedVessel] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('upload');
-  const [selectedHistorySidebarType, setSelectedHistorySidebarType] = useState<string>('');
+  const [selectedHistorySubType, setSelectedHistorySubType] = useState<string>('work-order');
 
   const vesselTemplates = [
     { id: 'machinery' as VesselTemplateType, number: 1, name: 'Machinery Components' },
@@ -363,9 +363,9 @@ export default function BulkDataImport() {
               <div className="px-3 py-3 space-y-2">
                 <p className="text-xs text-gray-500 font-medium">History Type</p>
                 <Select
-                  value={selectedHistorySidebarType}
+                  value={selectedHistorySubType}
                   onValueChange={(value) => {
-                    setSelectedHistorySidebarType(value);
+                    setSelectedHistorySubType(value);
                     setSelectedVesselTemplate('wo-history');
                   }}
                 >
@@ -461,7 +461,12 @@ export default function BulkDataImport() {
             ) : selectedVesselTemplate === 'locations' ? (
               <LocationsUpload vesselId={selectedVessel} />
             ) : selectedVesselTemplate === 'wo-history' ? (
-              <WoHistoryUpload vesselId={selectedVessel} markers={currentMarkers} />
+              <WoHistoryUpload
+                vesselId={selectedVessel}
+                markers={currentMarkers}
+                selectedHistorySubType={selectedHistorySubType}
+                onHistorySubTypeChange={setSelectedHistorySubType}
+              />
             ) : (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">

@@ -26,9 +26,11 @@ const HISTORY_TYPES = [
 interface WoHistoryUploadProps {
   vesselId: string;
   markers?: PageMarkers;
+  selectedHistorySubType?: string;
+  onHistorySubTypeChange?: (value: string) => void;
 }
 
-export default function WoHistoryUpload({ vesselId, markers }: WoHistoryUploadProps) {
+export default function WoHistoryUpload({ vesselId, markers, selectedHistorySubType, onHistorySubTypeChange }: WoHistoryUploadProps) {
   return (
     <UniformBulkUpload
       title="WO History Import"
@@ -40,6 +42,8 @@ export default function WoHistoryUpload({ vesselId, markers }: WoHistoryUploadPr
       vesselId={vesselId}
       previewColumns={["WO Number", "Component Code", "Job Title"]}
       historySubTypes={HISTORY_TYPES}
+      selectedHistorySubType={selectedHistorySubType}
+      onHistorySubTypeChange={onHistorySubTypeChange}
       markers={markers ? {
         header: markers.uploadHeader,
         description: markers.uploadDescription,
