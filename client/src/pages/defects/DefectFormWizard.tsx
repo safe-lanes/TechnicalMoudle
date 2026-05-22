@@ -356,7 +356,20 @@ export default function DefectFormWizard({
     // sees the just-added entry and matchesLast becomes true.
     const effectiveExtensions = extensionsOverride ?? targetDateExtensions;
     const lastExt = effectiveExtensions[effectiveExtensions.length - 1];
-    const b5Touched = !!(currentExtension.newTargetDate || currentExtension.reasonForExtension?.trim());
+    // Detect any B5 field touch (mandatory OR auxiliary). If the user filled
+    // only auxiliary fields (approver, approved, approval date, approver
+    // comments) and left the two mandatory ones empty, the guard must still
+    // fire so we don't silently drop their input with a false "submitted
+    // successfully" toast. `approved` is tri-state — undefined means
+    // untouched; both true and false count as touched.
+    const b5Touched = !!(
+      currentExtension.newTargetDate ||
+      currentExtension.reasonForExtension?.trim() ||
+      currentExtension.submitForApprovalTo ||
+      currentExtension.approved !== undefined ||
+      currentExtension.approvalDate ||
+      currentExtension.approverComments?.trim()
+    );
     const matchesLast = !!lastExt &&
       (lastExt.newTargetDate || '') === (currentExtension.newTargetDate || '') &&
       (lastExt.reasonForExtension || '') === (currentExtension.reasonForExtension || '') &&
