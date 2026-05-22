@@ -56,6 +56,9 @@ export async function validateData(type: string, data: any[], mode: string, vess
       case 'work-orders':
         primaryField = 'Work Order Number';
         break;
+      case 'wo-history':
+        primaryField = 'WO Number';
+        break;
       case 'makers':
         primaryField = 'Maker Code';
         break;
@@ -847,6 +850,72 @@ export async function validateData(type: string, data: any[], mode: string, vess
           normalized[key] = row[key];
         }
       });
+    } else if (type === 'wo-history') {
+      // ── WO History import validation ──
+      // Required: WO Number, Component Code, Job Title, Maintenance Type, Date Completed, Performed By
+
+      const woNumber = row['WO Number'];
+      if (!woNumber || String(woNumber).trim() === '') {
+        errors.push(`Row ${rowNum}: WO Number is required`);
+      } else {
+        normalized['WO Number'] = String(woNumber).trim();
+      }
+
+      const componentCode = row['Component Code'];
+      if (!componentCode || String(componentCode).trim() === '') {
+        errors.push(`Row ${rowNum}: Component Code is required`);
+      } else {
+        normalized['Component Code'] = String(componentCode).trim();
+      }
+
+      const jobTitle = row['Job Title'];
+      if (!jobTitle || String(jobTitle).trim() === '') {
+        errors.push(`Row ${rowNum}: Job Title is required`);
+      } else {
+        normalized['Job Title'] = String(jobTitle).trim();
+      }
+
+      const maintenanceType = row['Maintenance Type'];
+      if (!maintenanceType || String(maintenanceType).trim() === '') {
+        errors.push(`Row ${rowNum}: Maintenance Type is required`);
+      } else {
+        normalized['Maintenance Type'] = String(maintenanceType).trim();
+      }
+
+      if (!row['Date Completed'] && row['Date Completed'] !== 0) {
+        errors.push(`Row ${rowNum}: Date Completed is required`);
+      } else {
+        normalized['Date Completed'] = row['Date Completed'];
+      }
+
+      const performedBy = row['Performed By'];
+      if (!performedBy || String(performedBy).trim() === '') {
+        errors.push(`Row ${rowNum}: Performed By is required`);
+      } else {
+        normalized['Performed By'] = String(performedBy).trim();
+      }
+
+      // Status — optional, default to 'Completed'
+      const validStatuses = ['Completed', 'Approved'];
+      const rawStatus = row['Status'] ? String(row['Status']).trim() : '';
+      if (rawStatus && !validStatuses.includes(rawStatus)) {
+        warnings.push(`Row ${rowNum}: Status '${rawStatus}' is not standard. Will default to 'Completed'.`);
+        normalized['Status'] = 'Completed';
+      } else {
+        normalized['Status'] = rawStatus || 'Completed';
+      }
+
+      // Optional fields — copy as-is (dates stored raw for import service to parse)
+      const optionalFields = [
+        'WO Description', 'Duration Hours', 'Running Hours at Completion',
+        'Remarks', 'Next Due Date', 'Spare Parts Used', 'Job Approved By',
+        'WO Due Date', 'WO Due Hour', 'Next Due Hour'
+      ];
+      for (const field of optionalFields) {
+        if (row[field] !== undefined && row[field] !== null && String(row[field]).trim() !== '') {
+          normalized[field] = row[field];
+        }
+      }
     } else if (type === 'jobs') {
       // Validate jobs (21-column specification format)
       // Skip rows that don't have WO Title - user only fills in components they want jobs for

@@ -18,6 +18,7 @@ import {
 import { createRecordSnapshot } from './undoService';
 import { saveImportHistory } from '../../../services/fileBasedImportHistory';
 import { applyAssignmentSync } from '../../work-orders/services/workOrderService';
+import * as woRepo from '../../work-orders/repositories/workOrderRepository';
 import { logFieldChangesBatch } from '../../sync';
 
 
@@ -1262,6 +1263,207 @@ export async function performImport(
     }
     
     console.log(`✅ Work-orders import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.archived} archived`);
+  } else if (type === 'wo-history') {
+    // ── WO History import ──
+    // Upserts completed work orders from historical Excel data and writes
+    // component_maintenance_history records (immutable INSERT-only table).
+    console.log(`🚀 Starting wo-history import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);
+
+    // Helper: parse an Excel serial number or date string → 'YYYY-MM-DD' | null
+    const parseExcelDate = (val: any): string | null => {
+      if (val === undefined || val === null || val === '') return null;
+      if (typeof val === 'number') {
+        // Excel stores dates as days since 1900-01-00 (serial 1 = 1900-01-01)
+        const utcMs = Math.round((val - 25569) * 86400 * 1000);
+        const d = new Date(utcMs);
+        if (isNaN(d.getTime())) return null;
+        return d.toISOString().split('T')[0];
+      }
+      const s = String(val).trim();
+      if (!s) return null;
+      // Try direct ISO / common formats
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      // DD-MMM-YYYY  e.g. "15-Jan-2024"
+      const mmmMap: Record<string, string> = {
+        jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',
+        jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'
+      };
+      const mmmMatch = s.match(/^(\d{1,2})[-\/\s]([a-zA-Z]{3})[-\/\s](\d{4})$/);
+      if (mmmMatch) {
+        const mm = mmmMap[mmmMatch[2].toLowerCase()];
+        if (mm) return `${mmmMatch[3]}-${mm}-${mmmMatch[1].padStart(2,'0')}`;
+      }
+      return s; // return raw string as last resort
+    };
+
+    // Pre-fetch all existing work orders for upsert keying by workOrderNo
+    const allExistingWOs = await storage.getWorkOrders(vesselId);
+    const woByNumber = new Map<string, any>(
+      allExistingWOs
+        .filter((wo: any) => wo.workOrderNo)
+        .map((wo: any) => [String(wo.workOrderNo).trim(), wo])
+    );
+
+    // Pre-fetch all components for this vessel keyed by componentCode
+    const allCompCodes = data.map(row => String(row['Component Code'] || '').trim()).filter(Boolean);
+    const componentsByCode: Map<string, any> = await storage.getComponentsByCodes(allCompCodes, vesselId);
+
+    // Pre-fetch all jobs for this vessel for optional job linkage
+    const allJobs = await storage.getJobs(vesselId);
+
+    for (let _idx = 0; _idx < data.length; _idx++) {
+      const row = data[_idx];
+      const _rowNum = row['__meta']?.rowNumber || (_idx + 1);
+      const woNumber  = String(row['WO Number'] || '').trim();
+      const compCode  = String(row['Component Code'] || '').trim();
+      const jobTitle  = String(row['Job Title'] || '').trim();
+
+      try {
+        // Resolve component
+        const component = componentsByCode.get(compCode) || componentsByCode.get(compCode.toUpperCase());
+        if (!component) {
+          result.skipped++;
+          result.rowResults.push({
+            rowNumber: _rowNum, primaryIdentifier: woNumber, action: 'failed',
+            error: `Component Code '${compCode}' not found in vessel`
+          });
+          _emitProgress('Processing WO History…');
+          continue;
+        }
+
+        // Optional: resolve matching job by componentId + jobTitle for proper jobId linkage
+        const matchingJob = allJobs.find((j: any) =>
+          j.componentId === component.cuuid && j.jobTitle === jobTitle
+        ) || allJobs.find((j: any) =>
+          j.componentCode === compCode && j.jobTitle === jobTitle
+        );
+
+        // Parse date fields
+        const dateCompleted   = parseExcelDate(row['Date Completed']);
+        const dueDate         = parseExcelDate(row['WO Due Date']) || new Date().toISOString().split('T')[0];
+        const nextDueDate     = parseExcelDate(row['Next Due Date']);
+        const approvalDate    = parseExcelDate(row['Job Approved By'] ? row['Date Completed'] : null); // fallback
+
+        const status          = String(row['Status'] || 'Completed').trim();
+        const maintenanceType = String(row['Maintenance Type'] || '').trim();
+        const performedBy     = String(row['Performed By'] || '').trim();
+        const approver        = row['Job Approved By'] ? String(row['Job Approved By']).trim() : null;
+        const workDone        = row['WO Description'] ? String(row['WO Description']).trim() : null;
+        const remarks         = row['Remarks'] ? String(row['Remarks']).trim() : null;
+        const sparesUsed      = row['Spare Parts Used'] ? String(row['Spare Parts Used']).trim() : null;
+        const rhAtCompletion  = row['Running Hours at Completion'] != null
+          ? String(row['Running Hours at Completion']).trim() : null;
+        const dueRhSnapshot   = row['WO Due Hour'] != null ? String(row['WO Due Hour']).trim() : null;
+        const nextDueHour     = row['Next Due Hour'] != null ? String(row['Next Due Hour']).trim() : null;
+
+        // ── Step 1: Create or update the work_orders record ──
+        const existingWO = woByNumber.get(woNumber);
+        let savedWO: any;
+
+        const woPayload: any = {
+          vesselId,
+          component: component.description || component.name || compCode,
+          componentCode: compCode,
+          jobId: matchingJob?.juuid || matchingJob?.id || null,
+          workOrderNo: woNumber,
+          templateCode: woNumber,
+          jobTitle,
+          assignedTo: performedBy || '',
+          approver: approver || undefined,
+          dueDate,
+          status: status as any,
+          taskType: maintenanceType || null,
+          briefWorkDescription: workDone || undefined,
+          isExecution: true,
+          dataScope: 'vessel',
+          // Correct work_orders schema field names (see shared/schema.ts)
+          dateCompleted: dateCompleted || undefined,          // text("date_completed")
+          performedBy: performedBy || undefined,             // text("performed_by")
+          workCarriedOut: workDone || undefined,             // text("work_carried_out")
+          remarks: remarks || undefined,                     // text("remarks")
+          nextDueDate: nextDueDate || undefined,             // text("next_due_date")
+          nextDueReading: nextDueHour || undefined,          // text("next_due_reading")
+          runningHours: rhAtCompletion || undefined,         // text("running_hours") — RH at completion
+          dueRhSnapshot: dueRhSnapshot ? parseFloat(dueRhSnapshot) || undefined : undefined, // decimal
+        };
+
+        if (!existingWO) {
+          if (mode === 'update') {
+            // update-only mode: skip if WO doesn't exist
+            result.skipped++;
+            result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: woNumber, action: 'skipped', error: 'WO not found for update' });
+            _emitProgress('Processing WO History…');
+            continue;
+          }
+          savedWO = await storage.createWorkOrder(woPayload);
+          woByNumber.set(woNumber, savedWO);
+          result.created++;
+          result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: woNumber, action: 'created' });
+        } else {
+          if (mode === 'add') {
+            // add-only mode: skip if WO already exists
+            result.skipped++;
+            result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: woNumber, action: 'skipped', error: 'WO already exists' });
+            _emitProgress('Processing WO History…');
+            continue;
+          }
+          savedWO = await storage.updateWorkOrder(existingWO.id, woPayload);
+          woByNumber.set(woNumber, savedWO);
+          result.updated++;
+          result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: woNumber, action: 'updated' });
+        }
+
+        // ── Step 2: Write component_maintenance_history record (INSERT-only, immutable) ──
+        // Only write if this WO doesn't already have a history record
+        const workOrderUuid = savedWO?.wouuid || existingWO?.wouuid;
+        if (workOrderUuid) {
+          try {
+            const existingHistory = await woRepo.findMaintenanceHistoryByWorkOrderId(workOrderUuid);
+            if (!existingHistory) {
+              const historyPayload = {
+                componentId: component.cuuid,
+                componentCode: compCode,
+                vesselCode: vesselId,
+                jobId: matchingJob?.juuid || matchingJob?.id || null,
+                jobCode: matchingJob?.jobNo || null,
+                workOrderId: workOrderUuid,
+                workOrderNo: woNumber,
+                jobTitle,
+                maintenanceType: maintenanceType || 'Servicing',
+                dateCompleted: dateCompleted || new Date().toISOString().split('T')[0],
+                runningHoursAtCompletion: rhAtCompletion || null,
+                performedBy: performedBy || 'Unknown',
+                approvedBy: approver || null,
+                approvalDate: approver && dateCompleted ? dateCompleted : null,
+                status: 'Approved' as const,
+                workDescription: workDone || null,
+                sparesUsed: sparesUsed || null,
+                remarks: remarks || 'Imported from history',
+                isComponentReplaced: false,
+                missedCycles: 0,
+                originalDueDate: dueDate || null,
+              };
+              await woRepo.createMaintenanceHistory(historyPayload);
+              console.log(`✅ Created maintenance history for WO ${woNumber} (component: ${compCode})`);
+            } else {
+              console.log(`ℹ️ Maintenance history already exists for WO ${woNumber}, skipping`);
+            }
+          } catch (histErr: any) {
+            console.error(`⚠️ Failed to write maintenance history for WO ${woNumber}:`, histErr.message);
+            // Non-fatal: work order was already saved successfully
+          }
+        }
+      } catch (rowErr: any) {
+        console.error(`❌ Error processing wo-history row ${_idx + 1} (WO: ${woNumber}):`, rowErr.message);
+        result.skipped++;
+        result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: woNumber, action: 'failed', error: rowErr.message });
+      } finally {
+        _emitProgress('Processing WO History…');
+      }
+    }
+
+    console.log(`✅ WO History import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
   } else if (type === 'jobs') {
     // Import jobs using storage layer
     console.log(`🚀 Starting jobs import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);
