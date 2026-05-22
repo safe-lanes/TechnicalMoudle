@@ -71,6 +71,9 @@ export async function validateData(type: string, data: any[], mode: string, vess
       case 'fleet-spares':
         primaryField = 'Part Code';
         break;
+      case 'spare-history':
+        primaryField = 'Part Code';
+        break;
       default:
         primaryField = 'Component Code';
     }
@@ -916,6 +919,71 @@ export async function validateData(type: string, data: any[], mode: string, vess
           normalized[field] = row[field];
         }
       }
+    } else if (type === 'spare-history') {
+      // ── Spare History import validation ──
+      // Required: Part Code, Event Type, Quantity, ROB After, Date
+
+      const partCode = row['Part Code'];
+      if (!partCode || String(partCode).trim() === '') {
+        errors.push(`Row ${rowNum}: Part Code is required`);
+      } else {
+        normalized['Part Code'] = String(partCode).trim();
+      }
+
+      const eventType = row['Event Type'];
+      const validEventTypes = ['CONSUME', 'RECEIVE', 'ADJUST'];
+      if (!eventType || String(eventType).trim() === '') {
+        errors.push(`Row ${rowNum}: Event Type is required`);
+      } else {
+        const evtNorm = String(eventType).trim().toUpperCase();
+        if (!validEventTypes.includes(evtNorm)) {
+          errors.push(`Row ${rowNum}: Event Type '${eventType}' is invalid. Accepted values: CONSUME, RECEIVE, ADJUST`);
+        } else {
+          normalized['Event Type'] = evtNorm;
+        }
+      }
+
+      const quantity = row['Quantity'];
+      if (quantity === undefined || quantity === null || String(quantity).trim() === '') {
+        errors.push(`Row ${rowNum}: Quantity is required`);
+      } else {
+        const qtyNum = parseInt(String(quantity), 10);
+        if (isNaN(qtyNum) || qtyNum < 0) {
+          errors.push(`Row ${rowNum}: Quantity must be a non-negative integer`);
+        } else {
+          normalized['Quantity'] = qtyNum;
+        }
+      }
+
+      const robAfter = row['ROB After'];
+      if (robAfter === undefined || robAfter === null || String(robAfter).trim() === '') {
+        errors.push(`Row ${rowNum}: ROB After is required`);
+      } else {
+        const robNum = parseInt(String(robAfter), 10);
+        if (isNaN(robNum) || robNum < 0) {
+          errors.push(`Row ${rowNum}: ROB After must be a non-negative integer`);
+        } else {
+          normalized['ROB After'] = robNum;
+        }
+      }
+
+      if (!row['Date'] && row['Date'] !== 0) {
+        errors.push(`Row ${rowNum}: Date is required`);
+      } else {
+        normalized['Date'] = row['Date'];
+      }
+
+      // Optional fields — copy as-is
+      const optionalFields = [
+        'Vessel Code', 'Component Code', 'Performed By', 'Remarks',
+        'Reference', 'Port/Place', 'Timezone', 'Component Spare Code'
+      ];
+      for (const field of optionalFields) {
+        if (row[field] !== undefined && row[field] !== null && String(row[field]).trim() !== '') {
+          normalized[field] = row[field];
+        }
+      }
+
     } else if (type === 'jobs') {
       // Validate jobs (21-column specification format)
       // Skip rows that don't have WO Title - user only fills in components they want jobs for

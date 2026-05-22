@@ -1464,6 +1464,126 @@ export async function performImport(
     }
 
     console.log(`✅ WO History import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
+  } else if (type === 'spare-history') {
+    // ── Spare History import ──
+    // Inserts historical spare transaction records directly into spares_history.
+    // Does NOT touch the spare's current ROB — pure ledger backfill.
+    const spareHistVesselId = vesselId || 'V001';
+    console.log(`🚀 Starting spare-history import: ${data.length} rows, mode: ${mode}, vesselId: ${spareHistVesselId}`);
+
+    // Helper: parse Excel date serial or string → 'YYYY-MM-DD' | null
+    const parseShDate = (val: any): string | null => {
+      if (val === undefined || val === null || val === '') return null;
+      if (typeof val === 'number') {
+        const utcMs = Math.round((val - 25569) * 86400 * 1000);
+        const d = new Date(utcMs);
+        if (isNaN(d.getTime())) return null;
+        return d.toISOString().split('T')[0];
+      }
+      const s = String(val).trim();
+      if (!s) return null;
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      const mmmMap: Record<string, string> = {
+        jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',
+        jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'
+      };
+      const mmmMatch = s.match(/^(\d{1,2})[-\/\s]([a-zA-Z]{3})[-\/\s](\d{4})$/);
+      if (mmmMatch) {
+        const mm = mmmMap[mmmMatch[2].toLowerCase()];
+        if (mm) return `${mmmMatch[3]}-${mm}-${mmmMatch[1].padStart(2,'0')}`;
+      }
+      return s;
+    };
+
+    // Pre-load all spares for the vessel keyed by partCode
+    const allSpares = await storage.getSpares(spareHistVesselId);
+    const sparesByPartCode = new Map<string, any>(allSpares.map((s: any) => [String(s.partCode).trim(), s]));
+    console.log(`📋 Loaded ${allSpares.length} spares for vessel ${spareHistVesselId}`);
+
+    // Pre-load all components keyed by componentCode (for optional componentId resolution)
+    const allComponents = await storage.getComponents(spareHistVesselId);
+    const componentsByCode = new Map<string, any>(allComponents.map((c: any) => [String(c.componentCode).trim(), c]));
+
+    for (let _shIdx = 0; _shIdx < data.length; _shIdx++) {
+      const row = data[_shIdx];
+      const _shRowNum = row['__meta']?.rowNumber || (_shIdx + 1);
+      const partCode = String(row['Part Code'] || '').trim();
+
+      try {
+        // Resolve spare by Part Code — required
+        const spare = sparesByPartCode.get(partCode);
+        if (!spare) {
+          result.skipped++;
+          result.rowResults.push({
+            rowNumber: _shRowNum,
+            primaryIdentifier: partCode,
+            action: 'failed',
+            error: `Part Code '${partCode}' not found in vessel spares register`
+          });
+          _emitProgress('Processing Spare History…');
+          continue;
+        }
+
+        // Parse event type and derive qtyChange sign
+        const eventType = String(row['Event Type'] || '').trim().toUpperCase() as 'CONSUME' | 'RECEIVE' | 'ADJUST';
+        const rawQty = parseInt(String(row['Quantity'] || '0'), 10) || 0;
+        const qtyChange = eventType === 'CONSUME' ? -Math.abs(rawQty) : Math.abs(rawQty);
+        const robAfter = parseInt(String(row['ROB After'] || '0'), 10) || 0;
+
+        // Parse date
+        const dateStr = parseShDate(row['Date']);
+        const timestampUTC = dateStr ? new Date(dateStr) : new Date();
+
+        // Resolve component from spare or optional Component Code column
+        const componentCodeFromRow = row['Component Code'] ? String(row['Component Code']).trim() : null;
+        const component = componentCodeFromRow
+          ? componentsByCode.get(componentCodeFromRow) || componentsByCode.get((componentCodeFromRow).toUpperCase())
+          : null;
+
+        // Use spare's registered componentId as source of truth; fall back to row-resolved
+        const componentId = spare.componentId || component?.cuuid || '';
+        const componentCode = spare.componentCode || componentCodeFromRow || '';
+        const componentName = spare.componentName || component?.name || component?.description || '';
+
+        // Build payload
+        const historyPayload: any = {
+          timestampUTC,
+          vesselId: spareHistVesselId,
+          spareId: spare.id,
+          spareUuid: spare.suuid,
+          partCode: spare.partCode,
+          partName: spare.partName || spare.name || partCode,
+          componentId,
+          componentCode: componentCode || null,
+          componentName: componentName || '',
+          componentSpareCode: row['Component Spare Code'] ? String(row['Component Spare Code']).trim() : (spare.componentSpareCode || null),
+          eventType,
+          qtyChange,
+          robAfter,
+          userId: row['Performed By'] ? String(row['Performed By']).trim() : 'system',
+          remarks: row['Remarks'] ? String(row['Remarks']).trim() : null,
+          reference: row['Reference'] ? String(row['Reference']).trim() : null,
+          dateLocal: dateStr || null,
+          tz: row['Timezone'] ? String(row['Timezone']).trim() : null,
+          place: row['Port/Place'] ? String(row['Port/Place']).trim() : null,
+        };
+
+        await storage.createSpareHistory(historyPayload);
+        result.created++;
+        result.rowResults.push({ rowNumber: _shRowNum, primaryIdentifier: partCode, action: 'created' });
+        console.log(`✅ Created spare history: ${partCode} | ${eventType} | qty: ${qtyChange} | robAfter: ${robAfter}`);
+
+      } catch (rowErr: any) {
+        console.error(`❌ Error processing spare-history row ${_shIdx + 1} (Part: ${partCode}):`, rowErr.message);
+        result.skipped++;
+        result.rowResults.push({ rowNumber: _shRowNum, primaryIdentifier: partCode, action: 'failed', error: rowErr.message });
+      } finally {
+        _emitProgress('Processing Spare History…');
+      }
+    }
+
+    console.log(`✅ Spare History import complete: ${result.created} created, ${result.skipped} skipped`);
   } else if (type === 'jobs') {
     // Import jobs using storage layer
     console.log(`🚀 Starting jobs import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);

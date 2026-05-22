@@ -210,6 +210,117 @@ const COLUMN_MAPPINGS: { [key: string]: { [variant: string]: string } } = {
     'total_rob': 'Total ROB',
     'total rob': 'Total ROB'
   },
+  'spare-history': {
+    // Part Code
+    'partcode': 'Part Code',
+    'part_code': 'Part Code',
+    'part code': 'Part Code',
+    'sparepartcode': 'Part Code',
+    'spare_part_code': 'Part Code',
+    'spare part code': 'Part Code',
+    // Event Type
+    'eventtype': 'Event Type',
+    'event_type': 'Event Type',
+    'event type': 'Event Type',
+    'transactiontype': 'Event Type',
+    'transaction_type': 'Event Type',
+    'transaction type': 'Event Type',
+    'type': 'Event Type',
+    // Quantity
+    'quantity': 'Quantity',
+    'qty': 'Quantity',
+    'qtychange': 'Quantity',
+    'qty_change': 'Quantity',
+    'qty change': 'Quantity',
+    'amount': 'Quantity',
+    // ROB After
+    'robafter': 'ROB After',
+    'rob_after': 'ROB After',
+    'rob after': 'ROB After',
+    'balanceafter': 'ROB After',
+    'balance_after': 'ROB After',
+    'balance after': 'ROB After',
+    'closingbalance': 'ROB After',
+    'closing_balance': 'ROB After',
+    'closing balance': 'ROB After',
+    'rob': 'ROB After',
+    'stock': 'ROB After',
+    // Date
+    'date': 'Date',
+    'transactiondate': 'Date',
+    'transaction_date': 'Date',
+    'transaction date': 'Date',
+    'eventdate': 'Date',
+    'event_date': 'Date',
+    'event date': 'Date',
+    'datetime': 'Date',
+    'dateofevent': 'Date',
+    'date of event': 'Date',
+    // Component Code
+    'componentcode': 'Component Code',
+    'component_code': 'Component Code',
+    'component code': 'Component Code',
+    // Performed By
+    'performedby': 'Performed By',
+    'performed_by': 'Performed By',
+    'performed by': 'Performed By',
+    'doneby': 'Performed By',
+    'done_by': 'Performed By',
+    'done by': 'Performed By',
+    'userid': 'Performed By',
+    'user_id': 'Performed By',
+    'user id': 'Performed By',
+    'user': 'Performed By',
+    'operator': 'Performed By',
+    // Remarks
+    'remarks': 'Remarks',
+    'remark': 'Remarks',
+    'notes': 'Remarks',
+    'note': 'Remarks',
+    'comments': 'Remarks',
+    'comment': 'Remarks',
+    // Reference
+    'reference': 'Reference',
+    'ref': 'Reference',
+    'woreference': 'Reference',
+    'wo_reference': 'Reference',
+    'wo reference': 'Reference',
+    'poreference': 'Reference',
+    'po_reference': 'Reference',
+    'po reference': 'Reference',
+    'ponumber': 'Reference',
+    'po_number': 'Reference',
+    'po number': 'Reference',
+    'workorderref': 'Reference',
+    'work order ref': 'Reference',
+    // Port/Place
+    'place': 'Port/Place',
+    'port': 'Port/Place',
+    'portplace': 'Port/Place',
+    'port_place': 'Port/Place',
+    'port place': 'Port/Place',
+    'location': 'Port/Place',
+    'portofcall': 'Port/Place',
+    'port_of_call': 'Port/Place',
+    'port of call': 'Port/Place',
+    // Timezone
+    'tz': 'Timezone',
+    'timezone': 'Timezone',
+    'time_zone': 'Timezone',
+    'time zone': 'Timezone',
+    // Component Spare Code
+    'componentsparecode': 'Component Spare Code',
+    'component_spare_code': 'Component Spare Code',
+    'component spare code': 'Component Spare Code',
+    'sparecode': 'Component Spare Code',
+    'spare_code': 'Component Spare Code',
+    'spare code': 'Component Spare Code',
+    // Vessel Code
+    'vesselcode': 'Vessel Code',
+    'vessel_code': 'Vessel Code',
+    'vessel code': 'Vessel Code',
+    'vessel': 'Vessel Code',
+  },
   components: {
     'componentcode': 'Component Code',
     'component_code': 'Component Code',
@@ -777,6 +888,7 @@ export function getTypeFromSheetName(sheetName: string): string | null {
   if (normalizedName === 'fleet_component' || normalizedName === 'fleet component' || (normalizedName.includes('fleet') && normalizedName.includes('component'))) return 'fleet-components';
   if (normalizedName === 'fleet_job' || normalizedName === 'fleet job' || (normalizedName.includes('fleet') && normalizedName.includes('job'))) return 'fleet-jobs';
   if (normalizedName === 'fleet_spare' || normalizedName === 'fleet spare' || normalizedName === 'fleet_spares' || normalizedName === 'fleet spares' || (normalizedName.includes('fleet') && normalizedName.includes('spare'))) return 'fleet-spares';
+  if (normalizedName === 'spare history' || normalizedName === 'spare_history' || normalizedName === 'spares history' || normalizedName === 'spares_history' || (normalizedName.includes('spare') && normalizedName.includes('history'))) return 'spare-history';
   if (normalizedName === 'spares' || normalizedName.includes('spare')) return 'spares';
   if (normalizedName === 'components' || normalizedName.includes('component') || normalizedName.includes('machinery')) return 'components';
   if (normalizedName === 'vessel_job' || normalizedName === 'vessel job') return 'jobs';

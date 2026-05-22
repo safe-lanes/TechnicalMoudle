@@ -718,7 +718,7 @@ export default function UniformBulkUpload({
   };
 
   const isStoresAndNoType = templateType === 'stores' && !selectedStoreType;
-  const isHistoryComingSoon = historySubTypes !== undefined && selectedHistorySubType !== 'work-order';
+  const isHistoryComingSoon = historySubTypes !== undefined && selectedHistorySubType !== 'work-order' && selectedHistorySubType !== 'spares';
 
   return (
     <div className="space-y-6">

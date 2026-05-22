@@ -1192,3 +1192,104 @@ export async function generateWoHistoryTemplate(): Promise<Buffer> {
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }
+
+export async function generateSpareHistoryTemplate(): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+
+  // ── Sheet 1: Spare History (data entry) ───────────────
+  const dataSheet = workbook.addWorksheet('Spare History');
+  dataSheet.columns = [
+    { header: 'Part Code',            key: 'partCode',           width: 20 },
+    { header: 'Event Type',           key: 'eventType',          width: 16 },
+    { header: 'Quantity',             key: 'quantity',           width: 12 },
+    { header: 'ROB After',            key: 'robAfter',           width: 12 },
+    { header: 'Date',                 key: 'date',               width: 18 },
+    { header: 'Vessel Code',          key: 'vesselCode',         width: 16 },
+    { header: 'Component Code',       key: 'componentCode',      width: 20 },
+    { header: 'Performed By',         key: 'performedBy',        width: 25 },
+    { header: 'Remarks',              key: 'remarks',            width: 40 },
+    { header: 'Reference',            key: 'reference',          width: 25 },
+    { header: 'Port/Place',           key: 'place',              width: 20 },
+    { header: 'Timezone',             key: 'tz',                 width: 16 },
+    { header: 'Component Spare Code', key: 'componentSpareCode', width: 24 },
+  ];
+
+  // Style header row — bold; required columns (1–6) get red text
+  dataSheet.getRow(1).font = { bold: true };
+  dataSheet.getRow(1).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFD0E4F7' },
+  };
+  [1, 2, 3, 4, 5, 6].forEach(col => {
+    dataSheet.getRow(1).getCell(col).font = { bold: true, color: { argb: 'FFCC0000' } };
+  });
+
+  // Dropdown validation for Event Type (col 2)
+  for (let row = 2; row <= 1000; row++) {
+    dataSheet.getCell(row, 2).dataValidation = {
+      type: 'list',
+      allowBlank: false,
+      formulae: ['"CONSUME,RECEIVE,ADJUST"'],
+    };
+  }
+
+  // Sample data row
+  dataSheet.addRow({
+    partCode:          'PT-000123',
+    eventType:         'CONSUME',
+    quantity:          2,
+    robAfter:          8,
+    date:              '15-NOV-2024',
+    vesselCode:        'V001',
+    componentCode:     '601.001.AA',
+    performedBy:       'Chief Engineer',
+    remarks:           'Used during scheduled maintenance',
+    reference:         '601.001.WO-2024-01',
+    place:             'Singapore',
+    tz:                'Asia/Singapore',
+    componentSpareCode:'SP-601.001.AA-001',
+  });
+
+  // ── Sheet 2: Instructions ──────────────────────────────
+  const instrSheet = workbook.addWorksheet('Instructions');
+  instrSheet.columns = [
+    { header: 'Field',       key: 'field',       width: 28 },
+    { header: 'Required',    key: 'required',    width: 12 },
+    { header: 'Description', key: 'description', width: 70 },
+    { header: 'Example',     key: 'example',     width: 35 },
+  ];
+  instrSheet.getRow(1).font = { bold: true };
+
+  const instrRows = [
+    ['Part Code',            'Required', 'Part code of the spare — must already exist in the vessel\'s spares register',  'PT-000123'],
+    ['Event Type',           'Required', 'Type of transaction: CONSUME, RECEIVE, or ADJUST (uppercase)',                  'CONSUME'],
+    ['Quantity',             'Required', 'Absolute quantity involved (always positive — sign is derived from Event Type)','2'],
+    ['ROB After',            'Required', 'Remaining on-board balance after this transaction (non-negative integer)',       '8'],
+    ['Date',                 'Required', 'Date of the transaction — use DD-MMM-YYYY format',                              '15-NOV-2024'],
+    ['Vessel Code',          'Required', 'Vessel code this transaction belongs to (e.g. V001)',                           'V001'],
+    ['Component Code',       'Optional', 'Component this spare is linked to — used for cross-check only',                '601.001.AA'],
+    ['Performed By',         'Optional', 'Name or rank of person who performed the transaction. Defaults to system.',     'Chief Engineer'],
+    ['Remarks',              'Optional', 'Free-text notes about the transaction',                                         'Used during scheduled maintenance'],
+    ['Reference',            'Optional', 'Work Order or Purchase Order number linked to this event',                      '601.001.WO-2024-01'],
+    ['Port/Place',           'Optional', 'Port or location where the transaction took place',                             'Singapore'],
+    ['Timezone',             'Optional', 'Timezone string (e.g. Asia/Singapore). Omit to use UTC.',                      'Asia/Singapore'],
+    ['Component Spare Code', 'Optional', 'Spare code as registered against the component (e.g. SP-601.001.AA-001)',       'SP-601.001.AA-001'],
+    ['', '', '', ''],
+    ['--- NOTES ---', '', '', ''],
+    ['Date format',   '', 'Use DD-MMM-YYYY (e.g. 15-NOV-2024). Month must be a 3-letter abbreviation.',  ''],
+    ['Event Type',    '', 'Accepted values: CONSUME | RECEIVE | ADJUST (case-sensitive, uppercase)',      ''],
+    ['Quantity sign', '', 'Always enter a positive number. The system applies the correct sign automatically (CONSUME → negative qtyChange, RECEIVE/ADJUST → positive).', ''],
+    ['ROB After',     '', 'This is the balance AFTER the event, not the change. You must supply it — the system cannot auto-compute it from historical events.', ''],
+    ['Red headers',   '', 'Columns with red header text are REQUIRED. Rows missing required fields will be rejected during dry-run validation.', ''],
+    ['Import mode',   '', 'Use "Add Only" to load history without risk of overwriting. All rows create new history records.', ''],
+    ['Current ROB',   '', 'This import does NOT change the spare\'s current ROB balance. It only adds records to the transaction history ledger.', ''],
+  ];
+
+  instrRows.forEach(([field, required, description, example]) => {
+    instrSheet.addRow({ field, required, description, example });
+  });
+
+  const buf = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buf);
+}

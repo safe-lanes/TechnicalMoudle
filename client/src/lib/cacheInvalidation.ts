@@ -126,6 +126,9 @@ export function invalidateAfterBulkImport(type: string, vesselId?: string) {
         predicate: (query) => queryKeyMatchesPrefix(query.queryKey, '/technical/api/maintenance-history')
       });
       break;
+    case 'spare-history':
+      invalidateSpares(vesselId);
+      break;
     default:
       invalidateAll(vesselId);
   }
