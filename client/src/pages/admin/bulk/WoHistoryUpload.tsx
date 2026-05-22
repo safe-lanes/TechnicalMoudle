@@ -15,6 +15,11 @@ const FIELD_MAPPINGS = [
   { field: "Remarks",                    required: false, description: "Any observations, findings, or follow-up notes" },
   { field: "Next Due Date",              required: false, description: "Next scheduled maintenance date (DD-MMM-YYYY)" },
   { field: "Spare Parts Used",           required: false, description: "List of spare parts used (comma-separated part codes)" },
+  { field: "Job Approved By",            required: false, description: "Name or rank of person who approved the work order" },
+  { field: "WO Due Date",               required: false, description: "Date the work order was due (DD-MMM-YYYY)" },
+  { field: "WO Due Hour",               required: false, description: "Running hours at which the work order became due" },
+  { field: "Next Due Hour",             required: false, description: "Running hours at which the next maintenance is due" },
+  { field: "Status",                    required: false, description: "WO status: Completed, Due, Overdue, Postponed, Pending Approval, Active" },
 ];
 
 const HISTORY_TYPES = [

@@ -1092,6 +1092,11 @@ export async function generateWoHistoryTemplate(): Promise<Buffer> {
     { header: 'Remarks',                      key: 'remarks',         width: 40 },
     { header: 'Next Due Date',                key: 'nextDueDate',     width: 18 },
     { header: 'Spare Parts Used',             key: 'sparePartsUsed',  width: 40 },
+    { header: 'Job Approved By',              key: 'jobApprovedBy',   width: 25 },
+    { header: 'WO Due Date',                  key: 'woDueDate',       width: 18 },
+    { header: 'WO Due Hour',                  key: 'woDueHour',       width: 16 },
+    { header: 'Next Due Hour',                key: 'nextDueHour',     width: 16 },
+    { header: 'Status',                       key: 'status',          width: 20 },
   ];
 
   // Style header row — bold; required columns (1–6) get red text
@@ -1114,6 +1119,15 @@ export async function generateWoHistoryTemplate(): Promise<Buffer> {
     };
   }
 
+  // Dropdown validation for Status (col 17)
+  for (let row = 2; row <= 1000; row++) {
+    woSheet.getCell(row, 17).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ['"Completed,Due,Overdue,Postponed,Pending Approval,Active"'],
+    };
+  }
+
   // Sample data row
   woSheet.addRow({
     woNumber:       '601.001.WO-2024-01',
@@ -1128,6 +1142,11 @@ export async function generateWoHistoryTemplate(): Promise<Buffer> {
     remarks:        'Completed without issues. Oil sample sent for analysis.',
     nextDueDate:    '15-MAY-2025',
     sparePartsUsed: 'OIL-FILTER-001, GASKET-001',
+    jobApprovedBy:  'Chief Engineer',
+    woDueDate:      '10-NOV-2024',
+    woDueHour:      8200,
+    nextDueHour:    9200,
+    status:         'Completed',
   });
 
   // ── Sheet 2: Instructions ──────────────────────────
@@ -1153,6 +1172,11 @@ export async function generateWoHistoryTemplate(): Promise<Buffer> {
     ['Remarks',                    'Optional', 'Observations, findings, or follow-up notes',                         'Oil sample sent for analysis'],
     ['Next Due Date',              'Optional', 'Next scheduled maintenance date — use DD-MMM-YYYY format',           '15-MAY-2025'],
     ['Spare Parts Used',           'Optional', 'Comma-separated part codes of spare parts consumed',                 'OIL-FILTER-001, GASKET-001'],
+    ['Job Approved By',            'Optional', 'Name or rank of person who approved the work order',                 'Chief Engineer'],
+    ['WO Due Date',                'Optional', 'Date the work order was due — use DD-MMM-YYYY format',              '10-NOV-2024'],
+    ['WO Due Hour',                'Optional', 'Running hours at which the work order became due (numeric)',         '8200'],
+    ['Next Due Hour',              'Optional', 'Running hours at which the next maintenance is due (numeric)',       '9200'],
+    ['Status',                     'Optional', 'One of: Completed, Due, Overdue, Postponed, Pending Approval, Active', 'Completed'],
     ['', '', '', ''],
     ['--- NOTES ---', '', '', ''],
     ['Date format',              '', 'Use DD-MMM-YYYY (e.g. 15-NOV-2024). Month must be 3-letter abbreviation.',    ''],
