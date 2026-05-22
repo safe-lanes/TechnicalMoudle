@@ -1960,7 +1960,7 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-sm">
                       {viewModes.company === "edit" ? (
                         <Select 
-                          value={cert.companyGroup || "__none__"}
+                          value={cert.companyGroup || undefined}
                           onValueChange={(value) => {
                             const normalized = value === "__none__" ? "" : value;
                             if (isCompanyOnly) {
@@ -2028,7 +2028,7 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-sm">
                       <div className="flex items-center gap-2">
                         <Select 
-                          value={newCompanyEntryData.companyGroup || "__none__"}
+                          value={newCompanyEntryData.companyGroup || undefined}
                           onValueChange={(value) => setNewCompanyEntryData(prev => ({ ...prev, companyGroup: value === "__none__" ? "" : value }))}
                         >
                           <SelectTrigger className="h-8 text-sm flex-1" data-testid="select-new-company-group">
@@ -2390,7 +2390,7 @@ export default function ShipsCertificatesAdmin() {
                       <td className="px-3 py-3 text-sm">
                         {viewModes.vessel === "edit" ? (
                           <Select 
-                            value={cert.companyGroup || "__none__"}
+                            value={cert.companyGroup || undefined}
                             onValueChange={(value) => {
                               const normalized = value === "__none__" ? "" : value;
                               setVesselOnlyCerts(prev => prev.map(c => 
@@ -2453,7 +2453,7 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-sm">
                       <div className="flex items-center gap-2">
                         <Select 
-                          value={newVesselEntryData.companyGroup || "__none__"}
+                          value={newVesselEntryData.companyGroup || undefined}
                           onValueChange={(value) => setNewVesselEntryData(prev => ({ ...prev, companyGroup: value === "__none__" ? "" : value }))}
                         >
                           <SelectTrigger className="h-8 text-sm flex-1" data-testid="select-new-vessel-group">
