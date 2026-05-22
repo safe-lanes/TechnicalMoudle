@@ -172,6 +172,21 @@ export default function UniformBulkUpload({
     setInternalHistorySubType(value);
     onHistorySubTypeChange?.(value);
   };
+
+  // Derive the effective import type from templateType + selectedHistorySubType.
+  // When the user picks a history sub-type other than 'work-order', the effective type
+  // changes so template downloads, dry-runs, imports, and cache keys all target the
+  // correct backend handler instead of the default wo-history handler.
+  const effectiveType: string = (() => {
+    if (templateType === 'wo-history' && selectedHistorySubType === 'spares') return 'spare-history';
+    return templateType;
+  })();
+
+  // Effective template filename matching the effective type
+  const effectiveTemplateFileName: string = (() => {
+    if (effectiveType === 'spare-history') return 'spare_history_template.xlsx';
+    return templateFileName;
+  })();
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -200,9 +215,9 @@ export default function UniformBulkUpload({
   const { consumeStream } = useImportStream();
 
   const { data: historyData, isLoading: historyLoading } = useQuery<{items: ImportHistory[], total: number}>({
-    queryKey: ['/technical/api/bulk/history', templateType],
+    queryKey: ['/technical/api/bulk/history', effectiveType],
     queryFn: async () => {
-      const response = await fetch(`/technical/api/bulk/history?type=${templateType}&limit=50`);
+      const response = await fetch(`/technical/api/bulk/history?type=${effectiveType}&limit=50`);
       if (!response.ok) throw new Error('Failed to fetch history');
       return response.json();
     }
@@ -213,8 +228,8 @@ export default function UniformBulkUpload({
   const handleDownloadTemplate = async () => {
     try {
       const templateUrl = vesselId 
-        ? `/technical/api/bulk/template?type=${templateType}&vesselId=${vesselId}`
-        : `/technical/api/bulk/template?type=${templateType}`;
+        ? `/technical/api/bulk/template?type=${effectiveType}&vesselId=${vesselId}`
+        : `/technical/api/bulk/template?type=${effectiveType}`;
       const response = await fetch(templateUrl);
       if (!response.ok) throw new Error('Failed to download template');
       
@@ -222,7 +237,7 @@ export default function UniformBulkUpload({
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = templateFileName;
+      a.download = effectiveTemplateFileName;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -343,7 +358,7 @@ export default function UniformBulkUpload({
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('type', templateType);
+    formData.append('type', effectiveType);
     formData.append('mode', importMode);
     if (vesselId) {
       formData.append('vesselId', vesselId);
@@ -421,7 +436,7 @@ export default function UniformBulkUpload({
 
     const requestBody: any = {
       fileToken: dryRunResult.fileToken,
-      type: templateType,
+      type: effectiveType,
       mode: importMode,
       vesselId: vesselId,
       archiveMissing: false,
@@ -470,8 +485,8 @@ export default function UniformBulkUpload({
 
             setPartialImportDialogOpen(false);
 
-            queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', templateType] });
-            invalidateAfterBulkImport(templateType, vesselId);
+            queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', effectiveType] });
+            invalidateAfterBulkImport(effectiveType, vesselId);
 
             if (onRefreshData) {
               onRefreshData();
@@ -647,10 +662,10 @@ export default function UniformBulkUpload({
         description: `Deleted: ${result.deleted}, Restored: ${result.restored}, Unarchived: ${result.unarchived}`
       });
       
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', templateType] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', effectiveType] });
       
       // Invalidate domain-specific caches after undo
-      invalidateAfterBulkImport(templateType, vesselId);
+      invalidateAfterBulkImport(effectiveType, vesselId);
       
       if (onRefreshData) {
         onRefreshData();

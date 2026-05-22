@@ -968,9 +968,10 @@ export async function validateData(type: string, data: any[], mode: string, vess
       if (quantity === undefined || quantity === null || String(quantity).trim() === '') {
         errors.push(`Row ${rowNum}: Quantity is required`);
       } else {
-        const qtyNum = parseInt(String(quantity), 10);
-        if (isNaN(qtyNum) || qtyNum < 0) {
-          errors.push(`Row ${rowNum}: Quantity must be a non-negative integer`);
+        const qtyStr = String(quantity).trim();
+        const qtyNum = Number(qtyStr);
+        if (!Number.isInteger(qtyNum) || qtyNum < 0 || isNaN(qtyNum)) {
+          errors.push(`Row ${rowNum}: Quantity must be a non-negative integer (got '${qtyStr}')`);
         } else {
           normalized['Quantity'] = qtyNum;
         }
@@ -980,9 +981,10 @@ export async function validateData(type: string, data: any[], mode: string, vess
       if (robAfter === undefined || robAfter === null || String(robAfter).trim() === '') {
         errors.push(`Row ${rowNum}: ROB After is required`);
       } else {
-        const robNum = parseInt(String(robAfter), 10);
-        if (isNaN(robNum) || robNum < 0) {
-          errors.push(`Row ${rowNum}: ROB After must be a non-negative integer`);
+        const robStr = String(robAfter).trim();
+        const robNum = Number(robStr);
+        if (!Number.isInteger(robNum) || robNum < 0 || isNaN(robNum)) {
+          errors.push(`Row ${rowNum}: ROB After must be a non-negative integer (got '${robStr}')`);
         } else {
           normalized['ROB After'] = robNum;
         }
