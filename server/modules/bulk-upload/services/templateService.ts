@@ -1069,3 +1069,102 @@ export async function generateSparesTemplate(vesselId: string): Promise<Buffer> 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }
+
+// =====================================================
+// WO HISTORY TEMPLATE GENERATOR
+// =====================================================
+
+export async function generateWoHistoryTemplate(): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+
+  // ── Sheet 1: WO History (data entry) ──────────────
+  const woSheet = workbook.addWorksheet('WO History');
+  woSheet.columns = [
+    { header: 'WO Number',                    key: 'woNumber',        width: 25 },
+    { header: 'Component Code',               key: 'componentCode',   width: 20 },
+    { header: 'Job Title',                    key: 'jobTitle',        width: 40 },
+    { header: 'Maintenance Type',             key: 'maintenanceType', width: 20 },
+    { header: 'Date Completed',               key: 'dateCompleted',   width: 18 },
+    { header: 'Performed By',                 key: 'performedBy',     width: 25 },
+    { header: 'WO Description',               key: 'woDescription',   width: 50 },
+    { header: 'Duration Hours',               key: 'durationHours',   width: 16 },
+    { header: 'Running Hours at Completion',  key: 'rhAtCompletion',  width: 25 },
+    { header: 'Remarks',                      key: 'remarks',         width: 40 },
+    { header: 'Next Due Date',                key: 'nextDueDate',     width: 18 },
+    { header: 'Spare Parts Used',             key: 'sparePartsUsed',  width: 40 },
+  ];
+
+  // Style header row — bold; required columns (1–6) get red text
+  woSheet.getRow(1).font = { bold: true };
+  woSheet.getRow(1).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFD0E4F7' },
+  };
+  [1, 2, 3, 4, 5, 6].forEach(col => {
+    woSheet.getRow(1).getCell(col).font = { bold: true, color: { argb: 'FFCC0000' } };
+  });
+
+  // Dropdown validation for Maintenance Type (col 4)
+  for (let row = 2; row <= 1000; row++) {
+    woSheet.getCell(row, 4).dataValidation = {
+      type: 'list',
+      allowBlank: false,
+      formulae: ['"Planned,Unplanned,Condition-Based"'],
+    };
+  }
+
+  // Sample data row
+  woSheet.addRow({
+    woNumber:       '601.001.WO-2024-01',
+    componentCode:  '601.001.AA',
+    jobTitle:       'Main Engine Oil Change',
+    maintenanceType:'Planned',
+    dateCompleted:  '15-NOV-2024',
+    performedBy:    'Chief Engineer',
+    woDescription:  'Routine oil change as per PMS schedule',
+    durationHours:  3,
+    rhAtCompletion: 8250,
+    remarks:        'Completed without issues. Oil sample sent for analysis.',
+    nextDueDate:    '15-MAY-2025',
+    sparePartsUsed: 'OIL-FILTER-001, GASKET-001',
+  });
+
+  // ── Sheet 2: Instructions ──────────────────────────
+  const instrSheet = workbook.addWorksheet('Instructions');
+  instrSheet.columns = [
+    { header: 'Field',       key: 'field',       width: 30 },
+    { header: 'Required',    key: 'required',    width: 12 },
+    { header: 'Description', key: 'description', width: 70 },
+    { header: 'Example',     key: 'example',     width: 40 },
+  ];
+  instrSheet.getRow(1).font = { bold: true };
+
+  const rows = [
+    ['WO Number',                  'Required', 'Unique work order number',                                             '601.001.WO-2024-01'],
+    ['Component Code',             'Required', 'Equipment component code — must exist in the vessel register',        '601.001.AA'],
+    ['Job Title',                  'Required', 'Title of the maintenance job performed',                              'Main Engine Oil Change'],
+    ['Maintenance Type',           'Required', 'One of: Planned, Unplanned, Condition-Based',                        'Planned'],
+    ['Date Completed',             'Required', 'Date work was completed — use DD-MMM-YYYY format',                   '15-NOV-2024'],
+    ['Performed By',               'Required', 'Name or rank of person who performed the work',                      'Chief Engineer'],
+    ['WO Description',             'Optional', 'Detailed description of the work carried out',                       'Routine oil change per PMS schedule'],
+    ['Duration Hours',             'Optional', 'Time taken to complete the work (decimal hours)',                     '3.5'],
+    ['Running Hours at Completion','Optional', 'Component running hours recorded at time of completion',              '8250'],
+    ['Remarks',                    'Optional', 'Observations, findings, or follow-up notes',                         'Oil sample sent for analysis'],
+    ['Next Due Date',              'Optional', 'Next scheduled maintenance date — use DD-MMM-YYYY format',           '15-MAY-2025'],
+    ['Spare Parts Used',           'Optional', 'Comma-separated part codes of spare parts consumed',                 'OIL-FILTER-001, GASKET-001'],
+    ['', '', '', ''],
+    ['--- NOTES ---', '', '', ''],
+    ['Date format',              '', 'Use DD-MMM-YYYY (e.g. 15-NOV-2024). Month must be 3-letter abbreviation.',    ''],
+    ['Maintenance Type',         '', 'Accepted values: Planned | Unplanned | Condition-Based (case-sensitive)',     ''],
+    ['Red column headers',       '', 'Columns with red header text are REQUIRED. Rows missing required fields will be rejected.', ''],
+    ['Import mode',              '', 'Use "Add Only" to load history without overwriting existing completed records.', ''],
+  ];
+
+  rows.forEach(([field, required, description, example]) => {
+    instrSheet.addRow({ field, required, description, example });
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}

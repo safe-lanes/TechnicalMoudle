@@ -15,11 +15,12 @@ import FleetJobsUpload from "./bulk/FleetJobsUpload";
 import FleetSparesUpload from "./bulk/FleetSparesUpload";
 import MasterListsUpload from "./bulk/MasterListsUpload";
 import LocationsUpload from "./bulk/LocationsUpload";
+import WoHistoryUpload from "./bulk/WoHistoryUpload";
 import BulkImportHistory from "./bulk/BulkImportHistory";
 import { useVessels } from "@/hooks/useVessels";
 import { useUIRole } from "@/contexts/UIRoleContext";
 
-type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs' | 'locations';
+type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs' | 'locations' | 'wo-history';
 type FleetTemplateType = 'maker-list' | 'fleet-component' | 'fleet-jobs' | 'fleet-spares' | 'master-list';
 type ViewMode = 'upload' | 'history';
 
@@ -207,12 +208,41 @@ const LOCATIONS_PAGE_MARKERS: PageMarkers = {
   dropZone: "I1.6E.26",
 };
 
+const WO_HISTORY_PAGE_MARKERS: PageMarkers = {
+  templatesHeader: "I1.6F.6",
+  templateMachinery: "I1.6F.6A",
+  templateJobs: "I1.6F.6B",
+  templateSpares: "I1.6F.6C",
+  templateStores: "I1.6F.6D",
+  vesselLabel: "I1.6F.7",
+  vesselDropdown: "I1.6F.8",
+  newVesselButton: "I1.6F.9",
+  fleetToggle: "I1.6F.10",
+  infoText: "I1.6F.11",
+  historyButton: "I1.6F.12",
+  uploadHeader: "I1.6F.13",
+  uploadDescription: "I1.6F.14",
+  downloadTemplate: "I1.6F.15",
+  tabUpload: "I1.6F.16",
+  tabMapping: "I1.6F.17",
+  tabHistory: "I1.6F.18",
+  importModeSection: "I1.6F.19",
+  importModeLabel: "I1.6F.20",
+  radioAddOnly: "I1.6F.21",
+  radioUpdateOnly: "I1.6F.22",
+  radioUpsert: "I1.6F.23",
+  uploadSection: "I1.6F.24",
+  uploadDescription2: "I1.6F.25",
+  dropZone: "I1.6F.26",
+};
+
 const PAGE_MARKERS_BY_TEMPLATE: Record<VesselTemplateType, PageMarkers> = {
   machinery: MACHINERY_PAGE_MARKERS,
   jobs: JOBS_PAGE_MARKERS,
   spares: SPARES_PAGE_MARKERS,
   stores: STORES_PAGE_MARKERS,
   locations: LOCATIONS_PAGE_MARKERS,
+  'wo-history': WO_HISTORY_PAGE_MARKERS,
 };
 
 export default function BulkDataImport() {
@@ -226,6 +256,7 @@ export default function BulkDataImport() {
   const [selectedFleetTemplate, setSelectedFleetTemplate] = useState<FleetTemplateType>('maker-list');
   const [selectedVessel, setSelectedVessel] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('upload');
+  const [selectedHistorySidebarType, setSelectedHistorySidebarType] = useState<string>('');
 
   const vesselTemplates = [
     { id: 'machinery' as VesselTemplateType, number: 1, name: 'Machinery Components' },
@@ -297,6 +328,7 @@ export default function BulkDataImport() {
                 'spares': currentMarkers.templateSpares,
                 'stores': currentMarkers.templateStores,
                 'locations': `${currentMarkers.templatesHeader}-locations`,
+                'wo-history': `${currentMarkers.templatesHeader}-wo-history`,
               };
               const markerId = !isFleetMode ? templateMarkerMap[template.id as VesselTemplateType] : undefined;
               const isLast = index === currentTemplates.length - 1;
@@ -321,6 +353,34 @@ export default function BulkDataImport() {
               );
             })}
           </div>
+
+          {/* History Section — below Templates (vessel mode only) */}
+          {!isFleetMode && (
+            <div className="border-t border-gray-200">
+              <div className="bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm" data-testid="I1.6F.sidebar-header">
+                HISTORY
+              </div>
+              <div className="px-3 py-3 space-y-2">
+                <p className="text-xs text-gray-500 font-medium">History Type</p>
+                <Select
+                  value={selectedHistorySidebarType}
+                  onValueChange={(value) => {
+                    setSelectedHistorySidebarType(value);
+                    setSelectedVesselTemplate('wo-history');
+                  }}
+                >
+                  <SelectTrigger className="w-full text-sm h-8" data-testid="I1.6F.sidebar-dropdown">
+                    <SelectValue placeholder="Select type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="work-order">Work Order</SelectItem>
+                    <SelectItem value="spares">Spares</SelectItem>
+                    <SelectItem value="stores">Stores</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -400,6 +460,8 @@ export default function BulkDataImport() {
               <StoresUpload vesselId={selectedVessel} markers={currentMarkers} />
             ) : selectedVesselTemplate === 'locations' ? (
               <LocationsUpload vesselId={selectedVessel} />
+            ) : selectedVesselTemplate === 'wo-history' ? (
+              <WoHistoryUpload vesselId={selectedVessel} markers={currentMarkers} />
             ) : (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">

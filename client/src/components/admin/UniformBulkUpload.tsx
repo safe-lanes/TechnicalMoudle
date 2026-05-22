@@ -51,7 +51,8 @@ import {
   ChevronsRight,
   ChevronDown,
   ChevronUp,
-  Info
+  Info,
+  History
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -132,12 +133,13 @@ interface UniformBulkUploadProps {
   title: string;
   description: string;
   icon: LucideIcon;
-  templateType: 'components' | 'jobs' | 'spares' | 'stores' | 'makers' | 'fleet-components' | 'fleet-jobs' | 'fleet-spares';
+  templateType: 'components' | 'jobs' | 'spares' | 'stores' | 'makers' | 'fleet-components' | 'fleet-jobs' | 'fleet-spares' | 'wo-history';
   templateFileName: string;
   fieldMappings: FieldMapping[];
   vesselId?: string;
   previewColumns?: string[];
   storeTypes?: StoreTypeOption[];
+  historySubTypes?: StoreTypeOption[];
   onRefreshData?: () => void;
   markers?: MarkerConfig;
 }
@@ -152,6 +154,7 @@ export default function UniformBulkUpload({
   vesselId,
   previewColumns,
   storeTypes,
+  historySubTypes,
   onRefreshData,
   markers
 }: UniformBulkUploadProps) {
@@ -159,6 +162,7 @@ export default function UniformBulkUpload({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<'add' | 'update' | 'upsert'>('upsert');
   const [selectedStoreType, setSelectedStoreType] = useState<string>('');
+  const [selectedHistorySubType, setSelectedHistorySubType] = useState<string>('work-order');
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -699,6 +703,7 @@ export default function UniformBulkUpload({
   };
 
   const isStoresAndNoType = templateType === 'stores' && !selectedStoreType;
+  const isHistoryComingSoon = historySubTypes !== undefined && selectedHistorySubType !== 'work-order';
 
   return (
     <div className="space-y-6">
@@ -762,8 +767,42 @@ export default function UniformBulkUpload({
               </CardContent>
             </Card>
           )}
+          {historySubTypes && (
+            <Card data-testid="history-type-section">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base" data-testid="history-type-label">
+                  History Type <span className="text-red-500">*</span>
+                </CardTitle>
+                <CardDescription>Select the type of historical data to import</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Select value={selectedHistorySubType} onValueChange={setSelectedHistorySubType}>
+                  <SelectTrigger className="w-64" data-testid="select-history-type">
+                    <SelectValue placeholder="Select history type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {historySubTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+          )}
 
-          <Card className={isStoresAndNoType ? 'opacity-50 pointer-events-none' : ''} data-testid={markers?.importModeSection || "import-mode-section"}>
+          {isHistoryComingSoon && (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-16">
+                <History className="h-16 w-16 text-gray-300 mb-4" />
+                <h3 className="text-lg font-semibold text-gray-500 mb-2">Coming Soon</h3>
+                <p className="text-sm text-gray-400 text-center max-w-sm">
+                  Historical import for this type is not yet available. Please select <strong>Work Order</strong> to import WO history.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className={`${isStoresAndNoType ? 'opacity-50 pointer-events-none' : ''} ${isHistoryComingSoon ? 'hidden' : ''}`} data-testid={markers?.importModeSection || "import-mode-section"}>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Import Mode</CardTitle>
               <CardDescription data-testid={markers?.importModeLabel || "import-mode-label"}>
@@ -801,7 +840,7 @@ export default function UniformBulkUpload({
             </CardContent>
           </Card>
 
-          <Card className={isStoresAndNoType ? 'opacity-50 pointer-events-none' : ''}>
+          <Card className={`${isStoresAndNoType ? 'opacity-50 pointer-events-none' : ''} ${isHistoryComingSoon ? 'hidden' : ''}`}>
             <CardHeader className="pb-3">
               <CardTitle className="text-base" data-testid={markers?.uploadSection || "upload-section"}>
                 Upload File

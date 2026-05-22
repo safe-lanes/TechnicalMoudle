@@ -30,7 +30,7 @@ import {
   resetDynamicComponentCategories,
   getEffectiveComponentCategories
 } from '../services/helpers';
-import { generateFleetMasterTemplate, generateWorkOrdersTemplate, generateJobsTemplate, generateSparesTemplate } from '../services/templateService';
+import { generateFleetMasterTemplate, generateWorkOrdersTemplate, generateJobsTemplate, generateSparesTemplate, generateWoHistoryTemplate } from '../services/templateService';
 import { validateData } from '../services/validationService';
 import { performImport, storeImportHistory } from '../services/importService';
 import { getImportHistory, getHistoryFile } from '../services/historyService';
@@ -98,8 +98,22 @@ export async function getTemplate(req: Request, res: Response) {
     }
   }
   
+  // wo-history has its own generator — handle before the XLSX path
+  if (type === 'wo-history') {
+    try {
+      const buffer = await generateWoHistoryTemplate();
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="wo_history_template.xlsx"');
+      res.send(buffer);
+      return;
+    } catch (error) {
+      console.error('Error generating wo-history template:', error);
+      return res.status(500).json({ error: 'Failed to generate WO history template' });
+    }
+  }
+
   if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers', 'fleet-components', 'fleet-jobs', 'fleet-spares'].includes(type as string)) {
-    return res.status(400).json({ error: 'Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-components, fleet-jobs, fleet-spares' });
+    return res.status(400).json({ error: 'Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-components, fleet-jobs, fleet-spares, wo-history' });
   }
   
   // Default to V001 if no vesselId provided
