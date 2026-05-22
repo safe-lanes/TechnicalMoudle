@@ -79,6 +79,25 @@ export async function validateData(type: string, data: any[], mode: string, vess
     }
     
     const fieldValue = row[primaryField];
+
+    // For spare-history: a row that is missing Part Code but has other data (e.g. Event Type,
+    // Quantity, Date) must pass through so the per-row validator can emit a "Part Code is required"
+    // error. Only truly empty rows (no data in any relevant field) should be silently dropped.
+    if (type === 'spare-history') {
+      const spareHistoryDataFields = ['Event Type', 'Quantity', 'ROB After', 'Date', 'Performed By', 'Remarks', 'Reference', 'Port/Place'];
+      const hasOtherData = spareHistoryDataFields.some(f => {
+        const v = row[f];
+        return v !== undefined && v !== null && String(v).trim() !== '';
+      });
+      const partCodePresent = fieldValue && String(fieldValue).trim() !== '';
+      if (!partCodePresent && !hasOtherData) {
+        // Completely blank row — skip silently
+        return false;
+      }
+      // Row has some data: include it so the validator can emit per-row errors
+      return true;
+    }
+
     if (!fieldValue) {
       console.log(`[${type}] Row ${index + 2}: Skipping - no ${primaryField} value`);
       return false; // Skip empty rows
