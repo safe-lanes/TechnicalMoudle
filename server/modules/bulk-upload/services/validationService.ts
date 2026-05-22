@@ -207,6 +207,22 @@ export async function validateData(type: string, data: any[], mode: string, vess
     });
   }
   
+  // Pre-load vessel spares for spare-history Part Code validation
+  const vesselSparesByPartCode = new Map<string, any>();
+  if (type === 'spare-history' && vesselId) {
+    try {
+      const vesselSpares = await storage.getSpares(vesselId);
+      vesselSpares.forEach((s: any) => {
+        if (s.partCode) {
+          vesselSparesByPartCode.set(String(s.partCode).trim(), s);
+        }
+      });
+      console.log(`📋 Loaded ${vesselSparesByPartCode.size} spares for vessel '${vesselId}' (spare-history validation)`);
+    } catch (err) {
+      console.warn('⚠️ Could not pre-load vessel spares for spare-history validation:', err);
+    }
+  }
+
   let existingMakersByCode = new Map<string, any>();
   let existingMakersByName = new Map<string, any>();
   let makerListLoaded = false;
@@ -927,7 +943,12 @@ export async function validateData(type: string, data: any[], mode: string, vess
       if (!partCode || String(partCode).trim() === '') {
         errors.push(`Row ${rowNum}: Part Code is required`);
       } else {
-        normalized['Part Code'] = String(partCode).trim();
+        const partCodeStr = String(partCode).trim();
+        normalized['Part Code'] = partCodeStr;
+        // Verify the part code exists in this vessel's spares register
+        if (vesselSparesByPartCode.size > 0 && !vesselSparesByPartCode.has(partCodeStr)) {
+          errors.push(`Row ${rowNum}: Part Code '${partCodeStr}' not found in vessel's spares register`);
+        }
       }
 
       const eventType = row['Event Type'];
