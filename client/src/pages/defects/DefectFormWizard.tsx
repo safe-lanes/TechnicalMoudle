@@ -327,12 +327,14 @@ export default function DefectFormWizard({
     const vesselId = data.vesselId?.trim() || '';
     const issueDate = data.issueDate?.trim() || '';
     const description = data.description?.trim() || '';
-    
-    if (!vesselId || !issueDate || !description) {
+    const componentId = data.componentId?.trim() || '';
+
+    if (!vesselId || !issueDate || !description || !componentId) {
       const missingFields: string[] = [];
       if (!vesselId) missingFields.push('Vessel');
       if (!issueDate) missingFields.push('Date Observed');
       if (!description) missingFields.push('Description');
+      if (!componentId) missingFields.push('Component');
       
       toast({ 
         title: "Required fields missing", 
@@ -941,7 +943,7 @@ export default function DefectFormWizard({
                     </div>
 
                     <div className="flex flex-col">
-                      <label className="text-sm text-gray-600 mb-1.5">Component</label>
+                      <label className="text-sm text-gray-600 mb-1.5">Component<span className="text-red-500">*</span></label>
                       <VesselComponentCombobox
                         vesselId={form.watch('vesselId') || ""}
                         selectedId={form.watch('componentHardwareId') || ""}
