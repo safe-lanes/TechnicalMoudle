@@ -1173,26 +1173,40 @@ const Dashboard = () => {
   const activeOverdueToday = useMemo(() => {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
+    const thirtyDaysAgo = new Date(startOfToday);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const isOpen = (wo: EnrichedWorkOrder) =>
       !!wo && !wo.isExecution && wo.computedStatus !== 'Completed';
 
+    const getDue = (wo: EnrichedWorkOrder): Date | null => {
+      if (!wo.dueDate) return null;
+      const due = new Date(wo.dueDate as unknown as string);
+      return isNaN(due.getTime()) ? null : due;
+    };
+
     const isCurrentOverdue = (wo: EnrichedWorkOrder) => {
       if (!isOpen(wo)) return false;
-      if (!wo.dueDate) return false;
-      const due = new Date(wo.dueDate as unknown as string);
-      if (isNaN(due.getTime())) return false;
-      return due < startOfToday;
+      const due = getDue(wo);
+      return !!due && due < startOfToday;
+    };
+
+    const isOver30 = (wo: EnrichedWorkOrder) => {
+      if (!isOpen(wo)) return false;
+      const due = getDue(wo);
+      return !!due && due < thirtyDaysAgo;
     };
 
     const allOpen = (filteredWorkOrdersData as EnrichedWorkOrder[]).filter(isOpen);
     const allCurrentOverdue = (filteredWorkOrdersData as EnrichedWorkOrder[]).filter(isCurrentOverdue);
+    const allOver30Full = (filteredWorkOrdersData as EnrichedWorkOrder[]).filter(isOver30);
 
     const criticalSet = (workOrdersData as EnrichedWorkOrder[]).filter(
       wo => (wo?.criticality ?? '').toLowerCase() === 'yes'
     );
     const criticalOpen = criticalSet.filter(isOpen);
     const criticalCurrentOverdue = criticalSet.filter(isCurrentOverdue);
+    const criticalOver30Full = criticalSet.filter(isOver30);
 
     const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
 
@@ -1201,10 +1215,14 @@ const Dashboard = () => {
       allOverdueFull: allCurrentOverdue,
       allOpen: allOpen.length,
       allPercent: pct(allCurrentOverdue.length, allOpen.length),
+      allOver30: allOver30Full.length,
+      allOver30Full,
       criticalOverdue: criticalCurrentOverdue.length,
       criticalOverdueFull: criticalCurrentOverdue,
       criticalOpen: criticalOpen.length,
       criticalPercent: pct(criticalCurrentOverdue.length, criticalOpen.length),
+      criticalOver30: criticalOver30Full.length,
+      criticalOver30Full,
     };
   }, [filteredWorkOrdersData, workOrdersData]);
 
@@ -2699,6 +2717,20 @@ const Dashboard = () => {
                             onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - All Equipment', workOrders: activeOverdueToday.allOverdueFull })}
                             testId="gauge-overdue-wo"
                           />
+                          {activeOverdueToday.allOver30 > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setWoListModal({ open: true, title: 'Work Orders >30 Days Overdue - All Equipment', workOrders: activeOverdueToday.allOver30Full });
+                              }}
+                              data-testid="badge-30d-overdue-all"
+                              className="mt-1 mx-auto flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 hover:bg-red-100 border border-red-200 text-[11px] font-medium text-[#e74c3c] focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+                            >
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#e74c3c]" />
+                              {activeOverdueToday.allOver30} WO &gt;30 days overdue
+                            </button>
+                          )}
                         </div>
                       </TooltipTrigger>
                       <TooltipContent side="top" data-testid="tooltip-active-od-formula-all">
@@ -2780,6 +2812,20 @@ const Dashboard = () => {
                             onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - Critical Equipment', workOrders: activeOverdueToday.criticalOverdueFull })}
                             testId="gauge-overdue-wo-critical"
                           />
+                          {activeOverdueToday.criticalOver30 > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setWoListModal({ open: true, title: 'Work Orders >30 Days Overdue - Critical Equipment', workOrders: activeOverdueToday.criticalOver30Full });
+                              }}
+                              data-testid="badge-30d-overdue-critical"
+                              className="mt-1 mx-auto flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 hover:bg-red-100 border border-red-200 text-[11px] font-medium text-[#e74c3c] focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+                            >
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#e74c3c]" />
+                              {activeOverdueToday.criticalOver30} WO &gt;30 days overdue
+                            </button>
+                          )}
                         </div>
                       </TooltipTrigger>
                       <TooltipContent side="top" data-testid="tooltip-active-od-formula-critical">
