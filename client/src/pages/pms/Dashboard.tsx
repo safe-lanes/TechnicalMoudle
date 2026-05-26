@@ -1167,6 +1167,47 @@ const Dashboard = () => {
     : 0;
   const completionRate = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.completed / workOrderKPIs.total) * 100) : 0;
 
+  // "Active O/D W.O (Today)" gauges:
+  //   numerator   = open WOs whose dueDate < start of today
+  //   denominator = all open (non-completed, non-execution) WOs
+  const activeOverdueToday = useMemo(() => {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const isOpen = (wo: EnrichedWorkOrder) =>
+      !!wo && !wo.isExecution && wo.computedStatus !== 'Completed';
+
+    const isCurrentOverdue = (wo: EnrichedWorkOrder) => {
+      if (!isOpen(wo)) return false;
+      if (!wo.dueDate) return false;
+      const due = new Date(wo.dueDate as unknown as string);
+      if (isNaN(due.getTime())) return false;
+      return due < startOfToday;
+    };
+
+    const allOpen = (filteredWorkOrdersData as EnrichedWorkOrder[]).filter(isOpen);
+    const allCurrentOverdue = (filteredWorkOrdersData as EnrichedWorkOrder[]).filter(isCurrentOverdue);
+
+    const criticalSet = (workOrdersData as EnrichedWorkOrder[]).filter(
+      wo => (wo?.criticality ?? '').toLowerCase() === 'yes'
+    );
+    const criticalOpen = criticalSet.filter(isOpen);
+    const criticalCurrentOverdue = criticalSet.filter(isCurrentOverdue);
+
+    const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
+
+    return {
+      allOverdue: allCurrentOverdue.length,
+      allOverdueFull: allCurrentOverdue,
+      allOpen: allOpen.length,
+      allPercent: pct(allCurrentOverdue.length, allOpen.length),
+      criticalOverdue: criticalCurrentOverdue.length,
+      criticalOverdueFull: criticalCurrentOverdue,
+      criticalOpen: criticalOpen.length,
+      criticalPercent: pct(criticalCurrentOverdue.length, criticalOpen.length),
+    };
+  }, [filteredWorkOrdersData, workOrdersData]);
+
   const operationWOs = useMemo(() => {
     const filterExec = (wos: WorkOrder[]) => wos.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
     if (isAllVessels) return filterExec(workOrdersData);
@@ -2641,17 +2682,17 @@ const Dashboard = () => {
                 data-testid="column-wo-kpis"
               >
                 <div className="p-3">
-                  <div style={sectionHeaderBar} className="!pt-0 !pb-2">OVERDUE W.O - ALL EQPT.</div>
+                  <div style={sectionHeaderBar} className="!pt-0 !pb-2">Active O/D W.O (Today) - All Eqpt</div>
 
-                  {/* Row 1: Overdue WOs Gauge */}
+                  {/* Row 1: Active Overdue WOs Gauge (today vs all open) */}
                   <SemiCircleGauge
-                    value={workOrderKPIs.overdue}
-                    max={workOrderKPIs.total || 10}
+                    value={activeOverdueToday.allOverdue}
+                    max={activeOverdueToday.allOpen || 10}
                     color="#e74c3c"
-                    arcFillColor={overduePercent <= 1 ? '#FFEEAA' : '#e74c3c'}
-                    displayValue={`${overduePercent}%`}
-                    subtitle={`${workOrderKPIs.overdue} out of ${workOrderKPIs.total}`}
-                    onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - All Equipment', workOrders: workOrderKPIs.overdueFull })}
+                    arcFillColor={activeOverdueToday.allPercent <= 1 ? '#FFEEAA' : '#e74c3c'}
+                    displayValue={`${activeOverdueToday.allPercent}%`}
+                    subtitle={`${activeOverdueToday.allOverdue} out of ${activeOverdueToday.allOpen}`}
+                    onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - All Equipment', workOrders: activeOverdueToday.allOverdueFull })}
                     testId="gauge-overdue-wo"
                   />
 
@@ -2713,15 +2754,15 @@ const Dashboard = () => {
                   <div style={dividerH} />
 
                   {/* Row 3: Overdue WO Critical gauge */}
-                  <div style={subTitle} className="mb-1 mt-2">OVERDUE W.O - CRITICAL EQPT.</div>
+                  <div style={subTitle} className="mb-1 mt-2">Active O/D W.O (Today) - Critical Eqpt</div>
                   <SemiCircleGauge
-                    value={criticalWorkOrderKPIs.overdue}
-                    max={criticalWorkOrderKPIs.total || 10}
+                    value={activeOverdueToday.criticalOverdue}
+                    max={activeOverdueToday.criticalOpen || 10}
                     color="#e74c3c"
-                    arcFillColor={criticalOverduePercent <= 1 ? '#FFEEAA' : '#e74c3c'}
-                    displayValue={`${criticalOverduePercent}%`}
-                    subtitle={`${criticalWorkOrderKPIs.overdue} out of ${criticalWorkOrderKPIs.total}`}
-                    onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - Critical Equipment', workOrders: criticalWorkOrderKPIs.overdueFull })}
+                    arcFillColor={activeOverdueToday.criticalPercent <= 1 ? '#FFEEAA' : '#e74c3c'}
+                    displayValue={`${activeOverdueToday.criticalPercent}%`}
+                    subtitle={`${activeOverdueToday.criticalOverdue} out of ${activeOverdueToday.criticalOpen}`}
+                    onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - Critical Equipment', workOrders: activeOverdueToday.criticalOverdueFull })}
                     testId="gauge-overdue-wo-critical"
                   />
 
