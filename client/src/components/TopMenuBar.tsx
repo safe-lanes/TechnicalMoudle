@@ -8,7 +8,9 @@ import {
   Wrench,
   Shield,
   Anchor,
+  ShoppingCart,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 // ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
 import { NOON_MODULE_ENABLED } from "@/modules/noon-report/config";
 // ====== NOON REPORT MODULE NAV LINK — END ======
@@ -37,6 +39,7 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
 }) => {
   const { hasAnyChildAccess, isLoading: permissionsLoading } = usePermissions();
   const { isSailAdmin } = useUIRole();
+  const { toast } = useToast();
 
   const menuItems = [
     {
@@ -65,6 +68,22 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
       label: "Admin",
       icon: Shield,
     },
+    // ====== PURCHASING NAV LINK (placeholder) — START ======
+    // TODO: Once a menu-master row for "purchasing" exists, drop
+    // `bypassPermissionCheck` and let the standard
+    // `hasAnyChildAccess('purchasing')` filter gate visibility.
+    // Click handler currently shows a "Coming soon" toast — the real
+    // JWT-SSO redirect is wired in once the Purchasing integration URL
+    // and token contract are available. See the Purchasing section in
+    // replit.md for the planned integration shape.
+    {
+      id: "purchasing",
+      label: "Purchasing",
+      icon: ShoppingCart,
+      bypassPermissionCheck: true,
+      isPlaceholder: true,
+    },
+    // ====== PURCHASING NAV LINK (placeholder) — END ======
     // ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
     ...(NOON_MODULE_ENABLED && isSailAdmin ? [{
       id: "noon-report",
@@ -89,6 +108,7 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
         
         {menuItems.filter((item) => {
           if (item.isModule) return true;
+          if (item.bypassPermissionCheck) return true;
           return hasAnyChildAccess(item.id);
         }).map((item) => {
           const Icon = item.icon;
@@ -134,9 +154,23 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
           return (
             <button
               key={item.id}
-              onClick={() => onSubModuleChange(item.id)}
+              onClick={() => {
+                if (item.isPlaceholder) {
+                  // Placeholder for the future JWT-SSO Purchasing
+                  // integration. Real redirect is wired in once the
+                  // integration URL + token contract are available
+                  // (see "Purchasing" section in replit.md).
+                  toast({
+                    title: `${item.label} coming soon`,
+                    description: "This module will open once the external integration is connected.",
+                  });
+                  return;
+                }
+                onSubModuleChange(item.id);
+              }}
               className="flex flex-col items-center justify-center w-[110px] transition-all duration-200 relative"
               style={{ backgroundColor: isSelected ? '#52baf3' : '#f1f1f1' }}
+              data-testid={`button-nav-${item.id}`}
             >
               <Icon className="h-5 w-5 mb-1" style={{ color: isSelected ? '#ffffff' : '#4b5563' }} />
               <span className="text-xs font-medium" style={{ color: isSelected ? '#ffffff' : '#4b5563' }}>
