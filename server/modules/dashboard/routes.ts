@@ -16,9 +16,22 @@ router.get('/dashboard/maintenance-trend', asyncHandler(async (req, res) => {
       ? vesselIdsParam.split(',').filter(Boolean)
       : undefined;
 
-  const endMonth = (yearParam && monthParam && !isNaN(yearParam) && !isNaN(monthParam))
-    ? { year: yearParam, monthIndex0: monthParam - 1 }
-    : undefined;
+  // Resolve end month:
+  // - If year+month provided: use that month.
+  // - If only year provided: current month when it equals the current year,
+  //   else December of the selected year (most recent month of that year).
+  // - Else: undefined (service defaults to current month).
+  let endMonth: { year: number; monthIndex0: number } | undefined;
+  const now = new Date();
+  if (yearParam && !isNaN(yearParam)) {
+    if (monthParam && !isNaN(monthParam)) {
+      endMonth = { year: yearParam, monthIndex0: monthParam - 1 };
+    } else if (yearParam === now.getUTCFullYear()) {
+      endMonth = { year: yearParam, monthIndex0: now.getUTCMonth() };
+    } else {
+      endMonth = { year: yearParam, monthIndex0: 11 };
+    }
+  }
 
   const result = await getMaintenanceTrend({ vesselId, vesselIds, endMonth });
   res.json(result);

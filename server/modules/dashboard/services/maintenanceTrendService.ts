@@ -94,11 +94,10 @@ export interface MaintenanceTrendResult {
 export async function getMaintenanceTrend(options: MaintenanceTrendOptions): Promise<MaintenanceTrendResult> {
   const monthsBack = options.monthsBack ?? 6;
   const today = new Date();
-  // Default end = previous completed month so all 6 month-ends are strictly in
-  // the past and stable. Callers can override via options.endMonth.
-  const defaultEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
-  const endYear = options.endMonth?.year ?? defaultEnd.getUTCFullYear();
-  const endMonth0 = options.endMonth?.monthIndex0 ?? defaultEnd.getUTCMonth();
+  // Default end = current month (latest bucket evaluated at "today"). Callers
+  // can override via options.endMonth.
+  const endYear = options.endMonth?.year ?? today.getUTCFullYear();
+  const endMonth0 = options.endMonth?.monthIndex0 ?? today.getUTCMonth();
 
   // Build the list of (year, month0) buckets ending at endMonth, going back monthsBack-1 months.
   const buckets: { year: number; monthIndex0: number; key: string }[] = [];
@@ -161,8 +160,11 @@ export async function getMaintenanceTrend(options: MaintenanceTrendOptions): Pro
 
     datum.totalPlanned += 1;
 
-    // Always evaluate at strict month-end UTC so past months remain stable.
-    const evalDate = monthEndUTC(datum.year, datum.monthIndex);
+    // For past month-ends: strict month-end UTC (stable history).
+    // For the current/in-progress month: cap at "today" so we don't project
+    // the dashboard's latest point into the future.
+    const monthEnd = monthEndUTC(datum.year, datum.monthIndex);
+    const evalDate = monthEnd > today ? today : monthEnd;
 
     const vesselGrace = await getVesselGrace((wo as any).vesselId);
     const status: PointInTimeStatus = computePointInTimeStatus({
