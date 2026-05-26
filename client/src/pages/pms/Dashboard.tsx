@@ -49,6 +49,7 @@ import {
 } from "@/components/wo/woCellRenderers";
 import { RejectionHistoryBadge } from "@/components/wo/RejectionHistoryBadge";
 import { useVessels } from "@/hooks/useVessels";
+import { PeriodFilter, type PeriodFilterValue } from "@/components/filters/PeriodFilter";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
 import { ComplianceAnomalyPanel } from "./ComplianceAnomalyPanel";
@@ -409,6 +410,7 @@ const Dashboard = () => {
     setRejectSubmitting(false);
   };
   const [selectedCriticality, setSelectedCriticality] = useState("");
+  const [dashboardPeriod, setDashboardPeriod] = useState<PeriodFilterValue | null>(null);
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
@@ -2101,6 +2103,11 @@ const Dashboard = () => {
 
         {activeTab === 'overview' && showFilters && (
         <div className="flex items-center gap-3 flex-wrap" data-testid="bar-fleet-vessel-context">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 font-medium">Period:</span>
+            <PeriodFilter value={dashboardPeriod} onChange={setDashboardPeriod} />
+          </div>
+
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 font-medium">Vessel:</span>
             <Select value={mgmtVesselId} onValueChange={handleVesselChange}>
