@@ -2682,19 +2682,30 @@ const Dashboard = () => {
                 data-testid="column-wo-kpis"
               >
                 <div className="p-3">
-                  <div style={sectionHeaderBar} className="!pt-0 !pb-2">Active O/D W.O (Today) - All Eqpt</div>
+                  <TooltipProvider delayDuration={200}>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <div tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
+                          <div style={sectionHeaderBar} className="!pt-0 !pb-2">Active O/D W.O (Today) - All Eqpt</div>
 
-                  {/* Row 1: Active Overdue WOs Gauge (today vs all open) */}
-                  <SemiCircleGauge
-                    value={activeOverdueToday.allOverdue}
-                    max={activeOverdueToday.allOpen || 10}
-                    color="#e74c3c"
-                    arcFillColor={activeOverdueToday.allPercent <= 1 ? '#FFEEAA' : '#e74c3c'}
-                    displayValue={`${activeOverdueToday.allPercent}%`}
-                    subtitle={`${activeOverdueToday.allOverdue} out of ${activeOverdueToday.allOpen}`}
-                    onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - All Equipment', workOrders: activeOverdueToday.allOverdueFull })}
-                    testId="gauge-overdue-wo"
-                  />
+                          {/* Row 1: Active Overdue WOs Gauge (today vs all open) */}
+                          <SemiCircleGauge
+                            value={activeOverdueToday.allOverdue}
+                            max={activeOverdueToday.allOpen || 10}
+                            color="#e74c3c"
+                            arcFillColor={activeOverdueToday.allPercent <= 1 ? '#FFEEAA' : '#e74c3c'}
+                            displayValue={`${activeOverdueToday.allPercent}%`}
+                            subtitle={`${activeOverdueToday.allOverdue} out of ${activeOverdueToday.allOpen}`}
+                            onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - All Equipment', workOrders: activeOverdueToday.allOverdueFull })}
+                            testId="gauge-overdue-wo"
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" data-testid="tooltip-active-od-formula-all">
+                        Active Overdue % = (Current overdue WO / Total open WO) × 100
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
 
                   <div style={dividerH} />
 
@@ -2754,17 +2765,28 @@ const Dashboard = () => {
                   <div style={dividerH} />
 
                   {/* Row 3: Overdue WO Critical gauge */}
-                  <div style={subTitle} className="mb-1 mt-2">Active O/D W.O (Today) - Critical Eqpt</div>
-                  <SemiCircleGauge
-                    value={activeOverdueToday.criticalOverdue}
-                    max={activeOverdueToday.criticalOpen || 10}
-                    color="#e74c3c"
-                    arcFillColor={activeOverdueToday.criticalPercent <= 1 ? '#FFEEAA' : '#e74c3c'}
-                    displayValue={`${activeOverdueToday.criticalPercent}%`}
-                    subtitle={`${activeOverdueToday.criticalOverdue} out of ${activeOverdueToday.criticalOpen}`}
-                    onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - Critical Equipment', workOrders: activeOverdueToday.criticalOverdueFull })}
-                    testId="gauge-overdue-wo-critical"
-                  />
+                  <TooltipProvider delayDuration={200}>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <div tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
+                          <div style={subTitle} className="mb-1 mt-2">Active O/D W.O (Today) - Critical Eqpt</div>
+                          <SemiCircleGauge
+                            value={activeOverdueToday.criticalOverdue}
+                            max={activeOverdueToday.criticalOpen || 10}
+                            color="#e74c3c"
+                            arcFillColor={activeOverdueToday.criticalPercent <= 1 ? '#FFEEAA' : '#e74c3c'}
+                            displayValue={`${activeOverdueToday.criticalPercent}%`}
+                            subtitle={`${activeOverdueToday.criticalOverdue} out of ${activeOverdueToday.criticalOpen}`}
+                            onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - Critical Equipment', workOrders: activeOverdueToday.criticalOverdueFull })}
+                            testId="gauge-overdue-wo-critical"
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" data-testid="tooltip-active-od-formula-critical">
+                        Active Overdue % = (Current overdue WO / Total open WO) × 100
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
 
                   <div style={dividerH} />
 
