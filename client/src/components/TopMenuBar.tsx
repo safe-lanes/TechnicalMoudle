@@ -10,7 +10,11 @@ import {
   Anchor,
   ShoppingCart,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 // ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
 import { NOON_MODULE_ENABLED } from "@/modules/noon-report/config";
 // ====== NOON REPORT MODULE NAV LINK — END ======
@@ -39,7 +43,6 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
 }) => {
   const { hasAnyChildAccess, isLoading: permissionsLoading } = usePermissions();
   const { isSailAdmin } = useUIRole();
-  const { toast } = useToast();
 
   const menuItems = [
     {
@@ -151,19 +154,16 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
             );
           }
           
-          return (
+          const buttonEl = (
             <button
               key={item.id}
               onClick={() => {
                 if (item.isPlaceholder) {
                   // Placeholder for the future JWT-SSO Purchasing
-                  // integration. Real redirect is wired in once the
-                  // integration URL + token contract are available
-                  // (see "Purchasing" section in replit.md).
-                  toast({
-                    title: `${item.label} coming soon`,
-                    description: "This module will open once the external integration is connected.",
-                  });
+                  // integration. Click is a no-op — the hover
+                  // tooltip is the only feedback until the real
+                  // redirect is wired in (see "Purchasing" section
+                  // in replit.md).
                   return;
                 }
                 onSubModuleChange(item.id);
@@ -178,6 +178,23 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
               </span>
             </button>
           );
+
+          if (item.isPlaceholder) {
+            return (
+              <Tooltip key={item.id}>
+                <TooltipTrigger asChild>{buttonEl}</TooltipTrigger>
+                <TooltipContent
+                  side="bottom"
+                  sideOffset={6}
+                  data-testid={`tooltip-nav-${item.id}`}
+                >
+                  Coming soon
+                </TooltipContent>
+              </Tooltip>
+            );
+          }
+
+          return buttonEl;
         })}
         
         <div className="flex-1" />
