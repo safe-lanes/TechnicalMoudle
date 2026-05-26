@@ -948,49 +948,41 @@ const Dashboard = () => {
     };
   }, [filteredWorkOrdersData]);
 
+  // Point-in-time 6-month maintenance trend (Task #65).
+  // Backend computes per-month-end status using WO history + postponements so
+  // past months stay stable even after old WOs are closed.
+  type TrendMonth = {
+    month: string;
+    monthShort: string;
+    year: number;
+    monthIndex: number;
+    totalPlanned: number;
+    completed: number;
+    outstanding: number;
+    overdue: number;
+    postponed: number;
+    completedPercent: number;
+    outstandingPercent: number;
+    overduePercent: number;
+    postponedPercent: number;
+  };
+  const { data: trendResp } = useQuery<{ months: TrendMonth[]; delta: number }>({
+    queryKey: ['/technical/api/dashboard/maintenance-trend', effectiveVesselId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set('vesselId', effectiveVesselId || 'all');
+      const res = await fetch(`/technical/api/dashboard/maintenance-trend?${params.toString()}`);
+      if (!res.ok) throw new Error('Failed to fetch maintenance trend');
+      return res.json();
+    },
+    enabled: !!effectiveVesselId,
+  });
   const maintenanceTrendData = useMemo(() => {
-    const safeWOs = filteredWorkOrdersData.filter(wo => wo !== null && wo !== undefined);
-    const now = new Date();
-    const months: { month: string; monthShort: string; completedPercent: number; outstandingPercent: number; overduePercent: number; totalPlanned: number; completed: number; outstanding: number; overdue: number }[] = [];
-
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthName = format(d, 'MMM yyyy');
-      const monthShort = format(d, 'MMM');
-      const targetMonth = d.getMonth();
-      const targetYear = d.getFullYear();
-
-      const monthlyWOs = safeWOs.filter(wo => {
-        if (wo.isExecution) return false;
-        const dueDate = parseFlexibleDate(wo.dueDate);
-        if (!dueDate) return false;
-        return dueDate.getMonth() === targetMonth && dueDate.getFullYear() === targetYear;
-      });
-
-      const totalPlanned = monthlyWOs.length;
-      const completedCount = monthlyWOs.filter(wo => (wo as any).computedStatus === 'Completed').length;
-      const overdueCount = monthlyWOs.filter(wo => (wo as any).computedStatus === 'Overdue').length;
-      const outstandingCount = totalPlanned - completedCount - overdueCount;
-
-      months.push({
-        month: monthName,
-        monthShort,
-        completedPercent: totalPlanned > 0 ? Math.round((completedCount / totalPlanned) * 100) : 0,
-        outstandingPercent: totalPlanned > 0 ? Math.round((outstandingCount / totalPlanned) * 100) : 0,
-        overduePercent: totalPlanned > 0 ? Math.round((overdueCount / totalPlanned) * 100) : 0,
-        totalPlanned,
-        completed: completedCount,
-        outstanding: outstandingCount,
-        overdue: overdueCount,
-      });
-    }
-
-    const currentOutstanding = months.length >= 1 ? months[months.length - 1].outstandingPercent : 0;
-    const prevOutstanding = months.length >= 2 ? months[months.length - 2].outstandingPercent : 0;
-    const delta = currentOutstanding - prevOutstanding;
-
-    return { months, delta };
-  }, [filteredWorkOrdersData]);
+    return {
+      months: trendResp?.months ?? [],
+      delta: trendResp?.delta ?? 0,
+    };
+  }, [trendResp]);
 
   const runningHoursKPIs = useMemo(() => {
     const totalTracked = rhParentsData.length;
@@ -2812,6 +2804,7 @@ const Dashboard = () => {
                                         <div className="text-xs" style={{ color: '#2ecc71' }}>Completed: {d.completedPercent}% ({d.completed})</div>
                                         <div className="text-xs" style={{ color: '#f39c12' }}>Outstanding: {d.outstandingPercent}% ({d.outstanding})</div>
                                         <div className="text-xs" style={{ color: '#e74c3c' }}>Overdue: {d.overduePercent}% ({d.overdue})</div>
+                                        <div className="text-xs" style={{ color: '#8e44ad' }}>Postponed: {d.postponedPercent}% ({d.postponed})</div>
                                       </div>
                                     );
                                   }
@@ -2821,6 +2814,7 @@ const Dashboard = () => {
                               <Line type="monotone" dataKey="completedPercent" name="Completed %" stroke="#2ecc71" strokeWidth={2} dot={{ r: 4, fill: '#2ecc71', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#2ecc71' }} />
                               <Line type="monotone" dataKey="outstandingPercent" name="Outstanding %" stroke="#f39c12" strokeWidth={2} dot={{ r: 4, fill: '#f39c12', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#f39c12' }} />
                               <Line type="monotone" dataKey="overduePercent" name="Overdue %" stroke="#e74c3c" strokeWidth={2} dot={{ r: 4, fill: '#e74c3c', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#e74c3c' }} />
+                              <Line type="monotone" dataKey="postponedPercent" name="Postponed %" stroke="#8e44ad" strokeWidth={2} dot={{ r: 4, fill: '#8e44ad', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#8e44ad' }} />
                             </LineChart>
                           </ResponsiveContainer>
                         </div>
@@ -2828,6 +2822,7 @@ const Dashboard = () => {
                           <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#2ecc71' }} /><span>Completed %</span></div>
                           <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#f39c12' }} /><span>Outstanding %</span></div>
                           <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#e74c3c' }} /><span>Overdue %</span></div>
+                          <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#8e44ad' }} /><span>Postponed %</span></div>
                         </div>
                       </div>
                     ) : (
