@@ -410,7 +410,10 @@ const Dashboard = () => {
     setRejectSubmitting(false);
   };
   const [selectedCriticality, setSelectedCriticality] = useState("");
-  const [dashboardPeriod, setDashboardPeriod] = useState<PeriodFilterValue | null>(null);
+  const [dashboardPeriod, setDashboardPeriod] = useState<PeriodFilterValue | null>(() => {
+    const now = new Date();
+    return { mode: 'year-months', year: now.getFullYear(), months: [now.getMonth() + 1] };
+  });
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
