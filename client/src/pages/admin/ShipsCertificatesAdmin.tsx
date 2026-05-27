@@ -423,6 +423,18 @@ export default function ShipsCertificatesAdmin() {
 
   // Handle save button click
   const handleSave = () => {
+    const invalidCompany = companyOnlyCerts.filter(c => !c.certificateLabel?.trim());
+    const invalidVessel = vesselOnlyCerts.filter(c => !c.certificateLabel?.trim());
+    if (invalidCompany.length > 0 || invalidVessel.length > 0) {
+      setInvalidCompanyCertIds(new Set(invalidCompany.map(c => c.id)));
+      setInvalidVesselCertIds(new Set(invalidVessel.map(c => c.id)));
+      setSaveValidationError("Certificate Label is mandatory");
+      return;
+    }
+    setInvalidCompanyCertIds(new Set());
+    setInvalidVesselCertIds(new Set());
+    setSaveValidationError("");
+
     // Find the highest existing VES- sequence number from both masterData and vesselOnlyCerts
     let maxVesSeq = 0;
     for (const cert of masterData) {
@@ -874,6 +886,9 @@ export default function ShipsCertificatesAdmin() {
     companyGroup: "",
   });
   const [newCompanyEntryError, setNewCompanyEntryError] = useState("");
+  const [invalidCompanyCertIds, setInvalidCompanyCertIds] = useState<Set<number>>(new Set());
+  const [invalidVesselCertIds, setInvalidVesselCertIds] = useState<Set<number>>(new Set());
+  const [saveValidationError, setSaveValidationError] = useState("");
   
   // Vessel-specific certificates (not derived from Company)
   const [vesselOnlyCerts, setVesselOnlyCerts] = useState<VesselCertificate[]>([]);
@@ -1927,11 +1942,19 @@ export default function ShipsCertificatesAdmin() {
                       {viewModes.company === "edit" && isCompanyOnly ? (
                         <Input 
                           defaultValue={cert.certificateLabel}
-                          className="h-8 text-sm"
+                          className={`h-8 text-sm ${invalidCompanyCertIds.has(cert.id) && !cert.certificateLabel?.trim() ? 'border-red-500 focus:border-red-500' : ''}`}
                           onBlur={(e) => {
                             setCompanyOnlyCerts(prev => prev.map(c => 
                               c.id === cert.id ? { ...c, certificateLabel: e.target.value } : c
                             ));
+                            if (e.target.value.trim()) {
+                              setInvalidCompanyCertIds(prev => {
+                                if (!prev.has(cert.id)) return prev;
+                                const next = new Set(prev);
+                                next.delete(cert.id);
+                                return next;
+                              });
+                            }
                           }}
                           data-testid={`input-label-${testIdSuffix}`}
                         />
@@ -2359,11 +2382,19 @@ export default function ShipsCertificatesAdmin() {
                         {viewModes.vessel === "edit" ? (
                           <Input 
                             defaultValue={cert.certificateLabel}
-                            className="h-8 text-sm"
+                            className={`h-8 text-sm ${invalidVesselCertIds.has(cert.id) && !cert.certificateLabel?.trim() ? 'border-red-500 focus:border-red-500' : ''}`}
                             onBlur={(e) => {
                               setVesselOnlyCerts(prev => prev.map(c => 
                                 c.id === cert.id ? { ...c, certificateLabel: e.target.value } : c
                               ));
+                              if (e.target.value.trim()) {
+                                setInvalidVesselCertIds(prev => {
+                                  if (!prev.has(cert.id)) return prev;
+                                  const next = new Set(prev);
+                                  next.delete(cert.id);
+                                  return next;
+                                });
+                              }
                             }}
                             data-testid={`input-vessel-label-only-${cert.id}`}
                           />
@@ -2584,6 +2615,11 @@ export default function ShipsCertificatesAdmin() {
                 )}
                 {activeTab === "company" && (
                   <>
+                    {saveValidationError && (
+                      <span className="text-sm text-red-500 mr-2" data-testid="text-save-validation-error-company">
+                        {saveValidationError}
+                      </span>
+                    )}
                     <Button 
                       size="sm"
                       className="bg-green-600 hover:bg-green-700 gap-1"
@@ -2609,6 +2645,11 @@ export default function ShipsCertificatesAdmin() {
                 )}
                 {activeTab === "vessel" && (
                   <>
+                    {saveValidationError && (
+                      <span className="text-sm text-red-500 mr-2" data-testid="text-save-validation-error-vessel">
+                        {saveValidationError}
+                      </span>
+                    )}
                     <Button 
                       size="sm"
                       className="bg-green-600 hover:bg-green-700 gap-1"

@@ -362,10 +362,25 @@ export default function ShipsSurveysAdmin() {
     const invalidSurveys = dataToSave.filter(s => 
       !s.surveyName?.trim() || !s.category?.trim() || !s.group?.trim()
     );
+    const invalidCompanyOnly = activeTab === "company"
+      ? companyOnlySurveys.filter(s => !s.surveyLabel?.trim())
+      : [];
+    const invalidVesselOnly = activeTab === "vessel"
+      ? vesselOnlySurveys.filter(s => !s.surveyLabel?.trim())
+      : [];
     
-    if (invalidSurveys.length > 0) {
-      setInvalidSurveyIds(new Set(invalidSurveys.map(s => s.id)));
-      setMasterValidationError("Survey Name, Category, Group are Mandatory");
+    if (invalidSurveys.length > 0 || invalidCompanyOnly.length > 0 || invalidVesselOnly.length > 0) {
+      const invalidIds = new Set<number>([
+        ...invalidSurveys.map(s => s.id),
+        ...invalidCompanyOnly.map(s => s.id),
+        ...invalidVesselOnly.map(s => s.id),
+      ]);
+      setInvalidSurveyIds(invalidIds);
+      if (invalidSurveys.length > 0) {
+        setMasterValidationError("Survey Name, Category, Group are Mandatory");
+      } else {
+        setMasterValidationError("Survey Label is mandatory");
+      }
       return;
     }
     
@@ -1606,11 +1621,20 @@ export default function ShipsSurveysAdmin() {
                             {viewModes.company === "edit" && survey.isCompanyOnly ? (
                               <Input 
                                 defaultValue={survey.surveyLabel}
-                                className="h-8 text-sm"
+                                className={`h-8 text-sm ${invalidSurveyIds.has(survey.id) && !survey.surveyLabel?.trim() ? 'border-red-500 focus:border-red-500' : ''}`}
                                 onBlur={(e) => {
+                                  const value = e.target.value;
                                   setCompanyOnlySurveys(prev => prev.map(s => 
-                                    s.id === survey.id ? { ...s, surveyLabel: e.target.value } : s
+                                    s.id === survey.id ? { ...s, surveyLabel: value } : s
                                   ));
+                                  if (value.trim()) {
+                                    setInvalidSurveyIds(prev => {
+                                      if (!prev.has(survey.id)) return prev;
+                                      const next = new Set(prev);
+                                      next.delete(survey.id);
+                                      return next;
+                                    });
+                                  }
                                 }}
                                 data-testid={`input-label-${survey.id}`}
                               />
@@ -1733,6 +1757,11 @@ export default function ShipsSurveysAdmin() {
                       {viewModes.company === "edit" && isAddingNewCompany && newCompanyEntryError && (
                         <tr>
                           <td colSpan={7} className="px-3 py-2 text-sm text-red-500">{newCompanyEntryError}</td>
+                        </tr>
+                      )}
+                      {viewModes.company === "edit" && masterValidationError && (
+                        <tr>
+                          <td colSpan={7} className="px-3 py-2 text-sm text-red-600 bg-red-50" data-testid="text-save-validation-error-company">{masterValidationError}</td>
                         </tr>
                       )}
                     </tbody>
@@ -1974,11 +2003,20 @@ export default function ShipsSurveysAdmin() {
                             {viewModes.vessel === "edit" ? (
                               <Input 
                                 defaultValue={survey.surveyLabel}
-                                className="h-8 text-sm"
+                                className={`h-8 text-sm ${invalidSurveyIds.has(survey.id) && !survey.surveyLabel?.trim() ? 'border-red-500 focus:border-red-500' : ''}`}
                                 onBlur={(e) => {
+                                  const value = e.target.value;
                                   setVesselOnlySurveys(prev => prev.map(s => 
-                                    s.id === survey.id ? { ...s, surveyLabel: e.target.value } : s
+                                    s.id === survey.id ? { ...s, surveyLabel: value } : s
                                   ));
+                                  if (value.trim()) {
+                                    setInvalidSurveyIds(prev => {
+                                      if (!prev.has(survey.id)) return prev;
+                                      const next = new Set(prev);
+                                      next.delete(survey.id);
+                                      return next;
+                                    });
+                                  }
                                 }}
                                 data-testid={`input-vessel-label-only-${survey.id}`}
                               />
@@ -2094,6 +2132,11 @@ export default function ShipsSurveysAdmin() {
                             </Button>
                           </div>
                         </td>
+                      </tr>
+                    )}
+                    {viewModes.vessel === "edit" && masterValidationError && (
+                      <tr>
+                        <td colSpan={9} className="px-3 py-2 text-sm text-red-600 bg-red-50" data-testid="text-save-validation-error-vessel">{masterValidationError}</td>
                       </tr>
                     )}
                   </tbody>
