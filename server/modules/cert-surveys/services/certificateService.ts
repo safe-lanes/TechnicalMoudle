@@ -277,6 +277,43 @@ export async function updateCertificate(certId: string, body: any) {
     throw Object.assign(new Error("Database not available"), { statusCode: 500 });
   }
 
+  // Cross-field date validation: when the merged post-update state has both
+  // Issue Date and Expiry Date set, Issue Date must be <= Expiry Date.
+  // Dates may be stored either as ISO ("YYYY-MM-DD") or grid display format
+  // ("DD MMM YYYY"); normalise to ISO before comparing.
+  const normaliseDate = (raw: unknown): string => {
+    if (typeof raw !== 'string') return '';
+    const trimmed = raw.trim();
+    if (!trimmed) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    const months: Record<string, string> = {
+      Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
+      Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12',
+    };
+    const m = trimmed.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/);
+    if (m) {
+      const [, day, mon, year] = m;
+      const month = months[mon.charAt(0).toUpperCase() + mon.slice(1).toLowerCase()];
+      if (month) return `${year}-${month}-${day.padStart(2, '0')}`;
+    }
+    return '';
+  };
+  const existingRow = existingData[0] as any | undefined;
+  const incomingHasIssue = Object.prototype.hasOwnProperty.call(updateData, 'issueDate');
+  const incomingHasExpiry = Object.prototype.hasOwnProperty.call(updateData, 'expiryDate');
+  // Only enforce cross-field validation when the request actually touches one
+  // of these fields. Otherwise unrelated PATCHes (e.g. attachment-only) on
+  // historically inconsistent rows would be blocked by data the user is not
+  // editing.
+  const mergedIssue = normaliseDate(incomingHasIssue ? updateData.issueDate : existingRow?.issueDate);
+  const mergedExpiry = normaliseDate(incomingHasExpiry ? updateData.expiryDate : existingRow?.expiryDate);
+  if ((incomingHasIssue || incomingHasExpiry) && mergedIssue && mergedExpiry && mergedIssue > mergedExpiry) {
+    const wording = incomingHasExpiry && !incomingHasIssue
+      ? 'Expiry Date cannot be earlier than Issue Date.'
+      : 'Issue Date cannot be later than Expiry Date.';
+    throw Object.assign(new Error(wording), { statusCode: 400 });
+  }
+
   let result;
   if (existingData.length > 0) {
     result = await certRepo.updateCertificateData(vesselId, masterId, updateData);

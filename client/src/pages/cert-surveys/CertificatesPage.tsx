@@ -36,6 +36,16 @@ const parseDisplayDate = (displayDate: string): string => {
   return '';
 };
 
+const isIssueExpiryOrderValid = (
+  issueDisplay: string,
+  expiryDisplay: string,
+): boolean => {
+  const issueIso = parseDisplayDate(issueDisplay || '');
+  const expiryIso = parseDisplayDate(expiryDisplay || '');
+  if (!issueIso || !expiryIso) return true;
+  return issueIso <= expiryIso;
+};
+
 const formatToDisplayDate = (isoDate: string): string => {
   if (!isoDate) return '';
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -125,8 +135,13 @@ const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((prop
     console.log('[DateCellEditor] Committing value:', newDisplayValue, 'for field:', field, 'id:', compoundId);
     
     if (field && compoundId && props.node && props.context?.onDateChange) {
-      props.node.setDataValue(field, newDisplayValue);
-      props.context.onDateChange(compoundId, field, newDisplayValue, data);
+      // setDataValue returns false when the column's valueSetter rejected the
+      // value (e.g. Issue Date > Expiry Date). In that case we must NOT fire
+      // the PATCH — the cell has already been reverted by ag-grid.
+      const accepted = props.node.setDataValue(field, newDisplayValue);
+      if (accepted !== false) {
+        props.context.onDateChange(compoundId, field, newDisplayValue, data);
+      }
     }
     
     props.stopEditing();
@@ -628,11 +643,17 @@ export default function CertificatesPage() {
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
       valueSetter: (params: any) => {
-        if (params.newValue !== params.oldValue) {
-          params.data.issueDate = params.newValue;
-          return true;
+        if (params.newValue === params.oldValue) return false;
+        if (!isIssueExpiryOrderValid(params.newValue, params.data.expiryDate)) {
+          toast({
+            title: 'Invalid date',
+            description: 'Issue Date cannot be later than Expiry Date.',
+            variant: 'destructive',
+          });
+          return false;
         }
-        return false;
+        params.data.issueDate = params.newValue;
+        return true;
       },
     },
     {
@@ -676,11 +697,17 @@ export default function CertificatesPage() {
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
       valueSetter: (params: any) => {
-        if (params.newValue !== params.oldValue) {
-          params.data.expiryDate = params.newValue;
-          return true;
+        if (params.newValue === params.oldValue) return false;
+        if (!isIssueExpiryOrderValid(params.data.issueDate, params.newValue)) {
+          toast({
+            title: 'Invalid date',
+            description: 'Expiry Date cannot be earlier than Issue Date.',
+            variant: 'destructive',
+          });
+          return false;
         }
-        return false;
+        params.data.expiryDate = params.newValue;
+        return true;
       },
     },
     {
