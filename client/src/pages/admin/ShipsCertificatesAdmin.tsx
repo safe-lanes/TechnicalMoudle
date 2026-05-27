@@ -423,8 +423,12 @@ export default function ShipsCertificatesAdmin() {
 
   // Handle save button click
   const handleSave = () => {
-    const invalidCompany = companyOnlyCerts.filter(c => !c.certificateLabel?.trim());
-    const invalidVessel = vesselOnlyCerts.filter(c => !c.certificateLabel?.trim());
+    const invalidCompany = activeTab === "company"
+      ? companyOnlyCerts.filter(c => !c.certificateLabel?.trim())
+      : [];
+    const invalidVessel = activeTab === "vessel"
+      ? vesselOnlyCerts.filter(c => !c.certificateLabel?.trim())
+      : [];
     if (invalidCompany.length > 0 || invalidVessel.length > 0) {
       setInvalidCompanyCertIds(new Set(invalidCompany.map(c => c.id)));
       setInvalidVesselCertIds(new Set(invalidVessel.map(c => c.id)));
