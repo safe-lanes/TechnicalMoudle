@@ -37,6 +37,7 @@ import {
   HardDrive,
   Globe,
   GitPullRequest,
+  Workflow,
 } from "lucide-react";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 
@@ -137,6 +138,9 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
   // Conditionally add shore-only Fleet Sync Overview to admin menu
   if (subModule === "admin" && isShore) {
     allMenuItems = [...allMenuItems, { id: "sync-fleet", label: "Fleet Overview", icon: Globe }];
+  }
+  if (subModule === "admin") {
+    allMenuItems = [...allMenuItems, { id: "approval-workflow", label: "Approval Workflow", icon: Workflow }];
   }
   const menuItems = allMenuItems.filter((item) => {
     if (item.id === "access-control") return isSailAdmin;

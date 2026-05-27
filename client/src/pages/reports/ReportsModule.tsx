@@ -60,6 +60,7 @@ const REPORT_CATEGORIES: ReportCategory[] = [
     reports: [
       { id: "overdue-jobs", name: "Overdue Jobs" },
       { id: "completed-jobs", name: "Completed Jobs Register" },
+      { id: "all-jobs", name: "All Jobs / Work Orders Register" },
       { id: "monthly-summary", name: "Monthly Maintenance Summary" },
       { id: "critical-equipment", name: "Critical Equipment Status" },
       { id: "unplanned-jobs", name: "Unplanned/Breakdown Jobs" },

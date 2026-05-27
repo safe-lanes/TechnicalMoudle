@@ -64,6 +64,47 @@ export async function getCompletedJobsPreview(req: Request, res: Response) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// ALL JOBS / WORK ORDERS REGISTER - GET PREVIEW
+// ═══════════════════════════════════════════════════════════════
+
+export async function getAllJobsPreview(req: Request, res: Response) {
+  try {
+    const vesselId = req.query.vesselId as string;
+    const dateFrom = req.query.dateFrom as string | undefined;
+    const dateTo = req.query.dateTo as string | undefined;
+    if (!vesselId) {
+      return res.status(400).json({ error: "Please select a vessel" });
+    }
+    const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
+    const result = await maintenanceReportService.getAllJobsData(vesselId, dateFrom, dateTo, vesselIds);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error fetching All Jobs preview:", error);
+    res.status(500).json({ error: "Failed to fetch report data: " + error.message });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ALL JOBS / WORK ORDERS REGISTER - EXCEL EXPORT
+// ═══════════════════════════════════════════════════════════════
+
+export async function exportAllJobs(req: Request, res: Response) {
+  try {
+    const { vesselId, dateFrom, dateTo, componentFilter, departmentFilter } = req.body;
+    if (!vesselId) {
+      return res.status(400).json({ error: "Please select a vessel" });
+    }
+    const { buffer, filename } = await maintenanceReportService.exportAllJobs(vesselId, dateFrom, dateTo, componentFilter, departmentFilter);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (error: any) {
+    console.error("Error generating All Jobs Register report:", error);
+    res.status(500).json({ error: "Failed to generate report: " + error.message });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // POSTPONEMENT LOG - GET PREVIEW
 // ═══════════════════════════════════════════════════════════════
 

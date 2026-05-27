@@ -62,10 +62,12 @@ router.get('/reports/class-items-jobs', asyncHandler(equipCtrl.getClassItemsJobs
 router.get('/reports/due-jobs-7-days/preview', asyncHandler(maintCtrl.getDueJobs7DaysPreview));
 router.get('/reports/overdue-jobs/preview', asyncHandler(maintCtrl.getOverdueJobsPreview));
 router.get('/reports/completed-jobs/preview', asyncHandler(maintCtrl.getCompletedJobsPreview));
+router.get('/reports/all-jobs/preview', asyncHandler(maintCtrl.getAllJobsPreview));
 router.get('/reports/postponement-log/preview', asyncHandler(maintCtrl.getPostponementLogPreview));
 router.post('/reports/due-jobs-7-days', asyncHandler(maintCtrl.exportDueJobs7Days));
 router.post('/reports/overdue-jobs', asyncHandler(maintCtrl.exportOverdueJobs));
 router.post('/reports/completed-jobs', asyncHandler(maintCtrl.exportCompletedJobs));
+router.post('/reports/all-jobs', asyncHandler(maintCtrl.exportAllJobs));
 router.post('/reports/unplanned-jobs', asyncHandler(maintCtrl.exportUnplannedJobs));
 router.post('/reports/postponement-log', asyncHandler(maintCtrl.exportPostponementLog));
 router.get('/reports/maintenance/monthly-summary/preview', asyncHandler(maintCtrl.getMonthlySummaryPreview));

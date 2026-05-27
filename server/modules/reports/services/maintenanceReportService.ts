@@ -834,6 +834,277 @@ export async function exportCompletedJobs(vesselId: string, dateFrom?: string, d
 }
 
 // ═══════════════════════════════════════════════════════════════
+// ALL JOBS / WORK ORDERS REGISTER - SHARED DATA FUNCTION
+// ═══════════════════════════════════════════════════════════════
+
+export async function getAllJobsData(vesselId: string, dateFrom?: string, dateTo?: string, vesselIds?: string[]) {
+  const formatDateDDMMMYYYY = (dateStr: string | Date | null | undefined): string => {
+    if (!dateStr) return '\u2014';
+    try {
+      const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+      if (isNaN(d.getTime())) return '\u2014';
+      const day = d.getDate().toString().padStart(2, '0');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${day}-${months[d.getMonth()]}-${d.getFullYear()}`;
+    } catch { return '\u2014'; }
+  };
+
+  const allVessels = await repo.getVessels();
+  const vesselMap = new Map(allVessels.map(v => [v.id, v.name]));
+  const vessel = allVessels.find(v => v.id === vesselId);
+  const isMultiVessel = vesselId === 'all';
+  const vesselName = isMultiVessel
+    ? (vesselIds && vesselIds.length > 0 ? vesselIds.map(id => vesselMap.get(id) || id).join(', ') : 'All Vessels')
+    : (vessel?.name || vesselId);
+  const workOrders = await repo.getWorkOrders(vesselId, vesselIds);
+  const jobs = await repo.getJobs(vesselId, undefined, vesselIds);
+  const components = await repo.getComponents(vesselId, vesselIds);
+
+  const jobsMap = new Map(jobs.map(job => [job.juuid, job]));
+  const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
+
+  // Exclude execution rows, soft-deleted rows, and cancelled work orders
+  const eligibleWorkOrders = workOrders.filter(wo => {
+    if ((wo as any).isExecution) return false;
+    if ((wo as any).isDeleted === true) return false;
+    const status = (wo.status || '').toLowerCase();
+    if (status === 'cancelled' || status === 'canceled') return false;
+    return true;
+  });
+
+  // Period filter against dueDate (covers all statuses, since not all WOs are completed)
+  const filterFromObj = dateFrom ? new Date(dateFrom) : null;
+  const filterToObj = dateTo ? new Date(dateTo) : null;
+  if (filterFromObj) filterFromObj.setHours(0, 0, 0, 0);
+  if (filterToObj) filterToObj.setHours(23, 59, 59, 999);
+
+  let filteredJobs = eligibleWorkOrders;
+  if (filterFromObj || filterToObj) {
+    filteredJobs = eligibleWorkOrders.filter(wo => {
+      const due = (wo as any).dueDateSnapshot || wo.dueDate;
+      const d = parseDate(due);
+      if (!d) return false;
+      if (filterFromObj && d < filterFromObj) return false;
+      if (filterToObj && d > filterToObj) return false;
+      return true;
+    });
+  }
+
+  filteredJobs.sort((a, b) => {
+    const dateA = parseDate((a as any).dueDateSnapshot || a.dueDate)?.getTime() || 0;
+    const dateB = parseDate((b as any).dueDateSnapshot || b.dueDate)?.getTime() || 0;
+    if (dateB !== dateA) return dateB - dateA;
+    return (a.workOrderNo || a.id || '').localeCompare(b.workOrderNo || b.id || '');
+  });
+
+  let totalManHours = 0;
+  const statusCounts: Record<string, number> = {};
+
+  const allJobs = filteredJobs.map((wo, index) => {
+    const job = jobsMap.get(wo.jobId || '');
+    const comp = componentsByCodeMap.get(wo.componentCode || '');
+
+    const duration = parseFloat(wo.totalTimeHours || '0') || 0;
+    const persons = parseInt(wo.noOfPersons || '1') || 1;
+    const manHours = parseFloat(wo.manhours || '0') || (duration * persons);
+    if (manHours > 0) totalManHours += manHours;
+
+    const status = wo.status || 'Active';
+    statusCounts[status] = (statusCounts[status] || 0) + 1;
+
+    const frequency = job ? `${(job as any).frequencyValue || ''} ${(job as any).frequencyUnit || ''}`.trim() : '';
+
+    return {
+      sNo: index + 1,
+      workOrderNo: wo.workOrderNo || wo.id || '\u2014',
+      componentName: wo.component || comp?.name || '\u2014',
+      componentCode: wo.componentCode || '\u2014',
+      jobTitle: wo.jobTitle || '\u2014',
+      jobType: wo.taskType || wo.maintenanceType || '\u2014',
+      department: wo.department || 'Unassigned',
+      assignedTo: wo.performedBy || wo.assignedTo || job?.assignedTo || '\u2014',
+      frequency: frequency || '\u2014',
+      dueDate: formatDateDDMMMYYYY((wo as any).dueDateSnapshot || wo.dueDate),
+      completionDate: formatDateDDMMMYYYY(wo.dateCompleted || (wo as any).completionDateTime),
+      status,
+      manHours: manHours > 0 ? manHours.toFixed(1) : '\u2014',
+      remarks: (wo as any).remarks || (wo as any).comments || '\u2014',
+      vesselName: isMultiVessel ? (vesselMap.get((wo as any).vesselId) || (wo as any).vesselId || '-') : vesselName,
+    };
+  });
+
+  return {
+    success: true,
+    data: allJobs,
+    vesselName,
+    totalRecords: allJobs.length,
+    summary: {
+      totalJobs: allJobs.length,
+      totalManHours: totalManHours.toFixed(1),
+      statusCounts,
+    },
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ALL JOBS / WORK ORDERS REGISTER - EXCEL EXPORT
+// ═══════════════════════════════════════════════════════════════
+
+export async function exportAllJobs(vesselId: string, dateFrom?: string, dateTo?: string, componentFilter?: string, departmentFilter?: string): Promise<{ buffer: Buffer; filename: string }> {
+  const formatDateDDMMMYYYY = (dateStr: string | Date | null | undefined): string => {
+    if (!dateStr) return '\u2014';
+    try {
+      const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+      if (isNaN(d.getTime())) return '\u2014';
+      const day = d.getDate().toString().padStart(2, '0');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${day}-${months[d.getMonth()]}-${d.getFullYear()}`;
+    } catch { return '\u2014'; }
+  };
+
+  const { data: rowsRaw, vesselName, summary } = await getAllJobsData(vesselId, dateFrom, dateTo);
+  const rows = filterByDepartment(filterByComponent(rowsRaw, componentFilter), departmentFilter);
+  const isMultiVessel = vesselId === 'all';
+  // Recompute status counts against the post-filter row set so the header summary matches the data
+  const filteredStatusCounts: Record<string, number> = {};
+  for (const r of rows) {
+    const s = (r as any).status || 'Active';
+    filteredStatusCounts[s] = (filteredStatusCounts[s] || 0) + 1;
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'PMS System';
+  workbook.created = new Date();
+
+  const worksheet = workbook.addWorksheet('All Jobs Register', {
+    views: [{ state: 'frozen', ySplit: 8, xSplit: 2 }]
+  });
+
+  const columns: ColumnDef[] = [
+    { header: 'S.No', key: 'sNo', width: 8 },
+    ...(isMultiVessel ? [{ header: 'Vessel', key: 'vesselName', width: 22 }] as ColumnDef[] : []),
+    { header: 'WO No', key: 'workOrderNo', width: 22 },
+    { header: 'Component', key: 'componentName', width: 28 },
+    { header: 'Job Title', key: 'jobTitle', width: 30 },
+    { header: 'Job Type', key: 'jobType', width: 14 },
+    { header: 'Dept', key: 'department', width: 12 },
+    { header: 'Assigned To', key: 'assignedTo', width: 18 },
+    { header: 'Frequency', key: 'frequency', width: 14 },
+    { header: 'Due Date', key: 'dueDate', width: 16 },
+    { header: 'Completion Date', key: 'completionDate', width: 16 },
+    { header: 'Status', key: 'status', width: 14 },
+    { header: 'Man Hours', key: 'manHours', width: 12 },
+    { header: 'Remarks', key: 'remarks', width: 30 },
+  ];
+
+  const totalColumns = columns.length;
+  const lastColLetter = getLastColumnLetter(totalColumns);
+  const headerRowNum = 8;
+  const dataStartRow = 9;
+
+  // Title bar
+  worksheet.mergeCells(`A1:${lastColLetter}1`);
+  const titleCell = worksheet.getCell('A1');
+  titleCell.value = 'ALL JOBS / WORK ORDERS REGISTER';
+  titleCell.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E5A8E' } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(1).height = 28;
+
+  worksheet.mergeCells(`A2:${lastColLetter}2`);
+  const subtitleCell = worksheet.getCell('A2');
+  subtitleCell.value = 'Comprehensive register of all work orders regardless of status';
+  subtitleCell.font = { size: 11, color: { argb: 'FFFFFFFF' } };
+  subtitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E5A8E' } };
+  subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+  worksheet.getCell('A3').value = `Vessel: ${vesselName}`;
+  worksheet.getCell('A3').font = { bold: true };
+  worksheet.mergeCells('A3:D3');
+
+  const periodText = dateFrom && dateTo
+    ? `Report Period: ${formatDateDDMMMYYYY(dateFrom)} to ${formatDateDDMMMYYYY(dateTo)}`
+    : 'Report Period: All Time';
+  worksheet.getCell('E3').value = periodText;
+  worksheet.mergeCells('E3:H3');
+
+  worksheet.getCell('I3').value = `Generated: ${formatDateDDMMMYYYY(new Date())}`;
+  worksheet.mergeCells(`I3:${lastColLetter}3`);
+
+  worksheet.getRow(4).height = 5;
+  worksheet.getRow(5).height = 5;
+  worksheet.getRow(6).height = 5;
+
+  // Status summary line (computed against filtered rows)
+  const statusCounts = filteredStatusCounts;
+  void summary;
+  const statusSummary = Object.entries(statusCounts)
+    .map(([s, c]) => `${s}: ${c}`)
+    .join(' | ') || `Total: ${rows.length}`;
+  worksheet.mergeCells(`A7:${lastColLetter}7`);
+  const statusCell = worksheet.getCell('A7');
+  statusCell.value = `Total: ${rows.length}  |  ${statusSummary}`;
+  statusCell.font = { italic: true, size: 10 };
+  statusCell.alignment = { horizontal: 'left', vertical: 'middle' };
+
+  // Column headers
+  const headerRow = worksheet.getRow(headerRowNum);
+  columns.forEach((col, idx) => {
+    const cell = headerRow.getCell(idx + 1);
+    cell.value = col.header;
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF5DADE2' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+      bottom: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+      left: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+      right: { style: 'thin', color: { argb: 'FFE1E8ED' } }
+    };
+    worksheet.getColumn(idx + 1).width = col.width;
+  });
+  headerRow.height = 22;
+
+  // Data rows
+  rows.forEach((row, rowIdx) => {
+    const xlRow = worksheet.getRow(dataStartRow + rowIdx);
+    columns.forEach((col, colIdx) => {
+      const cell = xlRow.getCell(colIdx + 1);
+      cell.value = (row as any)[col.key] ?? '\u2014';
+      cell.font = { size: 9 };
+      cell.alignment = { vertical: 'middle' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+        bottom: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+        left: { style: 'thin', color: { argb: 'FFE1E8ED' } },
+        right: { style: 'thin', color: { argb: 'FFE1E8ED' } }
+      };
+      if (rowIdx % 2 === 1) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7F9FC' } };
+      }
+    });
+    xlRow.height = 18;
+  });
+
+  worksheet.autoFilter = { from: { row: headerRowNum, column: 1 }, to: { row: headerRowNum, column: totalColumns } };
+
+  worksheet.pageSetup = {
+    orientation: 'landscape',
+    paperSize: 8 as any,
+    fitToPage: true,
+    fitToWidth: 1,
+    printTitlesRow: `${headerRowNum}:${headerRowNum}`
+  };
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const filename = generateFilename('AllJobsRegister', vesselName);
+
+  console.log(`[ALL JOBS REGISTER] Generated: ${filename} (${rows.length} rows)`);
+
+  return { buffer: Buffer.from(buffer as ArrayBuffer), filename };
+}
+
+// ═══════════════════════════════════════════════════════════════
 // UNPLANNED/BREAKDOWN JOBS - EXCEL EXPORT
 // ═══════════════════════════════════════════════════════════════
 
