@@ -854,24 +854,28 @@ const Dashboard = () => {
     all: Record<'scheduled' | 'due' | 'overdue' | 'postponed' | 'completed' | 'pendingApproval', WoStatusBucket>;
     critical: Record<'scheduled' | 'due' | 'overdue' | 'postponed' | 'completed' | 'pendingApproval', WoStatusBucket>;
   }
+  // Cleared period (dashboardPeriodRange === null) intentionally sends no
+  // from/to and the backend treats it as all-time, per task #77 spec.
   const { data: woStatusByPeriodData } = useQuery<WoStatusByPeriodResponse>({
     queryKey: [
       '/technical/api/dashboard/wo-status-by-period',
       effectiveVesselId,
-      dashboardPeriodRange?.from?.toISOString() ?? null,
-      dashboardPeriodRange?.to?.toISOString() ?? null,
+      dashboardPeriodRange?.from?.toISOString() ?? 'all-time',
+      dashboardPeriodRange?.to?.toISOString() ?? 'all-time',
     ],
     queryFn: async () => {
       const params = new URLSearchParams({
         vesselId: effectiveVesselId || 'all',
-        from: dashboardPeriodRange!.from.toISOString(),
-        to: dashboardPeriodRange!.to.toISOString(),
       });
+      if (dashboardPeriodRange) {
+        params.set('from', dashboardPeriodRange.from.toISOString());
+        params.set('to', dashboardPeriodRange.to.toISOString());
+      }
       const res = await fetch(`/technical/api/dashboard/wo-status-by-period?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch WO status by period');
       return res.json();
     },
-    enabled: !!effectiveVesselId && !!dashboardPeriodRange,
+    enabled: !!effectiveVesselId,
   });
 
   // Map WO id (wouuid preferred, falling back to id) -> WO object so click

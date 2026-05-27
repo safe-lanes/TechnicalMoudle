@@ -43,16 +43,21 @@ router.get('/dashboard/wo-status-by-period', asyncHandler(async (req, res) => {
   const vesselId = (req.query.vesselId as string) || 'all';
   const fromStr = req.query.from as string | undefined;
   const toStr = req.query.to as string | undefined;
-  if (!fromStr || !toStr) {
-    return res.status(400).json({ error: 'from and to query params are required (ISO date strings)' });
-  }
-  const from = new Date(fromStr);
-  const to = new Date(toStr);
-  if (isNaN(from.getTime()) || isNaN(to.getTime())) {
-    return res.status(400).json({ error: 'invalid from or to date' });
-  }
-  if (to < from) {
-    return res.status(400).json({ error: 'to must be >= from' });
+  // Missing from/to → all-time mode (cleared Period filter).
+  let from: Date | null = null;
+  let to: Date | null = null;
+  if (fromStr || toStr) {
+    if (!fromStr || !toStr) {
+      return res.status(400).json({ error: 'from and to must both be provided, or both omitted for all-time' });
+    }
+    from = new Date(fromStr);
+    to = new Date(toStr);
+    if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+      return res.status(400).json({ error: 'invalid from or to date' });
+    }
+    if (to < from) {
+      return res.status(400).json({ error: 'to must be >= from' });
+    }
   }
   const vesselIdsParam = req.query.vesselIds;
   const vesselIds = Array.isArray(vesselIdsParam)

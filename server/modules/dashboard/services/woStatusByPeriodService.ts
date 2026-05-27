@@ -34,8 +34,8 @@ export interface WoStatusByPeriodResult {
 export interface WoStatusByPeriodOptions {
   vesselId: string;          // 'all' or specific vessel UUID
   vesselIds?: string[];      // explicit allow-list for scope-restricted users
-  from: Date;                // inclusive window start
-  to: Date;                  // inclusive window end
+  from?: Date | null;        // inclusive window start; null = all-time
+  to?: Date | null;          // inclusive window end; null = all-time
 }
 
 function buildVesselGraceSettings(
@@ -139,7 +139,9 @@ function classifySlice(args: {
   vesselGrace: VesselGraceSettings | undefined;
   companyGrace: CompanyStandardGraceConfig;
 }): WoStatusSlice {
-  const { wo, postponements, from, to, vesselGrace, companyGrace } = args;
+  const { wo, postponements, vesselGrace, companyGrace } = args;
+  const from = args.from;
+  const to = args.to;
   const woId = wo.wouuid || wo.id;
   const woPostponements = woId
     ? postponements.filter(p => p.workOrderId === woId)
@@ -277,7 +279,15 @@ function classifySlice(args: {
 export async function getWoStatusByPeriod(
   options: WoStatusByPeriodOptions,
 ): Promise<WoStatusByPeriodResult> {
-  const { from, to } = options;
+  // Cleared period -> all-time. Backend uses sentinel-wide bounds so the
+  // shared classify/bucket helpers don't need conditional branches.
+  // Documented per spec: clearing the dashboard Period filter shows the
+  // donut counts across all WOs (no time-window restriction).
+  const ALL_TIME_FROM = new Date(Date.UTC(1970, 0, 1));
+  const ALL_TIME_TO = new Date(Date.UTC(9999, 11, 31, 23, 59, 59, 999));
+  const from = options.from ?? ALL_TIME_FROM;
+  const to = options.to ?? ALL_TIME_TO;
+  const isAllTime = !options.from || !options.to;
   const isAll = !options.vesselId || options.vesselId === 'all';
 
   const workOrders = (await storage.getWorkOrders(
@@ -322,15 +332,17 @@ export async function getWoStatusByPeriod(
     return true;
   });
 
-  // Restrict to WOs whose bucket month overlaps [from, to].
+  // Restrict to WOs whose bucket month-end falls inside [from, to], per spec
+  // (mirrors the 6-month trend selection criterion). All-time mode keeps
+  // every WO with a valid bucket.
   const periodWOs = vesselWOs.filter((wo) => {
     const bucket = getWorkOrderBucketMonth(wo);
     if (!bucket) return false;
-    const monthStart = new Date(Date.UTC(bucket.year, bucket.month, 1));
+    if (isAllTime) return true;
     const monthEnd = new Date(
       Date.UTC(bucket.year, bucket.month + 1, 0, 23, 59, 59, 999),
     );
-    return monthEnd >= from && monthStart <= to;
+    return monthEnd >= from && monthEnd <= to;
   });
 
   const all = emptyBuckets();
