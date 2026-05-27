@@ -49,7 +49,7 @@ import {
 } from "@/components/wo/woCellRenderers";
 import { RejectionHistoryBadge } from "@/components/wo/RejectionHistoryBadge";
 import { useVessels } from "@/hooks/useVessels";
-import { PeriodFilter, type PeriodFilterValue } from "@/components/filters/PeriodFilter";
+import { PeriodFilter, type PeriodFilterValue, periodFilterToDateRange } from "@/components/filters/PeriodFilter";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
 import { ComplianceAnomalyPanel } from "./ComplianceAnomalyPanel";
@@ -839,46 +839,88 @@ const Dashboard = () => {
     return null;
   };
 
-  // Work Order Status chart data - filtered to current calendar month
-  const workOrderStatusChartData = useMemo(() => {
-    const safeWOs = filteredWorkOrdersData.filter(wo => wo !== null && wo !== undefined);
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+  // WO Status by Period — server-side computed slices using
+  // "ever in state during the selected period" logic (Task #77).
+  // Both donuts (All Eqpt + Critical Eqpt) derive from this query so they
+  // honor the Period filter and use mutually-exclusive Overdue > Postponed >
+  // Completed > Due > Scheduled precedence.
+  const dashboardPeriodRange = useMemo(
+    () => periodFilterToDateRange(dashboardPeriod),
+    [dashboardPeriod],
+  );
 
-    const monthlyWOs = safeWOs.filter(wo => {
-      if (wo.isExecution) return false;
-      const dueDate = parseFlexibleDate(wo.dueDate);
-      if (!dueDate) return false;
-      return dueDate.getMonth() === currentMonth && dueDate.getFullYear() === currentYear;
-    });
+  interface WoStatusBucket { count: number; woIds: string[] }
+  interface WoStatusByPeriodResponse {
+    all: Record<'scheduled' | 'due' | 'overdue' | 'postponed' | 'completed' | 'pendingApproval', WoStatusBucket>;
+    critical: Record<'scheduled' | 'due' | 'overdue' | 'postponed' | 'completed' | 'pendingApproval', WoStatusBucket>;
+  }
+  const { data: woStatusByPeriodData } = useQuery<WoStatusByPeriodResponse>({
+    queryKey: [
+      '/technical/api/dashboard/wo-status-by-period',
+      effectiveVesselId,
+      dashboardPeriodRange?.from?.toISOString() ?? null,
+      dashboardPeriodRange?.to?.toISOString() ?? null,
+    ],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        vesselId: effectiveVesselId || 'all',
+        from: dashboardPeriodRange!.from.toISOString(),
+        to: dashboardPeriodRange!.to.toISOString(),
+      });
+      const res = await fetch(`/technical/api/dashboard/wo-status-by-period?${params.toString()}`);
+      if (!res.ok) throw new Error('Failed to fetch WO status by period');
+      return res.json();
+    },
+    enabled: !!effectiveVesselId && !!dashboardPeriodRange,
+  });
 
-    const planned = monthlyWOs.filter(wo => {
-      const s = (wo as EnrichedWorkOrder).computedStatus;
-      return s === 'Active' || s === 'Postponed';
-    }).length;
-    const due = monthlyWOs.filter(wo => {
-      const s = (wo as EnrichedWorkOrder).computedStatus;
-      return s === 'Due' || s === 'Due (Grace P)';
-    }).length;
-    const overdue = monthlyWOs.filter(wo =>
-      (wo as EnrichedWorkOrder).computedStatus === 'Overdue'
-    ).length;
-    const completed = monthlyWOs.filter(wo =>
-      (wo as EnrichedWorkOrder).computedStatus === 'Completed'
-    ).length;
-    const pendingApproval = monthlyWOs.filter(wo =>
-      (wo as EnrichedWorkOrder).computedStatus === 'Pending Approval'
-    ).length;
+  // Map WO id (wouuid preferred, falling back to id) -> WO object so click
+  // handlers can resolve the woIds returned by the backend.
+  const workOrderByIdMap = useMemo(() => {
+    const map = new Map<string, EnrichedWorkOrder>();
+    for (const wo of (workOrdersData as EnrichedWorkOrder[])) {
+      if (!wo) continue;
+      const uuid = (wo as any).wouuid;
+      if (uuid != null) map.set(String(uuid), wo);
+      const id = (wo as any).id;
+      if (id != null) map.set(String(id), wo);
+    }
+    return map;
+  }, [workOrdersData]);
 
-    return [
-      { status: 'Scheduled', count: planned, color: '#9E9E9E' },
-      { status: 'Due', count: due, color: '#FF964f' },
-      { status: 'Overdue', count: overdue, color: '#ff6961' },
-      { status: 'Completed', count: completed, color: '#5dc86f' },
-      { status: 'Pending Approval', count: pendingApproval, color: '#FFEEAA' }
-    ].filter(d => d.count > 0);
-  }, [filteredWorkOrdersData]);
+  const resolveWosByIds = (ids: string[] | undefined): EnrichedWorkOrder[] => {
+    if (!ids || ids.length === 0) return [];
+    const out: EnrichedWorkOrder[] = [];
+    for (const id of ids) {
+      const wo = workOrderByIdMap.get(String(id));
+      if (wo) out.push(wo);
+    }
+    return out;
+  };
+
+  const buildPeriodDonutData = (
+    buckets: WoStatusByPeriodResponse['all'] | undefined,
+  ) => {
+    if (!buckets) return [] as { status: string; count: number; color: string; slice: keyof WoStatusByPeriodResponse['all'] }[];
+    return ([
+      { status: 'Scheduled',        slice: 'scheduled' as const,       color: '#9E9E9E' },
+      { status: 'Due',              slice: 'due' as const,             color: '#FF964f' },
+      { status: 'Overdue',          slice: 'overdue' as const,         color: '#ff6961' },
+      { status: 'Postponed',        slice: 'postponed' as const,       color: '#8e44ad' },
+      { status: 'Completed',        slice: 'completed' as const,       color: '#5dc86f' },
+      { status: 'Pending Approval', slice: 'pendingApproval' as const, color: '#FFEEAA' },
+    ] as const).map(s => ({
+      status: s.status,
+      slice: s.slice,
+      color: s.color,
+      count: buckets[s.slice]?.count ?? 0,
+    })).filter(d => d.count > 0);
+  };
+
+  const workOrderStatusChartData = useMemo(
+    () => buildPeriodDonutData(woStatusByPeriodData?.all),
+    [woStatusByPeriodData],
+  );
 
   // Spares Stock Status chart data
   const sparesStockChartData = useMemo(() => {
@@ -1156,14 +1198,10 @@ const Dashboard = () => {
     };
   }, [workOrdersData]);
 
-  const criticalWorkOrderStatusChartData = useMemo(() => {
-    return [
-      { status: 'Overdue', count: criticalWorkOrderKPIs.overdue, color: '#ff6961' },
-      { status: 'Due', count: criticalWorkOrderKPIs.due, color: '#FF964f' },
-      { status: 'Pending Approval', count: criticalWorkOrderKPIs.pendingApproval, color: '#1565C0' },
-      { status: 'Completed', count: criticalWorkOrderKPIs.completed, color: '#5dc86f' }
-    ].filter(d => d.count > 0);
-  }, [criticalWorkOrderKPIs]);
+  const criticalWorkOrderStatusChartData = useMemo(
+    () => buildPeriodDonutData(woStatusByPeriodData?.critical),
+    [woStatusByPeriodData],
+  );
 
   const criticalOverduePercent = criticalWorkOrderKPIs.total > 0
     ? Math.round((criticalWorkOrderKPIs.overdue / criticalWorkOrderKPIs.total) * 100)
@@ -2774,14 +2812,9 @@ const Dashboard = () => {
                             onClick={(_data: Record<string, unknown>, index: number) => {
                               const entry = workOrderStatusChartData[index];
                               if (!entry) return;
-                              const status = entry.status;
-                              let wos: EnrichedWorkOrder[] = [];
-                              if (status === 'Overdue') wos = workOrderKPIs.overdueFull;
-                              else if (status === 'Due') wos = workOrderKPIs.dueFull;
-                              else if (status === 'Completed') wos = workOrderKPIs.completedFull;
-                              else if (status === 'Pending Approval') wos = workOrderKPIs.pendingApprovalFull;
-                              else wos = workOrderKPIs.plannedFull;
-                              setWoListModal({ open: true, title: `${status} Work Orders - All Equipment`, workOrders: wos });
+                              const ids = woStatusByPeriodData?.all?.[entry.slice]?.woIds;
+                              const wos = resolveWosByIds(ids);
+                              setWoListModal({ open: true, title: `${entry.status} Work Orders - All Equipment`, workOrders: wos });
                             }}
                             cursor="pointer"
                           >
@@ -2869,14 +2902,9 @@ const Dashboard = () => {
                             onClick={(_data: Record<string, unknown>, index: number) => {
                               const entry = criticalWorkOrderStatusChartData[index];
                               if (!entry) return;
-                              const status = entry.status;
-                              let wos: EnrichedWorkOrder[] = [];
-                              if (status === 'Overdue') wos = criticalWorkOrderKPIs.overdueFull;
-                              else if (status === 'Due') wos = criticalWorkOrderKPIs.dueFull;
-                              else if (status === 'Pending Approval') wos = criticalWorkOrderKPIs.pendingApprovalFull;
-                              else if (status === 'Completed') wos = criticalWorkOrderKPIs.completedFull;
-                              else wos = criticalWorkOrderKPIs.plannedFull;
-                              setWoListModal({ open: true, title: `${status} Work Orders - Critical Equipment`, workOrders: wos });
+                              const ids = woStatusByPeriodData?.critical?.[entry.slice]?.woIds;
+                              const wos = resolveWosByIds(ids);
+                              setWoListModal({ open: true, title: `${entry.status} Work Orders - Critical Equipment`, workOrders: wos });
                             }}
                             cursor="pointer"
                           >

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../shared/middleware';
 import { getMaintenanceTrend } from './services/maintenanceTrendService';
+import { getWoStatusByPeriod } from './services/woStatusByPeriodService';
 
 const router = Router();
 
@@ -34,6 +35,33 @@ router.get('/dashboard/maintenance-trend', asyncHandler(async (req, res) => {
   }
 
   const result = await getMaintenanceTrend({ vesselId, vesselIds, endMonth });
+  res.json(result);
+}));
+
+// GET /technical/api/dashboard/wo-status-by-period?vesselId=...&from=...&to=...
+router.get('/dashboard/wo-status-by-period', asyncHandler(async (req, res) => {
+  const vesselId = (req.query.vesselId as string) || 'all';
+  const fromStr = req.query.from as string | undefined;
+  const toStr = req.query.to as string | undefined;
+  if (!fromStr || !toStr) {
+    return res.status(400).json({ error: 'from and to query params are required (ISO date strings)' });
+  }
+  const from = new Date(fromStr);
+  const to = new Date(toStr);
+  if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+    return res.status(400).json({ error: 'invalid from or to date' });
+  }
+  if (to < from) {
+    return res.status(400).json({ error: 'to must be >= from' });
+  }
+  const vesselIdsParam = req.query.vesselIds;
+  const vesselIds = Array.isArray(vesselIdsParam)
+    ? (vesselIdsParam as string[])
+    : typeof vesselIdsParam === 'string' && vesselIdsParam.length > 0
+      ? vesselIdsParam.split(',').filter(Boolean)
+      : undefined;
+
+  const result = await getWoStatusByPeriod({ vesselId, vesselIds, from, to });
   res.json(result);
 }));
 
