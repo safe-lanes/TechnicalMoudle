@@ -1907,167 +1907,200 @@ export default function ShipsSurveysAdmin() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {selectedVessels.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center">
-                          <div className="flex flex-col items-center gap-2">
-                            <Ship className="h-12 w-12 text-muted-foreground/50" />
-                            <p className="text-muted-foreground">Select at least one vessel to view survey configuration</p>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : isLoadingApplicability ? (
-                      <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center">
-                          <div className="flex flex-col items-center gap-2">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                            <p className="text-muted-foreground">Loading survey configuration...</p>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : companySurveys.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center">
-                          <div className="flex flex-col items-center gap-2">
-                            <Ship className="h-12 w-12 text-muted-foreground/50" />
-                            <p className="text-muted-foreground">No surveys are marked as applicable to Company. Configure the Company tab first.</p>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : companySurveys.map((survey, idx) => {
-                      const applicability = getSurveyApplicability(survey.masterId);
-                      const isMixed = applicability === 'mixed';
-                      const isChecked = applicability === true;
-                      const companyGroupLabel = companyGroupLabels.find(g => g.key === survey.companyGroup)?.label || "";
-                      const displayCompanyGroup = survey.companyGroup ? `${survey.companyGroup}. ${companyGroupLabel}` : "";
-                      
+                    {(() => {
+                      const vesselCompanyFromMaster = masterData
+                        .filter((s) => {
+                          if (!s.applicableToCompany) return false;
+                          if (s.masterId.startsWith('VES-')) {
+                            const vesselIds = getSelectedVesselIdsArray();
+                            if (vesselIds.length === 0) return false;
+                            return vesselIds.some(vesselId =>
+                              vesselApplicabilityData?.some((a: any) => a.vesselId === vesselId && a.masterId === s.masterId)
+                            );
+                          }
+                          return true;
+                        })
+                        .map((s) => ({ ...s, _sortSequence: s.companySequence ?? s.sequence, _isCompanyOnly: false as const }));
+                      const vesselCompanyOnlyMapped = companyOnlySurveys.map((s) => ({
+                        ...s,
+                        _sortSequence: s.sequence,
+                        _isCompanyOnly: true as const,
+                      }));
+                      const vesselMergedCompanyList: any[] = [...vesselCompanyFromMaster, ...vesselCompanyOnlyMapped]
+                        .sort((a, b) => a._sortSequence - b._sortSequence);
+                      const vesselOnlyVisible = vesselOnlySurveys.filter(survey => {
+                        if (survey.id >= 2000) return true;
+                        const vesselIds = getSelectedVesselIdsArray();
+                        return vesselIds.some(vesselId =>
+                          vesselApplicabilityData?.some((a: any) => a.vesselId === vesselId && a.masterId === survey.masterId && a.isApplicable === true)
+                        );
+                      });
+                      if (selectedVessels.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={7} className="px-6 py-12 text-center">
+                              <div className="flex flex-col items-center gap-2">
+                                <Ship className="h-12 w-12 text-muted-foreground/50" />
+                                <p className="text-muted-foreground">Select at least one vessel to view survey configuration</p>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }
+                      if (isLoadingApplicability) {
+                        return (
+                          <tr>
+                            <td colSpan={7} className="px-6 py-12 text-center">
+                              <div className="flex flex-col items-center gap-2">
+                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                                <p className="text-muted-foreground">Loading survey configuration...</p>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }
+                      if (vesselMergedCompanyList.length === 0 && vesselOnlyVisible.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={7} className="px-6 py-12 text-center">
+                              <div className="flex flex-col items-center gap-2">
+                                <Ship className="h-12 w-12 text-muted-foreground/50" />
+                                <p className="text-muted-foreground">No surveys are marked as applicable to Company. Configure the Company tab first.</p>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }
                       return (
-                        <tr key={survey.id} className={cn("hover:bg-gray-50", isMixed && "bg-amber-50")}>
-                          <td className="px-3 py-3 text-center">
-                            <div className="flex flex-col items-center gap-1">
-                              <Checkbox 
-                                checked={isMixed ? false : isChecked}
-                                onCheckedChange={(checked) => {
-                                  if (!conflictCheck.hasConflict && viewModes.vessel === "edit") {
-                                    handleApplicabilityChange(survey.masterId, !!checked);
-                                  }
-                                }}
-                                disabled={conflictCheck.hasConflict || viewModes.vessel !== "edit"}
-                                className={cn(
-                                  "border-blue-500 data-[state=checked]:bg-blue-500",
-                                  isMixed && "border-amber-500 bg-amber-100"
-                                )}
-                                data-testid={`checkbox-vessel-applicable-${survey.id}`}
-                              />
-                              {isMixed && (
-                                <span className="text-xs text-amber-600">Mixed</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 text-sm">{idx + 1}</td>
-                          <td className="px-3 py-3 text-sm font-medium text-blue-600">{survey.masterId}</td>
-                          <td className="px-3 py-3 text-sm">{survey.companyId || (survey.masterId ? `C${survey.masterId}` : "-")}</td>
-                          <td className="px-3 py-3 text-sm">{survey.surveyLabel || survey.surveyName}</td>
-                          <td className="px-3 py-3 text-sm">{survey.requirementRef}</td>
-                          <td className="px-3 py-3 text-sm">{displayCompanyGroup}</td>
-                        </tr>
+                        <>
+                          {vesselMergedCompanyList.map((survey: any, idx: number) => {
+                            const applicability = getSurveyApplicability(survey.masterId);
+                            const isMixed = applicability === 'mixed';
+                            const isChecked = applicability === true;
+                            const companyGroupLabel = companyGroupLabels.find(g => g.key === survey.companyGroup)?.label || "";
+                            const displayCompanyGroup = survey.companyGroup ? `${survey.companyGroup}. ${companyGroupLabel}` : "";
+                            const rowKey = survey._isCompanyOnly ? `company-inherited-${survey.id}` : survey.id;
+                            return (
+                              <tr key={rowKey} className={cn("hover:bg-gray-50", survey._isCompanyOnly && "bg-green-50", isMixed && "bg-amber-50")}>
+                                <td className="px-3 py-3 text-center">
+                                  <div className="flex flex-col items-center gap-1">
+                                    <Checkbox 
+                                      checked={isMixed ? false : isChecked}
+                                      onCheckedChange={(checked) => {
+                                        if (!conflictCheck.hasConflict && viewModes.vessel === "edit") {
+                                          handleApplicabilityChange(survey.masterId, !!checked);
+                                        }
+                                      }}
+                                      disabled={conflictCheck.hasConflict || viewModes.vessel !== "edit"}
+                                      className={cn(
+                                        "border-blue-500 data-[state=checked]:bg-blue-500",
+                                        isMixed && "border-amber-500 bg-amber-100"
+                                      )}
+                                      data-testid={`checkbox-vessel-applicable-${survey.id}`}
+                                    />
+                                    {isMixed && (
+                                      <span className="text-xs text-amber-600">Mixed</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-3 py-3 text-sm">{idx + 1}</td>
+                                <td className={cn("px-3 py-3 text-sm font-medium", survey._isCompanyOnly ? "text-gray-400" : "text-blue-600")}>{survey.masterId || "-"}</td>
+                                <td className="px-3 py-3 text-sm">{survey.companyId || (survey.masterId ? `C${survey.masterId}` : "-")}</td>
+                                <td className="px-3 py-3 text-sm">{survey.surveyLabel || survey.surveyName}</td>
+                                <td className="px-3 py-3 text-sm">{survey.requirementRef}</td>
+                                <td className="px-3 py-3 text-sm">{displayCompanyGroup}</td>
+                              </tr>
+                            );
+                          })}
+                          {vesselOnlyVisible.map((survey, idx) => {
+                            const companyGroupLabel = companyGroupLabels.find(g => g.key === survey.companyGroup)?.label || "";
+                            const displayCompanyGroup = survey.companyGroup ? `${survey.companyGroup}. ${companyGroupLabel}` : "";
+                            return (
+                              <tr key={`vessel-only-${survey.id}`} className="hover:bg-gray-50 bg-green-50">
+                                <td className="px-3 py-3 text-center">
+                                  <Checkbox
+                                    checked
+                                    disabled
+                                    title="Vessel-added surveys are always applicable to the vessel they were added to."
+                                    className="border-blue-500 bg-blue-500 data-[state=checked]:bg-blue-500"
+                                    data-testid={`checkbox-vessel-only-applicable-${survey.id}`}
+                                  />
+                                </td>
+                                <td className="px-3 py-3 text-sm">{vesselMergedCompanyList.length + idx + 1}</td>
+                                <td className="px-3 py-3 text-sm font-medium text-gray-400">-</td>
+                                <td className="px-3 py-3 text-sm text-gray-400">-</td>
+                                <td className="px-3 py-3 text-sm">
+                                  {viewModes.vessel === "edit" ? (
+                                    <Input 
+                                      defaultValue={survey.surveyLabel}
+                                      className={`h-8 text-sm ${invalidSurveyIds.has(survey.id) && !survey.surveyLabel?.trim() ? 'border-red-500 focus:border-red-500' : ''}`}
+                                      onBlur={(e) => {
+                                        const value = e.target.value;
+                                        setVesselOnlySurveys(prev => prev.map(s => 
+                                          s.id === survey.id ? { ...s, surveyLabel: value } : s
+                                        ));
+                                        if (value.trim()) {
+                                          setInvalidSurveyIds(prev => {
+                                            if (!prev.has(survey.id)) return prev;
+                                            const next = new Set(prev);
+                                            next.delete(survey.id);
+                                            return next;
+                                          });
+                                        }
+                                      }}
+                                      data-testid={`input-vessel-label-only-${survey.id}`}
+                                    />
+                                  ) : (
+                                    survey.surveyLabel
+                                  )}
+                                </td>
+                                <td className="px-3 py-3 text-sm">
+                                  {viewModes.vessel === "edit" ? (
+                                    <Input 
+                                      defaultValue={survey.requirementRef}
+                                      className="h-8 text-sm"
+                                      onBlur={(e) => {
+                                        setVesselOnlySurveys(prev => prev.map(s => 
+                                          s.id === survey.id ? { ...s, requirementRef: e.target.value } : s
+                                        ));
+                                      }}
+                                      data-testid={`input-vessel-requirement-only-${survey.id}`}
+                                    />
+                                  ) : (
+                                    survey.requirementRef
+                                  )}
+                                </td>
+                                <td className="px-3 py-3 text-sm">
+                                  {viewModes.vessel === "edit" ? (
+                                    <Select 
+                                      defaultValue={survey.companyGroup}
+                                      onValueChange={(value) => {
+                                        setVesselOnlySurveys(prev => prev.map(s => 
+                                          s.id === survey.id ? { ...s, companyGroup: value } : s
+                                        ));
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-8 text-sm" data-testid={`select-vessel-companygroup-only-${survey.id}`}>
+                                        <SelectValue placeholder="Select group" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {companyGroupLabels.map(grp => (
+                                          <SelectItem key={grp.key} value={grp.key}>
+                                            {grp.key}. {grp.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    displayCompanyGroup
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </>
                       );
-                    })}
-                    
-                    {/* Vessel-only surveys (VES-) — filtered by vessel applicability */}
-                    {selectedVessels.length > 0 && vesselOnlySurveys.filter(survey => {
-                      if (survey.id >= 2000) return true;
-                      const vesselIds = getSelectedVesselIdsArray();
-                      return vesselIds.some(vesselId =>
-                        vesselApplicabilityData?.some((a: any) => a.vesselId === vesselId && a.masterId === survey.masterId && a.isApplicable === true)
-                      );
-                    }).map((survey, idx) => {
-                      const companyGroupLabel = companyGroupLabels.find(g => g.key === survey.companyGroup)?.label || "";
-                      const displayCompanyGroup = survey.companyGroup ? `${survey.companyGroup}. ${companyGroupLabel}` : "";
-                      
-                      return (
-                        <tr key={`vessel-only-${survey.id}`} className="hover:bg-gray-50 bg-green-50">
-                          <td className="px-3 py-3 text-center">
-                            <Checkbox
-                              checked
-                              disabled
-                              title="Vessel-added surveys are always applicable to the vessel they were added to."
-                              className="border-blue-500 bg-blue-500 data-[state=checked]:bg-blue-500"
-                              data-testid={`checkbox-vessel-only-applicable-${survey.id}`}
-                            />
-                          </td>
-                          <td className="px-3 py-3 text-sm">{companySurveys.length + idx + 1}</td>
-                          <td className="px-3 py-3 text-sm font-medium text-gray-400">-</td>
-                          <td className="px-3 py-3 text-sm text-gray-400">-</td>
-                          <td className="px-3 py-3 text-sm">
-                            {viewModes.vessel === "edit" ? (
-                              <Input 
-                                defaultValue={survey.surveyLabel}
-                                className={`h-8 text-sm ${invalidSurveyIds.has(survey.id) && !survey.surveyLabel?.trim() ? 'border-red-500 focus:border-red-500' : ''}`}
-                                onBlur={(e) => {
-                                  const value = e.target.value;
-                                  setVesselOnlySurveys(prev => prev.map(s => 
-                                    s.id === survey.id ? { ...s, surveyLabel: value } : s
-                                  ));
-                                  if (value.trim()) {
-                                    setInvalidSurveyIds(prev => {
-                                      if (!prev.has(survey.id)) return prev;
-                                      const next = new Set(prev);
-                                      next.delete(survey.id);
-                                      return next;
-                                    });
-                                  }
-                                }}
-                                data-testid={`input-vessel-label-only-${survey.id}`}
-                              />
-                            ) : (
-                              survey.surveyLabel
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-sm">
-                            {viewModes.vessel === "edit" ? (
-                              <Input 
-                                defaultValue={survey.requirementRef}
-                                className="h-8 text-sm"
-                                onBlur={(e) => {
-                                  setVesselOnlySurveys(prev => prev.map(s => 
-                                    s.id === survey.id ? { ...s, requirementRef: e.target.value } : s
-                                  ));
-                                }}
-                                data-testid={`input-vessel-requirement-only-${survey.id}`}
-                              />
-                            ) : (
-                              survey.requirementRef
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-sm">
-                            {viewModes.vessel === "edit" ? (
-                              <Select 
-                                defaultValue={survey.companyGroup}
-                                onValueChange={(value) => {
-                                  setVesselOnlySurveys(prev => prev.map(s => 
-                                    s.id === survey.id ? { ...s, companyGroup: value } : s
-                                  ));
-                                }}
-                              >
-                                <SelectTrigger className="h-8 text-sm" data-testid={`select-vessel-companygroup-only-${survey.id}`}>
-                                  <SelectValue placeholder="Select group" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {companyGroupLabels.map(grp => (
-                                    <SelectItem key={grp.key} value={grp.key}>
-                                      {grp.key}. {grp.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              displayCompanyGroup
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    })()}
 
                     {/* New vessel survey entry row */}
                     {viewModes.vessel === "edit" && isAddingNewVessel && selectedVessels.length > 0 && (
