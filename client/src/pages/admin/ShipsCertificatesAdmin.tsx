@@ -1226,7 +1226,7 @@ export default function ShipsCertificatesAdmin() {
     
     const newId = Math.max(...vesselOnlyCerts.map(c => c.id), 0) + 2000;
     
-    const newCert: VesselCertificate = {
+    const newCert: VesselCertificate & { _pendingVesselIds?: string[] } = {
       id: newId,
       masterId: "",
       companyId: "",
@@ -1234,6 +1234,7 @@ export default function ShipsCertificatesAdmin() {
       requirementRef: newVesselEntryData.requirementRef || "",
       companyGroup: newVesselEntryData.companyGroup || "",
       applicable: newVesselEntryData.applicable ?? true,
+      _pendingVesselIds: getSelectedVesselIds(),
     };
     
     setVesselOnlyCerts(prev => [...prev, newCert]);
@@ -2244,9 +2245,13 @@ export default function ShipsCertificatesAdmin() {
                   }));
                   const vesselMergedCompanyList: any[] = [...vesselCompanyFromMaster, ...vesselCompanyOnlyMapped]
                     .sort((a, b) => a._sortSequence - b._sortSequence);
-                  const vesselOnlyVisible = vesselOnlyCerts.filter(cert => {
-                    if (cert.id >= 2000) return viewModes.vessel === "edit";
+                  const vesselOnlyVisible = vesselOnlyCerts.filter((cert: any) => {
                     const vesselIds = getSelectedVesselIds();
+                    if (cert.id >= 2000) {
+                      if (viewModes.vessel !== "edit") return false;
+                      const pending: string[] | undefined = cert._pendingVesselIds;
+                      return vesselIds.some(v => pending?.includes(v));
+                    }
                     return vesselIds.some(vesselId =>
                       vesselApplicabilityData.some((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId)
                     );

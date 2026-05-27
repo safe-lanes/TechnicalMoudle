@@ -1130,7 +1130,7 @@ export default function ShipsSurveysAdmin() {
 
     const newId = Math.max(...vesselOnlySurveys.map(s => s.id), 0) + 2000;
     
-    const newSurvey: VesselSurvey = {
+    const newSurvey: VesselSurvey & { _pendingVesselIds?: string[] } = {
       id: newId,
       masterId: newMasterId,
       companyId: "",
@@ -1138,6 +1138,7 @@ export default function ShipsSurveysAdmin() {
       requirementRef: newVesselSurvey.requirementRef || "",
       companyGroup: newVesselSurvey.companyGroup || "",
       applicable: true,
+      _pendingVesselIds: getSelectedVesselIdsArray(),
     };
 
     setVesselOnlySurveys(prev => [...prev, newSurvey]);
@@ -1928,9 +1929,12 @@ export default function ShipsSurveysAdmin() {
                       }));
                       const vesselMergedCompanyList: any[] = [...vesselCompanyFromMaster, ...vesselCompanyOnlyMapped]
                         .sort((a, b) => a._sortSequence - b._sortSequence);
-                      const vesselOnlyVisible = vesselOnlySurveys.filter(survey => {
-                        if (survey.id >= 2000) return true;
+                      const vesselOnlyVisible = vesselOnlySurveys.filter((survey: any) => {
                         const vesselIds = getSelectedVesselIdsArray();
+                        if (survey.id >= 2000) {
+                          const pending: string[] | undefined = survey._pendingVesselIds;
+                          return vesselIds.some(v => pending?.includes(v));
+                        }
                         return vesselIds.some(vesselId =>
                           vesselApplicabilityData?.some((a: any) => a.vesselId === vesselId && a.masterId === survey.masterId && a.isApplicable === true)
                         );
