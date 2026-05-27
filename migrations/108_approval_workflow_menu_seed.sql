@@ -21,26 +21,41 @@ WHERE NOT EXISTS (SELECT 1 FROM adm_menumaster_ac WHERE name = 'admin-approval-w
 -- ============================================================
 
 INSERT INTO adm_role_menu_access (role_ruid, menu_muid, can_view, can_create, can_edit, can_delete)
-SELECT (SELECT ruid FROM admn_role_master WHERE assigned_role = 'Sail Admin' LIMIT 1), muid, true, true, true, true
-FROM adm_menumaster_ac WHERE name = 'admin-approval-workflow'
+SELECT r.ruid, m.muid, true, true, true, true
+FROM adm_menumaster_ac m
+CROSS JOIN admn_role_master r
+WHERE m.name = 'admin-approval-workflow'
+  AND r.assigned_role = 'Sail Admin'
 ON CONFLICT (role_ruid, menu_muid) DO NOTHING;
 
 INSERT INTO adm_role_menu_access (role_ruid, menu_muid, can_view, can_create, can_edit, can_delete)
-SELECT (SELECT ruid FROM admn_role_master WHERE assigned_role = 'Super Admin' LIMIT 1), muid, true, true, true, true
-FROM adm_menumaster_ac WHERE name = 'admin-approval-workflow'
+SELECT r.ruid, m.muid, true, true, true, true
+FROM adm_menumaster_ac m
+CROSS JOIN admn_role_master r
+WHERE m.name = 'admin-approval-workflow'
+  AND r.assigned_role = 'Super Admin'
 ON CONFLICT (role_ruid, menu_muid) DO NOTHING;
 
 INSERT INTO adm_role_menu_access (role_ruid, menu_muid, can_view, can_create, can_edit, can_delete)
-SELECT (SELECT ruid FROM admn_role_master WHERE assigned_role = 'Admin' LIMIT 1), muid, true, true, true, true
-FROM adm_menumaster_ac WHERE name = 'admin-approval-workflow'
+SELECT r.ruid, m.muid, true, true, true, true
+FROM adm_menumaster_ac m
+CROSS JOIN admn_role_master r
+WHERE m.name = 'admin-approval-workflow'
+  AND r.assigned_role = 'Admin'
 ON CONFLICT (role_ruid, menu_muid) DO NOTHING;
 
 INSERT INTO adm_role_menu_access (role_ruid, menu_muid, can_view, can_create, can_edit, can_delete)
-SELECT (SELECT ruid FROM admn_role_master WHERE assigned_role = 'Offline Admin' LIMIT 1), muid, true, true, true, true
-FROM adm_menumaster_ac WHERE name = 'admin-approval-workflow'
+SELECT r.ruid, m.muid, true, true, true, true
+FROM adm_menumaster_ac m
+CROSS JOIN admn_role_master r
+WHERE m.name = 'admin-approval-workflow'
+  AND r.assigned_role = 'Offline Admin'
 ON CONFLICT (role_ruid, menu_muid) DO NOTHING;
 
 INSERT INTO adm_role_menu_access (role_ruid, menu_muid, can_view, can_create, can_edit, can_delete)
-SELECT (SELECT ruid FROM admn_role_master WHERE assigned_role = 'Vessel Admin' LIMIT 1), muid, true, false, true, false
-FROM adm_menumaster_ac WHERE name = 'admin-approval-workflow'
+SELECT r.ruid, m.muid, true, false, true, false
+FROM adm_menumaster_ac m
+CROSS JOIN admn_role_master r
+WHERE m.name = 'admin-approval-workflow'
+  AND r.assigned_role = 'Vessel Admin'
 ON CONFLICT (role_ruid, menu_muid) DO NOTHING;
