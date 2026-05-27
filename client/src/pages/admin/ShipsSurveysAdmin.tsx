@@ -1430,7 +1430,7 @@ export default function ShipsSurveysAdmin() {
                               </SelectTrigger>
                               <SelectContent>
                                 {CATEGORY_OPTIONS.map(cat => (
-                                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                                  <SelectItem key={cat} value={cat}>{getCategoryLabel(cat)}</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -1446,7 +1446,7 @@ export default function ShipsSurveysAdmin() {
                               </SelectTrigger>
                               <SelectContent>
                                 {GROUP_OPTIONS.map(grp => (
-                                  <SelectItem key={grp} value={grp}>{grp}</SelectItem>
+                                  <SelectItem key={grp} value={grp}>{getGroupLabel(grp)}</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
