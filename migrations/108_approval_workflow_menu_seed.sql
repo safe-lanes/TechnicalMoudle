@@ -10,10 +10,11 @@
 -- ============================================================
 
 INSERT INTO adm_menumaster_ac (id, muid, name, display_name, route, parent_menu, is_active, sort_order)
-VALUES
-  (34, gen_random_uuid(), 'admin-approval-workflow', 'Approval Workflow', '/admin/approval-workflow',
-    (SELECT muid FROM adm_menumaster_ac WHERE name = 'admin' LIMIT 1), true, 30)
-ON CONFLICT (name) DO NOTHING;
+SELECT
+  (SELECT COALESCE(MAX(id), 0) + 1 FROM adm_menumaster_ac),
+  gen_random_uuid(), 'admin-approval-workflow', 'Approval Workflow', '/admin/approval-workflow',
+  (SELECT muid FROM adm_menumaster_ac WHERE name = 'admin' LIMIT 1), true, 30
+WHERE NOT EXISTS (SELECT 1 FROM adm_menumaster_ac WHERE name = 'admin-approval-workflow');
 
 -- ============================================================
 -- STEP 2: Grant access to admin roles
