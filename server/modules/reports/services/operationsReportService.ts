@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import { sql } from 'drizzle-orm';
 import * as repo from '../repositories/reportRepository';
 import { getDb } from '../../../db';
-import { componentRunningHoursLog } from '@shared/schema';
+import { runningHoursAudit } from '@shared/schema';
 import {
   applyStandardHeader, applyStandardTableHeader,
   applyStandardDataRows, applyStandardPageSetup,
@@ -586,17 +586,8 @@ export async function getEquipmentUtilizationSummary(
     );
   }
 
-  // Get vessel code for querying logs (may be different from vesselId)
-  const vesselCode = vessel?.code || vesselId;
-
   // Get database instance
   const db = await getDb();
-
-  // Get running hours log for the period - query by both vesselId and vesselCode
-  const rhLogs = await db.select().from(componentRunningHoursLog)
-    .where(sql`${componentRunningHoursLog.vesselCode} = ${vesselCode} OR ${componentRunningHoursLog.vesselCode} = ${vesselId}`);
-
-  console.log(`[UTILIZATION] Vessel: ${vesselId}, VesselCode: ${vesselCode}, Components: ${rhComponents.length}, RH Logs found: ${rhLogs.length}`);
 
   const now = new Date();
   const defaultStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
@@ -607,17 +598,20 @@ export async function getEquipmentUtilizationSummary(
     throw new Error("Invalid date format");
   }
 
+  // Query running_hours_audit for the period (this is the populated table — 1,316+ rows)
+  const rhAuditLogs = await db.select().from(runningHoursAudit)
+    .where(sql`${runningHoursAudit.vesselId} = ${vesselId} AND ${runningHoursAudit.enteredAtUTC} >= ${periodStart.toISOString()} AND ${runningHoursAudit.enteredAtUTC} <= ${periodEnd.toISOString()}`);
+
+  console.log(`[UTILIZATION] Vessel: ${vesselId}, Components: ${rhComponents.length}, Audit logs in period: ${rhAuditLogs.length}`);
+
   const daysInPeriod = Math.max(1, Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)));
 
   // Build utilization data for each component
   const utilizationData = rhComponents.map((component, index) => {
-    // Get RH logs for this component in the period
-    const componentLogs = rhLogs.filter(log =>
-      (log.componentCode === component.componentCode || log.componentId === component.cuuid) &&
-      log.updatedAt &&
-      new Date(log.updatedAt) >= periodStart &&
-      new Date(log.updatedAt) <= periodEnd
-    ).sort((a, b) => new Date(a.updatedAt!).getTime() - new Date(b.updatedAt!).getTime());
+    // Get audit logs for this component in the period
+    const componentLogs = rhAuditLogs.filter(log =>
+      (log.componentCode === component.componentCode || log.componentId === component.cuuid)
+    ).sort((a, b) => new Date(a.enteredAtUTC!).getTime() - new Date(b.enteredAtUTC!).getTime());
 
     // Get current and baseline running hours separately
     // running_hours is the baseline (initial reading)
@@ -643,10 +637,10 @@ export async function getEquipmentUtilizationSummary(
     const cappedEstimateHours = Math.floor(maxPossibleHours * 0.80);
 
     if (componentLogs.length > 0) {
-      // Use log data if available - sum up all delta changes in the period
+      // Use audit log data — sum positive (new_rh - previous_rh) deltas across the period
       periodHours = componentLogs.reduce((sum, log) => {
-        const delta = Number(log.deltaRh) || 0;
-        return sum + Math.max(0, delta); // Only positive deltas (ignore corrections)
+        const delta = (Number(log.newRH) || 0) - (Number(log.previousRH) || 0);
+        return sum + Math.max(0, delta); // Only positive deltas (ignore corrections/resets)
       }, 0);
       dataSource = 'Actual';
     } else if (baselineHours !== null && currentCumulativeReading !== null && currentCumulativeReading > baselineHours) {
@@ -793,17 +787,8 @@ export async function exportEquipmentUtilizationSummaryExcel(
     );
   }
 
-  // Get vessel code for querying logs (may be different from vesselId)
-  const vesselCode = vessel?.code || vesselId;
-
   // Get database instance
   const db = await getDb();
-
-  // Get running hours log for the period - query by both vesselId and vesselCode
-  const rhLogs = await db.select().from(componentRunningHoursLog)
-    .where(sql`${componentRunningHoursLog.vesselCode} = ${vesselCode} OR ${componentRunningHoursLog.vesselCode} = ${vesselId}`);
-
-  console.log(`[UTILIZATION EXCEL] Vessel: ${vesselId}, VesselCode: ${vesselCode}, Components: ${rhComponents.length}, RH Logs found: ${rhLogs.length}`);
 
   const now = new Date();
   const defaultStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -814,16 +799,19 @@ export async function exportEquipmentUtilizationSummaryExcel(
     throw new Error("Invalid date format");
   }
 
+  // Query running_hours_audit for the period (this is the populated table — 1,316+ rows)
+  const rhAuditLogs = await db.select().from(runningHoursAudit)
+    .where(sql`${runningHoursAudit.vesselId} = ${vesselId} AND ${runningHoursAudit.enteredAtUTC} >= ${periodStart.toISOString()} AND ${runningHoursAudit.enteredAtUTC} <= ${periodEnd.toISOString()}`);
+
+  console.log(`[UTILIZATION EXCEL] Vessel: ${vesselId}, Components: ${rhComponents.length}, Audit logs in period: ${rhAuditLogs.length}`);
+
   const daysInPeriod = Math.max(1, Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)));
 
   // Build utilization data
   const utilizationData = rhComponents.map((component, index) => {
-    const componentLogs = rhLogs.filter(log =>
-      (log.componentCode === component.componentCode || log.componentId === component.cuuid) &&
-      log.updatedAt &&
-      new Date(log.updatedAt) >= periodStart &&
-      new Date(log.updatedAt) <= periodEnd
-    ).sort((a, b) => new Date(a.updatedAt!).getTime() - new Date(b.updatedAt!).getTime());
+    const componentLogs = rhAuditLogs.filter(log =>
+      (log.componentCode === component.componentCode || log.componentId === component.cuuid)
+    ).sort((a, b) => new Date(a.enteredAtUTC!).getTime() - new Date(b.enteredAtUTC!).getTime());
 
     // Get current and baseline running hours separately
     // running_hours is the baseline (initial reading)
@@ -850,7 +838,7 @@ export async function exportEquipmentUtilizationSummaryExcel(
 
     if (componentLogs.length > 0) {
       periodHours = componentLogs.reduce((sum, log) => {
-        const delta = Number(log.deltaRh) || 0;
+        const delta = (Number(log.newRH) || 0) - (Number(log.previousRH) || 0);
         return sum + Math.max(0, delta);
       }, 0);
       dataSource = 'Actual';

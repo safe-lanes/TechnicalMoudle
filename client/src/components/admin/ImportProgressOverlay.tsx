@@ -210,6 +210,52 @@ export default function ImportProgressOverlay({
   );
 }
 
+// Poll the server's import-status endpoint to recover the final outcome
+// when the SSE stream is severed mid-import (e.g. by a proxy idle-timeout).
+// Returns the resolved status payload, or null if it can't be determined
+// within the timeout window.
+async function pollImportStatus(
+  historyId: string,
+  callbacks: {
+    onProgress: (data: ImportProgressData) => void;
+  },
+  lastProgress: ImportProgressData | null,
+  opts: { intervalMs?: number; timeoutMs?: number } = {}
+): Promise<{ status: string; created: number; updated: number; skipped: number; archived: number; failed?: number } | null> {
+  const intervalMs = opts.intervalMs ?? 3000;
+  // Cover even very long imports (~30 min) — server-side write work can outlast
+  // a single 5-min window if the stream drops early in the run.
+  const timeoutMs = opts.timeoutMs ?? 30 * 60 * 1000;
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    try {
+      const resp = await fetch(`/technical/api/bulk/import-status/${historyId}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.status === 'complete' || data.status === 'failed') {
+          return data;
+        }
+        // Still in_progress — re-emit the last known progress with an
+        // updated status so the UI doesn't jump back to 0% / "Preparing…".
+        callbacks.onProgress({
+          processed: lastProgress?.processed ?? 0,
+          total: lastProgress?.total ?? 0,
+          remaining: lastProgress?.remaining ?? 0,
+          percent: lastProgress?.percent ?? 0,
+          status: 'Reconnecting… import is still running on the server',
+          errors: lastProgress?.errors ?? 0,
+        });
+      }
+      // 404 / 5xx → retry; the history row may not be written yet.
+    } catch (_e) {
+      // Network blip — keep polling until the deadline.
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return null;
+}
+
 export function useImportStream() {
   const consumeStream = async (
     url: string,
@@ -242,6 +288,8 @@ export function useImportStream() {
     let buffer = "";
     let receivedComplete = false;
     let receivedError = false;
+    let knownHistoryId: string | null = null;
+    let lastProgress: ImportProgressData | null = null;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -261,6 +309,10 @@ export function useImportStream() {
           try {
             const data = JSON.parse(jsonStr);
             if (currentEvent === "progress") {
+              if (data && typeof data.historyId === "string" && !knownHistoryId) {
+                knownHistoryId = data.historyId;
+              }
+              lastProgress = data;
               callbacks.onProgress(data);
             } else if (currentEvent === "complete") {
               receivedComplete = true;
@@ -274,12 +326,36 @@ export function useImportStream() {
           }
           currentEvent = "";
         }
+        // SSE comment lines (starting with ':') are heartbeats — ignore.
       }
     }
 
-    if (!receivedComplete && !receivedError) {
-      callbacks.onError("Import stream ended unexpectedly. The import may have partially completed — please check the data before retrying.");
+    if (receivedComplete || receivedError) return;
+
+    // Stream ended without a terminal event. The server may still be running
+    // (proxy idle-timeout, transient network drop). If we captured a
+    // historyId, poll the status endpoint to recover the real outcome
+    // instead of falsely reporting failure.
+    if (knownHistoryId) {
+      const final = await pollImportStatus(knownHistoryId, { onProgress: callbacks.onProgress }, lastProgress);
+      if (final && final.status === 'complete') {
+        callbacks.onComplete({
+          created: final.created,
+          updated: final.updated,
+          skipped: final.skipped,
+          archived: final.archived,
+          failed: final.failed ?? 0,
+          historyId: knownHistoryId,
+        });
+        return;
+      }
+      if (final && final.status === 'failed') {
+        callbacks.onError("Import failed on the server. Check the import history for details.");
+        return;
+      }
     }
+
+    callbacks.onError("Import stream ended unexpectedly. The import may have partially completed — please check the data before retrying.");
   };
 
   return { consumeStream };

@@ -336,7 +336,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         if (mode === 'preview') {
           return {
             title: 'Equipment Utilization Summary',
-            subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`,
+            subtitle: `Running hours analysis for ${mergedSummary.periodDays} days (${mergedSummary.periodStart} to ${mergedSummary.periodEnd})`,
             vessel: vesselName,
             dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to),
             columns,
@@ -348,7 +348,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         pdfReportGenerator.generateReport(
           { 
             title: 'Equipment Utilization Summary', 
-            subtitle: `Running hours analysis for ${summary.periodDays} days (${summary.periodStart} to ${summary.periodEnd})`, 
+            subtitle: `Running hours analysis for ${mergedSummary.periodDays} days (${mergedSummary.periodStart} to ${mergedSummary.periodEnd})`, 
             vessel: vesselName,
             dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },
@@ -434,7 +434,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         if (mode === 'preview') {
           return {
             title: 'Running Hours Anomaly Detection',
-            subtitle: `Period: ${summaryData.periodStart || 'N/A'} to ${summaryData.periodEnd || 'N/A'}`,
+            subtitle: `Period: ${mergedAnomalySummary.periodStart || 'N/A'} to ${mergedAnomalySummary.periodEnd || 'N/A'}`,
             vessel: vesselName,
             dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to),
             columns,
@@ -446,7 +446,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         pdfReportGenerator.generateReport(
           { 
             title: 'Running Hours Anomaly Detection', 
-            subtitle: `Period: ${summaryData.periodStart || 'N/A'} to ${summaryData.periodEnd || 'N/A'}`, 
+            subtitle: `Period: ${mergedAnomalySummary.periodStart || 'N/A'} to ${mergedAnomalySummary.periodEnd || 'N/A'}`, 
             vessel: vesselName,
             dateRange: formatReportDateRange(categoryFilters.dateRange?.from, categoryFilters.dateRange?.to)
           },

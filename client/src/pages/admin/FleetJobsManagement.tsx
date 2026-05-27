@@ -242,12 +242,17 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
     if (jobFormData.maintenanceBasis === 'Running Hours') {
       setJobFormData(prev => ({ ...prev, unit: 'Hours' }));
     }
+    // Dual Frequency: ensure calendar unit is not 'Hours' (reset to Months if so)
+    if (jobFormData.maintenanceBasis === 'Dual Frequency' && jobFormData.unit === 'Hours') {
+      setJobFormData(prev => ({ ...prev, unit: 'Months' }));
+    }
   }, [jobFormData.maintenanceBasis]);
 
   const handleSaveEdit = () => {
     if (!editingJob) return;
     const EDITABLE_FIELDS: (keyof FleetJobs)[] = [
       'woTitle', 'jobCode', 'maintenanceBasis', 'intervalValue', 'unit',
+      'intervalRunningHour',
       'taskType', 'assignedTo', 'approver', 'jobPriority',
       'classRelated', 'briefWorkDescription', 'department',
       'criticality', 'isActive',
@@ -415,7 +420,16 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
                 {renderDetailField("Fleet Equipment Code", detailJob.fleetEquipmentCode, "detail-job-equip-code")}
                 {renderDetailField("Fleet Equipment Name", detailJob.fleetEquipmentName, "detail-job-equip-name")}
                 {renderDetailField("Maintenance Basis", detailJob.maintenanceBasis, "detail-job-maint-basis")}
-                {renderDetailField("Interval", detailJob.intervalValue && detailJob.unit ? `${detailJob.intervalValue} ${detailJob.unit}` : null, "detail-job-interval")}
+                {renderDetailField(
+                  detailJob.maintenanceBasis === 'Dual Frequency' ? "Calendar Interval" : "Interval",
+                  detailJob.intervalValue && detailJob.unit ? `${detailJob.intervalValue} ${detailJob.unit}` : null,
+                  "detail-job-interval"
+                )}
+                {detailJob.maintenanceBasis === 'Dual Frequency' && renderDetailField(
+                  "RH Interval",
+                  detailJob.intervalRunningHour ? `${detailJob.intervalRunningHour} Hours` : null,
+                  "detail-job-rh-interval"
+                )}
                 {renderDetailField("Task Type", detailJob.taskType, "detail-job-task-type")}
               </div>
             </div>
@@ -664,11 +678,12 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
                       <SelectContent>
                         <SelectItem value="Calendar">Calendar</SelectItem>
                         <SelectItem value="Running Hours">Running Hours</SelectItem>
+                        <SelectItem value="Dual Frequency">Dual Frequency</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-sm text-[#8798ad]">Frequency</Label>
+                    <Label className="text-sm text-[#8798ad]">{jobFormData.maintenanceBasis === 'Dual Frequency' ? 'Calendar Frequency' : 'Frequency'}</Label>
                     <div className="flex gap-2">
                       <Input
                         placeholder="Value"
@@ -700,6 +715,24 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
                       )}
                     </div>
                   </div>
+                  {jobFormData.maintenanceBasis === 'Dual Frequency' && (
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Running Hours Interval</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="e.g., 1000"
+                          type="number"
+                          value={jobFormData.intervalRunningHour || ""}
+                          onChange={(e) => setJobFormData(prev => ({ ...prev, intervalRunningHour: e.target.value ? parseInt(e.target.value, 10) : null }))}
+                          className="flex-1"
+                          data-testid="input-add-rh-interval"
+                        />
+                        <div className="flex-1 text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center">
+                          Hours
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-1">
                     <Label className="text-sm text-[#8798ad]">Task Type</Label>
                     <Input
@@ -1021,11 +1054,12 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
                       <SelectContent>
                         <SelectItem value="Calendar">Calendar</SelectItem>
                         <SelectItem value="Running Hours">Running Hours</SelectItem>
+                        <SelectItem value="Dual Frequency">Dual Frequency</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-sm text-[#8798ad]">Frequency</Label>
+                    <Label className="text-sm text-[#8798ad]">{jobFormData.maintenanceBasis === 'Dual Frequency' ? 'Calendar Frequency' : 'Frequency'}</Label>
                     <div className="flex gap-2">
                       <Input
                         placeholder="Value"
@@ -1057,6 +1091,24 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
                       )}
                     </div>
                   </div>
+                  {jobFormData.maintenanceBasis === 'Dual Frequency' && (
+                    <div className="space-y-1">
+                      <Label className="text-sm text-[#8798ad]">Running Hours Interval</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="e.g., 1000"
+                          type="number"
+                          value={jobFormData.intervalRunningHour || ""}
+                          onChange={(e) => setJobFormData(prev => ({ ...prev, intervalRunningHour: e.target.value ? parseInt(e.target.value, 10) : null }))}
+                          className="flex-1"
+                          data-testid="input-edit-rh-interval"
+                        />
+                        <div className="flex-1 text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center">
+                          Hours
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-1">
                     <Label className="text-sm text-[#8798ad]">Task Type</Label>
                     <Input
@@ -1477,9 +1529,11 @@ export default function FleetJobsManagement({ onBack }: { onBack?: () => void })
                         </td>
                         <td className="py-3 px-4" data-testid={isFirstRow ? "I4.QL.4.24" : undefined}>
                           {isFirstRow && <Marker id="I4.QL.4.24" />}
-                          {job.intervalValue && job.unit
-                            ? `${job.intervalValue} ${job.unit}`
-                            : "-"}
+                          {job.maintenanceBasis === 'Dual Frequency'
+                            ? `${job.intervalValue || '?'} ${job.unit || '?'} / ${job.intervalRunningHour || '?'} RH`
+                            : job.intervalValue && job.unit
+                              ? `${job.intervalValue} ${job.unit}`
+                              : "-"}
                         </td>
                         <td className="py-3 px-4" data-testid={isFirstRow ? "I4.QL.4.25" : undefined}>
                           {isFirstRow && <Marker id="I4.QL.4.25" />}

@@ -223,6 +223,28 @@ export async function completeWorkOrder(
     if (missedCycles > 0) {
       console.log(`⚠️ Skipped cycle detection (RH): ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo} (dueRH: ${dueRH}, completionRH: ${completionRHValue}, interval: ${jobIntervalRH})`);
     }
+  } else if (workOrder.maintenanceBasis === 'Dual Frequency') {
+    // Dual Frequency: use calendar missed cycles (calendar leg is always present)
+    // D2: If RH entered, RH leg also updated; if not, RH unchanged
+    let dualCalendarDueDate = workOrder.nextDueDate || workOrder.dueDate || null;
+    if (!dualCalendarDueDate && workOrder.jobId) {
+      const jobForDualDue = await repo.findJob(workOrder.jobId);
+      if (jobForDualDue?.nextDueDate) {
+        dualCalendarDueDate = jobForDualDue.nextDueDate;
+      }
+    }
+    missedCycles = calcMissedCyclesShared(
+      dualCalendarDueDate,
+      dateOfCompletion,
+      workOrder.frequencyValue,
+      workOrder.frequencyUnit
+    );
+    if (missedCycles > 0) {
+      console.log(`⚠️ Skipped cycle detection (Dual/Calendar): ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo}`);
+    }
+    if (dualCalendarDueDate && !workOrder.nextDueDate) {
+      (workOrder as any).nextDueDate = dualCalendarDueDate;
+    }
   } else {
     let calendarDueDate = workOrder.nextDueDate || workOrder.dueDate || null;
     // Legacy WOs may have no nextDueDate stored on the record — fall back to the job's current nextDueDate
@@ -374,6 +396,22 @@ export async function completeWorkOrder(
           intervalRH: jobIntervalRH,
           missedCycles
         });
+      } else if (workOrder.maintenanceBasis === 'Dual Frequency') {
+        // Dual Frequency: backfill using calendar leg (always present)
+        const { createSkippedCycleRecords } = await import('../utils/skippedCycleBackfill');
+        await createSkippedCycleRecords({
+          workOrderId: workOrder.wouuid || workOrder.id,
+          componentId: component.cuuid,
+          componentCode: workOrder.componentCode || component.componentCode || null,
+          vesselCode: workOrder.vesselId || component.vesselId || null,
+          jobId: workOrder.jobId || null,
+          jobCode: workOrder.jobCode || null,
+          jobTitle: workOrder.jobTitle || null,
+          originalDueDate,
+          missedCycles,
+          frequencyValue: workOrder.frequencyValue,
+          frequencyUnit: workOrder.frequencyUnit
+        });
       } else if (workOrder.maintenanceBasis === 'Calendar') {
         const { createSkippedCycleRecords } = await import('../utils/skippedCycleBackfill');
         await createSkippedCycleRecords({
@@ -461,6 +499,52 @@ export async function completeWorkOrder(
 
         await repo.updateJob(job.juuid, jobUpdates);
         console.log(`✅ Updated calendar job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}`);
+      }
+
+      // Dual Frequency job cycle update — Calendar ALWAYS, RH only if RH entered (D2)
+      if (workOrder.maintenanceBasis === 'Dual Frequency' && dateOfCompletion) {
+        const { calculateNextDueDate } = await import('@shared/dateUtils');
+
+        // Calendar leg: ALWAYS update
+        linkUpdates.lastDoneDate = dateOfCompletion;
+        jobUpdates.lastDoneDate = dateOfCompletion;
+
+        if (job.frequencyValue && job.frequencyUnit) {
+          const nextDue = calculateNextDueDate(dateOfCompletion, job.frequencyValue, job.frequencyUnit, originalDueDate);
+          if (nextDue) {
+            linkUpdates.nextDueDate = nextDue;
+            jobUpdates.nextDueDate = nextDue;
+            console.log(`✅ [Dual] Auto-calculated next due date for job ${job.jobNo}: ${nextDue}`);
+          }
+        }
+
+        // RH leg: ONLY if runningHours entered (D2: if not entered, RH leg UNCHANGED)
+        if (runningHours) {
+          const dualCurrentRH = parseInt(runningHours);
+          if (!isNaN(dualCurrentRH)) {
+            linkUpdates.lastDoneRH = dualCurrentRH.toString();
+            jobUpdates.lastDoneRH = dualCurrentRH;
+
+            const dualRhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
+            if (dualRhInterval && !isNaN(dualRhInterval)) {
+              const nextDueRH = dualCurrentRH + dualRhInterval;
+              linkUpdates.nextDueRH = nextDueRH.toString();
+              jobUpdates.nextDueRH = nextDueRH;
+              console.log(`✅ [Dual] Auto-calculated next due RH for job ${job.jobNo}: ${nextDueRH} (last done RH: ${dualCurrentRH}, interval: ${dualRhInterval})`);
+            }
+          }
+        } else {
+          console.log(`ℹ️ [Dual] No RH entered for job ${job.jobNo} — RH leg stays unchanged (D2)`);
+        }
+
+        const dualUpdateVesselId = workOrder.vesselId || job.vesselId;
+        if (woComponentId && dualUpdateVesselId) {
+          await repo.updateJobComponentLinkTracking(dualUpdateVesselId, job.juuid, woComponentId, linkUpdates);
+          console.log(`✅ [Dual] Updated component tracking for vessel ${dualUpdateVesselId}, job ${job.jobNo} + component ${woComponentId}`);
+        }
+
+        await repo.updateJob(job.juuid, jobUpdates);
+        console.log(`✅ Updated Dual Frequency job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}${runningHours ? ', lastDoneRH: ' + runningHours : ' (RH unchanged)'}`);
       }
 
       // Running Hours-based job cycle update

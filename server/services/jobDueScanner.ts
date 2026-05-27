@@ -102,14 +102,18 @@ export class JobDueScannerService {
     calendarWOsGenerated: number;
     rhJobsChecked: number;
     rhWOsGenerated: number;
+    dualJobsChecked: number;
+    dualWOsGenerated: number;
   }> {
     console.log('[JobDueScanner] Starting job due scan...');
-    
+
     const results = {
       calendarJobsChecked: 0,
       calendarWOsGenerated: 0,
       rhJobsChecked: 0,
-      rhWOsGenerated: 0
+      rhWOsGenerated: 0,
+      dualJobsChecked: 0,
+      dualWOsGenerated: 0
     };
 
     try {
@@ -123,7 +127,12 @@ export class JobDueScannerService {
       results.rhJobsChecked = rhResults.checked;
       results.rhWOsGenerated = rhResults.generated;
 
-      console.log(`[JobDueScanner] Scan complete: Calendar (${results.calendarWOsGenerated}/${results.calendarJobsChecked} WOs), RH (${results.rhWOsGenerated}/${results.rhJobsChecked} WOs)`);
+      // Process Dual Frequency jobs (whichever-first: Calendar OR RH)
+      const dualResults = await this.processDualFrequencyJobs();
+      results.dualJobsChecked = dualResults.checked;
+      results.dualWOsGenerated = dualResults.generated;
+
+      console.log(`[JobDueScanner] Scan complete: Calendar (${results.calendarWOsGenerated}/${results.calendarJobsChecked} WOs), RH (${results.rhWOsGenerated}/${results.rhJobsChecked} WOs), Dual (${results.dualWOsGenerated}/${results.dualJobsChecked} WOs)`);
     } catch (error) {
       console.error('[JobDueScanner] Scan failed:', error);
       throw error;
@@ -398,6 +407,238 @@ export class JobDueScannerService {
   }
 
   /**
+   * Process Dual Frequency jobs — whichever-first: Calendar OR RH
+   * A WO is generated when EITHER the calendar leg OR the RH leg reaches its threshold.
+   * The WO records BOTH calendar and RH snapshots (D6) plus which leg triggered (D5).
+   *
+   * Applicability:
+   * - job.maintenanceBasis = 'Dual Frequency'
+   * - Component RH Counter Type = MASTER or INHERITED (D3)
+   * - job.isActive = true
+   * - job.intervalRunningHour > 0 AND job.nextDueDate set
+   */
+  private async processDualFrequencyJobs(): Promise<{ checked: number; generated: number }> {
+    const skipReasons = {
+      noComponentId: 0,
+      componentNotFound: 0,
+      wrongCounterType: 0,
+      neitherLegDue: 0,
+      legacyBlocking: 0,
+      noLinkedComponents: 0,
+      existingWO: 0,
+      missingCalendarData: 0,
+      missingRHData: 0,
+    };
+
+    // Get only active Dual Frequency jobs
+    const allJobs = await storage.getJobs();
+    const dualJobs = allJobs.filter(job =>
+      job.maintenanceBasis === 'Dual Frequency' &&
+      job.isActive !== false &&
+      job.intervalRunningHour && job.intervalRunningHour > 0 &&
+      job.nextDueDate
+    );
+
+    if (dualJobs.length === 0) {
+      return { checked: 0, generated: 0 };
+    }
+
+    const allWorkOrders = await storage.getWorkOrders();
+
+    // JOB-LEVEL LOCK: one active WO per job
+    const activeWOSets = buildJobsWithActiveWOSet(allWorkOrders);
+
+    // Component cache (same pattern as processRunningHoursJobs)
+    const componentCache = new Map<string, any>();
+    const vesselComponentsFetched = new Set<string>();
+
+    const getComponentFromCache = async (componentId: string, vesselId: string | null): Promise<any | undefined> => {
+      if (vesselId && !vesselComponentsFetched.has(vesselId)) {
+        const vesselComponents = await storage.getComponents(vesselId);
+        vesselComponents.forEach(c => {
+          componentCache.set(c.id, c);
+          if (c.cuuid) componentCache.set(c.cuuid, c);
+        });
+        vesselComponentsFetched.add(vesselId);
+      }
+      return componentCache.get(componentId);
+    };
+
+    let generated = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const job of dualJobs) {
+      // Must have component for RH resolution (D3)
+      if (!job.componentId) {
+        skipReasons.noComponentId++;
+        continue;
+      }
+      const component = await getComponentFromCache(job.componentId, job.vesselId);
+      if (!component) {
+        skipReasons.componentNotFound++;
+        continue;
+      }
+
+      // D3: RH counter type must be MASTER or INHERITED
+      // Normalize to uppercase — DB column is unconstrained text with inconsistent casing
+      const rhCounterType = (component.rhCounterType || '').toUpperCase();
+      if (rhCounterType !== 'MASTER' && rhCounterType !== 'INHERITED') {
+        skipReasons.wrongCounterType++;
+        continue;
+      }
+
+      // Calendar leg values
+      const dueDate = new Date(job.nextDueDate!);
+      dueDate.setHours(0, 0, 0, 0);
+      const generateDate = new Date(dueDate);
+      generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
+      const calendarDue = today >= generateDate;
+
+      // RH leg values
+      let rhEffectiveCurrent: number;
+      if (rhCounterType === 'MASTER') {
+        rhEffectiveCurrent = parseFloat(component.rhCurrentMaster || '0');
+      } else {
+        rhEffectiveCurrent = parseFloat(component.rhCurrentInheritedCached || '0');
+      }
+      const frequencyRH = job.intervalRunningHour || 0;
+      const rhLastDone = parseFloat(job.lastDoneRH || '0');
+      const rhDue = rhLastDone + frequencyRH;
+      const rhGenerate = Math.max(0, rhDue - WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS);
+      const rhLegDue = rhEffectiveCurrent >= rhGenerate;
+
+      // Whichever-first: at least one leg must be due
+      if (!calendarDue && !rhLegDue) {
+        skipReasons.neitherLegDue++;
+        continue;
+      }
+
+      const triggerLeg = calendarDue ? 'CALENDAR' : 'RH';
+
+      // LEGACY FALLBACK: Check for legacy WO without componentCode
+      const legacyBlockingWO = allWorkOrders.find(wo => {
+        if (!isBlockingStatus(wo.status)) return false;
+        if (wo.componentCode && wo.componentCode !== '') return false;
+        if (wo.jobId === job.juuid) return true;
+        const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+        if (woJobNo === job.jobNo && wo.vesselId === job.vesselId) return true;
+        return false;
+      });
+
+      if (legacyBlockingWO) {
+        skipReasons.legacyBlocking++;
+        continue;
+      }
+
+      // Get linked components
+      const linkedComponents = await storage.getLinkedComponentsForJob(job.juuid);
+      if (linkedComponents.length === 0 && job.componentId) {
+        linkedComponents.push({
+          componentId: job.componentId,
+          componentCode: job.componentCode || component.componentCode || '',
+          componentName: job.componentName || component.name || ''
+        });
+      }
+      if (linkedComponents.length === 0) {
+        skipReasons.noLinkedComponents++;
+        continue;
+      }
+
+      const dueDateStr = dueDate.toISOString().split('T')[0];
+      const generateDateStr = generateDate.toISOString().split('T')[0];
+
+      // Generate a WO for EACH linked component
+      for (const linkedComponent of linkedComponents) {
+        const componentCode = linkedComponent.componentCode;
+        const componentName = linkedComponent.componentName;
+
+        if (!componentCode) continue;
+
+        // COMPONENT-LEVEL CHECK: active WO for this job + component
+        const existingWOForComponent = allWorkOrders.find(wo =>
+          wo.jobId === job.juuid &&
+          wo.componentCode === componentCode &&
+          isBlockingStatus(wo.status)
+        );
+
+        if (existingWOForComponent) {
+          skipReasons.existingWO++;
+          continue;
+        }
+
+        const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined);
+
+        // D6: Record BOTH calendar and RH snapshots
+        const workOrderData: InsertWorkOrder = {
+          vesselId: job.vesselId,
+          component: componentName,
+          componentCode: componentCode,
+          jobId: job.juuid,
+          workOrderNo: workOrderNo,
+          templateCode: workOrderNo,
+          jobTitle: job.jobTitle,
+          assignedTo: job.assignedTo || 'Unassigned',
+          dueDate: job.nextDueDate, // Calendar due date
+          nextDueReading: String(rhDue), // RH due value
+          currentReading: String(rhEffectiveCurrent),
+          status: 'Active',
+          taskType: job.maintenanceType,
+          maintenanceBasis: 'Dual Frequency', // D5: WO tag
+          frequencyValue: job.frequencyValue?.toString(),
+          frequencyUnit: job.frequencyUnit,
+          intervalRunningHour: job.intervalRunningHour,
+          jobPriority: job.jobPriority,
+          classRelated: job.classRelated,
+          briefWorkDescription: job.briefWorkDescription,
+          department: job.department,
+          requiredSpareParts: job.requiredSpareParts || [],
+          requiredTools: job.requiredTools || [],
+          safetyRequirements: job.safetyRequirements || {
+            ppeRequirements: [],
+            permitRequirements: [],
+            otherRequirements: []
+          },
+          // D5: Which leg triggered
+          driverType: triggerLeg === 'CALENDAR' ? 'DUAL_CALENDAR' : 'DUAL_RH',
+          dualTriggerLeg: triggerLeg,
+          // Calendar snapshots (always present for Dual)
+          cycleDueDateSnapshot: dueDateStr,
+          generateDateSnapshot: generateDateStr,
+          dueDateSnapshot: dueDateStr,
+          lastDoneDateSnapshot: job.lastDoneDate || null,
+          // RH snapshots (always present for Dual)
+          cycleDueRhSnapshot: String(rhDue),
+          generateRhSnapshot: String(rhGenerate),
+          dueRhSnapshot: String(rhDue),
+          effectiveRhAtGeneration: String(rhEffectiveCurrent),
+          rhLastDoneSnapshot: String(rhLastDone),
+        };
+
+        try {
+          const createdWO = await workOrderService.createWorkOrder(workOrderData);
+          generated++;
+
+          allWorkOrders.push(createdWO);
+
+          const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
+          console.log(`✅ [Dual Trigger] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode} (trigger: ${triggerLeg})`);
+          console.log(`   Calendar: due=${dueDateStr}, generate=${generateDateStr}, calendarDue=${calendarDue}`);
+          console.log(`   RH: last_done=${rhLastDone}, F=${frequencyRH}, due=${rhDue}, generate=${rhGenerate}, current=${rhEffectiveCurrent}, rhDue=${rhLegDue}`);
+        } catch (error: any) {
+          console.warn(`⚠️ Failed to create WO for Dual job ${job.jobNo} + component ${componentCode}: ${error.message}`);
+        }
+      }
+    }
+
+    if (dualJobs.length > 0) {
+      console.log(`📋 [Dual WO Gen] ${dualJobs.length} Dual jobs checked, ${generated} WOs generated. Skip breakdown: neitherLegDue=${skipReasons.neitherLegDue}, wrongCounterType=${skipReasons.wrongCounterType}, existingWO=${skipReasons.existingWO}, legacyBlocking=${skipReasons.legacyBlocking}, noComponentId=${skipReasons.noComponentId}, componentNotFound=${skipReasons.componentNotFound}, noLinkedComponents=${skipReasons.noLinkedComponents}`);
+    }
+
+    return { checked: dualJobs.length, generated };
+  }
+
+  /**
    * Generate a work order for a specific job on-demand (Manual Button)
    * TRIGGER 3: Manual "Generate WO" button per new WO generation rules
    * 
@@ -539,13 +780,80 @@ export class JobDueScannerService {
 
     // Determine job type and compute cycle values
     const isRHJob = job.maintenanceBasis === 'Running Hours';
-    
+    const isDualJob = job.maintenanceBasis === 'Dual Frequency';
+
     let cycleSnapshots: Partial<InsertWorkOrder> = {};
     let dueRH: number | null = null;
     let currentRH: number | null = null;
     let rhLeadTimeHours: number | undefined;
-    
-    if (isRHJob) {
+
+    if (isDualJob) {
+      // Dual Frequency Job: compute BOTH calendar and RH cycle values
+      if (!componentData) {
+        return { success: false, message: 'Component not found for Dual Frequency job' };
+      }
+
+      // D3: Validate RH counter type
+      const dualRhCounterType = componentData.rhCounterType;
+      if (dualRhCounterType !== 'MASTER' && dualRhCounterType !== 'INHERITED') {
+        return { success: false, message: `Dual Frequency requires component RH Counter Type to be MASTER or INHERITED (current: ${dualRhCounterType})` };
+      }
+
+      rhLeadTimeHours = getRhLeadHours(job, settings);
+
+      // RH values
+      if (dualRhCounterType === 'MASTER') {
+        currentRH = parseFloat(componentData.rhCurrentMaster || '0');
+      } else {
+        currentRH = parseFloat(componentData.rhCurrentInheritedCached || '0');
+      }
+      const dualRhLastDone = parseFloat(job.lastDoneRH || '0');
+      const dualFrequencyRH = job.intervalRunningHour || 0;
+      const dualRhDueValue = dualRhLastDone + dualFrequencyRH;
+      const dualRhGenerate = Math.max(0, dualRhDueValue - WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS);
+      dueRH = dualRhDueValue;
+
+      // Calendar values
+      const dualDueDate = job.nextDueDate ? new Date(job.nextDueDate) : new Date();
+      dualDueDate.setHours(0, 0, 0, 0);
+      const dualDueDateStr = dualDueDate.toISOString().split('T')[0];
+      const dualGenerateDate = new Date(dualDueDate);
+      dualGenerateDate.setDate(dualGenerateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
+      const dualGenerateDateStr = dualGenerateDate.toISOString().split('T')[0];
+
+      // Determine which leg would trigger (for driverType) — manual trigger allows override
+      const dualToday = new Date();
+      dualToday.setHours(0, 0, 0, 0);
+      const calLegDue = dualToday >= dualGenerateDate;
+      const rhLegDue = currentRH >= dualRhGenerate;
+      const dualTriggerLeg = calLegDue ? 'CALENDAR' : (rhLegDue ? 'RH' : 'CALENDAR');
+
+      // Job-level blocking already checked above; skip cycle-level for Dual (manual override)
+
+      cycleSnapshots = {
+        driverType: dualTriggerLeg === 'CALENDAR' ? 'DUAL_CALENDAR' : 'DUAL_RH',
+        dualTriggerLeg: dualTriggerLeg,
+        // Calendar snapshots
+        cycleDueDateSnapshot: dualDueDateStr,
+        generateDateSnapshot: dualGenerateDateStr,
+        dueDateSnapshot: dualDueDateStr,
+        lastDoneDateSnapshot: job.lastDoneDate || null,
+        dueDate: job.nextDueDate,
+        // RH snapshots
+        cycleDueRhSnapshot: String(dualRhDueValue),
+        generateRhSnapshot: String(dualRhGenerate),
+        dueRhSnapshot: String(dualRhDueValue),
+        effectiveRhAtGeneration: String(currentRH),
+        rhLastDoneSnapshot: String(dualRhLastDone),
+        nextDueReading: String(dualRhDueValue),
+        currentReading: String(currentRH),
+        intervalRunningHour: job.intervalRunningHour,
+      };
+
+      console.log(`[Manual Trigger 3] Dual Frequency Job: trigger=${dualTriggerLeg}`);
+      console.log(`   Calendar: last_done=${job.lastDoneDate || 'N/A'}, DUE_DATE=${dualDueDateStr}, GENERATE_DATE=${dualGenerateDateStr}`);
+      console.log(`   RH: last_done=${dualRhLastDone}, F=${dualFrequencyRH}, RH_due=${dualRhDueValue}, RH_generate=${dualRhGenerate}, RH_current=${currentRH}`);
+    } else if (isRHJob) {
       // RH Job: compute cycle values
       if (!componentData) {
         return { success: false, message: 'Component not found for job' };

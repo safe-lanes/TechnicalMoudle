@@ -56,6 +56,9 @@ export async function validateData(type: string, data: any[], mode: string, vess
       case 'work-orders':
         primaryField = 'Work Order Number';
         break;
+      case 'wo-history':
+        primaryField = 'WO Number';
+        break;
       case 'makers':
         primaryField = 'Maker Code';
         break;
@@ -68,11 +71,33 @@ export async function validateData(type: string, data: any[], mode: string, vess
       case 'fleet-spares':
         primaryField = 'Part Code';
         break;
+      case 'spare-history':
+        primaryField = 'Part Code';
+        break;
       default:
         primaryField = 'Component Code';
     }
     
     const fieldValue = row[primaryField];
+
+    // For spare-history: a row that is missing Part Code but has other data (e.g. Event Type,
+    // Quantity, Date) must pass through so the per-row validator can emit a "Part Code is required"
+    // error. Only truly empty rows (no data in any relevant field) should be silently dropped.
+    if (type === 'spare-history') {
+      const spareHistoryDataFields = ['Event Type', 'Quantity', 'ROB After', 'Date', 'Performed By', 'Remarks', 'Reference', 'Port/Place'];
+      const hasOtherData = spareHistoryDataFields.some(f => {
+        const v = row[f];
+        return v !== undefined && v !== null && String(v).trim() !== '';
+      });
+      const partCodePresent = fieldValue && String(fieldValue).trim() !== '';
+      if (!partCodePresent && !hasOtherData) {
+        // Completely blank row — skip silently
+        return false;
+      }
+      // Row has some data: include it so the validator can emit per-row errors
+      return true;
+    }
+
     if (!fieldValue) {
       console.log(`[${type}] Row ${index + 2}: Skipping - no ${primaryField} value`);
       return false; // Skip empty rows
@@ -201,6 +226,22 @@ export async function validateData(type: string, data: any[], mode: string, vess
     });
   }
   
+  // Pre-load vessel spares for spare-history Part Code validation
+  const vesselSparesByPartCode = new Map<string, any>();
+  if (type === 'spare-history' && vesselId) {
+    try {
+      const vesselSpares = await storage.getSpares(vesselId);
+      vesselSpares.forEach((s: any) => {
+        if (s.partCode) {
+          vesselSparesByPartCode.set(String(s.partCode).trim(), s);
+        }
+      });
+      console.log(`📋 Loaded ${vesselSparesByPartCode.size} spares for vessel '${vesselId}' (spare-history validation)`);
+    } catch (err) {
+      console.warn('⚠️ Could not pre-load vessel spares for spare-history validation:', err);
+    }
+  }
+
   let existingMakersByCode = new Map<string, any>();
   let existingMakersByName = new Map<string, any>();
   let makerListLoaded = false;
@@ -600,6 +641,19 @@ export async function validateData(type: string, data: any[], mode: string, vess
         }
       }
 
+      // Validate Rotation Item (optional boolean: blank | Yes/Y/true/1 | No/N/false/0)
+      const rotationField = row['Rotation Item'];
+      const rawRotation = typeof rotationField === 'boolean'
+        ? (rotationField ? 'yes' : 'no')
+        : (rotationField === undefined || rotationField === null ? '' : String(rotationField).toLowerCase().trim());
+      if (rawRotation !== '') {
+        if (!['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'].includes(rawRotation)) {
+          errors.push(`Row ${rowNum}: Rotation Item must be Yes or No`);
+        } else {
+          normalized['Rotation Item'] = ['yes', 'y', 'true', '1'].includes(rawRotation) ? 'Yes' : 'No';
+        }
+      }
+
       // Validate Fleet Equipment Code if provided
       if (row['Fleet Equipment Code']) {
         const fleetCode = String(row['Fleet Equipment Code']).trim();
@@ -765,7 +819,7 @@ export async function validateData(type: string, data: any[], mode: string, vess
       }
 
       // Validate Schedule_Type (formerly Maintenance Basis)
-      const validScheduleTypes = ['Calendar', 'Running Hours'];
+      const validScheduleTypes = ['Calendar', 'Running Hours', 'Dual Frequency'];
       if (row['Schedule_Type'] && !validScheduleTypes.includes(row['Schedule_Type'])) {
         errors.push(`Row ${rowNum}: Invalid Schedule_Type. Allowed: ${validScheduleTypes.join(', ')}`);
       } else if (row['Schedule_Type']) {
@@ -847,6 +901,144 @@ export async function validateData(type: string, data: any[], mode: string, vess
           normalized[key] = row[key];
         }
       });
+    } else if (type === 'wo-history') {
+      // ── WO History import validation ──
+      // Required: WO Number, Component Code, Job Title, Maintenance Type, Date Completed, Performed By
+
+      const woNumber = row['WO Number'];
+      if (!woNumber || String(woNumber).trim() === '') {
+        errors.push(`Row ${rowNum}: WO Number is required`);
+      } else {
+        normalized['WO Number'] = String(woNumber).trim();
+      }
+
+      const componentCode = row['Component Code'];
+      if (!componentCode || String(componentCode).trim() === '') {
+        errors.push(`Row ${rowNum}: Component Code is required`);
+      } else {
+        normalized['Component Code'] = String(componentCode).trim();
+      }
+
+      const jobTitle = row['Job Title'];
+      if (!jobTitle || String(jobTitle).trim() === '') {
+        errors.push(`Row ${rowNum}: Job Title is required`);
+      } else {
+        normalized['Job Title'] = String(jobTitle).trim();
+      }
+
+      const maintenanceType = row['Maintenance Type'];
+      if (!maintenanceType || String(maintenanceType).trim() === '') {
+        errors.push(`Row ${rowNum}: Maintenance Type is required`);
+      } else {
+        normalized['Maintenance Type'] = String(maintenanceType).trim();
+      }
+
+      if (!row['Date Completed'] && row['Date Completed'] !== 0) {
+        errors.push(`Row ${rowNum}: Date Completed is required`);
+      } else {
+        normalized['Date Completed'] = row['Date Completed'];
+      }
+
+      const performedBy = row['Performed By'];
+      if (!performedBy || String(performedBy).trim() === '') {
+        errors.push(`Row ${rowNum}: Performed By is required`);
+      } else {
+        normalized['Performed By'] = String(performedBy).trim();
+      }
+
+      // Status — optional, default to 'Completed'
+      const validStatuses = ['Completed', 'Approved'];
+      const rawStatus = row['Status'] ? String(row['Status']).trim() : '';
+      if (rawStatus && !validStatuses.includes(rawStatus)) {
+        warnings.push(`Row ${rowNum}: Status '${rawStatus}' is not standard. Will default to 'Completed'.`);
+        normalized['Status'] = 'Completed';
+      } else {
+        normalized['Status'] = rawStatus || 'Completed';
+      }
+
+      // Optional fields — copy as-is (dates stored raw for import service to parse)
+      const optionalFields = [
+        'WO Description', 'Duration Hours', 'Running Hours at Completion',
+        'Remarks', 'Next Due Date', 'Spare Parts Used', 'Job Approved By',
+        'WO Due Date', 'WO Due Hour', 'Next Due Hour'
+      ];
+      for (const field of optionalFields) {
+        if (row[field] !== undefined && row[field] !== null && String(row[field]).trim() !== '') {
+          normalized[field] = row[field];
+        }
+      }
+    } else if (type === 'spare-history') {
+      // ── Spare History import validation ──
+      // Required: Part Code, Event Type, Quantity, ROB After, Date
+
+      const partCode = row['Part Code'];
+      if (!partCode || String(partCode).trim() === '') {
+        errors.push(`Row ${rowNum}: Part Code is required`);
+      } else {
+        const partCodeStr = String(partCode).trim();
+        normalized['Part Code'] = partCodeStr;
+        // Verify the part code exists in this vessel's spares register
+        if (vesselSparesByPartCode.size > 0 && !vesselSparesByPartCode.has(partCodeStr)) {
+          errors.push(`Row ${rowNum}: Part Code '${partCodeStr}' not found in vessel's spares register`);
+        }
+      }
+
+      const eventType = row['Event Type'];
+      const validEventTypes = ['CONSUME', 'RECEIVE', 'ADJUST'];
+      if (!eventType || String(eventType).trim() === '') {
+        errors.push(`Row ${rowNum}: Event Type is required`);
+      } else {
+        const evtNorm = String(eventType).trim().toUpperCase();
+        if (!validEventTypes.includes(evtNorm)) {
+          errors.push(`Row ${rowNum}: Event Type '${eventType}' is invalid. Accepted values: CONSUME, RECEIVE, ADJUST`);
+        } else {
+          normalized['Event Type'] = evtNorm;
+        }
+      }
+
+      const quantity = row['Quantity'];
+      if (quantity === undefined || quantity === null || String(quantity).trim() === '') {
+        errors.push(`Row ${rowNum}: Quantity is required`);
+      } else {
+        const qtyStr = String(quantity).trim();
+        const qtyNum = Number(qtyStr);
+        if (!Number.isInteger(qtyNum) || qtyNum < 0 || isNaN(qtyNum)) {
+          errors.push(`Row ${rowNum}: Quantity must be a non-negative integer (got '${qtyStr}')`);
+        } else {
+          normalized['Quantity'] = qtyNum;
+        }
+      }
+
+      const robAfter = row['ROB After'];
+      if (robAfter === undefined || robAfter === null || String(robAfter).trim() === '') {
+        errors.push(`Row ${rowNum}: ROB After is required`);
+      } else {
+        const robStr = String(robAfter).trim();
+        const robNum = Number(robStr);
+        if (!Number.isInteger(robNum) || robNum < 0 || isNaN(robNum)) {
+          errors.push(`Row ${rowNum}: ROB After must be a non-negative integer (got '${robStr}')`);
+        } else {
+          normalized['ROB After'] = robNum;
+        }
+      }
+
+      if (!row['Date'] && row['Date'] !== 0) {
+        errors.push(`Row ${rowNum}: Date is required`);
+      } else {
+        normalized['Date'] = row['Date'];
+      }
+
+      // Optional fields — copy as-is
+      const optionalFields = [
+        'Vessel Code', 'Component Code', 'Performed By', 'Remarks',
+        'Reference', 'Port/Place', 'Timezone', 'Component Spare Code'
+      ];
+      for (const field of optionalFields) {
+        if (row[field] !== undefined && row[field] !== null && String(row[field]).trim() !== '') {
+          normalized[field] = row[field];
+        }
+      }
+
     } else if (type === 'jobs') {
       // Validate jobs (21-column specification format)
       // Skip rows that don't have WO Title - user only fills in components they want jobs for
@@ -904,11 +1096,11 @@ export async function validateData(type: string, data: any[], mode: string, vess
 
       // Maintenance Basis - required (Calendar or Running Hours only)
       // CRITICAL: Frequency is the foundation of PMS scheduling - cannot be empty
-      const validMaintenanceBasis = ['Calendar', 'Running Hours'];
+      const validMaintenanceBasis = ['Calendar', 'Running Hours', 'Dual Frequency'];
       if (!row['Maintenance Basis']) {
-        errors.push(`Row ${rowNum}: Maintenance Basis is required (must be 'Calendar' or 'Running Hours')`);
+        errors.push(`Row ${rowNum}: Maintenance Basis is required (must be 'Calendar', 'Running Hours', or 'Dual Frequency')`);
       } else if (!validMaintenanceBasis.includes(row['Maintenance Basis'])) {
-        errors.push(`Row ${rowNum}: Invalid Maintenance Basis '${row['Maintenance Basis']}'. Must be 'Calendar' or 'Running Hours'`);
+        errors.push(`Row ${rowNum}: Invalid Maintenance Basis '${row['Maintenance Basis']}'. Must be 'Calendar', 'Running Hours', or 'Dual Frequency'`);
       } else {
         normalized['Maintenance Basis'] = row['Maintenance Basis'];
       }
@@ -954,10 +1146,33 @@ export async function validateData(type: string, data: any[], mode: string, vess
           }
         }
         normalized['Unit'] = 'Hours';
-        
+
         // Auto-derive Interval Running Hours from Interval Value when Unit = Hours and no explicit value provided
         if (!row['Interval Running Hours'] && row['Interval Value']) {
           normalized['Interval Running Hours'] = String(row['Interval Value']).trim();
+        }
+      } else if (maintenanceBasis === 'Dual Frequency') {
+        // Dual Frequency requires BOTH calendar unit AND Interval Running Hours
+        // Calendar leg: Interval Value + Unit define the calendar frequency
+        const validCalendarUnits = ['Hours', 'Days', 'Weeks', 'Months', 'Years'];
+        if (!row['Unit']) {
+          errors.push(`Row ${rowNum}: Unit is REQUIRED for Dual Frequency (calendar leg). Allowed: ${validCalendarUnits.join(', ')}`);
+        } else if (!validCalendarUnits.includes(row['Unit'])) {
+          errors.push(`Row ${rowNum}: Invalid Unit '${row['Unit']}' for Dual Frequency. Allowed: ${validCalendarUnits.join(', ')}`);
+        } else {
+          normalized['Unit'] = row['Unit'];
+        }
+        // RH leg: Interval Running Hours must be present and > 0
+        const dualIntervalRH = row['Interval Running Hours'];
+        if (!dualIntervalRH || String(dualIntervalRH).trim() === '') {
+          errors.push(`Row ${rowNum}: Interval Running Hours is REQUIRED for Dual Frequency jobs (RH leg)`);
+        } else {
+          const dualRH = parseFloat(String(dualIntervalRH).trim());
+          if (isNaN(dualRH) || dualRH <= 0) {
+            errors.push(`Row ${rowNum}: Interval Running Hours must be a positive number for Dual Frequency (got: '${dualIntervalRH}')`);
+          } else {
+            normalized['Interval Running Hours'] = String(dualRH);
+          }
         }
       }
 

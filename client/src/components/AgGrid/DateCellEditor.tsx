@@ -97,15 +97,19 @@ const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((prop
     const compoundId = data?.vesselId && data?.masterId
       ? `${data.vesselId}::${data.masterId}`
       : data?.id;
-    
+    const onDateChange = props.context?.onDateChange;
+
     console.log('[DateCellEditor] Committing value:', newDisplayValue, 'for field:', field, 'id:', compoundId);
-    
-    if (field && compoundId && props.node && props.context?.onDateChange) {
-      props.node.setDataValue(field, newDisplayValue);
-      props.context.onDateChange(compoundId, field, newDisplayValue, data);
-    }
-    
+
+    // Let AG Grid commit the value via getValue() during stopEditing — this is
+    // the single source of truth for writing the row. Avoid setDataValue here
+    // because it fires onCellValueChanged mid-edit and competes with the
+    // post-stopEditing write, producing the "value reverts" symptom.
     props.stopEditing();
+
+    if (field && compoundId && onDateChange) {
+      onDateChange(compoundId, field, newDisplayValue, data);
+    }
   }, [props]);
   
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

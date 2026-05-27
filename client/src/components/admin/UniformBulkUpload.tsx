@@ -51,7 +51,8 @@ import {
   ChevronsRight,
   ChevronDown,
   ChevronUp,
-  Info
+  Info,
+  History
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -132,12 +133,15 @@ interface UniformBulkUploadProps {
   title: string;
   description: string;
   icon: LucideIcon;
-  templateType: 'components' | 'jobs' | 'spares' | 'stores' | 'makers' | 'fleet-components' | 'fleet-jobs' | 'fleet-spares';
+  templateType: 'components' | 'jobs' | 'spares' | 'stores' | 'makers' | 'fleet-components' | 'fleet-jobs' | 'fleet-spares' | 'wo-history';
   templateFileName: string;
   fieldMappings: FieldMapping[];
   vesselId?: string;
   previewColumns?: string[];
   storeTypes?: StoreTypeOption[];
+  historySubTypes?: StoreTypeOption[];
+  selectedHistorySubType?: string;
+  onHistorySubTypeChange?: (value: string) => void;
   onRefreshData?: () => void;
   markers?: MarkerConfig;
 }
@@ -152,6 +156,9 @@ export default function UniformBulkUpload({
   vesselId,
   previewColumns,
   storeTypes,
+  historySubTypes,
+  selectedHistorySubType: selectedHistorySubTypeProp,
+  onHistorySubTypeChange,
   onRefreshData,
   markers
 }: UniformBulkUploadProps) {
@@ -159,6 +166,27 @@ export default function UniformBulkUpload({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<'add' | 'update' | 'upsert'>('upsert');
   const [selectedStoreType, setSelectedStoreType] = useState<string>('');
+  const [internalHistorySubType, setInternalHistorySubType] = useState<string>(selectedHistorySubTypeProp ?? 'work-order');
+  const selectedHistorySubType = selectedHistorySubTypeProp ?? internalHistorySubType;
+  const setSelectedHistorySubType = (value: string) => {
+    setInternalHistorySubType(value);
+    onHistorySubTypeChange?.(value);
+  };
+
+  // Derive the effective import type from templateType + selectedHistorySubType.
+  // When the user picks a history sub-type other than 'work-order', the effective type
+  // changes so template downloads, dry-runs, imports, and cache keys all target the
+  // correct backend handler instead of the default wo-history handler.
+  const effectiveType: string = (() => {
+    if (templateType === 'wo-history' && selectedHistorySubType === 'spares') return 'spare-history';
+    return templateType;
+  })();
+
+  // Effective template filename matching the effective type
+  const effectiveTemplateFileName: string = (() => {
+    if (effectiveType === 'spare-history') return 'spare_history_template.xlsx';
+    return templateFileName;
+  })();
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -187,9 +215,9 @@ export default function UniformBulkUpload({
   const { consumeStream } = useImportStream();
 
   const { data: historyData, isLoading: historyLoading } = useQuery<{items: ImportHistory[], total: number}>({
-    queryKey: ['/technical/api/bulk/history', templateType],
+    queryKey: ['/technical/api/bulk/history', effectiveType],
     queryFn: async () => {
-      const response = await fetch(`/technical/api/bulk/history?type=${templateType}&limit=50`);
+      const response = await fetch(`/technical/api/bulk/history?type=${effectiveType}&limit=50`);
       if (!response.ok) throw new Error('Failed to fetch history');
       return response.json();
     }
@@ -200,8 +228,8 @@ export default function UniformBulkUpload({
   const handleDownloadTemplate = async () => {
     try {
       const templateUrl = vesselId 
-        ? `/technical/api/bulk/template?type=${templateType}&vesselId=${vesselId}`
-        : `/technical/api/bulk/template?type=${templateType}`;
+        ? `/technical/api/bulk/template?type=${effectiveType}&vesselId=${vesselId}`
+        : `/technical/api/bulk/template?type=${effectiveType}`;
       const response = await fetch(templateUrl);
       if (!response.ok) throw new Error('Failed to download template');
       
@@ -209,7 +237,7 @@ export default function UniformBulkUpload({
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = templateFileName;
+      a.download = effectiveTemplateFileName;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -330,7 +358,7 @@ export default function UniformBulkUpload({
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('type', templateType);
+    formData.append('type', effectiveType);
     formData.append('mode', importMode);
     if (vesselId) {
       formData.append('vesselId', vesselId);
@@ -343,6 +371,9 @@ export default function UniformBulkUpload({
     
     if (templateType === 'stores' && selectedStoreType) {
       formData.append('storeType', selectedStoreType);
+    }
+    if (historySubTypes && selectedHistorySubType) {
+      formData.append('historySubType', selectedHistorySubType);
     }
 
     try {
@@ -405,7 +436,7 @@ export default function UniformBulkUpload({
 
     const requestBody: any = {
       fileToken: dryRunResult.fileToken,
-      type: templateType,
+      type: effectiveType,
       mode: importMode,
       vesselId: vesselId,
       archiveMissing: false,
@@ -414,6 +445,9 @@ export default function UniformBulkUpload({
 
     if (templateType === 'stores' && selectedStoreType) {
       requestBody.storeType = selectedStoreType;
+    }
+    if (historySubTypes && selectedHistorySubType) {
+      requestBody.historySubType = selectedHistorySubType;
     }
 
     setSseProgress(null);
@@ -451,8 +485,8 @@ export default function UniformBulkUpload({
 
             setPartialImportDialogOpen(false);
 
-            queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', templateType] });
-            invalidateAfterBulkImport(templateType, vesselId);
+            queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', effectiveType] });
+            invalidateAfterBulkImport(effectiveType, vesselId);
 
             if (onRefreshData) {
               onRefreshData();
@@ -496,10 +530,10 @@ export default function UniformBulkUpload({
         rows.push({
           rowNumber: rr.rowNumber,
           primaryIdentifier: rr.primaryIdentifier || '',
-          status: rr.action === 'created' || rr.action === 'updated' ? 'success'
+          status: rr.action === 'created' || rr.action === 'updated' || rr.action === 'linked' ? 'success'
             : rr.action === 'failed' ? 'failed'
             : 'skipped',
-          error: rr.error || undefined,
+          error: rr.error || rr.info || undefined,
           data: dryRunRow?.normalized,
         });
       }
@@ -628,10 +662,10 @@ export default function UniformBulkUpload({
         description: `Deleted: ${result.deleted}, Restored: ${result.restored}, Unarchived: ${result.unarchived}`
       });
       
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', templateType] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', effectiveType] });
       
       // Invalidate domain-specific caches after undo
-      invalidateAfterBulkImport(templateType, vesselId);
+      invalidateAfterBulkImport(effectiveType, vesselId);
       
       if (onRefreshData) {
         onRefreshData();
@@ -699,6 +733,7 @@ export default function UniformBulkUpload({
   };
 
   const isStoresAndNoType = templateType === 'stores' && !selectedStoreType;
+  const isHistoryComingSoon = historySubTypes !== undefined && selectedHistorySubType !== 'work-order' && selectedHistorySubType !== 'spares';
 
   return (
     <div className="space-y-6">
@@ -762,8 +797,42 @@ export default function UniformBulkUpload({
               </CardContent>
             </Card>
           )}
+          {historySubTypes && (
+            <Card data-testid="history-type-section">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base" data-testid="history-type-label">
+                  History Type <span className="text-red-500">*</span>
+                </CardTitle>
+                <CardDescription>Select the type of historical data to import</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Select value={selectedHistorySubType} onValueChange={setSelectedHistorySubType}>
+                  <SelectTrigger className="w-64" data-testid="select-history-type">
+                    <SelectValue placeholder="Select history type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {historySubTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+          )}
 
-          <Card className={isStoresAndNoType ? 'opacity-50 pointer-events-none' : ''} data-testid={markers?.importModeSection || "import-mode-section"}>
+          {isHistoryComingSoon && (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-16">
+                <History className="h-16 w-16 text-gray-300 mb-4" />
+                <h3 className="text-lg font-semibold text-gray-500 mb-2">Coming Soon</h3>
+                <p className="text-sm text-gray-400 text-center max-w-sm">
+                  Historical import for this type is not yet available. Please select <strong>Work Order</strong> to import WO history.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className={`${isStoresAndNoType ? 'opacity-50 pointer-events-none' : ''} ${isHistoryComingSoon ? 'hidden' : ''}`} data-testid={markers?.importModeSection || "import-mode-section"}>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Import Mode</CardTitle>
               <CardDescription data-testid={markers?.importModeLabel || "import-mode-label"}>
@@ -801,7 +870,7 @@ export default function UniformBulkUpload({
             </CardContent>
           </Card>
 
-          <Card className={isStoresAndNoType ? 'opacity-50 pointer-events-none' : ''}>
+          <Card className={`${isStoresAndNoType ? 'opacity-50 pointer-events-none' : ''} ${isHistoryComingSoon ? 'hidden' : ''}`}>
             <CardHeader className="pb-3">
               <CardTitle className="text-base" data-testid={markers?.uploadSection || "upload-section"}>
                 Upload File

@@ -480,6 +480,12 @@ export async function generateFleetMasterTemplate(): Promise<Buffer> {
       allowBlank: true,
       formulae: ["'Master Data'!$G$2:$G$3"]
     };
+    // Rotation Item Yes/No (col 28)
+    vesselSpareSheet.getCell(row, 28).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
     // IS Active (col 25)
     vesselSpareSheet.getCell(row, 25).dataValidation = {
       type: 'list',
@@ -734,8 +740,8 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
   // Create main "jobs" sheet with 26-column structure (includes Part A fields)
   const jobsSheet = workbook.addWorksheet('Vessel_Job');
   
-  // Add headers matching the 25-column specification (20 original + 5 Part A fields)
-  // NOTE: "Interval Running Hours" column removed - when Unit = "Hours", Interval Value is used as the running hours interval
+  // Add headers matching the 26-column specification (21 original + 5 Part A fields)
+  // NOTE: "Interval Running Hours" column restored for Dual Frequency support
   jobsSheet.columns = [
     { header: 'Job Code', key: 'jobCode', width: 18 },
     { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 22 },
@@ -746,6 +752,7 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Maintenance Basis', key: 'maintenanceBasis', width: 18 },
     { header: 'Interval Value', key: 'intervalValue', width: 15 },
     { header: 'Unit', key: 'unit', width: 12 },
+    { header: 'Interval Running Hours', key: 'intervalRunningHours', width: 22 },
     { header: 'Task Type', key: 'taskType', width: 20 },
     { header: 'Assigned To', key: 'assignedTo', width: 20 },
     { header: 'Approver', key: 'approver', width: 20 },
@@ -778,6 +785,7 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       maintenanceBasis: '',
       intervalValue: '',
       unit: '',
+      intervalRunningHours: '',
       taskType: '',
       assignedTo: '',
       approver: '',
@@ -811,11 +819,11 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Yes_No', key: 'yesNo', width: 10 }
   ];
   
-  // Add dropdown values (Only Calendar and Running Hours - interval is REQUIRED for PMS)
+  // Add dropdown values (Calendar, Running Hours, and Dual Frequency)
   const listValues = [
     { maintenanceBasis: 'Calendar', intervalUnit: 'Days', taskType: 'Inspection', jobPriority: 'Low', department: 'Engine', yesNo: 'Yes' },
     { maintenanceBasis: 'Running Hours', intervalUnit: 'Weeks', taskType: 'Overhaul', jobPriority: 'Medium', department: 'Deck', yesNo: 'No' },
-    { maintenanceBasis: '', intervalUnit: 'Months', taskType: 'Service', jobPriority: 'High', department: 'Electrical', yesNo: '' },
+    { maintenanceBasis: 'Dual Frequency', intervalUnit: 'Months', taskType: 'Service', jobPriority: 'High', department: 'Electrical', yesNo: '' },
     { maintenanceBasis: '', intervalUnit: 'Years', taskType: 'Testing', jobPriority: 'Critical', department: 'C/E', yesNo: '' },
     { maintenanceBasis: '', intervalUnit: 'Hours', taskType: 'Repair', jobPriority: '', department: '2/E', yesNo: '' },
     { maintenanceBasis: '', intervalUnit: '', taskType: 'Replacement', jobPriority: '', department: '3/E', yesNo: '' },
@@ -825,19 +833,19 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
   
   listValues.forEach(row => listsSheet.addRow(row));
   
-  // Add data validations to jobs sheet (20-column layout, removed Interval Running Hours)
-  // Column G (Maintenance Basis) - row 2 onwards (Only Calendar and Running Hours allowed)
+  // Add data validations to jobs sheet (26-column layout, with Interval Running Hours restored)
+  // Column G (Maintenance Basis) - row 2 onwards (Calendar, Running Hours, Dual Frequency)
   jobsSheet.getColumn(7).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
         allowBlank: true,
-        formulae: ['=Lists!$A$2:$A$3']  // Only Calendar and Running Hours
+        formulae: ['=Lists!$A$2:$A$4']  // Calendar, Running Hours, Dual Frequency
       };
     }
   });
   
-  // Column I (Unit - was J before removing Interval Running Hours column)
+  // Column I (Unit)
   jobsSheet.getColumn(9).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
@@ -847,9 +855,11 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       };
     }
   });
-  
-  // Column J (Task Type - was K before)
-  jobsSheet.getColumn(10).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+
+  // Column J (Interval Running Hours) - no validation, free-form number
+
+  // Column K (Task Type) - shifted +1 from col 10
+  jobsSheet.getColumn(11).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -858,9 +868,9 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       };
     }
   });
-  
-  // Column M (Job Priority - was N before)
-  jobsSheet.getColumn(13).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+
+  // Column N (Job Priority) - shifted +1 from col 13
+  jobsSheet.getColumn(14).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -869,9 +879,9 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       };
     }
   });
-  
-  // Column N (Class Related - was O before) - Yes/No
-  jobsSheet.getColumn(14).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+
+  // Column O (Class Related) - shifted +1 from col 14 - Yes/No
+  jobsSheet.getColumn(15).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -880,9 +890,9 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       };
     }
   });
-  
-  // Column Q (Department - was R before)
-  jobsSheet.getColumn(17).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+
+  // Column R (Department) - shifted +1 from col 17
+  jobsSheet.getColumn(18).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -891,9 +901,9 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       };
     }
   });
-  
-  // Column R (Criticality - was S before) - Yes/No
-  jobsSheet.getColumn(18).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+
+  // Column S (Criticality) - shifted +1 from col 18 - Yes/No
+  jobsSheet.getColumn(19).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -902,9 +912,9 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       };
     }
   });
-  
-  // Column S (Is Active - was T before) - Yes/No
-  jobsSheet.getColumn(19).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+
+  // Column T (Is Active) - shifted +1 from col 19 - Yes/No
+  jobsSheet.getColumn(20).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -1056,12 +1066,243 @@ export async function generateSparesTemplate(vesselId: string): Promise<Buffer> 
       allowBlank: true,
       formulae: ['=Lists!$B$2:$B$3']
     };
+
+    // Column AB (Rotation Item) - Column 28
+    sparesSheet.getCell(row, 28).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ['=Lists!$B$2:$B$3']
+    };
   }
   
-  // Spares template has 27 data columns (A through AA), version goes in column 28 (AB)
-  addVersionInfoToSheet(sparesSheet, 28);
+  // Spares template has 28 data columns (A through AB, including Rotation Item), version goes in column 29 (AC)
+  addVersionInfoToSheet(sparesSheet, 29);
   
   // Write to buffer and return
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
+}
+
+// =====================================================
+// WO HISTORY TEMPLATE GENERATOR
+// =====================================================
+
+export async function generateWoHistoryTemplate(): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+
+  // ── Sheet 1: WO History (data entry) ──────────────
+  const woSheet = workbook.addWorksheet('WO History');
+  woSheet.columns = [
+    { header: 'WO Number',                    key: 'woNumber',        width: 25 },
+    { header: 'Component Code',               key: 'componentCode',   width: 20 },
+    { header: 'Job Title',                    key: 'jobTitle',        width: 40 },
+    { header: 'Maintenance Type',             key: 'maintenanceType', width: 20 },
+    { header: 'Date Completed',               key: 'dateCompleted',   width: 18 },
+    { header: 'Performed By',                 key: 'performedBy',     width: 25 },
+    { header: 'WO Description',               key: 'woDescription',   width: 50 },
+    { header: 'Duration Hours',               key: 'durationHours',   width: 16 },
+    { header: 'Running Hours at Completion',  key: 'rhAtCompletion',  width: 25 },
+    { header: 'Remarks',                      key: 'remarks',         width: 40 },
+    { header: 'Next Due Date',                key: 'nextDueDate',     width: 18 },
+    { header: 'Spare Parts Used',             key: 'sparePartsUsed',  width: 40 },
+    { header: 'Job Approved By',              key: 'jobApprovedBy',   width: 25 },
+    { header: 'WO Due Date',                  key: 'woDueDate',       width: 18 },
+    { header: 'WO Due Hour',                  key: 'woDueHour',       width: 16 },
+    { header: 'Next Due Hour',                key: 'nextDueHour',     width: 16 },
+    { header: 'Status',                       key: 'status',          width: 20 },
+  ];
+
+  // Style header row — bold; required columns (1–6) get red text
+  woSheet.getRow(1).font = { bold: true };
+  woSheet.getRow(1).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFD0E4F7' },
+  };
+  [1, 2, 3, 4, 5, 6].forEach(col => {
+    woSheet.getRow(1).getCell(col).font = { bold: true, color: { argb: 'FFCC0000' } };
+  });
+
+  // Dropdown validation for Maintenance Type (col 4)
+  for (let row = 2; row <= 1000; row++) {
+    woSheet.getCell(row, 4).dataValidation = {
+      type: 'list',
+      allowBlank: false,
+      formulae: ['"Planned,Unplanned,Condition-Based"'],
+    };
+  }
+
+  // Dropdown validation for Status (col 17)
+  for (let row = 2; row <= 1000; row++) {
+    woSheet.getCell(row, 17).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ['"Completed,Due,Overdue,Postponed,Pending Approval,Active"'],
+    };
+  }
+
+  // Sample data row
+  woSheet.addRow({
+    woNumber:       '601.001.WO-2024-01',
+    componentCode:  '601.001.AA',
+    jobTitle:       'Main Engine Oil Change',
+    maintenanceType:'Planned',
+    dateCompleted:  '15-NOV-2024',
+    performedBy:    'Chief Engineer',
+    woDescription:  'Routine oil change as per PMS schedule',
+    durationHours:  3,
+    rhAtCompletion: 8250,
+    remarks:        'Completed without issues. Oil sample sent for analysis.',
+    nextDueDate:    '15-MAY-2025',
+    sparePartsUsed: 'OIL-FILTER-001, GASKET-001',
+    jobApprovedBy:  'Chief Engineer',
+    woDueDate:      '10-NOV-2024',
+    woDueHour:      8200,
+    nextDueHour:    9200,
+    status:         'Completed',
+  });
+
+  // ── Sheet 2: Instructions ──────────────────────────
+  const instrSheet = workbook.addWorksheet('Instructions');
+  instrSheet.columns = [
+    { header: 'Field',       key: 'field',       width: 30 },
+    { header: 'Required',    key: 'required',    width: 12 },
+    { header: 'Description', key: 'description', width: 70 },
+    { header: 'Example',     key: 'example',     width: 40 },
+  ];
+  instrSheet.getRow(1).font = { bold: true };
+
+  const rows = [
+    ['WO Number',                  'Required', 'Unique work order number',                                             '601.001.WO-2024-01'],
+    ['Component Code',             'Required', 'Equipment component code — must exist in the vessel register',        '601.001.AA'],
+    ['Job Title',                  'Required', 'Title of the maintenance job performed',                              'Main Engine Oil Change'],
+    ['Maintenance Type',           'Required', 'One of: Planned, Unplanned, Condition-Based',                        'Planned'],
+    ['Date Completed',             'Required', 'Date work was completed — use DD-MMM-YYYY format',                   '15-NOV-2024'],
+    ['Performed By',               'Required', 'Name or rank of person who performed the work',                      'Chief Engineer'],
+    ['WO Description',             'Optional', 'Detailed description of the work carried out',                       'Routine oil change per PMS schedule'],
+    ['Duration Hours',             'Optional', 'Time taken to complete the work (decimal hours)',                     '3.5'],
+    ['Running Hours at Completion','Optional', 'Component running hours recorded at time of completion',              '8250'],
+    ['Remarks',                    'Optional', 'Observations, findings, or follow-up notes',                         'Oil sample sent for analysis'],
+    ['Next Due Date',              'Optional', 'Next scheduled maintenance date — use DD-MMM-YYYY format',           '15-MAY-2025'],
+    ['Spare Parts Used',           'Optional', 'Comma-separated part codes of spare parts consumed',                 'OIL-FILTER-001, GASKET-001'],
+    ['Job Approved By',            'Optional', 'Name or rank of person who approved the work order',                 'Chief Engineer'],
+    ['WO Due Date',                'Optional', 'Date the work order was due — use DD-MMM-YYYY format',              '10-NOV-2024'],
+    ['WO Due Hour',                'Optional', 'Running hours at which the work order became due (numeric)',         '8200'],
+    ['Next Due Hour',              'Optional', 'Running hours at which the next maintenance is due (numeric)',       '9200'],
+    ['Status',                     'Optional', 'One of: Completed, Due, Overdue, Postponed, Pending Approval, Active', 'Completed'],
+    ['', '', '', ''],
+    ['--- NOTES ---', '', '', ''],
+    ['Date format',              '', 'Use DD-MMM-YYYY (e.g. 15-NOV-2024). Month must be 3-letter abbreviation.',    ''],
+    ['Maintenance Type',         '', 'Accepted values: Planned | Unplanned | Condition-Based (case-sensitive)',     ''],
+    ['Red column headers',       '', 'Columns with red header text are REQUIRED. Rows missing required fields will be rejected.', ''],
+    ['Import mode',              '', 'Use "Add Only" to load history without overwriting existing completed records.', ''],
+  ];
+
+  rows.forEach(([field, required, description, example]) => {
+    instrSheet.addRow({ field, required, description, example });
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+export async function generateSpareHistoryTemplate(): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+
+  // ── Sheet 1: Spare History (data entry) ───────────────
+  const dataSheet = workbook.addWorksheet('Spare History');
+  dataSheet.columns = [
+    { header: 'Part Code',            key: 'partCode',           width: 20 },
+    { header: 'Event Type',           key: 'eventType',          width: 16 },
+    { header: 'Quantity',             key: 'quantity',           width: 12 },
+    { header: 'ROB After',            key: 'robAfter',           width: 12 },
+    { header: 'Date',                 key: 'date',               width: 18 },
+    { header: 'Vessel Code',          key: 'vesselCode',         width: 16 },
+    { header: 'Component Code',       key: 'componentCode',      width: 20 },
+    { header: 'Performed By',         key: 'performedBy',        width: 25 },
+    { header: 'Remarks',              key: 'remarks',            width: 40 },
+    { header: 'Reference',            key: 'reference',          width: 25 },
+    { header: 'Port/Place',           key: 'place',              width: 20 },
+    { header: 'Timezone',             key: 'tz',                 width: 16 },
+    { header: 'Component Spare Code', key: 'componentSpareCode', width: 24 },
+  ];
+
+  // Style header row — bold; required columns (1–6) get red text
+  dataSheet.getRow(1).font = { bold: true };
+  dataSheet.getRow(1).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFD0E4F7' },
+  };
+  [1, 2, 3, 4, 5, 6].forEach(col => {
+    dataSheet.getRow(1).getCell(col).font = { bold: true, color: { argb: 'FFCC0000' } };
+  });
+
+  // Dropdown validation for Event Type (col 2)
+  for (let row = 2; row <= 1000; row++) {
+    dataSheet.getCell(row, 2).dataValidation = {
+      type: 'list',
+      allowBlank: false,
+      formulae: ['"CONSUME,RECEIVE,ADJUST"'],
+    };
+  }
+
+  // Sample data row
+  dataSheet.addRow({
+    partCode:          'PT-000123',
+    eventType:         'CONSUME',
+    quantity:          2,
+    robAfter:          8,
+    date:              '15-NOV-2024',
+    vesselCode:        'V001',
+    componentCode:     '601.001.AA',
+    performedBy:       'Chief Engineer',
+    remarks:           'Used during scheduled maintenance',
+    reference:         '601.001.WO-2024-01',
+    place:             'Singapore',
+    tz:                'Asia/Singapore',
+    componentSpareCode:'SP-601.001.AA-001',
+  });
+
+  // ── Sheet 2: Instructions ──────────────────────────────
+  const instrSheet = workbook.addWorksheet('Instructions');
+  instrSheet.columns = [
+    { header: 'Field',       key: 'field',       width: 28 },
+    { header: 'Required',    key: 'required',    width: 12 },
+    { header: 'Description', key: 'description', width: 70 },
+    { header: 'Example',     key: 'example',     width: 35 },
+  ];
+  instrSheet.getRow(1).font = { bold: true };
+
+  const instrRows = [
+    ['Part Code',            'Required', 'Part code of the spare — must already exist in the vessel\'s spares register',  'PT-000123'],
+    ['Event Type',           'Required', 'Type of transaction: CONSUME, RECEIVE, or ADJUST (uppercase)',                  'CONSUME'],
+    ['Quantity',             'Required', 'Absolute quantity involved (always positive — sign is derived from Event Type)','2'],
+    ['ROB After',            'Required', 'Remaining on-board balance after this transaction (non-negative integer)',       '8'],
+    ['Date',                 'Required', 'Date of the transaction — use DD-MMM-YYYY format',                              '15-NOV-2024'],
+    ['Vessel Code',          'Required', 'Vessel code this transaction belongs to (e.g. V001)',                           'V001'],
+    ['Component Code',       'Optional', 'Component this spare is linked to — used for cross-check only',                '601.001.AA'],
+    ['Performed By',         'Optional', 'Name or rank of person who performed the transaction. Defaults to system.',     'Chief Engineer'],
+    ['Remarks',              'Optional', 'Free-text notes about the transaction',                                         'Used during scheduled maintenance'],
+    ['Reference',            'Optional', 'Work Order or Purchase Order number linked to this event',                      '601.001.WO-2024-01'],
+    ['Port/Place',           'Optional', 'Port or location where the transaction took place',                             'Singapore'],
+    ['Timezone',             'Optional', 'Timezone string (e.g. Asia/Singapore). Omit to use UTC.',                      'Asia/Singapore'],
+    ['Component Spare Code', 'Optional', 'Spare code as registered against the component (e.g. SP-601.001.AA-001)',       'SP-601.001.AA-001'],
+    ['', '', '', ''],
+    ['--- NOTES ---', '', '', ''],
+    ['Date format',   '', 'Use DD-MMM-YYYY (e.g. 15-NOV-2024). Month must be a 3-letter abbreviation.',  ''],
+    ['Event Type',    '', 'Accepted values: CONSUME | RECEIVE | ADJUST (case-sensitive, uppercase)',      ''],
+    ['Quantity sign', '', 'Always enter a positive number. The system applies the correct sign automatically (CONSUME → negative qtyChange, RECEIVE/ADJUST → positive).', ''],
+    ['ROB After',     '', 'This is the balance AFTER the event, not the change. You must supply it — the system cannot auto-compute it from historical events.', ''],
+    ['Red headers',   '', 'Columns with red header text are REQUIRED. Rows missing required fields will be rejected during dry-run validation.', ''],
+    ['Import mode',   '', 'Use "Add Only" to load history without risk of overwriting. All rows create new history records.', ''],
+    ['Current ROB',   '', 'This import does NOT change the spare\'s current ROB balance. It only adds records to the transaction history ledger.', ''],
+  ];
+
+  instrRows.forEach(([field, required, description, example]) => {
+    instrSheet.addRow({ field, required, description, example });
+  });
+
+  const buf = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buf);
 }

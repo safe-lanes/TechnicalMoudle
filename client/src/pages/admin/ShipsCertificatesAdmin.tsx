@@ -1960,21 +1960,23 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-sm">
                       {viewModes.company === "edit" ? (
                         <Select 
-                          defaultValue={cert.companyGroup}
+                          value={cert.companyGroup || undefined}
                           onValueChange={(value) => {
+                            const normalized = value === "__none__" ? "" : value;
                             if (isCompanyOnly) {
                               setCompanyOnlyCerts(prev => prev.map(c => 
-                                c.id === cert.id ? { ...c, companyGroup: value } : c
+                                c.id === cert.id ? { ...c, companyGroup: normalized } : c
                               ));
                             } else {
-                              updateCompanyField(cert.id, 'companyGroup', value);
+                              updateCompanyField(cert.id, 'companyGroup', normalized);
                             }
                           }}
                         >
                           <SelectTrigger className="h-8 text-sm" data-testid={`select-companygroup-${testIdSuffix}`}>
-                            <SelectValue placeholder={getFormattedCompanyGroupLabel("A")} />
+                            <SelectValue placeholder="Select Group" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="__none__">— None —</SelectItem>
                             {companyGroupLabels.map((grp: LabelConfig) => (
                               <SelectItem key={grp.key} value={grp.key}>
                                 {getFormattedCompanyGroupLabel(grp.key)}
@@ -2026,13 +2028,14 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-sm">
                       <div className="flex items-center gap-2">
                         <Select 
-                          value={newCompanyEntryData.companyGroup || ""}
-                          onValueChange={(value) => setNewCompanyEntryData(prev => ({ ...prev, companyGroup: value }))}
+                          value={newCompanyEntryData.companyGroup || undefined}
+                          onValueChange={(value) => setNewCompanyEntryData(prev => ({ ...prev, companyGroup: value === "__none__" ? "" : value }))}
                         >
                           <SelectTrigger className="h-8 text-sm flex-1" data-testid="select-new-company-group">
                             <SelectValue placeholder="Select Group" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="__none__">— None —</SelectItem>
                             {companyGroupLabels.map((grp: LabelConfig) => (
                               <SelectItem key={grp.key} value={grp.key}>
                                 {getFormattedCompanyGroupLabel(grp.key)}
@@ -2309,10 +2312,12 @@ export default function ShipsCertificatesAdmin() {
                   );
                 })}
                 
-                {/* Vessel-only certificates (not from Company) — filtered by vessel applicability */}
+                {/* Vessel-only certificates (not from Company) — filtered by vessel applicability.
+                    The same filter runs in both View and Edit modes so the row set, count, and
+                    sequence numbers stay identical. Newly added in-memory rows (id >= 2000) are
+                    still shown so unsaved "Add New" entries remain visible while editing. */}
                 {selectedVessels.length > 0 && vesselOnlyCerts.filter(cert => {
-                  if (cert.id >= 2000) return true;
-                  if (viewModes.vessel === "edit") return true;
+                  if (cert.id >= 2000) return viewModes.vessel === "edit";
                   const vesselIds = getSelectedVesselIds();
                   return vesselIds.some(vesselId =>
                     vesselApplicabilityData.some((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId)
@@ -2385,10 +2390,11 @@ export default function ShipsCertificatesAdmin() {
                       <td className="px-3 py-3 text-sm">
                         {viewModes.vessel === "edit" ? (
                           <Select 
-                            defaultValue={cert.companyGroup}
+                            value={cert.companyGroup || undefined}
                             onValueChange={(value) => {
+                              const normalized = value === "__none__" ? "" : value;
                               setVesselOnlyCerts(prev => prev.map(c => 
-                                c.id === cert.id ? { ...c, companyGroup: value } : c
+                                c.id === cert.id ? { ...c, companyGroup: normalized } : c
                               ));
                             }}
                           >
@@ -2396,6 +2402,7 @@ export default function ShipsCertificatesAdmin() {
                               <SelectValue placeholder="Select Group" />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="__none__">— None —</SelectItem>
                               {companyGroupLabels.map((grp: LabelConfig) => (
                                 <SelectItem key={grp.key} value={grp.key}>
                                   {getFormattedCompanyGroupLabel(grp.key)}
@@ -2446,13 +2453,14 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-sm">
                       <div className="flex items-center gap-2">
                         <Select 
-                          value={newVesselEntryData.companyGroup || ""}
-                          onValueChange={(value) => setNewVesselEntryData(prev => ({ ...prev, companyGroup: value }))}
+                          value={newVesselEntryData.companyGroup || undefined}
+                          onValueChange={(value) => setNewVesselEntryData(prev => ({ ...prev, companyGroup: value === "__none__" ? "" : value }))}
                         >
                           <SelectTrigger className="h-8 text-sm flex-1" data-testid="select-new-vessel-group">
                             <SelectValue placeholder="Select Group" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="__none__">— None —</SelectItem>
                             {companyGroupLabels.map((grp: LabelConfig) => (
                               <SelectItem key={grp.key} value={grp.key}>
                                 {getFormattedCompanyGroupLabel(grp.key)}

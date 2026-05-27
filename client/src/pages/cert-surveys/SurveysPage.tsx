@@ -245,10 +245,23 @@ export default function SurveysPage() {
 
   const updateSurveyMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<SurveyData> }) => {
-      return apiRequest('PATCH', `/technical/api/surveys/${id}`, updates);
+      const res = await apiRequest('PATCH', `/technical/api/surveys/${id}`, updates);
+      try {
+        return await res.json();
+      } catch {
+        return null;
+      }
     },
-    onSuccess: (_data, variables) => {
-      // Optimistic cache update: patch the changed row in-place to avoid full grid re-render
+    onSuccess: (serverRow: any, variables) => {
+      // Merge the server response (especially the auto-stamped lastEditUpload)
+      // into the cached row so the Last Edit column updates immediately rather
+      // than waiting for the deferred refetch.
+      const serverLastEdit = serverRow?.lastEditUpload || serverRow?.last_edit_upload;
+      const cacheUpdates: Partial<SurveyData> = { ...variables.updates };
+      if (serverLastEdit) {
+        cacheUpdates.lastEdit = serverLastEdit;
+      }
+
       queryClient.setQueriesData<SurveysApiResponse>(
         { queryKey: ['/technical/api/surveys'] },
         (old) => {
@@ -258,7 +271,7 @@ export default function SurveysPage() {
             surveys: old.surveys.map((survey) => {
               const surveyKey = `${survey.vesselId}::${survey.masterId}`;
               if (surveyKey === variables.id) {
-                return { ...survey, ...variables.updates };
+                return { ...survey, ...cacheUpdates };
               }
               return survey;
             }),
@@ -272,10 +285,13 @@ export default function SurveysPage() {
       if (surveyInvalidateTimer.current) {
         clearTimeout(surveyInvalidateTimer.current);
       }
+      // Shorter debounce: the optimistic cache now reflects lastEdit, so the
+      // refetch is only a safety net for fields we don't echo. A long window
+      // can race with the next in-progress edit on a different row.
       surveyInvalidateTimer.current = setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['/technical/api/surveys'] });
         surveyInvalidateTimer.current = null;
-      }, 5000);
+      }, 1500);
     },
     onError: (error: any) => {
       toast({

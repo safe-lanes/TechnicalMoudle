@@ -1,0 +1,112 @@
+Dual Frequency feature is on this branch (feature/replit-work, 
+HEAD 4560f494b). Restart, verify migration 116 applied, and run 
+through the test checklist. Read-only verification — do NOT 
+change any code.
+
+═══════════════════════════════════════════════════════════════════
+STEP 1 — RESTART AND VERIFY
+═══════════════════════════════════════════════════════════════════
+1. Restart the Replit app so the server picks up the new code 
+   and migrations auto-run.
+
+2. Confirm the branch and commit:
+     git log -1 --oneline
+   Expected: 4560f494b
+
+3. Verify migration 116 applied. Run:
+     psql $DATABASE_URL -c "\d work_orders" | grep dual_trigger_leg
+     psql $DATABASE_URL -c "\d fleet_jobs" | grep interval_running_hour
+   Both columns should be present. If either is missing, the 
+   migration didn't run — report it.
+
+═══════════════════════════════════════════════════════════════════
+STEP 2 — TEST CHECKLIST (do each, report what you see)
+═══════════════════════════════════════════════════════════════════
+
+A. JOBS FORM — Dual Frequency option
+   - Open the Jobs form for a component whose RH Counter Type 
+     is Master or Inherited.
+   - Confirm "Dual Frequency" appears in the Maintenance Basis 
+     dropdown (alongside Calendar and Running Hours).
+   - Select Dual Frequency. Confirm BOTH the calendar fields 
+     (Interval Value + Unit) AND the Running Hour field 
+     (Interval Running Hour) appear together.
+   - Fill both in (e.g. 12 Months / 6000 RH). Save. Confirm 
+     the job saves successfully.
+
+B. JOBS FORM — D3 block on a bad component
+   - Open the Jobs form for a component whose RH Counter Type 
+     is NOT Master or Inherited (e.g. NOT_RH_DRIVEN).
+   - Try to set Maintenance Basis = Dual Frequency.
+   - Confirm a clear warning/block appears explaining the 
+     component must have an RH Counter Type of Master or 
+     Inherited first.
+   - Confirm save is prevented.
+
+C. JOBS FORM — both legs required
+   - Create a Dual Frequency job but leave Interval Running 
+     Hour empty (or the calendar fields empty).
+   - Confirm a clear validation message appears and save is 
+     prevented.
+
+D. CALENDAR & RH REGRESSION
+   - Create or edit a Calendar-only job → confirm it looks 
+     and behaves exactly as before. Only calendar fields show.
+   - Create or edit a Running Hours-only job → confirm only 
+     the RH field shows. Behaves as before.
+
+E. WO GENERATION — whichever-comes-first
+   - Take a Dual Frequency job whose calendar leg is due 
+     soon (or set it that way). Run the scanner / wait for 
+     auto-generation.
+   - Confirm a Work Order is generated when EITHER threshold 
+     is reached first.
+   - Open the generated WO. Confirm it shows which leg 
+     triggered it ("Triggered by: Calendar" or "Triggered by: 
+     Running Hours").
+
+F. WO COMPLETION — both legs update
+   - Complete a Dual WO and ENTER an RH value at completion.
+   - Confirm the job's next due (both date and RH target) 
+     advance correctly.
+
+G. WO COMPLETION — Option B (intentional)
+   - Complete another Dual WO and DO NOT enter RH.
+   - Expected behaviour: the calendar leg's next due 
+     advances, but the RH leg (lastDoneRH / nextDueRH) stays 
+     unchanged.
+   - This is intentional per the product decision — the RH 
+     leg only recalculates when RH is updated separately via 
+     the Running Hour section.
+   - The job may then show due-by-RH on the next scan until 
+     RH is updated. This is NOT a bug — confirm it matches 
+     expectations.
+
+H. FLEET-LEVEL — Dual Frequency at fleet level
+   - In Fleet Jobs management, add a fleet job with 
+     Maintenance Basis = Dual Frequency (both intervals).
+   - Confirm it saves.
+   - Copy this to a vessel whose target component HAS an RH 
+     Counter Type of Master/Inherited. Confirm the dual job 
+     copies through correctly.
+   - Copy it to a vessel whose target component does NOT 
+     have a valid RH counter. Confirm the dual job is 
+     SKIPPED with a warning, the rest of the copy succeeds.
+
+I. WO FORM — Dual Frequency dropdown
+   - Open the Work Order form directly. Confirm Dual 
+     Frequency appears in the Maintenance Basis dropdown.
+   - When selected, both calendar and RH interval fields 
+     show.
+
+═══════════════════════════════════════════════════════════════════
+STEP 3 — REPORT
+═══════════════════════════════════════════════════════════════════
+For each test A–I: PASS / FAIL with a short note on what was 
+observed.
+
+For any FAIL: describe exactly what happened (screenshot if 
+possible).
+
+For Test G (Option B): confirm Jeevan accepts this as the 
+intended behaviour, or flag it for discussion.

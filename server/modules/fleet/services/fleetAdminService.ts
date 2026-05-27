@@ -761,9 +761,10 @@ export async function copyVessel(body: any) {
   const db = await repo.getCopyVesselDb();
   const { components, jobs, spares, spareComponentLinks, storesItems } = repo;
 
-  const copyResults = { components: 0, jobs: 0, spares: 0, spareComponentLinks: 0, stores: 0, errors: [] as string[] };
+  const copyResults = { components: 0, jobs: 0, spares: 0, spareComponentLinks: 0, stores: 0, errors: [] as string[], warnings: [] as string[] };
   const componentIdMap = new Map<string, string>();
   const spareIdMap = new Map<number, number>();
+  const spareUuidMap = new Map<number, string>(); // source spare.id → target spare.suuid
 
   const generateId = (prefix: string) => {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 13)}`;
@@ -852,9 +853,25 @@ export async function copyVessel(body: any) {
       const newId = generateId('JOB');
       const newComponentId = componentIdMap.get(job.componentId || '') || job.componentId;
 
+      // D3: For Dual Frequency jobs, validate the TARGET component's RH Counter Type
+      // Normalize to uppercase — DB column is unconstrained text with inconsistent casing
+      if (job.maintenanceBasis === 'Dual Frequency' && newComponentId) {
+        const [targetComp] = await db.select().from(components)
+          .where(eq(components.cuuid, newComponentId));
+        const targetRhType = (targetComp?.rhCounterType || '').toUpperCase();
+        if (!targetComp || (targetRhType !== 'MASTER' && targetRhType !== 'INHERITED')) {
+          const compName = targetComp?.name || job.componentName || newComponentId;
+          copyResults.warnings.push(
+            `Job ${job.jobNo} (Dual Frequency) skipped: target component "${compName}" has RH Counter Type "${targetComp?.rhCounterType || 'not set'}" (requires Master or Inherited)`
+          );
+          continue;
+        }
+      }
+
       try {
         await db.insert(jobs).values({
           id: newId,
+          juuid: randomUUID(),
           vesselId: data.targetVesselCode,
           componentId: newComponentId,
           componentCode: job.componentCode,
@@ -909,8 +926,10 @@ export async function copyVessel(body: any) {
     const targetSpareList = await db.select().from(spares)
       .where(eq(spares.vesselId, data.targetVesselCode));
     const existingSpareKeyMap = new Map<string, number>();
+    const existingSpareUuidMap = new Map<number, string>(); // target spare id → suuid
     for (const s of targetSpareList) {
       existingSpareKeyMap.set(`${s.partCode}|${s.componentCode}`, s.id);
+      if (s.suuid) existingSpareUuidMap.set(s.id, s.suuid);
     }
 
     for (const spare of sourceSpareList) {
@@ -918,6 +937,8 @@ export async function copyVessel(body: any) {
       const existingId = existingSpareKeyMap.get(spareKey);
       if (existingId !== undefined) {
         spareIdMap.set(spare.id, existingId);
+        const existingSuuid = existingSpareUuidMap.get(existingId);
+        if (existingSuuid) spareUuidMap.set(spare.id, existingSuuid);
         continue;
       }
 
@@ -925,6 +946,7 @@ export async function copyVessel(body: any) {
 
       try {
         const [inserted] = await db.insert(spares).values({
+          suuid: randomUUID(),
           partCode: spare.partCode,
           partName: spare.partName,
           componentId: newComponentId,
@@ -952,8 +974,9 @@ export async function copyVessel(body: any) {
           drawingNo: spare.drawingNo,
           location2: null,
           remarks: spare.remarks,
-        }).returning({ id: spares.id });
+        }).returning({ id: spares.id, suuid: spares.suuid });
         spareIdMap.set(spare.id, inserted.id);
+        spareUuidMap.set(spare.id, inserted.suuid);
         copyResults.spares++;
       } catch (e: any) {
         copyResults.errors.push(`Spare ${spare.partCode}: ${e.message}`);
@@ -973,6 +996,8 @@ export async function copyVessel(body: any) {
       const newComponentId = componentIdMap.get(link.componentId) || link.componentId;
 
       if (newSpareId === undefined) continue;
+      const newSpareUuid = spareUuidMap.get(link.spareId);
+      if (!newSpareUuid) continue; // Can't link without the spare's suuid
 
       const linkKey = `${newSpareId}|${newComponentId}`;
       if (existingLinkKeys.has(linkKey)) continue;
@@ -981,6 +1006,7 @@ export async function copyVessel(body: any) {
         await db.insert(spareComponentLinks).values({
           vesselId: data.targetVesselCode,
           spareId: newSpareId,
+          spareUuid: newSpareUuid,
           componentId: newComponentId,
           linkedBy: 'system-copy-vessel',
         });
@@ -1009,6 +1035,7 @@ export async function copyVessel(body: any) {
 
       try {
         await db.insert(storesItems).values({
+          stuuid: randomUUID(),
           vesselId: data.targetVesselCode,
           itemType: item.itemType,
           itemCode: item.itemCode,
@@ -1059,9 +1086,18 @@ export async function copyVessel(body: any) {
   const totalCopied = copyResults.components + copyResults.jobs + copyResults.spares + copyResults.spareComponentLinks + copyResults.stores;
   console.log(`[Copy Vessel] ${data.sourceVesselCode} → ${data.targetVesselCode}: ${copyResults.components} components, ${copyResults.jobs} jobs, ${copyResults.spares} spares, ${copyResults.stores} stores copied`);
 
+  const hasErrors = copyResults.errors.length > 0;
+  const hasWarnings = copyResults.warnings.length > 0;
+  const success = hasErrors ? (totalCopied > 0 ? 'partial' : false) : true;
+  const message = hasErrors
+    ? `Vessel copy completed with ${copyResults.errors.length} error(s). ${totalCopied} record(s) copied.`
+    : hasWarnings
+      ? `Vessel data replicated with ${copyResults.warnings.length} warning(s). ${totalCopied} record(s) copied.`
+      : `Vessel data successfully replicated. ${totalCopied} record(s) copied.`;
+
   return {
-    success: true,
-    message: `Vessel data successfully replicated. ${totalCopied} record(s) copied.`,
+    success,
+    message,
     results: copyResults,
   };
 }

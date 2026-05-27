@@ -240,6 +240,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     maintenanceBasis: "Calendar",
     frequencyValue: "",
     frequencyUnit: "Months",
+    intervalRunningHour: "",
     taskType: "Inspection",
     assignedTo: "",
     approver: "",
@@ -421,6 +422,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         maintenanceBasis: template.maintenanceBasis || 'Calendar',
         frequencyValue: (template as any).frequency || template.frequencyValue || '',
         frequencyUnit: template.frequencyUnit || 'Months',
+        intervalRunningHour: template.intervalRunningHour?.toString() || '',
         taskType: template.taskType || 'Inspection',
         assignedTo: template.assignedTo || '',
         approver: template.approver || '',
@@ -527,6 +529,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         maintenanceBasis: workOrder.maintenanceBasis || "Calendar",
         frequencyValue: workOrder.frequencyValue || "",
         frequencyUnit: workOrder.frequencyUnit || "Months",
+        intervalRunningHour: workOrder.intervalRunningHour?.toString() || "",
         taskType: workOrder.taskType || workOrder.maintenanceType || "Inspection",
         assignedTo: workOrder.assignedTo || "",
         approver: workOrder.approver || workOrder.department || "",
@@ -549,6 +552,18 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         setOriginalSnapshot(initialData);
       }
       
+      // Auto-populate B3 Running Hours "Previous Reading" from the WO's stored component RH snapshot
+      // This applies to both Running Hours and Dual Frequency WOs
+      if (workOrder.maintenanceBasis === 'Running Hours' || workOrder.maintenanceBasis === 'Dual Frequency') {
+        const storedRH = workOrder.currentReading || '';
+        if (storedRH) {
+          setExecutionData(prev => ({
+            ...prev,
+            previousReading: storedRH
+          }));
+        }
+      }
+
       // If in execution mode, switch to Part B and generate execution ID
       if (executionMode) {
         setActiveSection('partB');
@@ -1758,6 +1773,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             <SelectContent>
                               <SelectItem value="Calendar">Calendar</SelectItem>
                               <SelectItem value="Running Hours">Running Hours</SelectItem>
+                              <SelectItem value="Dual Frequency">Dual Frequency</SelectItem>
                             </SelectContent>
                           </Select>
                         </ModifyFieldWrapper>
@@ -1766,7 +1782,9 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                       {/* Frequency Fields */}
                       <div className="space-y-2">
                         <Label className="text-sm text-[#8798ad]">
-                          {templateData.maintenanceBasis === "Calendar" ? "Every *" : "Every (Hours) *"}
+                          {templateData.maintenanceBasis === "Calendar" ? "Every *"
+                            : templateData.maintenanceBasis === "Dual Frequency" ? "Calendar Frequency *"
+                            : "Every (Hours) *"}
                         </Label>
                         <ModifyFieldWrapper
                           originalValue={workOrder?.frequencyValue || ""}
@@ -1775,9 +1793,9 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           isModifyMode={isModifyMode && !isPartAReadOnly}
                           onFieldChange={trackFieldChange}
                         >
-                          <Input 
+                          <Input
                             type="number"
-                            value={isPreviewMode && hasPreviewChange('frequencyValue') ? getPreviewValue('frequencyValue') : templateData.frequencyValue} 
+                            value={isPreviewMode && hasPreviewChange('frequencyValue') ? getPreviewValue('frequencyValue') : templateData.frequencyValue}
                             onChange={(e) => handleTemplateChange('frequencyValue', e.target.value)}
                             className={`text-sm ${
                               hasPreviewChange('frequencyValue') ? 'text-red-600 border-red-300 bg-red-50' : ''
@@ -1787,8 +1805,8 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           />
                         </ModifyFieldWrapper>
                       </div>
-                      
-                      {templateData.maintenanceBasis === "Calendar" && (
+
+                      {(templateData.maintenanceBasis === "Calendar" || templateData.maintenanceBasis === "Dual Frequency") && (
                         <div className="space-y-2">
                           <Label className="text-sm text-[#8798ad]">Unit *</Label>
                           <ModifyFieldWrapper
@@ -1798,8 +1816,8 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             isModifyMode={isModifyMode && !isPartAReadOnly}
                             onFieldChange={trackFieldChange}
                           >
-                            <Select 
-                              value={templateData.frequencyUnit} 
+                            <Select
+                              value={templateData.frequencyUnit}
                               onValueChange={(value) => handleTemplateChange('frequencyUnit', value)}
                               disabled={isPartAReadOnly}
                             >
@@ -1814,6 +1832,33 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                               </SelectContent>
                             </Select>
                           </ModifyFieldWrapper>
+                        </div>
+                      )}
+
+                      {/* RH Interval — shown for Dual Frequency WOs */}
+                      {templateData.maintenanceBasis === "Dual Frequency" && (
+                        <div className="space-y-2">
+                          <Label className="text-sm text-[#8798ad]">Running Hours Interval *</Label>
+                          <Input
+                            type="number"
+                            value={(templateData as any).intervalRunningHour || ""}
+                            onChange={(e) => handleTemplateChange('intervalRunningHour', e.target.value)}
+                            placeholder="e.g., 1000"
+                            className="text-sm"
+                            disabled={isPartAReadOnly}
+                          />
+                        </div>
+                      )}
+
+                      {/* B4 — Dual Frequency trigger leg display */}
+                      {templateData.maintenanceBasis === "Dual Frequency" && (workOrder as any)?.dualTriggerLeg && (
+                        <div className="space-y-2">
+                          <Label className="text-sm text-[#8798ad]">Triggered By</Label>
+                          <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200">
+                            {(workOrder as any).dualTriggerLeg === 'CALENDAR' ? 'Calendar' :
+                             (workOrder as any).dualTriggerLeg === 'RH' ? 'Running Hours' :
+                             (workOrder as any).dualTriggerLeg}
+                          </div>
                         </div>
                       )}
 
@@ -1927,9 +1972,11 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                       
                       <div className="space-y-2">
                         <Label className="text-sm text-[#8798ad]">
-                          {templateData.maintenanceBasis === "Calendar" ? "Next Due Date (Optional)" : "Next Due Reading"}
+                          {templateData.maintenanceBasis === "Dual Frequency" ? "Next Due Date (Calendar Leg)"
+                            : templateData.maintenanceBasis === "Calendar" ? "Next Due Date (Optional)"
+                            : "Next Due Reading"}
                         </Label>
-                        {templateData.maintenanceBasis === "Calendar" ? (
+                        {(templateData.maintenanceBasis === "Calendar" || templateData.maintenanceBasis === "Dual Frequency") ? (
                           <Input
                             type="date"
                             value={templateData.nextDueDate}
@@ -2837,8 +2884,8 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                     </div>
                   </div>
 
-                  {/* B3. Running Hours (Conditional - only for Running Hours based WOs) */}
-                  {templateData.maintenanceBasis === "Running Hours" && (
+                  {/* B3. Running Hours (Conditional - for Running Hours and Dual Frequency WOs) */}
+                  {(templateData.maintenanceBasis === "Running Hours" || templateData.maintenanceBasis === "Dual Frequency") && (
                     <div className="border border-gray-200 rounded-lg p-4 mb-6">
                       <h4 className="text-md font-medium mb-4" style={{ color: '#16569e' }}>B3. Running Hours</h4>
                       

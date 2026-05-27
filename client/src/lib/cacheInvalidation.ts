@@ -117,6 +117,18 @@ export function invalidateAfterBulkImport(type: string, vesselId?: string) {
     case 'work-orders':
       invalidateWorkOrders(vesselId);
       break;
+    case 'wo-history':
+      invalidateWorkOrders(vesselId);
+      queryClient.invalidateQueries({
+        predicate: (query) => queryKeyMatchesPrefix(query.queryKey, '/technical/api/work-order-executions')
+      });
+      queryClient.invalidateQueries({
+        predicate: (query) => queryKeyMatchesPrefix(query.queryKey, '/technical/api/maintenance-history')
+      });
+      break;
+    case 'spare-history':
+      invalidateSpares(vesselId);
+      break;
     default:
       invalidateAll(vesselId);
   }

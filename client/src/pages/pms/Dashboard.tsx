@@ -49,6 +49,7 @@ import {
 } from "@/components/wo/woCellRenderers";
 import { RejectionHistoryBadge } from "@/components/wo/RejectionHistoryBadge";
 import { useVessels } from "@/hooks/useVessels";
+import { PeriodFilter, type PeriodFilterValue, periodFilterToDateRange } from "@/components/filters/PeriodFilter";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
 import { ComplianceAnomalyPanel } from "./ComplianceAnomalyPanel";
@@ -409,6 +410,10 @@ const Dashboard = () => {
     setRejectSubmitting(false);
   };
   const [selectedCriticality, setSelectedCriticality] = useState("");
+  const [dashboardPeriod, setDashboardPeriod] = useState<PeriodFilterValue | null>(() => {
+    const now = new Date();
+    return { mode: 'year-months', year: now.getFullYear(), months: [now.getMonth() + 1] };
+  });
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
@@ -834,46 +839,92 @@ const Dashboard = () => {
     return null;
   };
 
-  // Work Order Status chart data - filtered to current calendar month
-  const workOrderStatusChartData = useMemo(() => {
-    const safeWOs = filteredWorkOrdersData.filter(wo => wo !== null && wo !== undefined);
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+  // WO Status by Period — server-side computed slices using
+  // "ever in state during the selected period" logic (Task #77).
+  // Both donuts (All Eqpt + Critical Eqpt) derive from this query so they
+  // honor the Period filter and use mutually-exclusive Overdue > Postponed >
+  // Completed > Due > Scheduled precedence.
+  const dashboardPeriodRange = useMemo(
+    () => periodFilterToDateRange(dashboardPeriod),
+    [dashboardPeriod],
+  );
 
-    const monthlyWOs = safeWOs.filter(wo => {
-      if (wo.isExecution) return false;
-      const dueDate = parseFlexibleDate(wo.dueDate);
-      if (!dueDate) return false;
-      return dueDate.getMonth() === currentMonth && dueDate.getFullYear() === currentYear;
-    });
+  interface WoStatusBucket { count: number; woIds: string[] }
+  interface WoStatusByPeriodResponse {
+    all: Record<'scheduled' | 'due' | 'overdue' | 'postponed' | 'completed' | 'pendingApproval', WoStatusBucket>;
+    critical: Record<'scheduled' | 'due' | 'overdue' | 'postponed' | 'completed' | 'pendingApproval', WoStatusBucket>;
+  }
+  // Cleared period (dashboardPeriodRange === null) intentionally sends no
+  // from/to and the backend treats it as all-time, per task #77 spec.
+  const { data: woStatusByPeriodData } = useQuery<WoStatusByPeriodResponse>({
+    queryKey: [
+      '/technical/api/dashboard/wo-status-by-period',
+      effectiveVesselId,
+      dashboardPeriodRange?.from?.toISOString() ?? 'all-time',
+      dashboardPeriodRange?.to?.toISOString() ?? 'all-time',
+    ],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        vesselId: effectiveVesselId || 'all',
+      });
+      if (dashboardPeriodRange) {
+        params.set('from', dashboardPeriodRange.from.toISOString());
+        params.set('to', dashboardPeriodRange.to.toISOString());
+      }
+      const res = await fetch(`/technical/api/dashboard/wo-status-by-period?${params.toString()}`);
+      if (!res.ok) throw new Error('Failed to fetch WO status by period');
+      return res.json();
+    },
+    enabled: !!effectiveVesselId,
+  });
 
-    const planned = monthlyWOs.filter(wo => {
-      const s = (wo as EnrichedWorkOrder).computedStatus;
-      return s === 'Active' || s === 'Postponed';
-    }).length;
-    const due = monthlyWOs.filter(wo => {
-      const s = (wo as EnrichedWorkOrder).computedStatus;
-      return s === 'Due' || s === 'Due (Grace P)';
-    }).length;
-    const overdue = monthlyWOs.filter(wo =>
-      (wo as EnrichedWorkOrder).computedStatus === 'Overdue'
-    ).length;
-    const completed = monthlyWOs.filter(wo =>
-      (wo as EnrichedWorkOrder).computedStatus === 'Completed'
-    ).length;
-    const pendingApproval = monthlyWOs.filter(wo =>
-      (wo as EnrichedWorkOrder).computedStatus === 'Pending Approval'
-    ).length;
+  // Map WO id (wouuid preferred, falling back to id) -> WO object so click
+  // handlers can resolve the woIds returned by the backend.
+  const workOrderByIdMap = useMemo(() => {
+    const map = new Map<string, EnrichedWorkOrder>();
+    for (const wo of (workOrdersData as EnrichedWorkOrder[])) {
+      if (!wo) continue;
+      const uuid = (wo as any).wouuid;
+      if (uuid != null) map.set(String(uuid), wo);
+      const id = (wo as any).id;
+      if (id != null) map.set(String(id), wo);
+    }
+    return map;
+  }, [workOrdersData]);
 
-    return [
-      { status: 'Scheduled', count: planned, color: '#9E9E9E' },
-      { status: 'Due', count: due, color: '#FF964f' },
-      { status: 'Overdue', count: overdue, color: '#ff6961' },
-      { status: 'Completed', count: completed, color: '#5dc86f' },
-      { status: 'Pending Approval', count: pendingApproval, color: '#FFEEAA' }
-    ].filter(d => d.count > 0);
-  }, [filteredWorkOrdersData]);
+  const resolveWosByIds = (ids: string[] | undefined): EnrichedWorkOrder[] => {
+    if (!ids || ids.length === 0) return [];
+    const out: EnrichedWorkOrder[] = [];
+    for (const id of ids) {
+      const wo = workOrderByIdMap.get(String(id));
+      if (wo) out.push(wo);
+    }
+    return out;
+  };
+
+  const buildPeriodDonutData = (
+    buckets: WoStatusByPeriodResponse['all'] | undefined,
+  ) => {
+    if (!buckets) return [] as { status: string; count: number; color: string; slice: keyof WoStatusByPeriodResponse['all'] }[];
+    return ([
+      { status: 'Scheduled',        slice: 'scheduled' as const,       color: '#9E9E9E' },
+      { status: 'Due',              slice: 'due' as const,             color: '#FF964f' },
+      { status: 'Overdue',          slice: 'overdue' as const,         color: '#ff6961' },
+      { status: 'Postponed',        slice: 'postponed' as const,       color: '#8e44ad' },
+      { status: 'Completed',        slice: 'completed' as const,       color: '#5dc86f' },
+      { status: 'Pending Approval', slice: 'pendingApproval' as const, color: '#FFEEAA' },
+    ] as const).map(s => ({
+      status: s.status,
+      slice: s.slice,
+      color: s.color,
+      count: buckets[s.slice]?.count ?? 0,
+    })).filter(d => d.count > 0);
+  };
+
+  const workOrderStatusChartData = useMemo(
+    () => buildPeriodDonutData(woStatusByPeriodData?.all),
+    [woStatusByPeriodData],
+  );
 
   // Spares Stock Status chart data
   const sparesStockChartData = useMemo(() => {
@@ -948,49 +999,41 @@ const Dashboard = () => {
     };
   }, [filteredWorkOrdersData]);
 
+  // Point-in-time 6-month maintenance trend (Task #65).
+  // Backend computes per-month-end status using WO history + postponements so
+  // past months stay stable even after old WOs are closed.
+  type TrendMonth = {
+    month: string;
+    monthShort: string;
+    year: number;
+    monthIndex: number;
+    totalPlanned: number;
+    completed: number;
+    outstanding: number;
+    overdue: number;
+    postponed: number;
+    completedPercent: number;
+    outstandingPercent: number;
+    overduePercent: number;
+    postponedPercent: number;
+  };
+  const { data: trendResp } = useQuery<{ months: TrendMonth[]; delta: number }>({
+    queryKey: ['/technical/api/dashboard/maintenance-trend', effectiveVesselId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set('vesselId', effectiveVesselId || 'all');
+      const res = await fetch(`/technical/api/dashboard/maintenance-trend?${params.toString()}`);
+      if (!res.ok) throw new Error('Failed to fetch maintenance trend');
+      return res.json();
+    },
+    enabled: !!effectiveVesselId,
+  });
   const maintenanceTrendData = useMemo(() => {
-    const safeWOs = filteredWorkOrdersData.filter(wo => wo !== null && wo !== undefined);
-    const now = new Date();
-    const months: { month: string; monthShort: string; completedPercent: number; outstandingPercent: number; overduePercent: number; totalPlanned: number; completed: number; outstanding: number; overdue: number }[] = [];
-
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthName = format(d, 'MMM yyyy');
-      const monthShort = format(d, 'MMM');
-      const targetMonth = d.getMonth();
-      const targetYear = d.getFullYear();
-
-      const monthlyWOs = safeWOs.filter(wo => {
-        if (wo.isExecution) return false;
-        const dueDate = parseFlexibleDate(wo.dueDate);
-        if (!dueDate) return false;
-        return dueDate.getMonth() === targetMonth && dueDate.getFullYear() === targetYear;
-      });
-
-      const totalPlanned = monthlyWOs.length;
-      const completedCount = monthlyWOs.filter(wo => (wo as any).computedStatus === 'Completed').length;
-      const overdueCount = monthlyWOs.filter(wo => (wo as any).computedStatus === 'Overdue').length;
-      const outstandingCount = totalPlanned - completedCount - overdueCount;
-
-      months.push({
-        month: monthName,
-        monthShort,
-        completedPercent: totalPlanned > 0 ? Math.round((completedCount / totalPlanned) * 100) : 0,
-        outstandingPercent: totalPlanned > 0 ? Math.round((outstandingCount / totalPlanned) * 100) : 0,
-        overduePercent: totalPlanned > 0 ? Math.round((overdueCount / totalPlanned) * 100) : 0,
-        totalPlanned,
-        completed: completedCount,
-        outstanding: outstandingCount,
-        overdue: overdueCount,
-      });
-    }
-
-    const currentOutstanding = months.length >= 1 ? months[months.length - 1].outstandingPercent : 0;
-    const prevOutstanding = months.length >= 2 ? months[months.length - 2].outstandingPercent : 0;
-    const delta = currentOutstanding - prevOutstanding;
-
-    return { months, delta };
-  }, [filteredWorkOrdersData]);
+    return {
+      months: trendResp?.months ?? [],
+      delta: trendResp?.delta ?? 0,
+    };
+  }, [trendResp]);
 
   const runningHoursKPIs = useMemo(() => {
     const totalTracked = rhParentsData.length;
@@ -1159,19 +1202,74 @@ const Dashboard = () => {
     };
   }, [workOrdersData]);
 
-  const criticalWorkOrderStatusChartData = useMemo(() => {
-    return [
-      { status: 'Overdue', count: criticalWorkOrderKPIs.overdue, color: '#ff6961' },
-      { status: 'Due', count: criticalWorkOrderKPIs.due, color: '#FF964f' },
-      { status: 'Pending Approval', count: criticalWorkOrderKPIs.pendingApproval, color: '#1565C0' },
-      { status: 'Completed', count: criticalWorkOrderKPIs.completed, color: '#5dc86f' }
-    ].filter(d => d.count > 0);
-  }, [criticalWorkOrderKPIs]);
+  const criticalWorkOrderStatusChartData = useMemo(
+    () => buildPeriodDonutData(woStatusByPeriodData?.critical),
+    [woStatusByPeriodData],
+  );
 
   const criticalOverduePercent = criticalWorkOrderKPIs.total > 0
     ? Math.round((criticalWorkOrderKPIs.overdue / criticalWorkOrderKPIs.total) * 100)
     : 0;
   const completionRate = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.completed / workOrderKPIs.total) * 100) : 0;
+
+  // "Active O/D W.O (Today)" gauges:
+  //   numerator   = open WOs whose dueDate < start of today
+  //   denominator = all open (non-completed, non-execution) WOs
+  const activeOverdueToday = useMemo(() => {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const thirtyDaysAgo = new Date(startOfToday);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const isOpen = (wo: EnrichedWorkOrder) =>
+      !!wo && !wo.isExecution && wo.computedStatus !== 'Completed';
+
+    const getDue = (wo: EnrichedWorkOrder): Date | null => {
+      if (!wo.dueDate) return null;
+      const due = new Date(wo.dueDate as unknown as string);
+      return isNaN(due.getTime()) ? null : due;
+    };
+
+    const isCurrentOverdue = (wo: EnrichedWorkOrder) => {
+      if (!isOpen(wo)) return false;
+      const due = getDue(wo);
+      return !!due && due < startOfToday;
+    };
+
+    const isOver30 = (wo: EnrichedWorkOrder) => {
+      if (!isOpen(wo)) return false;
+      const due = getDue(wo);
+      return !!due && due < thirtyDaysAgo;
+    };
+
+    const allOpen = (filteredWorkOrdersData as EnrichedWorkOrder[]).filter(isOpen);
+    const allCurrentOverdue = (filteredWorkOrdersData as EnrichedWorkOrder[]).filter(isCurrentOverdue);
+    const allOver30Full = (filteredWorkOrdersData as EnrichedWorkOrder[]).filter(isOver30);
+
+    const criticalSet = (workOrdersData as EnrichedWorkOrder[]).filter(
+      wo => (wo?.criticality ?? '').toLowerCase() === 'yes'
+    );
+    const criticalOpen = criticalSet.filter(isOpen);
+    const criticalCurrentOverdue = criticalSet.filter(isCurrentOverdue);
+    const criticalOver30Full = criticalSet.filter(isOver30);
+
+    const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
+
+    return {
+      allOverdue: allCurrentOverdue.length,
+      allOverdueFull: allCurrentOverdue,
+      allOpen: allOpen.length,
+      allPercent: pct(allCurrentOverdue.length, allOpen.length),
+      allOver30: allOver30Full.length,
+      allOver30Full,
+      criticalOverdue: criticalCurrentOverdue.length,
+      criticalOverdueFull: criticalCurrentOverdue,
+      criticalOpen: criticalOpen.length,
+      criticalPercent: pct(criticalCurrentOverdue.length, criticalOpen.length),
+      criticalOver30: criticalOver30Full.length,
+      criticalOver30Full,
+    };
+  }, [filteredWorkOrdersData, workOrdersData]);
 
   const operationWOs = useMemo(() => {
     const filterExec = (wos: WorkOrder[]) => wos.filter(wo => wo !== null && wo !== undefined && !wo.isExecution);
@@ -2110,6 +2208,11 @@ const Dashboard = () => {
         {activeTab === 'overview' && showFilters && (
         <div className="flex items-center gap-3 flex-wrap" data-testid="bar-fleet-vessel-context">
           <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 font-medium">Period:</span>
+            <PeriodFilter value={dashboardPeriod} onChange={setDashboardPeriod} />
+          </div>
+
+          <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 font-medium">Vessel:</span>
             <Select value={mgmtVesselId} onValueChange={handleVesselChange}>
               <SelectTrigger className="w-[180px]" data-testid="select-context-vessel">
@@ -2642,19 +2745,44 @@ const Dashboard = () => {
                 data-testid="column-wo-kpis"
               >
                 <div className="p-3">
-                  <div style={sectionHeaderBar} className="!pt-0 !pb-2">OVERDUE W.O - ALL EQPT.</div>
+                  <TooltipProvider delayDuration={200}>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <div tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
+                          <div style={sectionHeaderBar} className="!pt-0 !pb-2">Active O/D W.O (Today) - All Eqpt</div>
 
-                  {/* Row 1: Overdue WOs Gauge */}
-                  <SemiCircleGauge
-                    value={workOrderKPIs.overdue}
-                    max={workOrderKPIs.total || 10}
-                    color="#e74c3c"
-                    arcFillColor={overduePercent <= 1 ? '#FFEEAA' : '#e74c3c'}
-                    displayValue={`${overduePercent}%`}
-                    subtitle={`${workOrderKPIs.overdue} out of ${workOrderKPIs.total}`}
-                    onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - All Equipment', workOrders: workOrderKPIs.overdueFull })}
-                    testId="gauge-overdue-wo"
-                  />
+                          {/* Row 1: Active Overdue WOs Gauge (today vs all open) */}
+                          <SemiCircleGauge
+                            value={activeOverdueToday.allOverdue}
+                            max={activeOverdueToday.allOpen || 10}
+                            color="#e74c3c"
+                            arcFillColor={activeOverdueToday.allPercent <= 1 ? '#FFEEAA' : '#e74c3c'}
+                            displayValue={`${activeOverdueToday.allPercent}%`}
+                            subtitle={`${activeOverdueToday.allOverdue} out of ${activeOverdueToday.allOpen}`}
+                            onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - All Equipment', workOrders: activeOverdueToday.allOverdueFull })}
+                            testId="gauge-overdue-wo"
+                          />
+                          {activeOverdueToday.allOver30 > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setWoListModal({ open: true, title: 'Work Orders >30 Days Overdue - All Equipment', workOrders: activeOverdueToday.allOver30Full });
+                              }}
+                              data-testid="badge-30d-overdue-all"
+                              className="mt-1 mx-auto flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 hover:bg-red-100 border border-red-200 text-[11px] font-medium text-[#e74c3c] focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+                            >
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#e74c3c]" />
+                              {activeOverdueToday.allOver30} WO &gt;30 days overdue
+                            </button>
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" data-testid="tooltip-active-od-formula-all">
+                        Active Overdue % = (Current overdue WO / Total open WO) × 100
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
 
                   <div style={dividerH} />
 
@@ -2688,14 +2816,9 @@ const Dashboard = () => {
                             onClick={(_data: Record<string, unknown>, index: number) => {
                               const entry = workOrderStatusChartData[index];
                               if (!entry) return;
-                              const status = entry.status;
-                              let wos: EnrichedWorkOrder[] = [];
-                              if (status === 'Overdue') wos = workOrderKPIs.overdueFull;
-                              else if (status === 'Due') wos = workOrderKPIs.dueFull;
-                              else if (status === 'Completed') wos = workOrderKPIs.completedFull;
-                              else if (status === 'Pending Approval') wos = workOrderKPIs.pendingApprovalFull;
-                              else wos = workOrderKPIs.plannedFull;
-                              setWoListModal({ open: true, title: `${status} Work Orders - All Equipment`, workOrders: wos });
+                              const ids = woStatusByPeriodData?.all?.[entry.slice]?.woIds;
+                              const wos = resolveWosByIds(ids);
+                              setWoListModal({ open: true, title: `${entry.status} Work Orders - All Equipment`, workOrders: wos });
                             }}
                             cursor="pointer"
                           >
@@ -2714,17 +2837,42 @@ const Dashboard = () => {
                   <div style={dividerH} />
 
                   {/* Row 3: Overdue WO Critical gauge */}
-                  <div style={subTitle} className="mb-1 mt-2">OVERDUE W.O - CRITICAL EQPT.</div>
-                  <SemiCircleGauge
-                    value={criticalWorkOrderKPIs.overdue}
-                    max={criticalWorkOrderKPIs.total || 10}
-                    color="#e74c3c"
-                    arcFillColor={criticalOverduePercent <= 1 ? '#FFEEAA' : '#e74c3c'}
-                    displayValue={`${criticalOverduePercent}%`}
-                    subtitle={`${criticalWorkOrderKPIs.overdue} out of ${criticalWorkOrderKPIs.total}`}
-                    onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - Critical Equipment', workOrders: criticalWorkOrderKPIs.overdueFull })}
-                    testId="gauge-overdue-wo-critical"
-                  />
+                  <TooltipProvider delayDuration={200}>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <div tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
+                          <div style={subTitle} className="mb-1 mt-2">Active O/D W.O (Today) - Critical Eqpt</div>
+                          <SemiCircleGauge
+                            value={activeOverdueToday.criticalOverdue}
+                            max={activeOverdueToday.criticalOpen || 10}
+                            color="#e74c3c"
+                            arcFillColor={activeOverdueToday.criticalPercent <= 1 ? '#FFEEAA' : '#e74c3c'}
+                            displayValue={`${activeOverdueToday.criticalPercent}%`}
+                            subtitle={`${activeOverdueToday.criticalOverdue} out of ${activeOverdueToday.criticalOpen}`}
+                            onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - Critical Equipment', workOrders: activeOverdueToday.criticalOverdueFull })}
+                            testId="gauge-overdue-wo-critical"
+                          />
+                          {activeOverdueToday.criticalOver30 > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setWoListModal({ open: true, title: 'Work Orders >30 Days Overdue - Critical Equipment', workOrders: activeOverdueToday.criticalOver30Full });
+                              }}
+                              data-testid="badge-30d-overdue-critical"
+                              className="mt-1 mx-auto flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 hover:bg-red-100 border border-red-200 text-[11px] font-medium text-[#e74c3c] focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+                            >
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#e74c3c]" />
+                              {activeOverdueToday.criticalOver30} WO &gt;30 days overdue
+                            </button>
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" data-testid="tooltip-active-od-formula-critical">
+                        Active Overdue % = (Current overdue WO / Total open WO) × 100
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
 
                   <div style={dividerH} />
 
@@ -2758,14 +2906,9 @@ const Dashboard = () => {
                             onClick={(_data: Record<string, unknown>, index: number) => {
                               const entry = criticalWorkOrderStatusChartData[index];
                               if (!entry) return;
-                              const status = entry.status;
-                              let wos: EnrichedWorkOrder[] = [];
-                              if (status === 'Overdue') wos = criticalWorkOrderKPIs.overdueFull;
-                              else if (status === 'Due') wos = criticalWorkOrderKPIs.dueFull;
-                              else if (status === 'Pending Approval') wos = criticalWorkOrderKPIs.pendingApprovalFull;
-                              else if (status === 'Completed') wos = criticalWorkOrderKPIs.completedFull;
-                              else wos = criticalWorkOrderKPIs.plannedFull;
-                              setWoListModal({ open: true, title: `${status} Work Orders - Critical Equipment`, workOrders: wos });
+                              const ids = woStatusByPeriodData?.critical?.[entry.slice]?.woIds;
+                              const wos = resolveWosByIds(ids);
+                              setWoListModal({ open: true, title: `${entry.status} Work Orders - Critical Equipment`, workOrders: wos });
                             }}
                             cursor="pointer"
                           >
@@ -2812,6 +2955,7 @@ const Dashboard = () => {
                                         <div className="text-xs" style={{ color: '#2ecc71' }}>Completed: {d.completedPercent}% ({d.completed})</div>
                                         <div className="text-xs" style={{ color: '#f39c12' }}>Outstanding: {d.outstandingPercent}% ({d.outstanding})</div>
                                         <div className="text-xs" style={{ color: '#e74c3c' }}>Overdue: {d.overduePercent}% ({d.overdue})</div>
+                                        <div className="text-xs" style={{ color: '#8e44ad' }}>Postponed: {d.postponedPercent}% ({d.postponed})</div>
                                       </div>
                                     );
                                   }
@@ -2821,6 +2965,7 @@ const Dashboard = () => {
                               <Line type="monotone" dataKey="completedPercent" name="Completed %" stroke="#2ecc71" strokeWidth={2} dot={{ r: 4, fill: '#2ecc71', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#2ecc71' }} />
                               <Line type="monotone" dataKey="outstandingPercent" name="Outstanding %" stroke="#f39c12" strokeWidth={2} dot={{ r: 4, fill: '#f39c12', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#f39c12' }} />
                               <Line type="monotone" dataKey="overduePercent" name="Overdue %" stroke="#e74c3c" strokeWidth={2} dot={{ r: 4, fill: '#e74c3c', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#e74c3c' }} />
+                              <Line type="monotone" dataKey="postponedPercent" name="Postponed %" stroke="#8e44ad" strokeWidth={2} dot={{ r: 4, fill: '#8e44ad', stroke: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#8e44ad' }} />
                             </LineChart>
                           </ResponsiveContainer>
                         </div>
@@ -2828,6 +2973,7 @@ const Dashboard = () => {
                           <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#2ecc71' }} /><span>Completed %</span></div>
                           <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#f39c12' }} /><span>Outstanding %</span></div>
                           <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#e74c3c' }} /><span>Overdue %</span></div>
+                          <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: '#8e44ad' }} /><span>Postponed %</span></div>
                         </div>
                       </div>
                     ) : (

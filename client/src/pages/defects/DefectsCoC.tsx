@@ -44,7 +44,6 @@ import { cn } from "@/lib/utils";
 import { PeriodPicker, type PeriodValue } from "@/components/filters/PeriodPicker";
 import { VesselFleetGroupFilter, type VesselFleetGroupFilterValue } from "@/components/filters/VesselFleetGroupFilter";
 import { useToast } from "@/hooks/use-toast";
-import { useUIRole } from "@/contexts/UIRoleContext";
 import type { Defect } from "@shared/schema";
 import AgGridTable from "@/components/AgGrid/AgGridTable";
 import AgGridTableActions from "@/components/AgGrid/AgGridTableActions";
@@ -244,7 +243,6 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
 
 export default function DefectsCoC() {
   const { toast } = useToast();
-  const { isClientAdmin } = useUIRole();
   const { currentUser } = useAuth();
   const [filters, setFilters] = useState<DefectsFilters>({ status: 'active' });
   const [showFilters, setShowFilters] = useState(true);
@@ -407,6 +405,17 @@ export default function DefectsCoC() {
 
   const handleClearFilters = () => {
     setFilters({ status: 'active' });
+    // The VesselFleetGroupFilter is a controlled component driven by
+    // vesselFilterValue. Without this reset, the dropdown chip keeps
+    // showing the previously selected vessel even though filters.vesselId
+    // (which actually drives the API query) has been cleared, so the chip
+    // and the grid get out of sync.
+    setVesselFilterValue({
+      mode: 'vessel',
+      selectedVessels: [],
+      selectedFleets: [],
+      selectedGroups: [],
+    });
   };
 
   const handleExportPdf = () => {
@@ -750,13 +759,12 @@ export default function DefectsCoC() {
               />
             </div>
 
-            {isClientAdmin && (
-              <VesselFleetGroupFilter 
-                value={vesselFilterValue}
-                onChange={handleVesselFilterChange}
-                showClearButton={false}
-              />
-            )}
+            <VesselFleetGroupFilter 
+              value={vesselFilterValue}
+              onChange={handleVesselFilterChange}
+              showClearButton={false}
+              vesselOnly
+            />
 
             <Select value={filters.status || 'active'} onValueChange={(value) => handleFilterChange('status', value)}>
               <SelectTrigger className="w-[100px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">

@@ -28,6 +28,7 @@ interface VesselFleetGroupFilterProps {
   onChange: (value: VesselFleetGroupFilterResult) => void;
   className?: string;
   showClearButton?: boolean;
+  vesselOnly?: boolean;
 }
 
 const defaultValue: VesselFleetGroupFilterValue = {
@@ -47,11 +48,15 @@ const getFieldValue = (entry: any, fieldOptions: string[]): string => {
 };
 
 export const VesselFleetGroupFilter = ({ 
-  value = defaultValue, 
+  value: rawValue = defaultValue, 
   onChange, 
   className,
   showClearButton = true,
+  vesselOnly = false,
 }: VesselFleetGroupFilterProps) => {
+  const value: VesselFleetGroupFilterValue = vesselOnly
+    ? { ...rawValue, mode: 'vessel', selectedFleets: [], selectedGroups: [] }
+    : rawValue;
   const [vesselDropdownOpen, setVesselDropdownOpen] = useState(false);
   const [fleetDropdownOpen, setFleetDropdownOpen] = useState(false);
   const [groupDropdownOpen, setGroupDropdownOpen] = useState(false);
@@ -218,21 +223,8 @@ export const VesselFleetGroupFilter = ({
     return `${value.selectedGroups.length} Groups`;
   };
 
-  return (
-    <div className={`flex items-center gap-4 ${className || ''}`}>
-      <RadioGroup 
-        value={value.mode} 
-        onValueChange={(val) => handleModeChange(val as FilterMode)}
-        className="flex items-center gap-4"
-      >
-        <div className="flex items-center gap-1">
-          <RadioGroupItem 
-            value="vessel" 
-            id="filter-vessel" 
-            className="border-gray-400 text-gray-700 data-[state=checked]:bg-gray-700 data-[state=checked]:text-white"
-            data-testid="radio-filter-vessel"
-          />
-          <Popover open={vesselDropdownOpen} onOpenChange={setVesselDropdownOpen}>
+  const vesselPicker = (
+    <Popover open={vesselDropdownOpen} onOpenChange={setVesselDropdownOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
@@ -276,6 +268,41 @@ export const VesselFleetGroupFilter = ({
               </ScrollArea>
             </PopoverContent>
           </Popover>
+  );
+
+  if (vesselOnly) {
+    return (
+      <div className={`flex items-center gap-4 ${className || ''}`}>
+        {vesselPicker}
+        {showClearButton && (
+          <Button
+            variant="outline"
+            onClick={handleClear}
+            className="h-8 px-4 text-xs bg-transparent border-gray-300 text-gray-700 hover:bg-gray-100"
+            data-testid="button-clear-filters"
+          >
+            Clear
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex items-center gap-4 ${className || ''}`}>
+      <RadioGroup
+        value={value.mode}
+        onValueChange={(val) => handleModeChange(val as FilterMode)}
+        className="flex items-center gap-4"
+      >
+        <div className="flex items-center gap-1">
+          <RadioGroupItem
+            value="vessel"
+            id="filter-vessel"
+            className="border-gray-400 text-gray-700 data-[state=checked]:bg-gray-700 data-[state=checked]:text-white"
+            data-testid="radio-filter-vessel"
+          />
+          {vesselPicker}
         </div>
 
         <div className="flex items-center gap-1">

@@ -901,10 +901,17 @@ export async function getLsaFfaMaintenanceSchedule(
     lsaFfaComponents = lsaFfaComponents.filter((c: any) => getEffectiveDept(c) === equipmentType);
   }
 
-  const lsaFfaComponentIds = new Set(lsaFfaComponents.map((c: any) => c.cuuid));
-  const lsaFfaComponentMap = new Map(lsaFfaComponents.map((c: any) => [c.cuuid, c]));
+  // Build lookup: componentCode → component (WOs are vessel-scoped so code lookup is safe)
+  const lsaFfaCompByCode = new Map<string, any>();
+  for (const comp of lsaFfaComponents) {
+    if (comp.componentCode && !lsaFfaCompByCode.has(comp.componentCode)) {
+      lsaFfaCompByCode.set(comp.componentCode, comp);
+    }
+  }
+
   const lsaVesselMap = new Map(allVessels.map(v => [v.id, v.name || v.id]));
 
+  // Fetch jobs — used only for jobNo (job code) lookup via wo.jobId
   let allJobs: any[] = [];
   if (vesselId === 'all') {
     for (const v of scopedVessels) {
@@ -916,16 +923,7 @@ export async function getLsaFfaMaintenanceSchedule(
   }
   const jobMap = new Map(allJobs.map((j: any) => [j.juuid, j]));
 
-  let allLinks: any[] = [];
-  if (vesselId === 'all') {
-    for (const v of scopedVessels) {
-      const links = await repo.getJobComponentLinks(v.id);
-      allLinks.push(...links);
-    }
-  } else {
-    allLinks = await repo.getJobComponentLinks(vesselId);
-  }
-
+  // Fetch all work orders — primary data source
   let allWorkOrders: any[] = [];
   if (vesselId === 'all') {
     for (const v of scopedVessels) {
@@ -934,15 +932,6 @@ export async function getLsaFfaMaintenanceSchedule(
     }
   } else {
     allWorkOrders = await repo.getWorkOrders(vesselId);
-  }
-  const woByJobId = new Map<string, any[]>();
-  for (const wo of allWorkOrders) {
-    const jobId = wo.jobId;
-    if (jobId) {
-      const existing = woByJobId.get(jobId) || [];
-      existing.push(wo);
-      woByJobId.set(jobId, existing);
-    }
   }
 
   const today = new Date();
@@ -960,63 +949,49 @@ export async function getLsaFfaMaintenanceSchedule(
 
   const scheduleItems: any[] = [];
 
-  for (const link of allLinks) {
-    if (!lsaFfaComponentIds.has(link.componentId)) continue;
+  for (const wo of allWorkOrders) {
+    if (!wo.componentCode) continue;
 
-    const comp = lsaFfaComponentMap.get(link.componentId);
-    const job = jobMap.get(link.jobId);
-    if (!comp || !job) continue;
+    const comp = lsaFfaCompByCode.get(wo.componentCode);
+    if (!comp) continue;
 
-    const nextDueDateStr = link.nextDueDate || job.nextDueDate;
+    // Optional job lookup for job code only
+    const job = wo.jobId ? jobMap.get(wo.jobId) : undefined;
+
+    const dueDateStr = wo.dueDate;
     let daysUntilDue: number | null = null;
-    let status = 'On Schedule';
 
-    if (nextDueDateStr) {
-      const nextDueDate = new Date(nextDueDateStr);
-      if (!isNaN(nextDueDate.getTime())) {
-        nextDueDate.setHours(0, 0, 0, 0);
-        daysUntilDue = Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysUntilDue < 0) {
-          status = 'Overdue';
-        } else if (daysUntilDue <= 30) {
-          status = 'Due Soon';
-        } else {
-          status = 'On Schedule';
+    if (dueDateStr) {
+      try {
+        const dueDate = new Date(dueDateStr);
+        if (!isNaN(dueDate.getTime())) {
+          dueDate.setHours(0, 0, 0, 0);
+          daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
         }
-      }
+      } catch { /* ignore */ }
     }
 
-    const jobWorkOrders = woByJobId.get(job.juuid) || [];
-    const sortedWOs = jobWorkOrders.sort((a: any, b: any) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateB - dateA;
-    });
-    const lastWO = sortedWOs[0];
-
-    const lastDoneDateStr = link.lastDoneDate || job.lastDoneDate;
-    const freq = job.frequencyValue ? `${job.frequencyValue} ${job.frequencyUnit || ''}`.trim() : '-';
+    const freq = wo.frequencyValue ? `${wo.frequencyValue} ${wo.frequencyUnit || ''}`.trim() : '-';
 
     scheduleItems.push({
-      componentId: comp.cuuid,
-      jobId: job.juuid,
-      componentCode: comp.componentCode || '-',
-      componentName: comp.name || '-',
+      wouuid: wo.wouuid,
+      componentCode: wo.componentCode || '-',
+      componentName: wo.component || comp.name || '-',
       equipmentType: getEffectiveDept(comp) || '-',
       location: comp.location || '-',
-      jobCode: job.jobNo || '-',
-      jobTitle: job.jobTitle || '-',
-      taskType: job.maintenanceType || '-',
-      maintenanceBasis: job.maintenanceBasis || '-',
+      jobCode: job?.jobNo || '-',
+      jobTitle: wo.jobTitle || '-',
+      taskType: wo.taskType || wo.maintenanceType || '-',
+      maintenanceBasis: wo.maintenanceBasis || '-',
       frequency: freq,
-      nextDueDate: formatDateStr(nextDueDateStr),
+      nextDueDate: formatDateStr(dueDateStr),
       daysUntilDue: daysUntilDue !== null ? daysUntilDue : '-',
-      status,
-      lastDoneDate: formatDateStr(lastDoneDateStr),
-      lastWONumber: lastWO?.workOrderNo || '-',
-      assignedTo: job.assignedTo || '-',
-      vesselId: comp.vesselId,
-      vesselName: lsaVesselMap.get(comp.vesselId || '') || '-',
+      status: wo.status || 'Active',
+      lastDoneDate: formatDateStr(wo.dateCompleted),
+      lastWONumber: wo.workOrderNo || '-',
+      assignedTo: wo.assignedTo || '-',
+      vesselId: wo.vesselId,
+      vesselName: lsaVesselMap.get(wo.vesselId || '') || '-',
     });
   }
 
@@ -1038,14 +1013,17 @@ export async function getLsaFfaMaintenanceSchedule(
   }
 
   if (statusFilter && statusFilter !== 'all') {
-    const statusMap: Record<string, string> = {
-      'on-schedule': 'On Schedule',
-      'due-soon': 'Due Soon',
-      'overdue': 'Overdue'
+    const statusMap: Record<string, string[]> = {
+      'overdue':          ['Overdue'],
+      'due':              ['Due', 'Due (Grace P)'],
+      'active':           ['Active'],
+      'completed':        ['Completed'],
+      'pending-approval': ['Pending Approval'],
+      'postponed':        ['Postponed'],
     };
-    const filterValue = statusMap[statusFilter];
-    if (filterValue) {
-      const filtered = scheduleItems.filter(item => item.status === filterValue);
+    const filterValues = statusMap[statusFilter];
+    if (filterValues) {
+      const filtered = scheduleItems.filter(item => filterValues.includes(item.status));
       scheduleItems.length = 0;
       scheduleItems.push(...filtered);
     }
@@ -1060,9 +1038,12 @@ export async function getLsaFfaMaintenanceSchedule(
 
   scheduleItems.forEach((item, i) => { item.sno = i + 1; });
 
-  const onScheduleCount = scheduleItems.filter(i => i.status === 'On Schedule').length;
-  const dueSoonCount = scheduleItems.filter(i => i.status === 'Due Soon').length;
   const overdueCount = scheduleItems.filter(i => i.status === 'Overdue').length;
+  const dueCount = scheduleItems.filter(i => i.status === 'Due' || i.status === 'Due (Grace P)').length;
+  const activeCount = scheduleItems.filter(i => i.status === 'Active').length;
+  const completedCount = scheduleItems.filter(i => i.status === 'Completed').length;
+  const numericDays = scheduleItems.filter(i => typeof i.daysUntilDue === 'number').map(i => i.daysUntilDue as number);
+  const avgDaysUntilDue = numericDays.length > 0 ? Math.round(numericDays.reduce((a: number, b: number) => a + b, 0) / numericDays.length) : 0;
 
   if (format === 'excel') {
     const columns: ColumnDef[] = [
@@ -1076,12 +1057,12 @@ export async function getLsaFfaMaintenanceSchedule(
       { key: 'taskType', header: 'Task Type', width: 16, type: 'text' },
       { key: 'maintenanceBasis', header: 'Basis', width: 14, type: 'text' },
       { key: 'frequency', header: 'Frequency', width: 14, type: 'text' },
-      { key: 'nextDueDate', header: 'Next Due Date', width: 16, type: 'text' },
-      { key: 'daysUntilDue', header: 'Days', width: 10, type: 'number', align: 'center' },
-      { key: 'status', header: 'Status', width: 14, type: 'text', align: 'center' },
-      { key: 'lastDoneDate', header: 'Last Done', width: 16, type: 'text' },
-      { key: 'lastWONumber', header: 'Last WO', width: 18, type: 'text' },
-      { key: 'assignedTo', header: 'Assigned To', width: 16, type: 'text' }
+      { key: 'nextDueDate', header: 'Due Date', width: 16, type: 'text' },
+      { key: 'daysUntilDue', header: 'Days Until Due', width: 14, type: 'number', align: 'center' },
+      { key: 'status', header: 'Status', width: 16, type: 'text', align: 'center' },
+      { key: 'lastDoneDate', header: 'Completed Date', width: 16, type: 'text' },
+      { key: 'lastWONumber', header: 'WO Number', width: 22, type: 'text' },
+      { key: 'assignedTo', header: 'Assigned To', width: 16, type: 'text' },
     ];
 
     const conditionalStyles: ConditionalStyle[] = [
@@ -1090,7 +1071,7 @@ export async function getLsaFfaMaintenanceSchedule(
         style: 'danger'
       },
       {
-        condition: (row: any) => row.status === 'Due Soon',
+        condition: (row: any) => row.status === 'Due' || row.status === 'Due (Grace P)',
         style: 'warning'
       }
     ];
@@ -1101,7 +1082,7 @@ export async function getLsaFfaMaintenanceSchedule(
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('LSA-FFA Maintenance Schedule');
 
-    applyStandardHeader(ws, 'LSA/FFA Maintenance Schedule & Status', `${scheduleItems.length} schedule items`, vesselName, scheduleItems.length, lastCol);
+    applyStandardHeader(ws, 'LSA/FFA Maintenance Schedule & Status', `${scheduleItems.length} work orders`, vesselName, scheduleItems.length, lastCol);
     applyStandardTableHeader(ws, columns);
     applyStandardDataRows(ws, scheduleItems, columns, 8, conditionalStyles);
 
@@ -1123,9 +1104,11 @@ export async function getLsaFfaMaintenanceSchedule(
     scheduleItems,
     summary: {
       total: scheduleItems.length,
-      onSchedule: onScheduleCount,
-      dueSoon: dueSoonCount,
-      overdue: overdueCount
+      overdue: overdueCount,
+      due: dueCount,
+      active: activeCount,
+      completed: completedCount,
+      avgDaysUntilDue
     }
   };
 }
@@ -1141,11 +1124,16 @@ export async function getCriticalEquipmentSchedule(
   format: string,
   startDate?: string,
   endDate?: string,
+  vesselIds?: string[],
 ) {
   const allVessels = await repo.getVessels();
+  const scopedVessels = vesselId === 'all' && vesselIds?.length
+    ? allVessels.filter(v => vesselIds.includes(v.id))
+    : allVessels;
+
   let allComponents: any[] = [];
   if (vesselId === 'all') {
-    for (const v of allVessels) {
+    for (const v of scopedVessels) {
       allComponents = allComponents.concat(await repo.getComponents(v.id));
     }
   } else {
@@ -1157,12 +1145,18 @@ export async function getCriticalEquipmentSchedule(
     criticalComponents = criticalComponents.filter((c: any) => c.category === category);
   }
 
-  const criticalComponentIds = new Set(criticalComponents.map((c: any) => c.cuuid));
-  const criticalComponentMap = new Map(criticalComponents.map((c: any) => [c.cuuid, c]));
+  // Build lookup: componentCode → component (WOs are vessel-scoped so code lookup is safe)
+  const criticalCompByCode = new Map<string, any>();
+  for (const comp of criticalComponents) {
+    if (comp.componentCode && !criticalCompByCode.has(comp.componentCode)) {
+      criticalCompByCode.set(comp.componentCode, comp);
+    }
+  }
 
+  // Fetch jobs — used only for jobNo (job code) lookup via wo.jobId
   let allJobs: any[] = [];
   if (vesselId === 'all') {
-    for (const v of allVessels) {
+    for (const v of scopedVessels) {
       const vJobs = await repo.getJobs(v.id);
       allJobs = allJobs.concat(vJobs);
     }
@@ -1171,34 +1165,18 @@ export async function getCriticalEquipmentSchedule(
   }
   const jobMap = new Map(allJobs.map((j: any) => [j.juuid, j]));
 
-  let allLinks: any[] = [];
-  if (vesselId === 'all') {
-    for (const v of allVessels) {
-      const links = await repo.getJobComponentLinks(v.id);
-      allLinks.push(...links);
-    }
-  } else {
-    allLinks = await repo.getJobComponentLinks(vesselId);
-  }
-
+  // Fetch all work orders — primary data source
   let allWorkOrders: any[] = [];
   if (vesselId === 'all') {
-    for (const v of allVessels) {
+    for (const v of scopedVessels) {
       const wos = await repo.getWorkOrders(v.id);
       allWorkOrders = allWorkOrders.concat(wos);
     }
   } else {
     allWorkOrders = await repo.getWorkOrders(vesselId);
   }
-  const woByJobId = new Map<string, any[]>();
-  for (const wo of allWorkOrders) {
-    const jobId = wo.jobId;
-    if (jobId) {
-      const existing = woByJobId.get(jobId) || [];
-      existing.push(wo);
-      woByJobId.set(jobId, existing);
-    }
-  }
+
+  const vesselMap = new Map(allVessels.map(v => [v.id, v.name || v.id]));
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -1215,63 +1193,48 @@ export async function getCriticalEquipmentSchedule(
 
   const scheduleItems: any[] = [];
 
-  for (const link of allLinks) {
-    if (!criticalComponentIds.has(link.componentId)) continue;
+  for (const wo of allWorkOrders) {
+    if (!wo.componentCode) continue;
 
-    const comp = criticalComponentMap.get(link.componentId);
-    const job = jobMap.get(link.jobId);
-    if (!comp || !job) continue;
+    const comp = criticalCompByCode.get(wo.componentCode);
+    if (!comp) continue;
 
-    const nextDueDateStr = link.nextDueDate || job.nextDueDate;
+    // Optional job lookup for job code only
+    const job = wo.jobId ? jobMap.get(wo.jobId) : undefined;
+
+    const dueDateStr = wo.dueDate;
     let daysUntilDue: number | null = null;
-    let status = 'On Schedule';
 
-    if (nextDueDateStr) {
-      const nextDueDate = new Date(nextDueDateStr);
-      if (!isNaN(nextDueDate.getTime())) {
-        nextDueDate.setHours(0, 0, 0, 0);
-        daysUntilDue = Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysUntilDue < 0) {
-          status = 'Overdue';
-        } else if (daysUntilDue <= 7) {
-          status = 'Due Soon';
-        } else {
-          status = 'On Schedule';
+    if (dueDateStr) {
+      try {
+        const dueDate = new Date(dueDateStr);
+        if (!isNaN(dueDate.getTime())) {
+          dueDate.setHours(0, 0, 0, 0);
+          daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
         }
-      }
+      } catch { /* ignore */ }
     }
 
-    const jobWorkOrders = woByJobId.get(job.juuid) || [];
-    const sortedWOs = jobWorkOrders.sort((a: any, b: any) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateB - dateA;
-    });
-    const lastWO = sortedWOs[0];
-
-    const lastDoneDateStr = link.lastDoneDate || job.lastDoneDate;
-    const freq = job.frequencyValue ? `${job.frequencyValue} ${job.frequencyUnit || ''}`.trim() : '-';
+    const freq = wo.frequencyValue ? `${wo.frequencyValue} ${wo.frequencyUnit || ''}`.trim() : '-';
 
     scheduleItems.push({
-      componentId: comp.cuuid,
-      jobId: job.juuid,
-      componentCode: comp.componentCode || '-',
-      componentName: comp.name || '-',
+      wouuid: wo.wouuid,
+      componentCode: wo.componentCode || '-',
+      componentName: wo.component || comp.name || '-',
       location: comp.location || '-',
-      jobCode: job.jobNo || '-',
-      jobTitle: job.jobTitle || '-',
-      taskType: job.maintenanceType || '-',
-      maintenanceBasis: job.maintenanceBasis || '-',
+      jobCode: job?.jobNo || '-',
+      jobTitle: wo.jobTitle || '-',
+      taskType: wo.taskType || wo.maintenanceType || '-',
+      maintenanceBasis: wo.maintenanceBasis || '-',
       frequency: freq,
-      nextDueDate: formatDateStr(nextDueDateStr),
+      nextDueDate: formatDateStr(dueDateStr),
       daysUntilDue: daysUntilDue !== null ? daysUntilDue : '-',
-      status,
-      lastDoneDate: formatDateStr(lastDoneDateStr),
-      lastWONumber: lastWO?.workOrderNo || '-',
-      lastWOStatus: lastWO?.status || '-',
-      assignedTo: job.assignedTo || '-',
-      estimatedManHours: '-',
-      runningHours: comp.currentCumulativeRH || '-'
+      status: wo.status || 'Active',
+      lastDoneDate: formatDateStr(wo.dateCompleted),
+      lastWONumber: wo.workOrderNo || '-',
+      assignedTo: wo.assignedTo || '-',
+      vesselId: wo.vesselId,
+      vesselName: vesselMap.get(wo.vesselId || '') || '-',
     });
   }
 
@@ -1293,14 +1256,17 @@ export async function getCriticalEquipmentSchedule(
   }
 
   if (statusFilter && statusFilter !== 'all') {
-    const statusMap: Record<string, string> = {
-      'on-schedule': 'On Schedule',
-      'due-soon': 'Due Soon',
-      'overdue': 'Overdue'
+    const statusMap: Record<string, string[]> = {
+      'overdue':          ['Overdue'],
+      'due':              ['Due', 'Due (Grace P)'],
+      'active':           ['Active'],
+      'completed':        ['Completed'],
+      'pending-approval': ['Pending Approval'],
+      'postponed':        ['Postponed'],
     };
-    const filterValue = statusMap[statusFilter];
-    if (filterValue) {
-      const filtered = scheduleItems.filter(item => item.status === filterValue);
+    const filterValues = statusMap[statusFilter];
+    if (filterValues) {
+      const filtered = scheduleItems.filter(item => filterValues.includes(item.status));
       scheduleItems.length = 0;
       scheduleItems.push(...filtered);
     }
@@ -1315,9 +1281,10 @@ export async function getCriticalEquipmentSchedule(
 
   scheduleItems.forEach((item, i) => { item.sno = i + 1; });
 
-  const onScheduleCount = scheduleItems.filter(i => i.status === 'On Schedule').length;
-  const dueSoonCount = scheduleItems.filter(i => i.status === 'Due Soon').length;
   const overdueCount = scheduleItems.filter(i => i.status === 'Overdue').length;
+  const dueCount = scheduleItems.filter(i => i.status === 'Due' || i.status === 'Due (Grace P)').length;
+  const activeCount = scheduleItems.filter(i => i.status === 'Active').length;
+  const completedCount = scheduleItems.filter(i => i.status === 'Completed').length;
   const numericDays = scheduleItems.filter(i => typeof i.daysUntilDue === 'number').map(i => i.daysUntilDue as number);
   const avgDaysUntilDue = numericDays.length > 0 ? Math.round(numericDays.reduce((a: number, b: number) => a + b, 0) / numericDays.length) : 0;
 
@@ -1332,15 +1299,12 @@ export async function getCriticalEquipmentSchedule(
       { key: 'taskType', header: 'Task Type', width: 16, type: 'text' },
       { key: 'maintenanceBasis', header: 'Maint. Basis', width: 14, type: 'text' },
       { key: 'frequency', header: 'Frequency', width: 14, type: 'text' },
-      { key: 'nextDueDate', header: 'Next Due Date', width: 16, type: 'text' },
+      { key: 'nextDueDate', header: 'Due Date', width: 16, type: 'text' },
       { key: 'daysUntilDue', header: 'Days Until Due', width: 14, type: 'number', align: 'center' },
-      { key: 'status', header: 'Status', width: 14, type: 'text', align: 'center' },
-      { key: 'lastDoneDate', header: 'Last Done', width: 16, type: 'text' },
-      { key: 'lastWONumber', header: 'Last WO No', width: 18, type: 'text' },
-      { key: 'lastWOStatus', header: 'Last WO Status', width: 14, type: 'text' },
+      { key: 'status', header: 'Status', width: 16, type: 'text', align: 'center' },
+      { key: 'lastDoneDate', header: 'Completed Date', width: 16, type: 'text' },
+      { key: 'lastWONumber', header: 'WO Number', width: 22, type: 'text' },
       { key: 'assignedTo', header: 'Assigned To', width: 16, type: 'text' },
-      { key: 'estimatedManHours', header: 'Man-Hours', width: 12, type: 'number', align: 'center' },
-      { key: 'runningHours', header: 'Running Hours', width: 14, type: 'text' }
     ];
 
     const conditionalStyles: ConditionalStyle[] = [
@@ -1349,7 +1313,7 @@ export async function getCriticalEquipmentSchedule(
         style: 'danger'
       },
       {
-        condition: (row: any) => row.status === 'Due Soon',
+        condition: (row: any) => row.status === 'Due' || row.status === 'Due (Grace P)',
         style: 'warning'
       }
     ];
@@ -1360,7 +1324,7 @@ export async function getCriticalEquipmentSchedule(
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Critical Equipment Schedule');
 
-    applyStandardHeader(ws, 'Critical Equipment Maintenance Schedule', `${scheduleItems.length} schedule items`, vesselName, scheduleItems.length, lastCol);
+    applyStandardHeader(ws, 'Critical Equipment Maintenance Schedule', `${scheduleItems.length} work orders`, vesselName, scheduleItems.length, lastCol);
     applyStandardTableHeader(ws, columns);
     applyStandardDataRows(ws, scheduleItems, columns, 8, conditionalStyles);
 
@@ -1382,9 +1346,10 @@ export async function getCriticalEquipmentSchedule(
     scheduleItems,
     summary: {
       total: scheduleItems.length,
-      onSchedule: onScheduleCount,
-      dueSoon: dueSoonCount,
       overdue: overdueCount,
+      due: dueCount,
+      active: activeCount,
+      completed: completedCount,
       avgDaysUntilDue
     }
   };
@@ -1567,26 +1532,33 @@ export async function getClassItemsJobsStatus(
 
   let allComponents: any[] = [];
   let allJobs: any[] = [];
-  let allLinks: any[] = [];
+  let allWorkOrders: any[] = [];
   for (const v of scopedVessels) {
     allComponents = allComponents.concat(await repo.getComponents(v.id));
     allJobs = allJobs.concat(await repo.getJobs(v.id));
-    allLinks = allLinks.concat(await repo.getJobComponentLinks(v.id));
+    allWorkOrders = allWorkOrders.concat(await repo.getWorkOrders(v.id));
   }
 
   const isClassRelated = (val: any) => val === true || val === 'Yes' || val === 'true';
-  const classJobs = allJobs.filter((j: any) =>
-    isClassRelated(j.classRelated) &&
-    j.isDeleted !== true &&
-    (j.isActive === undefined || j.isActive === true)
-  );
 
-  const componentByCuuid = new Map<string, any>(allComponents.filter(c => c.isDeleted !== true).map(c => [c.cuuid, c]));
-  const linksByJobId = new Map<string, string[]>();
-  for (const link of allLinks) {
-    const arr = linksByJobId.get(link.jobId) || [];
-    arr.push(link.componentId);
-    linksByJobId.set(link.jobId, arr);
+  // Job lookup map — for job code (jobNo) display only
+  const jobMap = new Map<string, any>();
+  for (const j of allJobs) {
+    jobMap.set(j.juuid, j);
+  }
+
+  // Build component lookup by componentCode and a Set of class-item component codes
+  const componentByCode = new Map<string, any>();
+  const classCompCodes = new Set<string>();
+  for (const c of allComponents) {
+    if (c.isDeleted !== true && c.componentCode) {
+      if (!componentByCode.has(c.componentCode)) {
+        componentByCode.set(c.componentCode, c);
+      }
+      if (c.classItem === true) {
+        classCompCodes.add(c.componentCode);
+      }
+    }
   }
 
   const jobSearchQ = (jobSearch || '').toLowerCase().trim();
@@ -1594,65 +1566,67 @@ export async function getClassItemsJobsStatus(
   const dateFromTs = dateFrom ? Date.parse(dateFrom) : NaN;
   const dateToTs = dateTo ? Date.parse(dateTo) : NaN;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayTs = today.getTime();
-  const thirtyDaysTs = 30 * 24 * 60 * 60 * 1000;
-
-  const deriveStatus = (nextDueDate: string | null | undefined): string => {
-    if (!nextDueDate || nextDueDate === '-') return '-';
-    const t = _ciParseDate(nextDueDate);
-    if (!isFinite(t)) return '-';
-    if (t < todayTs) return 'Overdue';
-    if (t - todayTs <= thirtyDaysTs) return 'Due';
-    return 'Upcoming';
-  };
-
   const rows: any[] = [];
-  for (const job of classJobs) {
-    const directCompId = job.componentId || null;
-    const linkCompIds = linksByJobId.get(job.juuid) || [];
-    const representativeCompId = directCompId || linkCompIds[0] || null;
-    const comp = representativeCompId ? componentByCuuid.get(representativeCompId) : null;
+
+  const seenWoIds = new Set<string>();
+
+  for (const wo of allWorkOrders) {
+    // Inclusion: OR logic — WO-level flag (class_related = 'Yes') OR component flag (class_item = true)
+    const woIsClass = isClassRelated(wo.classRelated);
+    const compIsClass = wo.componentCode ? classCompCodes.has(wo.componentCode) : false;
+    if (!woIsClass && !compIsClass) continue;
+
+    // Deduplicate — WOs satisfying both conditions appear only once.
+    // Use wouuid as primary key; fall back to workOrderNo if wouuid is absent.
+    const dedupKey = wo.wouuid || wo.workOrderNo;
+    if (dedupKey) {
+      if (seenWoIds.has(dedupKey)) continue;
+      seenWoIds.add(dedupKey);
+    }
+
+    const job = jobMap.get(wo.jobId);
+    const comp = wo.componentCode ? componentByCode.get(wo.componentCode) : null;
 
     if (jobSearchQ) {
-      const jc = (job.jobNo || '').toLowerCase();
-      const jt = (job.jobTitle || '').toLowerCase();
+      const jc = (wo.workOrderNo || job?.jobNo || '').toLowerCase();
+      const jt = (wo.jobTitle || job?.jobTitle || '').toLowerCase();
       if (!jc.includes(jobSearchQ) && !jt.includes(jobSearchQ)) continue;
     }
     if (deptQ && deptQ !== 'all') {
-      const d = ((job.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || '') as string).toLowerCase();
+      const d = ((wo.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || '') as string).toLowerCase();
       if (d !== deptQ) continue;
     }
     if (!isNaN(dateFromTs) || !isNaN(dateToTs)) {
-      const dueTs = _ciParseDate(job.nextDueDate);
+      const dueTs = _ciParseDate(wo.dueDate);
       if (!isFinite(dueTs)) continue;
       if (!isNaN(dateFromTs) && dueTs < dateFromTs) continue;
       if (!isNaN(dateToTs) && dueTs > dateToTs) continue;
     }
 
-    const freq = [job.frequencyValue, job.frequencyUnit].filter(Boolean).join(' ');
+    const freq = [wo.frequencyValue || job?.frequencyValue, wo.frequencyUnit || job?.frequencyUnit].filter(Boolean).join(' ');
 
     rows.push({
-      jobCode: job.jobNo || '-',
-      jobTitle: job.jobTitle || '-',
-      componentCode: comp?.componentCode || '-',
-      componentName: comp?.name || '-',
-      department: job.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || '-',
-      taskType: job.maintenanceType || '-',
-      maintenanceBasis: job.maintenanceBasis || '-',
+      wouuid: wo.wouuid,
+      jobCode: job?.jobNo || '-',
+      jobTitle: wo.jobTitle || job?.jobTitle || '-',
+      componentCode: wo.componentCode || comp?.componentCode || '-',
+      componentName: wo.component || comp?.name || '-',
+      department: wo.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || '-',
+      taskType: wo.taskType || wo.maintenanceType || job?.maintenanceType || '-',
+      maintenanceBasis: wo.maintenanceBasis || job?.maintenanceBasis || '-',
       frequency: freq || '-',
-      assignedTo: job.assignedTo || '-',
-      approver: job.approver || '-',
-      jobPriority: job.jobPriority || '-',
-      criticality: job.criticality || (comp?.critical === true ? 'Yes' : (comp?.critical === false ? 'No' : '-')),
-      lastDoneDate: job.lastDoneDate || '-',
-      lastDoneRH: job.lastDoneRH || job.lastDoneRunningHours || '-',
-      nextDueDate: job.nextDueDate || '-',
-      nextDueRH: job.nextDueRH || job.nextDueRunningHours || '-',
-      status: deriveStatus(job.nextDueDate),
-      vesselName: vesselNameMap.get(comp?.vesselId || job.vesselId || '') || '-',
-      vesselId: comp?.vesselId || job.vesselId || '',
+      assignedTo: wo.assignedTo || job?.assignedTo || '-',
+      approver: wo.approver || job?.approver || '-',
+      jobPriority: wo.jobPriority || job?.jobPriority || '-',
+      criticality: comp?.critical === true ? 'Yes' : (comp?.critical === false ? 'No' : '-'),
+      lastDoneDate: wo.dateCompleted || '-',
+      lastDoneRH: wo.completedRunningHours || '-',
+      nextDueDate: wo.dueDate || '-',
+      nextDueRH: wo.dueRunningHours || '-',
+      workOrderNo: wo.workOrderNo || '-',
+      status: wo.status || 'Active',
+      vesselName: vesselNameMap.get(wo.vesselId || comp?.vesselId || '') || '-',
+      vesselId: wo.vesselId || comp?.vesselId || '',
     });
   }
 
@@ -1661,9 +1635,15 @@ export async function getClassItemsJobsStatus(
 
   const isMultiVessel = scopedVessels.length > 1 || vesselId === 'all';
 
+  const overdueCount = rows.filter(r => r.status === 'Overdue').length;
+  const dueCount = rows.filter(r => r.status === 'Due' || r.status === 'Due (Grace P)').length;
+  const activeCount = rows.filter(r => r.status === 'Active').length;
+  const completedCount = rows.filter(r => r.status === 'Completed').length;
+
   if (format === 'excel') {
     const columns: ColumnDef[] = [
       { key: 'sno', header: 'Sr. No.', width: 6, type: 'number', align: 'center' },
+      { key: 'workOrderNo', header: 'WO Number', width: 24, type: 'text' },
       { key: 'jobCode', header: 'Job Code', width: 16, type: 'text' },
       { key: 'jobTitle', header: 'Job Title', width: 32, type: 'text' },
       { key: 'componentCode', header: 'Component Code', width: 16, type: 'text' },
@@ -1676,21 +1656,26 @@ export async function getClassItemsJobsStatus(
       { key: 'approver', header: 'Approver', width: 14, type: 'text' },
       { key: 'jobPriority', header: 'Job Priority', width: 12, type: 'text', align: 'center' },
       { key: 'criticality', header: 'Criticality', width: 12, type: 'text', align: 'center' },
-      { key: 'lastDoneDate', header: 'Last Done Date', width: 14, type: 'text' },
-      { key: 'lastDoneRH', header: 'Last Done RH', width: 12, type: 'text', align: 'right' },
-      { key: 'nextDueDate', header: 'Next Due Date', width: 14, type: 'text' },
-      { key: 'nextDueRH', header: 'Next Due RH', width: 12, type: 'text', align: 'right' },
-      { key: 'status', header: 'Status', width: 12, type: 'text', align: 'center' },
+      { key: 'lastDoneDate', header: 'Completed Date', width: 16, type: 'text' },
+      { key: 'lastDoneRH', header: 'Completed RH', width: 14, type: 'text', align: 'right' },
+      { key: 'nextDueDate', header: 'Due Date', width: 14, type: 'text' },
+      { key: 'nextDueRH', header: 'Due RH', width: 12, type: 'text', align: 'right' },
+      { key: 'status', header: 'Status', width: 16, type: 'text', align: 'center' },
       ...(isMultiVessel ? [{ key: 'vesselName', header: 'Vessel', width: 22, type: 'text' as const }] : []),
+    ];
+
+    const conditionalStyles: ConditionalStyle[] = [
+      { condition: (row: any) => row.status === 'Overdue', style: 'danger' },
+      { condition: (row: any) => row.status === 'Due' || row.status === 'Due (Grace P)', style: 'warning' },
     ];
 
     const vesselName = vesselId !== 'all' ? (allVessels.find(v => v.id === vesselId)?.name || vesselId) : 'All Vessels';
     const lastCol = getLastColumnLetter(columns.length);
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Class Items Jobs');
-    applyStandardHeader(ws, 'Class Items Jobs Status', `${rows.length} class-related jobs`, vesselName, rows.length, lastCol);
+    applyStandardHeader(ws, 'Class Items Jobs Status', `${rows.length} work orders`, vesselName, rows.length, lastCol);
     applyStandardTableHeader(ws, columns);
-    applyStandardDataRows(ws, rows, columns);
+    applyStandardDataRows(ws, rows, columns, 8, conditionalStyles);
     const lastDataRow = 7 + rows.length;
     applyStandardPageSetup(ws, 7, columns.length, lastDataRow, vesselName);
     const buffer = await wb.xlsx.writeBuffer();
@@ -1706,10 +1691,10 @@ export async function getClassItemsJobsStatus(
     rows,
     summary: {
       total: rows.length,
-      jobs: classJobs.length,
-      overdue: rows.filter(r => r.status === 'Overdue').length,
-      due: rows.filter(r => r.status === 'Due').length,
-      upcoming: rows.filter(r => r.status === 'Upcoming').length,
+      overdue: overdueCount,
+      due: dueCount,
+      active: activeCount,
+      completed: completedCount,
     },
   };
 }

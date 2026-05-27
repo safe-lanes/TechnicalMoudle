@@ -169,15 +169,9 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
 
   useEffect(() => {
     if (embedded && selectedReportId) {
-      const version = ++previewVersionRef.current;
       setPreviewData(null);
       initialLoadRef.current = false;
-      generateChangeRequestReport(selectedReportId, 'preview').then((data) => {
-        if (previewVersionRef.current === version) {
-          if (data) setPreviewData(data);
-          initialLoadRef.current = true;
-        }
-      }).catch((err) => { console.error('Report preview load failed:', err); });
+      ++previewVersionRef.current;
     }
   }, [embedded, selectedReportId]);
 
@@ -240,6 +234,19 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
   }, [reportData?.requests, globalVessels, globalFilters?.component, vessels.length]);
 
   useEffect(() => {
+    if (!embedded || !selectedReportId) return;
+    if (!reportData) return;
+    if (initialLoadRef.current) return;
+    const version = ++previewVersionRef.current;
+    initialLoadRef.current = true;
+    generateChangeRequestReport(selectedReportId, 'preview').then((data) => {
+      if (previewVersionRef.current === version) {
+        if (data) setPreviewData(data);
+      }
+    }).catch((err) => { console.error('Report preview load failed:', err); });
+  }, [reportData, embedded, selectedReportId]);
+
+  useEffect(() => {
     if (!embedded || !selectedReportId || !initialLoadRef.current || !pendingPreviewRef.current) return;
     if (isFetching) return;
     pendingPreviewRef.current = false;
@@ -292,7 +299,9 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
 
   const generateChangeRequestReport = async (reportId: string, mode: 'preview' | 'download' = 'download'): Promise<ReportPreviewData | void> => {
     if (!reportData) {
-      toast({ title: "No Data", description: "No report data available to export.", variant: "destructive" });
+      if (mode === 'download') {
+        toast({ title: "No Data", description: "No report data available to export.", variant: "destructive" });
+      }
       return;
     }
 
@@ -682,6 +691,12 @@ const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, glo
         </>
       )}
 
+      {embedded && isLoading && !previewData && !isFilterRefreshing && (
+        <div className="flex items-center justify-center py-12" data-testid="initial-load-loading">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+          <span className="text-sm text-muted-foreground">Loading report data...</span>
+        </div>
+      )}
       {embedded && isFilterRefreshing && !previewData && (
         <div className="flex items-center justify-center py-12" data-testid="filter-refresh-loading">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mr-2" />

@@ -25,7 +25,7 @@ interface ComponentNode {
   children?: ComponentNode[];
   [key: string]: any;
 }
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -1124,21 +1124,63 @@ const Spares: React.FC = () => {
     );
   }, [editMakerSearch, makerListData]);
 
-  const { data: sparesData = [], isLoading, refetch } = useQuery({
-    queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId],
+  // Debounce search term so every keystroke doesn't trigger a request
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  // Server-side pagination is always on. The optional `componentId` query param
+  // pushes the hierarchical (dotted-code) component filter down into SQL so the
+  // page payload stays bounded even when a component is selected.
+  const activeOnlyForRole = (isVessel || isHeadOfDept) && !isExternal;
+
+  const { data: sparesResponse, isLoading, refetch } = useQuery<{ items: any[]; total: number }>({
+    queryKey: [
+      '/technical/api/inventory/spares-with-inventory',
+      vesselId,
+      'paged',
+      currentPage,
+      itemsPerPage,
+      debouncedSearchTerm,
+      criticalityFilter,
+      rotationItemFilter,
+      stockFilter,
+      activeOnlyForRole,
+      selectedComponentId ?? '',
+    ],
     queryFn: async () => {
-      const response = await fetch(`/technical/api/inventory/spares-with-inventory/${vesselId}`);
+      const params = new URLSearchParams();
+      params.set('page', String(currentPage));
+      params.set('pageSize', String(itemsPerPage));
+      if (debouncedSearchTerm) params.set('search', debouncedSearchTerm);
+      if (criticalityFilter && criticalityFilter !== 'All') params.set('criticality', criticalityFilter);
+      if (rotationItemFilter && rotationItemFilter !== 'All') params.set('rotation', rotationItemFilter);
+      if (stockFilter && stockFilter !== 'All') params.set('stockStatus', stockFilter);
+      if (activeOnlyForRole) params.set('activeOnly', 'true');
+      if (selectedComponentId) params.set('componentId', selectedComponentId);
+      const response = await fetch(
+        `/technical/api/inventory/spares-with-inventory/${vesselId}?${params.toString()}`
+      );
       if (!response.ok) throw new Error('Failed to fetch spares');
       const json = await response.json();
-      // Extract spare data with linkedComponents for filtering
-      return (json.data || []).map((item: any) => ({
-        ...item.spare,
-        linkedComponents: item.linkedComponents || [],
-        robTotal: item.robTotal,
-        stockStatus: item.stockStatus,
-      }));
-    }
+      const payload = json.data || {};
+      return {
+        items: (payload.items || []).map((item: any) => ({
+          ...item.spare,
+          linkedComponents: item.linkedComponents || [],
+          robTotal: item.robTotal,
+          stockStatus: item.stockStatus,
+        })),
+        total: typeof payload.total === 'number' ? payload.total : 0,
+      };
+    },
+    placeholderData: keepPreviousData,
   });
+
+  const sparesData = sparesResponse?.items ?? [];
+  const serverTotal = sparesResponse?.total ?? 0;
 
   // Fetch history data
   const { data: historyData = [] } = useQuery({
@@ -1781,75 +1823,16 @@ const Spares: React.FC = () => {
     return false;
   };
 
-  // Filter spares based on all criteria
+  // The server has already applied component scope, search, criticality, rotation,
+  // stockStatus, activeOnly filters and ORDER BY part_code ASC — return the page as-is.
   const filteredSpares = useMemo(() => {
-    // Defensive check: ensure sparesData is an array
     if (!sparesData || !Array.isArray(sparesData)) return [];
-    let filtered = sparesData;
+    return sparesData;
+  }, [sparesData]);
 
-    // Filter by selected component (including children)
-    if (selectedComponentId) {
-      filtered = filtered.filter((spare: Spare) => isComponentMatch(spare, selectedComponentId));
-    }
-
-    // Filter by search term
-    if (searchTerm) {
-      const search = searchTerm.toLowerCase();
-      filtered = filtered.filter((spare: Spare) => 
-        spare.partCode.toLowerCase().includes(search) ||
-        spare.partName.toLowerCase().includes(search) ||
-        spare.componentName.toLowerCase().includes(search) ||
-        spare.componentCode?.toLowerCase().includes(search) ||
-        spare.location?.toLowerCase().includes(search)
-      );
-    }
-
-    // Filter by criticality
-    if (criticalityFilter && criticalityFilter !== "All") {
-      if (criticalityFilter === "Critical") {
-        filtered = filtered.filter((spare: Spare) => spare.critical === "Critical" || spare.critical === "Yes");
-      } else if (criticalityFilter === "Non-critical") {
-        filtered = filtered.filter((spare: Spare) => spare.critical !== "Critical" && spare.critical !== "Yes");
-      }
-    }
-
-    // Filter by rotation item
-    if (rotationItemFilter && rotationItemFilter !== "All") {
-      if (rotationItemFilter === "Rotation Items") {
-        filtered = filtered.filter((spare: Spare) => spare.isRotationItem === true);
-      } else if (rotationItemFilter === "Non-Rotation Items") {
-        filtered = filtered.filter((spare: Spare) => !spare.isRotationItem);
-      }
-    }
-
-    // Filter by stock status (using computed status)
-    if (stockFilter && stockFilter !== "All") {
-      filtered = filtered.filter((spare: Spare) => {
-        const status = getStockStatus(spare.rob, spare.min);
-        return status.label === stockFilter;
-      });
-    }
-
-    if ((isVessel || isHeadOfDept) && !isExternal) {
-      filtered = filtered.filter((spare: Spare) => spare.isActive !== false);
-    }
-
-    filtered = filtered.sort((a: Spare, b: Spare) => {
-      const aInactive = a.isActive === false ? 1 : 0;
-      const bInactive = b.isActive === false ? 1 : 0;
-      if (aInactive !== bInactive) return aInactive - bInactive;
-      return (a.partCode || '').localeCompare(b.partCode || '', undefined, { numeric: true });
-    });
-
-    return filtered;
-  }, [sparesData, selectedComponentId, searchTerm, criticalityFilter, rotationItemFilter, stockFilter, isVessel, isHeadOfDept, isExternal]);
-
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredSpares.length / itemsPerPage);
-  const paginatedSpares = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredSpares.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredSpares, currentPage, itemsPerPage]);
+  // Pagination derives from server `total`; `paginatedSpares` IS the page.
+  const totalPages = Math.max(1, Math.ceil((serverTotal ?? 0) / itemsPerPage));
+  const paginatedSpares = filteredSpares;
 
   // Reset page when filters change
   useEffect(() => {
@@ -1860,10 +1843,8 @@ const Spares: React.FC = () => {
   useEffect(() => {
     if (totalPages > 0 && currentPage > totalPages) {
       setCurrentPage(totalPages);
-    } else if (totalPages === 0 && filteredSpares.length === 0) {
-      setCurrentPage(1);
     }
-  }, [totalPages, currentPage, filteredSpares.length]);
+  }, [totalPages, currentPage]);
 
   const collectAllNodeIds = (nodes: ComponentNode[]): string[] => {
     const ids: string[] = [];
@@ -3807,7 +3788,7 @@ const Spares: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-600" data-testid="inventory-pagination-info">
                     <span>
-                      Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredSpares.length)} of {filteredSpares.length} spares
+                      Showing {serverTotal === 0 ? 0 : ((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, serverTotal)} of {serverTotal} spares
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
@@ -3825,7 +3806,7 @@ const Spares: React.FC = () => {
                         max={totalPages || 1}
                         value={currentPage}
                         onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) goToInventoryPage(v); }}
-                        className="w-14 h-8 text-center"
+                        className="w-20 h-8 text-center"
                         data-testid="input-inventory-page-number"
                       />
                       <span className="text-sm text-gray-600">of {totalPages || 1}</span>

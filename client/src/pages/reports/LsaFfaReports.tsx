@@ -108,15 +108,10 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
 
   useEffect(() => {
     if (embedded && selectedReportId) {
-      const version = ++previewVersionRef.current;
       setPreviewData(null);
       initialLoadRef.current = false;
-      generateReport(selectedReportId, 'preview').then((data) => {
-        if (previewVersionRef.current === version) {
-          if (data) setPreviewData(data);
-          initialLoadRef.current = true;
-        }
-      }).catch((err) => { console.error('Report preview load failed:', err); });
+      pendingPreviewRef.current = true;
+      ++previewVersionRef.current;
     }
   }, [embedded, selectedReportId]);
 
@@ -222,23 +217,27 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
         return true;
       });
     }
-    return { ...scheduleData, scheduleItems: result, summary: { ...scheduleData.summary, total: result.length, onSchedule: result.filter((i: any) => i.status === 'On Schedule' || i.status === 'on-schedule').length, dueSoon: result.filter((i: any) => i.status === 'Due Soon' || i.status === 'due-soon').length, overdue: result.filter((i: any) => i.status === 'Overdue' || i.status === 'overdue').length } };
+    return { ...scheduleData, scheduleItems: result, summary: { ...scheduleData.summary, total: result.length, overdue: result.filter((i: any) => i.status === 'Overdue').length, due: result.filter((i: any) => i.status === 'Due' || i.status === 'Due (Grace P)').length, active: result.filter((i: any) => i.status === 'Active').length, completed: result.filter((i: any) => i.status === 'Completed').length } };
   }, [scheduleData, globalVessels, globalFilters?.component, vessels.length, categoryFilters.dateRange]);
 
   useEffect(() => {
-    if (!embedded || !selectedReportId || !initialLoadRef.current || !pendingPreviewRef.current) return;
+    if (!embedded || !selectedReportId || !pendingPreviewRef.current) return;
     if (isFetching) return;
     pendingPreviewRef.current = false;
     const version = ++previewVersionRef.current;
     generateReport(selectedReportId, 'preview').then((data) => {
       if (previewVersionRef.current === version) {
         if (data) setPreviewData(data);
+        initialLoadRef.current = true;
         setIsFilterRefreshing(false);
       }
     }).catch(() => {
-      if (previewVersionRef.current === version) setIsFilterRefreshing(false);
+      if (previewVersionRef.current === version) {
+        initialLoadRef.current = true;
+        setIsFilterRefreshing(false);
+      }
     });
-  }, [filteredMasterList, filteredScheduleData, isFetching]);
+  }, [selectedReportId, filteredMasterList, filteredScheduleData, isFetching]);
 
   const reports: LsaFfaReport[] = [
     {
@@ -403,10 +402,11 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
 
       const summary = filteredScheduleData.summary || {};
       const summaryItems = [
-        { label: 'Total Items', value: summary.total ?? 0 },
-        { label: 'On Schedule', value: summary.onSchedule ?? 0 },
-        { label: 'Due Soon', value: summary.dueSoon ?? 0 },
-        { label: 'Overdue', value: summary.overdue ?? 0 }
+        { label: 'Total WOs', value: summary.total ?? 0 },
+        { label: 'Overdue', value: summary.overdue ?? 0 },
+        { label: 'Due', value: summary.due ?? 0 },
+        { label: 'Active', value: summary.active ?? 0 },
+        { label: 'Completed', value: summary.completed ?? 0 },
       ];
 
       const finalData = tableData.length > 0 ? tableData : [{ sno: '-', componentCode: '-', componentName: 'No maintenance items found', equipmentType: '-', location: '-', jobCode: '-', jobTitle: '-', taskType: '-', maintenanceBasis: '-', frequency: '-', nextDueDate: '-', daysUntilDue: '-', status: '-', lastDoneDate: '-', lastWONumber: '-', assignedTo: '-' }];
@@ -582,8 +582,11 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
                   <SelectContent>
                     <SelectItem value="all">All Statuses</SelectItem>
                     <SelectItem value="overdue">Overdue</SelectItem>
-                    <SelectItem value="due-soon">Due Soon</SelectItem>
-                    <SelectItem value="on-schedule">On Schedule</SelectItem>
+                    <SelectItem value="due">Due</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="pending-approval">Pending Approval</SelectItem>
+                    <SelectItem value="postponed">Postponed</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -617,10 +620,10 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-1">
                   <Clock className="w-4 h-4 text-amber-500" />
-                  Due Soon
+                  Due
                 </CardDescription>
-                <CardTitle className="text-3xl text-amber-600" data-testid="text-due-soon-count">
-                  {anyLoading ? '...' : (scheduleSummary.dueSoon ?? 0)}
+                <CardTitle className="text-3xl text-amber-600" data-testid="text-due-count">
+                  {anyLoading ? '...' : (scheduleSummary.due ?? 0)}
                 </CardTitle>
               </CardHeader>
             </Card>
@@ -628,10 +631,10 @@ const LsaFfaReports: React.FC<LsaFfaReportsProps> = ({ onBack, globalFilters, em
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-1">
                   <CheckCircle className="w-4 h-4 text-green-500" />
-                  On Schedule
+                  Active
                 </CardDescription>
-                <CardTitle className="text-3xl text-green-600" data-testid="text-on-schedule-count">
-                  {anyLoading ? '...' : (scheduleSummary.onSchedule ?? 0)}
+                <CardTitle className="text-3xl text-green-600" data-testid="text-active-count">
+                  {anyLoading ? '...' : (scheduleSummary.active ?? 0)}
                 </CardTitle>
               </CardHeader>
             </Card>

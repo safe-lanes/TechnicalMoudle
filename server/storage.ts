@@ -979,6 +979,18 @@ export interface IStorage {
   // Enhanced Spare Data Methods
   getSpareWithInventory(spareId: string): Promise<SpareWithInventory | null>;
   getSparesWithInventoryByVessel(vesselId: string): Promise<SpareWithInventory[]>;
+  getSparesWithInventoryByVesselPaged(vesselId: string, opts: {
+    page: number;
+    pageSize: number;
+    search?: string;
+    criticality?: 'Critical' | 'Non-critical';
+    rotation?: 'Rotation Items' | 'Non-Rotation Items';
+    stockStatus?: 'OK' | 'Low' | 'At Min';
+    sortBy?: 'partCode';
+    sortDir?: 'asc' | 'desc';
+    activeOnly?: boolean;
+    componentId?: string;
+  }): Promise<{ items: SpareWithInventory[]; total: number; page: number; pageSize: number }>;
   getSparesWithInventoryByComponent(componentId: string): Promise<SpareWithInventory[]>;
   getSparesWithInventoryByComponentCode(vesselId: string, componentCode: string): Promise<SpareWithInventory[]>;
 
