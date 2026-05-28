@@ -418,6 +418,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         
         const formattedData = anomalies.map((a: any) => ({
           sNo: a.sNo,
+          componentId: a.componentId || a.componentUuid || a.cuuid || a.id,
           vesselName: a.vesselName || '-',
           componentCode: a.componentCode,
           componentName: a.componentName,
