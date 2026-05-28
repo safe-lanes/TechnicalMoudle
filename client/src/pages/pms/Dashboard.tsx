@@ -377,29 +377,56 @@ const Dashboard = () => {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
   const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: EnrichedWorkOrder[] }>({ open: false, title: '', workOrders: [] });
-  const woRestoreAppliedRef = useRef(false);
-  const openWoListModal = (args: { title: string; workOrders: EnrichedWorkOrder[] }) => {
-    setWoListModal({ open: true, title: args.title, workOrders: args.workOrders });
+  const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
+  const [crListModal, setCrListModal] = useState<{ open: boolean; title: string; changeRequests: ChangeRequest[] }>({ open: false, title: '', changeRequests: [] });
+  const drilldownRestoreAppliedRef = useRef(false);
+  const DRILLDOWN_KEY = 'dashboardDrilldownModal';
+  const DRILLDOWN_NAV_KEY = 'dashboardDrilldownNavigating';
+  const spareKeyOf = (s: any): string => `${s?.vesselId ?? ''}__${s?.id ?? ''}`;
+  const persistDrilldown = (kind: 'wo' | 'spares' | 'cr', title: string, ids: string[]) => {
     try {
-      const ids = args.workOrders
-        .map((wo: any) => (wo?.wouuid != null ? String(wo.wouuid) : (wo?.id != null ? String(wo.id) : '')))
-        .filter(Boolean);
-      sessionStorage.setItem('dashboardWoListModal', JSON.stringify({ title: args.title, ids }));
+      sessionStorage.setItem(DRILLDOWN_KEY, JSON.stringify({ kind, title, ids: ids.filter(Boolean) }));
     } catch {}
   };
-  const handleWoListModalClose = () => {
-    setWoListModal({ open: false, title: '', workOrders: [] });
+  const clearDrilldownIfNotNavigating = () => {
     try {
-      const navigating = sessionStorage.getItem('dashboardDrilldownNavigating');
-      if (navigating) {
-        sessionStorage.removeItem('dashboardDrilldownNavigating');
+      const nav = sessionStorage.getItem(DRILLDOWN_NAV_KEY);
+      if (nav) {
+        sessionStorage.removeItem(DRILLDOWN_NAV_KEY);
       } else {
-        sessionStorage.removeItem('dashboardWoListModal');
+        sessionStorage.removeItem(DRILLDOWN_KEY);
       }
     } catch {}
   };
-  const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
-  const [crListModal, setCrListModal] = useState<{ open: boolean; title: string; changeRequests: ChangeRequest[] }>({ open: false, title: '', changeRequests: [] });
+  const openWoListModal = (args: { title: string; workOrders: EnrichedWorkOrder[] }) => {
+    setWoListModal({ open: true, title: args.title, workOrders: args.workOrders });
+    const ids = args.workOrders.map((wo: any) =>
+      wo?.wouuid != null ? String(wo.wouuid) : (wo?.id != null ? String(wo.id) : '')
+    );
+    persistDrilldown('wo', args.title, ids);
+  };
+  const openSparesListModal = (args: { title: string; spares: Spare[] }) => {
+    setSparesListModal({ open: true, title: args.title, spares: args.spares });
+    const ids = args.spares.map((s: any) => spareKeyOf(s));
+    persistDrilldown('spares', args.title, ids);
+  };
+  const openCrListModal = (args: { title: string; changeRequests: ChangeRequest[] }) => {
+    setCrListModal({ open: true, title: args.title, changeRequests: args.changeRequests });
+    const ids = args.changeRequests.map((cr: any) => (cr?.id != null ? String(cr.id) : ''));
+    persistDrilldown('cr', args.title, ids);
+  };
+  const handleWoListModalClose = () => {
+    setWoListModal({ open: false, title: '', workOrders: [] });
+    clearDrilldownIfNotNavigating();
+  };
+  const handleSparesListModalClose = () => {
+    setSparesListModal({ open: false, title: '', spares: [] });
+    clearDrilldownIfNotNavigating();
+  };
+  const handleCrListModalClose = () => {
+    setCrListModal({ open: false, title: '', changeRequests: [] });
+    clearDrilldownIfNotNavigating();
+  };
   const crListModalOpenRef = useRef(false);
   crListModalOpenRef.current = crListModal.open;
 
@@ -923,27 +950,44 @@ const Dashboard = () => {
     return out;
   };
 
-  // Restore drill-down WO list modal after returning from the Work Order form
-  // (the form's Back button calls window.history.back() which remounts this page).
+  // Restore drill-down modal (WO / Spares / CR) after the user returns from a
+  // form opened from that modal. The form's Back button calls
+  // window.history.back() which remounts this Dashboard; local modal state is
+  // lost, so we read the descriptor written by openXxxListModal() and re-open.
   useEffect(() => {
-    if (woRestoreAppliedRef.current) return;
-    if (isWorkOrdersLoading) return;
+    if (drilldownRestoreAppliedRef.current) return;
+    // Wait until the relevant dataset(s) are loaded so we can resolve IDs.
+    if (isWorkOrdersLoading || isSparesLoading) return;
     let raw: string | null = null;
-    try { raw = sessionStorage.getItem('dashboardWoListModal'); } catch {}
-    if (!raw) { woRestoreAppliedRef.current = true; return; }
+    try { raw = sessionStorage.getItem(DRILLDOWN_KEY); } catch {}
+    if (!raw) { drilldownRestoreAppliedRef.current = true; return; }
+    const clear = () => { try { sessionStorage.removeItem(DRILLDOWN_KEY); } catch {} };
     try {
-      const parsed = JSON.parse(raw) as { title?: string; ids?: string[] };
-      const wos = resolveWosByIds(parsed?.ids);
-      if (wos.length > 0) {
-        setWoListModal({ open: true, title: parsed.title || '', workOrders: wos });
+      const parsed = JSON.parse(raw) as { kind?: 'wo' | 'spares' | 'cr'; title?: string; ids?: string[] };
+      const title = parsed?.title || '';
+      const ids = parsed?.ids || [];
+      if (parsed?.kind === 'wo') {
+        const wos = resolveWosByIds(ids);
+        if (wos.length > 0) setWoListModal({ open: true, title, workOrders: wos });
+        else clear();
+      } else if (parsed?.kind === 'spares') {
+        const idSet = new Set(ids);
+        const matched = (sparesData as any[]).filter((s: any) => idSet.has(spareKeyOf(s))) as Spare[];
+        if (matched.length > 0) setSparesListModal({ open: true, title, spares: matched });
+        else clear();
+      } else if (parsed?.kind === 'cr') {
+        const idSet = new Set(ids);
+        const matched = (changeRequestsData as any[]).filter((cr: any) => idSet.has(String(cr?.id))) as ChangeRequest[];
+        if (matched.length > 0) setCrListModal({ open: true, title, changeRequests: matched });
+        else clear();
       } else {
-        try { sessionStorage.removeItem('dashboardWoListModal'); } catch {}
+        clear();
       }
     } catch {
-      try { sessionStorage.removeItem('dashboardWoListModal'); } catch {}
+      clear();
     }
-    woRestoreAppliedRef.current = true;
-  }, [isWorkOrdersLoading, workOrderByIdMap]);
+    drilldownRestoreAppliedRef.current = true;
+  }, [isWorkOrdersLoading, isSparesLoading, workOrderByIdMap, sparesData, changeRequestsData]);
 
   const buildPeriodDonutData = (
     buckets: WoStatusByPeriodResponse['all'] | undefined,
@@ -3278,7 +3322,7 @@ const Dashboard = () => {
                               const entry = sparesStockChartData[index];
                               if (!entry) return;
                               const filtered = filteredSparesData.filter(s => getStockStatus(s.rob, s.min).label === entry.status);
-                              setSparesListModal({ open: true, title: `${entry.status} Stock Spares - All Equipment`, spares: filtered });
+                              openSparesListModal({ title: `${entry.status} Stock Spares - All Equipment`, spares: filtered });
                             }}
                             cursor="pointer"
                           >
@@ -3344,7 +3388,7 @@ const Dashboard = () => {
                               if (!entry) return;
                               const criticalSparesList = sparesData.filter(s => s.critical === 'Critical' || s.critical === 'Yes');
                               const filtered = criticalSparesList.filter(s => getStockStatus(s.rob, s.min).label === entry.status);
-                              setSparesListModal({ open: true, title: `${entry.status} Stock Spares - Critical Equipment`, spares: filtered });
+                              openSparesListModal({ title: `${entry.status} Stock Spares - Critical Equipment`, spares: filtered });
                             }}
                             cursor="pointer"
                           >
@@ -3386,8 +3430,7 @@ const Dashboard = () => {
                             color="#e74c3c"
                             displayValue={`${modifyPmsPeriodKPIs.percent}%`}
                             subtitle={`${modifyPmsPeriodKPIs.numerator} modifications out of ${modifyPmsPeriodKPIs.denominator} WO`}
-                            onClick={() => setCrListModal({
-                              open: true,
+                            onClick={() => openCrListModal({
                               title: 'Modify PMS Requests',
                               changeRequests: modifyPmsPeriodKPIs.changeRequestsFull,
                             })}
@@ -3427,13 +3470,13 @@ const Dashboard = () => {
       />
       <SparesListModal
         open={sparesListModal.open}
-        onClose={() => setSparesListModal({ open: false, title: '', spares: [] })}
+        onClose={handleSparesListModalClose}
         title={sparesListModal.title}
         spares={sparesListModal.spares}
         vessels={vessels}
         getStockStatus={getStockStatus}
       />
-      <Dialog open={crListModal.open} onOpenChange={(isOpen) => !isOpen && setCrListModal({ open: false, title: '', changeRequests: [] })}>
+      <Dialog open={crListModal.open} onOpenChange={(isOpen) => { if (!isOpen) handleCrListModalClose(); }}>
         <DialogContent className="max-w-[90vw] h-[calc(100vh-10vw)] max-h-[90vh] overflow-hidden flex flex-col [&>button.absolute]:top-6 [&>button.absolute]:translate-y-1">
           <DialogHeader className="pb-4 flex flex-row items-center justify-between gap-4">
             <DialogTitle className="text-xl font-semibold text-[#0f4c81]" data-testid="title-cr-list-modal">
