@@ -452,6 +452,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
               )}
               {consumptionTrends.length > 0 && (
                 <ReportAgGridTable
+                  reportId="spares-consumption-analysis"
                   columns={[
                     { header: "Month", field: "month" },
                     { header: "Total Qty", field: "totalQtyDisplay" },
@@ -488,6 +489,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
               )}
               {filteredItems.length > 0 ? (
                 <ReportAgGridTable
+                  reportId="spares-consumption-analysis"
                   columns={[
                     { header: "S.No", field: "sNo", width: 70 },
                     { header: "Part Code", field: "itemCode" },
@@ -570,6 +572,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
               )}
               {categoryBreakdown.length > 0 ? (
                 <ReportAgGridTable
+                  reportId="spares-consumption-analysis"
                   columns={[
                     { header: "Category", field: "category" },
                     { header: "Total Qty", field: "totalQtyDisplay" },
@@ -595,6 +598,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
               {stockEfficiency.length > 0 ? (
                 <>
                   <ReportAgGridTable
+                    reportId="spares-consumption-analysis"
                     columns={[
                       { header: "S.No", field: "sNo", width: 70 },
                       { header: "Part Code", field: "itemCode" },
@@ -648,6 +652,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
                   <CollapsibleContent>
                     <div className="mt-3">
                       <ReportAgGridTable
+                        reportId="spares-consumption-analysis"
                         columns={[
                           { header: "S.No", field: "sNo", width: 70 },
                           { header: "Part Code", field: "itemCode" },
@@ -693,6 +698,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
                     </div>
                   </Card>
                   <ReportAgGridTable
+                    reportId="spares-consumption-analysis"
                     columns={[
                       { header: "S.No", field: "sNo", width: 70 },
                       { header: "Part Code", field: "itemCode" },

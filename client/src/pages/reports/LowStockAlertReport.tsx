@@ -410,6 +410,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
 
   const renderPriorityTable = (priorityItems: LowStockItem[], label: string) => (
     <ReportAgGridTable
+      reportId="low-stock-alert"
       columns={getPriorityTableColumns()}
       data={mapPriorityData(priorityItems)}
       height={priorityItems.length > 15 ? '500px' : `${Math.max(priorityItems.length * 36 + 50, 150)}px`}
@@ -663,6 +664,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
             </CardHeader>
             <CardContent>
               <ReportAgGridTable
+                reportId="low-stock-alert"
                 columns={(() => {
                   const cols = [
                     { header: isSpares ? 'Part Code' : 'Item Code', field: 'itemCode' },
@@ -877,6 +879,7 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                             {isViewing && snapshotDetail && (
                               <div className="border-t border-gray-200 p-3 bg-gray-50">
                                 <ReportAgGridTable
+                                  reportId="low-stock-alert"
                                   columns={[
                                     { header: 'S.No', field: 'sNo' },
                                     { header: 'Priority', field: 'priority' },

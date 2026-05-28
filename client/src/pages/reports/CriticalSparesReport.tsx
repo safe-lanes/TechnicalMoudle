@@ -431,6 +431,7 @@ const CriticalSparesReport: React.FC<CriticalSparesReportProps> = ({ onBack, ves
           </div>
 
           <ReportAgGridTable
+            reportId="spares-critical-parts"
             columns={reportColumns}
             data={reportData}
             height="60vh"

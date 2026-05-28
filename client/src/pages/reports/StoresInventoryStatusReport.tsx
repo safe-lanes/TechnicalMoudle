@@ -612,6 +612,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
 
           {activeTab === 'stock-status' && (
             <ReportAgGridTable
+              reportId="stores-inventory-status"
               columns={[
                 { header: 'S.No', field: 'sno', width: 70 },
                 { header: 'Item Code', field: 'itemCode', width: 120 },
@@ -630,6 +631,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
 
           {activeTab === 'consumption' && (
             <ReportAgGridTable
+              reportId="stores-inventory-status"
               columns={[
                 { header: 'S.No', field: 'sno', width: 70 },
                 { header: 'Item Code', field: 'itemCode', width: 120 },
@@ -646,6 +648,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
 
           {activeTab === 'reorder' && (
             <ReportAgGridTable
+              reportId="stores-inventory-status"
               columns={[
                 { header: 'S.No', field: 'sno', width: 70 },
                 { header: 'Item Code', field: 'itemCode', width: 120 },

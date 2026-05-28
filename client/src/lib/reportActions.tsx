@@ -84,9 +84,9 @@ export const REPORT_ACTIONS: Record<string, ReportActionConfig> = {
         : `/stores?itemId=${encodeURIComponent(id)}`,
   },
 
-  // Change Requests — opens Modify-PMS list (per-CR detail route not available; reuses existing list per spec)
-  "change-requests-status":          { entityKind: "changeRequest", menuName: "pms-modify-pms", idFields: CHANGE_REQUEST_ID_FIELDS, route: () => `/pms/modify-pms/jobs` },
-  "change-requests-status-tracking": { entityKind: "changeRequest", menuName: "pms-modify-pms", idFields: CHANGE_REQUEST_ID_FIELDS, route: () => `/pms/modify-pms/jobs` },
+  // Change Requests — Modify-PMS list page with the specific request pre-selected via query param
+  "change-requests-status":          { entityKind: "changeRequest", menuName: "pms-modify-pms", idFields: CHANGE_REQUEST_ID_FIELDS, route: (id) => `/pms/modify-pms/jobs?requestId=${encodeURIComponent(id)}` },
+  "change-requests-status-tracking": { entityKind: "changeRequest", menuName: "pms-modify-pms", idFields: CHANGE_REQUEST_ID_FIELDS, route: (id) => `/pms/modify-pms/jobs?requestId=${encodeURIComponent(id)}` },
 
   // Critical Equipment
   "critical-components-list":   { entityKind: "component", menuName: "pms-components",  idFields: COMPONENT_ID_FIELDS,  route: (id) => `/pms/maintenance-records/${encodeURIComponent(id)}` },

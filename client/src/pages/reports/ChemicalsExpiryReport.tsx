@@ -452,6 +452,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
               </CardHeader>
               <CardContent>
                 <ReportAgGridTable
+                  reportId="chemicals-tracking"
                   columns={[
                     { header: 'S.No', field: 'sNo', width: 70 },
                     { header: 'Chem Code', field: 'itemCode', width: 120 },
@@ -489,6 +490,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
               </CardHeader>
               <CardContent>
                 <ReportAgGridTable
+                  reportId="chemicals-tracking"
                   columns={[
                     { header: 'S.No', field: 'sNo', width: 70 },
                     { header: 'Chem Code', field: 'itemCode', width: 120 },
@@ -527,6 +529,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
             </CardHeader>
             <CardContent>
               <ReportAgGridTable
+                reportId="chemicals-tracking"
                 columns={[
                   { header: 'S.No', field: 'sNo', width: 70 },
                   { header: 'Chem Code', field: 'itemCode', width: 120 },
@@ -593,6 +596,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                 {missingSdsItems.length > 0 && (
                   <div className="mt-4">
                     <ReportAgGridTable
+                      reportId="chemicals-tracking"
                       columns={[
                         { header: 'Chem Code', field: 'itemCode', width: 150 },
                         { header: 'Chemical Name', field: 'itemName', width: 250 },
@@ -623,6 +627,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                   <p className="text-sm text-gray-500">No chemical data available.</p>
                 ) : (
                   <ReportAgGridTable
+                    reportId="chemicals-tracking"
                     columns={[
                       { header: 'Hazard Classification', field: 'classification', width: 200 },
                       { header: 'Count', field: 'count', width: 100 },
