@@ -2816,7 +2816,11 @@ const Dashboard = () => {
 
                   <div style={dividerH} />
 
-                  {/* Row 2: WO Status Distribution Donut */}
+                  {/* Row 2: WO Status Distribution Donut — Task #83: tooltip */}
+                  <TooltipProvider delayDuration={200}>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <div tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
                   <div style={subTitle} className="mb-1 mt-2">WO Status - All Eqpt</div>
                   <div style={{ height: '170px' }} data-testid="card-wo-status-chart">
                     {workOrderStatusChartData.length > 0 ? (
@@ -2863,6 +2867,16 @@ const Dashboard = () => {
                       <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>No work orders to display</div>
                     )}
                   </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed" data-testid="tooltip-wo-status-all-formula">
+                        <div>Distribution of work orders by status across all equipment for the selected period.</div>
+                        <div className="mt-1">Slices use mutually-exclusive precedence: Overdue &gt; Postponed &gt; Completed &gt; Due &gt; Scheduled — each WO is counted once in its highest-precedence state during the window.</div>
+                        <div className="mt-1">Click a slice to see the underlying work orders.</div>
+                        <div className="mt-1 font-medium">Period: {dashboardPeriodLabel}</div>
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
 
                   <div style={dividerH} />
 
@@ -2906,7 +2920,11 @@ const Dashboard = () => {
 
                   <div style={dividerH} />
 
-                  {/* Row 4: WO Status Critical donut */}
+                  {/* Row 4: WO Status Critical donut — Task #83: tooltip */}
+                  <TooltipProvider delayDuration={200}>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <div tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
                   <div style={subTitle} className="mb-1 mt-2">WO STATUS - CRITICAL EQPT.</div>
                   <div style={{ height: '170px' }} data-testid="card-wo-status-critical-chart">
                     {criticalWorkOrderStatusChartData.length > 0 ? (
@@ -2953,6 +2971,15 @@ const Dashboard = () => {
                       <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>No critical work orders to display</div>
                     )}
                   </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed" data-testid="tooltip-wo-status-critical-formula">
+                        <div>Distribution of work orders by status for critical equipment only, using the same mutually-exclusive precedence as the All-Eqpt donut: Overdue &gt; Postponed &gt; Completed &gt; Due &gt; Scheduled.</div>
+                        <div className="mt-1">Click a slice to see the underlying work orders.</div>
+                        <div className="mt-1 font-medium">Period: {dashboardPeriodLabel}</div>
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
                 </div>
               </div>
 
@@ -3173,9 +3200,12 @@ const Dashboard = () => {
                 data-testid="column-inventory-fleet"
               >
                 <div className="p-3">
-                  <div style={sectionHeaderBar} className="!pt-0 !pb-2">SPARES STOCK STATUS</div>
-
-                  {/* Row 1: Spare Parts Donut */}
+                  {/* Row 1: Spare Parts Donut — Task #83: tooltip + (TODAY) title */}
+                  <TooltipProvider delayDuration={200}>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <div tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
+                  <div style={sectionHeaderBar} className="!pt-0 !pb-2">SPARES STOCK STATUS (TODAY)</div>
                   <div style={{ height: '170px' }} data-testid="card-spares-status-chart">
                     {sparesStockChartData.length > 0 ? (
                       <ResponsiveContainer width="100%" height={170}>
@@ -3220,11 +3250,27 @@ const Dashboard = () => {
                       <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>No spares data</div>
                     )}
                   </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed" data-testid="tooltip-spares-stock-formula">
+                        <div>Current stock health of all spares for the selected vessel:</div>
+                        <div className="mt-1">• OK — ROB &gt; Min</div>
+                        <div>• At Min — ROB = Min</div>
+                        <div>• Low — ROB &lt; Min</div>
+                        <div className="mt-1">Click a slice to see the underlying spares.</div>
+                        <div className="mt-1 font-medium">As of: now</div>
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
 
                   <div style={dividerH} />
 
-                  {/* Row 2: Critical Spare Parts donut */}
-                  <div style={subTitle} className="mb-1 mt-2">CRITICAL SPARES STOCK STATUS</div>
+                  {/* Row 2: Critical Spare Parts donut — Task #83: tooltip + (TODAY) title */}
+                  <TooltipProvider delayDuration={200}>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <div tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
+                  <div style={subTitle} className="mb-1 mt-2">CRITICAL SPARES STOCK STATUS (TODAY)</div>
                   <div style={{ height: '170px' }} data-testid="card-critical-spares-status-chart">
                     {criticalSparesStockChartData.length > 0 ? (
                       <ResponsiveContainer width="100%" height={170}>
@@ -3270,6 +3316,18 @@ const Dashboard = () => {
                       <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>No critical spares data</div>
                     )}
                   </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed" data-testid="tooltip-critical-spares-stock-formula">
+                        <div>Current stock health of spares marked Critical for the selected vessel:</div>
+                        <div className="mt-1">• OK — ROB &gt; Min</div>
+                        <div>• At Min — ROB = Min</div>
+                        <div>• Low — ROB &lt; Min</div>
+                        <div className="mt-1">Click a slice to see the underlying spares.</div>
+                        <div className="mt-1 font-medium">As of: now</div>
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
 
                   <div style={dividerH} />
 
