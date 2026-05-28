@@ -321,7 +321,7 @@ export async function validateData(type: string, data: any[], mode: string, vess
       } else {
         const codeStr = String(componentCode).trim();
         if (!validateSFICode(codeStr)) {
-          errors.push(`Row ${rowNum}: Invalid Component Code format. Expected SFI format: 6, 61, 612, 612.005, etc.`);
+          errors.push(`Row ${rowNum}: Invalid Component Code format. Expected SFI format: 6, 61, 612, 612.005, 601001, 601001001, etc.`);
         } else {
           normalized['Component Code'] = codeStr;
           const codeUpperCase = codeStr.toUpperCase();
