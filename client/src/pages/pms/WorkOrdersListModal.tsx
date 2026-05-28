@@ -35,6 +35,7 @@ export function WorkOrdersListModal({ open, onClose, title, workOrders, vessels 
 
   const handleEditClick = (wo: EnrichedWorkOrder) => {
     if (!wo?.id) return;
+    try { sessionStorage.setItem('dashboardDrilldownNavigating', '1'); } catch {}
     onClose();
     setLocation(`/pms/work-order/${wo.id}`);
   };
