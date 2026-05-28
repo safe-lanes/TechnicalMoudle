@@ -49,7 +49,7 @@ import {
 } from "@/components/wo/woCellRenderers";
 import { RejectionHistoryBadge } from "@/components/wo/RejectionHistoryBadge";
 import { useVessels } from "@/hooks/useVessels";
-import { PeriodFilter, type PeriodFilterValue, periodFilterToDateRange } from "@/components/filters/PeriodFilter";
+import { PeriodFilter, type PeriodFilterValue, periodFilterToDateRange, getPeriodLabel } from "@/components/filters/PeriodFilter";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
 import { ComplianceAnomalyPanel } from "./ComplianceAnomalyPanel";
@@ -837,6 +837,13 @@ const Dashboard = () => {
     () => periodFilterToDateRange(dashboardPeriod),
     [dashboardPeriod],
   );
+
+  // Task #82: human-readable period label for gauge tooltips. Falls back
+  // to "All time" when the global Period filter is cleared.
+  const dashboardPeriodLabel = useMemo(() => {
+    const label = getPeriodLabel(dashboardPeriod);
+    return label || 'All time';
+  }, [dashboardPeriod]);
 
   interface WoStatusBucket { count: number; woIds: string[] }
   interface WoGaugeBucket { numerator: number; denominator: number; numeratorWoIds: string[] }
@@ -3027,38 +3034,59 @@ const Dashboard = () => {
                     const uPct = uDen > 0 ? Math.round((uNum / uDen) * 100) : 0;
                     return (
                       <>
-                        <div className="flex flex-col items-center">
-                          <div style={subTitle} className="mb-1 text-center">Postponed Work Orders %</div>
-                          <SemiCircleGauge
-                            value={pNum}
-                            max={pDen > 0 ? pDen : 1}
-                            color="#e74c3c"
-                            displayValue={`${pPct}%`}
-                            subtitle={pg ? `${pNum} postponed out of ${pDen} scheduled WO` : '—'}
-                            testId="gauge-postponed-wo"
-                            onClick={pg ? () => setWoListModal({
-                              open: true,
-                              title: 'Postponed Work Orders',
-                              workOrders: resolveWosByIds(pg.numeratorWoIds),
-                            }) : undefined}
-                          />
-                        </div>
-                        <div className="flex flex-col items-center">
-                          <div style={subTitle} className="mb-1 text-center">Unplanned Maintenance %</div>
-                          <SemiCircleGauge
-                            value={uNum}
-                            max={uDen > 0 ? uDen : 1}
-                            color="#e74c3c"
-                            displayValue={`${uPct}%`}
-                            subtitle={ug ? `${uNum} unplanned out of ${uDen} total WO` : '—'}
-                            testId="gauge-unplanned-wo"
-                            onClick={ug ? () => setWoListModal({
-                              open: true,
-                              title: 'Unplanned Work Orders',
-                              workOrders: resolveWosByIds(ug.numeratorWoIds),
-                            }) : undefined}
-                          />
-                        </div>
+                        <TooltipProvider delayDuration={200}>
+                          <UITooltip>
+                            <TooltipTrigger asChild>
+                              <div tabIndex={0} className="flex flex-col items-center outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
+                                <div style={subTitle} className="mb-1 text-center">Postponed Work Orders %</div>
+                                <SemiCircleGauge
+                                  value={pNum}
+                                  max={pDen > 0 ? pDen : 1}
+                                  color="#e74c3c"
+                                  displayValue={`${pPct}%`}
+                                  subtitle={pg ? `${pNum} postponed out of ${pDen} scheduled WO` : '—'}
+                                  testId="gauge-postponed-wo"
+                                  onClick={pg ? () => setWoListModal({
+                                    open: true,
+                                    title: 'Postponed Work Orders',
+                                    workOrders: resolveWosByIds(pg.numeratorWoIds),
+                                  }) : undefined}
+                                />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed" data-testid="tooltip-postponed-wo-formula">
+                              <div>Postponed % = (Work orders postponed during the period ÷ Scheduled work orders during the period) × 100.</div>
+                              <div className="mt-1">Scheduled WO = non-execution WOs whose due date falls in the window.</div>
+                              <div className="mt-1 font-medium">Period: {dashboardPeriodLabel}</div>
+                            </TooltipContent>
+                          </UITooltip>
+                        </TooltipProvider>
+                        <TooltipProvider delayDuration={200}>
+                          <UITooltip>
+                            <TooltipTrigger asChild>
+                              <div tabIndex={0} className="flex flex-col items-center outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
+                                <div style={subTitle} className="mb-1 text-center">Unplanned Maintenance %</div>
+                                <SemiCircleGauge
+                                  value={uNum}
+                                  max={uDen > 0 ? uDen : 1}
+                                  color="#e74c3c"
+                                  displayValue={`${uPct}%`}
+                                  subtitle={ug ? `${uNum} unplanned out of ${uDen} total WO` : '—'}
+                                  testId="gauge-unplanned-wo"
+                                  onClick={ug ? () => setWoListModal({
+                                    open: true,
+                                    title: 'Unplanned Work Orders',
+                                    workOrders: resolveWosByIds(ug.numeratorWoIds),
+                                  }) : undefined}
+                                />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed" data-testid="tooltip-unplanned-wo-formula">
+                              <div>Unplanned % = (Unplanned work orders during the period ÷ Total work orders during the period) × 100.</div>
+                              <div className="mt-1 font-medium">Period: {dashboardPeriodLabel}</div>
+                            </TooltipContent>
+                          </UITooltip>
+                        </TooltipProvider>
                       </>
                     );
                   })()}
@@ -3245,23 +3273,34 @@ const Dashboard = () => {
 
                   <div style={dividerH} />
 
-                  {/* Row 3: Modify PMS Requests gauge — Task #80: period-driven */}
-                  <div style={subTitle} className="mb-1 mt-2">MODIFY PMS REQUESTS</div>
-                  <div data-testid="cell-right-row3">
-                    <SemiCircleGauge
-                      value={modifyPmsPeriodKPIs.denominator > 0 ? modifyPmsPeriodKPIs.numerator : 0}
-                      max={modifyPmsPeriodKPIs.denominator > 0 ? modifyPmsPeriodKPIs.denominator : 1}
-                      color="#e74c3c"
-                      displayValue={`${modifyPmsPeriodKPIs.percent}%`}
-                      subtitle={`${modifyPmsPeriodKPIs.numerator} modifications out of ${modifyPmsPeriodKPIs.denominator} WO`}
-                      onClick={() => setCrListModal({
-                        open: true,
-                        title: 'Modify PMS Requests',
-                        changeRequests: modifyPmsPeriodKPIs.changeRequestsFull,
-                      })}
-                      testId="gauge-modify-pms-ytd"
-                    />
-                  </div>
+                  {/* Row 3: Modify PMS Requests gauge — Task #80: period-driven; Task #82: tooltip */}
+                  <TooltipProvider delayDuration={200}>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <div tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded" data-testid="cell-right-row3">
+                          <div style={subTitle} className="mb-1 mt-2">MODIFY PMS REQUESTS</div>
+                          <SemiCircleGauge
+                            value={modifyPmsPeriodKPIs.denominator > 0 ? modifyPmsPeriodKPIs.numerator : 0}
+                            max={modifyPmsPeriodKPIs.denominator > 0 ? modifyPmsPeriodKPIs.denominator : 1}
+                            color="#e74c3c"
+                            displayValue={`${modifyPmsPeriodKPIs.percent}%`}
+                            subtitle={`${modifyPmsPeriodKPIs.numerator} modifications out of ${modifyPmsPeriodKPIs.denominator} WO`}
+                            onClick={() => setCrListModal({
+                              open: true,
+                              title: 'Modify PMS Requests',
+                              changeRequests: modifyPmsPeriodKPIs.changeRequestsFull,
+                            })}
+                            testId="gauge-modify-pms-ytd"
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed" data-testid="tooltip-modify-pms-formula">
+                        <div>Modify PMS % = (Change requests raised during the period ÷ Scheduled work orders during the period) × 100.</div>
+                        <div className="mt-1">A "request" is a change request whose created date falls in the window; the denominator matches the Postponed gauge.</div>
+                        <div className="mt-1 font-medium">Period: {dashboardPeriodLabel}</div>
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
                 </div>
               </div>
             </div>
