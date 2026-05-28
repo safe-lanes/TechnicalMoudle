@@ -113,6 +113,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isUnplannedSaving, setIsUnplannedSaving] = useState(false);
   const forceSubmitOnly = useRef(false);
+  const forceDraftSave = useRef(false);
   const [unplannedComponentId, setUnplannedComponentId] = useState('');
 
   // Minimal A/B navigation matching reference design (hide Part B in template mode)
@@ -2167,6 +2168,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const handleSave = async () => {
     if (embedded) return;
+    // Snapshot and clear control refs immediately so that an early return
+    // (e.g. on a hard validation error) cannot leak a stale flag into the
+    // next click and route it to the wrong branch.
+    const draftIntent = forceDraftSave.current;
+    const submitOnlyIntent = forceSubmitOnly.current;
+    forceDraftSave.current = false;
+    forceSubmitOnly.current = false;
     try {
       const isUnplannedWO = workOrderType === 'Unplanned';
 
@@ -2420,12 +2428,54 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const isReadyForSubmission = missingFields.length === 0;
       const isDraftSave = hasAnyPartBData && !isReadyForSubmission;
 
-      if (forceSubmitOnly.current) {
-        forceSubmitOnly.current = false;
+      if (draftIntent) {
+        const saveExecutionData = {
+          ...executionData,
+          runningHours: currentRHValue || executionData.runningHours,
+          riskAssessmentStatus: executionData.riskAssessment,
+          safetyChecklistsStatus: executionData.safetyChecklists,
+          operationalFormsStatus: executionData.operationalForms,
+        };
+
+        const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...templateData,
+            ...saveExecutionData,
+          })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+          if (result.code === 'INVALID_RUNNING_HOURS') {
+            throw new Error(`Current Reading (${result.enteredValue} hrs) exceeds component actual RH (${result.componentActualRH} hrs). Update running hours in the RH module first, or enter a value ≤ ${result.maxAllowed} hrs.`);
+          }
+          throw new Error(result.error || 'Failed to save draft');
+        }
+
+        await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+        await queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
+        await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+        if (hasConsumedSparesData && vesselId) {
+          await queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/${vesselId}`] });
+          await queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/spares-with-inventory/${vesselId}`] });
+        }
+
+        toast({
+          title: "Draft Saved",
+          description: missingFields.length > 0
+            ? `Your progress has been saved. Complete these fields before submitting: ${missingFields.join(', ')}.`
+            : "Your progress has been saved as a draft.",
+        });
+        return;
+      }
+
+      if (submitOnlyIntent) {
         if (!isReadyForSubmission) {
           toast({
             title: "Validation Error",
-            description: `The following Part B fields are required to submit for approval: ${missingFields.join(', ')}. Use "Save" to save your progress as a draft instead.`,
+            description: `The following Part B fields are required to submit for approval: ${missingFields.join(', ')}. Use "Save Draft" to save your progress instead.`,
             variant: "destructive",
           });
           return;
@@ -6250,21 +6300,46 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 handleSave();
               }
             };
+            const handleBottomSaveDraft = () => {
+              forceDraftSave.current = true;
+              handleSave();
+            };
+            const handleBottomSubmitRegular = () => {
+              forceSubmitOnly.current = true;
+              handleSave();
+            };
+            const showSplitButtons = !isNewJobCreation && !showDraftActions;
             return (
-              <div className="flex justify-end mt-6 pb-6" data-testid="WOF6"><Marker id="WOF6" />
+              <div className="flex justify-end gap-3 mt-6 pb-6" data-testid="WOF6"><Marker id="WOF6" />
+                {showSplitButtons && (
+                  <Button
+                    onClick={handleBottomSaveDraft}
+                    disabled={!!isRHSaveBlocked}
+                    className={`font-bold px-8 py-2.5 h-auto text-sm shadow-md ${
+                      isRHSaveBlocked
+                        ? 'bg-gray-400 text-gray-200 cursor-not-allowed hover:bg-gray-400'
+                        : 'bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white'
+                    }`}
+                    data-testid="button-save-draft-bottom"
+                  >
+                    Save Draft
+                  </Button>
+                )}
                 <div title={isRHSaveBlocked && !showDraftActions ? rhBlockReason : ''}>
                   <Button
-                    onClick={isNewJobCreation ? handleSaveNewJob : showDraftActions ? handleBottomSubmit : handleSave}
+                    onClick={isNewJobCreation ? handleSaveNewJob : showDraftActions ? handleBottomSubmit : handleBottomSubmitRegular}
                     disabled={showDraftActions ? (isUnplannedCreate ? isUnplannedSaving : false) : !!isRHSaveBlocked}
                     className={`font-bold px-12 py-2.5 h-auto text-sm shadow-md ${
                       (showDraftActions ? (isUnplannedCreate ? isUnplannedSaving : false) : isRHSaveBlocked)
                         ? 'bg-gray-400 text-gray-200 cursor-not-allowed hover:bg-gray-400'
-                        : 'bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white'
+                        : showSplitButtons
+                          ? 'bg-[#5dc86f] hover:bg-[#4db85f] text-white'
+                          : 'bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white'
                     }`}
                     data-testid="WOF6.1"
                   >
                     <Marker id="WOF6.1" />
-                    {isNewJobCreation ? 'Create Job' : showDraftActions ? (isUnplannedSaving ? 'Submitting...' : 'Submit Work Order') : 'Save'}
+                    {isNewJobCreation ? 'Create Job' : showDraftActions ? (isUnplannedSaving ? 'Submitting...' : 'Submit Work Order') : 'Submit'}
                   </Button>
                 </div>
               </div>
