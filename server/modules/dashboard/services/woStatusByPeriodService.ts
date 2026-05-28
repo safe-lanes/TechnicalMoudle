@@ -26,9 +26,22 @@ export interface WoStatusBucket {
   woIds: string[];
 }
 
+export interface WoGaugeBucket {
+  numerator: number;
+  denominator: number;
+}
+
 export interface WoStatusByPeriodResult {
   all: Record<WoStatusSlice, WoStatusBucket>;
   critical: Record<WoStatusSlice, WoStatusBucket>;
+  // Task #78: period-based gauges driven by the same dashboardPeriod filter.
+  // postponedGauge: WOs whose dueDate falls inside the period (denominator)
+  // vs subset with >=1 postponement event (approved/submitted/created) in
+  // the period (numerator). Event-based; does NOT use computedStatus.
+  postponedGauge: WoGaugeBucket;
+  // unplannedGauge: WOs created inside the period (denominator) vs subset
+  // with workOrderType === 'Unplanned' (numerator).
+  unplannedGauge: WoGaugeBucket;
 }
 
 export interface WoStatusByPeriodOptions {
@@ -368,5 +381,66 @@ export async function getWoStatusByPeriod(
     }
   }
 
-  return { all, critical };
+  // === Task #78: Postponed % and Unplanned % gauges ===
+  // These gauges follow the same dashboardPeriod filter as the donuts but
+  // use simple event-based date windows on vesselWOs (NOT the bucket-month
+  // filter used by `periodWOs`). All-time mode keeps every vessel WO.
+  // All-time mode (cleared dashboardPeriod): no time filter at all — every
+  // vessel WO and every postponement event qualifies regardless of date
+  // parseability. Periodic mode: require a parseable date inside [from, to].
+  const inWindow = (d: Date | null): boolean => {
+    if (isAllTime) return true;
+    if (!d) return false;
+    return d >= from && d <= to;
+  };
+
+  // Precompute: WO id -> true if it has any postponement event inside the window.
+  // Event date = approvedDate ?? submittedDate ?? createdAt (matches the
+  // ordering used by findActivePostponementAt elsewhere).
+  const postponedInWindowIds = new Set<string>();
+  for (const p of postponements) {
+    if (!p.workOrderId) continue;
+    const eventDate = toDateLoose(
+      p.approvedDate ?? p.submittedDate ?? (p.createdAt as string | Date | null) ?? null,
+    );
+    if (!inWindow(eventDate)) continue;
+    postponedInWindowIds.add(String(p.workOrderId));
+  }
+
+  let postponedDen = 0;
+  let postponedNum = 0;
+  let unplannedDen = 0;
+  let unplannedNum = 0;
+
+  for (const wo of vesselWOs) {
+    const woIdRaw = wo.wouuid ?? wo.id;
+    const woIdStr = woIdRaw != null ? String(woIdRaw) : '';
+
+    // Postponed denominator: WOs whose dueDate falls in the window
+    const dueDate = toDateLoose(wo.dueDate ?? null);
+    if (inWindow(dueDate)) {
+      postponedDen += 1;
+      if (woIdStr && postponedInWindowIds.has(woIdStr)) {
+        postponedNum += 1;
+      }
+    }
+
+    // Unplanned denominator: WOs whose createdAt falls in the window
+    const createdAtDate = toDateLoose(
+      (wo as any).createdAt as string | Date | null | undefined,
+    );
+    if (inWindow(createdAtDate)) {
+      unplannedDen += 1;
+      if (((wo as any).workOrderType ?? '') === 'Unplanned') {
+        unplannedNum += 1;
+      }
+    }
+  }
+
+  return {
+    all,
+    critical,
+    postponedGauge: { numerator: postponedNum, denominator: postponedDen },
+    unplannedGauge: { numerator: unplannedNum, denominator: unplannedDen },
+  };
 }

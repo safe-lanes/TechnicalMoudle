@@ -850,9 +850,13 @@ const Dashboard = () => {
   );
 
   interface WoStatusBucket { count: number; woIds: string[] }
+  interface WoGaugeBucket { numerator: number; denominator: number }
   interface WoStatusByPeriodResponse {
     all: Record<'scheduled' | 'due' | 'overdue' | 'postponed' | 'completed' | 'pendingApproval', WoStatusBucket>;
     critical: Record<'scheduled' | 'due' | 'overdue' | 'postponed' | 'completed' | 'pendingApproval', WoStatusBucket>;
+    // Task #78: period-driven gauges (replace the YTD-only postponed/unplanned wiring).
+    postponedGauge: WoGaugeBucket;
+    unplannedGauge: WoGaugeBucket;
   }
   // Cleared period (dashboardPeriodRange === null) intentionally sends no
   // from/to and the backend treats it as all-time, per task #77 spec.
@@ -2990,30 +2994,45 @@ const Dashboard = () => {
                 data-testid="cell-center-row3"
               >
                 <div className="p-3 grid grid-cols-2 gap-4 h-full">
-                  <div className="flex flex-col items-center">
-                    <div style={subTitle} className="mb-1 text-center">Postponed Work Orders</div>
-                    <SemiCircleGauge
-                      value={ytdKPIs.postponed}
-                      max={ytdKPIs.total || 10}
-                      color="#e74c3c"
-                      displayValue={ytdKPIs.postponed.toString()}
-                      subtitle={`${ytdKPIs.postponedPercent}% of total`}
-                      onClick={() => setWoListModal({ open: true, title: 'Postponed Work Orders YTD', workOrders: ytdKPIs.postponedFull })}
-                      testId="gauge-postponed-wo"
-                    />
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <div style={subTitle} className="mb-1 text-center">Unplanned Maintenance %</div>
-                    <SemiCircleGauge
-                      value={ytdKPIs.unplanned}
-                      max={ytdKPIs.total || 10}
-                      color="#e74c3c"
-                      displayValue={ytdKPIs.unplanned.toString()}
-                      subtitle={`${ytdKPIs.unplannedPercent}% of total`}
-                      onClick={() => setWoListModal({ open: true, title: 'Unplanned Work Orders YTD', workOrders: ytdKPIs.unplannedFull })}
-                      testId="gauge-unplanned-wo"
-                    />
-                  </div>
+                  {/* Task #78: Both gauges now follow the global dashboardPeriod filter
+                      via woStatusByPeriodData (event-based, not YTD/computedStatus).
+                      While the query is pending, show 0% with subtitle "—". */}
+                  {(() => {
+                    const pg = woStatusByPeriodData?.postponedGauge;
+                    const pNum = pg?.numerator ?? 0;
+                    const pDen = pg?.denominator ?? 0;
+                    const pPct = pDen > 0 ? Math.round((pNum / pDen) * 100) : 0;
+                    const ug = woStatusByPeriodData?.unplannedGauge;
+                    const uNum = ug?.numerator ?? 0;
+                    const uDen = ug?.denominator ?? 0;
+                    const uPct = uDen > 0 ? Math.round((uNum / uDen) * 100) : 0;
+                    return (
+                      <>
+                        <div className="flex flex-col items-center">
+                          <div style={subTitle} className="mb-1 text-center">Postponed Work Orders %</div>
+                          <SemiCircleGauge
+                            value={pNum}
+                            max={pDen > 0 ? pDen : 1}
+                            color="#e74c3c"
+                            displayValue={`${pPct}%`}
+                            subtitle={pg ? `${pNum} postponed out of ${pDen} scheduled WO` : '—'}
+                            testId="gauge-postponed-wo"
+                          />
+                        </div>
+                        <div className="flex flex-col items-center">
+                          <div style={subTitle} className="mb-1 text-center">Unplanned Maintenance %</div>
+                          <SemiCircleGauge
+                            value={uNum}
+                            max={uDen > 0 ? uDen : 1}
+                            color="#e74c3c"
+                            displayValue={`${uPct}%`}
+                            subtitle={ug ? `${uNum} unplanned out of ${uDen} total WO` : '—'}
+                            testId="gauge-unplanned-wo"
+                          />
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 
