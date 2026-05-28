@@ -1928,15 +1928,24 @@ const Dashboard = () => {
     setCrListModal(prev => ({ ...prev, changeRequests: modifyPmsPeriodKPIs.changeRequestsFull }));
   }, [modifyPmsPeriodKPIs.changeRequestsFull]);
 
+  // Task #81: Top 5 reasons chart driven by the global dashboardPeriod
+  // filter (replaces YTD-only logic). In-period predicate matches the
+  // Postponed gauge / Modify PMS denominator: non-execution WO whose
+  // dueDate falls within the selected window. Cleared period = all-time.
   const top5ReasonsData = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const ytdWOs = (workOrdersData as EnrichedWorkOrder[]).filter(wo => {
+    const inRange = (raw: string | Date | null | undefined) => {
+      if (!raw) return false;
+      const d = raw instanceof Date ? raw : new Date(raw);
+      if (isNaN(d.getTime())) return false;
+      if (!dashboardPeriodRange) return true; // cleared = all-time
+      return d >= dashboardPeriodRange.from && d <= dashboardPeriodRange.to;
+    };
+    const periodWOs = (workOrdersData as EnrichedWorkOrder[]).filter(wo => {
       if (!wo || wo.isExecution) return false;
-      const createdDate = wo.createdAt ? new Date(wo.createdAt) : null;
-      return createdDate !== null && createdDate.getFullYear() === currentYear;
+      return inRange(wo.dueDate ?? null);
     });
 
-    const overdueWOs = ytdWOs.filter(wo => wo.computedStatus === 'Overdue');
+    const overdueWOs = periodWOs.filter(wo => wo.computedStatus === 'Overdue');
     const overdueByReason = new Map<string, EnrichedWorkOrder[]>();
     overdueWOs.forEach(wo => {
       const reason = String(wo.overdueReason ?? '').trim();
@@ -1951,7 +1960,7 @@ const Dashboard = () => {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    const postponedWOs = ytdWOs.filter(wo => wo.computedStatus === 'Postponed');
+    const postponedWOs = periodWOs.filter(wo => wo.computedStatus === 'Postponed');
     const postponeByReason = new Map<string, EnrichedWorkOrder[]>();
     postponedWOs.forEach(wo => {
       const reason = String(wo.postponementReason ?? '').trim();
@@ -1967,7 +1976,7 @@ const Dashboard = () => {
       .slice(0, 5);
 
     return { overdueTop5, postponeTop5 };
-  }, [workOrdersData]);
+  }, [workOrdersData, dashboardPeriodRange]);
 
   const HEADER_BLUE = '#1a3a5c';
 
@@ -3063,7 +3072,7 @@ const Dashboard = () => {
               >
                 <div className="p-3 h-full flex flex-col">
                   <div className="flex items-center justify-between mb-2">
-                    <div style={subTitle}>Top 5 Reason for Postponement / Overdue YTD</div>
+                    <div style={subTitle}>Top 5 Reason for Postponement / Overdue</div>
                     <div className="flex items-center gap-2 text-xs">
                       <button
                         type="button"
