@@ -10,10 +10,10 @@ export type ReportEntityKind =
   | "anomaly";
 
 export interface ReportActionConfig {
-  entityKind: ReportEntityKind;
-  menuName: string;
-  idFields: string[];
-  route: (id: string) => string;
+  entityKind: ReportEntityKind | ((row: Record<string, any>) => ReportEntityKind);
+  menuName: string | ((row: Record<string, any>) => string);
+  idFields: string[] | ((row: Record<string, any>) => string[]);
+  route: (id: string, row: Record<string, any>) => string;
 }
 
 const PLACEHOLDER_VALUES = new Set(["", "-", "—", "–", "n/a", "na", "null", "undefined", "total", "totals", "subtotal", "grand total"]);
@@ -39,11 +39,11 @@ const FIRST_DEFINED = (row: Record<string, any>, fields: string[]): string | nul
   return null;
 };
 
-const WORK_ORDER_ID_FIELDS = ["workOrderId", "workOrderUuid", "wouuid", "woId", "workOrderNo"];
-const COMPONENT_ID_FIELDS = ["componentId", "componentUuid", "cuuid", "componentCode"];
-const SPARE_ID_FIELDS = ["spareId", "spareUuid", "spuuid", "id"];
-const STORE_ID_FIELDS = ["itemId", "storeId", "id"];
-const CHANGE_REQUEST_ID_FIELDS = ["ruid", "changeRequestId", "id"];
+const WORK_ORDER_ID_FIELDS = ["workOrderId", "workOrderUuid", "wouuid", "woId"];
+const COMPONENT_ID_FIELDS = ["componentId", "componentUuid", "cuuid"];
+const SPARE_ID_FIELDS = ["spareId", "spareUuid", "spuuid"];
+const STORE_ID_FIELDS = ["itemId", "storeId", "storeItemId"];
+const CHANGE_REQUEST_ID_FIELDS = ["ruid", "changeRequestId", "crId", "id"];
 
 export const REPORT_ACTIONS: Record<string, ReportActionConfig> = {
   // Maintenance & Work Orders → Work Order page
@@ -56,7 +56,7 @@ export const REPORT_ACTIONS: Record<string, ReportActionConfig> = {
 
   // Running Hours & Condition → Component
   "rh-utilization-summary": { entityKind: "component", menuName: "pms-components", idFields: COMPONENT_ID_FIELDS, route: (id) => `/pms/maintenance-records/${encodeURIComponent(id)}` },
-  // rh-anomaly-detection and change-requests-status intentionally omitted — no per-row destination route
+  "rh-anomaly-detection":   { entityKind: "component", menuName: "pms-components", idFields: COMPONENT_ID_FIELDS, route: (id) => `/pms/maintenance-records/${encodeURIComponent(id)}` },
 
   // Inventory - Spares → Spares module
   "spares-low-stock":             { entityKind: "spare", menuName: "pms-spares", idFields: SPARE_ID_FIELDS, route: (id) => `/spares?spareId=${encodeURIComponent(id)}` },
@@ -70,8 +70,23 @@ export const REPORT_ACTIONS: Record<string, ReportActionConfig> = {
   "low-stock-alert":             { entityKind: "store", menuName: "pms-stores", idFields: STORE_ID_FIELDS, route: (id) => `/stores?itemId=${encodeURIComponent(id)}` },
   "stores-consumption-analysis": { entityKind: "store", menuName: "pms-stores", idFields: STORE_ID_FIELDS, route: (id) => `/stores?itemId=${encodeURIComponent(id)}` },
 
-  // IHM
-  "ihm-inventory-status": { entityKind: "ihm", menuName: "pms-stores", idFields: STORE_ID_FIELDS, route: (id) => `/stores?itemId=${encodeURIComponent(id)}` },
+  // IHM — per-row destination based on row.itemType ('spare' → Spares module, 'store' → Stores module)
+  "ihm-inventory-status": {
+    entityKind: (row) => (row?.itemType === "spare" ? "spare" : "store"),
+    menuName: (row) => (row?.itemType === "spare" ? "pms-spares" : "pms-stores"),
+    idFields: (row) =>
+      row?.itemType === "spare"
+        ? ["spareId", "spareUuid", "spuuid"]
+        : ["itemId", "storeId", "storeItemId"],
+    route: (id, row) =>
+      row?.itemType === "spare"
+        ? `/spares?spareId=${encodeURIComponent(id)}`
+        : `/stores?itemId=${encodeURIComponent(id)}`,
+  },
+
+  // Change Requests — opens Modify-PMS list (per-CR detail route not available; reuses existing list per spec)
+  "change-requests-status":          { entityKind: "changeRequest", menuName: "pms-modify-pms", idFields: CHANGE_REQUEST_ID_FIELDS, route: () => `/pms/modify-pms/jobs` },
+  "change-requests-status-tracking": { entityKind: "changeRequest", menuName: "pms-modify-pms", idFields: CHANGE_REQUEST_ID_FIELDS, route: () => `/pms/modify-pms/jobs` },
 
   // Critical Equipment
   "critical-components-list":   { entityKind: "component", menuName: "pms-components",  idFields: COMPONENT_ID_FIELDS,  route: (id) => `/pms/maintenance-records/${encodeURIComponent(id)}` },
@@ -93,7 +108,12 @@ export const getReportAction = (reportId?: string | null): ReportActionConfig | 
 };
 
 export const extractRowEntityId = (row: Record<string, any>, config: ReportActionConfig): string | null => {
-  return FIRST_DEFINED(row, config.idFields);
+  const fields = typeof config.idFields === "function" ? config.idFields(row) : config.idFields;
+  return FIRST_DEFINED(row, fields);
+};
+
+export const resolveMenuName = (config: ReportActionConfig, row: Record<string, any>): string => {
+  return typeof config.menuName === "function" ? config.menuName(row) : config.menuName;
 };
 
 export { Pencil, Eye };

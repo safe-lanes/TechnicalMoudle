@@ -129,6 +129,7 @@ export async function getCriticalEquipmentStatus(vesselId: string, startDateStr?
 
     return {
       sNo: index + 1,
+      componentId: (component as any).cuuid || component.id,
       componentCode: component.componentCode || component.id,
       componentName: component.name || 'Unnamed Component',
       isCritical: component.critical ? 'Yes' : 'No',
@@ -676,6 +677,7 @@ export async function getCriticalComponentsList(
     const parent = allComponents.find((p: any) => p.id === c.parentId);
     return {
       sno: i + 1,
+      componentId: c.cuuid || c.id,
       vesselName: vesselMap.get(c.vesselId || '') || '-',
       componentCode: c.componentCode || '-',
       componentName: c.name || '-',
@@ -793,6 +795,7 @@ export async function getLsaFfaMasterList(
 
   const data = filteredComponents.map((c: any, i: number) => ({
     sno: i + 1,
+    componentId: c.cuuid || c.id,
     componentCode: c.componentCode || '-',
     componentName: c.name || '-',
     equipmentType: getEffectiveDept(c) || '-',
@@ -975,6 +978,7 @@ export async function getLsaFfaMaintenanceSchedule(
 
     scheduleItems.push({
       wouuid: wo.wouuid,
+      workOrderId: wo.wouuid,
       componentCode: wo.componentCode || '-',
       componentName: wo.component || comp.name || '-',
       equipmentType: getEffectiveDept(comp) || '-',
@@ -1219,6 +1223,7 @@ export async function getCriticalEquipmentSchedule(
 
     scheduleItems.push({
       wouuid: wo.wouuid,
+      workOrderId: wo.wouuid,
       componentCode: wo.componentCode || '-',
       componentName: wo.component || comp.name || '-',
       location: comp.location || '-',
@@ -1494,6 +1499,7 @@ export async function getClassItemsMasterList(
 
 function _ciMasterRow(comp: any, cr: any | null, vesselNameMap: Map<string, string>) {
   return {
+    componentId: comp.cuuid || comp.id,
     componentCode: comp.componentCode || '-',
     componentName: comp.name || '-',
     department: comp.eqptSystemDept || comp.deptCategory || comp.department || '-',
@@ -1607,6 +1613,7 @@ export async function getClassItemsJobsStatus(
 
     rows.push({
       wouuid: wo.wouuid,
+      workOrderId: wo.wouuid,
       jobCode: job?.jobNo || '-',
       jobTitle: wo.jobTitle || job?.jobTitle || '-',
       componentCode: wo.componentCode || comp?.componentCode || '-',

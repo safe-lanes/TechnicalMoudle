@@ -11,7 +11,7 @@ import {
   LicenseManager,
 } from 'ag-grid-enterprise';
 import type { ReportColumn } from '@/components/reports/ReportPreviewModal';
-import { getReportAction, extractRowEntityId, Pencil, Eye } from '@/lib/reportActions';
+import { getReportAction, extractRowEntityId, resolveMenuName, Pencil, Eye } from '@/lib/reportActions';
 import { usePermissions } from '@/contexts/PermissionsContext';
 
 import 'ag-grid-community/styles/ag-grid.css';
@@ -102,9 +102,9 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({
   const { canEdit: canEditMenu } = usePermissions();
 
   const actionConfig = useMemo(() => getReportAction(reportId), [reportId]);
-  const userCanEdit = useMemo(() => {
-    if (!actionConfig) return false;
-    try { return canEditMenu(actionConfig.menuName); } catch { return false; }
+  const staticCanEdit = useMemo(() => {
+    if (!actionConfig || typeof actionConfig.menuName === 'function') return false;
+    try { return canEditMenu(actionConfig.menuName as string); } catch { return false; }
   }, [actionConfig, canEditMenu]);
 
   const columnDefs: ColDef[] = useMemo(() => {
@@ -182,15 +182,19 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({
         cellRenderer: (params: any) => {
           const row = params.data || {};
           const id = extractRowEntityId(row, actionConfig);
-          const url = id ? actionConfig.route(id) : null;
-          return <ActionCellRenderer url={url} canEdit={userCanEdit} />;
+          const url = id ? actionConfig.route(id, row) : null;
+          let rowCanEdit = staticCanEdit;
+          if (typeof actionConfig.menuName === 'function') {
+            try { rowCanEdit = canEditMenu(resolveMenuName(actionConfig, row)); } catch { rowCanEdit = false; }
+          }
+          return <ActionCellRenderer url={url} canEdit={rowCanEdit} />;
         },
         valueGetter: () => '',
       } as ColDef);
     }
 
     return baseCols;
-  }, [columns, actionConfig, userCanEdit]);
+  }, [columns, actionConfig, staticCanEdit, canEditMenu]);
 
   const defaultColDef: ColDef = useMemo(() => ({
     sortable: true,
