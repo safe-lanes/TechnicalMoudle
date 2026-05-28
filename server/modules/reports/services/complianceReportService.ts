@@ -198,6 +198,7 @@ export async function getRunningHoursAnomalyDetection(
           sNo++;
           anomalies.push({
             sNo,
+            componentId: component?.cuuid || log.componentId || '',
             componentCode: log.componentCode || component?.componentCode || '-',
             componentName,
             category: component?.componentCategory || component?.category || '-',

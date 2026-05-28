@@ -281,7 +281,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           
           if (response.ok && result.success && result.data) {
             const vName = vessels.find((v: any) => v.id === vId)?.name || vId;
-            allUtilizationData = allUtilizationData.concat(result.data.map((d: any) => ({ ...d, vesselName: d.vesselName || vName })));
+            allUtilizationData = allUtilizationData.concat(result.data.map((d: any) => ({ ...d, componentId: d.componentId ?? d.componentUuid ?? d.cuuid, vesselName: d.vesselName || vName })));
             if (!mergedSummary.periodDays) mergedSummary = { ...result.summary };
             else {
               mergedSummary.totalEquipment = (mergedSummary.totalEquipment || 0) + (result.summary?.totalEquipment || 0);
