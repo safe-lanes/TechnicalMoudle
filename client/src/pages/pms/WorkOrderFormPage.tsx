@@ -2263,11 +2263,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         hardErrors.push("Manhours must be a positive number.");
       }
 
-      if (workCarriedOutTrimmed && (workCarriedOutTrimmed.toLowerCase() === 'describe work carried out...' || workCarriedOutTrimmed.toLowerCase() === 'describe work carried out')) {
-        hardErrors.push("Please provide a proper description of work carried out, not the placeholder text.");
-      }
-      if (workCarriedOutTrimmed && workCarriedOutTrimmed.length < 20) {
-        hardErrors.push("Work Carried Out must be at least 20 characters to provide a meaningful description.");
+      if (!draftIntent) {
+        if (workCarriedOutTrimmed && (workCarriedOutTrimmed.toLowerCase() === 'describe work carried out...' || workCarriedOutTrimmed.toLowerCase() === 'describe work carried out')) {
+          hardErrors.push("Please provide a proper description of work carried out, not the placeholder text.");
+        }
+        if (workCarriedOutTrimmed && workCarriedOutTrimmed.length < 20) {
+          hardErrors.push("Work Carried Out must be at least 20 characters to provide a meaningful description.");
+        }
       }
 
       if (currentRHValue) {
@@ -2287,14 +2289,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      const b1DocChecks = [
-        { field: executionData.riskAssessment, type: 'riskAssessment', label: 'Risk Assessment' },
-        { field: executionData.safetyChecklists, type: 'safetyChecklist', label: 'Safety Checklists' },
-        { field: executionData.operationalForms, type: 'operationalForm', label: 'Operational Forms' },
-      ];
-      for (const check of b1DocChecks) {
-        if (check.field === 'Yes' && getDocsByType(check.type).length === 0) {
-          hardErrors.push(`${check.label} is marked as "Yes" but no supporting document has been uploaded.`);
+      if (!draftIntent) {
+        const b1DocChecks = [
+          { field: executionData.riskAssessment, type: 'riskAssessment', label: 'Risk Assessment' },
+          { field: executionData.safetyChecklists, type: 'safetyChecklist', label: 'Safety Checklists' },
+          { field: executionData.operationalForms, type: 'operationalForm', label: 'Operational Forms' },
+        ];
+        for (const check of b1DocChecks) {
+          if (check.field === 'Yes' && getDocsByType(check.type).length === 0) {
+            hardErrors.push(`${check.label} is marked as "Yes" but no supporting document has been uploaded.`);
+          }
         }
       }
 
@@ -2312,16 +2316,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         hardErrors.push(`Qty Used must be a positive whole number (≥ 1) for: ${parts}. Remove the row if no spares were consumed.`);
       }
 
-      const allSparesWithMissingLocation = executionData.consumedSpareParts.filter(spare => {
-        const qty = parseFloat(spare.quantityConsumed || '0');
-        if (qty <= 0) return false;
-        const hasLocationId = spare.locationId != null && spare.locationId > 0;
-        const hasLocationName = spare.location && typeof spare.location === 'string' && spare.location.trim().length > 0;
-        return !hasLocationId && !hasLocationName;
-      });
-      if (allSparesWithMissingLocation.length > 0) {
-        const parts = allSparesWithMissingLocation.map(s => s.partNo || s.description).join(', ');
-        hardErrors.push(`Please select a location for: ${parts}. A location is required when consuming spare parts.`);
+      if (!draftIntent) {
+        const allSparesWithMissingLocation = executionData.consumedSpareParts.filter(spare => {
+          const qty = parseFloat(spare.quantityConsumed || '0');
+          if (qty <= 0) return false;
+          const hasLocationId = spare.locationId != null && spare.locationId > 0;
+          const hasLocationName = spare.location && typeof spare.location === 'string' && spare.location.trim().length > 0;
+          return !hasLocationId && !hasLocationName;
+        });
+        if (allSparesWithMissingLocation.length > 0) {
+          const parts = allSparesWithMissingLocation.map(s => s.partNo || s.description).join(', ');
+          hardErrors.push(`Please select a location for: ${parts}. A location is required when consuming spare parts.`);
+        }
       }
 
       const hasConsumedSpares = executionData.consumedSpareParts.some(
@@ -2347,7 +2353,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           const hasLocationName = spare.location && typeof spare.location === 'string' && spare.location.trim().length > 0;
           return !hasLocationId && !hasLocationName;
         });
-        if (sparesWithMissingLocation.length > 0) {
+        if (!draftIntent && sparesWithMissingLocation.length > 0) {
           const missingParts = sparesWithMissingLocation.map(s => s.partNo || s.description).join(', ');
           hardErrors.push(`Please select a location for: ${missingParts}. Location selection is required for inventory tracking.`);
         }
