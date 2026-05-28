@@ -2218,7 +2218,7 @@ const Dashboard = () => {
             ) : activeTab === 'overview' ? (
               <>
                 <div style={{ fontSize: '18px', fontWeight: 700, color: '#1a2b4a' }} data-testid="text-current-year">
-                  {new Date().getFullYear()}
+                  {dashboardPeriodLabel}
                 </div>
                 <Button
                   variant="outline"
