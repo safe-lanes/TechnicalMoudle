@@ -2242,7 +2242,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      if (executionData.performedBy && hodLabel && executionData.performedBy === hodLabel) {
+      if (!draftIntent && executionData.performedBy && hodLabel && executionData.performedBy === hodLabel) {
         hardErrors.push(`The Head of Department (${hodLabel}) cannot both perform and approve the work. The server will assign ${hodLabel} as approver based on the vessel org chart.`);
       }
 
@@ -2277,12 +2277,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      const b1Warnings: string[] = [];
-      if (executionData.riskAssessment === 'No') b1Warnings.push('Risk Assessment');
-      if (executionData.safetyChecklists === 'No') b1Warnings.push('Safety Checklists');
-      if (executionData.operationalForms === 'No') b1Warnings.push('Operational Forms');
-      if (b1Warnings.length > 0) {
-        hardErrors.push(`${b1Warnings.join(', ')} ${b1Warnings.length === 1 ? 'is' : 'are'} marked as "No". Please complete the required assessments or select "NA" if not applicable.`);
+      if (!draftIntent) {
+        const b1Warnings: string[] = [];
+        if (executionData.riskAssessment === 'No') b1Warnings.push('Risk Assessment');
+        if (executionData.safetyChecklists === 'No') b1Warnings.push('Safety Checklists');
+        if (executionData.operationalForms === 'No') b1Warnings.push('Operational Forms');
+        if (b1Warnings.length > 0) {
+          hardErrors.push(`${b1Warnings.join(', ')} ${b1Warnings.length === 1 ? 'is' : 'are'} marked as "No". Please complete the required assessments or select "NA" if not applicable.`);
+        }
       }
 
       const b1DocChecks = [
@@ -2325,7 +2327,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const hasConsumedSpares = executionData.consumedSpareParts.some(
         spare => spare.partNo && spare.quantityConsumed && parseFloat(spare.quantityConsumed) > 0
       );
-      if (hasConsumedSpares && vesselId) {
+      if (!draftIntent && hasConsumedSpares && vesselId) {
         if (!isSparesInventoryFetched) {
           hardErrors.push("Please wait for inventory data to load before submitting.");
         }
@@ -2379,16 +2381,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           if (rob <= 0) return qty > 0;
           return qty > (rob * 0.5);
         });
-        if (sparesNeedingComments.length > 0) {
+        if (!draftIntent && sparesNeedingComments.length > 0) {
           const parts = sparesNeedingComments.map(s => s.partNo || s.description).join(', ');
           hardErrors.push(`High consumption detected for: ${parts}. Please add a comment explaining the usage when consuming more than 50% of available stock.`);
         }
       }
 
       if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours') {
-        if (componentActualRHStatus === 'loading') {
+        if (!draftIntent && componentActualRHStatus === 'loading') {
           hardErrors.push('Component running hours are still loading. Please wait for the value to load before saving.');
-        } else if (componentActualRHStatus === 'error') {
+        } else if (!draftIntent && componentActualRHStatus === 'error') {
           hardErrors.push('Unable to verify component running hours. Please refresh the page or retry loading the component RH before saving.');
         }
         if (currentRHValue) {
