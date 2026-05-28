@@ -850,7 +850,7 @@ const Dashboard = () => {
   );
 
   interface WoStatusBucket { count: number; woIds: string[] }
-  interface WoGaugeBucket { numerator: number; denominator: number }
+  interface WoGaugeBucket { numerator: number; denominator: number; numeratorWoIds: string[] }
   interface WoStatusByPeriodResponse {
     all: Record<'scheduled' | 'due' | 'overdue' | 'postponed' | 'completed' | 'pendingApproval', WoStatusBucket>;
     critical: Record<'scheduled' | 'due' | 'overdue' | 'postponed' | 'completed' | 'pendingApproval', WoStatusBucket>;
@@ -3017,6 +3017,11 @@ const Dashboard = () => {
                             displayValue={`${pPct}%`}
                             subtitle={pg ? `${pNum} postponed out of ${pDen} scheduled WO` : '—'}
                             testId="gauge-postponed-wo"
+                            onClick={pg ? () => setWoListModal({
+                              open: true,
+                              title: 'Postponed Work Orders',
+                              workOrders: resolveWosByIds(pg.numeratorWoIds),
+                            }) : undefined}
                           />
                         </div>
                         <div className="flex flex-col items-center">
@@ -3028,6 +3033,11 @@ const Dashboard = () => {
                             displayValue={`${uPct}%`}
                             subtitle={ug ? `${uNum} unplanned out of ${uDen} total WO` : '—'}
                             testId="gauge-unplanned-wo"
+                            onClick={ug ? () => setWoListModal({
+                              open: true,
+                              title: 'Unplanned Work Orders',
+                              workOrders: resolveWosByIds(ug.numeratorWoIds),
+                            }) : undefined}
                           />
                         </div>
                       </>

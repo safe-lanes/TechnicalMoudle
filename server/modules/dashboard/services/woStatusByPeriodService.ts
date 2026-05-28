@@ -29,6 +29,10 @@ export interface WoStatusBucket {
 export interface WoGaugeBucket {
   numerator: number;
   denominator: number;
+  // Task #79: WO ids (wouuid ?? id, stringified) for every WO that
+  // contributed to the numerator. Powers the click-through drilldown
+  // popup on the gauge cards. Deduped via Set during construction.
+  numeratorWoIds: string[];
 }
 
 export interface WoStatusByPeriodResult {
@@ -411,6 +415,8 @@ export async function getWoStatusByPeriod(
   let postponedNum = 0;
   let unplannedDen = 0;
   let unplannedNum = 0;
+  const postponedNumIds = new Set<string>();
+  const unplannedNumIds = new Set<string>();
 
   for (const wo of vesselWOs) {
     const woIdRaw = wo.wouuid ?? wo.id;
@@ -422,6 +428,7 @@ export async function getWoStatusByPeriod(
       postponedDen += 1;
       if (woIdStr && postponedInWindowIds.has(woIdStr)) {
         postponedNum += 1;
+        postponedNumIds.add(woIdStr);
       }
     }
 
@@ -433,6 +440,7 @@ export async function getWoStatusByPeriod(
       unplannedDen += 1;
       if (((wo as any).workOrderType ?? '') === 'Unplanned') {
         unplannedNum += 1;
+        if (woIdStr) unplannedNumIds.add(woIdStr);
       }
     }
   }
@@ -440,7 +448,15 @@ export async function getWoStatusByPeriod(
   return {
     all,
     critical,
-    postponedGauge: { numerator: postponedNum, denominator: postponedDen },
-    unplannedGauge: { numerator: unplannedNum, denominator: unplannedDen },
+    postponedGauge: {
+      numerator: postponedNum,
+      denominator: postponedDen,
+      numeratorWoIds: Array.from(postponedNumIds),
+    },
+    unplannedGauge: {
+      numerator: unplannedNum,
+      denominator: unplannedDen,
+      numeratorWoIds: Array.from(unplannedNumIds),
+    },
   };
 }
