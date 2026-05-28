@@ -34,6 +34,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const OTHER_REASON = "Other Reason";
 const DOC_TYPE = "postponement";
+const RA_DOC_TYPE = "postponementRiskAssessment";
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_MIME = [
@@ -121,6 +122,10 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [riskAssessmentDoc, setRiskAssessmentDoc] = useState<PostponementDoc | null>(null);
+  const [isRAUploading, setIsRAUploading] = useState(false);
+  const raFileInputRef = useRef<HTMLInputElement>(null);
+
   const { data: masterListItems, isLoading: reasonsLoading, isError: reasonsError } = useQuery<MasterListItem[]>({
     queryKey: ["/technical/api/fleet/master-lists", "postponementReason"],
     queryFn: async () => {
@@ -171,6 +176,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     const loadDocs = async () => {
       if (!isOpen || !workOrder?.id) {
         setPostponementDocs([]);
+        setRiskAssessmentDoc(null);
         return;
       }
       try {
@@ -180,10 +186,17 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
         const list: PostponementDoc[] = Array.isArray(json) ? json : [];
         if (!cancelled) {
           setPostponementDocs(list.filter((d) => d.documentType === DOC_TYPE));
+          const raDocs = list
+            .filter((d) => d.documentType === RA_DOC_TYPE)
+            .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+          setRiskAssessmentDoc(raDocs[0] || null);
         }
       } catch (err) {
         console.error("Failed to load postponement docs:", err);
-        if (!cancelled) setPostponementDocs([]);
+        if (!cancelled) {
+          setPostponementDocs([]);
+          setRiskAssessmentDoc(null);
+        }
       }
     };
     loadDocs();
@@ -342,6 +355,110 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     }
   };
 
+  const handleRAUploadClick = () => {
+    if (isRAUploading) return;
+    if (!workOrder?.id) {
+      toast({ title: "Upload failed", description: "Work order is not available.", variant: "destructive" });
+      return;
+    }
+    raFileInputRef.current?.click();
+  };
+
+  const handleRAFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+
+    if (!workOrder?.id) {
+      toast({ title: "Upload failed", description: "Work order is not available.", variant: "destructive" });
+      event.target.value = "";
+      return;
+    }
+    if (!vesselId) {
+      toast({ title: "Upload failed", description: "No vessel context available.", variant: "destructive" });
+      event.target.value = "";
+      return;
+    }
+
+    const ext = "." + (file.name.split(".").pop()?.toLowerCase() || "");
+    if (!ALLOWED_MIME.includes(file.type) && !ALLOWED_EXT.includes(ext)) {
+      toast({
+        title: "Invalid file type",
+        description: `${file.name}: Only PDF, image, Word, or Excel files are accepted.`,
+        variant: "destructive",
+      });
+      event.target.value = "";
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      toast({
+        title: "File too large",
+        description: `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Maximum is 5MB.`,
+        variant: "destructive",
+      });
+      event.target.value = "";
+      return;
+    }
+
+    setIsRAUploading(true);
+    const previousDoc = riskAssessmentDoc;
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("documentType", RA_DOC_TYPE);
+      fd.append("vesselId", vesselId);
+
+      const response = await fetch(`/technical/api/work-orders/${workOrder.id}/documents`, {
+        method: "POST",
+        body: fd,
+      });
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        throw new Error(errBody.message || errBody.error || `Failed to upload ${file.name}`);
+      }
+      const result: PostponementDoc = await response.json();
+      setRiskAssessmentDoc(result);
+
+      if (previousDoc?.id) {
+        try {
+          await fetch(`/technical/api/work-order-documents/${previousDoc.id}`, { method: "DELETE" });
+        } catch (delErr) {
+          console.error("Failed to remove previous Risk Assessment doc:", delErr);
+        }
+      }
+
+      toast({
+        title: "Risk Assessment uploaded",
+        description: `${file.name} has been attached.`,
+      });
+    } catch (error: any) {
+      console.error("Risk Assessment upload error:", error);
+      toast({
+        title: "Upload failed",
+        description: error.message || "Failed to upload Risk Assessment. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRAUploading(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleRAViewClick = () => {
+    if (!riskAssessmentDoc) {
+      toast({
+        title: "No Risk Assessment attached",
+        description: "Upload a Risk Assessment document first using the UPLOAD button.",
+      });
+      return;
+    }
+    window.open(
+      `/technical/api/work-order-documents/${riskAssessmentDoc.id}/download`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  };
+
   const handleDeleteDoc = async (docId: string) => {
     try {
       const response = await fetch(`/technical/api/work-order-documents/${docId}`, {
@@ -475,18 +592,22 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
                   <div className="inline-flex items-center h-9 rounded-md border border-gray-200 bg-gray-50 overflow-hidden">
                     <button
                       type="button"
-                      onClick={() => {}}
+                      onClick={handleRAUploadClick}
+                      disabled={isRAUploading}
                       data-testid="button-risk-assessment-upload"
-                      className="px-3 h-full text-xs font-semibold text-[#52baf3] hover:bg-gray-100"
+                      className="px-3 h-full text-xs font-semibold text-[#52baf3] hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
                     >
+                      {isRAUploading && <Loader2 className="h-3 w-3 animate-spin" />}
                       UPLOAD
                     </button>
                     <div className="h-5 w-px bg-gray-300" />
                     <button
                       type="button"
-                      onClick={() => {}}
+                      onClick={handleRAViewClick}
                       data-testid="button-risk-assessment-view"
-                      className="px-3 h-full text-xs font-semibold text-[#52baf3] hover:bg-gray-100"
+                      className={`px-3 h-full text-xs font-semibold hover:bg-gray-100 ${
+                        riskAssessmentDoc ? "text-[#52baf3]" : "text-gray-400"
+                      }`}
                     >
                       VIEW
                     </button>
@@ -494,13 +615,30 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
                   <button
                     type="button"
                     onClick={() => {}}
+                    disabled
+                    title="Coming soon — will link to the Risk Assessment module"
                     data-testid="button-risk-assessment-link"
-                    className="inline-flex items-center gap-1 h-9 px-3 rounded-md border border-gray-200 bg-white text-xs font-semibold text-[#52baf3] hover:bg-gray-50"
+                    className="inline-flex items-center gap-1 h-9 px-3 rounded-md border border-gray-200 bg-white text-xs font-semibold text-[#52baf3] opacity-60 cursor-not-allowed"
                   >
                     LINK
                     <ArrowUpRight className="h-3.5 w-3.5" />
                   </button>
+                  <input
+                    ref={raFileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={handleRAFileSelected}
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"
+                    data-testid="input-file-risk-assessment"
+                  />
                 </div>
+                <p className="text-xs text-gray-500 truncate" data-testid="text-risk-assessment-filename">
+                  {riskAssessmentDoc ? (
+                    <span title={riskAssessmentDoc.fileName}>Attached: {riskAssessmentDoc.fileName}</span>
+                  ) : (
+                    "No file attached"
+                  )}
+                </p>
               </div>
             </div>
 
