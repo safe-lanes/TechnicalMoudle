@@ -226,6 +226,7 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
   const itemsData = useMemo(() => {
     return filteredItems.map((item: any, idx: number) => ({
       sNo: idx + 1,
+      itemId: item.itemId || item.id,
       itemCode: item.itemCode,
       itemName: item.itemName + (item.hasSingleEvent ? " (1 event)" : ""),
       itemType: item.itemType,
@@ -293,6 +294,7 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
 
       return {
         sNo: idx + 1,
+        itemId: item.itemId || item.id,
         itemCode: item.itemCode,
         itemName: item.itemName + (item.negativeRob ? " [Negative ROB]" : ""),
         itemType: item.itemType,
@@ -319,6 +321,7 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
   const nonMovingData = useMemo(() => {
     return nonMovingItems.map((item: any, idx: number) => ({
       sNo: idx + 1,
+      itemId: item.itemId || item.id,
       itemCode: item.itemCode,
       itemName: item.itemName,
       itemType: item.itemType,
@@ -357,6 +360,7 @@ const ConsumptionPatternReport: React.FC<ConsumptionPatternReportProps> = ({ onB
 
       return {
         sNo: idx + 1,
+        itemId: f.itemId || f.id,
         itemCode: f.itemCode,
         itemName: f.itemName + (f.reorderReasoning && f.reorderNeeded ? ` (${f.reorderReasoning})` : ""),
         uom: f.uom,

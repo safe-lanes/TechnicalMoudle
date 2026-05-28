@@ -465,6 +465,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                   ]}
                   data={expiredItems.map((item, index) => ({
                     sNo: index + 1,
+                    itemId: (item as any).itemId || (item as any).id,
                     itemCode: item.itemCode || '-',
                     itemName: item.itemName || '-',
                     expiryDate: formatDate(item.expiryDate),
@@ -504,6 +505,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                   ]}
                   data={expiringSoonItems.map((item, index) => ({
                     sNo: index + 1,
+                    itemId: (item as any).itemId || (item as any).id,
                     itemCode: item.itemCode || '-',
                     itemName: item.itemName || '-',
                     expiryDate: formatDate(item.expiryDate),
@@ -547,6 +549,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                 ]}
                 data={filteredItems.map((item, index) => ({
                   sNo: index + 1,
+                  itemId: (item as any).itemId || (item as any).id,
                   itemCode: item.itemCode || '-',
                   itemName: item.itemName || '-',
                   batchNumber: item.batchNumber || '-',
@@ -603,6 +606,7 @@ const ChemicalsExpiryReport: React.FC<ChemicalsExpiryReportProps> = ({ onBack, v
                         { header: 'Hazard Class', field: 'hazardClassification', width: 150 },
                       ]}
                       data={missingSdsItems.map(item => ({
+                        itemId: (item as any).itemId || (item as any).id,
                         itemCode: item.itemCode || '-',
                         itemName: item.itemName || '-',
                         hazardClassification: item.hazardClassification || 'None',

@@ -392,7 +392,9 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
   };
 
   const mapPriorityData = (priorityItems: LowStockItem[]) =>
-    priorityItems.map(item => ({
+    priorityItems.map((item: any) => ({
+      spareId: item.spareId || item.spuuid || item.id,
+      itemId: item.itemId || item.storeItemId || item.id,
       itemCode: item.itemCode || '-',
       itemName: item.itemName || '-',
       category: item.category || '-',
@@ -690,7 +692,9 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                   }
                   return cols;
                 })()}
-                data={sortedItems.map(item => ({
+                data={sortedItems.map((item: any) => ({
+                  spareId: item.spareId || item.spuuid || item.id,
+                  itemId: item.itemId || item.storeItemId || item.id,
                   itemCode: item.itemCode || '-',
                   itemName: item.itemName || '-',
                   itemType: item.itemType || '-',
@@ -897,6 +901,8 @@ const LowStockAlertReport: React.FC<LowStockAlertReportProps> = ({ onBack, vesse
                                   ]}
                                   data={(snapshotDetail.itemsData as any[]).map((item: any, idx: number) => ({
                                     sNo: idx + 1,
+                                    spareId: item.spareId || item.spuuid || item.id,
+                                    itemId: item.itemId || item.storeItemId || item.id,
                                     priority: item.priority || '-',
                                     itemCode: item.itemCode || '-',
                                     itemName: item.itemName || '-',

@@ -505,6 +505,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
                   ]}
                   data={filteredItems.map((item: any, idx: number) => ({
                     sNo: idx + 1,
+                    spareId: item.spareId || item.itemId || item.id,
                     itemCode: item.itemCode,
                     itemNameDisplay: item.hasSingleEvent ? `${item.itemName} (1 event)` : item.itemName,
                     category: item.category,
@@ -622,6 +623,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
                       }
                       return {
                         sNo: idx + 1,
+                        spareId: item.spareId || item.itemId || item.id,
                         itemCode: item.itemCode,
                         itemNameDisplay: item.negativeRob ? `${item.itemName} [Negative ROB]` : item.itemName,
                         currentRob: item.currentRob,
@@ -662,6 +664,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
                         ]}
                         data={nonMovingItems.map((item: any, idx: number) => ({
                           sNo: idx + 1,
+                          spareId: item.spareId || item.itemId || item.id,
                           itemCode: item.itemCode,
                           itemName: item.itemName,
                           currentRob: item.currentRob,
@@ -715,6 +718,7 @@ const SparesConsumptionPatternReport: React.FC<SparesConsumptionPatternReportPro
                     ]}
                     data={forecastData.map((item: any, idx: number) => ({
                       sNo: idx + 1,
+                      spareId: item.spareId || item.itemId || item.id,
                       itemCode: item.itemCode,
                       itemName: item.itemName,
                       uom: item.uom,
