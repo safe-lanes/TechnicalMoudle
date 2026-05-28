@@ -2891,8 +2891,10 @@ export async function updateComponentFromRow(componentCode: string, row: any, ve
   if (row['Serial No']) updateData.serialNo = row['Serial No'];
   if (row['Drawing No']) updateData.drawingNo = row['Drawing No'];
   // Department and categorization - support both new and legacy headers
-  const deptValue = row['Equipment / System Department'] || row['Eqpt / System Department'];
-  if (deptValue) {
+  // Normalize "Null"/"null"/"NULL" → actual SQL NULL (user may type "Null" to indicate no department)
+  const rawUpdateDeptValue = row['Equipment / System Department'] || row['Eqpt / System Department'];
+  const deptValue = (rawUpdateDeptValue && rawUpdateDeptValue.toLowerCase() === 'null') ? null : rawUpdateDeptValue;
+  if (rawUpdateDeptValue !== undefined) {
     updateData.department = deptValue;
     updateData.deptCategory = deptValue;
     updateData.equipmentDepartment = deptValue;

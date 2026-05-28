@@ -476,7 +476,9 @@ export async function validateData(type: string, data: any[], mode: string, vess
       });
 
       const deptValue = normalized['Equipment / System Department'] || normalized['Eqpt / System Department'];
-      if (deptValue && !DEPARTMENTS.includes(deptValue)) {
+      // "Null"/"null"/"NULL" is treated as explicit no-department — always valid regardless of case
+      const deptIsNullSentinel = deptValue && deptValue.toLowerCase() === 'null';
+      if (deptValue && !deptIsNullSentinel && !DEPARTMENTS.includes(deptValue)) {
         errors.push(`Row ${rowNum}: Invalid Equipment / System Department '${deptValue}'. Allowed values are: ${DEPARTMENTS.join(', ')}.`);
       }
 
