@@ -4768,7 +4768,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             <div className="space-y-4">
               {/* B1.1 Risk Assessment */}
               <div className="flex items-center justify-between py-3 border-b border-gray-100" data-testid="WOF.B1.3"><Marker id="WOF.B1.3" />
-                <Label className="text-sm text-gray-700" data-testid="WOF.B1.4"><Marker id="WOF.B1.4" />B1.1 Risk Assessment Completed / Reviewed:</Label>
+                <Label className="text-sm text-gray-700" data-testid="WOF.B1.4"><Marker id="WOF.B1.4" />B1.1 Risk Assessment Completed / Reviewed: <span className="text-red-500">*</span></Label>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2">
@@ -4840,7 +4840,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
               {/* B1.2 Safety Checklists */}
               <div className="flex items-center justify-between py-3 border-b border-gray-100" data-testid="WOF.B1.10"><Marker id="WOF.B1.10" />
-                <Label className="text-sm text-gray-700" data-testid="WOF.B1.11"><Marker id="WOF.B1.11" />B1.2 Safety Checklists Completed (As applicable):</Label>
+                <Label className="text-sm text-gray-700" data-testid="WOF.B1.11"><Marker id="WOF.B1.11" />B1.2 Safety Checklists Completed (As applicable): <span className="text-red-500">*</span></Label>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2">
@@ -4912,7 +4912,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
               {/* B1.3 Operational Forms */}
               <div className="flex items-center justify-between py-3" data-testid="WOF.B1.17"><Marker id="WOF.B1.17" />
-                <Label className="text-sm text-gray-700" data-testid="WOF.B1.18"><Marker id="WOF.B1.18" />B1.3 Operational Forms Completed (As applicable):</Label>
+                <Label className="text-sm text-gray-700" data-testid="WOF.B1.18"><Marker id="WOF.B1.18" />B1.3 Operational Forms Completed (As applicable): <span className="text-red-500">*</span></Label>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2">
