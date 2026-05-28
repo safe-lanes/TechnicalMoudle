@@ -379,9 +379,9 @@ const Dashboard = () => {
   const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: EnrichedWorkOrder[] }>({ open: false, title: '', workOrders: [] });
   const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
   const [crListModal, setCrListModal] = useState<{ open: boolean; title: string; changeRequests: ChangeRequest[] }>({ open: false, title: '', changeRequests: [] });
-  const drilldownRestoreAppliedRef = useRef(false);
   const DRILLDOWN_KEY = 'dashboardDrilldownModal';
   const DRILLDOWN_NAV_KEY = 'dashboardDrilldownNavigating';
+  const DASHBOARD_PERIOD_KEY = 'dashboardPeriod';
   const spareKeyOf = (s: any): string => `${s?.vesselId ?? ''}__${s?.id ?? ''}`;
   const persistDrilldown = (kind: 'wo' | 'spares' | 'cr', title: string, ids: string[]) => {
     try {
@@ -459,9 +459,29 @@ const Dashboard = () => {
   };
   const [selectedCriticality, setSelectedCriticality] = useState("");
   const [dashboardPeriod, setDashboardPeriod] = useState<PeriodFilterValue | null>(() => {
+    try {
+      const raw = sessionStorage.getItem(DASHBOARD_PERIOD_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as PeriodFilterValue | null;
+        if (parsed && parsed.mode === 'date-range') {
+          if (parsed.dateFrom) parsed.dateFrom = new Date(parsed.dateFrom as any);
+          if (parsed.dateTo) parsed.dateTo = new Date(parsed.dateTo as any);
+        }
+        return parsed;
+      }
+    } catch {}
     const now = new Date();
     return { mode: 'year-months', year: now.getFullYear(), months: [now.getMonth() + 1] };
   });
+  useEffect(() => {
+    try {
+      if (dashboardPeriod === null) {
+        sessionStorage.removeItem(DASHBOARD_PERIOD_KEY);
+      } else {
+        sessionStorage.setItem(DASHBOARD_PERIOD_KEY, JSON.stringify(dashboardPeriod));
+      }
+    } catch {}
+  }, [dashboardPeriod]);
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
@@ -657,7 +677,7 @@ const Dashboard = () => {
     enabled: !!effectiveVesselId && (isAllVessels ? vessels.length > 0 : true)
   });
 
-  const { data: changeRequestsData = [] } = useQuery<ChangeRequest[]>({
+  const { data: changeRequestsData = [], isLoading: isChangeRequestsLoading } = useQuery<ChangeRequest[]>({
     queryKey: ['/technical/api/change-requests', effectiveVesselId],
     queryFn: async () => {
       const url = isAllVessels
@@ -955,39 +975,71 @@ const Dashboard = () => {
   // window.history.back() which remounts this Dashboard; local modal state is
   // lost, so we read the descriptor written by openXxxListModal() and re-open.
   useEffect(() => {
-    if (drilldownRestoreAppliedRef.current) return;
-    // Wait until the relevant dataset(s) are loaded so we can resolve IDs.
-    if (isWorkOrdersLoading || isSparesLoading) return;
+    // If any drill-down modal is already showing, skip restoration entirely.
+    // This prevents the effect from reopening a modal the user has just
+    // dismissed, and from churning state once the modal is up.
+    if (woListModal.open || sparesListModal.open || crListModal.open) return;
+    // Until the vessel context resolves, the underlying queries are disabled
+    // (so isLoading is false while data is still empty defaults). Bailing
+    // here avoids prematurely clearing the saved descriptor in that window.
+    if (!effectiveVesselId) return;
     let raw: string | null = null;
     try { raw = sessionStorage.getItem(DRILLDOWN_KEY); } catch {}
-    if (!raw) { drilldownRestoreAppliedRef.current = true; return; }
+    if (!raw) return;
     const clear = () => { try { sessionStorage.removeItem(DRILLDOWN_KEY); } catch {} };
+    let parsed: { kind?: 'wo' | 'spares' | 'cr'; title?: string; ids?: string[] };
     try {
-      const parsed = JSON.parse(raw) as { kind?: 'wo' | 'spares' | 'cr'; title?: string; ids?: string[] };
-      const title = parsed?.title || '';
-      const ids = parsed?.ids || [];
-      if (parsed?.kind === 'wo') {
-        const wos = resolveWosByIds(ids);
-        if (wos.length > 0) setWoListModal({ open: true, title, workOrders: wos });
-        else clear();
-      } else if (parsed?.kind === 'spares') {
-        const idSet = new Set(ids);
-        const matched = (sparesData as any[]).filter((s: any) => idSet.has(spareKeyOf(s))) as Spare[];
-        if (matched.length > 0) setSparesListModal({ open: true, title, spares: matched });
-        else clear();
-      } else if (parsed?.kind === 'cr') {
-        const idSet = new Set(ids);
-        const matched = (changeRequestsData as any[]).filter((cr: any) => idSet.has(String(cr?.id))) as ChangeRequest[];
-        if (matched.length > 0) setCrListModal({ open: true, title, changeRequests: matched });
-        else clear();
+      parsed = JSON.parse(raw);
+    } catch {
+      clear();
+      return;
+    }
+    const title = parsed?.title || '';
+    const ids = parsed?.ids || [];
+    // Per-kind gating: wait while THAT kind's data is still loading; only
+    // give up (and clear the saved descriptor) once loading is finished
+    // and the descriptor still resolves to zero rows.
+    if (parsed?.kind === 'wo') {
+      if (isWorkOrdersLoading) return;
+      const wos = resolveWosByIds(ids);
+      if (wos.length > 0) {
+        setWoListModal({ open: true, title, workOrders: wos });
       } else {
         clear();
       }
-    } catch {
+    } else if (parsed?.kind === 'spares') {
+      if (isSparesLoading) return;
+      const idSet = new Set(ids);
+      const matched = (sparesData as any[]).filter((s: any) => idSet.has(spareKeyOf(s))) as Spare[];
+      if (matched.length > 0) {
+        setSparesListModal({ open: true, title, spares: matched });
+      } else {
+        clear();
+      }
+    } else if (parsed?.kind === 'cr') {
+      if (isChangeRequestsLoading) return;
+      const idSet = new Set(ids);
+      const matched = (changeRequestsData as any[]).filter((cr: any) => idSet.has(String(cr?.id))) as ChangeRequest[];
+      if (matched.length > 0) {
+        setCrListModal({ open: true, title, changeRequests: matched });
+      } else {
+        clear();
+      }
+    } else {
       clear();
     }
-    drilldownRestoreAppliedRef.current = true;
-  }, [isWorkOrdersLoading, isSparesLoading, workOrderByIdMap, sparesData, changeRequestsData]);
+  }, [
+    effectiveVesselId,
+    isWorkOrdersLoading,
+    isSparesLoading,
+    isChangeRequestsLoading,
+    workOrderByIdMap,
+    sparesData,
+    changeRequestsData,
+    woListModal.open,
+    sparesListModal.open,
+    crListModal.open,
+  ]);
 
   const buildPeriodDonutData = (
     buckets: WoStatusByPeriodResponse['all'] | undefined,
