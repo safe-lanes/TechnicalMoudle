@@ -622,17 +622,6 @@ const Dashboard = () => {
     enabled: !!effectiveVesselId,
   });
 
-  useEffect(() => {
-    if (crListModalOpenRef.current) {
-      const currentYear = new Date().getFullYear();
-      const refreshed = changeRequestsData.filter(cr => {
-        const created = cr.createdAt ? new Date(cr.createdAt) : null;
-        return created !== null && created.getFullYear() === currentYear;
-      });
-      setCrListModal(prev => ({ ...prev, changeRequests: refreshed }));
-    }
-  }, [changeRequestsData]);
-
   const { data: superintendentSummary } = useQuery<{ pendingCount: number; acknowledgedThisMonthCount: number }>({
     queryKey: ['/technical/api/superintendent/notifications/summary', effectiveVesselId],
     queryFn: async () => {
@@ -1897,13 +1886,6 @@ const Dashboard = () => {
     const unplannedFull = ytdWOs.filter(wo => wo.workOrderType === 'Unplanned');
     const unplanned = unplannedFull.length;
 
-    const changeRequestsFull = changeRequestsData.filter(cr => {
-      const created = cr.createdAt ? new Date(cr.createdAt) : null;
-      return created !== null && created.getFullYear() === currentYear;
-    });
-    const changeRequestCountYTD = changeRequestsFull.length;
-    const changeRequestPercent = total > 0 ? Math.round((changeRequestCountYTD / total) * 100) : 0;
-
     return {
       total,
       postponed,
@@ -1912,11 +1894,39 @@ const Dashboard = () => {
       unplanned,
       unplannedFull,
       unplannedPercent: total > 0 ? Math.round((unplanned / total) * 100) : 0,
-      changeRequests: changeRequestCountYTD,
-      changeRequestsFull,
-      changeRequestPercent,
     };
-  }, [workOrdersData, changeRequestsData]);
+  }, [workOrdersData]);
+
+  // Task #80: Modify PMS Requests gauge driven by global dashboardPeriod filter
+  // (replaces YTD-only logic). Numerator = change requests whose createdAt
+  // falls in the window; denominator = non-execution WOs whose dueDate falls
+  // in the window (matches the "scheduled WO" definition used by the
+  // Postponed gauge). Cleared period -> all-time.
+  const modifyPmsPeriodKPIs = useMemo(() => {
+    const inRange = (raw: string | Date | null | undefined) => {
+      if (!raw) return false;
+      const d = raw instanceof Date ? raw : new Date(raw);
+      if (isNaN(d.getTime())) return false;
+      if (!dashboardPeriodRange) return true; // all-time
+      return d >= dashboardPeriodRange.from && d <= dashboardPeriodRange.to;
+    };
+    const woDen = (workOrdersData as EnrichedWorkOrder[])
+      .filter(wo => wo && !wo.isExecution && inRange(wo.dueDate ?? null))
+      .length;
+    const crNumeratorList = changeRequestsData
+      .filter(cr => inRange(cr.createdAt ?? null));
+    const num = crNumeratorList.length;
+    const percent = woDen > 0 ? Math.round((num / woDen) * 100) : 0;
+    return { numerator: num, denominator: woDen, percent, changeRequestsFull: crNumeratorList };
+  }, [workOrdersData, changeRequestsData, dashboardPeriodRange]);
+
+  // Task #80: While the CR list modal is open (gauge drilldown), keep its
+  // contents in sync with the same period filter as the gauge numerator.
+  // Replaces the previous YTD-only refresh effect.
+  useEffect(() => {
+    if (!crListModalOpenRef.current) return;
+    setCrListModal(prev => ({ ...prev, changeRequests: modifyPmsPeriodKPIs.changeRequestsFull }));
+  }, [modifyPmsPeriodKPIs.changeRequestsFull]);
 
   const top5ReasonsData = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -3226,16 +3236,20 @@ const Dashboard = () => {
 
                   <div style={dividerH} />
 
-                  {/* Row 3: Modify PMS Requests YTD gauge */}
-                  <div style={subTitle} className="mb-1 mt-2">MODIFY PMS REQUESTS YTD</div>
+                  {/* Row 3: Modify PMS Requests gauge — Task #80: period-driven */}
+                  <div style={subTitle} className="mb-1 mt-2">MODIFY PMS REQUESTS</div>
                   <div data-testid="cell-right-row3">
                     <SemiCircleGauge
-                      value={ytdKPIs.changeRequests}
-                      max={ytdKPIs.total || 10}
+                      value={modifyPmsPeriodKPIs.denominator > 0 ? modifyPmsPeriodKPIs.numerator : 0}
+                      max={modifyPmsPeriodKPIs.denominator > 0 ? modifyPmsPeriodKPIs.denominator : 1}
                       color="#e74c3c"
-                      displayValue={ytdKPIs.changeRequests.toString()}
-                      subtitle={`${ytdKPIs.changeRequestPercent}% of total`}
-                      onClick={() => setCrListModal({ open: true, title: 'Modify PMS Requests YTD', changeRequests: ytdKPIs.changeRequestsFull })}
+                      displayValue={`${modifyPmsPeriodKPIs.percent}%`}
+                      subtitle={`${modifyPmsPeriodKPIs.numerator} modifications out of ${modifyPmsPeriodKPIs.denominator} WO`}
+                      onClick={() => setCrListModal({
+                        open: true,
+                        title: 'Modify PMS Requests',
+                        changeRequests: modifyPmsPeriodKPIs.changeRequestsFull,
+                      })}
                       testId="gauge-modify-pms-ytd"
                     />
                   </div>
