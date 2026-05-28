@@ -1457,13 +1457,13 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         />
       )}
       {embedded && previewData && (!monthlySummaryData || selectedReportId !== 'monthly-summary') && (
-        <InlineReportPreview reportData={previewData} embedded={embedded} />
+        <InlineReportPreview reportData={previewData ? { ...previewData, reportId: previewData.reportId ?? selectedReportId ?? null } : null} embedded={embedded} />
       )}
       {!embedded && (
         <ReportPreviewModal
           open={previewOpen}
           onClose={() => { setPreviewOpen(false); setPreviewData(null); }}
-          reportData={previewData}
+          reportData={previewData ? { ...previewData, reportId: previewData.reportId ?? selectedReportId ?? null } : null}
         />
       )}
     </div>

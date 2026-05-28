@@ -40,6 +40,7 @@ export interface ReportPreviewData {
   columns: ReportColumn[];
   data: Record<string, any>[];
   summary?: ReportSummaryItem[];
+  reportId?: string | null;
 }
 
 interface ReportPreviewModalProps {
@@ -93,7 +94,7 @@ const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({ open, onClose, 
         )}
 
         <div className="flex-1 overflow-hidden p-4 pt-2">
-          <ReportAgGridTable columns={columns} data={data} height="calc(90vh - 280px)" />
+          <ReportAgGridTable columns={columns} data={data} height="calc(90vh - 280px)" reportId={reportData.reportId} />
         </div>
 
         <div className="flex-shrink-0 border-t p-3 flex justify-end">

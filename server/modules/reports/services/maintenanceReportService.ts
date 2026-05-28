@@ -191,6 +191,7 @@ export async function getDueJobs7DaysData(vesselId: string, vesselIds?: string[]
 
     if (isDue) {
       dueJobs.push({
+        workOrderId: (wo as any).wouuid || wo.id,
         workOrderNo: wo.workOrderNo || wo.id,
         jobTitle: wo.jobTitle || job?.jobTitle || '-',
         componentCode: wo.componentCode || '-',
@@ -434,6 +435,7 @@ export async function getOverdueJobsData(vesselId: string, dateFrom?: string, da
       if (isCriticalEquipment) debugStats.criticalEquipment++;
 
       overdueJobs.push({
+        workOrderId: (wo as any).wouuid || wo.id,
         workOrderNo: wo.workOrderNo || wo.id,
         jobTitle: wo.jobTitle || job?.jobTitle || '-',
         componentCode: wo.componentCode || '-',
@@ -662,6 +664,7 @@ export async function getCompletedJobsData(vesselId: string, dateFrom?: string, 
 
     return {
       sNo: index + 1,
+      workOrderId: (wo as any).wouuid || wo.id,
       workOrderNo: wo.workOrderNo || wo.id || '\u2014',
       componentName: wo.component || comp?.name || '\u2014',
       componentCode: wo.componentCode || '\u2014',
@@ -916,6 +919,7 @@ export async function getAllJobsData(vesselId: string, dateFrom?: string, dateTo
 
     return {
       sNo: index + 1,
+      workOrderId: (wo as any).wouuid || wo.id,
       workOrderNo: wo.workOrderNo || wo.id || '\u2014',
       componentName: wo.component || comp?.name || '\u2014',
       componentCode: wo.componentCode || '\u2014',
@@ -1146,6 +1150,7 @@ export async function exportUnplannedJobs(vesselId: string, dateFrom?: string, d
     const isCritical = (comp as any)?.criticalEquipment === true || (comp as any)?.criticalEquipment === 'Yes';
 
     return {
+      workOrderId: (wo as any).wouuid || wo.id,
       workOrderNo: (wo as any).workOrderNumber || wo.id,
       templateCode: (job as any)?.templateCode || '-',
       jobTitle: (wo as any).title || wo.jobTitle || '-',

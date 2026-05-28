@@ -422,6 +422,7 @@ const IhmInventoryStatusReport: React.FC<IhmInventoryStatusReportProps> = ({ onB
           ) : (
             <div data-testid="ihm-inventory-table">
               <ReportAgGridTable
+                reportId="ihm-inventory-status"
                 columns={[
                   { header: 'S.No', field: 'sno', width: 70 },
                   ...(isMultiVessel ? [{ header: 'Vessel', field: 'vesselName', width: 150 }] : []),
