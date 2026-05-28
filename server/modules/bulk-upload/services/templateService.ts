@@ -354,7 +354,7 @@ export async function generateFleetMasterTemplate(): Promise<Buffer> {
     vesselComponentSheet.getCell(row, 19).dataValidation = {
       type: 'list',
       allowBlank: true,
-      formulae: ["'Master Data'!$A$2:$A$4"]
+      formulae: ["'Master Data'!$A$2:$A$8"]
     };
     // IS Active (col 22)
     vesselComponentSheet.getCell(row, 22).dataValidation = {
@@ -370,7 +370,7 @@ export async function generateFleetMasterTemplate(): Promise<Buffer> {
     fleetJobSheet.getCell(row, 6).dataValidation = {
       type: 'list',
       allowBlank: true,
-      formulae: ["'Master Data'!$A$2:$A$4"]
+      formulae: ["'Master Data'!$A$2:$A$8"]
     };
     // Responsible Rank (col 7)
     fleetJobSheet.getCell(row, 7).dataValidation = {
@@ -410,7 +410,7 @@ export async function generateFleetMasterTemplate(): Promise<Buffer> {
     vesselJobSheet.getCell(row, 7).dataValidation = {
       type: 'list',
       allowBlank: true,
-      formulae: ["'Master Data'!$A$2:$A$4"]
+      formulae: ["'Master Data'!$A$2:$A$8"]
     };
     // Responsible Rank (col 8)
     vesselJobSheet.getCell(row, 8).dataValidation = {

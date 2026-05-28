@@ -2739,7 +2739,9 @@ export async function createComponentFromRow(row: any, vesselId?: string) {
   }
   
   // Support both new and legacy header formats for department
-  const departmentValue = row['Equipment / System Department'] || row['Eqpt / System Department'] || null;
+  const rawDeptValue = row['Equipment / System Department'] || row['Eqpt / System Department'] || null;
+  // Normalize "Null"/"null"/"NULL" → actual SQL NULL (user may type "Null" to indicate no department)
+  const departmentValue = (rawDeptValue && rawDeptValue.toLowerCase() === 'null') ? null : rawDeptValue;
   
   // Support both new and legacy header formats for criticality
   const criticalValue = row['Criticality'] ?? row['Critical Yes/No'] ?? row['Critical (Yes/No)'];
