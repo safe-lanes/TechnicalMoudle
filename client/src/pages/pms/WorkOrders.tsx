@@ -166,13 +166,18 @@ const WorkOrders: React.FC = () => {
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = sessionStorage.getItem('workOrdersActiveTab');
     if (savedTab) {
-      sessionStorage.removeItem('workOrdersActiveTab');
       // Handle legacy "Active" tab name - map to "Planned"
       const resolved = savedTab === "Active" ? "Planned" : savedTab;
       return VALID_TABS.has(resolved) ? resolved : "Planned";
     }
     return "Planned";
   });
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('workOrdersActiveTab', activeTab);
+    } catch {}
+  }, [activeTab]);
   const [showPlanner, setShowPlanner] = useState(false);
   const [postponeDialogOpen, setPostponeDialogOpen] = useState(false);
   const [overdueReasonDialogOpen, setOverdueReasonDialogOpen] = useState(false);
