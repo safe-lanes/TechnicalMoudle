@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -46,11 +46,20 @@ export function FileAttachmentDialog({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewType, setPreviewType] = useState<string | null>(null);
 
+  const attachmentsRef = useRef<FileAttachment[]>(attachments);
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
+
+  const commitAttachments = (next: FileAttachment[]) => {
+    attachmentsRef.current = next;
+    onAttachmentsChange(next);
+  };
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
-    const newAttachments: FileAttachment[] = [];
     const errors: string[] = [];
 
     Array.from(files).forEach((file) => {
@@ -74,9 +83,9 @@ export function FileAttachmentDialog({
           data: e.target?.result as string,
           uploadedAt: new Date().toISOString(),
         };
-        
-        onAttachmentsChange([...attachments, attachment]);
-        
+
+        commitAttachments([...attachmentsRef.current, attachment]);
+
         toast({
           title: 'File Uploaded',
           description: `${file.name} has been attached successfully.`,
@@ -99,15 +108,15 @@ export function FileAttachmentDialog({
   };
 
   const handleRemoveAttachment = (id: string) => {
-    const attachment = attachments.find((a) => a.id === id);
-    onAttachmentsChange(attachments.filter((a) => a.id !== id));
-    
-    if (attachment) {
-      toast({
-        title: 'File Removed',
-        description: `${attachment.name} has been removed.`,
-      });
-    }
+    const current = attachmentsRef.current;
+    const attachment = current.find((a) => a.id === id);
+    if (!attachment) return;
+    commitAttachments(current.filter((a) => a.id !== id));
+
+    toast({
+      title: 'File Removed',
+      description: `${attachment.name} has been removed.`,
+    });
   };
 
   const handlePreview = (attachment: FileAttachment) => {

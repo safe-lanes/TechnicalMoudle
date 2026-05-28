@@ -1,0 +1,84 @@
+Update the logic for existing gauge widgets:
+
+1. POSTPONED WORK ORDERS %
+2. UNPLANNED MAINTENANCE %
+
+IMPORTANT:
+- Do NOT create new UI components or charts
+- Only update the data calculation logic
+- Ensure both widgets respond to the global "Period" filter
+- Remove existing YTD-only calculation
+
+--------------------------------------------------
+
+1. POSTPONED WORK ORDERS %
+
+Definition:
+Percentage of planned work orders in the selected period that were postponed.
+
+Logic:
+- Consider only work orders with due_date within selected period
+- From these, count work orders marked as "Postponed"
+- If a work order was postponed at least once in the period, include it
+
+Formula:
+Postponed % = (Number of postponed WO during period / Total WO scheduled in period) * 100
+
+Display:
+- Percentage value in gauge
+- Subtext: "X postponed out of Y scheduled WO"
+
+--------------------------------------------------
+
+2. UNPLANNED MAINTENANCE %
+
+Definition:
+Percentage of unplanned work orders created during the selected period.
+
+Logic:
+- Consider all work orders created within selected period
+- Identify those marked as "Unplanned" or "Breakdown / Corrective"
+- Include both planned and unplanned in total count
+
+Formula:
+Unplanned % = (Number of unplanned WO during period / Total WO created during period) * 100
+
+Display:
+- Percentage value in gauge
+- Subtext: "X unplanned out of Y total WO"
+
+--------------------------------------------------
+
+PERIOD FILTER BEHAVIOUR:
+
+- Both widgets MUST fully follow the global Period filter
+- Default period = Current Month
+- Supported filters:
+  - Current Month
+  - Quarter
+  - YTD
+  - Custom range
+
+--------------------------------------------------
+
+ADDITIONAL CONDITIONS:
+
+- Do NOT use "status as of today" logic
+- Do NOT include backlog from previous periods unless it falls within selected date range
+- Calculations should be strictly event-based within selected period
+
+--------------------------------------------------
+
+DATA HANDLING EDGE CASES:
+
+- If total WO = 0 → show 0% (avoid division error)
+- Ensure consistency:
+  - Postponed uses due_date
+  - Unplanned uses created_date
+
+--------------------------------------------------
+
+GOAL:
+
+Ensure both widgets reflect period-based performance metrics (not cumulative YTD),
+aligned with maintenance compliance and reliability tracking.

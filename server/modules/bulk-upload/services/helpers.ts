@@ -803,10 +803,18 @@ export function getParentSFICode(sfiCode: string): string | null {
     parts.pop(); // Remove last part
     return parts.join('.');
   }
-  // No decimal, check if it's a multi-digit code
+  // No decimal — undotted or short code
   const baseCode = cleanCode;
-  if (baseCode.length > 2) {
-    // 3+ digit code (e.g., 711 → parent is 71)
+  if (baseCode.length >= 7) {
+    // 7–9 digit undotted code: strip last 3 digits to get parent
+    // e.g. 601001001 (9) → 601001, 6010010 (7) → 6010
+    return baseCode.substring(0, baseCode.length - 3);
+  } else if (baseCode.length >= 4) {
+    // 4–6 digit undotted code: parent is first 3 digits
+    // e.g. 601001 (6) → 601, 6010 (4) → 601
+    return baseCode.substring(0, 3);
+  } else if (baseCode.length === 3) {
+    // 3-digit code (e.g., 711 → parent is 71)
     return baseCode.substring(0, 2);
   } else if (baseCode.length === 2) {
     // 2-digit code (e.g., 71 → parent is 7)
@@ -818,11 +826,15 @@ export function getParentSFICode(sfiCode: string): string | null {
 // Validate SFI code format
 export function validateSFICode(sfiCode: string): boolean {
   // SFI codes can be: 6, 61, 612, 612.005, 612.005.001
+  // Also accept undotted formats: 601001, 601001001 (1–9 consecutive digits, no dots)
   // Also accept codes with suffixes like 226.065(1), 230(2), etc.
   // Strip the suffix before validation
   const cleanCode = stripSFISuffix(sfiCode);
-  const pattern = /^\d{1,3}(\.\d{1,3})*$/;
-  return pattern.test(cleanCode);
+  // Dotted format: each segment is 1–3 digits separated by dots
+  const dottedPattern = /^\d{1,3}(\.\d{1,3})*$/;
+  // Undotted format: 1–9 consecutive digits with no dots
+  const undottedPattern = /^\d{1,9}$/;
+  return dottedPattern.test(cleanCode) || undottedPattern.test(cleanCode);
 }
 
 // Helper to check if row has explicit parent from any header variant
@@ -866,7 +878,7 @@ export const STORES_CATEGORIES = [
 ];
 
 // Departments list for jobs/work orders
-export const DEPARTMENTS = ['Engine', 'Deck', 'Electrical', 'Galley', 'LSA', 'FFA'];
+export const DEPARTMENTS = ['Engine', 'Deck', 'Electrical', 'Galley', 'LSA', 'FFA', 'Null'];
 
 // Responsible ranks for work orders
 export const RESPONSIBLE_RANKS = [

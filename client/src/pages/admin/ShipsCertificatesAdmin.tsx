@@ -423,6 +423,22 @@ export default function ShipsCertificatesAdmin() {
 
   // Handle save button click
   const handleSave = () => {
+    const invalidCompany = activeTab === "company"
+      ? companyOnlyCerts.filter(c => !c.certificateLabel?.trim())
+      : [];
+    const invalidVessel = activeTab === "vessel"
+      ? vesselOnlyCerts.filter(c => !c.certificateLabel?.trim())
+      : [];
+    if (invalidCompany.length > 0 || invalidVessel.length > 0) {
+      setInvalidCompanyCertIds(new Set(invalidCompany.map(c => c.id)));
+      setInvalidVesselCertIds(new Set(invalidVessel.map(c => c.id)));
+      setSaveValidationError("Certificate Label is mandatory");
+      return;
+    }
+    setInvalidCompanyCertIds(new Set());
+    setInvalidVesselCertIds(new Set());
+    setSaveValidationError("");
+
     // Find the highest existing VES- sequence number from both masterData and vesselOnlyCerts
     let maxVesSeq = 0;
     for (const cert of masterData) {
@@ -874,6 +890,9 @@ export default function ShipsCertificatesAdmin() {
     companyGroup: "",
   });
   const [newCompanyEntryError, setNewCompanyEntryError] = useState("");
+  const [invalidCompanyCertIds, setInvalidCompanyCertIds] = useState<Set<number>>(new Set());
+  const [invalidVesselCertIds, setInvalidVesselCertIds] = useState<Set<number>>(new Set());
+  const [saveValidationError, setSaveValidationError] = useState("");
   
   // Vessel-specific certificates (not derived from Company)
   const [vesselOnlyCerts, setVesselOnlyCerts] = useState<VesselCertificate[]>([]);
@@ -1207,7 +1226,7 @@ export default function ShipsCertificatesAdmin() {
     
     const newId = Math.max(...vesselOnlyCerts.map(c => c.id), 0) + 2000;
     
-    const newCert: VesselCertificate = {
+    const newCert: VesselCertificate & { _pendingVesselIds?: string[] } = {
       id: newId,
       masterId: "",
       companyId: "",
@@ -1215,6 +1234,7 @@ export default function ShipsCertificatesAdmin() {
       requirementRef: newVesselEntryData.requirementRef || "",
       companyGroup: newVesselEntryData.companyGroup || "",
       applicable: newVesselEntryData.applicable ?? true,
+      _pendingVesselIds: getSelectedVesselIds(),
     };
     
     setVesselOnlyCerts(prev => [...prev, newCert]);
@@ -1927,11 +1947,19 @@ export default function ShipsCertificatesAdmin() {
                       {viewModes.company === "edit" && isCompanyOnly ? (
                         <Input 
                           defaultValue={cert.certificateLabel}
-                          className="h-8 text-sm"
+                          className={`h-8 text-sm ${invalidCompanyCertIds.has(cert.id) && !cert.certificateLabel?.trim() ? 'border-red-500 focus:border-red-500' : ''}`}
                           onBlur={(e) => {
                             setCompanyOnlyCerts(prev => prev.map(c => 
                               c.id === cert.id ? { ...c, certificateLabel: e.target.value } : c
                             ));
+                            if (e.target.value.trim()) {
+                              setInvalidCompanyCertIds(prev => {
+                                if (!prev.has(cert.id)) return prev;
+                                const next = new Set(prev);
+                                next.delete(cert.id);
+                                return next;
+                              });
+                            }
                           }}
                           data-testid={`input-label-${testIdSuffix}`}
                         />
@@ -2204,125 +2232,118 @@ export default function ShipsCertificatesAdmin() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {selectedVessels.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <Ship className="h-12 w-12 text-muted-foreground/50" />
-                        <p className="text-muted-foreground">Select at least one vessel to view certificate configuration</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : isLoadingApplicability ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                        <p className="text-muted-foreground">Loading certificate configuration...</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (companyCertificates.length === 0 && companyOnlyCerts.length === 0) ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <Ship className="h-12 w-12 text-muted-foreground/50" />
-                        <p className="text-muted-foreground">No certificates are marked as applicable to Company. Configure the Company tab first.</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : companyCertificates.map((cert, idx) => {
-                  const applicability = getCertificateApplicability(cert.masterId);
-                  const isMixed = applicability === 'mixed';
-                  const isChecked = applicability === true;
-                  const companyGroupLabel = companyGroupLabels.find(g => g.key === cert.companyGroup)?.label || "";
-                  const displayCompanyGroup = cert.companyGroup ? `${cert.companyGroup}. ${companyGroupLabel}` : "";
-                  
+                {(() => {
+                  const vesselCompanyFromMaster = companyCertificates.map((cert) => ({
+                    ...cert,
+                    _sortSequence: cert.companySequence ?? cert.sequence ?? 999999,
+                    _isCompanyOnly: false as const,
+                  }));
+                  const vesselCompanyOnlyMapped = companyOnlyCerts.map((cert) => ({
+                    ...cert,
+                    _sortSequence: cert.sequence ?? 999999,
+                    _isCompanyOnly: true as const,
+                  }));
+                  const vesselMergedCompanyList: any[] = [...vesselCompanyFromMaster, ...vesselCompanyOnlyMapped]
+                    .sort((a, b) => a._sortSequence - b._sortSequence);
+                  const vesselOnlyVisible = vesselOnlyCerts.filter((cert: any) => {
+                    const vesselIds = getSelectedVesselIds();
+                    if (cert.id >= 2000) {
+                      if (viewModes.vessel !== "edit") return false;
+                      const pending: string[] | undefined = cert._pendingVesselIds;
+                      return vesselIds.some(v => pending?.includes(v));
+                    }
+                    return vesselIds.some(vesselId =>
+                      vesselApplicabilityData.some((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId)
+                    );
+                  });
+                  if (selectedVessels.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center">
+                          <div className="flex flex-col items-center gap-2">
+                            <Ship className="h-12 w-12 text-muted-foreground/50" />
+                            <p className="text-muted-foreground">Select at least one vessel to view certificate configuration</p>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  if (isLoadingApplicability) {
+                    return (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center">
+                          <div className="flex flex-col items-center gap-2">
+                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                            <p className="text-muted-foreground">Loading certificate configuration...</p>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  if (vesselMergedCompanyList.length === 0 && vesselOnlyVisible.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center">
+                          <div className="flex flex-col items-center gap-2">
+                            <Ship className="h-12 w-12 text-muted-foreground/50" />
+                            <p className="text-muted-foreground">No certificates are marked as applicable to Company. Configure the Company tab first.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
                   return (
-                    <tr key={cert.id} className={cn("hover:bg-gray-50", isMixed && "bg-amber-50")}>
-                      <td className="px-3 py-3 text-center">
-                        <div className="flex flex-col items-center gap-1">
-                          <Checkbox 
-                            checked={isMixed ? false : isChecked}
-                            onCheckedChange={(checked) => {
-                              if (!conflictCheck.hasConflict && viewModes.vessel === "edit") {
-                                handleApplicabilityChange(cert.masterId, !!checked);
-                              }
-                            }}
-                            disabled={conflictCheck.hasConflict || viewModes.vessel !== "edit"}
-                            className={cn(
-                              "border-blue-500 data-[state=checked]:bg-blue-500",
-                              isMixed && "border-amber-500 bg-amber-100"
-                            )}
-                            data-testid={`checkbox-vessel-applicable-${cert.id}`}
-                          />
-                          {isMixed && (
-                            <span className="text-xs text-amber-600">Mixed</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 text-sm">{idx + 1}</td>
-                      <td className="px-3 py-3 text-sm font-medium text-blue-600">{cert.masterId}</td>
-                      <td className="px-3 py-3 text-sm">{cert.companyId || `C${cert.masterId}`}</td>
-                      <td className="px-3 py-3 text-sm">{cert.certificateLabel || cert.certificateName}</td>
-                      <td className="px-3 py-3 text-sm">{cert.requirementRef}</td>
-                      <td className="px-3 py-3 text-sm">{displayCompanyGroup}</td>
-                    </tr>
-                  );
-                })}
-                
-                {/* Company-only certificates (inherited from Company tab) */}
-                {selectedVessels.length > 0 && companyOnlyCerts.map((cert, idx) => {
-                  const companyGroupLabel = companyGroupLabels.find(g => g.key === cert.companyGroup)?.label || "";
-                  const displayCompanyGroup = cert.companyGroup ? `${cert.companyGroup}. ${companyGroupLabel}` : "";
-                  const applicability = getCertificateApplicability(cert.masterId);
-                  const isMixed = applicability === 'mixed';
-                  const isChecked = applicability === true;
-                  
-                  return (
-                    <tr key={`company-inherited-${cert.id}`} className={cn("hover:bg-gray-50 bg-green-50", isMixed && "bg-amber-50")}>
-                      <td className="px-3 py-3 text-center">
-                        <div className="flex flex-col items-center gap-1">
-                          <Checkbox 
-                            checked={isMixed ? false : isChecked}
-                            onCheckedChange={(checked) => {
-                              if (!conflictCheck.hasConflict && viewModes.vessel === "edit") {
-                                handleApplicabilityChange(cert.masterId, !!checked);
-                              }
-                            }}
-                            disabled={conflictCheck.hasConflict || viewModes.vessel !== "edit"}
-                            className={cn(
-                              "border-blue-500 data-[state=checked]:bg-blue-500",
-                              isMixed && "border-amber-500 bg-amber-100"
-                            )}
-                            data-testid={`checkbox-vessel-company-applicable-${cert.id}`}
-                          />
-                          {isMixed && (
-                            <span className="text-xs text-amber-600">Mixed</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 text-sm">{companyCertificates.length + idx + 1}</td>
-                      <td className="px-3 py-3 text-sm font-medium text-blue-600">{cert.masterId && /^CMP-/.test(cert.masterId) ? cert.masterId : "-"}</td>
-                      <td className="px-3 py-3 text-sm">{cert.companyId || "-"}</td>
-                      <td className="px-3 py-3 text-sm">{cert.certificateLabel}</td>
-                      <td className="px-3 py-3 text-sm">{cert.requirementRef}</td>
-                      <td className="px-3 py-3 text-sm">{displayCompanyGroup}</td>
-                    </tr>
-                  );
-                })}
-                
-                {/* Vessel-only certificates (not from Company) — filtered by vessel applicability.
-                    The same filter runs in both View and Edit modes so the row set, count, and
-                    sequence numbers stay identical. Newly added in-memory rows (id >= 2000) are
-                    still shown so unsaved "Add New" entries remain visible while editing. */}
-                {selectedVessels.length > 0 && vesselOnlyCerts.filter(cert => {
-                  if (cert.id >= 2000) return viewModes.vessel === "edit";
-                  const vesselIds = getSelectedVesselIds();
-                  return vesselIds.some(vesselId =>
-                    vesselApplicabilityData.some((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId)
-                  );
-                }).map((cert, idx) => {
+                    <>
+                      {vesselMergedCompanyList.map((cert: any, idx: number) => {
+                        const applicability = getCertificateApplicability(cert.masterId);
+                        const isMixed = applicability === 'mixed';
+                        const isChecked = applicability === true;
+                        const companyGroupLabel = companyGroupLabels.find(g => g.key === cert.companyGroup)?.label || "";
+                        const displayCompanyGroup = cert.companyGroup ? `${cert.companyGroup}. ${companyGroupLabel}` : "";
+                        const rowKey = cert._isCompanyOnly ? `company-inherited-${cert.id}` : cert.id;
+                        const testIdPrefix = cert._isCompanyOnly ? 'checkbox-vessel-company-applicable' : 'checkbox-vessel-applicable';
+                        const masterIdCell = cert._isCompanyOnly
+                          ? (cert.masterId && /^CMP-/.test(cert.masterId) ? cert.masterId : "-")
+                          : cert.masterId;
+                        const companyIdCell = cert._isCompanyOnly
+                          ? (cert.companyId || "-")
+                          : (cert.companyId || `C${cert.masterId}`);
+                        const labelCell = cert._isCompanyOnly
+                          ? cert.certificateLabel
+                          : (cert.certificateLabel || cert.certificateName);
+                        return (
+                          <tr key={rowKey} className={cn("hover:bg-gray-50", cert._isCompanyOnly && "bg-green-50", isMixed && "bg-amber-50")}>
+                            <td className="px-3 py-3 text-center">
+                              <div className="flex flex-col items-center gap-1">
+                                <Checkbox 
+                                  checked={isMixed ? false : isChecked}
+                                  onCheckedChange={(checked) => {
+                                    if (!conflictCheck.hasConflict && viewModes.vessel === "edit") {
+                                      handleApplicabilityChange(cert.masterId, !!checked);
+                                    }
+                                  }}
+                                  disabled={conflictCheck.hasConflict || viewModes.vessel !== "edit"}
+                                  className={cn(
+                                    "border-blue-500 data-[state=checked]:bg-blue-500",
+                                    isMixed && "border-amber-500 bg-amber-100"
+                                  )}
+                                  data-testid={`${testIdPrefix}-${cert.id}`}
+                                />
+                                {isMixed && (
+                                  <span className="text-xs text-amber-600">Mixed</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-3 text-sm">{idx + 1}</td>
+                            <td className="px-3 py-3 text-sm font-medium text-blue-600">{masterIdCell}</td>
+                            <td className="px-3 py-3 text-sm">{companyIdCell}</td>
+                            <td className="px-3 py-3 text-sm">{labelCell}</td>
+                            <td className="px-3 py-3 text-sm">{cert.requirementRef}</td>
+                            <td className="px-3 py-3 text-sm">{displayCompanyGroup}</td>
+                          </tr>
+                        );
+                      })}
+                      {vesselOnlyVisible.map((cert, idx) => {
                   const companyGroupLabel = companyGroupLabels.find(g => g.key === cert.companyGroup)?.label || "";
                   const displayCompanyGroup = cert.companyGroup ? `${cert.companyGroup}. ${companyGroupLabel}` : "";
                   const applicability = getCertificateApplicability(cert.masterId);
@@ -2352,18 +2373,26 @@ export default function ShipsCertificatesAdmin() {
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-sm">{companyCertificates.length + companyOnlyCerts.length + idx + 1}</td>
+                      <td className="px-3 py-3 text-sm">{vesselMergedCompanyList.length + idx + 1}</td>
                       <td className="px-3 py-3 text-sm font-medium text-gray-400">-</td>
                       <td className="px-3 py-3 text-sm text-gray-400">-</td>
                       <td className="px-3 py-3 text-sm">
                         {viewModes.vessel === "edit" ? (
                           <Input 
                             defaultValue={cert.certificateLabel}
-                            className="h-8 text-sm"
+                            className={`h-8 text-sm ${invalidVesselCertIds.has(cert.id) && !cert.certificateLabel?.trim() ? 'border-red-500 focus:border-red-500' : ''}`}
                             onBlur={(e) => {
                               setVesselOnlyCerts(prev => prev.map(c => 
                                 c.id === cert.id ? { ...c, certificateLabel: e.target.value } : c
                               ));
+                              if (e.target.value.trim()) {
+                                setInvalidVesselCertIds(prev => {
+                                  if (!prev.has(cert.id)) return prev;
+                                  const next = new Set(prev);
+                                  next.delete(cert.id);
+                                  return next;
+                                });
+                              }
                             }}
                             data-testid={`input-vessel-label-only-${cert.id}`}
                           />
@@ -2417,6 +2446,9 @@ export default function ShipsCertificatesAdmin() {
                     </tr>
                   );
                 })}
+                    </>
+                  );
+                })()}
                 
                 {/* New entry row for Vessel-specific certificate */}
                 {viewModes.vessel === "edit" && isAddingNewVessel && selectedVessels.length > 0 && (
@@ -2584,6 +2616,11 @@ export default function ShipsCertificatesAdmin() {
                 )}
                 {activeTab === "company" && (
                   <>
+                    {saveValidationError && (
+                      <span className="text-sm text-red-500 mr-2" data-testid="text-save-validation-error-company">
+                        {saveValidationError}
+                      </span>
+                    )}
                     <Button 
                       size="sm"
                       className="bg-green-600 hover:bg-green-700 gap-1"
@@ -2609,6 +2646,11 @@ export default function ShipsCertificatesAdmin() {
                 )}
                 {activeTab === "vessel" && (
                   <>
+                    {saveValidationError && (
+                      <span className="text-sm text-red-500 mr-2" data-testid="text-save-validation-error-vessel">
+                        {saveValidationError}
+                      </span>
+                    )}
                     <Button 
                       size="sm"
                       className="bg-green-600 hover:bg-green-700 gap-1"

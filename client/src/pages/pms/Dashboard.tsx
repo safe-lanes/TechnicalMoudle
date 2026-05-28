@@ -49,7 +49,7 @@ import {
 } from "@/components/wo/woCellRenderers";
 import { RejectionHistoryBadge } from "@/components/wo/RejectionHistoryBadge";
 import { useVessels } from "@/hooks/useVessels";
-import { PeriodFilter, type PeriodFilterValue, periodFilterToDateRange } from "@/components/filters/PeriodFilter";
+import { PeriodFilter, type PeriodFilterValue, periodFilterToDateRange, getPeriodLabel } from "@/components/filters/PeriodFilter";
 import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
 import { ComplianceAnomalyPanel } from "./ComplianceAnomalyPanel";
@@ -622,17 +622,6 @@ const Dashboard = () => {
     enabled: !!effectiveVesselId,
   });
 
-  useEffect(() => {
-    if (crListModalOpenRef.current) {
-      const currentYear = new Date().getFullYear();
-      const refreshed = changeRequestsData.filter(cr => {
-        const created = cr.createdAt ? new Date(cr.createdAt) : null;
-        return created !== null && created.getFullYear() === currentYear;
-      });
-      setCrListModal(prev => ({ ...prev, changeRequests: refreshed }));
-    }
-  }, [changeRequestsData]);
-
   const { data: superintendentSummary } = useQuery<{ pendingCount: number; acknowledgedThisMonthCount: number }>({
     queryKey: ['/technical/api/superintendent/notifications/summary', effectiveVesselId],
     queryFn: async () => {
@@ -849,10 +838,21 @@ const Dashboard = () => {
     [dashboardPeriod],
   );
 
+  // Task #82: human-readable period label for gauge tooltips. Falls back
+  // to "All time" when the global Period filter is cleared.
+  const dashboardPeriodLabel = useMemo(() => {
+    const label = getPeriodLabel(dashboardPeriod);
+    return label || 'All time';
+  }, [dashboardPeriod]);
+
   interface WoStatusBucket { count: number; woIds: string[] }
+  interface WoGaugeBucket { numerator: number; denominator: number; numeratorWoIds: string[] }
   interface WoStatusByPeriodResponse {
     all: Record<'scheduled' | 'due' | 'overdue' | 'postponed' | 'completed' | 'pendingApproval', WoStatusBucket>;
     critical: Record<'scheduled' | 'due' | 'overdue' | 'postponed' | 'completed' | 'pendingApproval', WoStatusBucket>;
+    // Task #78: period-driven gauges (replace the YTD-only postponed/unplanned wiring).
+    postponedGauge: WoGaugeBucket;
+    unplannedGauge: WoGaugeBucket;
   }
   // Cleared period (dashboardPeriodRange === null) intentionally sends no
   // from/to and the backend treats it as all-time, per task #77 spec.
@@ -1893,13 +1893,6 @@ const Dashboard = () => {
     const unplannedFull = ytdWOs.filter(wo => wo.workOrderType === 'Unplanned');
     const unplanned = unplannedFull.length;
 
-    const changeRequestsFull = changeRequestsData.filter(cr => {
-      const created = cr.createdAt ? new Date(cr.createdAt) : null;
-      return created !== null && created.getFullYear() === currentYear;
-    });
-    const changeRequestCountYTD = changeRequestsFull.length;
-    const changeRequestPercent = total > 0 ? Math.round((changeRequestCountYTD / total) * 100) : 0;
-
     return {
       total,
       postponed,
@@ -1908,21 +1901,58 @@ const Dashboard = () => {
       unplanned,
       unplannedFull,
       unplannedPercent: total > 0 ? Math.round((unplanned / total) * 100) : 0,
-      changeRequests: changeRequestCountYTD,
-      changeRequestsFull,
-      changeRequestPercent,
     };
-  }, [workOrdersData, changeRequestsData]);
+  }, [workOrdersData]);
 
+  // Task #80: Modify PMS Requests gauge driven by global dashboardPeriod filter
+  // (replaces YTD-only logic). Numerator = change requests whose createdAt
+  // falls in the window; denominator = non-execution WOs whose dueDate falls
+  // in the window (matches the "scheduled WO" definition used by the
+  // Postponed gauge). Cleared period -> all-time.
+  const modifyPmsPeriodKPIs = useMemo(() => {
+    const inRange = (raw: string | Date | null | undefined) => {
+      if (!raw) return false;
+      const d = raw instanceof Date ? raw : new Date(raw);
+      if (isNaN(d.getTime())) return false;
+      if (!dashboardPeriodRange) return true; // all-time
+      return d >= dashboardPeriodRange.from && d <= dashboardPeriodRange.to;
+    };
+    const woDen = (workOrdersData as EnrichedWorkOrder[])
+      .filter(wo => wo && !wo.isExecution && inRange(wo.dueDate ?? null))
+      .length;
+    const crNumeratorList = changeRequestsData
+      .filter(cr => inRange(cr.createdAt ?? null));
+    const num = crNumeratorList.length;
+    const percent = woDen > 0 ? Math.round((num / woDen) * 100) : 0;
+    return { numerator: num, denominator: woDen, percent, changeRequestsFull: crNumeratorList };
+  }, [workOrdersData, changeRequestsData, dashboardPeriodRange]);
+
+  // Task #80: While the CR list modal is open (gauge drilldown), keep its
+  // contents in sync with the same period filter as the gauge numerator.
+  // Replaces the previous YTD-only refresh effect.
+  useEffect(() => {
+    if (!crListModalOpenRef.current) return;
+    setCrListModal(prev => ({ ...prev, changeRequests: modifyPmsPeriodKPIs.changeRequestsFull }));
+  }, [modifyPmsPeriodKPIs.changeRequestsFull]);
+
+  // Task #81: Top 5 reasons chart driven by the global dashboardPeriod
+  // filter (replaces YTD-only logic). In-period predicate matches the
+  // Postponed gauge / Modify PMS denominator: non-execution WO whose
+  // dueDate falls within the selected window. Cleared period = all-time.
   const top5ReasonsData = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const ytdWOs = (workOrdersData as EnrichedWorkOrder[]).filter(wo => {
+    const inRange = (raw: string | Date | null | undefined) => {
+      if (!raw) return false;
+      const d = raw instanceof Date ? raw : new Date(raw);
+      if (isNaN(d.getTime())) return false;
+      if (!dashboardPeriodRange) return true; // cleared = all-time
+      return d >= dashboardPeriodRange.from && d <= dashboardPeriodRange.to;
+    };
+    const periodWOs = (workOrdersData as EnrichedWorkOrder[]).filter(wo => {
       if (!wo || wo.isExecution) return false;
-      const createdDate = wo.createdAt ? new Date(wo.createdAt) : null;
-      return createdDate !== null && createdDate.getFullYear() === currentYear;
+      return inRange(wo.dueDate ?? null);
     });
 
-    const overdueWOs = ytdWOs.filter(wo => wo.computedStatus === 'Overdue');
+    const overdueWOs = periodWOs.filter(wo => wo.computedStatus === 'Overdue');
     const overdueByReason = new Map<string, EnrichedWorkOrder[]>();
     overdueWOs.forEach(wo => {
       const reason = String(wo.overdueReason ?? '').trim();
@@ -1937,7 +1967,7 @@ const Dashboard = () => {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    const postponedWOs = ytdWOs.filter(wo => wo.computedStatus === 'Postponed');
+    const postponedWOs = periodWOs.filter(wo => wo.computedStatus === 'Postponed');
     const postponeByReason = new Map<string, EnrichedWorkOrder[]>();
     postponedWOs.forEach(wo => {
       const reason = String(wo.postponementReason ?? '').trim();
@@ -1953,7 +1983,7 @@ const Dashboard = () => {
       .slice(0, 5);
 
     return { overdueTop5, postponeTop5 };
-  }, [workOrdersData]);
+  }, [workOrdersData, dashboardPeriodRange]);
 
   const HEADER_BLUE = '#1a3a5c';
 
@@ -2188,7 +2218,7 @@ const Dashboard = () => {
             ) : activeTab === 'overview' ? (
               <>
                 <div style={{ fontSize: '18px', fontWeight: 700, color: '#1a2b4a' }} data-testid="text-current-year">
-                  {new Date().getFullYear()}
+                  {dashboardPeriodLabel}
                 </div>
                 <Button
                   variant="outline"
@@ -2786,7 +2816,11 @@ const Dashboard = () => {
 
                   <div style={dividerH} />
 
-                  {/* Row 2: WO Status Distribution Donut */}
+                  {/* Row 2: WO Status Distribution Donut — Task #83: tooltip */}
+                  <TooltipProvider delayDuration={200}>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <div tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
                   <div style={subTitle} className="mb-1 mt-2">WO Status - All Eqpt</div>
                   <div style={{ height: '170px' }} data-testid="card-wo-status-chart">
                     {workOrderStatusChartData.length > 0 ? (
@@ -2833,6 +2867,16 @@ const Dashboard = () => {
                       <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>No work orders to display</div>
                     )}
                   </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed" data-testid="tooltip-wo-status-all-formula">
+                        <div>Distribution of work orders by status across all equipment for the selected period.</div>
+                        <div className="mt-1">Slices use mutually-exclusive precedence: Overdue &gt; Postponed &gt; Completed &gt; Due &gt; Scheduled — each WO is counted once in its highest-precedence state during the window.</div>
+                        <div className="mt-1">Click a slice to see the underlying work orders.</div>
+                        <div className="mt-1 font-medium">Period: {dashboardPeriodLabel}</div>
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
 
                   <div style={dividerH} />
 
@@ -2876,7 +2920,11 @@ const Dashboard = () => {
 
                   <div style={dividerH} />
 
-                  {/* Row 4: WO Status Critical donut */}
+                  {/* Row 4: WO Status Critical donut — Task #83: tooltip */}
+                  <TooltipProvider delayDuration={200}>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <div tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
                   <div style={subTitle} className="mb-1 mt-2">WO STATUS - CRITICAL EQPT.</div>
                   <div style={{ height: '170px' }} data-testid="card-wo-status-critical-chart">
                     {criticalWorkOrderStatusChartData.length > 0 ? (
@@ -2923,6 +2971,15 @@ const Dashboard = () => {
                       <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>No critical work orders to display</div>
                     )}
                   </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed" data-testid="tooltip-wo-status-critical-formula">
+                        <div>Distribution of work orders by status for critical equipment only, using the same mutually-exclusive precedence as the All-Eqpt donut: Overdue &gt; Postponed &gt; Completed &gt; Due &gt; Scheduled.</div>
+                        <div className="mt-1">Click a slice to see the underlying work orders.</div>
+                        <div className="mt-1 font-medium">Period: {dashboardPeriodLabel}</div>
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
                 </div>
               </div>
 
@@ -2990,30 +3047,76 @@ const Dashboard = () => {
                 data-testid="cell-center-row3"
               >
                 <div className="p-3 grid grid-cols-2 gap-4 h-full">
-                  <div className="flex flex-col items-center">
-                    <div style={subTitle} className="mb-1 text-center">Postponed Work Orders</div>
-                    <SemiCircleGauge
-                      value={ytdKPIs.postponed}
-                      max={ytdKPIs.total || 10}
-                      color="#e74c3c"
-                      displayValue={ytdKPIs.postponed.toString()}
-                      subtitle={`${ytdKPIs.postponedPercent}% of total`}
-                      onClick={() => setWoListModal({ open: true, title: 'Postponed Work Orders YTD', workOrders: ytdKPIs.postponedFull })}
-                      testId="gauge-postponed-wo"
-                    />
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <div style={subTitle} className="mb-1 text-center">Unplanned Maintenance %</div>
-                    <SemiCircleGauge
-                      value={ytdKPIs.unplanned}
-                      max={ytdKPIs.total || 10}
-                      color="#e74c3c"
-                      displayValue={ytdKPIs.unplanned.toString()}
-                      subtitle={`${ytdKPIs.unplannedPercent}% of total`}
-                      onClick={() => setWoListModal({ open: true, title: 'Unplanned Work Orders YTD', workOrders: ytdKPIs.unplannedFull })}
-                      testId="gauge-unplanned-wo"
-                    />
-                  </div>
+                  {/* Task #78: Both gauges now follow the global dashboardPeriod filter
+                      via woStatusByPeriodData (event-based, not YTD/computedStatus).
+                      While the query is pending, show 0% with subtitle "—". */}
+                  {(() => {
+                    const pg = woStatusByPeriodData?.postponedGauge;
+                    const pNum = pg?.numerator ?? 0;
+                    const pDen = pg?.denominator ?? 0;
+                    const pPct = pDen > 0 ? Math.round((pNum / pDen) * 100) : 0;
+                    const ug = woStatusByPeriodData?.unplannedGauge;
+                    const uNum = ug?.numerator ?? 0;
+                    const uDen = ug?.denominator ?? 0;
+                    const uPct = uDen > 0 ? Math.round((uNum / uDen) * 100) : 0;
+                    return (
+                      <>
+                        <TooltipProvider delayDuration={200}>
+                          <UITooltip>
+                            <TooltipTrigger asChild>
+                              <div tabIndex={0} className="flex flex-col items-center outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
+                                <div style={subTitle} className="mb-1 text-center">Postponed Work Orders %</div>
+                                <SemiCircleGauge
+                                  value={pNum}
+                                  max={pDen > 0 ? pDen : 1}
+                                  color="#e74c3c"
+                                  displayValue={`${pPct}%`}
+                                  subtitle={pg ? `${pNum} postponed out of ${pDen} scheduled WO` : '—'}
+                                  testId="gauge-postponed-wo"
+                                  onClick={pg ? () => setWoListModal({
+                                    open: true,
+                                    title: 'Postponed Work Orders',
+                                    workOrders: resolveWosByIds(pg.numeratorWoIds),
+                                  }) : undefined}
+                                />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed" data-testid="tooltip-postponed-wo-formula">
+                              <div>Postponed % = (Work orders postponed during the period ÷ Scheduled work orders during the period) × 100.</div>
+                              <div className="mt-1">Scheduled WO = non-execution WOs whose due date falls in the window.</div>
+                              <div className="mt-1 font-medium">Period: {dashboardPeriodLabel}</div>
+                            </TooltipContent>
+                          </UITooltip>
+                        </TooltipProvider>
+                        <TooltipProvider delayDuration={200}>
+                          <UITooltip>
+                            <TooltipTrigger asChild>
+                              <div tabIndex={0} className="flex flex-col items-center outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
+                                <div style={subTitle} className="mb-1 text-center">Unplanned Maintenance %</div>
+                                <SemiCircleGauge
+                                  value={uNum}
+                                  max={uDen > 0 ? uDen : 1}
+                                  color="#e74c3c"
+                                  displayValue={`${uPct}%`}
+                                  subtitle={ug ? `${uNum} unplanned out of ${uDen} total WO` : '—'}
+                                  testId="gauge-unplanned-wo"
+                                  onClick={ug ? () => setWoListModal({
+                                    open: true,
+                                    title: 'Unplanned Work Orders',
+                                    workOrders: resolveWosByIds(ug.numeratorWoIds),
+                                  }) : undefined}
+                                />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed" data-testid="tooltip-unplanned-wo-formula">
+                              <div>Unplanned % = (Unplanned work orders during the period ÷ Total work orders during the period) × 100.</div>
+                              <div className="mt-1 font-medium">Period: {dashboardPeriodLabel}</div>
+                            </TooltipContent>
+                          </UITooltip>
+                        </TooltipProvider>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -3024,7 +3127,7 @@ const Dashboard = () => {
               >
                 <div className="p-3 h-full flex flex-col">
                   <div className="flex items-center justify-between mb-2">
-                    <div style={subTitle}>Top 5 Reason for Postponement / Overdue YTD</div>
+                    <div style={subTitle}>Top 5 Reason for Postponement / Overdue</div>
                     <div className="flex items-center gap-2 text-xs">
                       <button
                         type="button"
@@ -3097,9 +3200,12 @@ const Dashboard = () => {
                 data-testid="column-inventory-fleet"
               >
                 <div className="p-3">
-                  <div style={sectionHeaderBar} className="!pt-0 !pb-2">SPARES STOCK STATUS</div>
-
-                  {/* Row 1: Spare Parts Donut */}
+                  {/* Row 1: Spare Parts Donut — Task #83: tooltip + (TODAY) title */}
+                  <TooltipProvider delayDuration={200}>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <div tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
+                  <div style={sectionHeaderBar} className="!pt-0 !pb-2">SPARES STOCK STATUS (TODAY)</div>
                   <div style={{ height: '170px' }} data-testid="card-spares-status-chart">
                     {sparesStockChartData.length > 0 ? (
                       <ResponsiveContainer width="100%" height={170}>
@@ -3144,11 +3250,27 @@ const Dashboard = () => {
                       <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>No spares data</div>
                     )}
                   </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed" data-testid="tooltip-spares-stock-formula">
+                        <div>Current stock health of all spares for the selected vessel:</div>
+                        <div className="mt-1">• OK — ROB &gt; Min</div>
+                        <div>• At Min — ROB = Min</div>
+                        <div>• Low — ROB &lt; Min</div>
+                        <div className="mt-1">Click a slice to see the underlying spares.</div>
+                        <div className="mt-1 font-medium">As of: now</div>
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
 
                   <div style={dividerH} />
 
-                  {/* Row 2: Critical Spare Parts donut */}
-                  <div style={subTitle} className="mb-1 mt-2">CRITICAL SPARES STOCK STATUS</div>
+                  {/* Row 2: Critical Spare Parts donut — Task #83: tooltip + (TODAY) title */}
+                  <TooltipProvider delayDuration={200}>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <div tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded">
+                  <div style={subTitle} className="mb-1 mt-2">CRITICAL SPARES STOCK STATUS (TODAY)</div>
                   <div style={{ height: '170px' }} data-testid="card-critical-spares-status-chart">
                     {criticalSparesStockChartData.length > 0 ? (
                       <ResponsiveContainer width="100%" height={170}>
@@ -3194,22 +3316,49 @@ const Dashboard = () => {
                       <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>No critical spares data</div>
                     )}
                   </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed" data-testid="tooltip-critical-spares-stock-formula">
+                        <div>Current stock health of spares marked Critical for the selected vessel:</div>
+                        <div className="mt-1">• OK — ROB &gt; Min</div>
+                        <div>• At Min — ROB = Min</div>
+                        <div>• Low — ROB &lt; Min</div>
+                        <div className="mt-1">Click a slice to see the underlying spares.</div>
+                        <div className="mt-1 font-medium">As of: now</div>
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
 
                   <div style={dividerH} />
 
-                  {/* Row 3: Modify PMS Requests YTD gauge */}
-                  <div style={subTitle} className="mb-1 mt-2">MODIFY PMS REQUESTS YTD</div>
-                  <div data-testid="cell-right-row3">
-                    <SemiCircleGauge
-                      value={ytdKPIs.changeRequests}
-                      max={ytdKPIs.total || 10}
-                      color="#e74c3c"
-                      displayValue={ytdKPIs.changeRequests.toString()}
-                      subtitle={`${ytdKPIs.changeRequestPercent}% of total`}
-                      onClick={() => setCrListModal({ open: true, title: 'Modify PMS Requests YTD', changeRequests: ytdKPIs.changeRequestsFull })}
-                      testId="gauge-modify-pms-ytd"
-                    />
-                  </div>
+                  {/* Row 3: Modify PMS Requests gauge — Task #80: period-driven; Task #82: tooltip */}
+                  <TooltipProvider delayDuration={200}>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <div tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded" data-testid="cell-right-row3">
+                          <div style={subTitle} className="mb-1 mt-2">MODIFY PMS REQUESTS</div>
+                          <SemiCircleGauge
+                            value={modifyPmsPeriodKPIs.denominator > 0 ? modifyPmsPeriodKPIs.numerator : 0}
+                            max={modifyPmsPeriodKPIs.denominator > 0 ? modifyPmsPeriodKPIs.denominator : 1}
+                            color="#e74c3c"
+                            displayValue={`${modifyPmsPeriodKPIs.percent}%`}
+                            subtitle={`${modifyPmsPeriodKPIs.numerator} modifications out of ${modifyPmsPeriodKPIs.denominator} WO`}
+                            onClick={() => setCrListModal({
+                              open: true,
+                              title: 'Modify PMS Requests',
+                              changeRequests: modifyPmsPeriodKPIs.changeRequestsFull,
+                            })}
+                            testId="gauge-modify-pms-ytd"
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed" data-testid="tooltip-modify-pms-formula">
+                        <div>Modify PMS % = (Change requests raised during the period ÷ Scheduled work orders during the period) × 100.</div>
+                        <div className="mt-1">A "request" is a change request whose created date falls in the window; the denominator matches the Postponed gauge.</div>
+                        <div className="mt-1 font-medium">Period: {dashboardPeriodLabel}</div>
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
                 </div>
               </div>
             </div>
