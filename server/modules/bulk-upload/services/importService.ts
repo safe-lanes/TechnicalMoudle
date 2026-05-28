@@ -216,7 +216,6 @@ export async function performImport(
     updated: 0,
     skipped: 0,
     archived: 0,
-    jobComponentLinksCreated: 0,
     spareComponentLinksCreated: 0,
     spareComponentLinksExpected: 0,
     spareComponentLinksDbTotal: 0,
@@ -2064,20 +2063,6 @@ export async function performImport(
           result.created++;
           result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'created' });
           
-          try {
-            await storage.createJobComponentLink({
-              vesselId: canonicalVesselId,
-              jobId: createdJob.id,
-              componentId: component.cuuid,
-              componentCode: componentCode,
-              linkedBy: 'system-bulk-import',
-            });
-            result.jobComponentLinksCreated++;
-            console.log(`🔗 Created job ${createdJob.jobNo} for component ${componentCode}`);
-          } catch (linkError: any) {
-            console.warn(`⚠️ Job created but failed to create job-component link: ${linkError.message}`);
-          }
-          
           if (importHistoryId) {
             const canonicalJob = await storage.getJob(createdJob.id);
             await trackChange(importHistoryId, 'created', 'job', createdJob.id, null, canonicalJob);
@@ -2089,25 +2074,6 @@ export async function performImport(
         }
       } else if (mode === 'update') {
         if (existingJob) {
-          try {
-            const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
-            const linkAlreadyExists = existingLinks.some(link => link.componentId === component.cuuid);
-            
-            if (!linkAlreadyExists) {
-              await storage.createJobComponentLink({
-                vesselId: canonicalVesselId,
-                jobId: existingJob.id,
-                componentId: component.cuuid,
-                componentCode: componentCode,
-                linkedBy: 'system-bulk-import',
-              });
-              result.jobComponentLinksCreated++;
-              console.log(`🔗 Linked job ${jobData.jobNo} to component ${componentCode} (update mode)`);
-            }
-          } catch (linkError: any) {
-            console.warn(`⚠️ Failed to create job-component link: ${linkError.message}`);
-          }
-          
           const previousSnapshot = createRecordSnapshot(existingJob);
           const updatedJob = await storage.updateJob(existingJob.id, jobData);
           const updateKey = getJobUniqueKey(canonicalVesselId, componentCode, updatedJob.jobNo);
@@ -2125,37 +2091,16 @@ export async function performImport(
         }
       } else if (mode === 'upsert') {
         if (existingJob) {
-          try {
-            const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
-            const linkAlreadyExists = existingLinks.some(link => link.componentId === component.cuuid);
-            
-            if (!linkAlreadyExists) {
-              await storage.createJobComponentLink({
-                vesselId: canonicalVesselId,
-                jobId: existingJob.id,
-                componentId: component.cuuid,
-                componentCode: componentCode,
-                linkedBy: 'system-bulk-import',
-              });
-              result.jobComponentLinksCreated++;
-              console.log(`🔗 Linked job ${jobData.jobNo} to component ${componentCode} (upsert mode)`);
-            }
-            
-            const previousSnapshot = createRecordSnapshot(existingJob);
-            const updatedJob = await storage.updateJob(existingJob.id, jobData);
-            const upsertKey = getJobUniqueKey(canonicalVesselId, componentCode, updatedJob.jobNo);
-            jobsByCompositeKey.set(upsertKey, updatedJob);
-            result.updated++;
-            result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'updated' });
-            
-            if (importHistoryId) {
-              const canonicalJob = await storage.getJob(updatedJob.id);
-              await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, existingJob, canonicalJob);
-            }
-          } catch (linkError: any) {
-            console.warn(`⚠️ Failed to process job-component link for ${jobData.jobNo} -> ${componentCode}: ${linkError.message}`);
-            result.skipped++;
-            result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'failed', error: linkError.message });
+          const previousSnapshot = createRecordSnapshot(existingJob);
+          const updatedJob = await storage.updateJob(existingJob.id, jobData);
+          const upsertKey = getJobUniqueKey(canonicalVesselId, componentCode, updatedJob.jobNo);
+          jobsByCompositeKey.set(upsertKey, updatedJob);
+          result.updated++;
+          result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'updated' });
+          
+          if (importHistoryId) {
+            const canonicalJob = await storage.getJob(updatedJob.id);
+            await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, existingJob, canonicalJob);
           }
         } else {
           // For NEW jobs (upsert creates): include deprecated component fields for backwards compatibility
@@ -2166,20 +2111,6 @@ export async function performImport(
           jobsByCompositeKey.set(newKey, createdJob);
           result.created++;
           result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: 'created' });
-          
-          try {
-            await storage.createJobComponentLink({
-              vesselId: canonicalVesselId,
-              jobId: createdJob.id,
-              componentId: component.cuuid,
-              componentCode: componentCode,
-              linkedBy: 'system-bulk-import',
-            });
-            result.jobComponentLinksCreated++;
-            console.log(`🔗 Created job ${createdJob.jobNo} for component ${componentCode}`);
-          } catch (linkError: any) {
-            console.warn(`⚠️ Job created but failed to create job-component link: ${linkError.message}`);
-          }
           
           if (importHistoryId) {
             const canonicalJob = await storage.getJob(createdJob.id);
@@ -2232,7 +2163,7 @@ export async function performImport(
       }
     }
     
-    console.log(`✅ Jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.archived} archived, ${result.jobComponentLinksCreated || 0} job-component links created`);
+    console.log(`✅ Jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.archived} archived`);
   } else if (type === 'makers') {
     // Import makers to maker_list table
     console.log(`🚀 Starting makers import: ${data.length} rows, mode: ${mode}`);
