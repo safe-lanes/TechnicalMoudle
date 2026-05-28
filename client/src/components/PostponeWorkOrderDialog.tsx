@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -18,10 +18,33 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Paperclip, ArrowUpRight } from "lucide-react";
+import {
+  Loader2,
+  Paperclip,
+  ArrowUpRight,
+  Upload,
+  FileText,
+  Image as ImageIcon,
+  FileSpreadsheet,
+  X,
+} from "lucide-react";
 import { POSTPONEMENT_REASONS } from "@shared/postponementReasons";
+import { useVessel } from "@/contexts/VesselContext";
+import { useToast } from "@/hooks/use-toast";
 
 const OTHER_REASON = "Other Reason";
+const DOC_TYPE = "postponement";
+const MAX_FILES = 5;
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_MIME = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+];
+const ALLOWED_EXT = [".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx", ".xlsx"];
 
 interface MasterListItem {
   id: number;
@@ -30,6 +53,18 @@ interface MasterListItem {
   listValue: string;
   displayOrder: number;
   isActive: boolean;
+}
+
+interface PostponementDoc {
+  id: string;
+  workOrderId: string;
+  documentType: string;
+  fileName: string;
+  fileKey: string;
+  fileType: string;
+  fileSize: number;
+  uploadedBy: string;
+  uploadedAt: string;
 }
 
 interface PostponeWorkOrderDialogProps {
@@ -47,12 +82,24 @@ interface PostponeWorkOrderDialogProps {
   onConfirm?: (workOrderId: string, postponeData: any) => void;
 }
 
+const getFileIcon = (fileName: string) => {
+  const ext = fileName.split(".").pop()?.toLowerCase() || "";
+  if (["jpg", "jpeg", "png", "gif", "bmp", "webp"].includes(ext))
+    return <ImageIcon className="h-3.5 w-3.5" />;
+  if (ext === "pdf") return <FileText className="h-3.5 w-3.5" />;
+  if (["xls", "xlsx"].includes(ext)) return <FileSpreadsheet className="h-3.5 w-3.5" />;
+  return <Paperclip className="h-3.5 w-3.5" />;
+};
+
 const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
   isOpen,
   onClose,
   workOrder,
   onConfirm,
 }) => {
+  const { vesselId } = useVessel();
+  const { toast } = useToast();
+
   const [formData, setFormData] = useState({
     workOrderId: "",
     component: "",
@@ -65,11 +112,14 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     nextDueDate: "",
     durationOfPostponement: "5 Days",
     informOfficer: false,
-    attachDocument: false,
   });
 
   const [validationError, setValidationError] = useState("");
   const [remarksError, setRemarksError] = useState("");
+
+  const [postponementDocs, setPostponementDocs] = useState<PostponementDoc[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: masterListItems, isLoading: reasonsLoading, isError: reasonsError } = useQuery<MasterListItem[]>({
     queryKey: ["/technical/api/fleet/master-lists", "postponementReason"],
@@ -96,7 +146,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
 
   const isOtherReason = formData.reasonForPostponement === OTHER_REASON;
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (workOrder) {
       setFormData({
         workOrderId: workOrder.templateCode || workOrder.workOrderNo || "",
@@ -110,17 +160,42 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
         nextDueDate: "",
         durationOfPostponement: "5 Days",
         informOfficer: false,
-        attachDocument: false,
       });
       setValidationError("");
       setRemarksError("");
     }
   }, [workOrder]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadDocs = async () => {
+      if (!isOpen || !workOrder?.id) {
+        setPostponementDocs([]);
+        return;
+      }
+      try {
+        const res = await fetch(`/technical/api/work-orders/${workOrder.id}/documents`);
+        if (!res.ok) throw new Error(`Failed to load documents: ${res.status}`);
+        const json = await res.json();
+        const list: PostponementDoc[] = Array.isArray(json) ? json : [];
+        if (!cancelled) {
+          setPostponementDocs(list.filter((d) => d.documentType === DOC_TYPE));
+        }
+      } catch (err) {
+        console.error("Failed to load postponement docs:", err);
+        if (!cancelled) setPostponementDocs([]);
+      }
+    };
+    loadDocs();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, workOrder?.id]);
+
   const calculatePostponementEndDate = (duration: string): string => {
     const today = new Date();
     let endDate = new Date(today);
-    
+
     switch (duration) {
       case '1 Day':
         endDate.setDate(today.getDate() + 1);
@@ -143,9 +218,146 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
       default:
         endDate.setDate(today.getDate() + 5);
     }
-    
+
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return `${String(endDate.getDate()).padStart(2, '0')}-${months[endDate.getMonth()]}-${endDate.getFullYear()}`;
+  };
+
+  const handleUploadClick = () => {
+    if (isUploading) return;
+    if (postponementDocs.length >= MAX_FILES) {
+      toast({
+        title: "Limit reached",
+        description: `Maximum ${MAX_FILES} documents. Delete an existing document first.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    if (!workOrder?.id) {
+      toast({ title: "Upload failed", description: "Work order is not available.", variant: "destructive" });
+      event.target.value = "";
+      return;
+    }
+    if (!vesselId) {
+      toast({ title: "Upload failed", description: "No vessel context available.", variant: "destructive" });
+      event.target.value = "";
+      return;
+    }
+
+    const slotsAvailable = MAX_FILES - postponementDocs.length;
+    if (slotsAvailable <= 0) {
+      toast({
+        title: "Limit reached",
+        description: `Maximum ${MAX_FILES} documents. Delete an existing document first.`,
+        variant: "destructive",
+      });
+      event.target.value = "";
+      return;
+    }
+
+    const validFiles: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const ext = "." + (file.name.split(".").pop()?.toLowerCase() || "");
+      if (!ALLOWED_MIME.includes(file.type) && !ALLOWED_EXT.includes(ext)) {
+        toast({
+          title: "Invalid file type",
+          description: `${file.name}: Only allowed file types are accepted.`,
+          variant: "destructive",
+        });
+        continue;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        toast({
+          title: "File too large",
+          description: `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Maximum is 5MB.`,
+          variant: "destructive",
+        });
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) {
+      event.target.value = "";
+      return;
+    }
+
+    const filesToUpload = validFiles.slice(0, slotsAvailable);
+    if (validFiles.length > slotsAvailable) {
+      toast({
+        title: "Partial upload",
+        description: `Only ${slotsAvailable} slot(s) remaining. Uploading first ${slotsAvailable} of ${validFiles.length} files.`,
+        variant: "destructive",
+      });
+    }
+
+    setIsUploading(true);
+    let uploadedCount = 0;
+    try {
+      for (const file of filesToUpload) {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("documentType", DOC_TYPE);
+        fd.append("vesselId", vesselId);
+
+        const response = await fetch(`/technical/api/work-orders/${workOrder.id}/documents`, {
+          method: "POST",
+          body: fd,
+        });
+
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => ({}));
+          throw new Error(errBody.message || errBody.error || `Failed to upload ${file.name}`);
+        }
+
+        const result: PostponementDoc = await response.json();
+        setPostponementDocs((prev) => [...prev, result]);
+        uploadedCount++;
+      }
+
+      toast({
+        title: "Documents uploaded",
+        description:
+          uploadedCount === 1
+            ? `${filesToUpload[0].name} has been uploaded successfully.`
+            : `${uploadedCount} files have been uploaded successfully.`,
+      });
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast({
+        title: "Upload failed",
+        description: error.message || "Failed to upload document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleDeleteDoc = async (docId: string) => {
+    try {
+      const response = await fetch(`/technical/api/work-order-documents/${docId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Failed to delete document");
+      setPostponementDocs((prev) => prev.filter((d) => d.id !== docId));
+      toast({ title: "Document deleted", description: "The document has been removed." });
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast({
+        title: "Delete failed",
+        description: "Failed to delete document. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSubmit = () => {
@@ -169,7 +381,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
 
     if (onConfirm && workOrder) {
       const postponementEndDate = calculatePostponementEndDate(formData.durationOfPostponement);
-      
+
       onConfirm(workOrder.id || "", {
         nextDueDate: formData.nextDueDate,
         reason: formData.reasonForPostponement,
@@ -177,8 +389,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
         authorizedBy: formData.authorizedBy,
         duration: formData.durationOfPostponement,
         approvalRemarks: formData.approvalRemarks,
-        attachDocument: formData.attachDocument,
-        postponementEndDate: postponementEndDate
+        postponementEndDate: postponementEndDate,
       });
     }
     onClose();
@@ -192,7 +403,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>Postpone Work Order</DialogTitle>
         </DialogHeader>
-        
+
         <div className="flex-1 overflow-y-auto px-1">
           <div className="space-y-3 py-4">
             {/* Row 1: Work Order ID and Component */}
@@ -236,7 +447,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
                   <Checkbox
                     id="informOfficer"
                     checked={formData.informOfficer}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       setFormData({ ...formData, informOfficer: checked as boolean })
                     }
                   />
@@ -366,8 +577,8 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label htmlFor="authorizedBy" className="text-sm">Authorized By</Label>
-                <Select 
-                  value={formData.authorizedBy} 
+                <Select
+                  value={formData.authorizedBy}
                   onValueChange={(value) => setFormData({ ...formData, authorizedBy: value })}
                 >
                   <SelectTrigger className="h-9">
@@ -410,8 +621,8 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
               </div>
               <div className="space-y-1">
                 <Label htmlFor="durationOfPostponement" className="text-sm">Duration of Postponement</Label>
-                <Select 
-                  value={formData.durationOfPostponement} 
+                <Select
+                  value={formData.durationOfPostponement}
                   onValueChange={(value) => setFormData({ ...formData, durationOfPostponement: value })}
                 >
                   <SelectTrigger className="h-9">
@@ -429,18 +640,62 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
               </div>
             </div>
 
-            {/* Row 8: Attach Document */}
+            {/* Row 8: Attach Document (Upload) */}
             <div className="space-y-1">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="attachDocument"
-                  checked={formData.attachDocument}
-                  onCheckedChange={(checked) => 
-                    setFormData({ ...formData, attachDocument: checked as boolean })
-                  }
+              <Label className="text-sm">Attach Document (Optional)</Label>
+              <div className="flex flex-col items-start gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUploadClick}
+                  disabled={isUploading || postponementDocs.length >= MAX_FILES}
+                  className="h-8 px-3 text-xs font-medium border-gray-300 text-gray-600 hover:bg-gray-50"
+                  data-testid="button-upload-postponement"
+                >
+                  {isUploading ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-1" />
+                  )}
+                  Upload
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  multiple
+                  onChange={handleFileSelected}
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"
+                  data-testid="input-file-postponement"
                 />
-                <Label htmlFor="attachDocument" className="text-sm">Attach Document (Optional)</Label>
+                <span className="text-xs text-gray-400" data-testid="text-postponement-count">
+                  {postponementDocs.length}/{MAX_FILES}
+                </span>
               </div>
+              {postponementDocs.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2" data-testid="list-postponement-docs">
+                  {postponementDocs.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="inline-flex items-center gap-1.5 h-7 pl-2 pr-1 rounded-md border border-gray-200 bg-gray-50 text-xs text-gray-700"
+                      data-testid={`chip-postponement-doc-${doc.id}`}
+                    >
+                      <span className="text-gray-500">{getFileIcon(doc.fileName)}</span>
+                      <span className="max-w-[180px] truncate" title={doc.fileName}>{doc.fileName}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteDoc(doc.id)}
+                        className="ml-1 p-0.5 rounded hover:bg-gray-200 text-gray-500 hover:text-red-600"
+                        aria-label={`Remove ${doc.fileName}`}
+                        data-testid={`button-delete-postponement-doc-${doc.id}`}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
