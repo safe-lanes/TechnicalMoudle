@@ -3160,8 +3160,7 @@ const Dashboard = () => {
                                   displayValue={`${pPct}%`}
                                   subtitle={pg ? `${pNum} postponed out of ${pDen} scheduled WO` : '—'}
                                   testId="gauge-postponed-wo"
-                                  onClick={pg ? () => setWoListModal({
-                                    open: true,
+                                  onClick={pg ? () => openWoListModal({
                                     title: 'Postponed Work Orders',
                                     workOrders: resolveWosByIds(pg.numeratorWoIds),
                                   }) : undefined}
@@ -3187,8 +3186,7 @@ const Dashboard = () => {
                                   displayValue={`${uPct}%`}
                                   subtitle={ug ? `${uNum} unplanned out of ${uDen} total WO` : '—'}
                                   testId="gauge-unplanned-wo"
-                                  onClick={ug ? () => setWoListModal({
-                                    open: true,
+                                  onClick={ug ? () => openWoListModal({
                                     title: 'Unplanned Work Orders',
                                     workOrders: resolveWosByIds(ug.numeratorWoIds),
                                   }) : undefined}
