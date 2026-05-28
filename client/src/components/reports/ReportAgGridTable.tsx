@@ -5,6 +5,9 @@ import { ModuleRegistry } from 'ag-grid-community';
 import {
   MenuModule,
   ColumnsToolPanelModule,
+  SetFilterModule,
+  MultiFilterModule,
+  FiltersToolPanelModule,
   LicenseManager,
 } from 'ag-grid-enterprise';
 import type { ReportColumn } from '@/components/reports/ReportPreviewModal';
@@ -23,8 +26,20 @@ try {
   ModuleRegistry.registerModules([
     MenuModule,
     ColumnsToolPanelModule,
+    SetFilterModule,
+    MultiFilterModule,
+    FiltersToolPanelModule,
   ]);
 } catch (_) {}
+
+const DATE_FIELD_PATTERN = /(date|dueDate|completionDate|issueDate|periodFrom|periodTo|expiry|expires|scheduled)/i;
+const NUMBER_FIELD_PATTERN = /(qty|quantity|^count$|hours$|^rh$|manHours|amount|price|cost|stock|^rob$|sNo|^sno$)/i;
+
+const detectFilterTypeByField = (field: string): string => {
+  if (DATE_FIELD_PATTERN.test(field)) return 'agDateColumnFilter';
+  if (NUMBER_FIELD_PATTERN.test(field)) return 'agNumberColumnFilter';
+  return 'agTextColumnFilter';
+};
 
 interface ReportAgGridTableProps {
   columns: ReportColumn[];
@@ -64,15 +79,28 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({
   const columnDefs: ColDef[] = useMemo(() => {
     return columns.map((col) => {
       const hasRenderer = typeof col.cellRenderer === 'function';
+      const isSerial = col.field === 'sNo' || col.field === 'sno' || col.field === 'S.NO';
+      const isActionsCol = !col.field || /^action(s)?$/i.test(col.field);
+      const filterDisabled = col.filter === false || isSerial || isActionsCol;
+      const innerFilter = detectFilterTypeByField(col.field);
       const def: ColDef = {
         headerName: col.header,
         field: col.field,
-        minWidth: col.minWidth ?? col.width ?? (col.field === 'sNo' || col.field === 'sno' ? 60 : 80),
+        minWidth: col.minWidth ?? col.width ?? (isSerial ? 60 : 80),
         flex: col.flex ?? 1,
-        sortable: col.sortable ?? true,
+        sortable: col.sortable ?? !isActionsCol,
         resizable: true,
-        filter: col.filter ?? false,
-        suppressHeaderFilterButton: true,
+        filter: filterDisabled ? false : 'agMultiColumnFilter',
+        filterParams: filterDisabled ? undefined : {
+          filters: [
+            { filter: 'agSetColumnFilter' },
+            { filter: innerFilter },
+          ],
+        },
+        suppressHeaderFilterButton: filterDisabled,
+        menuTabs: filterDisabled
+          ? ['generalMenuTab', 'columnsMenuTab']
+          : ['filterMenuTab', 'generalMenuTab', 'columnsMenuTab'],
         wrapText: col.wrapText ?? false,
         autoHeight: col.autoHeight ?? false,
         cellStyle: col.cellStyle ?? {
@@ -104,10 +132,9 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({
   const defaultColDef: ColDef = useMemo(() => ({
     sortable: true,
     resizable: true,
-    filter: false,
+    filter: 'agMultiColumnFilter',
     flex: 1,
-    suppressHeaderFilterButton: true,
-    menuTabs: ['generalMenuTab', 'columnsMenuTab'],
+    menuTabs: ['filterMenuTab', 'generalMenuTab', 'columnsMenuTab'],
     wrapText: false,
     autoHeight: false,
   }), []);
