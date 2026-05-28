@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
+import { useLocation } from "wouter";
 import {
   Dialog,
   DialogContent,
@@ -6,11 +7,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Eye, Download } from "lucide-react";
+import { Pen, Download } from "lucide-react";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import type { TableColumn } from "@/lib/pdfReportGenerator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import WorkOrderForm from "@/components/WorkOrderForm";
 import type { WorkOrder } from "@shared/schema";
 import WOAgGridTable from "@/components/WOAgGridTable";
 import type { ColDef } from 'ag-grid-community';
@@ -26,18 +26,17 @@ interface WorkOrdersListModalProps {
 }
 
 export function WorkOrdersListModal({ open, onClose, title, workOrders, vessels = [] }: WorkOrdersListModalProps) {
+  const [, setLocation] = useLocation();
   const vesselMap = useMemo(() => {
     const map = new Map<string, string>();
     vessels.forEach(v => map.set(v.id, v.name));
     return map;
   }, [vessels]);
-  const [viewModal, setViewModal] = useState<{ open: boolean; workOrder: EnrichedWorkOrder | null }>({
-    open: false,
-    workOrder: null,
-  });
 
-  const handleViewClick = (wo: EnrichedWorkOrder) => {
-    setViewModal({ open: true, workOrder: wo });
+  const handleEditClick = (wo: EnrichedWorkOrder) => {
+    if (!wo?.id) return;
+    onClose();
+    setLocation(`/pms/work-order/${wo.id}`);
   };
 
   const handleExportPdf = () => {
@@ -202,14 +201,14 @@ export function WorkOrdersListModal({ open, onClose, title, workOrders, vessels 
                   className="h-7 w-7"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleViewClick(params.data);
+                    handleEditClick(params.data);
                   }}
-                  data-testid={`modal-view-wo-${params.data?.id}`}
+                  data-testid={`modal-edit-wo-${params.data?.id}`}
                 >
-                  <Eye className="h-4 w-4 text-gray-500" />
+                  <Pen className="h-4 w-4 text-gray-600" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>View</TooltipContent>
+              <TooltipContent>Edit</TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
@@ -252,16 +251,6 @@ export function WorkOrdersListModal({ open, onClose, title, workOrders, vessels 
           </div>
         </DialogContent>
       </Dialog>
-
-      {viewModal.workOrder && (
-        <WorkOrderForm
-          isOpen={viewModal.open}
-          onClose={() => setViewModal({ open: false, workOrder: null })}
-          workOrder={viewModal.workOrder}
-          mode="template"
-          isApprovalMode
-        />
-      )}
     </>
   );
 }
