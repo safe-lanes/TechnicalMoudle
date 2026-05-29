@@ -11,7 +11,7 @@ import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { secureGetItem } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
 import { setActiveRank } from "@/lib/activeRank";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 function resolveProfileName(profile: Record<string, any>): {
   fullName: string | null;
@@ -302,6 +302,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const logout = () => {
+    // Best-effort Shipskart SSO logout (Purchasing module). Per the
+    // integration guide we notify Shipskart BEFORE clearing the local
+    // session, but it must NEVER block local logout — fire-and-forget,
+    // errors are logged only. The backend endpoint is idempotent.
+    void (async () => {
+      try {
+        await apiRequest("POST", "/technical/api/shipskart/sso/logout");
+      } catch (err) {
+        console.error("[Shipskart] logout call failed (non-blocking):", err);
+      }
+    })();
+
     setCurrentUser(null);
     setUserType(null);
     const rankChanged = setActiveRank(null);

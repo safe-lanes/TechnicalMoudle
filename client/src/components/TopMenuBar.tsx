@@ -10,11 +10,6 @@ import {
   Anchor,
   ShoppingCart,
 } from "lucide-react";
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/components/ui/tooltip";
 // ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
 import { NOON_MODULE_ENABLED } from "@/modules/noon-report/config";
 // ====== NOON REPORT MODULE NAV LINK — END ======
@@ -71,22 +66,18 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
       label: "Admin",
       icon: Shield,
     },
-    // ====== PURCHASING NAV LINK (placeholder) — START ======
-    // TODO: Once a menu-master row for "purchasing" exists, drop
-    // `bypassPermissionCheck` and let the standard
-    // `hasAnyChildAccess('purchasing')` filter gate visibility.
-    // Click handler currently shows a "Coming soon" toast — the real
-    // JWT-SSO redirect is wired in once the Purchasing integration URL
-    // and token contract are available. See the Purchasing section in
-    // replit.md for the planned integration shape.
+    // ====== PURCHASING NAV LINK (Shipskart SSO) — START ======
+    // Clicking opens the Purchasing submodule, which embeds the Shipskart
+    // platform via backend-brokered ticket SSO (see PurchasingPage.tsx).
+    // TODO(UAT): replace bypassPermissionCheck with proper
+    // adm_menumaster_ac row + role grants once UAT user mapping is in place.
     {
       id: "purchasing",
       label: "Purchasing",
       icon: ShoppingCart,
       bypassPermissionCheck: true,
-      isPlaceholder: true,
     },
-    // ====== PURCHASING NAV LINK (placeholder) — END ======
+    // ====== PURCHASING NAV LINK (Shipskart SSO) — END ======
     // ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
     ...(NOON_MODULE_ENABLED && isSailAdmin ? [{
       id: "noon-report",
@@ -158,14 +149,6 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
             <button
               key={item.id}
               onClick={() => {
-                if (item.isPlaceholder) {
-                  // Placeholder for the future JWT-SSO Purchasing
-                  // integration. Click is a no-op — the hover
-                  // tooltip is the only feedback until the real
-                  // redirect is wired in (see "Purchasing" section
-                  // in replit.md).
-                  return;
-                }
                 onSubModuleChange(item.id);
               }}
               className="flex flex-col items-center justify-center w-[110px] transition-all duration-200 relative"
@@ -178,21 +161,6 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
               </span>
             </button>
           );
-
-          if (item.isPlaceholder) {
-            return (
-              <Tooltip key={item.id}>
-                <TooltipTrigger asChild>{buttonEl}</TooltipTrigger>
-                <TooltipContent
-                  side="bottom"
-                  sideOffset={6}
-                  data-testid={`tooltip-nav-${item.id}`}
-                >
-                  Coming soon
-                </TooltipContent>
-              </Tooltip>
-            );
-          }
 
           return buttonEl;
         })}
