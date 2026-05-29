@@ -11,6 +11,8 @@ import {
   LicenseManager,
 } from 'ag-grid-enterprise';
 import type { ReportColumn } from '@/components/reports/ReportPreviewModal';
+import { getReportAction, extractRowEntityId, resolveMenuName, Pencil, Eye } from '@/lib/reportActions';
+import { usePermissions } from '@/contexts/PermissionsContext';
 
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
@@ -54,7 +56,28 @@ interface ReportAgGridTableProps {
   noRowsMessage?: string;
   getRowClass?: (params: RowClassParams) => string | string[] | undefined;
   getRowId?: (params: GetRowIdParams) => string;
+  reportId?: string | null;
 }
+
+const ActionCellRenderer: React.FC<{ url: string | null; canEdit: boolean }> = ({ url, canEdit }) => {
+  if (!url) return null;
+  const Icon = canEdit ? Pencil : Eye;
+  const label = canEdit ? 'Edit record' : 'View record';
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={label}
+      aria-label={label}
+      onClick={(e) => e.stopPropagation()}
+      className="inline-flex items-center justify-center w-7 h-7 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 hover:text-[#52baf3]"
+      data-testid={`button-report-row-${canEdit ? 'edit' : 'view'}`}
+    >
+      <Icon className="h-4 w-4" />
+    </a>
+  );
+};
 
 const HeaderRendererWrapper: React.FC<{ render: () => React.ReactNode }> = ({ render }) => {
   return <>{render()}</>;
@@ -73,11 +96,19 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({
   noRowsMessage = 'No data available',
   getRowClass,
   getRowId,
+  reportId,
 }) => {
   const gridApiRef = useRef<GridApi | null>(null);
+  const { canEdit: canEditMenu } = usePermissions();
+
+  const actionConfig = useMemo(() => getReportAction(reportId), [reportId]);
+  const staticCanEdit = useMemo(() => {
+    if (!actionConfig || typeof actionConfig.menuName === 'function') return false;
+    try { return canEditMenu(actionConfig.menuName as string); } catch { return false; }
+  }, [actionConfig, canEditMenu]);
 
   const columnDefs: ColDef[] = useMemo(() => {
-    return columns.map((col) => {
+    const baseCols = columns.map((col) => {
       const hasRenderer = typeof col.cellRenderer === 'function';
       const isSerial = col.field === 'sNo' || col.field === 'sno' || col.field === 'S.NO';
       const isActionsCol = !col.field || /^action(s)?$/i.test(col.field);
@@ -127,7 +158,43 @@ const ReportAgGridTable: React.FC<ReportAgGridTableProps> = ({
       }
       return def;
     });
-  }, [columns]);
+
+    if (actionConfig) {
+      baseCols.push({
+        headerName: 'Actions',
+        colId: '__actions__',
+        field: '__actions__',
+        pinned: 'right',
+        width: 80,
+        minWidth: 70,
+        maxWidth: 90,
+        flex: 0,
+        sortable: false,
+        filter: false,
+        resizable: false,
+        suppressMovable: true,
+        suppressHeaderFilterButton: true,
+        suppressColumnsToolPanel: true,
+        suppressFiltersToolPanel: true,
+        menuTabs: [],
+        lockPinned: true,
+        cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
+        cellRenderer: (params: any) => {
+          const row = params.data || {};
+          const id = extractRowEntityId(row, actionConfig);
+          const url = id ? actionConfig.route(id, row) : null;
+          let rowCanEdit = staticCanEdit;
+          if (typeof actionConfig.menuName === 'function') {
+            try { rowCanEdit = canEditMenu(resolveMenuName(actionConfig, row)); } catch { rowCanEdit = false; }
+          }
+          return <ActionCellRenderer url={url} canEdit={rowCanEdit} />;
+        },
+        valueGetter: () => '',
+      } as ColDef);
+    }
+
+    return baseCols;
+  }, [columns, actionConfig, staticCanEdit, canEditMenu]);
 
   const defaultColDef: ColDef = useMemo(() => ({
     sortable: true,

@@ -198,6 +198,7 @@ export async function getRunningHoursAnomalyDetection(
           sNo++;
           anomalies.push({
             sNo,
+            componentId: component?.cuuid || log.componentId || '',
             componentCode: log.componentCode || component?.componentCode || '-',
             componentName,
             category: component?.componentCategory || component?.category || '-',
@@ -641,6 +642,7 @@ export async function getIhmInventoryStatus(
     if (ihmStatus !== 'present') continue;
     combinedItems.push({
       id: s.id,
+      spareId: s.spuuid || s.id,
       vesselId: s.vesselId || '',
       vesselName: vesselNameMap.get(s.vesselId || '') || '-',
       itemCode: s.partCode || s.componentSpareCode || '',
@@ -666,6 +668,7 @@ export async function getIhmInventoryStatus(
     if (ihmStatus !== 'present') continue;
     combinedItems.push({
       id: st.id + 1000000,
+      itemId: st.suuid || st.storeItemId || st.id,
       vesselId: st.vesselId || '',
       vesselName: vesselNameMap.get(st.vesselId || '') || '-',
       itemCode: st.itemCode || '',

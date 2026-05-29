@@ -281,7 +281,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
           
           if (response.ok && result.success && result.data) {
             const vName = vessels.find((v: any) => v.id === vId)?.name || vId;
-            allUtilizationData = allUtilizationData.concat(result.data.map((d: any) => ({ ...d, vesselName: d.vesselName || vName })));
+            allUtilizationData = allUtilizationData.concat(result.data.map((d: any) => ({ ...d, componentId: d.componentId ?? d.componentUuid ?? d.cuuid, vesselName: d.vesselName || vName })));
             if (!mergedSummary.periodDays) mergedSummary = { ...result.summary };
             else {
               mergedSummary.totalEquipment = (mergedSummary.totalEquipment || 0) + (result.summary?.totalEquipment || 0);
@@ -418,6 +418,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         
         const formattedData = anomalies.map((a: any) => ({
           sNo: a.sNo,
+          componentId: a.componentId || a.componentUuid || a.cuuid || a.id,
           vesselName: a.vesselName || '-',
           componentCode: a.componentCode,
           componentName: a.componentName,
@@ -669,13 +670,13 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack, globa
         </div>
       )}
       {embedded && previewData && (
-        <InlineReportPreview reportData={previewData} embedded={embedded} />
+        <InlineReportPreview reportData={previewData ? { ...previewData, reportId: previewData.reportId ?? selectedReportId ?? null } : null} embedded={embedded} />
       )}
       {!embedded && (
         <ReportPreviewModal
           open={!!previewData}
           onClose={() => setPreviewData(null)}
-          reportData={previewData}
+          reportData={previewData ? { ...previewData, reportId: previewData.reportId ?? selectedReportId ?? null } : null}
         />
       )}
     </div>

@@ -449,6 +449,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         const data = filteredDueJobs.map((job: any, index: number) => ({
           sno: index + 1,
+          workOrderId: job.workOrderId || job.woUuid || job.wouuid || job.id,
           vesselName: job.vesselName || '-',
           workOrderNo: job.workOrderNo,
           jobTitle: job.jobTitle,
@@ -521,6 +522,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           }
           return {
             sNo: index + 1,
+            workOrderId: job.workOrderId || job.woUuid || job.wouuid || job.id,
             vesselName: job.vesselName || '-',
             workOrderNo: job.workOrderNo,
             jobTitle: job.jobTitle,
@@ -899,6 +901,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
         const data = postponeRaw.map((job: any, idx: number) => ({
           sno: idx + 1,
+          workOrderId: job.workOrderId || job.woUuid || job.wouuid || job.id,
           vesselName: job.vesselName || '-',
           workOrderNo: job.workOrderNo,
           jobTitle: job.jobTitle,
@@ -1457,13 +1460,13 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         />
       )}
       {embedded && previewData && (!monthlySummaryData || selectedReportId !== 'monthly-summary') && (
-        <InlineReportPreview reportData={previewData} embedded={embedded} />
+        <InlineReportPreview reportData={previewData ? { ...previewData, reportId: previewData.reportId ?? selectedReportId ?? null } : null} embedded={embedded} />
       )}
       {!embedded && (
         <ReportPreviewModal
           open={previewOpen}
           onClose={() => { setPreviewOpen(false); setPreviewData(null); }}
-          reportData={previewData}
+          reportData={previewData ? { ...previewData, reportId: previewData.reportId ?? selectedReportId ?? null } : null}
         />
       )}
     </div>

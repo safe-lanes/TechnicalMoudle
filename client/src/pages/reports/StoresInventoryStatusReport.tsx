@@ -228,6 +228,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
       const status = getStockStatus(rob, min);
       return {
         sno: idx + 1,
+        itemId: (item as any).itemId || item.id,
         itemCode: item.itemCode || '-',
         itemName: item.itemName || '-',
         category: categoryDisplayMap[item.itemType] || item.itemType || '-',
@@ -248,6 +249,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
       const trend = getTrend(item.id);
       return {
         sno: idx + 1,
+        itemId: (item as any).itemId || item.id,
         itemCode: item.itemCode || '-',
         itemName: item.itemName || '-',
         category: categoryDisplayMap[item.itemType] || item.itemType || '-',
@@ -280,6 +282,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
       .filter(r => (r.rob - r.monthlyConsumption) <= r.min)
       .map((r, idx) => ({
         sno: idx + 1,
+        itemId: (r.item as any).itemId || r.item.id,
         itemCode: r.item.itemCode || '-',
         itemName: r.item.itemName || '-',
         category: categoryDisplayMap[r.item.itemType] || r.item.itemType || '-',
@@ -612,6 +615,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
 
           {activeTab === 'stock-status' && (
             <ReportAgGridTable
+              reportId="stores-inventory-status"
               columns={[
                 { header: 'S.No', field: 'sno', width: 70 },
                 { header: 'Item Code', field: 'itemCode', width: 120 },
@@ -630,6 +634,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
 
           {activeTab === 'consumption' && (
             <ReportAgGridTable
+              reportId="stores-inventory-status"
               columns={[
                 { header: 'S.No', field: 'sno', width: 70 },
                 { header: 'Item Code', field: 'itemCode', width: 120 },
@@ -646,6 +651,7 @@ const StoresInventoryStatusReport: React.FC<StoresInventoryStatusReportProps> = 
 
           {activeTab === 'reorder' && (
             <ReportAgGridTable
+              reportId="stores-inventory-status"
               columns={[
                 { header: 'S.No', field: 'sno', width: 70 },
                 { header: 'Item Code', field: 'itemCode', width: 120 },

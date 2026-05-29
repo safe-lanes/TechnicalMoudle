@@ -379,6 +379,54 @@ const Dashboard = () => {
   const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: EnrichedWorkOrder[] }>({ open: false, title: '', workOrders: [] });
   const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
   const [crListModal, setCrListModal] = useState<{ open: boolean; title: string; changeRequests: ChangeRequest[] }>({ open: false, title: '', changeRequests: [] });
+  const DRILLDOWN_KEY = 'dashboardDrilldownModal';
+  const DRILLDOWN_NAV_KEY = 'dashboardDrilldownNavigating';
+  const DASHBOARD_PERIOD_KEY = 'dashboardPeriod';
+  const spareKeyOf = (s: any): string => `${s?.vesselId ?? ''}__${s?.id ?? ''}`;
+  const persistDrilldown = (kind: 'wo' | 'spares' | 'cr', title: string, ids: string[]) => {
+    try {
+      sessionStorage.setItem(DRILLDOWN_KEY, JSON.stringify({ kind, title, ids: ids.filter(Boolean) }));
+    } catch {}
+  };
+  const clearDrilldownIfNotNavigating = () => {
+    try {
+      const nav = sessionStorage.getItem(DRILLDOWN_NAV_KEY);
+      if (nav) {
+        sessionStorage.removeItem(DRILLDOWN_NAV_KEY);
+      } else {
+        sessionStorage.removeItem(DRILLDOWN_KEY);
+      }
+    } catch {}
+  };
+  const openWoListModal = (args: { title: string; workOrders: EnrichedWorkOrder[] }) => {
+    setWoListModal({ open: true, title: args.title, workOrders: args.workOrders });
+    const ids = args.workOrders.map((wo: any) =>
+      wo?.wouuid != null ? String(wo.wouuid) : (wo?.id != null ? String(wo.id) : '')
+    );
+    persistDrilldown('wo', args.title, ids);
+  };
+  const openSparesListModal = (args: { title: string; spares: Spare[] }) => {
+    setSparesListModal({ open: true, title: args.title, spares: args.spares });
+    const ids = args.spares.map((s: any) => spareKeyOf(s));
+    persistDrilldown('spares', args.title, ids);
+  };
+  const openCrListModal = (args: { title: string; changeRequests: ChangeRequest[] }) => {
+    setCrListModal({ open: true, title: args.title, changeRequests: args.changeRequests });
+    const ids = args.changeRequests.map((cr: any) => (cr?.id != null ? String(cr.id) : ''));
+    persistDrilldown('cr', args.title, ids);
+  };
+  const handleWoListModalClose = () => {
+    setWoListModal({ open: false, title: '', workOrders: [] });
+    clearDrilldownIfNotNavigating();
+  };
+  const handleSparesListModalClose = () => {
+    setSparesListModal({ open: false, title: '', spares: [] });
+    clearDrilldownIfNotNavigating();
+  };
+  const handleCrListModalClose = () => {
+    setCrListModal({ open: false, title: '', changeRequests: [] });
+    clearDrilldownIfNotNavigating();
+  };
   const crListModalOpenRef = useRef(false);
   crListModalOpenRef.current = crListModal.open;
 
@@ -411,9 +459,29 @@ const Dashboard = () => {
   };
   const [selectedCriticality, setSelectedCriticality] = useState("");
   const [dashboardPeriod, setDashboardPeriod] = useState<PeriodFilterValue | null>(() => {
+    try {
+      const raw = sessionStorage.getItem(DASHBOARD_PERIOD_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as PeriodFilterValue | null;
+        if (parsed && parsed.mode === 'date-range') {
+          if (parsed.dateFrom) parsed.dateFrom = new Date(parsed.dateFrom as any);
+          if (parsed.dateTo) parsed.dateTo = new Date(parsed.dateTo as any);
+        }
+        return parsed;
+      }
+    } catch {}
     const now = new Date();
     return { mode: 'year-months', year: now.getFullYear(), months: [now.getMonth() + 1] };
   });
+  useEffect(() => {
+    try {
+      if (dashboardPeriod === null) {
+        sessionStorage.removeItem(DASHBOARD_PERIOD_KEY);
+      } else {
+        sessionStorage.setItem(DASHBOARD_PERIOD_KEY, JSON.stringify(dashboardPeriod));
+      }
+    } catch {}
+  }, [dashboardPeriod]);
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
@@ -609,7 +677,7 @@ const Dashboard = () => {
     enabled: !!effectiveVesselId && (isAllVessels ? vessels.length > 0 : true)
   });
 
-  const { data: changeRequestsData = [] } = useQuery<ChangeRequest[]>({
+  const { data: changeRequestsData = [], isLoading: isChangeRequestsLoading } = useQuery<ChangeRequest[]>({
     queryKey: ['/technical/api/change-requests', effectiveVesselId],
     queryFn: async () => {
       const url = isAllVessels
@@ -901,6 +969,77 @@ const Dashboard = () => {
     }
     return out;
   };
+
+  // Restore drill-down modal (WO / Spares / CR) after the user returns from a
+  // form opened from that modal. The form's Back button calls
+  // window.history.back() which remounts this Dashboard; local modal state is
+  // lost, so we read the descriptor written by openXxxListModal() and re-open.
+  useEffect(() => {
+    // If any drill-down modal is already showing, skip restoration entirely.
+    // This prevents the effect from reopening a modal the user has just
+    // dismissed, and from churning state once the modal is up.
+    if (woListModal.open || sparesListModal.open || crListModal.open) return;
+    // Until the vessel context resolves, the underlying queries are disabled
+    // (so isLoading is false while data is still empty defaults). Bailing
+    // here avoids prematurely clearing the saved descriptor in that window.
+    if (!effectiveVesselId) return;
+    let raw: string | null = null;
+    try { raw = sessionStorage.getItem(DRILLDOWN_KEY); } catch {}
+    if (!raw) return;
+    const clear = () => { try { sessionStorage.removeItem(DRILLDOWN_KEY); } catch {} };
+    let parsed: { kind?: 'wo' | 'spares' | 'cr'; title?: string; ids?: string[] };
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      clear();
+      return;
+    }
+    const title = parsed?.title || '';
+    const ids = parsed?.ids || [];
+    // Per-kind gating: wait while THAT kind's data is still loading; only
+    // give up (and clear the saved descriptor) once loading is finished
+    // and the descriptor still resolves to zero rows.
+    if (parsed?.kind === 'wo') {
+      if (isWorkOrdersLoading) return;
+      const wos = resolveWosByIds(ids);
+      if (wos.length > 0) {
+        setWoListModal({ open: true, title, workOrders: wos });
+      } else {
+        clear();
+      }
+    } else if (parsed?.kind === 'spares') {
+      if (isSparesLoading) return;
+      const idSet = new Set(ids);
+      const matched = (sparesData as any[]).filter((s: any) => idSet.has(spareKeyOf(s))) as Spare[];
+      if (matched.length > 0) {
+        setSparesListModal({ open: true, title, spares: matched });
+      } else {
+        clear();
+      }
+    } else if (parsed?.kind === 'cr') {
+      if (isChangeRequestsLoading) return;
+      const idSet = new Set(ids);
+      const matched = (changeRequestsData as any[]).filter((cr: any) => idSet.has(String(cr?.id))) as ChangeRequest[];
+      if (matched.length > 0) {
+        setCrListModal({ open: true, title, changeRequests: matched });
+      } else {
+        clear();
+      }
+    } else {
+      clear();
+    }
+  }, [
+    effectiveVesselId,
+    isWorkOrdersLoading,
+    isSparesLoading,
+    isChangeRequestsLoading,
+    workOrderByIdMap,
+    sparesData,
+    changeRequestsData,
+    woListModal.open,
+    sparesListModal.open,
+    crListModal.open,
+  ]);
 
   const buildPeriodDonutData = (
     buckets: WoStatusByPeriodResponse['all'] | undefined,
@@ -2789,7 +2928,7 @@ const Dashboard = () => {
                             arcFillColor={activeOverdueToday.allPercent <= 1 ? '#FFEEAA' : '#e74c3c'}
                             displayValue={`${activeOverdueToday.allPercent}%`}
                             subtitle={`${activeOverdueToday.allOverdue} out of ${activeOverdueToday.allOpen}`}
-                            onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - All Equipment', workOrders: activeOverdueToday.allOverdueFull })}
+                            onClick={() => openWoListModal({ title: 'Overdue Work Orders - All Equipment', workOrders: activeOverdueToday.allOverdueFull })}
                             testId="gauge-overdue-wo"
                           />
                           {activeOverdueToday.allOver30 > 0 && (
@@ -2797,7 +2936,7 @@ const Dashboard = () => {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setWoListModal({ open: true, title: 'Work Orders >30 Days Overdue - All Equipment', workOrders: activeOverdueToday.allOver30Full });
+                                openWoListModal({ title: 'Work Orders >30 Days Overdue - All Equipment', workOrders: activeOverdueToday.allOver30Full });
                               }}
                               data-testid="badge-30d-overdue-all"
                               className="mt-1 mx-auto flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 hover:bg-red-100 border border-red-200 text-[11px] font-medium text-[#e74c3c] focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
@@ -2852,7 +2991,7 @@ const Dashboard = () => {
                               if (!entry) return;
                               const ids = woStatusByPeriodData?.all?.[entry.slice]?.woIds;
                               const wos = resolveWosByIds(ids);
-                              setWoListModal({ open: true, title: `${entry.status} Work Orders - All Equipment`, workOrders: wos });
+                              openWoListModal({ title: `${entry.status} Work Orders - All Equipment`, workOrders: wos });
                             }}
                             cursor="pointer"
                           >
@@ -2893,7 +3032,7 @@ const Dashboard = () => {
                             arcFillColor={activeOverdueToday.criticalPercent <= 1 ? '#FFEEAA' : '#e74c3c'}
                             displayValue={`${activeOverdueToday.criticalPercent}%`}
                             subtitle={`${activeOverdueToday.criticalOverdue} out of ${activeOverdueToday.criticalOpen}`}
-                            onClick={() => setWoListModal({ open: true, title: 'Overdue Work Orders - Critical Equipment', workOrders: activeOverdueToday.criticalOverdueFull })}
+                            onClick={() => openWoListModal({ title: 'Overdue Work Orders - Critical Equipment', workOrders: activeOverdueToday.criticalOverdueFull })}
                             testId="gauge-overdue-wo-critical"
                           />
                           {activeOverdueToday.criticalOver30 > 0 && (
@@ -2901,7 +3040,7 @@ const Dashboard = () => {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setWoListModal({ open: true, title: 'Work Orders >30 Days Overdue - Critical Equipment', workOrders: activeOverdueToday.criticalOver30Full });
+                                openWoListModal({ title: 'Work Orders >30 Days Overdue - Critical Equipment', workOrders: activeOverdueToday.criticalOver30Full });
                               }}
                               data-testid="badge-30d-overdue-critical"
                               className="mt-1 mx-auto flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 hover:bg-red-100 border border-red-200 text-[11px] font-medium text-[#e74c3c] focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
@@ -2956,7 +3095,7 @@ const Dashboard = () => {
                               if (!entry) return;
                               const ids = woStatusByPeriodData?.critical?.[entry.slice]?.woIds;
                               const wos = resolveWosByIds(ids);
-                              setWoListModal({ open: true, title: `${entry.status} Work Orders - Critical Equipment`, workOrders: wos });
+                              openWoListModal({ title: `${entry.status} Work Orders - Critical Equipment`, workOrders: wos });
                             }}
                             cursor="pointer"
                           >
@@ -3073,8 +3212,7 @@ const Dashboard = () => {
                                   displayValue={`${pPct}%`}
                                   subtitle={pg ? `${pNum} postponed out of ${pDen} scheduled WO` : '—'}
                                   testId="gauge-postponed-wo"
-                                  onClick={pg ? () => setWoListModal({
-                                    open: true,
+                                  onClick={pg ? () => openWoListModal({
                                     title: 'Postponed Work Orders',
                                     workOrders: resolveWosByIds(pg.numeratorWoIds),
                                   }) : undefined}
@@ -3100,8 +3238,7 @@ const Dashboard = () => {
                                   displayValue={`${uPct}%`}
                                   subtitle={ug ? `${uNum} unplanned out of ${uDen} total WO` : '—'}
                                   testId="gauge-unplanned-wo"
-                                  onClick={ug ? () => setWoListModal({
-                                    open: true,
+                                  onClick={ug ? () => openWoListModal({
                                     title: 'Unplanned Work Orders',
                                     workOrders: resolveWosByIds(ug.numeratorWoIds),
                                   }) : undefined}
@@ -3178,7 +3315,7 @@ const Dashboard = () => {
                             onClick={(data: { reason: string; count: number; workOrders: EnrichedWorkOrder[] }) => {
                               if (data?.workOrders) {
                                 const label = reasonsToggle === 'overdue' ? 'Overdue' : 'Postponement';
-                                setWoListModal({ open: true, title: `${label} — ${data.reason}`, workOrders: data.workOrders });
+                                openWoListModal({ title: `${label} — ${data.reason}`, workOrders: data.workOrders });
                               }
                             }}
                           />
@@ -3235,7 +3372,7 @@ const Dashboard = () => {
                               const entry = sparesStockChartData[index];
                               if (!entry) return;
                               const filtered = filteredSparesData.filter(s => getStockStatus(s.rob, s.min).label === entry.status);
-                              setSparesListModal({ open: true, title: `${entry.status} Stock Spares - All Equipment`, spares: filtered });
+                              openSparesListModal({ title: `${entry.status} Stock Spares - All Equipment`, spares: filtered });
                             }}
                             cursor="pointer"
                           >
@@ -3301,7 +3438,7 @@ const Dashboard = () => {
                               if (!entry) return;
                               const criticalSparesList = sparesData.filter(s => s.critical === 'Critical' || s.critical === 'Yes');
                               const filtered = criticalSparesList.filter(s => getStockStatus(s.rob, s.min).label === entry.status);
-                              setSparesListModal({ open: true, title: `${entry.status} Stock Spares - Critical Equipment`, spares: filtered });
+                              openSparesListModal({ title: `${entry.status} Stock Spares - Critical Equipment`, spares: filtered });
                             }}
                             cursor="pointer"
                           >
@@ -3343,8 +3480,7 @@ const Dashboard = () => {
                             color="#e74c3c"
                             displayValue={`${modifyPmsPeriodKPIs.percent}%`}
                             subtitle={`${modifyPmsPeriodKPIs.numerator} modifications out of ${modifyPmsPeriodKPIs.denominator} WO`}
-                            onClick={() => setCrListModal({
-                              open: true,
+                            onClick={() => openCrListModal({
                               title: 'Modify PMS Requests',
                               changeRequests: modifyPmsPeriodKPIs.changeRequestsFull,
                             })}
@@ -3377,20 +3513,20 @@ const Dashboard = () => {
       />
       <WorkOrdersListModal
         open={woListModal.open}
-        onClose={() => setWoListModal({ open: false, title: '', workOrders: [] })}
+        onClose={handleWoListModalClose}
         title={woListModal.title}
         workOrders={woListModal.workOrders}
         vessels={vessels}
       />
       <SparesListModal
         open={sparesListModal.open}
-        onClose={() => setSparesListModal({ open: false, title: '', spares: [] })}
+        onClose={handleSparesListModalClose}
         title={sparesListModal.title}
         spares={sparesListModal.spares}
         vessels={vessels}
         getStockStatus={getStockStatus}
       />
-      <Dialog open={crListModal.open} onOpenChange={(isOpen) => !isOpen && setCrListModal({ open: false, title: '', changeRequests: [] })}>
+      <Dialog open={crListModal.open} onOpenChange={(isOpen) => { if (!isOpen) handleCrListModalClose(); }}>
         <DialogContent className="max-w-[90vw] h-[calc(100vh-10vw)] max-h-[90vh] overflow-hidden flex flex-col [&>button.absolute]:top-6 [&>button.absolute]:translate-y-1">
           <DialogHeader className="pb-4 flex flex-row items-center justify-between gap-4">
             <DialogTitle className="text-xl font-semibold text-[#0f4c81]" data-testid="title-cr-list-modal">

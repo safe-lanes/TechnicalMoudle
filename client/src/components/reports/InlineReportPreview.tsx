@@ -44,7 +44,7 @@ const InlineReportPreview: React.FC<InlineReportPreviewProps> = ({ reportData, o
         </div>
       )}
 
-      <ReportAgGridTable columns={columns} data={data} height="60vh" />
+      <ReportAgGridTable columns={columns} data={data} height="60vh" reportId={reportData.reportId} />
     </div>
   );
 };

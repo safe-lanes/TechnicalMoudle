@@ -223,7 +223,7 @@ const ClassItemsJobsStatus: React.FC<Props> = ({ onBack, globalFilters, embedded
             <span className="ml-2 text-sm text-gray-500">Loading class items jobs report…</span>
           </div>
         ) : previewData ? (
-          <InlineReportPreview reportData={previewData} embedded={embedded} />
+          <InlineReportPreview reportData={previewData ? { ...previewData, reportId: previewData.reportId ?? 'class-items-jobs-status' } : null} embedded={embedded} />
         ) : (
           <div className="text-center py-16 text-sm text-gray-500">No data to display.</div>
         )}

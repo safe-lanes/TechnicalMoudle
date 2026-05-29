@@ -154,6 +154,7 @@ export async function getCriticalSparesPreview(
 
     return {
       sNo: 0,
+      spareId: (spare as any).spuuid || spare.id,
       vesselName: vesselMap.get(spare.vesselId || '') || vesselName,
       partCode: spare.partCode || '-',
       partName: spare.partName || '-',

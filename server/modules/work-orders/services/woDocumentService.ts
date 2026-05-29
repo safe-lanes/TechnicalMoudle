@@ -24,7 +24,7 @@ const MAX_RAW_FILE_SIZE = 25 * 1024 * 1024;
 const TARGET_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_DOCS_PER_TYPE = 5;
 
-const VALID_DOC_TYPES = ['riskAssessment', 'safetyChecklist', 'operationalForm', 'other'];
+const VALID_DOC_TYPES = ['riskAssessment', 'safetyChecklist', 'operationalForm', 'other', 'postponement', 'postponementRiskAssessment'];
 
 const LOCAL_STORAGE_DIR = path.resolve(process.cwd(), '.private', 'wo-docs');
 

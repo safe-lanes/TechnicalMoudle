@@ -690,6 +690,7 @@ export async function getEquipmentUtilizationSummary(
 
     return {
       sNo: index + 1,
+      componentId: component.cuuid || component.id,
       componentCode: component.componentCode || component.id,
       componentName: component.name || component.fleetEquipmentName || 'Unnamed',
       category: component.componentCategory || component.category || '-',

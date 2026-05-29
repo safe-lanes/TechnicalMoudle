@@ -113,6 +113,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isUnplannedSaving, setIsUnplannedSaving] = useState(false);
   const forceSubmitOnly = useRef(false);
+  const forceDraftSave = useRef(false);
   const [unplannedComponentId, setUnplannedComponentId] = useState('');
 
   // Minimal A/B navigation matching reference design (hide Part B in template mode)
@@ -2167,6 +2168,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const handleSave = async () => {
     if (embedded) return;
+    // Snapshot and clear control refs immediately so that an early return
+    // (e.g. on a hard validation error) cannot leak a stale flag into the
+    // next click and route it to the wrong branch.
+    const draftIntent = forceDraftSave.current;
+    const submitOnlyIntent = forceSubmitOnly.current;
+    forceDraftSave.current = false;
+    forceSubmitOnly.current = false;
     try {
       const isUnplannedWO = workOrderType === 'Unplanned';
 
@@ -2234,7 +2242,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      if (executionData.performedBy && hodLabel && executionData.performedBy === hodLabel) {
+      if (!draftIntent && executionData.performedBy && hodLabel && executionData.performedBy === hodLabel) {
         hardErrors.push(`The Head of Department (${hodLabel}) cannot both perform and approve the work. The server will assign ${hodLabel} as approver based on the vessel org chart.`);
       }
 
@@ -2255,11 +2263,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         hardErrors.push("Manhours must be a positive number.");
       }
 
-      if (workCarriedOutTrimmed && (workCarriedOutTrimmed.toLowerCase() === 'describe work carried out...' || workCarriedOutTrimmed.toLowerCase() === 'describe work carried out')) {
-        hardErrors.push("Please provide a proper description of work carried out, not the placeholder text.");
-      }
-      if (workCarriedOutTrimmed && workCarriedOutTrimmed.length < 20) {
-        hardErrors.push("Work Carried Out must be at least 20 characters to provide a meaningful description.");
+      if (!draftIntent) {
+        if (workCarriedOutTrimmed && (workCarriedOutTrimmed.toLowerCase() === 'describe work carried out...' || workCarriedOutTrimmed.toLowerCase() === 'describe work carried out')) {
+          hardErrors.push("Please provide a proper description of work carried out, not the placeholder text.");
+        }
+        if (workCarriedOutTrimmed && workCarriedOutTrimmed.length < 20) {
+          hardErrors.push("Work Carried Out must be at least 20 characters to provide a meaningful description.");
+        }
       }
 
       if (currentRHValue) {
@@ -2269,22 +2279,26 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      const b1Warnings: string[] = [];
-      if (executionData.riskAssessment === 'No') b1Warnings.push('Risk Assessment');
-      if (executionData.safetyChecklists === 'No') b1Warnings.push('Safety Checklists');
-      if (executionData.operationalForms === 'No') b1Warnings.push('Operational Forms');
-      if (b1Warnings.length > 0) {
-        hardErrors.push(`${b1Warnings.join(', ')} ${b1Warnings.length === 1 ? 'is' : 'are'} marked as "No". Please complete the required assessments or select "NA" if not applicable.`);
+      if (!draftIntent) {
+        const b1Warnings: string[] = [];
+        if (executionData.riskAssessment === 'No') b1Warnings.push('Risk Assessment');
+        if (executionData.safetyChecklists === 'No') b1Warnings.push('Safety Checklists');
+        if (executionData.operationalForms === 'No') b1Warnings.push('Operational Forms');
+        if (b1Warnings.length > 0) {
+          hardErrors.push(`${b1Warnings.join(', ')} ${b1Warnings.length === 1 ? 'is' : 'are'} marked as "No". Please complete the required assessments or select "NA" if not applicable.`);
+        }
       }
 
-      const b1DocChecks = [
-        { field: executionData.riskAssessment, type: 'riskAssessment', label: 'Risk Assessment' },
-        { field: executionData.safetyChecklists, type: 'safetyChecklist', label: 'Safety Checklists' },
-        { field: executionData.operationalForms, type: 'operationalForm', label: 'Operational Forms' },
-      ];
-      for (const check of b1DocChecks) {
-        if (check.field === 'Yes' && getDocsByType(check.type).length === 0) {
-          hardErrors.push(`${check.label} is marked as "Yes" but no supporting document has been uploaded.`);
+      if (!draftIntent) {
+        const b1DocChecks = [
+          { field: executionData.riskAssessment, type: 'riskAssessment', label: 'Risk Assessment' },
+          { field: executionData.safetyChecklists, type: 'safetyChecklist', label: 'Safety Checklists' },
+          { field: executionData.operationalForms, type: 'operationalForm', label: 'Operational Forms' },
+        ];
+        for (const check of b1DocChecks) {
+          if (check.field === 'Yes' && getDocsByType(check.type).length === 0) {
+            hardErrors.push(`${check.label} is marked as "Yes" but no supporting document has been uploaded.`);
+          }
         }
       }
 
@@ -2302,22 +2316,24 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         hardErrors.push(`Qty Used must be a positive whole number (≥ 1) for: ${parts}. Remove the row if no spares were consumed.`);
       }
 
-      const allSparesWithMissingLocation = executionData.consumedSpareParts.filter(spare => {
-        const qty = parseFloat(spare.quantityConsumed || '0');
-        if (qty <= 0) return false;
-        const hasLocationId = spare.locationId != null && spare.locationId > 0;
-        const hasLocationName = spare.location && typeof spare.location === 'string' && spare.location.trim().length > 0;
-        return !hasLocationId && !hasLocationName;
-      });
-      if (allSparesWithMissingLocation.length > 0) {
-        const parts = allSparesWithMissingLocation.map(s => s.partNo || s.description).join(', ');
-        hardErrors.push(`Please select a location for: ${parts}. A location is required when consuming spare parts.`);
+      if (!draftIntent) {
+        const allSparesWithMissingLocation = executionData.consumedSpareParts.filter(spare => {
+          const qty = parseFloat(spare.quantityConsumed || '0');
+          if (qty <= 0) return false;
+          const hasLocationId = spare.locationId != null && spare.locationId > 0;
+          const hasLocationName = spare.location && typeof spare.location === 'string' && spare.location.trim().length > 0;
+          return !hasLocationId && !hasLocationName;
+        });
+        if (allSparesWithMissingLocation.length > 0) {
+          const parts = allSparesWithMissingLocation.map(s => s.partNo || s.description).join(', ');
+          hardErrors.push(`Please select a location for: ${parts}. A location is required when consuming spare parts.`);
+        }
       }
 
       const hasConsumedSpares = executionData.consumedSpareParts.some(
         spare => spare.partNo && spare.quantityConsumed && parseFloat(spare.quantityConsumed) > 0
       );
-      if (hasConsumedSpares && vesselId) {
+      if (!draftIntent && hasConsumedSpares && vesselId) {
         if (!isSparesInventoryFetched) {
           hardErrors.push("Please wait for inventory data to load before submitting.");
         }
@@ -2337,7 +2353,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           const hasLocationName = spare.location && typeof spare.location === 'string' && spare.location.trim().length > 0;
           return !hasLocationId && !hasLocationName;
         });
-        if (sparesWithMissingLocation.length > 0) {
+        if (!draftIntent && sparesWithMissingLocation.length > 0) {
           const missingParts = sparesWithMissingLocation.map(s => s.partNo || s.description).join(', ');
           hardErrors.push(`Please select a location for: ${missingParts}. Location selection is required for inventory tracking.`);
         }
@@ -2371,16 +2387,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           if (rob <= 0) return qty > 0;
           return qty > (rob * 0.5);
         });
-        if (sparesNeedingComments.length > 0) {
+        if (!draftIntent && sparesNeedingComments.length > 0) {
           const parts = sparesNeedingComments.map(s => s.partNo || s.description).join(', ');
           hardErrors.push(`High consumption detected for: ${parts}. Please add a comment explaining the usage when consuming more than 50% of available stock.`);
         }
       }
 
       if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours') {
-        if (componentActualRHStatus === 'loading') {
+        if (!draftIntent && componentActualRHStatus === 'loading') {
           hardErrors.push('Component running hours are still loading. Please wait for the value to load before saving.');
-        } else if (componentActualRHStatus === 'error') {
+        } else if (!draftIntent && componentActualRHStatus === 'error') {
           hardErrors.push('Unable to verify component running hours. Please refresh the page or retry loading the component RH before saving.');
         }
         if (currentRHValue) {
@@ -2420,12 +2436,54 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const isReadyForSubmission = missingFields.length === 0;
       const isDraftSave = hasAnyPartBData && !isReadyForSubmission;
 
-      if (forceSubmitOnly.current) {
-        forceSubmitOnly.current = false;
+      if (draftIntent) {
+        const saveExecutionData = {
+          ...executionData,
+          runningHours: currentRHValue || executionData.runningHours,
+          riskAssessmentStatus: executionData.riskAssessment,
+          safetyChecklistsStatus: executionData.safetyChecklists,
+          operationalFormsStatus: executionData.operationalForms,
+        };
+
+        const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...templateData,
+            ...saveExecutionData,
+          })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+          if (result.code === 'INVALID_RUNNING_HOURS') {
+            throw new Error(`Current Reading (${result.enteredValue} hrs) exceeds component actual RH (${result.componentActualRH} hrs). Update running hours in the RH module first, or enter a value ≤ ${result.maxAllowed} hrs.`);
+          }
+          throw new Error(result.error || 'Failed to save draft');
+        }
+
+        await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+        await queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
+        await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+        if (hasConsumedSparesData && vesselId) {
+          await queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/${vesselId}`] });
+          await queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/spares-with-inventory/${vesselId}`] });
+        }
+
+        toast({
+          title: "Draft Saved",
+          description: missingFields.length > 0
+            ? `Your progress has been saved. Complete these fields before submitting: ${missingFields.join(', ')}.`
+            : "Your progress has been saved as a draft.",
+        });
+        return;
+      }
+
+      if (submitOnlyIntent) {
         if (!isReadyForSubmission) {
           toast({
             title: "Validation Error",
-            description: `The following Part B fields are required to submit for approval: ${missingFields.join(', ')}. Use "Save" to save your progress as a draft instead.`,
+            description: `The following Part B fields are required to submit for approval: ${missingFields.join(', ')}. Use "Save Draft" to save your progress instead.`,
             variant: "destructive",
           });
           return;
@@ -4768,7 +4826,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             <div className="space-y-4">
               {/* B1.1 Risk Assessment */}
               <div className="flex items-center justify-between py-3 border-b border-gray-100" data-testid="WOF.B1.3"><Marker id="WOF.B1.3" />
-                <Label className="text-sm text-gray-700" data-testid="WOF.B1.4"><Marker id="WOF.B1.4" />B1.1 Risk Assessment Completed / Reviewed:</Label>
+                <Label className="text-sm text-gray-700" data-testid="WOF.B1.4"><Marker id="WOF.B1.4" />B1.1 Risk Assessment Completed / Reviewed: <span className="text-red-500">*</span></Label>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2">
@@ -4840,7 +4898,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
               {/* B1.2 Safety Checklists */}
               <div className="flex items-center justify-between py-3 border-b border-gray-100" data-testid="WOF.B1.10"><Marker id="WOF.B1.10" />
-                <Label className="text-sm text-gray-700" data-testid="WOF.B1.11"><Marker id="WOF.B1.11" />B1.2 Safety Checklists Completed (As applicable):</Label>
+                <Label className="text-sm text-gray-700" data-testid="WOF.B1.11"><Marker id="WOF.B1.11" />B1.2 Safety Checklists Completed (As applicable): <span className="text-red-500">*</span></Label>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2">
@@ -4912,7 +4970,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
               {/* B1.3 Operational Forms */}
               <div className="flex items-center justify-between py-3" data-testid="WOF.B1.17"><Marker id="WOF.B1.17" />
-                <Label className="text-sm text-gray-700" data-testid="WOF.B1.18"><Marker id="WOF.B1.18" />B1.3 Operational Forms Completed (As applicable):</Label>
+                <Label className="text-sm text-gray-700" data-testid="WOF.B1.18"><Marker id="WOF.B1.18" />B1.3 Operational Forms Completed (As applicable): <span className="text-red-500">*</span></Label>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2">
@@ -6250,21 +6308,46 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 handleSave();
               }
             };
+            const handleBottomSaveDraft = () => {
+              forceDraftSave.current = true;
+              handleSave();
+            };
+            const handleBottomSubmitRegular = () => {
+              forceSubmitOnly.current = true;
+              handleSave();
+            };
+            const showSplitButtons = !isNewJobCreation && !showDraftActions;
             return (
-              <div className="flex justify-end mt-6 pb-6" data-testid="WOF6"><Marker id="WOF6" />
+              <div className="flex justify-end gap-3 mt-6 pb-6" data-testid="WOF6"><Marker id="WOF6" />
+                {showSplitButtons && (
+                  <Button
+                    onClick={handleBottomSaveDraft}
+                    disabled={!!isRHSaveBlocked}
+                    className={`font-bold px-8 py-2.5 h-auto text-sm shadow-md ${
+                      isRHSaveBlocked
+                        ? 'bg-gray-400 text-gray-200 cursor-not-allowed hover:bg-gray-400'
+                        : 'bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white'
+                    }`}
+                    data-testid="button-save-draft-bottom"
+                  >
+                    Save Draft
+                  </Button>
+                )}
                 <div title={isRHSaveBlocked && !showDraftActions ? rhBlockReason : ''}>
                   <Button
-                    onClick={isNewJobCreation ? handleSaveNewJob : showDraftActions ? handleBottomSubmit : handleSave}
+                    onClick={isNewJobCreation ? handleSaveNewJob : showDraftActions ? handleBottomSubmit : handleBottomSubmitRegular}
                     disabled={showDraftActions ? (isUnplannedCreate ? isUnplannedSaving : false) : !!isRHSaveBlocked}
                     className={`font-bold px-12 py-2.5 h-auto text-sm shadow-md ${
                       (showDraftActions ? (isUnplannedCreate ? isUnplannedSaving : false) : isRHSaveBlocked)
                         ? 'bg-gray-400 text-gray-200 cursor-not-allowed hover:bg-gray-400'
-                        : 'bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white'
+                        : showSplitButtons
+                          ? 'bg-[#5dc86f] hover:bg-[#4db85f] text-white'
+                          : 'bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white'
                     }`}
                     data-testid="WOF6.1"
                   >
                     <Marker id="WOF6.1" />
-                    {isNewJobCreation ? 'Create Job' : showDraftActions ? (isUnplannedSaving ? 'Submitting...' : 'Submit Work Order') : 'Save'}
+                    {isNewJobCreation ? 'Create Job' : showDraftActions ? (isUnplannedSaving ? 'Submitting...' : 'Submit Work Order') : 'Submit'}
                   </Button>
                 </div>
               </div>
