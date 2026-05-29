@@ -1152,8 +1152,8 @@ export default function ShipsSurveysAdmin() {
 
   const filteredData = sortedMasterData.filter(survey => {
     const matchesSearch = searchTerm === "" || 
-      survey.surveyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      survey.masterId.toLowerCase().includes(searchTerm.toLowerCase());
+      (survey.surveyName ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (survey.masterId ?? '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === "All Categories" || survey.category === selectedCategory;
     const matchesGroup = selectedGroup === "All Groups" || survey.group === selectedGroup;
     return matchesSearch && matchesCategory && matchesGroup;
@@ -1553,8 +1553,8 @@ export default function ShipsSurveysAdmin() {
 
                 const filteredData = mergedCompanyData.filter(s => {
                   const matchesSearch = companySearchTerm === "" || 
-                    s.surveyLabel.toLowerCase().includes(companySearchTerm.toLowerCase()) ||
-                    s.masterId.toLowerCase().includes(companySearchTerm.toLowerCase());
+                    (s.surveyLabel ?? '').toLowerCase().includes(companySearchTerm.toLowerCase()) ||
+                    (s.masterId ?? '').toLowerCase().includes(companySearchTerm.toLowerCase());
                   return matchesSearch;
                 });
 
