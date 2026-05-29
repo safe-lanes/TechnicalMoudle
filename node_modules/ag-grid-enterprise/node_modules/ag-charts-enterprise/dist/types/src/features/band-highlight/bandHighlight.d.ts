@@ -1,0 +1,38 @@
+import { _ModuleSupport } from 'ag-charts-community';
+import { type InternalAgColorType } from 'ag-charts-core';
+export declare class BandHighlight extends _ModuleSupport.BaseModuleInstance implements _ModuleSupport.ModuleInstance {
+    private readonly ctx;
+    readonly id: string;
+    enabled: boolean;
+    stroke?: string;
+    lineDash?: number[];
+    lineDashOffset: number;
+    strokeWidth: number;
+    strokeOpacity: number;
+    fill: InternalAgColorType;
+    fillOpacity: number;
+    readonly fillGradientDefaults: _ModuleSupport.FillGradientDefaults;
+    readonly fillPatternDefaults: _ModuleSupport.FillPatternDefaults;
+    readonly fillImageDefaults: _ModuleSupport.FillImageDefaults;
+    private readonly axisCtx;
+    private bounds;
+    private axisLayout?;
+    private readonly bandHighlightGroup;
+    private readonly rangeNode;
+    private activeAxisHighlight?;
+    constructor(ctx: _ModuleSupport.ModuleContextWithParent<_ModuleSupport.AxisContext>);
+    private axisChange;
+    private isHover;
+    private onClick;
+    private clearAllHighlight;
+    private onKeyPress;
+    private onHoverLikeEvent;
+    private handleHoverHighlight;
+    private layout;
+    private updateBand;
+    private isVertical;
+    private onHighlightChange;
+    private updateBandPosition;
+    private showBand;
+    private hideBand;
+}

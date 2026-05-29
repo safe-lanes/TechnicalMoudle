@@ -1,0 +1,33 @@
+import type { AgContextMenuItem } from 'ag-charts-community';
+import { _ModuleSupport } from 'ag-charts-community';
+export declare class ContextMenu extends _ModuleSupport.BaseModuleInstance implements _ModuleSupport.ModuleInstance {
+    readonly ctx: _ModuleSupport.ModuleContext;
+    enabled: boolean;
+    darkTheme: boolean;
+    readonly items: readonly Readonly<AgContextMenuItem>[];
+    private readonly interactionManager;
+    private pickedNode;
+    private pickedLegendItem?;
+    private showEvent;
+    private x;
+    private y;
+    private closingSubMenus;
+    private readonly element;
+    private readonly menuWidget;
+    private readonly mutationObserver?;
+    constructor(ctx: _ModuleSupport.ModuleContext);
+    private expandItemsOptions;
+    private onContext;
+    private show;
+    private hide;
+    private onClose;
+    private onSubMenuOpen;
+    private onSubMenuClose;
+    private createMenu;
+    private createMenuItems;
+    private createButtonOnClick;
+    private initTableCells;
+    private initButtonElement;
+    private reposition;
+    destroy(): void;
+}

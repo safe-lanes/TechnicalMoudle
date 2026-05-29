@@ -1,0 +1,15 @@
+import { type OptionsDefs } from 'ag-charts-core';
+import type { AgNavigatorHandleOptions, AgNavigatorOptions, BarIgnoredProperties, BoxPlotIgnoredProperties, BubbleIgnoredProperties, CommonIgnoredProperties, HeatmapIgnoredProperties, HistogramIgnoredProperties, LineIgnoredProperties, RangeAreaIgnoredProperties, RangeBarIgnoredProperties, ScatterIgnoredProperties, WaterfallIgnoredProperties } from 'ag-charts-types';
+export declare const navigatorHandleOptionsDef: OptionsDefs<AgNavigatorHandleOptions>;
+export declare const commonIgnoredMiniChartProperties: CommonIgnoredProperties[];
+export declare const barIgnoredMiniChartProperties: BarIgnoredProperties[];
+export declare const boxPlotIngnoredMiniChartProperties: BoxPlotIgnoredProperties[];
+export declare const bubbleIgnoredMiniChartProperties: BubbleIgnoredProperties[];
+export declare const heatmapIgnoredMiniChartProperties: HeatmapIgnoredProperties[];
+export declare const histogramIgnoredMiniChartProperties: HistogramIgnoredProperties[];
+export declare const lineIgnoredMiniChartProperties: LineIgnoredProperties[];
+export declare const rangeAreaIgnoredMiniChartProperties: RangeAreaIgnoredProperties[];
+export declare const rangeBarIgnoredMiniChartProperties: RangeBarIgnoredProperties[];
+export declare const scatterIgnoredMiniChartProperties: ScatterIgnoredProperties[];
+export declare const waterfallIgnoredMiniChartProperties: WaterfallIgnoredProperties[];
+export declare const navigatorOptionsDef: OptionsDefs<AgNavigatorOptions>;
