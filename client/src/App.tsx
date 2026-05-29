@@ -99,7 +99,10 @@ function App() {
                 
                 <Route path="/cert-surveys" component={TechnicalModule} />
                 <Route path="/cert-surveys/:subpage" component={TechnicalModule} />
-                
+
+                {/* Purchasing — Shipskart SSO embed (handled inside TechnicalModule) */}
+                <Route path="/purchasing" component={TechnicalModule} />
+
                 {/* ====== NOON REPORT MODULE ROUTES — START (remove to disable) ====== */}
                 <Route path="/noon-report" component={TechnicalModule} />
                 <Route path="/noon-report/entry/:id" component={TechnicalModule} />
