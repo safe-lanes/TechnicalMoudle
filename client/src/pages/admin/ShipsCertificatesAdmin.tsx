@@ -1346,8 +1346,8 @@ export default function ShipsCertificatesAdmin() {
 
   const renderMasterTab = () => {
     const filteredData = sortedMasterData.filter(cert => {
-      const matchesSearch = cert.certificateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           cert.masterId.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = (cert.certificateName ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (cert.masterId ?? '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = selectedCategory === "All Categories" || cert.category === selectedCategory;
       const matchesGroup = selectedGroup === "All Groups" || cert.group === selectedGroup;
       return matchesSearch && matchesCategory && matchesGroup;
@@ -1854,8 +1854,8 @@ export default function ShipsCertificatesAdmin() {
     const allCompanyData = [...companyDataFromMaster, ...companyOnlyMapped].sort((a, b) => a.sequence - b.sequence);
 
     const filteredData = allCompanyData.filter(cert => {
-      const matchesSearch = cert.certificateLabel.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           cert.masterId.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = (cert.certificateLabel ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (cert.masterId ?? '').toLowerCase().includes(searchTerm.toLowerCase());
       return matchesSearch;
     });
 
