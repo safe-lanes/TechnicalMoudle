@@ -26,6 +26,7 @@ import DefectFormWizard from "./defects/DefectFormWizard";
 import RecurringDefects from "./RecurringDefects";
 import CertificatesPage from "./cert-surveys/CertificatesPage";
 import SurveysPage from "./cert-surveys/SurveysPage";
+import PurchasingPage from "./purchasing/PurchasingPage";
 import { useLocation, useParams } from "wouter";
 import DataMasters from "./admin/DataMasters";
 import ShipsCertificatesAdmin from "./admin/ShipsCertificatesAdmin";
@@ -92,6 +93,8 @@ export const TechnicalModule = () => {
     } else if (location.startsWith("/cert-surveys/")) {
       const subpage = location.replace("/cert-surveys/", "");
       return { subModule: "cert-surveys", menuItem: subpage };
+    } else if (location.startsWith("/purchasing")) {
+      return { subModule: "purchasing", menuItem: "purchasing" };
     // ====== NOON REPORT MODULE — START ======
     } else if (location === "/noon-report") {
       return { subModule: "noon-report", menuItem: "entry" };
@@ -132,6 +135,9 @@ export const TechnicalModule = () => {
     } else if (subModule === "cert-surveys") {
       setSelectedMenuItem("certificates");
       setLocation("/cert-surveys");
+    } else if (subModule === "purchasing") {
+      setSelectedMenuItem("purchasing");
+      setLocation("/purchasing");
     // ====== NOON REPORT MODULE — START ======
     } else if (subModule === "noon-report") {
       setSelectedMenuItem("entry");
@@ -166,7 +172,7 @@ export const TechnicalModule = () => {
         
         {/* Main Content Area */}
         <div className={`flex-1 min-h-0 overflow-auto ${selectedMenuItem === "fleet-component-editor" ? "" : "p-6"}`}>
-          {(permissionStatus === "configured" || permissionStatus === "error") && !(selectedMenuItem === "access-control" && isSailAdmin) && !canViewSidebarItem(selectedSubModule, selectedMenuItem) ? (
+          {(permissionStatus === "configured" || permissionStatus === "error") && !(selectedMenuItem === "access-control" && isSailAdmin) && selectedSubModule !== "purchasing" && !canViewSidebarItem(selectedSubModule, selectedMenuItem) ? (
             <div className="flex items-center justify-center h-full min-h-[400px]" data-testid="access-denied">
               <div className="text-center">
                 <ShieldX className="h-16 w-16 text-red-400 mx-auto mb-4" />
@@ -278,6 +284,8 @@ export const TechnicalModule = () => {
             <CertificatesPage />
           ) : selectedSubModule === "cert-surveys" && selectedMenuItem === "surveys" ? (
             <SurveysPage />
+          ) : selectedSubModule === "purchasing" ? (
+            <PurchasingPage />
           // ====== NOON REPORT MODULE — START ======
           ) : selectedSubModule === "noon-report" && selectedMenuItem === "entry" ? (
             <NoonEntryForm />

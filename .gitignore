@@ -25,3 +25,7 @@ uploads/
 
 # Deployment output
 ship-deploy/
+
+# Secrets — never commit real env values (.env.example IS tracked)
+.env
+!.env.example
