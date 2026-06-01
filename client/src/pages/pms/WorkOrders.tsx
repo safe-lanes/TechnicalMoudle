@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar, ChevronDown } from "lucide-react";
 import WOAgGridTable from "@/components/WOAgGridTable";
 import { getWoStatusBadgeColor } from "@/components/wo/woCellRenderers";
@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PeriodFilter, PeriodFilterValue } from "@/components/filters/PeriodFilter";
+import { getDisplayStatus, getEffectiveStatus, filterAndSortWorkOrders, type WorkOrderApprovalTierCounts } from "@shared/utils/workOrderFilters";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -57,6 +58,18 @@ type WorkOrderWithHydratedData = WorkOrderWithLeadTime & {
   componentCritical?: boolean;
 };
 
+// Server response shape for the paginated Work Orders list endpoint
+// (GET /technical/api/work-orders?page=...). Mirrors the spares paged envelope.
+interface WorkOrdersPageEnvelope {
+  items: WorkOrderWithHydratedData[];
+  total: number;
+  page: number;
+  pageSize: number;
+  statusCounts: Record<string, number>;
+  approvalTierCounts?: WorkOrderApprovalTierCounts;
+  rankOptions: string[];
+}
+
 // Using WorkOrder type from shared schema
 // The WorkOrder interface is now imported from @shared/schema
 
@@ -86,59 +99,6 @@ type WOSortField =
   | "status" | "dateCompleted" | "plannedDate" | "postponeUntil"
   | "postponementReason" | "daysLate" | "approvalTier";
 type WOSortDir = "asc" | "desc";
-
-function compareWorkOrders(a: WorkOrderWithHydratedData, b: WorkOrderWithHydratedData, field: WOSortField, dir: WOSortDir, activeTab = ""): number {
-  let cmp = 0;
-  switch (field) {
-    case "component": cmp = (a.component || "").localeCompare(b.component || ""); break;
-    case "workOrderNo": {
-      const getWoNo = (wo: WorkOrderWithHydratedData) =>
-        (activeTab === "Pending Approval" || activeTab === "Completed") && wo.executionId
-          ? wo.executionId
-          : wo.workOrderNo || wo.templateCode || "";
-      cmp = getWoNo(a).localeCompare(getWoNo(b));
-      break;
-    }
-    case "jobTitle": cmp = (a.jobTitle || "").localeCompare(b.jobTitle || ""); break;
-    case "assignedTo": cmp = (a.assignedTo || "").localeCompare(b.assignedTo || ""); break;
-    case "dueDate": {
-      const useSubmitted = activeTab === "Pending Approval" || activeTab === "Completed";
-      const aVal = useSubmitted ? (a.submittedDate || "") : (a.dueDate || "");
-      const bVal = useSubmitted ? (b.submittedDate || "") : (b.dueDate || "");
-      cmp = aVal.localeCompare(bVal);
-      break;
-    }
-    case "status": {
-      const STATUS_ORDER: Record<string, number> = {
-        "Overdue": 0, "Due": 1, "Due (Grace P)": 2, "Active": 3,
-        "Pending Approval": 4, "Postponed": 5, "Draft": 6, "Completed": 7,
-      };
-      const aS = a.computedStatus || a.status || "";
-      const bS = b.computedStatus || b.status || "";
-      cmp = (STATUS_ORDER[aS] ?? 99) - (STATUS_ORDER[bS] ?? 99);
-      break;
-    }
-    case "dateCompleted":
-      cmp = (a.dateCompleted || "9999").localeCompare(b.dateCompleted || "9999");
-      break;
-    case "plannedDate":
-      cmp = (a.plannedDate || "9999").localeCompare(b.plannedDate || "9999");
-      break;
-    case "postponeUntil":
-      cmp = (a.postponementEndDate || "9999").localeCompare(b.postponementEndDate || "9999");
-      break;
-    case "postponementReason":
-      cmp = (a.postponementReason || "").localeCompare(b.postponementReason || "");
-      break;
-    case "daysLate":
-      cmp = (a.daysLate || 0) - (b.daysLate || 0);
-      break;
-    case "approvalTier":
-      cmp = (a.approvalTier || "").localeCompare(b.approvalTier || "");
-      break;
-  }
-  return dir === "desc" ? -cmp : cmp;
-}
 
 const AG_FIELD_TO_SORT_FIELD: Record<string, WOSortField> = {
   component: "component",
@@ -200,16 +160,62 @@ const WorkOrders: React.FC = () => {
   const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept } = useUIRole();
   const { data: vessels = [] } = useVessels();
   
-  // Fetch work orders using React Query (includes computedStatus and lead time from backend)
-  const { data: workOrdersList = [], isLoading, error } = useQuery<WorkOrderWithHydratedData[]>({
-    queryKey: ['/technical/api/work-orders', vesselId],
+  // Debounce the search box so each keystroke doesn't fire a server round-trip
+  // (mirrors the Spares module's server-side search behavior).
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  const criticalityParam = useMemo(
+    () => Array.from(criticalitySelections).sort().join(','),
+    [criticalitySelections]
+  );
+
+  // Server-side paginated fetch for the Work Orders module list. Search,
+  // tab/status, period, rank, criticality, postponement-reason filtering and
+  // sorting all run on the server (single source of truth in
+  // @shared/utils/workOrderFilters); only one page of rows comes back.
+  const { data: woEnvelope, isLoading, error } = useQuery<WorkOrdersPageEnvelope>({
+    queryKey: ['/technical/api/work-orders', vesselId, activeTab, debouncedSearch, periodFilter, selectedRank, criticalityParam, selectedPostponementReason, woSortField, woSortDir, currentPage, itemsPerPage],
     queryFn: async () => {
-      const response = await fetch(`/technical/api/work-orders?vesselId=${vesselId}`);
+      const params = new URLSearchParams();
+      params.set('vesselId', vesselId);
+      params.set('page', String(currentPage));
+      params.set('pageSize', String(itemsPerPage));
+      params.set('status', activeTab);
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      if (periodFilter) params.set('period', JSON.stringify(periodFilter));
+      if (selectedRank && selectedRank !== 'all') params.set('rank', selectedRank);
+      if (criticalityParam) params.set('criticality', criticalityParam);
+      if (selectedPostponementReason && selectedPostponementReason !== 'all') params.set('postponementReason', selectedPostponementReason);
+      if (woSortField) {
+        params.set('sortBy', woSortField);
+        params.set('sortDir', woSortDir);
+      }
+      const response = await fetch(`/technical/api/work-orders?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch work orders');
-      return await response.json() as WorkOrderWithHydratedData[];
+      const json = await response.json();
+      return json.data as WorkOrdersPageEnvelope;
     },
     enabled: !!vesselId, // Only fetch when vesselId is available
   });
+
+  // On-demand full fetch (no `page` param → raw enriched array). Used by the
+  // export builders and deep-link navigation that need the complete data set
+  // rather than just the current page.
+  const fetchAllWorkOrders = useCallback(async (): Promise<WorkOrderWithHydratedData[]> => {
+    const response = await fetch(`/technical/api/work-orders?vesselId=${vesselId}`);
+    if (!response.ok) throw new Error('Failed to fetch work orders');
+    return await response.json() as WorkOrderWithHydratedData[];
+  }, [vesselId]);
+
+  const paginatedWorkOrders: WorkOrderWithHydratedData[] = woEnvelope?.items ?? [];
+  const totalItems = woEnvelope?.total ?? 0;
+  const statusCounts = woEnvelope?.statusCounts ?? {};
+  const approvalTierCounts = woEnvelope?.approvalTierCounts;
+  const uniqueRanks = woEnvelope?.rankOptions ?? [];
 
   const { data: allVesselJobs = [] } = useQuery<any[]>({
     queryKey: ['/technical/api/jobs', vesselId],
@@ -299,206 +305,34 @@ const WorkOrders: React.FC = () => {
     
     // Auto-navigate to work order page if navigating from "View Changes"
     if (previewChanges === '1' && targetType === 'workOrder' && previewTargetId) {
-      const targetWorkOrder = safeWorkOrdersList.find(wo => wo.id === previewTargetId);
-      if (targetWorkOrder) {
-        setLocation(`/pms/work-order/${targetWorkOrder.id}`);
-      }
+      setLocation(`/pms/work-order/${previewTargetId}`);
     }
-  }, [location, workOrdersList, setLocation]);
+  }, [location, setLocation]);
 
-  const safeWorkOrdersList = (workOrdersList || []).filter(wo => wo !== null && wo !== undefined);
-  
-  const FINALIZED_STATUSES = new Set(['completed', 'approved', 'closed', 'cancelled', 'canceled']);
-  const isStoredCompleted = (wo: any) => wo.status && FINALIZED_STATUSES.has(wo.status.toLowerCase().trim());
-
-  // Used for TAB ROUTING only — returns 'Unplanned' for all Unplanned WOs so they
-  // never bleed into Scheduled or Completed tabs regardless of their stored status.
-  const getEffectiveStatus = (wo: any) => {
-    if (wo.workOrderType === 'Unplanned') return 'Unplanned';
-    if (isStoredCompleted(wo)) return 'Completed';
-    return wo.computedStatus || wo.status || 'Active';
-  };
-
-  // Used for BADGE DISPLAY — shows the real status for Unplanned WOs (Active, Draft, Completed…)
-  // so users can see the actual state while in the Unplanned tab.
-  const getDisplayStatus = (wo: any) => {
-    if (wo.workOrderType === 'Unplanned') {
-      if (isStoredCompleted(wo)) return 'Completed';
-      if (wo.status === 'Pending Approval') return 'Pending Approval';
-      if (wo.status === 'Draft') return 'Draft';
-      return wo.status || 'Active';
-    }
-    return getEffectiveStatus(wo);
-  };
-
+  // Tab badge counts come from the server (computed over the full list,
+  // independent of the active search/filters) — see statusCounts above.
   const tabs = [
-    { id: "Planned", label: "Scheduled", count: safeWorkOrdersList.filter(wo => {
-      if (wo.isExecution) return false;
-      // Unplanned WOs never appear in the Scheduled tab regardless of their stored status
-      if (wo.workOrderType === 'Unplanned') return false;
-      const effectiveStatus = getEffectiveStatus(wo);
-      return effectiveStatus === "Active";
-    }).length },
-    { id: "Due", label: "Due", count: safeWorkOrdersList.filter(wo => {
-      const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
-      if (wo.isExecution && !isRejectedExecution) return false;
-      const effectiveStatus = getEffectiveStatus(wo);
-      return effectiveStatus === "Due" || effectiveStatus === "Due (Grace P)";
-    }).length },
-    { id: "Overdue", label: "Overdue", count: safeWorkOrdersList.filter(wo => {
-      const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
-      if (wo.isExecution && !isRejectedExecution) return false;
-      const effectiveStatus = getEffectiveStatus(wo);
-      return effectiveStatus === "Overdue";
-    }).length },
-    { id: "Postponed", label: "Postponed", count: safeWorkOrdersList.filter(wo => {
-      if (wo.isExecution) return false;
-      return getEffectiveStatus(wo) === "Postponed";
-    }).length },
-    { id: "Unplanned", label: "Unplanned", count: safeWorkOrdersList.filter(wo => {
-      // All Unplanned WOs belong here — Draft, Active, Completed, etc.
-      return wo.workOrderType === 'Unplanned';
-    }).length },
-    { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => {
-      // Unplanned WOs in Pending Approval state appear in both the Unplanned tab and this tab
-      const displayStatus = getDisplayStatus(wo);
-      return displayStatus === "Pending Approval";
-    }).length },
-    { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => {
-      // Completed Unplanned WOs stay in the Unplanned tab, not here
-      if (wo.workOrderType === 'Unplanned') return false;
-      return getEffectiveStatus(wo) === "Completed";
-    }).length }
+    { id: "Planned", label: "Scheduled", count: statusCounts["Planned"] ?? 0 },
+    { id: "Due", label: "Due", count: statusCounts["Due"] ?? 0 },
+    { id: "Overdue", label: "Overdue", count: statusCounts["Overdue"] ?? 0 },
+    { id: "Postponed", label: "Postponed", count: statusCounts["Postponed"] ?? 0 },
+    { id: "Unplanned", label: "Unplanned", count: statusCounts["Unplanned"] ?? 0 },
+    { id: "Pending Approval", label: "Pending Approval", count: statusCounts["Pending Approval"] ?? 0 },
+    { id: "Completed", label: "Completed", count: statusCounts["Completed"] ?? 0 },
   ];
 
   const getStatusBadgeColor = getWoStatusBadgeColor;
 
-  const filteredWorkOrders = safeWorkOrdersList.filter(wo => {
-    const effectiveStatus = getEffectiveStatus(wo);
-    
-    if (activeTab === "Planned") {
-      if (wo.isExecution) return false;
-      // All Unplanned WOs are excluded from Scheduled regardless of status
-      if (wo.workOrderType === 'Unplanned') return false;
-      if (effectiveStatus !== "Active") return false;
-    } else if (activeTab === "Due") {
-      const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
-      if (wo.isExecution && !isRejectedExecution) return false;
-      if (effectiveStatus !== "Due" && effectiveStatus !== "Due (Grace P)") return false;
-    } else if (activeTab === "Overdue") {
-      const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
-      if (wo.isExecution && !isRejectedExecution) return false;
-      if (effectiveStatus !== "Overdue") return false;
-    } else if (activeTab === "Completed") {
-      // Completed Unplanned WOs stay in the Unplanned tab only
-      if (wo.workOrderType === 'Unplanned') return false;
-      if (effectiveStatus !== "Completed") return false;
-    } else if (activeTab === "Pending Approval") {
-      // Unplanned WOs in Pending Approval appear here AND in the Unplanned tab
-      if (getDisplayStatus(wo) !== "Pending Approval") return false;
-    } else if (activeTab === "Postponed") {
-      if (wo.isExecution) return false;
-      if (effectiveStatus !== "Postponed") return false;
-    } else if (activeTab === "Unplanned") {
-      // All Unplanned WOs belong here regardless of their stored status
-      if (wo.workOrderType !== 'Unplanned') return false;
-    }
-    
-    if (searchTerm && !wo.jobTitle.toLowerCase().includes(searchTerm.toLowerCase()) && 
-        !wo.workOrderNo.toLowerCase().includes(searchTerm.toLowerCase()) &&
-        !(wo.templateCode && wo.templateCode.toLowerCase().includes(searchTerm.toLowerCase())) &&
-        !(wo.executionId && wo.executionId.toLowerCase().includes(searchTerm.toLowerCase()))) {
-      return false;
-    }
-    
-    if (periodFilter) {
-      const isRhBased = wo.maintenanceBasis === "Running Hours";
-
-      if (isRhBased) {
-        const rhTarget = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null);
-        const rhCurrent = wo.currentRH ?? (wo.currentReading != null ? Number(wo.currentReading) : null);
-        if (rhTarget == null || isNaN(rhTarget) || rhCurrent == null || isNaN(rhCurrent)) {
-          return false;
-        }
-        const rhRemaining = rhTarget - rhCurrent;
-        let periodDays = 0;
-        if (periodFilter.mode === 'year-only' && periodFilter.year) {
-          const isLeap = (periodFilter.year % 4 === 0 && periodFilter.year % 100 !== 0) || periodFilter.year % 400 === 0;
-          periodDays = isLeap ? 366 : 365;
-        } else if (periodFilter.mode === 'year-quarter' && periodFilter.year && periodFilter.quarter) {
-          const qStart = new Date(periodFilter.year, (periodFilter.quarter - 1) * 3, 1);
-          const qEnd = new Date(periodFilter.year, periodFilter.quarter * 3, 0);
-          periodDays = Math.round((qEnd.getTime() - qStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        } else if (periodFilter.mode === 'year-months' && periodFilter.year && periodFilter.months && periodFilter.months.length > 0) {
-          let totalDays = 0;
-          for (const m of periodFilter.months) {
-            const lastDay = new Date(periodFilter.year, m, 0).getDate();
-            totalDays += lastDay;
-          }
-          periodDays = totalDays;
-        } else if (periodFilter.mode === 'date-range' && periodFilter.dateFrom && periodFilter.dateTo) {
-          const from = new Date(periodFilter.dateFrom);
-          from.setHours(0, 0, 0, 0);
-          const to = new Date(periodFilter.dateTo);
-          to.setHours(0, 0, 0, 0);
-          periodDays = Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        }
-        const periodHours = periodDays * 24;
-        if (rhRemaining > periodHours) return false;
-      } else {
-        const woDueDate = wo.dueDate ? new Date(wo.dueDate) : null;
-        if (!woDueDate || isNaN(woDueDate.getTime())) {
-          return false;
-        }
-        if (periodFilter.mode === 'year-only' && periodFilter.year) {
-          if (woDueDate.getFullYear() !== periodFilter.year) return false;
-        } else if (periodFilter.mode === 'year-quarter' && periodFilter.year && periodFilter.quarter) {
-          if (woDueDate.getFullYear() !== periodFilter.year) return false;
-          const woMonth = woDueDate.getMonth() + 1;
-          const qStart = (periodFilter.quarter - 1) * 3 + 1;
-          const qEnd = qStart + 2;
-          if (woMonth < qStart || woMonth > qEnd) return false;
-        } else if (periodFilter.mode === 'year-months' && periodFilter.year && periodFilter.months && periodFilter.months.length > 0) {
-          if (woDueDate.getFullYear() !== periodFilter.year) return false;
-          const woMonth = woDueDate.getMonth() + 1;
-          if (!periodFilter.months.includes(woMonth)) return false;
-        } else if (periodFilter.mode === 'date-range' && periodFilter.dateFrom && periodFilter.dateTo) {
-          const from = new Date(periodFilter.dateFrom);
-          from.setHours(0, 0, 0, 0);
-          const to = new Date(periodFilter.dateTo);
-          to.setHours(23, 59, 59, 999);
-          const woTime = woDueDate.getTime();
-          if (woTime < from.getTime() || woTime > to.getTime()) return false;
-        }
-      }
-    }
-    
-    // Rank filter: match against assignedTo field
-    if (selectedRank && selectedRank !== "all") {
-      if (wo.assignedTo?.trim() !== selectedRank) {
-        return false;
-      }
-    }
-    
-    if (criticalitySelections.size > 0) {
-      const woCriticality = wo.criticality?.toLowerCase();
-      const isCompCritical = wo.componentCritical === true;
-      let matchesAny = false;
-      if (criticalitySelections.has("critical") && woCriticality === "yes") matchesAny = true;
-      if (criticalitySelections.has("non-critical") && woCriticality !== "yes") matchesAny = true;
-      if (criticalitySelections.has("critical-component") && isCompCritical) matchesAny = true;
-      if (!matchesAny) return false;
-    }
-
-    // Postponement reason filter: only applies to Postponed work orders
-    if (selectedPostponementReason && selectedPostponementReason !== "all") {
-      if (wo.postponementReason !== selectedPostponementReason) {
-        return false;
-      }
-    }
-    
-    return true;
-  });
+  // Build the active filter params (matching the server query) so export
+  // builders can reproduce the same filtered set client-side over the full list.
+  const currentFilterParams = useMemo(() => ({
+    activeTab,
+    search: debouncedSearch,
+    period: periodFilter,
+    rank: selectedRank,
+    criticality: Array.from(criticalitySelections),
+    postponementReason: selectedPostponementReason,
+  }), [activeTab, debouncedSearch, periodFilter, selectedRank, criticalitySelections, selectedPostponementReason]);
 
   const woColumnDefs: ColDef[] = useMemo(() => {
     const cols: ColDef[] = [
@@ -882,13 +716,6 @@ const WorkOrders: React.FC = () => {
     return cols;
   }, [activeTab, isVessel]);
 
-  const sortedWorkOrders = useMemo(
-    () => woSortField
-      ? [...filteredWorkOrders].sort((a, b) => compareWorkOrders(a, b, woSortField, woSortDir, activeTab))
-      : filteredWorkOrders,
-    [filteredWorkOrders, woSortField, woSortDir, activeTab]
-  );
-
   const handleWoSortChanged = (field: string | null, direction: 'asc' | 'desc') => {
     if (!field) {
       setWoSortField(null);
@@ -902,14 +729,13 @@ const WorkOrders: React.FC = () => {
     }
   };
 
-  // Pagination calculations
-  const totalItems = filteredWorkOrders.length;
+  // Pagination calculations (totalItems comes from the server envelope above)
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   
   // Reset to page 1 when filters or sort change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchTerm, periodFilter, selectedRank, criticalitySelections, selectedPostponementReason, vesselId, woSortField, woSortDir]);
+  }, [activeTab, debouncedSearch, periodFilter, selectedRank, criticalitySelections, selectedPostponementReason, vesselId, woSortField, woSortDir]);
 
   useEffect(() => {
     setWoSortField(null);
@@ -922,23 +748,7 @@ const WorkOrders: React.FC = () => {
       setCurrentPage(totalPages);
     }
   }, [totalPages, currentPage]);
-  
-  // Extract unique ranks (assigned_to values) from work orders for dynamic filter
-  const uniqueRanks = useMemo(() => {
-    const ranks = safeWorkOrdersList
-      .map(wo => wo.assignedTo?.trim())
-      .filter((rank): rank is string => !!rank && rank.length > 0);
-    const uniqueSet = Array.from(new Set(ranks));
-    return uniqueSet.sort((a, b) => a.localeCompare(b));
-  }, [safeWorkOrdersList]);
 
-  // Get paginated work orders (from sorted list)
-  const paginatedWorkOrders = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return sortedWorkOrders.slice(startIndex, endIndex);
-  }, [sortedWorkOrders, currentPage, itemsPerPage]);
-  
   // Pagination handlers
   const goToPage = (page: number) => {
     if (page >= 1 && page <= totalPages) {
@@ -971,7 +781,7 @@ const WorkOrders: React.FC = () => {
   };
 
   const handleApprove = (workOrderId: string, approverRemarks?: string) => {
-    const workOrder = safeWorkOrdersList.find(wo => wo.executionId === workOrderId || wo.id === workOrderId);
+    const workOrder = paginatedWorkOrders.find(wo => wo.executionId === workOrderId || wo.id === workOrderId);
     if (!workOrder) return;
     
     // Use the actual completion date from the work order (user-entered date when work was completed)
@@ -1021,7 +831,7 @@ const WorkOrders: React.FC = () => {
   };
 
   const handleReject = (workOrderId: string, rejectionComments: string) => {
-    const workOrder = safeWorkOrdersList.find(wo => wo.executionId === workOrderId || wo.id === workOrderId);
+    const workOrder = paginatedWorkOrders.find(wo => wo.executionId === workOrderId || wo.id === workOrderId);
     if (!workOrder) return;
     
     const updateData = {
@@ -1060,12 +870,15 @@ const WorkOrders: React.FC = () => {
     return vessel?.name || vesselId;
   }, [vesselId, vessels]);
 
-  const exportWorkOrdersExcel = () => {
+  const exportWorkOrdersExcel = async () => {
     setExportingType('wo-excel');
     try {
       const now = new Date();
       const timestamp = format(now, 'yyyyMMdd_HHmm');
-      const exportList = (activeTab === "Postponed" || activeTab === "Unplanned") ? filteredWorkOrders : safeWorkOrdersList;
+      const allWorkOrders = await fetchAllWorkOrders();
+      const exportList = (activeTab === "Postponed" || activeTab === "Unplanned")
+        ? filterAndSortWorkOrders(allWorkOrders, currentFilterParams)
+        : allWorkOrders;
       const isPostponedExport = activeTab === "Postponed";
 
       type BaseExcelRow = {
@@ -1122,11 +935,14 @@ const WorkOrders: React.FC = () => {
     setExportingType(null);
   };
 
-  const exportWorkOrdersPdf = () => {
+  const exportWorkOrdersPdf = async () => {
     setExportingType('wo-pdf');
     try {
       const isPostponedExport = activeTab === "Postponed";
-      const exportList = (isPostponedExport || activeTab === "Unplanned") ? filteredWorkOrders : safeWorkOrdersList;
+      const allWorkOrders = await fetchAllWorkOrders();
+      const exportList = (isPostponedExport || activeTab === "Unplanned")
+        ? filterAndSortWorkOrders(allWorkOrders, currentFilterParams)
+        : allWorkOrders;
 
       const columns = isPostponedExport
         ? [
@@ -1515,10 +1331,10 @@ const WorkOrders: React.FC = () => {
 
       {/* Pending Approval Summary Stat Bar */}
       {activeTab === "Pending Approval" && (() => {
-        const lockedCount = filteredWorkOrders.filter(wo => wo.approvalTier === "superintendent_locked").length;
-        const notifiedCount = filteredWorkOrders.filter(wo => wo.approvalTier === "superintendent_notification").length;
-        const ceRemarksCount = filteredWorkOrders.filter(wo => wo.approvalTier === "ce_with_justification").length;
-        const standardCount = filteredWorkOrders.filter(wo => !wo.approvalTier || wo.approvalTier === "standard").length;
+        const lockedCount = approvalTierCounts?.superintendent_locked ?? 0;
+        const notifiedCount = approvalTierCounts?.superintendent_notification ?? 0;
+        const ceRemarksCount = approvalTierCounts?.ce_with_justification ?? 0;
+        const standardCount = approvalTierCounts?.standard ?? 0;
         const statCards = [
           { icon: Lock, label: "Locked (Supt. Required)", count: lockedCount, bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-800 dark:text-red-300", testId: "stat-locked" },
           { icon: AlertTriangle, label: "Supt. Notified", count: notifiedCount, bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-800 dark:text-orange-300", testId: "stat-supt-notified" },

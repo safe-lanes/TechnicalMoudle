@@ -11,6 +11,12 @@ import { getDb } from '../../../db';
 import { plannerDates } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { logFieldChanges } from '../../sync';
+import {
+  filterAndSortWorkOrders,
+  computeWorkOrderTabCounts,
+  computeApprovalTierCounts,
+  type WorkOrderFilterParams,
+} from '@shared/utils/workOrderFilters';
 
 async function resolveRankIdFromLabel(assignedTo: string | null | undefined): Promise<string | null> {
   if (!assignedTo) return null;
@@ -456,6 +462,58 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[]) {
   });
 
   return sortedWorkOrders;
+}
+
+export interface ListWorkOrdersPagedParams extends WorkOrderFilterParams {
+  page: number;
+  pageSize: number;
+}
+
+export interface ListWorkOrdersPagedResult {
+  items: any[];
+  total: number;
+  page: number;
+  pageSize: number;
+  statusCounts: Record<string, number>;
+  approvalTierCounts: ReturnType<typeof computeApprovalTierCounts>;
+  rankOptions: string[];
+}
+
+/**
+ * Paginated variant of listWorkOrders. Reuses the exact same enrichment as the
+ * non-paged path, then applies the shared filter/search/sort logic (single
+ * source of truth in @shared/utils/workOrderFilters) before slicing the
+ * requested page. Tab counts and rank options are derived from the full
+ * enriched set so the UI's tab badges and rank dropdown stay complete even
+ * though only one page of rows is returned.
+ */
+export async function listWorkOrdersPaged(
+  vesselId: string | undefined,
+  vesselIds: string[] | undefined,
+  params: ListWorkOrdersPagedParams,
+): Promise<ListWorkOrdersPagedResult> {
+  const enriched = await listWorkOrders(vesselId, vesselIds);
+
+  const statusCounts = computeWorkOrderTabCounts(enriched);
+
+  const rankOptions = Array.from(
+    new Set(
+      enriched
+        .map((wo: any) => (typeof wo.assignedTo === 'string' ? wo.assignedTo.trim() : ''))
+        .filter((rank: string) => rank.length > 0),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+
+  const filtered = filterAndSortWorkOrders(enriched, params);
+  const approvalTierCounts = computeApprovalTierCounts(filtered);
+
+  const total = filtered.length;
+  const pageSize = params.pageSize;
+  const page = params.page;
+  const start = (page - 1) * pageSize;
+  const items = filtered.slice(start, start + pageSize);
+
+  return { items, total, page, pageSize, statusCounts, approvalTierCounts, rankOptions };
 }
 
 // ── Rejection History ──
