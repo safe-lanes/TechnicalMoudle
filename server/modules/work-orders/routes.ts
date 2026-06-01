@@ -96,7 +96,7 @@ router.post('/work-orders/:id/reject-completion',
 
 // POST /work-orders/:id/reopen-completion — reopen a Completed WO (Office/PMS Admin only)
 router.post('/work-orders/:id/reopen-completion',
-  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  requireRole(['Office', 'PMS Admin']),
   asyncHandler(woCtrl.reopenCompletion)
 );
 
