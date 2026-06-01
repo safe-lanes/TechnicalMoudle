@@ -427,7 +427,7 @@ export default function ShipsCertificatesAdmin() {
       ? companyOnlyCerts.filter(c => !c.certificateLabel?.trim())
       : [];
     const invalidVessel = activeTab === "vessel"
-      ? vesselOnlyCerts.filter(c => !c.certificateLabel?.trim())
+      ? getVisibleVesselOnlyCerts().filter(c => !c.certificateLabel?.trim())
       : [];
     if (invalidCompany.length > 0 || invalidVessel.length > 0) {
       setInvalidCompanyCertIds(new Set(invalidCompany.map(c => c.id)));
@@ -616,7 +616,26 @@ export default function ShipsCertificatesAdmin() {
     },
     enabled: selectedVesselIds.length > 0,
   });
-  
+
+  // Vessel-only certs that are actually visible/editable for the currently
+  // selected vessel(s). Shared by renderVesselTab (display) and handleSave
+  // (validation) so the two never drift. Validating the full global
+  // vesselOnlyCerts array would otherwise block Save on empty-label rows that
+  // belong to other vessels and aren't even on screen.
+  const getVisibleVesselOnlyCerts = () => {
+    const vesselIds = getSelectedVesselIds();
+    return vesselOnlyCerts.filter((cert: any) => {
+      if (cert.id >= 2000) {
+        if (viewModes.vessel !== "edit") return false;
+        const pending: string[] | undefined = cert._pendingVesselIds;
+        return vesselIds.some(v => pending?.includes(v));
+      }
+      return vesselIds.some(vesselId =>
+        vesselApplicabilityData.some((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId)
+      );
+    });
+  };
+
   // Initialize vessel applicability mutation
   const initializeVesselMutation = useMutation({
     mutationFn: async ({ vesselId, vesselName }: { vesselId: string, vesselName: string }) => {
@@ -2245,17 +2264,7 @@ export default function ShipsCertificatesAdmin() {
                   }));
                   const vesselMergedCompanyList: any[] = [...vesselCompanyFromMaster, ...vesselCompanyOnlyMapped]
                     .sort((a, b) => a._sortSequence - b._sortSequence);
-                  const vesselOnlyVisible = vesselOnlyCerts.filter((cert: any) => {
-                    const vesselIds = getSelectedVesselIds();
-                    if (cert.id >= 2000) {
-                      if (viewModes.vessel !== "edit") return false;
-                      const pending: string[] | undefined = cert._pendingVesselIds;
-                      return vesselIds.some(v => pending?.includes(v));
-                    }
-                    return vesselIds.some(vesselId =>
-                      vesselApplicabilityData.some((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId)
-                    );
-                  });
+                  const vesselOnlyVisible = getVisibleVesselOnlyCerts();
                   if (selectedVessels.length === 0) {
                     return (
                       <tr>
