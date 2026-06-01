@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -6328,16 +6329,25 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           {!embedded && currentWorkOrderStatus === 'Completed' && !isVessel && (
             <>
               {!showReopenSection && (
-                <div className="mt-4 flex justify-start">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowReopenSection(true)}
-                    className="text-sm font-semibold border-gray-300 hover:bg-gray-50"
-                    data-testid="button-show-reopen-section"
-                  >
-                    <Plus className="h-4 w-4 mr-1.5" />
-                    Reopen
-                  </Button>
+                <div className="mt-4 flex justify-center">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowReopenSection(true)}
+                          className="text-sm font-semibold border-gray-300 hover:bg-gray-50"
+                          data-testid="button-show-reopen-section"
+                        >
+                          <Plus className="h-4 w-4 mr-1.5" />
+                          Reopen
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Reopen Completed Work Order</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               )}
               {showReopenSection && (
