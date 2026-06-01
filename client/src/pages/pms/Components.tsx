@@ -2330,6 +2330,7 @@ const Components: React.FC = () => {
   // Fetch components from API and build tree
   const { data: fetchedComponents = [], isLoading: isLoadingComponents } = useQuery<any[]>({
     queryKey: [`/technical/api/components/${vesselId}`],
+    enabled: !!vesselId && vesselId !== 'all',
   });
   
   const inactivateMutation = useMutation({
