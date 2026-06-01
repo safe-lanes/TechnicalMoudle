@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/table";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { WorkOrder, ChangeRequest } from "@shared/schema";
+import { getEffectiveStatus } from "@shared/utils/workOrderFilters";
 import WOAgGridTable from "@/components/WOAgGridTable";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import {
@@ -1382,7 +1383,10 @@ const Dashboard = () => {
   const completionRate = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.completed / workOrderKPIs.total) * 100) : 0;
 
   // "Active O/D W.O (Today)" gauges:
-  //   numerator   = open WOs whose dueDate < start of today
+  //   numerator   = open WOs whose official status is 'Overdue'
+  //                 (computedStatus from the backend — same rule as the
+  //                 Work Orders > Overdue tab; honours grace period and
+  //                 Running-Hours-based due dates)
   //   denominator = all open (non-completed, non-execution) WOs
   const activeOverdueToday = useMemo(() => {
     const startOfToday = new Date();
@@ -1399,14 +1403,21 @@ const Dashboard = () => {
       return isNaN(due.getTime()) ? null : due;
     };
 
+    // Use the shared effective-status helper (the single source of truth the
+    // Work Orders > Overdue tab uses) so the gauge matches it exactly: it
+    // honours the grace period and Running-Hours due, forces Unplanned WOs out
+    // of the Overdue bucket, and falls back to `status` when computedStatus is
+    // absent on a payload.
     const isCurrentOverdue = (wo: EnrichedWorkOrder) => {
       if (!isOpen(wo)) return false;
-      const due = getDue(wo);
-      return !!due && due < startOfToday;
+      return getEffectiveStatus(wo) === 'Overdue';
     };
 
+    // ">30 days overdue" still uses the calendar due date, but only over
+    // WOs that are actually Overdue by the official rule, so the badge
+    // stays a strict subset of the numerator above.
     const isOver30 = (wo: EnrichedWorkOrder) => {
-      if (!isOpen(wo)) return false;
+      if (!isCurrentOverdue(wo)) return false;
       const due = getDue(wo);
       return !!due && due < thirtyDaysAgo;
     };
