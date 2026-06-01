@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -9,7 +9,6 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
   CheckCircle,
-  CheckSquare,
   XCircle,
   Eye,
   Pencil,
@@ -41,7 +40,7 @@ import {
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { WorkOrder, ChangeRequest } from "@shared/schema";
 import WOAgGridTable from "@/components/WOAgGridTable";
-import type { ColDef } from "ag-grid-community";
+import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import {
   WoStatusBadgeCell,
   WoCriticalityBadgeCell,
@@ -50,7 +49,6 @@ import {
 import { RejectionHistoryBadge } from "@/components/wo/RejectionHistoryBadge";
 import { useVessels } from "@/hooks/useVessels";
 import { PeriodFilter, type PeriodFilterValue, periodFilterToDateRange, getPeriodLabel } from "@/components/filters/PeriodFilter";
-import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
 import { ComplianceAnomalyPanel } from "./ComplianceAnomalyPanel";
 import { WorkOrdersListModal } from "./WorkOrdersListModal";
@@ -66,6 +64,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
@@ -375,7 +383,8 @@ const FleetView = ({ vessels, onSelectVessel }: { vessels: { id: string; name: s
 const Dashboard = () => {
   const [, setLocation] = useLocation();
   const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
+  const [pendingSelectedIds, setPendingSelectedIds] = useState<Set<string>>(new Set());
+  const [pendingBulkConfirmApprove, setPendingBulkConfirmApprove] = useState(false);
   const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: EnrichedWorkOrder[] }>({ open: false, title: '', workOrders: [] });
   const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
   const [crListModal, setCrListModal] = useState<{ open: boolean; title: string; changeRequests: ChangeRequest[] }>({ open: false, title: '', changeRequests: [] });
@@ -787,42 +796,51 @@ const Dashboard = () => {
     };
   }, [filteredWorkOrdersData]);
 
-  // Approve single work order mutation (for Head of Dept quick actions)
+  // Approve work orders mutation (supports single or bulk)
   const approveMutation = useMutation({
-    mutationFn: async (workOrderId: string) => {
+    mutationFn: async (workOrderIds: string[]) => {
       const response = await apiRequest('POST', '/technical/api/work-orders/bulk-approve', {
-        workOrderIds: [workOrderId],
+        workOrderIds,
         approver: "Head of Dept"
       });
       return response.json();
     },
-    onSuccess: () => {
-      toast({ title: "Success", description: "Work order approved successfully" });
+    onSuccess: (data) => {
+      const count = data?.results?.success?.length ?? 1;
+      toast({ title: "Success", description: `${count} work order${count !== 1 ? 's' : ''} approved successfully` });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      setPendingSelectedIds(new Set());
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to approve work order", variant: "destructive" });
     }
   });
 
-  // Reject single work order mutation (for Head of Dept quick actions)
+  // Reject work orders mutation (supports single or bulk)
   const rejectMutation = useMutation({
-    mutationFn: async ({ workOrderId, comments }: { workOrderId: string; comments: string }) => {
+    mutationFn: async ({ workOrderIds, comments }: { workOrderIds: string[]; comments: string }) => {
       const response = await apiRequest('POST', '/technical/api/work-orders/bulk-reject', {
-        workOrderIds: [workOrderId],
+        workOrderIds,
         approver: "Head of Dept",
         rejectionComments: comments
       });
       return response.json();
     },
-    onSuccess: () => {
-      toast({ title: "Rejected", description: "Work order rejected and sent back to Due" });
+    onSuccess: (data) => {
+      const count = data?.results?.success?.length ?? 1;
+      toast({ title: "Rejected", description: `${count} work order${count !== 1 ? 's' : ''} rejected and sent back to Due` });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      setPendingSelectedIds(new Set());
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to reject work order", variant: "destructive" });
     }
   });
+
+  const handlePendingSelectionChanged = useCallback((event: SelectionChangedEvent) => {
+    const ids = event.api.getSelectedRows().map((r: any) => String(r.id));
+    setPendingSelectedIds(new Set(ids));
+  }, []);
 
   const sparesKPIs = useMemo(() => {
     const lowStockSpares = filteredSparesData.filter(spare => {
@@ -1660,6 +1678,7 @@ const Dashboard = () => {
   }, [isAllVessels, vessels]);
 
   const pendingApprovalsColumnDefs: ColDef[] = useMemo(() => {
+    const hasSelection = pendingSelectedIds.size > 0;
     const formatWoDate = (d: string | null | undefined) => {
       if (!d) return '—';
       try {
@@ -1688,7 +1707,22 @@ const Dashboard = () => {
         <span className="truncate font-medium" data-testid={`cell-pending-approval-vessel-${params.data?.id ?? ''}`}>{params.value || '—'}</span>
       ),
     };
+    const checkboxCol: ColDef = {
+      headerName: '',
+      field: '__select',
+      width: 48,
+      minWidth: 48,
+      maxWidth: 48,
+      checkboxSelection: true,
+      headerCheckboxSelection: true,
+      headerCheckboxSelectionFilteredOnly: true,
+      sortable: false,
+      filter: false,
+      resizable: false,
+      pinned: 'left',
+    };
     return [
+      checkboxCol,
       ...(isAllVessels ? [vesselCol] : []),
       {
         headerName: 'Component',
@@ -1761,8 +1795,9 @@ const Dashboard = () => {
       {
         headerName: 'Actions',
         field: 'id',
-        minWidth: 220,
-        flex: 0,
+        minWidth: 100,
+        width: 100,
+        hide: hasSelection,
         sortable: false,
         filter: false,
         resizable: false,
@@ -1770,46 +1805,21 @@ const Dashboard = () => {
           const wo = params.data;
           if (!wo) return null;
           return (
-            <div className="flex items-center justify-center gap-2 h-full">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => { e.stopPropagation(); navigateToWorkOrder(wo.id); }}
-                data-testid={`button-op-view-pending-wo-${wo.id}`}
-              >
-                <Eye className="w-4 h-4" />
-              </Button>
+            <div className="flex items-center justify-center h-full">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openRejectDialog('wo', String(wo.id), wo.jobTitle ? `WO-${wo.id} • ${wo.jobTitle}` : `WO-${wo.id}`);
-                }}
-                style={{ borderColor: '#E53935', color: '#E53935' }}
-                disabled={rejectMutation.isPending}
-                data-testid={`button-op-reject-wo-${wo.id}`}
+                onClick={(e) => { e.stopPropagation(); navigateToWorkOrder(wo.id); }}
+                data-testid={`button-op-edit-pending-wo-${wo.id}`}
               >
-                <XCircle className="w-4 h-4 mr-1" />
-                Reject
-              </Button>
-              <Button
-                size="sm"
-                onClick={(e) => { e.stopPropagation(); approveMutation.mutate(wo.id); }}
-                style={{ background: '#2E7D32' }}
-                className="text-white hover:opacity-90"
-                disabled={approveMutation.isPending}
-                data-testid={`button-op-approve-wo-${wo.id}`}
-              >
-                <CheckCircle className="w-4 h-4 mr-1" />
-                Approve
+                Edit
               </Button>
             </div>
           );
         },
       },
     ];
-  }, [isAllVessels, vessels, navigateToWorkOrder, rejectMutation, approveMutation]);
+  }, [isAllVessels, vessels, navigateToWorkOrder, pendingSelectedIds]);
 
   const criticalSparesColumnDefs: ColDef[] = useMemo(() => {
     const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
@@ -2656,18 +2666,37 @@ const Dashboard = () => {
                       <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E0E0E0' }}>
                         <span style={{ fontSize: '13px', fontWeight: 500, color: '#212121' }}>
                           {operationKPIs.pendingApprovalCount} work order{operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} require your review
+                          {pendingSelectedIds.size > 0 && (
+                            <span style={{ marginLeft: '8px', color: '#1565C0' }}>
+                              • {pendingSelectedIds.size} selected
+                            </span>
+                          )}
                         </span>
-                        {operationKPIs.pendingApprovalCount > 0 && (
-                          <Button
-                            onClick={() => setBulkApproveModalOpen(true)}
-                            style={{ background: '#1565C0' }}
-                            className="text-white hover:opacity-90"
-                            size="sm"
-                            data-testid="button-op-bulk-approve-open"
-                          >
-                            <CheckSquare className="w-4 h-4 mr-2" />
-                            Bulk Approve ({operationKPIs.pendingApprovalCount})
-                          </Button>
+                        {pendingSelectedIds.size > 0 && (
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              style={{ borderColor: '#E53935', color: '#E53935' }}
+                              onClick={() => openRejectDialog('wo', '__bulk__', `${pendingSelectedIds.size} work order${pendingSelectedIds.size !== 1 ? 's' : ''}`)}
+                              disabled={rejectMutation.isPending || approveMutation.isPending}
+                              data-testid="button-op-bulk-reject-open"
+                            >
+                              <XCircle className="w-4 h-4 mr-1" />
+                              Reject ({pendingSelectedIds.size})
+                            </Button>
+                            <Button
+                              size="sm"
+                              style={{ background: '#2E7D32' }}
+                              className="text-white hover:opacity-90"
+                              onClick={() => setPendingBulkConfirmApprove(true)}
+                              disabled={approveMutation.isPending || rejectMutation.isPending}
+                              data-testid="button-op-bulk-approve-confirm"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              Approve ({pendingSelectedIds.size})
+                            </Button>
+                          </div>
                         )}
                       </div>
                       <div style={{ height: 'calc(100vh - 360px)', minHeight: '360px' }} data-testid="ag-grid-op-pending-approvals-wrap">
@@ -2678,6 +2707,10 @@ const Dashboard = () => {
                           rowHeight={52}
                           noRowsMessage="No work orders pending approval"
                           testId="ag-grid-op-pending-approvals"
+                          rowSelection="multiple"
+                          onSelectionChanged={handlePendingSelectionChanged}
+                          getRowId={(params) => String(params.data.id)}
+                          suppressRowClickSelection={true}
                           getRowClass={(params) => {
                             const id = params.data?.id;
                             const base = id ? `row-op-pending-approval-wo-${id}` : '';
@@ -3504,13 +3537,31 @@ const Dashboard = () => {
           </div>
         )}
       </div>
-      <BulkApproveModal
-        open={bulkApproveModalOpen}
-        onOpenChange={setBulkApproveModalOpen}
-        workOrders={activeTab === 'management' && selectedOpCard === 'pending-approvals' ? operationKPIs.pendingApprovalWOs : (workOrderKPIs.pendingApprovalFull || [])}
-        vesselId={effectiveVesselId}
-        vesselName={currentVessel?.name}
-      />
+      <AlertDialog open={pendingBulkConfirmApprove} onOpenChange={setPendingBulkConfirmApprove}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Approve {pendingSelectedIds.size} Work Order{pendingSelectedIds.size !== 1 ? 's' : ''}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will approve all {pendingSelectedIds.size} selected work order{pendingSelectedIds.size !== 1 ? 's' : ''}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-bulk-approve">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                approveMutation.mutate(Array.from(pendingSelectedIds));
+                setPendingBulkConfirmApprove(false);
+              }}
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="button-confirm-bulk-approve"
+            >
+              Approve
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <WorkOrdersListModal
         open={woListModal.open}
         onClose={handleWoListModalClose}
@@ -3879,7 +3930,8 @@ const Dashboard = () => {
                 if (rejectDialog.type === 'wo') {
                   setRejectSubmitting(true);
                   try {
-                    await rejectMutation.mutateAsync({ workOrderId: rejectDialog.id, comments: reason });
+                    const ids = rejectDialog.id === '__bulk__' ? Array.from(pendingSelectedIds) : [rejectDialog.id];
+                    await rejectMutation.mutateAsync({ workOrderIds: ids, comments: reason });
                     closeRejectDialog();
                   } catch {
                     setRejectSubmitting(false);
