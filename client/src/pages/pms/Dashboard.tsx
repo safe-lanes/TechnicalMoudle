@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -9,7 +9,6 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
   CheckCircle,
-  CheckSquare,
   XCircle,
   Eye,
   Pencil,
@@ -41,7 +40,7 @@ import {
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { WorkOrder, ChangeRequest } from "@shared/schema";
 import WOAgGridTable from "@/components/WOAgGridTable";
-import type { ColDef } from "ag-grid-community";
+import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import {
   WoStatusBadgeCell,
   WoCriticalityBadgeCell,
@@ -50,7 +49,6 @@ import {
 import { RejectionHistoryBadge } from "@/components/wo/RejectionHistoryBadge";
 import { useVessels } from "@/hooks/useVessels";
 import { PeriodFilter, type PeriodFilterValue, periodFilterToDateRange, getPeriodLabel } from "@/components/filters/PeriodFilter";
-import { BulkApproveModal } from "@/components/BulkApproveModal";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
 import { ComplianceAnomalyPanel } from "./ComplianceAnomalyPanel";
 import { WorkOrdersListModal } from "./WorkOrdersListModal";
@@ -66,6 +64,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
@@ -372,13 +380,26 @@ const FleetView = ({ vessels, onSelectVessel }: { vessels: { id: string; name: s
   );
 };
 
+// Map a raw change-request status to its display label used across the
+// Modify PMS Requests donut, drilldown modal, and PDF export.
+const mapCrStatusLabel = (raw: string | null | undefined): string => {
+  const st = raw?.trim().toLowerCase();
+  if (st === 'submitted' || st === 'pending') return 'Pending Approval';
+  if (st === 'approved') return 'Approved';
+  if (st === 'rejected') return 'Rejected';
+  if (st === 'returned') return 'Returned';
+  if (st === 'draft') return 'Draft';
+  return raw || '-';
+};
+
 const Dashboard = () => {
   const [, setLocation] = useLocation();
   const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
+  const [pendingSelectedIds, setPendingSelectedIds] = useState<Set<string>>(new Set());
+  const [pendingBulkConfirmApprove, setPendingBulkConfirmApprove] = useState(false);
   const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: EnrichedWorkOrder[] }>({ open: false, title: '', workOrders: [] });
   const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
-  const [crListModal, setCrListModal] = useState<{ open: boolean; title: string; changeRequests: ChangeRequest[] }>({ open: false, title: '', changeRequests: [] });
+  const [crListModal, setCrListModal] = useState<{ open: boolean; title: string; changeRequests: ChangeRequest[]; statusFilter: string | null }>({ open: false, title: '', changeRequests: [], statusFilter: null });
   const DRILLDOWN_KEY = 'dashboardDrilldownModal';
   const DRILLDOWN_NAV_KEY = 'dashboardDrilldownNavigating';
   const DASHBOARD_PERIOD_KEY = 'dashboardPeriod';
@@ -410,8 +431,8 @@ const Dashboard = () => {
     const ids = args.spares.map((s: any) => spareKeyOf(s));
     persistDrilldown('spares', args.title, ids);
   };
-  const openCrListModal = (args: { title: string; changeRequests: ChangeRequest[] }) => {
-    setCrListModal({ open: true, title: args.title, changeRequests: args.changeRequests });
+  const openCrListModal = (args: { title: string; changeRequests: ChangeRequest[]; statusFilter?: string | null }) => {
+    setCrListModal({ open: true, title: args.title, changeRequests: args.changeRequests, statusFilter: args.statusFilter ?? null });
     const ids = args.changeRequests.map((cr: any) => (cr?.id != null ? String(cr.id) : ''));
     persistDrilldown('cr', args.title, ids);
   };
@@ -424,7 +445,7 @@ const Dashboard = () => {
     clearDrilldownIfNotNavigating();
   };
   const handleCrListModalClose = () => {
-    setCrListModal({ open: false, title: '', changeRequests: [] });
+    setCrListModal({ open: false, title: '', changeRequests: [], statusFilter: null });
     clearDrilldownIfNotNavigating();
   };
   const crListModalOpenRef = useRef(false);
@@ -754,9 +775,9 @@ const Dashboard = () => {
     const due = safeWOs.filter(wo => 
       ((wo as any).computedStatus === 'Due' || (wo as any).computedStatus === 'Due (Grace P)') && !wo.isExecution
     );
-    // Overdue only includes breach items (past tolerance/grace period)
+    // Overdue includes breach items and superintendent-rejected completed WOs
     const overdue = safeWOs.filter(wo => 
-      (wo as any).computedStatus === 'Overdue' && !wo.isExecution
+      ((wo as any).computedStatus === 'Overdue' || (wo as any).computedStatus === 'Rejected') && !wo.isExecution
     );
     const pendingApproval = safeWOs.filter(wo => 
       (wo as any).computedStatus === 'Pending Approval'
@@ -787,42 +808,51 @@ const Dashboard = () => {
     };
   }, [filteredWorkOrdersData]);
 
-  // Approve single work order mutation (for Head of Dept quick actions)
+  // Approve work orders mutation (supports single or bulk)
   const approveMutation = useMutation({
-    mutationFn: async (workOrderId: string) => {
+    mutationFn: async (workOrderIds: string[]) => {
       const response = await apiRequest('POST', '/technical/api/work-orders/bulk-approve', {
-        workOrderIds: [workOrderId],
+        workOrderIds,
         approver: "Head of Dept"
       });
       return response.json();
     },
-    onSuccess: () => {
-      toast({ title: "Success", description: "Work order approved successfully" });
+    onSuccess: (data) => {
+      const count = data?.results?.success?.length ?? 1;
+      toast({ title: "Success", description: `${count} work order${count !== 1 ? 's' : ''} approved successfully` });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      setPendingSelectedIds(new Set());
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to approve work order", variant: "destructive" });
     }
   });
 
-  // Reject single work order mutation (for Head of Dept quick actions)
+  // Reject work orders mutation (supports single or bulk)
   const rejectMutation = useMutation({
-    mutationFn: async ({ workOrderId, comments }: { workOrderId: string; comments: string }) => {
+    mutationFn: async ({ workOrderIds, comments }: { workOrderIds: string[]; comments: string }) => {
       const response = await apiRequest('POST', '/technical/api/work-orders/bulk-reject', {
-        workOrderIds: [workOrderId],
+        workOrderIds,
         approver: "Head of Dept",
         rejectionComments: comments
       });
       return response.json();
     },
-    onSuccess: () => {
-      toast({ title: "Rejected", description: "Work order rejected and sent back to Due" });
+    onSuccess: (data) => {
+      const count = data?.results?.success?.length ?? 1;
+      toast({ title: "Rejected", description: `${count} work order${count !== 1 ? 's' : ''} rejected and sent back to Due` });
       queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      setPendingSelectedIds(new Set());
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to reject work order", variant: "destructive" });
     }
   });
+
+  const handlePendingSelectionChanged = useCallback((event: SelectionChangedEvent) => {
+    const ids = event.api.getSelectedRows().map((r: any) => String(r.id));
+    setPendingSelectedIds(new Set(ids));
+  }, []);
 
   const sparesKPIs = useMemo(() => {
     const lowStockSpares = filteredSparesData.filter(spare => {
@@ -1021,7 +1051,7 @@ const Dashboard = () => {
       const idSet = new Set(ids);
       const matched = (changeRequestsData as any[]).filter((cr: any) => idSet.has(String(cr?.id))) as ChangeRequest[];
       if (matched.length > 0) {
-        setCrListModal({ open: true, title, changeRequests: matched });
+        setCrListModal({ open: true, title, changeRequests: matched, statusFilter: null });
       } else {
         clear();
       }
@@ -1314,7 +1344,7 @@ const Dashboard = () => {
       (wo.computedStatus === 'Due' || wo.computedStatus === 'Due (Grace P)') && !wo.isExecution
     );
     const overdue = safeWOs.filter(wo =>
-      wo.computedStatus === 'Overdue' && !wo.isExecution
+      (wo.computedStatus === 'Overdue' || wo.computedStatus === 'Rejected') && !wo.isExecution
     );
     const pendingApproval = safeWOs.filter(wo =>
       wo.computedStatus === 'Pending Approval'
@@ -1660,6 +1690,7 @@ const Dashboard = () => {
   }, [isAllVessels, vessels]);
 
   const pendingApprovalsColumnDefs: ColDef[] = useMemo(() => {
+    const hasSelection = pendingSelectedIds.size > 0;
     const formatWoDate = (d: string | null | undefined) => {
       if (!d) return '—';
       try {
@@ -1688,7 +1719,22 @@ const Dashboard = () => {
         <span className="truncate font-medium" data-testid={`cell-pending-approval-vessel-${params.data?.id ?? ''}`}>{params.value || '—'}</span>
       ),
     };
+    const checkboxCol: ColDef = {
+      headerName: '',
+      field: '__select',
+      width: 48,
+      minWidth: 48,
+      maxWidth: 48,
+      checkboxSelection: true,
+      headerCheckboxSelection: true,
+      headerCheckboxSelectionFilteredOnly: true,
+      sortable: false,
+      filter: false,
+      resizable: false,
+      pinned: 'left',
+    };
     return [
+      checkboxCol,
       ...(isAllVessels ? [vesselCol] : []),
       {
         headerName: 'Component',
@@ -1761,8 +1807,9 @@ const Dashboard = () => {
       {
         headerName: 'Actions',
         field: 'id',
-        minWidth: 220,
-        flex: 0,
+        minWidth: 60,
+        width: 60,
+        hide: hasSelection,
         sortable: false,
         filter: false,
         resizable: false,
@@ -1770,46 +1817,22 @@ const Dashboard = () => {
           const wo = params.data;
           if (!wo) return null;
           return (
-            <div className="flex items-center justify-center gap-2 h-full">
+            <div className="flex items-center justify-center h-full">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={(e) => { e.stopPropagation(); navigateToWorkOrder(wo.id); }}
-                data-testid={`button-op-view-pending-wo-${wo.id}`}
+                data-testid={`button-op-edit-pending-wo-${wo.id}`}
+                className="text-gray-500 hover:text-gray-800 hover:bg-gray-100"
               >
-                <Eye className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openRejectDialog('wo', String(wo.id), wo.jobTitle ? `WO-${wo.id} • ${wo.jobTitle}` : `WO-${wo.id}`);
-                }}
-                style={{ borderColor: '#E53935', color: '#E53935' }}
-                disabled={rejectMutation.isPending}
-                data-testid={`button-op-reject-wo-${wo.id}`}
-              >
-                <XCircle className="w-4 h-4 mr-1" />
-                Reject
-              </Button>
-              <Button
-                size="sm"
-                onClick={(e) => { e.stopPropagation(); approveMutation.mutate(wo.id); }}
-                style={{ background: '#2E7D32' }}
-                className="text-white hover:opacity-90"
-                disabled={approveMutation.isPending}
-                data-testid={`button-op-approve-wo-${wo.id}`}
-              >
-                <CheckCircle className="w-4 h-4 mr-1" />
-                Approve
+                <Pencil className="w-4 h-4" />
               </Button>
             </div>
           );
         },
       },
     ];
-  }, [isAllVessels, vessels, navigateToWorkOrder, rejectMutation, approveMutation]);
+  }, [isAllVessels, vessels, navigateToWorkOrder, pendingSelectedIds]);
 
   const criticalSparesColumnDefs: ColDef[] = useMemo(() => {
     const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
@@ -2066,12 +2089,41 @@ const Dashboard = () => {
     return { numerator: num, denominator: woDen, percent, changeRequestsFull: crNumeratorList };
   }, [workOrdersData, changeRequestsData, dashboardPeriodRange]);
 
-  // Task #80: While the CR list modal is open (gauge drilldown), keep its
-  // contents in sync with the same period filter as the gauge numerator.
-  // Replaces the previous YTD-only refresh effect.
+  // Task #104: Modify PMS Requests donut — split the in-period change requests
+  // by approval status. Draft requests are excluded entirely (not yet
+  // submitted), per product direction. Only non-zero statuses render as slices.
+  const modifyPmsDonutData = useMemo(() => {
+    const order: { status: string; color: string }[] = [
+      { status: 'Pending Approval', color: '#2563eb' },
+      { status: 'Approved',         color: '#5dc86f' },
+      { status: 'Rejected',         color: '#ff6961' },
+      { status: 'Returned',         color: '#f1c40f' },
+    ];
+    const groups = new Map<string, ChangeRequest[]>(order.map(o => [o.status, []]));
+    for (const cr of modifyPmsPeriodKPIs.changeRequestsFull) {
+      const label = mapCrStatusLabel(cr.status);
+      if (label === 'Draft') continue; // excluded from donut and total
+      const arr = groups.get(label);
+      if (arr) arr.push(cr);
+    }
+    const data = order
+      .map(o => ({ status: o.status, color: o.color, count: groups.get(o.status)?.length ?? 0, requests: groups.get(o.status) ?? [] }))
+      .filter(d => d.count > 0);
+    const total = data.reduce((sum, d) => sum + d.count, 0);
+    return { data, total };
+  }, [modifyPmsPeriodKPIs.changeRequestsFull]);
+
+  // Task #80/#104: While the CR list modal is open (donut drilldown), keep its
+  // contents in sync with the same period filter. If a status slice was
+  // clicked, re-apply that status filter so refetches don't widen the list.
   useEffect(() => {
     if (!crListModalOpenRef.current) return;
-    setCrListModal(prev => ({ ...prev, changeRequests: modifyPmsPeriodKPIs.changeRequestsFull }));
+    setCrListModal(prev => {
+      const next = prev.statusFilter
+        ? modifyPmsPeriodKPIs.changeRequestsFull.filter(cr => mapCrStatusLabel(cr.status) === prev.statusFilter)
+        : modifyPmsPeriodKPIs.changeRequestsFull;
+      return { ...prev, changeRequests: next };
+    });
   }, [modifyPmsPeriodKPIs.changeRequestsFull]);
 
   // Task #81: Top 5 reasons chart driven by the global dashboardPeriod
@@ -2656,19 +2708,49 @@ const Dashboard = () => {
                       <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E0E0E0' }}>
                         <span style={{ fontSize: '13px', fontWeight: 500, color: '#212121' }}>
                           {operationKPIs.pendingApprovalCount} work order{operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} require your review
+                          {pendingSelectedIds.size > 0 && (
+                            <span style={{ marginLeft: '8px', color: '#1565C0' }}>
+                              • {pendingSelectedIds.size} selected
+                            </span>
+                          )}
                         </span>
-                        {operationKPIs.pendingApprovalCount > 0 && (
-                          <Button
-                            onClick={() => setBulkApproveModalOpen(true)}
-                            style={{ background: '#1565C0' }}
-                            className="text-white hover:opacity-90"
-                            size="sm"
-                            data-testid="button-op-bulk-approve-open"
-                          >
-                            <CheckSquare className="w-4 h-4 mr-2" />
-                            Bulk Approve ({operationKPIs.pendingApprovalCount})
-                          </Button>
-                        )}
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              style={pendingSelectedIds.size > 0 ? { borderColor: '#E53935', color: '#E53935' } : {}}
+                              onClick={() => {
+                                if (pendingSelectedIds.size === 0) {
+                                  toast({ description: 'Please select at least one checkbox.' });
+                                  return;
+                                }
+                                openRejectDialog('wo', '__bulk__', `${pendingSelectedIds.size} work order${pendingSelectedIds.size !== 1 ? 's' : ''}`);
+                              }}
+                              disabled={rejectMutation.isPending || approveMutation.isPending}
+                              data-testid="button-op-bulk-reject-open"
+                            >
+                              <XCircle className="w-4 h-4 mr-1" />
+                              {pendingSelectedIds.size > 0 ? `Reject (${pendingSelectedIds.size})` : 'Reject'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              style={pendingSelectedIds.size > 0 ? { background: '#2E7D32' } : {}}
+                              className={pendingSelectedIds.size > 0 ? "text-white hover:opacity-90" : ""}
+                              variant={pendingSelectedIds.size > 0 ? undefined : "outline"}
+                              onClick={() => {
+                                if (pendingSelectedIds.size === 0) {
+                                  toast({ description: 'Please select at least one checkbox.' });
+                                  return;
+                                }
+                                setPendingBulkConfirmApprove(true);
+                              }}
+                              disabled={approveMutation.isPending || rejectMutation.isPending}
+                              data-testid="button-op-bulk-approve-confirm"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              {pendingSelectedIds.size > 0 ? `Approve (${pendingSelectedIds.size})` : 'Approve'}
+                            </Button>
+                          </div>
                       </div>
                       <div style={{ height: 'calc(100vh - 360px)', minHeight: '360px' }} data-testid="ag-grid-op-pending-approvals-wrap">
                         <WOAgGridTable
@@ -2678,6 +2760,10 @@ const Dashboard = () => {
                           rowHeight={52}
                           noRowsMessage="No work orders pending approval"
                           testId="ag-grid-op-pending-approvals"
+                          rowSelection="multiple"
+                          onSelectionChanged={handlePendingSelectionChanged}
+                          getRowId={(params) => String(params.data.id)}
+                          suppressRowClickSelection={true}
                           getRowClass={(params) => {
                             const id = params.data?.id;
                             const base = id ? `row-op-pending-approval-wo-${id}` : '';
@@ -3468,29 +3554,65 @@ const Dashboard = () => {
 
                   <div style={dividerH} />
 
-                  {/* Row 3: Modify PMS Requests gauge — Task #80: period-driven; Task #82: tooltip */}
+                  {/* Row 3: Modify PMS Requests donut — Task #104: status split */}
                   <TooltipProvider delayDuration={200}>
                     <UITooltip>
                       <TooltipTrigger asChild>
                         <div tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded" data-testid="cell-right-row3">
                           <div style={subTitle} className="mb-1 mt-2">MODIFY PMS REQUESTS</div>
-                          <SemiCircleGauge
-                            value={modifyPmsPeriodKPIs.denominator > 0 ? modifyPmsPeriodKPIs.numerator : 0}
-                            max={modifyPmsPeriodKPIs.denominator > 0 ? modifyPmsPeriodKPIs.denominator : 1}
-                            color="#e74c3c"
-                            displayValue={`${modifyPmsPeriodKPIs.percent}%`}
-                            subtitle={`${modifyPmsPeriodKPIs.numerator} modifications out of ${modifyPmsPeriodKPIs.denominator} WO`}
-                            onClick={() => openCrListModal({
-                              title: 'Modify PMS Requests',
-                              changeRequests: modifyPmsPeriodKPIs.changeRequestsFull,
-                            })}
-                            testId="gauge-modify-pms-ytd"
-                          />
+                          <div style={{ height: '170px' }} data-testid="card-modify-pms-chart">
+                            {modifyPmsDonutData.data.length > 0 ? (
+                              <ResponsiveContainer width="100%" height={170}>
+                                <PieChart>
+                                  <Pie
+                                    data={modifyPmsDonutData.data}
+                                    dataKey="count"
+                                    nameKey="status"
+                                    cx="50%"
+                                    cy="45%"
+                                    innerRadius={35}
+                                    outerRadius={58}
+                                    paddingAngle={2}
+                                    label={({ cx, cy, midAngle, innerRadius, outerRadius, payload }: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; payload: { count: number } }) => {
+                                      const RADIAN = Math.PI / 180;
+                                      const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                                      const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                      const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                                      return (
+                                        <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight="bold">
+                                          {payload.count}
+                                        </text>
+                                      );
+                                    }}
+                                    labelLine={false}
+                                    onClick={(_data: Record<string, unknown>, index: number) => {
+                                      const entry = modifyPmsDonutData.data[index];
+                                      if (!entry) return;
+                                      openCrListModal({
+                                        title: `Modify PMS Requests - ${entry.status}`,
+                                        changeRequests: entry.requests,
+                                        statusFilter: entry.status,
+                                      });
+                                    }}
+                                    cursor="pointer"
+                                  >
+                                    {modifyPmsDonutData.data.map((entry, index) => (
+                                      <Cell key={`modify-pms-cell-${index}`} fill={entry.color} stroke={entry.color} />
+                                    ))}
+                                  </Pie>
+                                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '2px' }} />
+                                </PieChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>No Modify PMS requests to display</div>
+                            )}
+                          </div>
                         </div>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed" data-testid="tooltip-modify-pms-formula">
-                        <div>Modify PMS % = (Change requests raised during the period ÷ Scheduled work orders during the period) × 100.</div>
-                        <div className="mt-1">A "request" is a change request whose created date falls in the window; the denominator matches the Postponed gauge.</div>
+                        <div>Distribution of Modify PMS requests by status for the selected period (total: {modifyPmsDonutData.total}).</div>
+                        <div className="mt-1">Slices: Pending Approval, Approved, Rejected, Returned. Draft requests are excluded as they have not been submitted.</div>
+                        <div className="mt-1">Click a slice to see the underlying requests.</div>
                         <div className="mt-1 font-medium">Period: {dashboardPeriodLabel}</div>
                       </TooltipContent>
                     </UITooltip>
@@ -3504,13 +3626,31 @@ const Dashboard = () => {
           </div>
         )}
       </div>
-      <BulkApproveModal
-        open={bulkApproveModalOpen}
-        onOpenChange={setBulkApproveModalOpen}
-        workOrders={activeTab === 'management' && selectedOpCard === 'pending-approvals' ? operationKPIs.pendingApprovalWOs : (workOrderKPIs.pendingApprovalFull || [])}
-        vesselId={effectiveVesselId}
-        vesselName={currentVessel?.name}
-      />
+      <AlertDialog open={pendingBulkConfirmApprove} onOpenChange={setPendingBulkConfirmApprove}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Approve {pendingSelectedIds.size} Work Order{pendingSelectedIds.size !== 1 ? 's' : ''}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will approve all {pendingSelectedIds.size} selected work order{pendingSelectedIds.size !== 1 ? 's' : ''}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-bulk-approve">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                approveMutation.mutate(Array.from(pendingSelectedIds));
+                setPendingBulkConfirmApprove(false);
+              }}
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="button-confirm-bulk-approve"
+            >
+              Approve
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <WorkOrdersListModal
         open={woListModal.open}
         onClose={handleWoListModalClose}
@@ -3879,7 +4019,8 @@ const Dashboard = () => {
                 if (rejectDialog.type === 'wo') {
                   setRejectSubmitting(true);
                   try {
-                    await rejectMutation.mutateAsync({ workOrderId: rejectDialog.id, comments: reason });
+                    const ids = rejectDialog.id === '__bulk__' ? Array.from(pendingSelectedIds) : [rejectDialog.id];
+                    await rejectMutation.mutateAsync({ workOrderIds: ids, comments: reason });
                     closeRejectDialog();
                   } catch {
                     setRejectSubmitting(false);

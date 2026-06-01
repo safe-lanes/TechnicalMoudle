@@ -23,6 +23,8 @@ export const getWoStatusBadgeColor = (status: string): string => {
       return "bg-purple-100 text-purple-800";
     case "rejected":
       return "bg-red-100 text-red-800";
+    case "reopened":
+      return "bg-amber-100 text-amber-800";
     case "draft":
       return "bg-gray-100 text-gray-800";
     default:

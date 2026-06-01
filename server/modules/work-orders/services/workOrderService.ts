@@ -8,7 +8,7 @@ import { calculateMissedCycles, calculateMissedCyclesRH } from '@shared/dateUtil
 import { invalidateComplianceCache } from './complianceAnomalyService';
 import { storage } from '../../../storage';
 import { getDb } from '../../../db';
-import { plannerDates } from '@shared/schema';
+import { plannerDates, jobs } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { logFieldChanges } from '../../sync';
 import {
@@ -534,14 +534,31 @@ export async function getRejectionHistory(id: string) {
     logs.push(...entries);
   }
 
+  const REJECTION_ACTION_TYPES = new Set(['reject', 'superintendent_reject_completion', 'superintendent_reopen_completion']);
+
   const rejections = logs
-    .filter((entry: any) => entry.actionType === 'reject')
+    .filter((entry: any) => REJECTION_ACTION_TYPES.has(entry.actionType))
     .map((entry: any) => {
       const payload = entry.payload || {};
+      const isSuperintendentCompletion = entry.actionType === 'superintendent_reject_completion';
+      const isSuperintendentReopen = entry.actionType === 'superintendent_reopen_completion';
       return {
-        rejectedAt: payload.rejectedAt || entry.timestamp,
-        rejectedBy: entry.userId,
-        rejectionComments: payload.rejectionComments ?? null,
+        rejectedAt: isSuperintendentReopen
+          ? (payload.reopenedAt || entry.timestamp)
+          : (payload.rejectedAt || entry.timestamp),
+        rejectedBy: (isSuperintendentCompletion || isSuperintendentReopen)
+          ? (payload.rejectedByName || payload.reopenedByName || entry.userId)
+          : entry.userId,
+        rejectionComments: isSuperintendentCompletion
+          ? (payload.rejectionRemarks ?? null)
+          : isSuperintendentReopen
+          ? (payload.reopenRemarks ?? null)
+          : (payload.rejectionComments ?? null),
+        rejectionType: isSuperintendentCompletion
+          ? 'superintendent_completion_rejection'
+          : isSuperintendentReopen
+          ? 'superintendent_completion_reopen'
+          : 'approver_rejection',
       };
     })
     .sort((a, b) => {
@@ -1083,14 +1100,18 @@ export async function updateWorkOrder(id: string, body: any) {
     console.log('📝 Work order rejected - setting status to Due, wasRejected=true, clearing approval tier for rework');
   }
 
-  // REJECTED WO RESUBMISSION
-  const isRejectedWO = existingWO.wasRejected === true;
+  // REJECTED WO RESUBMISSION (handles both approval-path rejection and completion-rejection)
+  const isRejectedWO = existingWO.wasRejected === true || existingWO.status === 'Rejected';
   if (isRejectedWO && hasCompletionData && !hasExplicitStatus) {
     updateData.status = 'Pending Approval';
     updateData.rejectionComments = null;
     updateData.rejectionDate = null;
     updateData.approvalAction = null;
     updateData.submittedDate = new Date().toISOString();
+    // Clear superintendent rejection remarks when a completion-rejected WO is resubmitted
+    if (existingWO.status === 'Rejected') {
+      updateData.superintendentRejectionRemarks = null;
+    }
     console.log('📝 Previously rejected WO resubmitted - transitioning to Pending Approval');
   }
 
@@ -2063,4 +2084,272 @@ export async function getScopedOperationData(
       fallbackMode: null,
     },
   };
+}
+
+// ── Superintendent Completion Rejection ──
+
+/**
+ * Reject a Completed work order from the Office/Superintendent side.
+ *
+ * - Status transitions: Completed → Rejected (completion data preserved)
+ * - Remarks stored in superintendentRejectionRemarks
+ * - Sibling WOs (same jobId, same vessel, Active/Due/Overdue, dueDate > rejected WO dueDate) are soft-deleted
+ * - Job's nextDueDate is reset to the rejected WO's dueDate so the cycle restarts
+ * - Sync field changes and audit log are emitted
+ */
+export async function rejectCompletedWorkOrder(
+  id: string,
+  remarks: string,
+  actorUserUuid: string,
+  actorName?: string
+) {
+  // 1. Resolve WO
+  let existingWO = await repo.findById(id);
+  if (!existingWO) existingWO = await repo.findByCode(id);
+  if (!existingWO) throw new NotFoundError('Work order not found');
+
+  // 2. Guard: only Completed WOs may be rejected via this path
+  if (existingWO.status !== 'Completed') {
+    throw new ValidationError(
+      `Only Completed work orders can be rejected by the superintendent. Current status: ${existingWO.status}`
+    );
+  }
+
+  // 2b. Guard: remarks are mandatory
+  if (!remarks || !remarks.trim()) {
+    throw new ValidationError('Superintendent rejection remarks are mandatory.');
+  }
+
+  const rejectedAt = new Date().toISOString();
+
+  // 3. Update the WO — status → Rejected, wasRejected → true; all completion data preserved
+  const updatePayload: any = {
+    status: 'Rejected',
+    wasRejected: true,
+    superintendentRejectionRemarks: remarks.trim(),
+    superintendentRejectedByName: actorName || actorUserUuid,
+    rejectionDate: rejectedAt,
+  };
+  const updatedWO = await repo.update(id, updatePayload);
+
+  // 4. Sync field-level change log — not wrapped: failures must surface for sync reliability
+  await logFieldChanges(
+    'work_orders',
+    existingWO.wouuid,
+    existingWO.vesselId || null,
+    existingWO,
+    updatedWO,
+    actorUserUuid
+  );
+
+  // 5. Audit log entry — distinct type for superintendent completion rejection
+  try {
+    await repo.createAuditLog({
+      entityType: 'work_order',
+      entityId: existingWO.wouuid || id,
+      actionType: 'superintendent_reject_completion',
+      userId: actorUserUuid,
+      source: 'web_ui',
+      vesselCode: existingWO.vesselId || null,
+      componentCode: existingWO.componentCode || null,
+      fieldName: null,
+      oldValue: null,
+      newValue: null,
+      payload: {
+        workOrderNo: existingWO.workOrderNo,
+        rejectedAt,
+        rejectedByName: actorName || actorUserUuid,
+        rejectionRemarks: remarks.trim(),
+        rejectionType: 'superintendent_completion_rejection',
+      },
+    });
+  } catch (err) {
+    console.error('[AuditLog] Completed WO rejection:', err);
+  }
+
+  // 6. Cancel next-cycle sibling WOs:
+  //    - Same jobId + vesselId
+  //    - Status in: Active, Planned, Due, Due (Grace P), Overdue
+  //    - Not already deleted
+  //    - dueDate or nextDueDate is after the rejected WO's completionDateTime (or dueDate as fallback)
+  if (existingWO.jobId && existingWO.vesselId) {
+    try {
+      const siblings = await repo.findWorkOrdersByJobId(existingWO.jobId);
+      // Use completionDateTime as the reference point; fall back to dueDate
+      const referenceDate = (existingWO as any).completionDateTime || existingWO.dueDate || '';
+      const openStatuses = new Set(['Active', 'Planned', 'Due', 'Due (Grace P)', 'Overdue']);
+      const toCancel = siblings.filter((wo: any) =>
+        wo.id !== existingWO!.id &&
+        wo.vesselId === existingWO!.vesselId &&
+        openStatuses.has(wo.status) &&
+        !wo.isDeleted &&
+        referenceDate &&
+        (
+          (wo.dueDate && wo.dueDate > referenceDate) ||
+          (wo.nextDueDate && wo.nextDueDate > referenceDate)
+        )
+      );
+      for (const sibling of toCancel) {
+        const cancelled = await repo.update(sibling.id, { isDeleted: true, isActive: false });
+        try {
+          await logFieldChanges(
+            'work_orders',
+            sibling.wouuid,
+            sibling.vesselId || null,
+            sibling,
+            cancelled,
+            actorUserUuid
+          );
+        } catch (err) {
+          console.error('[FieldLogger] Sibling WO cancellation:', err);
+        }
+        console.log(`🗑️ [Rejection] Cancelled next-cycle sibling WO: ${sibling.workOrderNo}`);
+      }
+    } catch (err) {
+      console.error('[Rejection] Error cancelling sibling WOs:', err);
+    }
+  }
+
+  // 7. Reset job's nextDueDate to the rejected WO's dueDate so the cycle regenerates from the right point
+  if (existingWO.jobId && existingWO.dueDate) {
+    try {
+      const db = await getDb();
+      await db
+        .update(jobs)
+        .set({ nextDueDate: existingWO.dueDate })
+        .where(eq(jobs.juuid, existingWO.jobId));
+      console.log(`📅 [Rejection] Reset job nextDueDate to ${existingWO.dueDate} for job ${existingWO.jobId}`);
+    } catch (err) {
+      console.error('[Rejection] Error resetting job nextDueDate:', err);
+    }
+  }
+
+  return updatedWO;
+}
+
+// ── Superintendent Reopen Completed Work Order ──
+
+export async function reopenCompletedWorkOrder(
+  id: string,
+  remarks: string,
+  actorUserUuid: string,
+  actorName?: string
+) {
+  // 1. Resolve WO
+  let existingWO = await repo.findById(id);
+  if (!existingWO) existingWO = await repo.findByCode(id);
+  if (!existingWO) throw new NotFoundError('Work order not found');
+
+  // 2. Guard: only Completed WOs may be reopened
+  if (existingWO.status !== 'Completed') {
+    throw new ValidationError(
+      `Only Completed work orders can be reopened. Current status: ${existingWO.status}`
+    );
+  }
+
+  // 3. Guard: remarks are mandatory
+  if (!remarks || !remarks.trim()) {
+    throw new ValidationError('Superintendent reopen remarks are mandatory.');
+  }
+
+  const reopenedAt = new Date().toISOString();
+
+  // 4. Update: status → Reopened, wasReopened → true; all completion data preserved
+  const updatePayload: any = {
+    status: 'Reopened',
+    wasReopened: true,
+    superintendentReopenRemarks: remarks.trim(),
+    superintendentReopenedByName: actorName || actorUserUuid,
+    reopenedAt,
+  };
+  const updatedWO = await repo.update(id, updatePayload);
+
+  // 5. Sync field-level change log
+  await logFieldChanges(
+    'work_orders',
+    existingWO.wouuid,
+    existingWO.vesselId || null,
+    existingWO,
+    updatedWO,
+    actorUserUuid
+  );
+
+  // 6. Audit log entry
+  try {
+    await repo.createAuditLog({
+      entityType: 'work_order',
+      entityId: existingWO.wouuid || id,
+      actionType: 'superintendent_reopen_completion',
+      userId: actorUserUuid,
+      source: 'web_ui',
+      vesselCode: existingWO.vesselId || null,
+      componentCode: existingWO.componentCode || null,
+      fieldName: null,
+      oldValue: null,
+      newValue: null,
+      payload: {
+        workOrderNo: existingWO.workOrderNo,
+        reopenedAt,
+        reopenedByName: actorName || actorUserUuid,
+        reopenRemarks: remarks.trim(),
+        reopenType: 'superintendent_completion_reopen',
+      },
+    });
+  } catch (err) {
+    console.error('[AuditLog] Completed WO reopen:', err);
+  }
+
+  // 7. Cancel next-cycle sibling WOs (same logic as rejectCompletedWorkOrder)
+  if (existingWO.jobId && existingWO.vesselId) {
+    try {
+      const siblings = await repo.findWorkOrdersByJobId(existingWO.jobId);
+      const referenceDate = (existingWO as any).completionDateTime || existingWO.dueDate || '';
+      const openStatuses = new Set(['Active', 'Planned', 'Due', 'Due (Grace P)', 'Overdue']);
+      const toCancel = siblings.filter((wo: any) =>
+        wo.id !== existingWO!.id &&
+        wo.vesselId === existingWO!.vesselId &&
+        openStatuses.has(wo.status) &&
+        !wo.isDeleted &&
+        referenceDate &&
+        (
+          (wo.dueDate && wo.dueDate > referenceDate) ||
+          (wo.nextDueDate && wo.nextDueDate > referenceDate)
+        )
+      );
+      for (const sibling of toCancel) {
+        const cancelled = await repo.update(sibling.id, { isDeleted: true, isActive: false });
+        try {
+          await logFieldChanges(
+            'work_orders',
+            sibling.wouuid,
+            sibling.vesselId || null,
+            sibling,
+            cancelled,
+            actorUserUuid
+          );
+        } catch (err) {
+          console.error('[FieldLogger] Sibling WO cancellation (reopen):', err);
+        }
+        console.log(`🗑️ [Reopen] Cancelled next-cycle sibling WO: ${sibling.workOrderNo}`);
+      }
+    } catch (err) {
+      console.error('[Reopen] Error cancelling sibling WOs:', err);
+    }
+  }
+
+  // 8. Reset job's nextDueDate to the reopened WO's dueDate so the cycle regenerates
+  if (existingWO.jobId && existingWO.dueDate) {
+    try {
+      const db = await getDb();
+      await db
+        .update(jobs)
+        .set({ nextDueDate: existingWO.dueDate })
+        .where(eq(jobs.juuid, existingWO.jobId));
+      console.log(`📅 [Reopen] Reset job nextDueDate to ${existingWO.dueDate} for job ${existingWO.jobId}`);
+    } catch (err) {
+      console.error('[Reopen] Error resetting job nextDueDate:', err);
+    }
+  }
+
+  return updatedWO;
 }
