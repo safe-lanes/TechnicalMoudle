@@ -553,7 +553,10 @@ export default function ShipsCertificatesAdmin() {
     const targetVessels = (vesselMasterData || [])
       .filter(v => selectedVessels.includes(v.name))
       .map(v => ({ id: String(v.id), name: v.name }));
-    const newVesselCerts = vesselOnlyCerts.filter(c => !/^VES-\d+$/.test(c.masterId));
+    // Only mark applicability for new vessel certs the user left checked
+    // (cert.applicable). Toggled-off rows are still created, just not marked
+    // applicable to the selected vessel(s).
+    const newVesselCerts = vesselOnlyCerts.filter(c => !/^VES-\d+$/.test(c.masterId) && c.applicable !== false);
     const newVesselMasterIds = vesselOnlyCertsWithIds
       .filter(c => newVesselCerts.some(nv => nv.id === c.id))
       .map(c => c.masterId);
@@ -2355,7 +2358,13 @@ export default function ShipsCertificatesAdmin() {
                       {vesselOnlyVisible.map((cert, idx) => {
                   const companyGroupLabel = companyGroupLabels.find(g => g.key === cert.companyGroup)?.label || "";
                   const displayCompanyGroup = cert.companyGroup ? `${cert.companyGroup}. ${companyGroupLabel}` : "";
-                  const applicability = getCertificateApplicability(cert.masterId);
+                  // Newly-added vessel certs have no persisted VES- masterId yet, so their
+                  // applicability lives in local state (the `applicable` flag) until Save.
+                  // Routing them through the backend mutation with an empty masterId fails.
+                  const isNewUnsaved = !/^VES-\d+$/.test(cert.masterId);
+                  const applicability = isNewUnsaved
+                    ? (cert.applicable === true)
+                    : getCertificateApplicability(cert.masterId);
                   const isMixed = applicability === 'mixed';
                   const isChecked = applicability === true;
                   
@@ -2366,7 +2375,13 @@ export default function ShipsCertificatesAdmin() {
                           <Checkbox
                             checked={isMixed ? false : isChecked}
                             onCheckedChange={(checked) => {
-                              if (!conflictCheck.hasConflict && viewModes.vessel === "edit") {
+                              if (conflictCheck.hasConflict || viewModes.vessel !== "edit") return;
+                              if (isNewUnsaved) {
+                                setVesselOnlyCerts(prev => prev.map(c =>
+                                  c.id === cert.id ? { ...c, applicable: !!checked } : c
+                                ));
+                                setHasUnsavedChanges(true);
+                              } else {
                                 handleApplicabilityChange(cert.masterId, !!checked);
                               }
                             }}
