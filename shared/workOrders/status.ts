@@ -269,7 +269,10 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
   if (isExecution) {
     if (status === 'Pending Approval') return 'Pending Approval';
     if (status === 'Rejected') return 'Rejected';
-    if (completionDateTime) {
+    if (status === 'Reopened') {
+      // Reopened WOs preserve completionDateTime but must re-compute Due/Overdue/Active
+      // Fall through to the calendar/RH computation block below
+    } else if (completionDateTime) {
       return 'Completed';
     } else {
       return 'Active';
@@ -282,7 +285,9 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
 
   if (status === 'Rejected') return 'Rejected';
   
-  if (completionDateTime) {
+  // 'Reopened' WOs preserve completionDateTime by design — skip the Completed early-return
+  // so they re-enter the calendar/RH computation and naturally surface as Due/Overdue/Active.
+  if (status !== 'Reopened' && completionDateTime) {
     return 'Completed';
   }
   
