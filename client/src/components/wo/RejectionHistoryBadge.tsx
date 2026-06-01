@@ -12,6 +12,8 @@ export interface RejectionHistoryEntry {
   rejectedAt: string | null;
   rejectedBy: string | null;
   rejectionComments: string | null;
+  /** Distinguishes approver (pending-approval) rejections from superintendent completion rejections */
+  rejectionType?: 'approver_rejection' | 'superintendent_completion_rejection';
 }
 
 interface RejectionHistoryBadgeProps {

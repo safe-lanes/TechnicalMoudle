@@ -476,14 +476,24 @@ export async function getRejectionHistory(id: string) {
     logs.push(...entries);
   }
 
+  const REJECTION_ACTION_TYPES = new Set(['reject', 'superintendent_reject_completion']);
+
   const rejections = logs
-    .filter((entry: any) => entry.actionType === 'reject')
+    .filter((entry: any) => REJECTION_ACTION_TYPES.has(entry.actionType))
     .map((entry: any) => {
       const payload = entry.payload || {};
+      const isSuperintendentCompletion = entry.actionType === 'superintendent_reject_completion';
       return {
         rejectedAt: payload.rejectedAt || entry.timestamp,
-        rejectedBy: entry.userId,
-        rejectionComments: payload.rejectionComments ?? null,
+        rejectedBy: isSuperintendentCompletion
+          ? (payload.rejectedByName || entry.userId)
+          : entry.userId,
+        rejectionComments: isSuperintendentCompletion
+          ? (payload.rejectionRemarks ?? null)
+          : (payload.rejectionComments ?? null),
+        rejectionType: isSuperintendentCompletion
+          ? 'superintendent_completion_rejection'
+          : 'approver_rejection',
       };
     })
     .sort((a, b) => {
