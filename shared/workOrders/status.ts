@@ -268,8 +268,8 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
 
   if (isExecution) {
     if (status === 'Pending Approval') return 'Pending Approval';
-    if (status === 'Rejected') {
-    } else if (completionDateTime) {
+    if (status === 'Rejected') return 'Rejected';
+    if (completionDateTime) {
       return 'Completed';
     } else {
       return 'Active';
@@ -279,8 +279,10 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
   if (status === 'Pending Approval') return 'Pending Approval';
   
   if (status === 'Postponed') return 'Postponed';
+
+  if (status === 'Rejected') return 'Rejected';
   
-  if (status !== 'Rejected' && completionDateTime) {
+  if (completionDateTime) {
     return 'Completed';
   }
   
