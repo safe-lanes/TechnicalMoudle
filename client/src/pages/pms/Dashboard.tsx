@@ -1795,8 +1795,8 @@ const Dashboard = () => {
       {
         headerName: 'Actions',
         field: 'id',
-        minWidth: 100,
-        width: 100,
+        minWidth: 60,
+        width: 60,
         hide: hasSelection,
         sortable: false,
         filter: false,
@@ -1807,14 +1807,13 @@ const Dashboard = () => {
           return (
             <div className="flex items-center justify-center h-full">
               <Button
-                variant="outline"
-                size="sm"
+                variant="ghost"
+                size="icon"
                 onClick={(e) => { e.stopPropagation(); navigateToWorkOrder(wo.id); }}
                 data-testid={`button-op-edit-pending-wo-${wo.id}`}
-                className="flex items-center gap-1 border border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="text-gray-500 hover:text-gray-800 hover:bg-gray-100"
               >
-                <Pencil className="w-3.5 h-3.5" />
-                Edit
+                <Pencil className="w-4 h-4" />
               </Button>
             </div>
           );
