@@ -1811,7 +1811,9 @@ const Dashboard = () => {
                 size="sm"
                 onClick={(e) => { e.stopPropagation(); navigateToWorkOrder(wo.id); }}
                 data-testid={`button-op-edit-pending-wo-${wo.id}`}
+                className="flex items-center gap-1 border border-gray-300 text-gray-700 hover:bg-gray-50"
               >
+                <Pencil className="w-3.5 h-3.5" />
                 Edit
               </Button>
             </div>
@@ -2672,32 +2674,43 @@ const Dashboard = () => {
                             </span>
                           )}
                         </span>
-                        {pendingSelectedIds.size > 0 && (
-                          <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ display: 'flex', gap: '8px' }}>
                             <Button
                               variant="outline"
                               size="sm"
-                              style={{ borderColor: '#E53935', color: '#E53935' }}
-                              onClick={() => openRejectDialog('wo', '__bulk__', `${pendingSelectedIds.size} work order${pendingSelectedIds.size !== 1 ? 's' : ''}`)}
+                              style={pendingSelectedIds.size > 0 ? { borderColor: '#E53935', color: '#E53935' } : {}}
+                              onClick={() => {
+                                if (pendingSelectedIds.size === 0) {
+                                  toast({ description: 'Please select at least one checkbox.' });
+                                  return;
+                                }
+                                openRejectDialog('wo', '__bulk__', `${pendingSelectedIds.size} work order${pendingSelectedIds.size !== 1 ? 's' : ''}`);
+                              }}
                               disabled={rejectMutation.isPending || approveMutation.isPending}
                               data-testid="button-op-bulk-reject-open"
                             >
                               <XCircle className="w-4 h-4 mr-1" />
-                              Reject ({pendingSelectedIds.size})
+                              {pendingSelectedIds.size > 0 ? `Reject (${pendingSelectedIds.size})` : 'Reject'}
                             </Button>
                             <Button
                               size="sm"
-                              style={{ background: '#2E7D32' }}
-                              className="text-white hover:opacity-90"
-                              onClick={() => setPendingBulkConfirmApprove(true)}
+                              style={pendingSelectedIds.size > 0 ? { background: '#2E7D32' } : {}}
+                              className={pendingSelectedIds.size > 0 ? "text-white hover:opacity-90" : ""}
+                              variant={pendingSelectedIds.size > 0 ? undefined : "outline"}
+                              onClick={() => {
+                                if (pendingSelectedIds.size === 0) {
+                                  toast({ description: 'Please select at least one checkbox.' });
+                                  return;
+                                }
+                                setPendingBulkConfirmApprove(true);
+                              }}
                               disabled={approveMutation.isPending || rejectMutation.isPending}
                               data-testid="button-op-bulk-approve-confirm"
                             >
                               <CheckCircle className="w-4 h-4 mr-1" />
-                              Approve ({pendingSelectedIds.size})
+                              {pendingSelectedIds.size > 0 ? `Approve (${pendingSelectedIds.size})` : 'Approve'}
                             </Button>
                           </div>
-                        )}
                       </div>
                       <div style={{ height: 'calc(100vh - 360px)', minHeight: '360px' }} data-testid="ag-grid-op-pending-approvals-wrap">
                         <WOAgGridTable
