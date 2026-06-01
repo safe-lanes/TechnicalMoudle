@@ -32,6 +32,10 @@ type TransactionMode = "consume" | "receive" | "";
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
+// Stable empty reference so the loading state doesn't hand a fresh array to the
+// [sparesData] effect on every render (which would loop setBulkUpdateData).
+const EMPTY_SPARES: Spare[] = [];
+
 export default function BulkUpdateSpares() {
   const [, setLocation] = useLocation();
   const { vesselId } = useVessel();
@@ -47,12 +51,24 @@ export default function BulkUpdateSpares() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
-  const { data: sparesData = [], isLoading } = useQuery({
+  const { data: sparesData = EMPTY_SPARES, isLoading } = useQuery({
     queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId],
     queryFn: async () => {
       const response = await fetch(`/technical/api/inventory/spares-with-inventory/${vesselId}`);
       if (!response.ok) return [];
-      return response.json();
+      const json = await response.json();
+      // The endpoint returns the envelope { success, data: SpareWithInventory[] },
+      // where each item is { spare, robTotal, stockStatus, locations, linkedComponents }.
+      // Flatten to the spare object (carrying stock fields) — same shape the main
+      // Spares screen consumes — so the grid, search, and inputs read flat fields.
+      const list = Array.isArray(json) ? json : (json?.data ?? []);
+      return (Array.isArray(list) ? list : []).map((item: any) => ({
+        ...item.spare,
+        robTotal: item.robTotal,
+        stockStatus: item.stockStatus,
+        locations: item.locations || [],
+        linkedComponents: item.linkedComponents || [],
+      }));
     },
     enabled: !!vesselId
   });
