@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { asyncHandler } from '../shared/middleware';
+import { requireRole } from '../../middleware/auth';
 import * as woCtrl from './controllers/workOrderController';
 import * as woDocCtrl from './controllers/woDocumentController';
 
@@ -87,8 +88,11 @@ router.delete('/work-orders/:id', asyncHandler(woCtrl.deleteWorkOrder));
 
 // ── Superintendent Endpoints (Layer 5) ──
 
-// POST /work-orders/:id/reject-completion — reject a Completed WO (superintendent/office only)
-router.post('/work-orders/:id/reject-completion', asyncHandler(woCtrl.rejectCompletion));
+// POST /work-orders/:id/reject-completion — reject a Completed WO (Office/PMS Admin only)
+router.post('/work-orders/:id/reject-completion',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.rejectCompletion)
+);
 
 // POST /work-orders/:id/superintendent-acknowledge
 router.post('/work-orders/:id/superintendent-acknowledge', asyncHandler(woCtrl.superintendentAcknowledge));

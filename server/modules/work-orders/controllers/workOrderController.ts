@@ -126,10 +126,15 @@ export async function deleteWorkOrder(req: Request, res: Response) {
 
 export async function rejectCompletion(req: Request, res: Response) {
   try {
-    const actor = resolveActorIdentity(req);
+    const actorName = resolveActorIdentity(req);
     const { remarks } = req.body;
-    const actorId = actor || (req as AuthenticatedRequest).user?.username || 'system';
-    const result = await woService.rejectCompletedWorkOrder(req.params.id, remarks || '', actorId);
+    const actorUserUuid = (req as AuthenticatedRequest).user?.userUuid || (req as AuthenticatedRequest).user?.username || 'system';
+    const result = await woService.rejectCompletedWorkOrder(
+      req.params.id,
+      remarks || '',
+      actorUserUuid,
+      actorName
+    );
     res.json(result);
   } catch (error: any) {
     console.error('❌ Completion rejection error:', error);

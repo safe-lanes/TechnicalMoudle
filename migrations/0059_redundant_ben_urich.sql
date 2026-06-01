@@ -1,0 +1,1 @@
+ALTER TABLE "work_orders" ADD COLUMN "superintendent_rejected_by_name" text;

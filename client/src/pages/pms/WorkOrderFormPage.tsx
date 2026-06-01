@@ -506,6 +506,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   // Superintendent completion-rejection state
   const [completionRejectionRemarks, setCompletionRejectionRemarks] = useState('');
+  const [completionRejectionRemarksError, setCompletionRejectionRemarksError] = useState('');
   const [isProcessingCompletionRejection, setIsProcessingCompletionRejection] = useState(false);
   const [showCompletionRejectionConfirm, setShowCompletionRejectionConfirm] = useState(false);
 
@@ -6304,7 +6305,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-5" data-testid="section-completion-rejection">
               <div className="flex items-center gap-2 mb-3">
                 <AlertTriangle className="h-4 w-4 text-red-700" />
-                <h3 className="text-sm font-bold text-red-800 uppercase tracking-wide">Reject Completion</h3>
+                <h3 className="text-sm font-bold text-red-800 uppercase tracking-wide">Superintendent Review — Reject Completion</h3>
               </div>
               <p className="text-xs text-red-700 mb-3">
                 Use this only if the completed work order requires correction. All existing completion data will be preserved.
@@ -6316,25 +6317,40 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </Label>
                 <Textarea
                   value={completionRejectionRemarks}
-                  onChange={(e) => setCompletionRejectionRemarks(e.target.value)}
+                  onChange={(e) => {
+                    setCompletionRejectionRemarks(e.target.value);
+                    if (completionRejectionRemarksError) setCompletionRejectionRemarksError('');
+                  }}
                   maxLength={500}
-                  placeholder="Provide your reason for rejecting this completed work order (minimum 10 characters)..."
-                  className="text-sm min-h-[100px] border-red-200 focus:border-red-400 bg-white"
+                  placeholder="Provide your reason for rejecting this completed work order..."
+                  className={`text-sm min-h-[100px] bg-white ${completionRejectionRemarksError ? 'border-red-500 focus:border-red-600' : 'border-red-200 focus:border-red-400'}`}
                   data-testid="input-completion-rejection-remarks"
                 />
+                {completionRejectionRemarksError && (
+                  <p className="text-xs text-red-600 font-medium" data-testid="error-completion-rejection-remarks">
+                    {completionRejectionRemarksError}
+                  </p>
+                )}
                 <span className="text-xs text-gray-400 block text-right">{completionRejectionRemarks.length} / 500</span>
               </div>
               <div className="flex justify-end">
                 <Button
-                  onClick={() => setShowCompletionRejectionConfirm(true)}
-                  disabled={completionRejectionRemarks.trim().length < 10 || isProcessingCompletionRejection}
-                  className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2 h-auto text-sm rounded-full shadow-sm min-w-[140px]"
+                  onClick={() => {
+                    if (!completionRejectionRemarks.trim()) {
+                      setCompletionRejectionRemarksError('Superintendent Rejection Remarks are mandatory.');
+                      return;
+                    }
+                    setCompletionRejectionRemarksError('');
+                    setShowCompletionRejectionConfirm(true);
+                  }}
+                  disabled={isProcessingCompletionRejection}
+                  className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2 h-auto text-sm rounded-full shadow-sm min-w-[160px]"
                   data-testid="button-reject-completion"
                 >
                   {isProcessingCompletionRejection ? (
                     <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Rejecting...</>
                   ) : (
-                    'Reject Completion'
+                    'Reject Completed Work Order'
                   )}
                 </Button>
               </div>
@@ -6346,8 +6362,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4" data-testid="display-superintendent-rejection-remarks">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
-                <div>
-                  <Label className="text-sm font-semibold text-amber-800 block mb-1">Superintendent Rejection Remarks</Label>
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mb-2">
+                    <Label className="text-sm font-semibold text-amber-800">Rejected by Superintendent</Label>
+                    {(workOrderContext as any).workOrder.superintendentRejectedByName && (
+                      <span className="text-xs text-amber-700 font-medium">
+                        — {(workOrderContext as any).workOrder.superintendentRejectedByName}
+                      </span>
+                    )}
+                    {(workOrderContext as any).workOrder.rejectionDate && (
+                      <span className="text-xs text-amber-600">
+                        on {new Date((workOrderContext as any).workOrder.rejectionDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-amber-900 whitespace-pre-wrap">{(workOrderContext as any).workOrder.superintendentRejectionRemarks}</p>
                 </div>
               </div>
