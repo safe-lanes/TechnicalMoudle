@@ -8891,7 +8891,7 @@ export class PostgresStorage {
       LEFT JOIN locations l ON sls.location_id = l.id
       LEFT JOIN spare_component_links scl ON scl.spare_id = s.id
       LEFT JOIN components c ON scl.component_id = c.cuuid
-      WHERE s.vessel_id = ${vesselId}
+      WHERE ${vesselId === 'all' ? sql`TRUE` : sql`s.vessel_id = ${vesselId}`}
         AND s.deleted = false
         AND s.data_scope = 'vessel'
       GROUP BY s.id
@@ -9006,11 +9006,15 @@ export class PostgresStorage {
     const dir = (opts.sortDir || 'asc').toLowerCase() === 'desc' ? sql.raw('DESC') : sql.raw('ASC');
 
     // Build dynamic WHERE filter on spares table (rob/min are columns on s)
+    // vesselId === 'all' means the "All Vessel" selection: omit the per-vessel
+    // filter and return spares across every vessel (still paginated).
     const filters: any[] = [
-      sql`s.vessel_id = ${vesselId}`,
       sql`s.deleted = false`,
       sql`s.data_scope = 'vessel'`,
     ];
+    if (vesselId !== 'all') {
+      filters.push(sql`s.vessel_id = ${vesselId}`);
+    }
 
     if (opts.search && opts.search.trim()) {
       const q = `%${opts.search.trim()}%`;

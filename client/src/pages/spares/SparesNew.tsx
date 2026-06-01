@@ -1193,9 +1193,15 @@ const Spares: React.FC = () => {
     enabled: activeTab === 'history'
   });
 
-  // Fetch components for tree display
+  // Fetch components for tree display.
+  // The component-filter tree relies on SFI codes that are only unique WITHIN a
+  // single vessel. Under "All Vessel" (vesselId === 'all') the /components/all
+  // payload mixes duplicate codes across vessels, which corrupts the parent/child
+  // tree build and white-screens the page. Skip the per-vessel tree in that case;
+  // the spares list still shows cross-vessel data with search/filter/pagination.
   const { data: fetchedComponents = [] } = useQuery<any[]>({
     queryKey: [`/technical/api/components/${vesselId}`],
+    enabled: vesselId !== 'all',
   });
   
   // Build component tree from fetched data (same logic as Components.tsx)
