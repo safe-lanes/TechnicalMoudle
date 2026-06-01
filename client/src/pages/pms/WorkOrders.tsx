@@ -346,10 +346,10 @@ const WorkOrders: React.FC = () => {
       return effectiveStatus === "Due" || effectiveStatus === "Due (Grace P)";
     }).length },
     { id: "Overdue", label: "Overdue", count: safeWorkOrdersList.filter(wo => {
-      const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
-      if (wo.isExecution && !isRejectedExecution) return false;
+      const isRejectedWO = wo.status === 'Rejected';
+      if (wo.isExecution && !isRejectedWO) return false;
       const effectiveStatus = getEffectiveStatus(wo);
-      return effectiveStatus === "Overdue";
+      return effectiveStatus === "Overdue" || effectiveStatus === "Rejected";
     }).length },
     { id: "Postponed", label: "Postponed", count: safeWorkOrdersList.filter(wo => {
       if (wo.isExecution) return false;
@@ -386,9 +386,9 @@ const WorkOrders: React.FC = () => {
       if (wo.isExecution && !isRejectedExecution) return false;
       if (effectiveStatus !== "Due" && effectiveStatus !== "Due (Grace P)") return false;
     } else if (activeTab === "Overdue") {
-      const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
-      if (wo.isExecution && !isRejectedExecution) return false;
-      if (effectiveStatus !== "Overdue") return false;
+      const isRejectedWO = wo.status === 'Rejected';
+      if (wo.isExecution && !isRejectedWO) return false;
+      if (effectiveStatus !== "Overdue" && effectiveStatus !== "Rejected") return false;
     } else if (activeTab === "Completed") {
       // Completed Unplanned WOs stay in the Unplanned tab only
       if (wo.workOrderType === 'Unplanned') return false;
