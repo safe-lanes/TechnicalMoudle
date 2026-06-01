@@ -504,6 +504,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [skippedCyclesJustification, setSkippedCyclesJustification] = useState('');
   const [ceApprovalRemarks, setCeApprovalRemarks] = useState('');
 
+  // Superintendent completion-rejection state
+  const [completionRejectionRemarks, setCompletionRejectionRemarks] = useState('');
+  const [isProcessingCompletionRejection, setIsProcessingCompletionRejection] = useState(false);
+  const [showCompletionRejectionConfirm, setShowCompletionRejectionConfirm] = useState(false);
+
   // Track work order type to conditionally skip frequency validation for unplanned WOs
   const [workOrderType, setWorkOrderType] = useState<'Planned' | 'Unplanned'>('Planned');
 
@@ -3401,6 +3406,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           </span>
         </div>
       )}
+      {!embedded && currentWorkOrderStatus === 'Rejected' && (workOrderContext as any)?.workOrder?.superintendentRejectionRemarks && (
+        <div className="sticky top-0 z-50 bg-amber-50 border-b border-amber-300 px-4 py-3" data-testid="banner-superintendent-rejection">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
+            <div>
+              <span className="text-sm font-semibold text-amber-800 block">Rejected by Superintendent</span>
+              <span className="text-sm text-amber-900 whitespace-pre-wrap" data-testid="text-superintendent-rejection-remarks">
+                {(workOrderContext as any).workOrder.superintendentRejectionRemarks}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
       {!embedded && currentWorkOrderStatus === 'Pending Approval' && (() => {
         const topTier: string = (workOrderContext as any)?.workOrder?.approvalTier || 'standard';
         const topDaysLate = (workOrderContext as any)?.workOrder?.daysLate || 0;
@@ -6281,6 +6299,61 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </div>
           )}
 
+          {/* Superintendent Rejection Section — visible to Office users only when WO is Completed */}
+          {!embedded && currentWorkOrderStatus === 'Completed' && !isVessel && (
+            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-5" data-testid="section-completion-rejection">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="h-4 w-4 text-red-700" />
+                <h3 className="text-sm font-bold text-red-800 uppercase tracking-wide">Reject Completion</h3>
+              </div>
+              <p className="text-xs text-red-700 mb-3">
+                Use this only if the completed work order requires correction. All existing completion data will be preserved.
+                The next scheduled work order in this cycle will be cancelled and the maintenance cycle reset.
+              </p>
+              <div className="space-y-2 mb-4" data-testid="field-completion-rejection-remarks">
+                <Label className="text-sm font-semibold text-red-800">
+                  Superintendent Rejection Remarks <span className="text-red-600">*</span>
+                </Label>
+                <Textarea
+                  value={completionRejectionRemarks}
+                  onChange={(e) => setCompletionRejectionRemarks(e.target.value)}
+                  maxLength={500}
+                  placeholder="Provide your reason for rejecting this completed work order (minimum 10 characters)..."
+                  className="text-sm min-h-[100px] border-red-200 focus:border-red-400 bg-white"
+                  data-testid="input-completion-rejection-remarks"
+                />
+                <span className="text-xs text-gray-400 block text-right">{completionRejectionRemarks.length} / 500</span>
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => setShowCompletionRejectionConfirm(true)}
+                  disabled={completionRejectionRemarks.trim().length < 10 || isProcessingCompletionRejection}
+                  className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2 h-auto text-sm rounded-full shadow-sm min-w-[140px]"
+                  data-testid="button-reject-completion"
+                >
+                  {isProcessingCompletionRejection ? (
+                    <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Rejecting...</>
+                  ) : (
+                    'Reject Completion'
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Rejection banner for already-rejected WOs (all roles) */}
+          {currentWorkOrderStatus === 'Rejected' && (workOrderContext as any)?.workOrder?.superintendentRejectionRemarks && (
+            <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4" data-testid="display-superintendent-rejection-remarks">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
+                <div>
+                  <Label className="text-sm font-semibold text-amber-800 block mb-1">Superintendent Rejection Remarks</Label>
+                  <p className="text-sm text-amber-900 whitespace-pre-wrap">{(workOrderContext as any).workOrder.superintendentRejectionRemarks}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
             </>
           )}
 
@@ -6825,6 +6898,73 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           onOpenChange={setRhTimelineOpen}
         />
       )}
+
+      {/* Superintendent Completion Rejection — Confirmation Dialog */}
+      <AlertDialog open={showCompletionRejectionConfirm} onOpenChange={setShowCompletionRejectionConfirm}>
+        <AlertDialogContent data-testid="dialog-completion-rejection-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-700 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Confirm Rejection of Completed Work Order
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 pt-2">
+              <p className="text-sm text-gray-700">
+                This will mark <strong>{(workOrderContext as any)?.workOrder?.workOrderNo}</strong> as <strong className="text-red-700">Rejected</strong>.
+                All completion data will be preserved. The next scheduled work order in this cycle will be cancelled
+                and the maintenance cycle reset to the original due date.
+              </p>
+              {completionRejectionRemarks && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
+                  <span className="font-semibold text-amber-800 block mb-1">Rejection Remarks:</span>
+                  <span className="text-amber-900 whitespace-pre-wrap">{completionRejectionRemarks}</span>
+                </div>
+              )}
+              <p className="text-xs text-gray-500">This action cannot be undone. The crew will be able to resubmit once they have addressed the issue.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => setShowCompletionRejectionConfirm(false)}
+              data-testid="button-rejection-confirm-cancel"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setShowCompletionRejectionConfirm(false);
+                setIsProcessingCompletionRejection(true);
+                try {
+                  await apiRequest(
+                    'POST',
+                    `/technical/api/work-orders/${workOrderId}/reject-completion`,
+                    { remarks: completionRejectionRemarks }
+                  );
+                  toast({
+                    title: 'Work order rejected',
+                    description: 'The completed work order has been rejected. The crew can now resubmit.',
+                  });
+                  setCompletionRejectionRemarks('');
+                  await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+                  await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}`] });
+                  await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+                } catch (err: any) {
+                  toast({
+                    title: 'Rejection failed',
+                    description: err?.message || 'Could not reject the work order. Please try again.',
+                    variant: 'destructive',
+                  });
+                } finally {
+                  setIsProcessingCompletionRejection(false);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              data-testid="button-rejection-confirm-submit"
+            >
+              Confirm Rejection
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

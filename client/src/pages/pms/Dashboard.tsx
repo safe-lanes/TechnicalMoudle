@@ -763,9 +763,9 @@ const Dashboard = () => {
     const due = safeWOs.filter(wo => 
       ((wo as any).computedStatus === 'Due' || (wo as any).computedStatus === 'Due (Grace P)') && !wo.isExecution
     );
-    // Overdue only includes breach items (past tolerance/grace period)
+    // Overdue includes breach items and superintendent-rejected completed WOs
     const overdue = safeWOs.filter(wo => 
-      (wo as any).computedStatus === 'Overdue' && !wo.isExecution
+      ((wo as any).computedStatus === 'Overdue' || (wo as any).computedStatus === 'Rejected') && !wo.isExecution
     );
     const pendingApproval = safeWOs.filter(wo => 
       (wo as any).computedStatus === 'Pending Approval'
@@ -1332,7 +1332,7 @@ const Dashboard = () => {
       (wo.computedStatus === 'Due' || wo.computedStatus === 'Due (Grace P)') && !wo.isExecution
     );
     const overdue = safeWOs.filter(wo =>
-      wo.computedStatus === 'Overdue' && !wo.isExecution
+      (wo.computedStatus === 'Overdue' || wo.computedStatus === 'Rejected') && !wo.isExecution
     );
     const pendingApproval = safeWOs.filter(wo =>
       wo.computedStatus === 'Pending Approval'

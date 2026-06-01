@@ -87,6 +87,9 @@ router.delete('/work-orders/:id', asyncHandler(woCtrl.deleteWorkOrder));
 
 // ── Superintendent Endpoints (Layer 5) ──
 
+// POST /work-orders/:id/reject-completion — reject a Completed WO (superintendent/office only)
+router.post('/work-orders/:id/reject-completion', asyncHandler(woCtrl.rejectCompletion));
+
 // POST /work-orders/:id/superintendent-acknowledge
 router.post('/work-orders/:id/superintendent-acknowledge', asyncHandler(woCtrl.superintendentAcknowledge));
 

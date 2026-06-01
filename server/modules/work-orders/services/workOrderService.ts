@@ -8,7 +8,7 @@ import { calculateMissedCycles, calculateMissedCyclesRH } from '@shared/dateUtil
 import { invalidateComplianceCache } from './complianceAnomalyService';
 import { storage } from '../../../storage';
 import { getDb } from '../../../db';
-import { plannerDates } from '@shared/schema';
+import { plannerDates, jobs } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { logFieldChanges } from '../../sync';
 
@@ -1025,14 +1025,18 @@ export async function updateWorkOrder(id: string, body: any) {
     console.log('📝 Work order rejected - setting status to Due, wasRejected=true, clearing approval tier for rework');
   }
 
-  // REJECTED WO RESUBMISSION
-  const isRejectedWO = existingWO.wasRejected === true;
+  // REJECTED WO RESUBMISSION (handles both approval-path rejection and completion-rejection)
+  const isRejectedWO = existingWO.wasRejected === true || existingWO.status === 'Rejected';
   if (isRejectedWO && hasCompletionData && !hasExplicitStatus) {
     updateData.status = 'Pending Approval';
     updateData.rejectionComments = null;
     updateData.rejectionDate = null;
     updateData.approvalAction = null;
     updateData.submittedDate = new Date().toISOString();
+    // Clear superintendent rejection remarks when a completion-rejected WO is resubmitted
+    if (existingWO.status === 'Rejected') {
+      updateData.superintendentRejectionRemarks = null;
+    }
     console.log('📝 Previously rejected WO resubmitted - transitioning to Pending Approval');
   }
 
@@ -2005,4 +2009,129 @@ export async function getScopedOperationData(
       fallbackMode: null,
     },
   };
+}
+
+// ── Superintendent Completion Rejection ──
+
+/**
+ * Reject a Completed work order from the Office/Superintendent side.
+ *
+ * - Status transitions: Completed → Rejected (completion data preserved)
+ * - Remarks stored in superintendentRejectionRemarks
+ * - Sibling WOs (same jobId, same vessel, Active/Due/Overdue, dueDate > rejected WO dueDate) are soft-deleted
+ * - Job's nextDueDate is reset to the rejected WO's dueDate so the cycle restarts
+ * - Sync field changes and audit log are emitted
+ */
+export async function rejectCompletedWorkOrder(
+  id: string,
+  remarks: string,
+  actorUserUuid: string
+) {
+  // 1. Resolve WO
+  let existingWO = await repo.findById(id);
+  if (!existingWO) existingWO = await repo.findByCode(id);
+  if (!existingWO) throw new NotFoundError('Work order not found');
+
+  // 2. Guard: only Completed WOs may be rejected via this path
+  if (existingWO.status !== 'Completed') {
+    throw new ValidationError(
+      `Only Completed work orders can be rejected by the superintendent. Current status: ${existingWO.status}`
+    );
+  }
+
+  // 3. Update the WO — status → Rejected, store remarks; all other data preserved
+  const updatePayload: any = {
+    status: 'Rejected',
+    superintendentRejectionRemarks: remarks || null,
+    rejectionDate: new Date().toISOString(),
+  };
+  const updatedWO = await repo.update(id, updatePayload);
+
+  // 4. Sync field-level change log
+  try {
+    await logFieldChanges(
+      'work_orders',
+      existingWO.wouuid,
+      existingWO.vesselId || null,
+      existingWO,
+      updatedWO,
+      actorUserUuid
+    );
+  } catch (err) {
+    console.error('[FieldLogger] Completed WO rejection:', err);
+  }
+
+  // 5. Audit log entry (appears in getRejectionHistory via actionType='reject')
+  try {
+    await repo.createAuditLog({
+      entityType: 'work_order',
+      entityId: existingWO.wouuid || id,
+      actionType: 'reject',
+      userId: actorUserUuid,
+      source: 'web_ui',
+      vesselCode: existingWO.vesselId || null,
+      componentCode: existingWO.componentCode || null,
+      fieldName: null,
+      oldValue: null,
+      newValue: null,
+      payload: {
+        workOrderNo: existingWO.workOrderNo,
+        rejectedAt: new Date().toISOString(),
+        rejectionComments: remarks || null,
+        rejectionType: 'completion_rejection',
+      },
+    });
+  } catch (err) {
+    console.error('[AuditLog] Completed WO rejection:', err);
+  }
+
+  // 6. Cancel next-cycle sibling WOs (same jobId + vesselId, open status, dueDate after rejected WO's dueDate)
+  if (existingWO.jobId && existingWO.vesselId) {
+    try {
+      const siblings = await repo.findWorkOrdersByJobId(existingWO.jobId);
+      const rejectedDueDate = existingWO.dueDate || '';
+      const openStatuses = new Set(['Active', 'Due', 'Overdue']);
+      const toCancel = siblings.filter((wo: any) =>
+        wo.id !== existingWO!.id &&
+        wo.vesselId === existingWO!.vesselId &&
+        openStatuses.has(wo.status) &&
+        !wo.isDeleted &&
+        wo.dueDate && rejectedDueDate && wo.dueDate > rejectedDueDate
+      );
+      for (const sibling of toCancel) {
+        const cancelled = await repo.update(sibling.id, { isDeleted: true, isActive: false });
+        try {
+          await logFieldChanges(
+            'work_orders',
+            sibling.wouuid,
+            sibling.vesselId || null,
+            sibling,
+            cancelled,
+            actorUserUuid
+          );
+        } catch (err) {
+          console.error('[FieldLogger] Sibling WO cancellation:', err);
+        }
+        console.log(`🗑️ [Rejection] Cancelled next-cycle sibling WO: ${sibling.workOrderNo}`);
+      }
+    } catch (err) {
+      console.error('[Rejection] Error cancelling sibling WOs:', err);
+    }
+  }
+
+  // 7. Reset job's nextDueDate to the rejected WO's dueDate so the cycle regenerates correctly
+  if (existingWO.jobId && existingWO.dueDate) {
+    try {
+      const db = await getDb();
+      await db
+        .update(jobs)
+        .set({ nextDueDate: existingWO.dueDate })
+        .where(eq(jobs.juuid, existingWO.jobId));
+      console.log(`📅 [Rejection] Reset job nextDueDate to ${existingWO.dueDate} for job ${existingWO.jobId}`);
+    } catch (err) {
+      console.error('[Rejection] Error resetting job nextDueDate:', err);
+    }
+  }
+
+  return updatedWO;
 }

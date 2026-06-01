@@ -1222,6 +1222,7 @@ export const workOrders = pgTable("work_orders", {
   superintendentNotifiedAt: text("superintendent_notified_at"),
   ceApprovalRemarks: text("ce_approval_remarks"),
   approvalBlockReason: text("approval_block_reason"),
+  superintendentRejectionRemarks: text("superintendent_rejection_remarks"),
 
   // === Layer 7: Running Hours Validation & Isolation ===
   completionRH: decimal("completion_rh", { precision: 10, scale: 2 }),

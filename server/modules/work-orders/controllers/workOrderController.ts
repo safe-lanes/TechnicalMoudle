@@ -122,6 +122,27 @@ export async function deleteWorkOrder(req: Request, res: Response) {
   }
 }
 
+// ── Superintendent Completion Rejection ──
+
+export async function rejectCompletion(req: Request, res: Response) {
+  try {
+    const actor = resolveActorIdentity(req);
+    const { remarks } = req.body;
+    const actorId = actor || (req as AuthenticatedRequest).user?.username || 'system';
+    const result = await woService.rejectCompletedWorkOrder(req.params.id, remarks || '', actorId);
+    res.json(result);
+  } catch (error: any) {
+    console.error('❌ Completion rejection error:', error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message });
+    }
+    throw error;
+  }
+}
+
 // ── Work Order Completion ──
 
 export async function completeWorkOrder(req: Request, res: Response) {
