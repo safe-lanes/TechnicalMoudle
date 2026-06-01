@@ -94,6 +94,12 @@ router.post('/work-orders/:id/reject-completion',
   asyncHandler(woCtrl.rejectCompletion)
 );
 
+// POST /work-orders/:id/reopen-completion — reopen a Completed WO (Office/PMS Admin only)
+router.post('/work-orders/:id/reopen-completion',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.reopenCompletion)
+);
+
 // POST /work-orders/:id/superintendent-acknowledge
 router.post('/work-orders/:id/superintendent-acknowledge', asyncHandler(woCtrl.superintendentAcknowledge));
 

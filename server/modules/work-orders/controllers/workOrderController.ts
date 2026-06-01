@@ -148,6 +148,32 @@ export async function rejectCompletion(req: Request, res: Response) {
   }
 }
 
+// ── Superintendent Completion Reopen ──
+
+export async function reopenCompletion(req: Request, res: Response) {
+  try {
+    const actorName = resolveActorIdentity(req);
+    const { remarks } = req.body;
+    const actorUserUuid = (req as AuthenticatedRequest).user?.userUuid || (req as AuthenticatedRequest).user?.username || 'system';
+    const result = await woService.reopenCompletedWorkOrder(
+      req.params.id,
+      remarks || '',
+      actorUserUuid,
+      actorName
+    );
+    res.json(result);
+  } catch (error: any) {
+    console.error('❌ Completion reopen error:', error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message });
+    }
+    throw error;
+  }
+}
+
 // ── Work Order Completion ──
 
 export async function completeWorkOrder(req: Request, res: Response) {

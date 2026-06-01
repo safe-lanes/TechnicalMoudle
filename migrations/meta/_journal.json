@@ -421,6 +421,13 @@
       "when": 1780306356360,
       "tag": "0059_redundant_ben_urich",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1780315301625,
+      "tag": "0060_cold_blindfold",
+      "breakpoints": true
     }
   ]
 }

@@ -340,14 +340,14 @@ const WorkOrders: React.FC = () => {
       return effectiveStatus === "Active";
     }).length },
     { id: "Due", label: "Due", count: safeWorkOrdersList.filter(wo => {
-      const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
-      if (wo.isExecution && !isRejectedExecution) return false;
+      const isAllowedExecution = wo.isExecution && (wo.status === 'Rejected' || wo.status === 'Reopened');
+      if (wo.isExecution && !isAllowedExecution) return false;
       const effectiveStatus = getEffectiveStatus(wo);
       return effectiveStatus === "Due" || effectiveStatus === "Due (Grace P)";
     }).length },
     { id: "Overdue", label: "Overdue", count: safeWorkOrdersList.filter(wo => {
-      const isRejectedWO = wo.status === 'Rejected';
-      if (wo.isExecution && !isRejectedWO) return false;
+      const isAllowedExecution = wo.isExecution && (wo.status === 'Rejected' || wo.status === 'Reopened');
+      if (wo.isExecution && !isAllowedExecution) return false;
       const effectiveStatus = getEffectiveStatus(wo);
       return effectiveStatus === "Overdue" || effectiveStatus === "Rejected";
     }).length },
@@ -382,12 +382,12 @@ const WorkOrders: React.FC = () => {
       if (wo.workOrderType === 'Unplanned') return false;
       if (effectiveStatus !== "Active") return false;
     } else if (activeTab === "Due") {
-      const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
-      if (wo.isExecution && !isRejectedExecution) return false;
+      const isAllowedExecution = wo.isExecution && (wo.status === 'Rejected' || wo.status === 'Reopened');
+      if (wo.isExecution && !isAllowedExecution) return false;
       if (effectiveStatus !== "Due" && effectiveStatus !== "Due (Grace P)") return false;
     } else if (activeTab === "Overdue") {
-      const isRejectedWO = wo.status === 'Rejected';
-      if (wo.isExecution && !isRejectedWO) return false;
+      const isAllowedExecution = wo.isExecution && (wo.status === 'Rejected' || wo.status === 'Reopened');
+      if (wo.isExecution && !isAllowedExecution) return false;
       if (effectiveStatus !== "Overdue" && effectiveStatus !== "Rejected") return false;
     } else if (activeTab === "Completed") {
       // Completed Unplanned WOs stay in the Unplanned tab only
@@ -740,10 +740,13 @@ const WorkOrders: React.FC = () => {
       cellRenderer: (params: any) => {
         const wo = params.data;
         if (!wo) return null;
-        if (wo.status === 'Rejected') {
+        if (wo.status === 'Rejected' || wo.status === 'Reopened') {
+          const isReopened = wo.status === 'Reopened';
           return (
             <div className="flex flex-row items-center gap-1 overflow-hidden w-full min-w-0">
-              <span className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${getStatusBadgeColor('rejected')}`}>Rejected</span>
+              <span className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${getStatusBadgeColor(isReopened ? 'reopened' : 'rejected')}`}>
+                {isReopened ? 'Reopened' : 'Rejected'}
+              </span>
               <span className={`px-2 py-0.5 rounded text-xs shrink-0 ${getStatusBadgeColor(wo.computedStatus || 'Active')}`}>
                 {wo.computedStatus === 'Due (Grace P)' ? 'Grace P' : (wo.computedStatus || 'Active')}
               </span>
@@ -1557,8 +1560,8 @@ const WorkOrders: React.FC = () => {
           }}
           onSortChanged={handleWoSortChanged}
           getRowClass={(params: any) => {
-            const isRejected = params.data?.wasRejected === true;
-            if (isRejected) return 'wo-rejected-row';
+            if (params.data?.wasReopened === true) return 'wo-reopened-row';
+            if (params.data?.wasRejected === true) return 'wo-rejected-row';
             return undefined;
           }}
           noRowsMessage={

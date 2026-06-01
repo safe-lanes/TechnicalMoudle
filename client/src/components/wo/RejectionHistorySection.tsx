@@ -94,24 +94,29 @@ export function RejectionHistorySection(props: RejectionHistorySectionProps) {
           className="text-sm font-bold text-red-800 uppercase tracking-wide"
           data-testid={`heading-rejection-history-${testIdSuffix}`}
         >
-          Rejection History ({data.length})
+          Action History ({data.length})
         </h3>
       </div>
       <ul className="space-y-3">
         {data.map((entry, idx) => {
           const isSuperRejection = entry.rejectionType === 'superintendent_completion_rejection';
+          const isSuperReopen = entry.rejectionType === 'superintendent_completion_reopen';
           return (
             <li
               key={`${entry.rejectedAt ?? "unknown"}-${idx}`}
-              className={`rounded-md border p-3 ${isSuperRejection ? 'border-amber-200 bg-amber-50' : 'border-red-200 bg-white'}`}
+              className={`rounded-md border p-3 ${(isSuperRejection || isSuperReopen) ? 'border-amber-200 bg-amber-50' : 'border-red-200 bg-white'}`}
               data-testid={`item-rejection-history-${testIdSuffix}-${idx}`}
             >
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-1.5">
                 <span
-                  className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${isSuperRejection ? 'bg-amber-200 text-amber-800' : 'bg-red-100 text-red-800'}`}
+                  className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${(isSuperRejection || isSuperReopen) ? 'bg-amber-200 text-amber-800' : 'bg-red-100 text-red-800'}`}
                   data-testid={`badge-rejection-type-${testIdSuffix}-${idx}`}
                 >
-                  {isSuperRejection ? 'Superintendent — Completion Rejected' : 'Approver — Pending Approval Rejected'}
+                  {isSuperReopen
+                    ? 'Superintendent — Work Order Reopened'
+                    : isSuperRejection
+                    ? 'Superintendent — Completion Rejected'
+                    : 'Approver — Pending Approval Rejected'}
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-700 mb-1">
