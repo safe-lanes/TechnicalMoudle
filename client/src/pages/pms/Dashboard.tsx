@@ -380,6 +380,18 @@ const FleetView = ({ vessels, onSelectVessel }: { vessels: { id: string; name: s
   );
 };
 
+// Map a raw change-request status to its display label used across the
+// Modify PMS Requests donut, drilldown modal, and PDF export.
+const mapCrStatusLabel = (raw: string | null | undefined): string => {
+  const st = raw?.trim().toLowerCase();
+  if (st === 'submitted' || st === 'pending') return 'Pending Approval';
+  if (st === 'approved') return 'Approved';
+  if (st === 'rejected') return 'Rejected';
+  if (st === 'returned') return 'Returned';
+  if (st === 'draft') return 'Draft';
+  return raw || '-';
+};
+
 const Dashboard = () => {
   const [, setLocation] = useLocation();
   const [lastUpdated, setLastUpdated] = useState(new Date());
@@ -387,7 +399,7 @@ const Dashboard = () => {
   const [pendingBulkConfirmApprove, setPendingBulkConfirmApprove] = useState(false);
   const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: EnrichedWorkOrder[] }>({ open: false, title: '', workOrders: [] });
   const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
-  const [crListModal, setCrListModal] = useState<{ open: boolean; title: string; changeRequests: ChangeRequest[] }>({ open: false, title: '', changeRequests: [] });
+  const [crListModal, setCrListModal] = useState<{ open: boolean; title: string; changeRequests: ChangeRequest[]; statusFilter: string | null }>({ open: false, title: '', changeRequests: [], statusFilter: null });
   const DRILLDOWN_KEY = 'dashboardDrilldownModal';
   const DRILLDOWN_NAV_KEY = 'dashboardDrilldownNavigating';
   const DASHBOARD_PERIOD_KEY = 'dashboardPeriod';
@@ -419,8 +431,8 @@ const Dashboard = () => {
     const ids = args.spares.map((s: any) => spareKeyOf(s));
     persistDrilldown('spares', args.title, ids);
   };
-  const openCrListModal = (args: { title: string; changeRequests: ChangeRequest[] }) => {
-    setCrListModal({ open: true, title: args.title, changeRequests: args.changeRequests });
+  const openCrListModal = (args: { title: string; changeRequests: ChangeRequest[]; statusFilter?: string | null }) => {
+    setCrListModal({ open: true, title: args.title, changeRequests: args.changeRequests, statusFilter: args.statusFilter ?? null });
     const ids = args.changeRequests.map((cr: any) => (cr?.id != null ? String(cr.id) : ''));
     persistDrilldown('cr', args.title, ids);
   };
@@ -433,7 +445,7 @@ const Dashboard = () => {
     clearDrilldownIfNotNavigating();
   };
   const handleCrListModalClose = () => {
-    setCrListModal({ open: false, title: '', changeRequests: [] });
+    setCrListModal({ open: false, title: '', changeRequests: [], statusFilter: null });
     clearDrilldownIfNotNavigating();
   };
   const crListModalOpenRef = useRef(false);
@@ -1039,7 +1051,7 @@ const Dashboard = () => {
       const idSet = new Set(ids);
       const matched = (changeRequestsData as any[]).filter((cr: any) => idSet.has(String(cr?.id))) as ChangeRequest[];
       if (matched.length > 0) {
-        setCrListModal({ open: true, title, changeRequests: matched });
+        setCrListModal({ open: true, title, changeRequests: matched, statusFilter: null });
       } else {
         clear();
       }
@@ -2077,12 +2089,41 @@ const Dashboard = () => {
     return { numerator: num, denominator: woDen, percent, changeRequestsFull: crNumeratorList };
   }, [workOrdersData, changeRequestsData, dashboardPeriodRange]);
 
-  // Task #80: While the CR list modal is open (gauge drilldown), keep its
-  // contents in sync with the same period filter as the gauge numerator.
-  // Replaces the previous YTD-only refresh effect.
+  // Task #104: Modify PMS Requests donut — split the in-period change requests
+  // by approval status. Draft requests are excluded entirely (not yet
+  // submitted), per product direction. Only non-zero statuses render as slices.
+  const modifyPmsDonutData = useMemo(() => {
+    const order: { status: string; color: string }[] = [
+      { status: 'Pending Approval', color: '#2563eb' },
+      { status: 'Approved',         color: '#5dc86f' },
+      { status: 'Rejected',         color: '#ff6961' },
+      { status: 'Returned',         color: '#f1c40f' },
+    ];
+    const groups = new Map<string, ChangeRequest[]>(order.map(o => [o.status, []]));
+    for (const cr of modifyPmsPeriodKPIs.changeRequestsFull) {
+      const label = mapCrStatusLabel(cr.status);
+      if (label === 'Draft') continue; // excluded from donut and total
+      const arr = groups.get(label);
+      if (arr) arr.push(cr);
+    }
+    const data = order
+      .map(o => ({ status: o.status, color: o.color, count: groups.get(o.status)?.length ?? 0, requests: groups.get(o.status) ?? [] }))
+      .filter(d => d.count > 0);
+    const total = data.reduce((sum, d) => sum + d.count, 0);
+    return { data, total };
+  }, [modifyPmsPeriodKPIs.changeRequestsFull]);
+
+  // Task #80/#104: While the CR list modal is open (donut drilldown), keep its
+  // contents in sync with the same period filter. If a status slice was
+  // clicked, re-apply that status filter so refetches don't widen the list.
   useEffect(() => {
     if (!crListModalOpenRef.current) return;
-    setCrListModal(prev => ({ ...prev, changeRequests: modifyPmsPeriodKPIs.changeRequestsFull }));
+    setCrListModal(prev => {
+      const next = prev.statusFilter
+        ? modifyPmsPeriodKPIs.changeRequestsFull.filter(cr => mapCrStatusLabel(cr.status) === prev.statusFilter)
+        : modifyPmsPeriodKPIs.changeRequestsFull;
+      return { ...prev, changeRequests: next };
+    });
   }, [modifyPmsPeriodKPIs.changeRequestsFull]);
 
   // Task #81: Top 5 reasons chart driven by the global dashboardPeriod
@@ -3513,29 +3554,65 @@ const Dashboard = () => {
 
                   <div style={dividerH} />
 
-                  {/* Row 3: Modify PMS Requests gauge — Task #80: period-driven; Task #82: tooltip */}
+                  {/* Row 3: Modify PMS Requests donut — Task #104: status split */}
                   <TooltipProvider delayDuration={200}>
                     <UITooltip>
                       <TooltipTrigger asChild>
                         <div tabIndex={0} className="outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded" data-testid="cell-right-row3">
                           <div style={subTitle} className="mb-1 mt-2">MODIFY PMS REQUESTS</div>
-                          <SemiCircleGauge
-                            value={modifyPmsPeriodKPIs.denominator > 0 ? modifyPmsPeriodKPIs.numerator : 0}
-                            max={modifyPmsPeriodKPIs.denominator > 0 ? modifyPmsPeriodKPIs.denominator : 1}
-                            color="#e74c3c"
-                            displayValue={`${modifyPmsPeriodKPIs.percent}%`}
-                            subtitle={`${modifyPmsPeriodKPIs.numerator} modifications out of ${modifyPmsPeriodKPIs.denominator} WO`}
-                            onClick={() => openCrListModal({
-                              title: 'Modify PMS Requests',
-                              changeRequests: modifyPmsPeriodKPIs.changeRequestsFull,
-                            })}
-                            testId="gauge-modify-pms-ytd"
-                          />
+                          <div style={{ height: '170px' }} data-testid="card-modify-pms-chart">
+                            {modifyPmsDonutData.data.length > 0 ? (
+                              <ResponsiveContainer width="100%" height={170}>
+                                <PieChart>
+                                  <Pie
+                                    data={modifyPmsDonutData.data}
+                                    dataKey="count"
+                                    nameKey="status"
+                                    cx="50%"
+                                    cy="45%"
+                                    innerRadius={35}
+                                    outerRadius={58}
+                                    paddingAngle={2}
+                                    label={({ cx, cy, midAngle, innerRadius, outerRadius, payload }: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; payload: { count: number } }) => {
+                                      const RADIAN = Math.PI / 180;
+                                      const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                                      const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                      const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                                      return (
+                                        <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight="bold">
+                                          {payload.count}
+                                        </text>
+                                      );
+                                    }}
+                                    labelLine={false}
+                                    onClick={(_data: Record<string, unknown>, index: number) => {
+                                      const entry = modifyPmsDonutData.data[index];
+                                      if (!entry) return;
+                                      openCrListModal({
+                                        title: `Modify PMS Requests - ${entry.status}`,
+                                        changeRequests: entry.requests,
+                                        statusFilter: entry.status,
+                                      });
+                                    }}
+                                    cursor="pointer"
+                                  >
+                                    {modifyPmsDonutData.data.map((entry, index) => (
+                                      <Cell key={`modify-pms-cell-${index}`} fill={entry.color} stroke={entry.color} />
+                                    ))}
+                                  </Pie>
+                                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '2px' }} />
+                                </PieChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <div className="h-full flex items-center justify-center" style={{ color: '#9E9E9E', fontSize: '11px' }}>No Modify PMS requests to display</div>
+                            )}
+                          </div>
                         </div>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed" data-testid="tooltip-modify-pms-formula">
-                        <div>Modify PMS % = (Change requests raised during the period ÷ Scheduled work orders during the period) × 100.</div>
-                        <div className="mt-1">A "request" is a change request whose created date falls in the window; the denominator matches the Postponed gauge.</div>
+                        <div>Distribution of Modify PMS requests by status for the selected period (total: {modifyPmsDonutData.total}).</div>
+                        <div className="mt-1">Slices: Pending Approval, Approved, Rejected, Returned. Draft requests are excluded as they have not been submitted.</div>
+                        <div className="mt-1">Click a slice to see the underlying requests.</div>
                         <div className="mt-1 font-medium">Period: {dashboardPeriodLabel}</div>
                       </TooltipContent>
                     </UITooltip>
