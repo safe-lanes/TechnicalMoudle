@@ -94,47 +94,63 @@ export function RejectionHistorySection(props: RejectionHistorySectionProps) {
           className="text-sm font-bold text-red-800 uppercase tracking-wide"
           data-testid={`heading-rejection-history-${testIdSuffix}`}
         >
-          Rejection History ({data.length})
+          Action History ({data.length})
         </h3>
       </div>
       <ul className="space-y-3">
-        {data.map((entry, idx) => (
-          <li
-            key={`${entry.rejectedAt ?? "unknown"}-${idx}`}
-            className="rounded-md border border-red-200 bg-white p-3"
-            data-testid={`item-rejection-history-${testIdSuffix}-${idx}`}
-          >
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-700 mb-1">
-              <div>
-                <span className="font-medium">Rejected by: </span>
+        {data.map((entry, idx) => {
+          const isSuperRejection = entry.rejectionType === 'superintendent_completion_rejection';
+          const isSuperReopen = entry.rejectionType === 'superintendent_completion_reopen';
+          return (
+            <li
+              key={`${entry.rejectedAt ?? "unknown"}-${idx}`}
+              className={`rounded-md border p-3 ${(isSuperRejection || isSuperReopen) ? 'border-amber-200 bg-amber-50' : 'border-red-200 bg-white'}`}
+              data-testid={`item-rejection-history-${testIdSuffix}-${idx}`}
+            >
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-1.5">
                 <span
-                  className="text-gray-900"
-                  data-testid={`text-rejection-history-by-${testIdSuffix}-${idx}`}
+                  className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${(isSuperRejection || isSuperReopen) ? 'bg-amber-200 text-amber-800' : 'bg-red-100 text-red-800'}`}
+                  data-testid={`badge-rejection-type-${testIdSuffix}-${idx}`}
                 >
-                  {entry.rejectedBy || "Unknown"}
+                  {isSuperReopen
+                    ? 'Superintendent — Work Order Reopened'
+                    : isSuperRejection
+                    ? 'Superintendent — Completion Rejected'
+                    : 'Approver — Pending Approval Rejected'}
                 </span>
               </div>
-              <div>
-                <span className="font-medium">When: </span>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-700 mb-1">
+                <div>
+                  <span className="font-medium">Rejected by: </span>
+                  <span
+                    className="text-gray-900"
+                    data-testid={`text-rejection-history-by-${testIdSuffix}-${idx}`}
+                  >
+                    {entry.rejectedBy || "Unknown"}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-medium">When: </span>
+                  <span
+                    className="text-gray-900"
+                    data-testid={`text-rejection-history-at-${testIdSuffix}-${idx}`}
+                  >
+                    {formatDate(entry.rejectedAt)}
+                  </span>
+                </div>
+              </div>
+              <div className="text-sm">
+                <span className="font-medium text-gray-700">Reason: </span>
                 <span
-                  className="text-gray-900"
-                  data-testid={`text-rejection-history-at-${testIdSuffix}-${idx}`}
+                  className="text-gray-900 whitespace-pre-wrap"
+                  data-testid={`text-rejection-history-reason-${testIdSuffix}-${idx}`}
                 >
-                  {formatDate(entry.rejectedAt)}
+                  {entry.rejectionComments?.trim() || "No reason recorded"}
                 </span>
               </div>
-            </div>
-            <div className="text-sm">
-              <span className="font-medium text-gray-700">Reason: </span>
-              <span
-                className="text-gray-900 whitespace-pre-wrap"
-                data-testid={`text-rejection-history-reason-${testIdSuffix}-${idx}`}
-              >
-                {entry.rejectionComments?.trim() || "No reason recorded"}
-              </span>
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

@@ -1222,6 +1222,14 @@ export const workOrders = pgTable("work_orders", {
   superintendentNotifiedAt: text("superintendent_notified_at"),
   ceApprovalRemarks: text("ce_approval_remarks"),
   approvalBlockReason: text("approval_block_reason"),
+  superintendentRejectionRemarks: text("superintendent_rejection_remarks"),
+  superintendentRejectedByName: text("superintendent_rejected_by_name"),
+
+  // === Layer 8: Superintendent Reopen Completion ===
+  wasReopened: boolean("was_reopened").notNull().default(false),
+  superintendentReopenRemarks: text("superintendent_reopen_remarks"),
+  superintendentReopenedByName: text("superintendent_reopened_by_name"),
+  reopenedAt: text("reopened_at"),
 
   // === Layer 7: Running Hours Validation & Isolation ===
   completionRH: decimal("completion_rh", { precision: 10, scale: 2 }),

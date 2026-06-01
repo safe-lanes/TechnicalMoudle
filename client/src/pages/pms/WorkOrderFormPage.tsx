@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -504,6 +505,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [skippedCyclesJustification, setSkippedCyclesJustification] = useState('');
   const [ceApprovalRemarks, setCeApprovalRemarks] = useState('');
 
+  // Superintendent completion-rejection state
+  const [completionRejectionRemarks, setCompletionRejectionRemarks] = useState('');
+  const [completionRejectionRemarksError, setCompletionRejectionRemarksError] = useState('');
+  const [isProcessingCompletionRejection, setIsProcessingCompletionRejection] = useState(false);
+  const [showCompletionRejectionConfirm, setShowCompletionRejectionConfirm] = useState(false);
+  const [showReopenSection, setShowReopenSection] = useState(false);
+  const [completionReopenRemarks, setCompletionReopenRemarks] = useState('');
+  const [completionReopenRemarksError, setCompletionReopenRemarksError] = useState('');
+  const [isProcessingCompletionReopen, setIsProcessingCompletionReopen] = useState(false);
+  const [showCompletionReopenConfirm, setShowCompletionReopenConfirm] = useState(false);
+
   // Track work order type to conditionally skip frequency validation for unplanned WOs
   const [workOrderType, setWorkOrderType] = useState<'Planned' | 'Unplanned'>('Planned');
 
@@ -520,7 +532,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const isReadOnly = embedded || currentWorkOrderStatus === 'Completed';
 
-  const isRejectedWO = !!(context?.workOrder?.wasRejected === true && currentWorkOrderStatus !== 'Completed' && currentWorkOrderStatus !== 'Pending Approval');
+  const isReopenedWO = !!(context?.workOrder?.wasReopened === true && currentWorkOrderStatus !== 'Completed' && currentWorkOrderStatus !== 'Pending Approval');
+  const isRejectedWO = !!(context?.workOrder?.wasRejected === true && currentWorkOrderStatus !== 'Completed' && currentWorkOrderStatus !== 'Pending Approval') || isReopenedWO;
 
   const isPartBReadOnly = isReadOnly || currentWorkOrderStatus === 'Completed' || (currentWorkOrderStatus === 'Pending Approval' && !isRejectedWO);
 
@@ -3399,6 +3412,37 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           <span className="text-sm text-blue-800 font-medium" data-testid="banner-completed-readonly">
             This Work Order is completed. Part B is read-only.
           </span>
+        </div>
+      )}
+      {!embedded && currentWorkOrderStatus === 'Rejected' && (workOrderContext as any)?.workOrder?.superintendentRejectionRemarks && (
+        <div className="sticky top-0 z-50 bg-amber-50 border-b border-amber-300 px-4 py-3" data-testid="banner-superintendent-rejection">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
+            <div>
+              <span className="text-sm font-semibold text-amber-800 block">Rejected by Superintendent</span>
+              <span className="text-sm text-amber-900 whitespace-pre-wrap" data-testid="text-superintendent-rejection-remarks">
+                {(workOrderContext as any).workOrder.superintendentRejectionRemarks}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+      {!embedded && currentWorkOrderStatus === 'Reopened' && (workOrderContext as any)?.workOrder?.superintendentReopenRemarks && (
+        <div className="sticky top-0 z-50 bg-amber-50 border-b border-amber-300 px-4 py-3" data-testid="banner-superintendent-reopen">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
+            <div>
+              <span className="text-sm font-semibold text-amber-800 block">
+                Reopened by Superintendent
+                {(workOrderContext as any).workOrder.superintendentReopenedByName && (
+                  <> — {(workOrderContext as any).workOrder.superintendentReopenedByName}</>
+                )}
+              </span>
+              <span className="text-sm text-amber-900 whitespace-pre-wrap" data-testid="text-superintendent-reopen-remarks">
+                {(workOrderContext as any).workOrder.superintendentReopenRemarks}
+              </span>
+            </div>
+          </div>
         </div>
       )}
       {!embedded && currentWorkOrderStatus === 'Pending Approval' && (() => {
@@ -6281,6 +6325,149 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </div>
           )}
 
+          {/* Superintendent Reopen Section — visible to Office users only when WO is Completed */}
+          {!embedded && currentWorkOrderStatus === 'Completed' && !isVessel && (
+            <>
+              {!showReopenSection && (
+                <div className="mt-4 flex justify-center">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowReopenSection(true)}
+                          className="text-sm font-semibold border-gray-300 hover:bg-gray-50"
+                          data-testid="button-show-reopen-section"
+                        >
+                          <Plus className="h-4 w-4 mr-1.5" />
+                          Reopen
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Reopen Completed Work Order</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              )}
+              {showReopenSection && (
+                <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-5" data-testid="section-completion-reopen">
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertTriangle className="h-4 w-4 text-amber-700" />
+                    <h3 className="text-sm font-bold text-amber-800 uppercase tracking-wide">Superintendent Review — Reopen Work Order</h3>
+                  </div>
+                  <p className="text-xs text-amber-700 mb-3">
+                    Use this only if the completed work order requires correction. All existing completion data,
+                    attachments, spare records, and running hours will be preserved unchanged.
+                    The next scheduled work order in this cycle will be cancelled and the maintenance cycle reset.
+                  </p>
+                  <div className="space-y-2 mb-4" data-testid="field-completion-reopen-remarks">
+                    <Label className="text-sm font-semibold text-amber-800">
+                      Superintendent Reopen Remarks <span className="text-red-600">*</span>
+                    </Label>
+                    <Textarea
+                      value={completionReopenRemarks}
+                      onChange={(e) => {
+                        setCompletionReopenRemarks(e.target.value);
+                        if (completionReopenRemarksError) setCompletionReopenRemarksError('');
+                      }}
+                      maxLength={500}
+                      placeholder="Provide your reason for reopening this completed work order..."
+                      className={`text-sm min-h-[100px] bg-white ${completionReopenRemarksError ? 'border-red-500 focus:border-red-600' : 'border-amber-200 focus:border-amber-400'}`}
+                      data-testid="input-completion-reopen-remarks"
+                    />
+                    {completionReopenRemarksError && (
+                      <p className="text-xs text-red-600 font-medium" data-testid="error-completion-reopen-remarks">
+                        {completionReopenRemarksError}
+                      </p>
+                    )}
+                    <span className="text-xs text-gray-400 block text-right">{completionReopenRemarks.length} / 500</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setShowReopenSection(false); setCompletionReopenRemarks(''); setCompletionReopenRemarksError(''); }}
+                      className="text-gray-500 hover:text-gray-700 text-xs"
+                      data-testid="button-cancel-reopen-section"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        if (!completionReopenRemarks.trim()) {
+                          setCompletionReopenRemarksError('Superintendent Reopen Remarks are mandatory.');
+                          return;
+                        }
+                        setCompletionReopenRemarksError('');
+                        setShowCompletionReopenConfirm(true);
+                      }}
+                      disabled={isProcessingCompletionReopen}
+                      className="bg-amber-600 hover:bg-amber-700 text-white font-semibold px-6 py-2 h-auto text-sm rounded-full shadow-sm min-w-[200px]"
+                      data-testid="button-reopen-completion"
+                    >
+                      {isProcessingCompletionReopen ? (
+                        <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Reopening...</>
+                      ) : (
+                        'Reopen Completed Work Order'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Rejection banner for already-rejected WOs (all roles) */}
+          {currentWorkOrderStatus === 'Rejected' && (workOrderContext as any)?.workOrder?.superintendentRejectionRemarks && (
+            <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4" data-testid="display-superintendent-rejection-remarks">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mb-2">
+                    <Label className="text-sm font-semibold text-amber-800">Rejected by Superintendent</Label>
+                    {(workOrderContext as any).workOrder.superintendentRejectedByName && (
+                      <span className="text-xs text-amber-700 font-medium">
+                        — {(workOrderContext as any).workOrder.superintendentRejectedByName}
+                      </span>
+                    )}
+                    {(workOrderContext as any).workOrder.rejectionDate && (
+                      <span className="text-xs text-amber-600">
+                        on {new Date((workOrderContext as any).workOrder.rejectionDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-amber-900 whitespace-pre-wrap">{(workOrderContext as any).workOrder.superintendentRejectionRemarks}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Reopen banner for already-reopened WOs (all roles) */}
+          {currentWorkOrderStatus === 'Reopened' && (workOrderContext as any)?.workOrder?.superintendentReopenRemarks && (
+            <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4" data-testid="display-superintendent-reopen-remarks">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mb-2">
+                    <Label className="text-sm font-semibold text-amber-800">Reopened by Superintendent</Label>
+                    {(workOrderContext as any).workOrder.superintendentReopenedByName && (
+                      <span className="text-xs text-amber-700 font-medium">
+                        — {(workOrderContext as any).workOrder.superintendentReopenedByName}
+                      </span>
+                    )}
+                    {(workOrderContext as any).workOrder.reopenedAt && (
+                      <span className="text-xs text-amber-600">
+                        on {new Date((workOrderContext as any).workOrder.reopenedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-amber-900 whitespace-pre-wrap">{(workOrderContext as any).workOrder.superintendentReopenRemarks}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
             </>
           )}
 
@@ -6825,6 +7012,142 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           onOpenChange={setRhTimelineOpen}
         />
       )}
+
+      {/* Superintendent Completion Rejection — Confirmation Dialog */}
+      <AlertDialog open={showCompletionRejectionConfirm} onOpenChange={setShowCompletionRejectionConfirm}>
+        <AlertDialogContent data-testid="dialog-completion-rejection-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-700 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Confirm Rejection of Completed Work Order
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 pt-2">
+              <p className="text-sm text-gray-700">
+                This will mark <strong>{(workOrderContext as any)?.workOrder?.workOrderNo}</strong> as <strong className="text-red-700">Rejected</strong>.
+                All completion data will be preserved. The next scheduled work order in this cycle will be cancelled
+                and the maintenance cycle reset to the original due date.
+              </p>
+              {completionRejectionRemarks && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
+                  <span className="font-semibold text-amber-800 block mb-1">Rejection Remarks:</span>
+                  <span className="text-amber-900 whitespace-pre-wrap">{completionRejectionRemarks}</span>
+                </div>
+              )}
+              <p className="text-xs text-gray-500">This action cannot be undone. The crew will be able to resubmit once they have addressed the issue.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => setShowCompletionRejectionConfirm(false)}
+              data-testid="button-rejection-confirm-cancel"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setShowCompletionRejectionConfirm(false);
+                setIsProcessingCompletionRejection(true);
+                try {
+                  await apiRequest(
+                    'POST',
+                    `/technical/api/work-orders/${workOrderId}/reject-completion`,
+                    { remarks: completionRejectionRemarks }
+                  );
+                  toast({
+                    title: 'Work order rejected',
+                    description: 'The completed work order has been rejected. The crew can now resubmit.',
+                  });
+                  setCompletionRejectionRemarks('');
+                  await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+                  await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}`] });
+                  await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+                } catch (err: any) {
+                  toast({
+                    title: 'Rejection failed',
+                    description: err?.message || 'Could not reject the work order. Please try again.',
+                    variant: 'destructive',
+                  });
+                } finally {
+                  setIsProcessingCompletionRejection(false);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              data-testid="button-rejection-confirm-submit"
+            >
+              Confirm Rejection
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Superintendent Completion Reopen — Confirmation Dialog */}
+      <AlertDialog open={showCompletionReopenConfirm} onOpenChange={setShowCompletionReopenConfirm}>
+        <AlertDialogContent data-testid="dialog-completion-reopen-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-amber-700 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Confirm Reopen of Completed Work Order
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 pt-2">
+              <p className="text-sm text-gray-700">
+                This will mark <strong>{(workOrderContext as any)?.workOrder?.workOrderNo}</strong> as <strong className="text-amber-700">Reopened</strong>.
+                All completion data, attachments, spare records, and running hours will be preserved.
+                The next scheduled work order in this cycle will be cancelled and the maintenance cycle reset.
+              </p>
+              {completionReopenRemarks && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
+                  <span className="font-semibold text-amber-800 block mb-1">Reopen Remarks:</span>
+                  <span className="text-amber-900 whitespace-pre-wrap">{completionReopenRemarks}</span>
+                </div>
+              )}
+              <p className="text-xs text-gray-500">This action cannot be undone. The vessel crew will be able to update and resubmit the work order.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => setShowCompletionReopenConfirm(false)}
+              data-testid="button-reopen-confirm-cancel"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setShowCompletionReopenConfirm(false);
+                setIsProcessingCompletionReopen(true);
+                try {
+                  await apiRequest(
+                    'POST',
+                    `/technical/api/work-orders/${workOrderId}/reopen-completion`,
+                    { remarks: completionReopenRemarks }
+                  );
+                  toast({
+                    title: 'Work order reopened',
+                    description: 'The completed work order has been reopened. The vessel crew can now update and resubmit.',
+                  });
+                  setCompletionReopenRemarks('');
+                  setShowReopenSection(false);
+                  setCurrentWorkOrderStatus('Reopened');
+                  await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+                  await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}`] });
+                  await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
+                } catch (err: any) {
+                  toast({
+                    title: 'Reopen failed',
+                    description: err?.message || 'Could not reopen the work order. Please try again.',
+                    variant: 'destructive',
+                  });
+                } finally {
+                  setIsProcessingCompletionReopen(false);
+                }
+              }}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              data-testid="button-reopen-confirm-submit"
+            >
+              Confirm Reopen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

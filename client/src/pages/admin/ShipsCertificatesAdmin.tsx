@@ -427,7 +427,7 @@ export default function ShipsCertificatesAdmin() {
       ? companyOnlyCerts.filter(c => !c.certificateLabel?.trim())
       : [];
     const invalidVessel = activeTab === "vessel"
-      ? vesselOnlyCerts.filter(c => !c.certificateLabel?.trim())
+      ? getVisibleVesselOnlyCerts().filter(c => !c.certificateLabel?.trim())
       : [];
     if (invalidCompany.length > 0 || invalidVessel.length > 0) {
       setInvalidCompanyCertIds(new Set(invalidCompany.map(c => c.id)));
@@ -550,13 +550,22 @@ export default function ShipsCertificatesAdmin() {
     const allCertificates = [...sortedMaster, ...companyCertsForSave, ...vesselOnlyCertsWithIds];
     
     // Get selected vessel info (ID and name) for vessel-specific certificate applicability
-    const targetVessels = (vesselMasterData || [])
-      .filter(v => selectedVessels.includes(v.name))
-      .map(v => ({ id: String(v.id), name: v.name }));
+    // New vessel certs carry their own _pendingVesselIds — the exact vessels the
+    // user marked them applicable to (which may differ from the current
+    // selection). Persist applicability only for those vessels, and skip certs
+    // marked applicable to nothing (they are still created, just not applicable).
+    // The bulk endpoint applies targetVessels to every vesselSpecificCert, so we
+    // send the union of pending vessels here.
     const newVesselCerts = vesselOnlyCerts.filter(c => !/^VES-\d+$/.test(c.masterId));
+    const applicableNewCerts = newVesselCerts.filter(c => (c._pendingVesselIds?.length ?? 0) > 0);
     const newVesselMasterIds = vesselOnlyCertsWithIds
-      .filter(c => newVesselCerts.some(nv => nv.id === c.id))
+      .filter(c => applicableNewCerts.some(nv => nv.id === c.id))
       .map(c => c.masterId);
+    const pendingVesselIds = new Set<string>();
+    applicableNewCerts.forEach(c => (c._pendingVesselIds ?? []).forEach(v => pendingVesselIds.add(v)));
+    const targetVessels = (vesselMasterData || [])
+      .filter(v => pendingVesselIds.has(String(v.id)))
+      .map(v => ({ id: String(v.id), name: v.name }));
     
     if (newVesselMasterIds.length > 0 && targetVessels.length === 0) {
       toast({
@@ -616,7 +625,26 @@ export default function ShipsCertificatesAdmin() {
     },
     enabled: selectedVesselIds.length > 0,
   });
-  
+
+  // Vessel-only certs that are actually visible/editable for the currently
+  // selected vessel(s). Shared by renderVesselTab (display) and handleSave
+  // (validation) so the two never drift. Validating the full global
+  // vesselOnlyCerts array would otherwise block Save on empty-label rows that
+  // belong to other vessels and aren't even on screen.
+  const getVisibleVesselOnlyCerts = () => {
+    const vesselIds = getSelectedVesselIds();
+    return vesselOnlyCerts.filter((cert) => {
+      if (cert.id >= 2000) {
+        if (viewModes.vessel !== "edit") return false;
+        const pending: string[] | undefined = cert._pendingVesselIds;
+        return vesselIds.some(v => pending?.includes(v));
+      }
+      return vesselIds.some(vesselId =>
+        vesselApplicabilityData.some((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId)
+      );
+    });
+  };
+
   // Initialize vessel applicability mutation
   const initializeVesselMutation = useMutation({
     mutationFn: async ({ vesselId, vesselName }: { vesselId: string, vesselName: string }) => {
@@ -806,6 +834,34 @@ export default function ShipsCertificatesAdmin() {
       bulkUpdateApplicabilityMutation.mutate({ vessels, masterId, isApplicable });
     }
   };
+
+  // Applicability for newly-added (unsaved) vessel certs is tracked locally in
+  // _pendingVesselIds (the vessels the user marked it applicable to) until Save
+  // assigns a real VES- masterId. Mirrors getCertificateApplicability's tri-state.
+  const getPendingApplicability = (cert: VesselCertificate & { _pendingVesselIds?: string[] }): boolean | 'mixed' => {
+    const vesselIds = getSelectedVesselIds();
+    if (vesselIds.length === 0) return cert.applicable === true;
+    const pending = cert._pendingVesselIds ?? [];
+    const inPending = vesselIds.filter(v => pending.includes(v));
+    if (inPending.length === vesselIds.length) return true;
+    if (inPending.length === 0) return false;
+    return 'mixed';
+  };
+
+  // Toggle local pending applicability for an unsaved vessel cert across the
+  // currently selected vessel(s). No backend call — persisted on Save.
+  const togglePendingApplicability = (certId: number, isApplicable: boolean) => {
+    const vesselIds = getSelectedVesselIds();
+    setVesselOnlyCerts(prev => prev.map(c => {
+      if (c.id !== certId) return c;
+      const cur = c._pendingVesselIds ?? [];
+      const next = isApplicable
+        ? Array.from(new Set([...cur, ...vesselIds]))
+        : cur.filter(v => !vesselIds.includes(v));
+      return { ...c, _pendingVesselIds: next, applicable: next.length > 0 };
+    }));
+    setHasUnsavedChanges(true);
+  };
   
   // Track changes to master data
   const updateMasterDataWithTracking = (updater: (prev: MasterCertificate[]) => MasterCertificate[]) => {
@@ -895,7 +951,7 @@ export default function ShipsCertificatesAdmin() {
   const [saveValidationError, setSaveValidationError] = useState("");
   
   // Vessel-specific certificates (not derived from Company)
-  const [vesselOnlyCerts, setVesselOnlyCerts] = useState<VesselCertificate[]>([]);
+  const [vesselOnlyCerts, setVesselOnlyCerts] = useState<Array<VesselCertificate & { _pendingVesselIds?: string[] }>>([]);
   const [isAddingNewVessel, setIsAddingNewVessel] = useState(false);
   const [newVesselEntryData, setNewVesselEntryData] = useState<Partial<VesselCertificate>>({
     applicable: true,
@@ -1234,7 +1290,7 @@ export default function ShipsCertificatesAdmin() {
       requirementRef: newVesselEntryData.requirementRef || "",
       companyGroup: newVesselEntryData.companyGroup || "",
       applicable: newVesselEntryData.applicable ?? true,
-      _pendingVesselIds: getSelectedVesselIds(),
+      _pendingVesselIds: (newVesselEntryData.applicable ?? true) ? getSelectedVesselIds() : [],
     };
     
     setVesselOnlyCerts(prev => [...prev, newCert]);
@@ -2245,17 +2301,7 @@ export default function ShipsCertificatesAdmin() {
                   }));
                   const vesselMergedCompanyList: any[] = [...vesselCompanyFromMaster, ...vesselCompanyOnlyMapped]
                     .sort((a, b) => a._sortSequence - b._sortSequence);
-                  const vesselOnlyVisible = vesselOnlyCerts.filter((cert: any) => {
-                    const vesselIds = getSelectedVesselIds();
-                    if (cert.id >= 2000) {
-                      if (viewModes.vessel !== "edit") return false;
-                      const pending: string[] | undefined = cert._pendingVesselIds;
-                      return vesselIds.some(v => pending?.includes(v));
-                    }
-                    return vesselIds.some(vesselId =>
-                      vesselApplicabilityData.some((a: any) => a.vesselId === vesselId && a.masterId === cert.masterId)
-                    );
-                  });
+                  const vesselOnlyVisible = getVisibleVesselOnlyCerts();
                   if (selectedVessels.length === 0) {
                     return (
                       <tr>
@@ -2346,7 +2392,13 @@ export default function ShipsCertificatesAdmin() {
                       {vesselOnlyVisible.map((cert, idx) => {
                   const companyGroupLabel = companyGroupLabels.find(g => g.key === cert.companyGroup)?.label || "";
                   const displayCompanyGroup = cert.companyGroup ? `${cert.companyGroup}. ${companyGroupLabel}` : "";
-                  const applicability = getCertificateApplicability(cert.masterId);
+                  // Newly-added vessel certs have no persisted VES- masterId yet, so their
+                  // applicability lives in local state (_pendingVesselIds) until Save.
+                  // Routing them through the backend mutation with an empty masterId fails.
+                  const isNewUnsaved = !/^VES-\d+$/.test(cert.masterId);
+                  const applicability = isNewUnsaved
+                    ? getPendingApplicability(cert)
+                    : getCertificateApplicability(cert.masterId);
                   const isMixed = applicability === 'mixed';
                   const isChecked = applicability === true;
                   
@@ -2357,7 +2409,10 @@ export default function ShipsCertificatesAdmin() {
                           <Checkbox
                             checked={isMixed ? false : isChecked}
                             onCheckedChange={(checked) => {
-                              if (!conflictCheck.hasConflict && viewModes.vessel === "edit") {
+                              if (conflictCheck.hasConflict || viewModes.vessel !== "edit") return;
+                              if (isNewUnsaved) {
+                                togglePendingApplicability(cert.id, !!checked);
+                              } else {
                                 handleApplicabilityChange(cert.masterId, !!checked);
                               }
                             }}
