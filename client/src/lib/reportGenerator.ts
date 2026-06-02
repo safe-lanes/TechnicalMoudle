@@ -247,7 +247,7 @@ class ReportGeneratorService {
       'priority-performance': 'Work Priority Performance',
       'manhours-analysis': 'Man-Hours Planned vs Actual',
       'workload-distribution': 'Crew Workload Distribution',
-    'wo-overview': 'Work Orders Overview',
+    'wo-overview': 'Work Order Overview',
     };
     return titles[reportType] || 'Unknown Report';
   }

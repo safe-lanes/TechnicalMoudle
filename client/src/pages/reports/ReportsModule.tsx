@@ -66,7 +66,7 @@ const REPORT_CATEGORIES: ReportCategory[] = [
       { id: "unplanned-jobs", name: "Unplanned/Breakdown Work Orders" },
       { id: "postponement-log", name: "Work Order Postponement Log" },
       { id: "workload-distribution", name: "Crew Workload Distribution" },
-      { id: "wo-overview", name: "Work Orders Overview" },
+      { id: "wo-overview", name: "Work Order Overview" },
     ],
   },
   {

@@ -307,6 +307,13 @@ export default function WorkOrderOverviewPreview({ data, isLoading, error }: Wor
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Footer note */}
+      <div className="mt-3 px-2 py-2 bg-gray-50 border border-gray-200 rounded text-[10px] text-gray-500 italic">
+        Vessel with ≥ 0% jobs pending on the selected month. Critical = criticality &quot;Yes&quot; OR job priority &quot;Critical&quot;.
+        Overdue % = (Overdue ÷ Total Due) × 100. Extended % = (Postponed ÷ Total Due) × 100.
+        Overdue classification uses computed status (grace/lead-time aware). Completed counts by actual completion month.
+      </div>
     </div>
   );
 }

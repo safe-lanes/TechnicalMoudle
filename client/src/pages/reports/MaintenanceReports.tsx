@@ -358,7 +358,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     },
     {
       id: "wo-overview",
-      name: "Work Orders Overview",
+      name: "Work Order Overview",
       description: "12-month rolling matrix of work order volume, completion, overdue % and postponements by month",
       purpose: "Trend analysis and KPI tracking (Office/Management)",
       frequency: "Monthly",
@@ -1115,7 +1115,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           anchorYear = nowD.getFullYear();
           anchorMonth = nowD.getMonth() + 1;
         }
-        const woUrl = `/technical/api/reports/maintenance/wo-overview/preview?vesselId=${activeVesselId}&anchorYear=${anchorYear}&anchorMonth=${anchorMonth}${vesselIdsParam}`;
+        const woUrl = `/technical/api/reports/maintenance/work-order-overview/preview?vesselId=${activeVesselId}&year=${anchorYear}&month=${anchorMonth}${vesselIdsParam}`;
         const woRes = await fetch(woUrl);
         if (!woRes.ok) {
           const err = await woRes.json().catch(() => ({ error: 'Failed to fetch WO overview' }));
@@ -1128,7 +1128,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           const mLabel0 = woData.months[0]?.label ?? '';
           const mLabel11 = woData.months[11]?.label ?? '';
           return {
-            title: 'Work Orders Overview',
+            title: 'Work Order Overview',
             subtitle: `12-Month Rolling Matrix · ${mLabel0} – ${mLabel11}`,
             vessel: woData.vesselName,
             dateRange: `${mLabel0} – ${mLabel11}`,
@@ -1141,7 +1141,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         // PDF not supported for matrix — suggest Excel
         toast({
           title: "Excel Only",
-          description: "Work Orders Overview is a wide matrix. Please use the Excel export instead.",
+          description: "Work Order Overview is a wide matrix. Please use the Excel export instead.",
         });
         break;
       }
@@ -1178,7 +1178,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       'monthly-summary': '/technical/api/reports/maintenance/monthly-summary/excel',
       'critical-equipment': '/technical/api/reports/critical-equipment-status/excel',
       'workload-distribution': '/technical/api/reports/crew-workload-distribution/excel',
-      'wo-overview': '/technical/api/reports/maintenance/wo-overview/excel',
+      'wo-overview': '/technical/api/reports/maintenance/work-order-overview/excel',
     };
 
     const endpoint = reportEndpoints[reportId];
@@ -1207,8 +1207,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     if (reportId === 'wo-overview') {
       const dateFrom2 = categoryFilters.dateRange?.from || globalFilters?.dateRange?.from;
       if (dateFrom2) {
-        requestBody.anchorYear = dateFrom2.getFullYear();
-        requestBody.anchorMonth = dateFrom2.getMonth() + 1;
+        requestBody.year = dateFrom2.getFullYear();
+        requestBody.month = dateFrom2.getMonth() + 1;
       }
     }
 

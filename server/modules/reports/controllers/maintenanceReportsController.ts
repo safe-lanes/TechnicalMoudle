@@ -398,8 +398,8 @@ export async function getWorkOrderOverviewPreview(req: Request, res: Response) {
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
-    const anchorYear = req.query.anchorYear ? Number(req.query.anchorYear) : undefined;
-    const anchorMonth = req.query.anchorMonth ? Number(req.query.anchorMonth) : undefined;
+    const anchorYear = (req.query.year || req.query.anchorYear) ? Number(req.query.year || req.query.anchorYear) : undefined;
+    const anchorMonth = (req.query.month || req.query.anchorMonth) ? Number(req.query.month || req.query.anchorMonth) : undefined;
     const vesselIds = req.query.vesselIds ? (req.query.vesselIds as string).split(',').filter(Boolean) : undefined;
     const result = await maintenanceReportService.getWorkOrderOverviewData(vesselId, anchorYear, anchorMonth, vesselIds);
     res.json(result);
@@ -419,8 +419,8 @@ export async function exportWorkOrderOverview(req: Request, res: Response) {
     if (!vesselId) {
       return res.status(400).json({ error: "Please select a vessel" });
     }
-    const anchorYear = req.body.anchorYear ? Number(req.body.anchorYear) : undefined;
-    const anchorMonth = req.body.anchorMonth ? Number(req.body.anchorMonth) : undefined;
+    const anchorYear = (req.body.year || req.body.anchorYear) ? Number(req.body.year || req.body.anchorYear) : undefined;
+    const anchorMonth = (req.body.month || req.body.anchorMonth) ? Number(req.body.month || req.body.anchorMonth) : undefined;
     const vesselIds = req.body.vesselIds ? String(req.body.vesselIds).split(',').filter(Boolean) : undefined;
 
     const { buffer, filename } = await maintenanceReportService.exportWorkOrderOverview(
