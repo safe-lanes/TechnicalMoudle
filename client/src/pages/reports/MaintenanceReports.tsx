@@ -1159,7 +1159,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     const activeVesselId = (globalFilters?.vessels !== undefined)
       ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
       : effectiveVesselId;
-    if (!activeVesselId || activeVesselId === 'all') {
+    // wo-overview supports multi-vessel; all other reports require a single vessel
+    if (!activeVesselId || (activeVesselId === 'all' && reportId !== 'wo-overview')) {
       toast({
         title: "Vessel Required",
         description: "Please select a specific vessel to generate the report.",
@@ -1203,12 +1204,16 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
     }
     
-    // Add anchor year/month for WO Overview
+    // Add anchor year/month and vesselIds for WO Overview
     if (reportId === 'wo-overview') {
       const dateFrom2 = categoryFilters.dateRange?.from || globalFilters?.dateRange?.from;
       if (dateFrom2) {
         requestBody.year = dateFrom2.getFullYear();
         requestBody.month = dateFrom2.getMonth() + 1;
+      }
+      // Pass selected vessel IDs for multi-vessel export
+      if (activeVesselId === 'all' && (globalFilters?.vessels?.length ?? 0) > 0) {
+        requestBody.vesselIds = globalFilters!.vessels.join(',');
       }
     }
 
