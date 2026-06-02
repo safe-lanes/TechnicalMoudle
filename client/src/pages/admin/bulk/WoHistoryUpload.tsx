@@ -2,7 +2,7 @@ import { History } from "lucide-react";
 import UniformBulkUpload from "@/components/admin/UniformBulkUpload";
 import { PageMarkers } from "../BulkDataImport";
 
-const FIELD_MAPPINGS = [
+const WO_HISTORY_FIELD_MAPPINGS = [
   { field: "WO Number",                  required: true,  description: "Unique work order number (e.g. 601.001.WO-2024-01)" },
   { field: "Component Code",             required: true,  description: "Equipment component code (must exist in vessel register)" },
   { field: "Job Title",                  required: true,  description: "Title of the maintenance job performed" },
@@ -22,6 +22,37 @@ const FIELD_MAPPINGS = [
   { field: "Status",                    required: false, description: "WO status: Completed, Due, Overdue, Postponed, Pending Approval, Active" },
 ];
 
+const SPARE_HISTORY_FIELD_MAPPINGS = [
+  { field: "Part Code",            required: true,  description: "Part code of the spare — must exist in vessel's spares register" },
+  { field: "Event Type",           required: true,  description: "Type of transaction: CONSUME, RECEIVE, or ADJUST" },
+  { field: "Quantity",             required: true,  description: "Absolute quantity involved (always positive)" },
+  { field: "ROB After",            required: true,  description: "Remaining on-board balance after this transaction" },
+  { field: "Date",                 required: true,  description: "Date of the transaction (DD-MMM-YYYY)" },
+  { field: "Vessel Code",          required: true,  description: "Vessel code (e.g. V001)" },
+  { field: "Component Code",       required: false, description: "Component this spare is linked to" },
+  { field: "Performed By",         required: false, description: "Name or rank of person who performed the transaction" },
+  { field: "Remarks",              required: false, description: "Free-text notes about the transaction" },
+  { field: "Reference",            required: false, description: "Work Order or Purchase Order number linked to this event" },
+  { field: "Port/Place",           required: false, description: "Port or location where the transaction took place" },
+  { field: "Timezone",             required: false, description: "Timezone string (e.g. Asia/Singapore)" },
+  { field: "Component Spare Code", required: false, description: "Spare code as registered against the component" },
+];
+
+const STORE_HISTORY_FIELD_MAPPINGS = [
+  { field: "Item Code",    required: true,  description: "Item code of the stores item — must exist in vessel's stores register" },
+  { field: "Event Type",   required: true,  description: "Type of transaction: RECEIVE, CONSUME, ADJUST, TRANSFER_IN, or TRANSFER_OUT" },
+  { field: "Quantity",     required: true,  description: "Absolute quantity involved (always positive)" },
+  { field: "ROB After",    required: true,  description: "Remaining on-board balance after this transaction" },
+  { field: "Date",         required: true,  description: "Date of the transaction (DD-MMM-YYYY)" },
+  { field: "Vessel Code",  required: true,  description: "Vessel code (e.g. V001)" },
+  { field: "Location",     required: false, description: "Storage location name (stored as a note in remarks)" },
+  { field: "Remarks",      required: false, description: "Free-text notes about the transaction" },
+  { field: "Reference",    required: false, description: "Work Order or Purchase Order number linked to this event" },
+  { field: "Port/Place",   required: false, description: "Port or location where the transaction took place" },
+  { field: "Timezone",     required: false, description: "Timezone string (e.g. Asia/Singapore)" },
+  { field: "Performed By", required: false, description: "Name or rank of person who performed the transaction" },
+];
+
 const HISTORY_TYPES = [
   { value: 'work-order', label: 'Work Order' },
   { value: 'spares',     label: 'Spares' },
@@ -36,16 +67,34 @@ interface WoHistoryUploadProps {
 }
 
 export default function WoHistoryUpload({ vesselId, markers, selectedHistorySubType, onHistorySubTypeChange }: WoHistoryUploadProps) {
+  const subType = selectedHistorySubType ?? 'work-order';
+
+  const fieldMappings =
+    subType === 'stores' ? STORE_HISTORY_FIELD_MAPPINGS :
+    subType === 'spares' ? SPARE_HISTORY_FIELD_MAPPINGS :
+    WO_HISTORY_FIELD_MAPPINGS;
+
+  const description =
+    subType === 'stores'
+      ? "Upload historical stores transaction records. Imported entries are stored in the Stores ledger."
+      : subType === 'spares'
+      ? "Upload historical spare parts transaction records. Imported entries are stored in the Spares history ledger."
+      : "Upload historical work order records. Imported entries are stored as Completed work orders.";
+
   return (
     <UniformBulkUpload
-      title="WO History Import"
-      description="Upload historical work order records. Imported entries are stored as Completed work orders."
+      title="History Import"
+      description={description}
       icon={History}
       templateType="wo-history"
       templateFileName="wo_history_template.xlsx"
-      fieldMappings={FIELD_MAPPINGS}
+      fieldMappings={fieldMappings}
       vesselId={vesselId}
-      previewColumns={["WO Number", "Component Code", "Job Title"]}
+      previewColumns={
+        subType === 'stores' ? ["Item Code", "Event Type", "Quantity"] :
+        subType === 'spares' ? ["Part Code", "Event Type", "Quantity"] :
+        ["WO Number", "Component Code", "Job Title"]
+      }
       historySubTypes={HISTORY_TYPES}
       selectedHistorySubType={selectedHistorySubType}
       onHistorySubTypeChange={onHistorySubTypeChange}

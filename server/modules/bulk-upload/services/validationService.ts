@@ -74,6 +74,9 @@ export async function validateData(type: string, data: any[], mode: string, vess
       case 'spare-history':
         primaryField = 'Part Code';
         break;
+      case 'store-history':
+        primaryField = 'Item Code';
+        break;
       default:
         primaryField = 'Component Code';
     }
@@ -91,10 +94,21 @@ export async function validateData(type: string, data: any[], mode: string, vess
       });
       const partCodePresent = fieldValue && String(fieldValue).trim() !== '';
       if (!partCodePresent && !hasOtherData) {
-        // Completely blank row — skip silently
         return false;
       }
-      // Row has some data: include it so the validator can emit per-row errors
+      return true;
+    }
+
+    if (type === 'store-history') {
+      const storeHistoryDataFields = ['Event Type', 'Quantity', 'ROB After', 'Date', 'Performed By', 'Remarks', 'Reference', 'Port/Place'];
+      const hasOtherData = storeHistoryDataFields.some(f => {
+        const v = row[f];
+        return v !== undefined && v !== null && String(v).trim() !== '';
+      });
+      const itemCodePresent = fieldValue && String(fieldValue).trim() !== '';
+      if (!itemCodePresent && !hasOtherData) {
+        return false;
+      }
       return true;
     }
 
@@ -239,6 +253,22 @@ export async function validateData(type: string, data: any[], mode: string, vess
       console.log(`📋 Loaded ${vesselSparesByPartCode.size} spares for vessel '${vesselId}' (spare-history validation)`);
     } catch (err) {
       console.warn('⚠️ Could not pre-load vessel spares for spare-history validation:', err);
+    }
+  }
+
+  // Pre-load vessel stores for store-history Item Code validation
+  const vesselStoresByItemCode = new Map<string, any>();
+  if (type === 'store-history' && vesselId) {
+    try {
+      const vesselStores = await storage.getStoresItems(vesselId);
+      vesselStores.forEach((s: any) => {
+        if (s.itemCode) {
+          vesselStoresByItemCode.set(String(s.itemCode).trim(), s);
+        }
+      });
+      console.log(`📋 Loaded ${vesselStoresByItemCode.size} stores items for vessel '${vesselId}' (store-history validation)`);
+    } catch (err) {
+      console.warn('⚠️ Could not pre-load vessel stores for store-history validation:', err);
     }
   }
 
@@ -1036,6 +1066,78 @@ export async function validateData(type: string, data: any[], mode: string, vess
         'Reference', 'Port/Place', 'Timezone', 'Component Spare Code'
       ];
       for (const field of optionalFields) {
+        if (row[field] !== undefined && row[field] !== null && String(row[field]).trim() !== '') {
+          normalized[field] = row[field];
+        }
+      }
+
+    } else if (type === 'store-history') {
+      // ── Store History import validation ──
+      // Required: Item Code, Event Type, Quantity, ROB After, Date, Vessel Code
+
+      const itemCode = row['Item Code'];
+      if (!itemCode || String(itemCode).trim() === '') {
+        errors.push(`Row ${rowNum}: Item Code is required`);
+      } else {
+        const itemCodeStr = String(itemCode).trim();
+        normalized['Item Code'] = itemCodeStr;
+        if (vesselStoresByItemCode.size > 0 && !vesselStoresByItemCode.has(itemCodeStr)) {
+          errors.push(`Row ${rowNum}: Item Code '${itemCodeStr}' not found in vessel's stores register`);
+        }
+      }
+
+      const eventType = row['Event Type'];
+      const validStoreEventTypes = ['RECEIVE', 'CONSUME', 'ADJUST', 'TRANSFER_IN', 'TRANSFER_OUT'];
+      if (!eventType || String(eventType).trim() === '') {
+        errors.push(`Row ${rowNum}: Event Type is required`);
+      } else {
+        const evtNorm = String(eventType).trim().toUpperCase();
+        if (!validStoreEventTypes.includes(evtNorm)) {
+          errors.push(`Row ${rowNum}: Event Type '${eventType}' is invalid. Accepted values: RECEIVE, CONSUME, ADJUST, TRANSFER_IN, TRANSFER_OUT`);
+        } else {
+          normalized['Event Type'] = evtNorm;
+        }
+      }
+
+      const quantity = row['Quantity'];
+      if (quantity === undefined || quantity === null || String(quantity).trim() === '') {
+        errors.push(`Row ${rowNum}: Quantity is required`);
+      } else {
+        const qtyNum = Number(String(quantity).trim());
+        if (isNaN(qtyNum) || qtyNum < 0) {
+          errors.push(`Row ${rowNum}: Quantity must be a non-negative number (got '${quantity}')`);
+        } else {
+          normalized['Quantity'] = qtyNum;
+        }
+      }
+
+      const robAfter = row['ROB After'];
+      if (robAfter === undefined || robAfter === null || String(robAfter).trim() === '') {
+        errors.push(`Row ${rowNum}: ROB After is required`);
+      } else {
+        const robNum = Number(String(robAfter).trim());
+        if (isNaN(robNum) || robNum < 0) {
+          errors.push(`Row ${rowNum}: ROB After must be a non-negative number (got '${robAfter}')`);
+        } else {
+          normalized['ROB After'] = robNum;
+        }
+      }
+
+      if (!row['Date'] && row['Date'] !== 0) {
+        errors.push(`Row ${rowNum}: Date is required`);
+      } else {
+        normalized['Date'] = row['Date'];
+      }
+
+      if (!row['Vessel Code'] || String(row['Vessel Code']).trim() === '') {
+        errors.push(`Row ${rowNum}: Vessel Code is required`);
+      } else {
+        normalized['Vessel Code'] = String(row['Vessel Code']).trim();
+      }
+
+      // Optional fields — copy as-is
+      const storeOptionalFields = ['Location', 'Remarks', 'Reference', 'Port/Place', 'Timezone', 'Performed By'];
+      for (const field of storeOptionalFields) {
         if (row[field] !== undefined && row[field] !== null && String(row[field]).trim() !== '') {
           normalized[field] = row[field];
         }

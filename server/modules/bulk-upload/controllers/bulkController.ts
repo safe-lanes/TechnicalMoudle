@@ -30,7 +30,7 @@ import {
   resetDynamicComponentCategories,
   getEffectiveComponentCategories
 } from '../services/helpers';
-import { generateFleetMasterTemplate, generateWorkOrdersTemplate, generateJobsTemplate, generateSparesTemplate, generateWoHistoryTemplate, generateSpareHistoryTemplate } from '../services/templateService';
+import { generateFleetMasterTemplate, generateWorkOrdersTemplate, generateJobsTemplate, generateSparesTemplate, generateWoHistoryTemplate, generateSpareHistoryTemplate, generateStoreHistoryTemplate } from '../services/templateService';
 import { validateData } from '../services/validationService';
 import { performImport, storeImportHistory } from '../services/importService';
 import { getImportHistory, getHistoryFile } from '../services/historyService';
@@ -126,8 +126,22 @@ export async function getTemplate(req: Request, res: Response) {
     }
   }
 
+  // store-history has its own generator
+  if (type === 'store-history') {
+    try {
+      const buffer = await generateStoreHistoryTemplate();
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="store_history_template.xlsx"');
+      res.send(buffer);
+      return;
+    } catch (error) {
+      console.error('Error generating store-history template:', error);
+      return res.status(500).json({ error: 'Failed to generate store history template' });
+    }
+  }
+
   if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers', 'fleet-components', 'fleet-jobs', 'fleet-spares'].includes(type as string)) {
-    return res.status(400).json({ error: 'Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-components, fleet-jobs, fleet-spares, wo-history, spare-history' });
+    return res.status(400).json({ error: 'Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-components, fleet-jobs, fleet-spares, wo-history, spare-history, store-history' });
   }
   
   // Default to V001 if no vesselId provided
@@ -704,7 +718,7 @@ export async function dryRun(req: Request, res: Response) {
     
     console.log(`📋 Type determination: requested='${requestedType}', sheetName='${sheetName}', sheetBasedType='${sheetBasedType}', effective='${type}'`);
 
-    if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers', 'fleet-components', 'fleet-jobs', 'fleet-spares', 'wo-history', 'spare-history'].includes(type)) {
+    if (!['components', 'spares', 'stores', 'work-orders', 'jobs', 'makers', 'fleet-components', 'fleet-jobs', 'fleet-spares', 'wo-history', 'spare-history', 'store-history'].includes(type)) {
       return res.status(400).json({ error: 'Invalid type' });
     }
 
