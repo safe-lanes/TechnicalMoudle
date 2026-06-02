@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import * as repo from '../repositories/reportRepository';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
+import type { VesselGraceSettings } from '@shared/workOrders/status';
 import { storage } from '../../../storage';
 import {
   COLORS, STATUS_COLORS, STANDARD_WORK_ORDER_COLUMNS,
@@ -1706,6 +1707,18 @@ function getYearMonth(dateStr: string | null | undefined): string | null {
   return `${y}-${m}`;
 }
 
+function buildVesselGraceSettings(vesselSettings: Record<string, unknown> | null | undefined): VesselGraceSettings {
+  if (!vesselSettings) {
+    return { calendarGraceMode: 'COMPANY_STANDARD', calendarGraceDays: 7, rhGraceHours: 50 };
+  }
+  return {
+    calendarGraceMode: ((vesselSettings.calendarGraceMode as string) || 'COMPANY_STANDARD') as 'COMPANY_STANDARD' | 'CUSTOM_DAYS',
+    calendarGraceDays: (vesselSettings.calendarGraceDays as number) ?? 7,
+    rhGraceHours: (vesselSettings.rhGraceHours as number) ?? 50,
+    rhLeadTimeHours: vesselSettings.rhLeadTimeHours as number | undefined,
+  };
+}
+
 export async function getWorkOrderOverviewData(
   vesselId: string,
   anchorYear?: number,
@@ -1740,16 +1753,23 @@ export async function getWorkOrderOverviewData(
   const companyGraceRow = await storage.getCompanyStandardGraceSettings();
   const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
 
+  // Build per-vessel grace settings cache
+  const vesselGraceCache = new Map<string, VesselGraceSettings>();
+  const uniqueVesselIds = Array.from(new Set<string>(
+    workOrders.map((wo: any) => wo.vesselId).filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+  ));
+  for (const vid of uniqueVesselIds) {
+    const vs = await repo.getPmsVesselSettings(vid);
+    vesselGraceCache.set(vid, buildVesselGraceSettings(vs as Record<string, unknown> | null));
+  }
+
   const isCritical = (wo: any): boolean =>
     wo.criticality === 'Yes' || wo.jobPriority === 'Critical';
 
-  interface MonthBucket {
+  interface DueBucket {
     total: WoOverviewCellData;
     critical: WoOverviewCellData;
     nonCritical: WoOverviewCellData;
-    completedTotal: WoOverviewCellData;
-    completedCritical: WoOverviewCellData;
-    completedNonCritical: WoOverviewCellData;
     notCompletedTotal: WoOverviewCellData;
     notCompletedCritical: WoOverviewCellData;
     notCompletedNonCritical: WoOverviewCellData;
@@ -1761,15 +1781,25 @@ export async function getWorkOrderOverviewData(
     postponedNonCritical: WoOverviewCellData;
   }
 
+  interface CompBucket {
+    completedTotal: WoOverviewCellData;
+    completedCritical: WoOverviewCellData;
+    completedNonCritical: WoOverviewCellData;
+  }
+
   const emptyCell = (): WoOverviewCellData => ({ count: 0, woIds: [] });
-  const buckets = new Map<string, MonthBucket>();
+
+  const dueBuckets = new Map<string, DueBucket>();
+  const compBuckets = new Map<string, CompBucket>();
   for (const m of months) {
-    buckets.set(m.yearMonth, {
+    dueBuckets.set(m.yearMonth, {
       total: emptyCell(), critical: emptyCell(), nonCritical: emptyCell(),
-      completedTotal: emptyCell(), completedCritical: emptyCell(), completedNonCritical: emptyCell(),
       notCompletedTotal: emptyCell(), notCompletedCritical: emptyCell(), notCompletedNonCritical: emptyCell(),
       overdueTotal: emptyCell(), overdueCritical: emptyCell(), overdueNonCritical: emptyCell(),
       postponedTotal: emptyCell(), postponedCritical: emptyCell(), postponedNonCritical: emptyCell(),
+    });
+    compBuckets.set(m.yearMonth, {
+      completedTotal: emptyCell(), completedCritical: emptyCell(), completedNonCritical: emptyCell(),
     });
   }
 
@@ -1785,25 +1815,12 @@ export async function getWorkOrderOverviewData(
   for (const wo of workOrders) {
     if (wo.isExecution) continue;
     const dueYM = getYearMonth(wo.dueDate);
-    if (!dueYM || !ymSet.has(dueYM)) continue;
+    const complYM = getYearMonth(wo.completionDateTime || wo.dateCompleted);
+    if (!dueYM && !complYM) continue;
 
-    const bucket = buckets.get(dueYM)!;
     const crit = isCritical(wo);
     const woId: string = wo.wouuid || String(wo.id);
-
-    // Collect WO info for drilldown
-    if (!woInfoMap[woId]) {
-      woInfoMap[woId] = {
-        workOrderNo: wo.workOrderNo || '-',
-        jobTitle: wo.jobTitle || '-',
-        status: wo.status || '-',
-        componentName: wo.component || '-',
-        dueDate: wo.dueDate || null,
-      };
-    }
-
-    push(bucket.total, woId);
-    if (crit) { push(bucket.critical, woId); } else { push(bucket.nonCritical, woId); }
+    const vesselGraceSettings = vesselGraceCache.get(wo.vesselId ?? '') || buildVesselGraceSettings(null);
 
     const computedStatus = computeWorkOrderStatus({
       dueDate: wo.dueDate,
@@ -1814,32 +1831,56 @@ export async function getWorkOrderOverviewData(
       completionDateTime: wo.completionDateTime,
       maintenanceBasis: wo.maintenanceBasis || 'Calendar',
       companyGraceConfig,
+      vesselGraceSettings,
     });
 
     const isCompleted = computedStatus === 'Completed';
     const isPostponed = computedStatus === 'Postponed';
-    const isOverdue = !isCompleted && !isPostponed && (dueYM < anchorYM || computedStatus === 'Overdue');
 
-    if (isCompleted) {
-      push(bucket.completedTotal, woId);
-      if (crit) { push(bucket.completedCritical, woId); } else { push(bucket.completedNonCritical, woId); }
-    } else {
-      push(bucket.notCompletedTotal, woId);
-      if (crit) { push(bucket.notCompletedCritical, woId); } else { push(bucket.notCompletedNonCritical, woId); }
+    // Collect WO info for drilldown (for any WO in scope)
+    if (!woInfoMap[woId]) {
+      woInfoMap[woId] = {
+        workOrderNo: wo.workOrderNo || '-',
+        jobTitle: wo.jobTitle || '-',
+        status: wo.status || '-',
+        componentName: wo.component || '-',
+        dueDate: wo.dueDate || null,
+      };
     }
 
-    if (isOverdue) {
-      push(bucket.overdueTotal, woId);
-      if (crit) { push(bucket.overdueCritical, woId); } else { push(bucket.overdueNonCritical, woId); }
+    // Due-date bucket: totalDue, notCompleted, overdue, postponed
+    if (dueYM && ymSet.has(dueYM)) {
+      const db = dueBuckets.get(dueYM)!;
+      push(db.total, woId);
+      if (crit) { push(db.critical, woId); } else { push(db.nonCritical, woId); }
+
+      if (!isCompleted) {
+        push(db.notCompletedTotal, woId);
+        if (crit) { push(db.notCompletedCritical, woId); } else { push(db.notCompletedNonCritical, woId); }
+      }
+
+      const isOverdue = !isCompleted && !isPostponed && (dueYM < anchorYM || computedStatus === 'Overdue');
+      if (isOverdue) {
+        push(db.overdueTotal, woId);
+        if (crit) { push(db.overdueCritical, woId); } else { push(db.overdueNonCritical, woId); }
+      }
+
+      if (isPostponed) {
+        push(db.postponedTotal, woId);
+        if (crit) { push(db.postponedCritical, woId); } else { push(db.postponedNonCritical, woId); }
+      }
     }
 
-    if (isPostponed) {
-      push(bucket.postponedTotal, woId);
-      if (crit) { push(bucket.postponedCritical, woId); } else { push(bucket.postponedNonCritical, woId); }
+    // Completion-date bucket: completedTotal/Critical/NonCritical (by month the WO was completed)
+    if (isCompleted && complYM && ymSet.has(complYM)) {
+      const cb = compBuckets.get(complYM)!;
+      push(cb.completedTotal, woId);
+      if (crit) { push(cb.completedCritical, woId); } else { push(cb.completedNonCritical, woId); }
     }
   }
 
-  const ordered = months.map(m => buckets.get(m.yearMonth)!);
+  const orderedDue = months.map(m => dueBuckets.get(m.yearMonth)!);
+  const orderedComp = months.map(m => compBuckets.get(m.yearMonth)!);
 
   const pctCell = (numerator: number, denominator: number, woIds: string[]): WoOverviewCellData => ({
     count: denominator === 0 ? 0 : Math.round((numerator / denominator) * 100),
@@ -1854,22 +1895,22 @@ export async function getWorkOrderOverviewData(
     months,
     woInfo: woInfoMap,
     matrix: {
-      totalDue:          ordered.map(b => b.total),
-      criticalDue:       ordered.map(b => b.critical),
-      nonCriticalDue:    ordered.map(b => b.nonCritical),
-      completedTotal:    ordered.map(b => b.completedTotal),
-      completedCritical: ordered.map(b => b.completedCritical),
-      completedNonCritical: ordered.map(b => b.completedNonCritical),
-      notCompletedTotal: ordered.map(b => b.notCompletedTotal),
-      notCompletedCritical: ordered.map(b => b.notCompletedCritical),
-      notCompletedNonCritical: ordered.map(b => b.notCompletedNonCritical),
-      overdueTotal:      ordered.map((b, i) => pctCell(b.overdueTotal.count, ordered[i].total.count, b.overdueTotal.woIds)),
-      overdueCritical:   ordered.map((b, i) => pctCell(b.overdueCritical.count, ordered[i].critical.count, b.overdueCritical.woIds)),
-      overdueNonCritical: ordered.map((b, i) => pctCell(b.overdueNonCritical.count, ordered[i].nonCritical.count, b.overdueNonCritical.woIds)),
-      postponedTotal:    ordered.map(b => b.postponedTotal),
-      postponedCritical: ordered.map(b => b.postponedCritical),
-      postponedNonCritical: ordered.map(b => b.postponedNonCritical),
-      extendedPct:       ordered.map((b, i) => pctCell(b.postponedTotal.count, ordered[i].total.count, b.postponedTotal.woIds)),
+      totalDue:            orderedDue.map(b => b.total),
+      criticalDue:         orderedDue.map(b => b.critical),
+      nonCriticalDue:      orderedDue.map(b => b.nonCritical),
+      completedTotal:      orderedComp.map(b => b.completedTotal),
+      completedCritical:   orderedComp.map(b => b.completedCritical),
+      completedNonCritical: orderedComp.map(b => b.completedNonCritical),
+      notCompletedTotal:    orderedDue.map(b => b.notCompletedTotal),
+      notCompletedCritical: orderedDue.map(b => b.notCompletedCritical),
+      notCompletedNonCritical: orderedDue.map(b => b.notCompletedNonCritical),
+      overdueTotal:         orderedDue.map(b => pctCell(b.overdueTotal.count, b.total.count, b.overdueTotal.woIds)),
+      overdueCritical:      orderedDue.map(b => pctCell(b.overdueCritical.count, b.critical.count, b.overdueCritical.woIds)),
+      overdueNonCritical:   orderedDue.map(b => pctCell(b.overdueNonCritical.count, b.nonCritical.count, b.overdueNonCritical.woIds)),
+      postponedTotal:       orderedDue.map(b => b.postponedTotal),
+      postponedCritical:    orderedDue.map(b => b.postponedCritical),
+      postponedNonCritical: orderedDue.map(b => b.postponedNonCritical),
+      extendedPct:          orderedDue.map(b => pctCell(b.postponedTotal.count, b.total.count, b.postponedTotal.woIds)),
     },
   };
 }
@@ -1967,13 +2008,14 @@ export async function exportWorkOrderOverview(
     cells: WoOverviewCellData[],
     bgColor: string,
     bold: boolean = false,
-    indent: number = 0
+    indent: number = 0,
+    italic: boolean = false
   ) => {
     const row = worksheet.getRow(curRow);
     row.height = 16;
     const lc = row.getCell(1);
     lc.value = label;
-    lc.font = { bold, name: 'Arial', size: 9, color: { argb: 'FF1A1A2E' } };
+    lc.font = { bold, italic, name: 'Arial', size: 9, color: { argb: 'FF1A1A2E' } };
     lc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${bgColor}` } };
     lc.alignment = { horizontal: 'left', vertical: 'middle', indent };
     lc.border = { right: { style: 'thin', color: { argb: 'FFAAAAAA' } }, bottom: { style: 'hair', color: { argb: 'FFCCCCCC' } } };
@@ -1981,9 +2023,9 @@ export async function exportWorkOrderOverview(
     for (let i = 0; i < months.length; i++) {
       const cd = cells[i];
       const dc = row.getCell(i + 2);
-      const display = cd.count === 0 ? '—' : (cd.isPct ? `${cd.count}%` : String(cd.count));
+      const display = cd.isPct ? `${cd.count}%` : (cd.count === 0 ? '—' : String(cd.count));
       dc.value = display;
-      dc.font = { name: 'Arial', size: 9, bold: bold && !cd.isPct, color: { argb: cd.count === 0 ? 'FF999999' : 'FF1A1A2E' } };
+      dc.font = { name: 'Arial', size: 9, bold: bold && !cd.isPct, italic, color: { argb: (cd.count === 0 && !cd.isPct) ? 'FF999999' : 'FF1A1A2E' } };
       dc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${bgColor}` } };
       dc.alignment = { horizontal: 'center', vertical: 'middle' };
       dc.border = { bottom: { style: 'hair', color: { argb: 'FFCCCCCC' } }, right: { style: 'hair', color: { argb: 'FFDDDDDD' } } };
@@ -2009,15 +2051,15 @@ export async function exportWorkOrderOverview(
   writeDataRow('  Not Completed (Non-Crit)', matrix.notCompletedNonCritical,  sNotComp.bgData, false, 1);
 
   writeSectionHeader(sOverdue.header, sOverdue.bgLabel);
-  writeDataRow('Overdue % (Total)',     matrix.overdueTotal,       sOverdue.bgData, true);
-  writeDataRow('  Overdue % (Critical)', matrix.overdueCritical,   sOverdue.bgData, false, 1);
-  writeDataRow('  Overdue % (Non-Crit)', matrix.overdueNonCritical, sOverdue.bgData, false, 1);
+  writeDataRow('Overdue % (Total)',     matrix.overdueTotal,       sOverdue.bgData, true,  0, true);
+  writeDataRow('  Overdue % (Critical)', matrix.overdueCritical,   sOverdue.bgData, false, 1, true);
+  writeDataRow('  Overdue % (Non-Crit)', matrix.overdueNonCritical, sOverdue.bgData, false, 1, true);
 
   writeSectionHeader(sExt.header, sExt.bgLabel);
   writeDataRow('Extended Total',        matrix.postponedTotal,       sExt.bgData, true);
   writeDataRow('  Extended (Critical)', matrix.postponedCritical,    sExt.bgData, false, 1);
   writeDataRow('  Extended (Non-Crit)', matrix.postponedNonCritical, sExt.bgData, false, 1);
-  writeDataRow('Extended %',            matrix.extendedPct,          sExt.bgData, true);
+  writeDataRow('Extended %',            matrix.extendedPct,          sExt.bgData, true,  0, true);
 
   // Footer note
   curRow++;

@@ -105,10 +105,10 @@ export default function WorkOrderOverviewPreview({ data }: WorkOrderOverviewPrev
   ) => {
     const { data: dataBg, hover } = SECTION_COLORS[sectionKey];
     const clickable = cell.count > 0 && !cell.isPct;
-    const display = cell.count === 0
-      ? <span className="text-gray-400">—</span>
-      : cell.isPct
-        ? <span className={bold ? "font-bold" : ""}>{cell.count}%</span>
+    const display = cell.isPct
+      ? <span className={bold ? "font-bold" : ""}>{cell.count}%</span>
+      : cell.count === 0
+        ? <span className="text-gray-400">—</span>
         : <span className={`${bold ? "font-bold" : ""} ${clickable ? "underline decoration-dotted cursor-pointer text-blue-700" : ""}`}>{cell.count}</span>;
 
     return (
