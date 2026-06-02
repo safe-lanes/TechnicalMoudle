@@ -1138,11 +1138,9 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           } as ReportPreviewData;
         }
 
-        // PDF not supported for matrix — suggest Excel
-        toast({
-          title: "Excel Only",
-          description: "Work Order Overview is a wide matrix. Please use the Excel export instead.",
-        });
+        // PDF is not practical for this wide matrix.
+        // handleGenerateReport routes PDF clicks to generateExcelReport, so this
+        // branch is only reached if called directly — silently break.
         break;
       }
 
@@ -1206,10 +1204,16 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     
     // Add anchor year/month and vesselIds for WO Overview
     if (reportId === 'wo-overview') {
-      const dateFrom2 = categoryFilters.dateRange?.from || globalFilters?.dateRange?.from;
-      if (dateFrom2) {
-        requestBody.year = dateFrom2.getFullYear();
-        requestBody.month = dateFrom2.getMonth() + 1;
+      // Use globalFilters.dateRange preferentially — same priority order as the preview path.
+      // Always send year/month so the server never has to guess the anchor month.
+      const woAnchor = globalFilters?.dateRange?.from ?? categoryFilters.dateRange?.from;
+      if (woAnchor) {
+        requestBody.year = woAnchor.getFullYear();
+        requestBody.month = woAnchor.getMonth() + 1;
+      } else {
+        const nowD = new Date();
+        requestBody.year = nowD.getFullYear();
+        requestBody.month = nowD.getMonth() + 1;
       }
       // Pass selected vessel IDs for multi-vessel export
       if (activeVesselId === 'all' && (globalFilters?.vessels?.length ?? 0) > 0) {
@@ -1303,16 +1307,21 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
     try {
       setGeneratingReports(prev => new Set(prev).add(reportKey));
-      
+
+      // wo-overview is a wide matrix — PDF is not practical; auto-download as Excel instead.
+      const effectiveFormat = (reportId === 'wo-overview' && format === 'PDF') ? 'Excel' : format;
+
       toast({
         title: "Generating Report",
-        description: `Creating ${format} report...`,
+        description: effectiveFormat === 'Excel' && format === 'PDF'
+          ? "Work Order Overview exported as Excel (PDF not supported for this wide matrix)."
+          : `Creating ${effectiveFormat} report...`,
       });
 
-      if (format === 'PDF') {
-        await generateMaintenancePDF(reportId);
-      } else if (format === 'Excel') {
+      if (effectiveFormat === 'Excel') {
         await generateExcelReport(reportId);
+      } else if (effectiveFormat === 'PDF') {
+        await generateMaintenancePDF(reportId);
       } else {
         toast({
           title: "CSV Export",
@@ -1323,7 +1332,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       
       toast({
         title: "Report Generated",
-        description: `${format} report downloaded successfully!`,
+        description: `${effectiveFormat} report downloaded successfully!`,
       });
       
     } catch (error: any) {
