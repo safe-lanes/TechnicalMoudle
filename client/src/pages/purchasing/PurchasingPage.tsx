@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { apiRequest } from "@/lib/queryClient";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, Lock } from "lucide-react";
 
 /**
  * Purchasing — embeds the Shipskart platform via ticket-based SSO.
@@ -17,13 +16,28 @@ export default function PurchasingPage() {
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [roleBlocked, setRoleBlocked] = useState(false);
 
   const initiate = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setRoleBlocked(false);
     try {
-      const res = await apiRequest("POST", "/technical/api/shipskart/sso/initiate");
-      const data = await res.json();
+      // Direct fetch (not apiRequest) so we can inspect the 403 ROLE_NOT_MAPPED
+      // body and branch on it instead of treating it as a generic error.
+      const res = await fetch("/technical/api/shipskart/sso/initiate", {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => null);
+
+      if (res.status === 403 && data?.errorCode === "ROLE_NOT_MAPPED") {
+        setRoleBlocked(true);
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error || `Request failed (${res.status}).`);
+      }
       if (!data?.iframeUrl) {
         throw new Error("No iframeUrl returned by the SSO service.");
       }
@@ -49,6 +63,26 @@ export default function PurchasingPage() {
         <div className="flex flex-col items-center text-gray-500">
           <Loader2 className="h-8 w-8 animate-spin mb-3" />
           <span>Connecting to Purchasing…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (roleBlocked) {
+    return (
+      <div
+        className="flex h-full w-full items-center justify-center"
+        data-testid="purchasing-role-blocked"
+      >
+        <div className="text-center max-w-md">
+          <Lock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">
+            Purchasing not available for your role
+          </h2>
+          <p className="text-gray-500">
+            Purchasing is not available for your role. Please contact your
+            administrator if you need access.
+          </p>
         </div>
       </div>
     );

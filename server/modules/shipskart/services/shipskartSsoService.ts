@@ -29,8 +29,19 @@ interface ShipskartConfig {
   baseUrl: string;
   apiKey: string;
   hmacSecret: string;
-  externalUserId: string;
   tenantId: string;
+}
+
+/**
+ * Thrown when the current user's role has no Shipskart externalUserId mapping.
+ * The controller catches this specifically and returns 403 ROLE_NOT_MAPPED so
+ * the frontend can show "Purchasing is not available for your role".
+ */
+export class ShipskartRoleNotMappedError extends Error {
+  constructor(public readonly userRole: string) {
+    super(`No Shipskart externalUserId mapping for role "${userRole || '(none)'}".`);
+    this.name = 'ShipskartRoleNotMappedError';
+  }
 }
 
 let _cachedConfig: ShipskartConfig | null = null;
@@ -41,15 +52,24 @@ function getShipskartConfig(): ShipskartConfig {
   const baseUrl = process.env.SHIPSKART_SSO_BASE_URL;
   const apiKey = process.env.SHIPSKART_API_KEY;
   const hmacSecret = process.env.SHIPSKART_HMAC_SECRET;
-  const externalUserId = process.env.SHIPSKART_EXTERNAL_USER_ID;
   const tenantId = process.env.SHIPSKART_TENANT_ID;
 
   const missing: string[] = [];
   if (!baseUrl) missing.push('SHIPSKART_SSO_BASE_URL');
   if (!apiKey) missing.push('SHIPSKART_API_KEY');
   if (!hmacSecret) missing.push('SHIPSKART_HMAC_SECRET');
-  if (!externalUserId) missing.push('SHIPSKART_EXTERNAL_USER_ID');
   if (!tenantId) missing.push('SHIPSKART_TENANT_ID');
+
+  // At least one role→externalUserId mapping must be configured, otherwise the
+  // role map is empty and every user would be blocked.
+  const hasAnyRoleMapping = !!(
+    process.env.SHIPSKART_USER_VESSEL_ADMIN ||
+    process.env.SHIPSKART_USER_ADMIN ||
+    process.env.SHIPSKART_USER_REGULAR
+  );
+  if (!hasAnyRoleMapping) {
+    missing.push('at least one of SHIPSKART_USER_VESSEL_ADMIN / SHIPSKART_USER_ADMIN / SHIPSKART_USER_REGULAR');
+  }
 
   if (missing.length > 0) {
     throw new AppError(
@@ -63,7 +83,6 @@ function getShipskartConfig(): ShipskartConfig {
     baseUrl: baseUrl!.replace(/\/+$/, ''),
     apiKey: apiKey!,
     hmacSecret: hmacSecret!,
-    externalUserId: externalUserId!,
     tenantId: tenantId!,
   };
 
@@ -138,14 +157,36 @@ async function signedPost(path: string, body: Record<string, unknown>): Promise<
 }
 
 /**
+ * Resolve the Shipskart externalUserId for one of our roles. Per-role mapping
+ * (NOT per-user): every user with the same role gets the same Shipskart
+ * account. Returns null if the role has no mapping → caller blocks the user.
+ *
+ * For dev testing on this codebase, temporarily change mockAuthMiddleware
+ * (server/middleware/auth.ts) to return one of the mapped roles (Vessel Admin /
+ * Admin / User) instead of "Sail Admin". Do NOT commit that change.
+ */
+export function resolveExternalUserId(userRole: string): string | null {
+  const roleMap: Record<string, string | undefined> = {
+    'Vessel Admin': process.env.SHIPSKART_USER_VESSEL_ADMIN,
+    'Admin':        process.env.SHIPSKART_USER_ADMIN,
+    'User':         process.env.SHIPSKART_USER_REGULAR,
+  };
+  const externalUserId = roleMap[userRole];
+  return externalUserId ?? null;
+}
+
+/**
  * POST /api/v1/sso/initiate — backend only.
  * Returns { success, ssoCode, expiresIn, partnerName, iframeUrl }.
  * The iframeUrl is fully-formed (code + partner embedded) — the caller must
  * use it as-is and must NOT reconstruct it.
  *
+ * @param userRole  the current user's role; resolved to an externalUserId via
+ *                  the per-role map. Unmapped roles throw ShipskartRoleNotMappedError.
+ *
  * SECURITY: never log the returned ssoCode.
  */
-export async function initiateSso(): Promise<{
+export async function initiateSso(userRole: string): Promise<{
   success: boolean;
   ssoCode: string;
   expiresIn: number;
@@ -154,17 +195,21 @@ export async function initiateSso(): Promise<{
 }> {
   const cfg = getShipskartConfig();
 
-  // externalUserId is hardcoded (via env) to a single dev user for this
-  // integration; tenantId is likewise fixed for dev.
+  const externalUserId = resolveExternalUserId(userRole);
+  if (externalUserId === null) {
+    throw new ShipskartRoleNotMappedError(userRole);
+  }
+
+  // Per-role externalUserId mapping; tenantId is fixed for the environment.
   const body = {
-    externalUserId: cfg.externalUserId,
+    externalUserId,
     tenantId: cfg.tenantId,
   };
 
   const result = await signedPost('/api/v1/sso/initiate', body);
   console.log(
-    `[Shipskart] SSO initiate OK (partner=${result?.partnerName}, expiresIn=${result?.expiresIn}s)`,
-  ); // intentionally NOT logging ssoCode
+    `[Shipskart] SSO initiate OK (role=${userRole}, partner=${result?.partnerName}, expiresIn=${result?.expiresIn}s)`,
+  ); // intentionally NOT logging ssoCode or externalUserId
   return result;
 }
 
@@ -172,10 +217,18 @@ export async function initiateSso(): Promise<{
  * POST /api/v1/sso/logout — backend only. Idempotent (200 even with no
  * active sessions). Callers should wrap in try/catch and never block the
  * user's local logout if this fails.
+ *
+ * @param userRole  the current user's role. If unmapped, this is a NO-OP
+ *                  (returns without calling Shipskart and without throwing) —
+ *                  local logout must always complete.
  */
-export async function logoutSso(): Promise<{ success: boolean; message?: string }> {
-  const cfg = getShipskartConfig();
-  const body = { externalUserId: cfg.externalUserId };
+export async function logoutSso(userRole: string): Promise<{ success: boolean; message?: string }> {
+  const externalUserId = resolveExternalUserId(userRole);
+  if (externalUserId === null) {
+    // Unmapped role never had a Shipskart session — nothing to evict.
+    return { success: true, message: 'No Shipskart mapping for role — logout skipped' };
+  }
+  const body = { externalUserId };
   const result = await signedPost('/api/v1/sso/logout', body);
   console.log('[Shipskart] SSO logout OK');
   return result;
