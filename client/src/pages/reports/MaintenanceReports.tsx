@@ -22,7 +22,8 @@ import {
   Eye,
   Loader2,
   Download,
-  ClipboardList
+  ClipboardList,
+  BarChart3
 } from "lucide-react";
 import { format } from "date-fns";
 import { pdfReportGenerator, fetchReportData, formatDate, formatReportDateRange } from "@/lib/pdfReportGenerator";
@@ -36,6 +37,7 @@ import ReportAgGridTable from "@/components/reports/ReportAgGridTable";
 import type { ReportColumn } from "@/components/reports/ReportPreviewModal";
 import InlineReportPreview from "@/components/reports/InlineReportPreview";
 import MonthlySummaryPreview, { type MonthlySummaryData } from "@/components/reports/MonthlySummaryPreview";
+import WorkOrderOverviewPreview, { type WorkOrderOverviewData } from "@/components/reports/WorkOrderOverviewPreview";
 
 interface MaintenanceReport {
   id: string;
@@ -76,6 +78,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
   const [monthlySummaryData, setMonthlySummaryData] = useState<{ data: MonthlySummaryData; vesselId: string; year: number; month: number } | null>(null);
+  const [woOverviewData, setWoOverviewData] = useState<WorkOrderOverviewData | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [isFilterRefreshing, setIsFilterRefreshing] = useState(false);
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -119,6 +122,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       const version = ++previewVersionRef.current;
       setPreviewData(null);
       setMonthlySummaryData(null);
+      setWoOverviewData(null);
       setPreviewOpen(false);
       initialLoadRef.current = false;
       generateMaintenancePDF(selectedReportId, 'preview').then((data) => {
@@ -141,6 +145,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     filterTimerRef.current = setTimeout(() => {
       setPreviewData(null);
       setMonthlySummaryData(null);
+      setWoOverviewData(null);
       generateMaintenancePDF(selectedReportId, 'preview').then((data) => {
         if (previewVersionRef.current === version) {
           if (data) setPreviewData(data);
@@ -350,6 +355,20 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       priority: "low",
       lastGenerated: "1 week ago",
       estimatedTime: "2-3 min"
+    },
+    {
+      id: "wo-overview",
+      name: "Work Orders Overview",
+      description: "12-month rolling matrix of work order volume, completion, overdue % and postponements by month",
+      purpose: "Trend analysis and KPI tracking (Office/Management)",
+      frequency: "Monthly",
+      fields: ["Total/Critical/Non-Critical WOs Due", "Completed", "Not Completed", "Overdue %", "Extended (Postponed)", "Extended %"],
+      filters: ["Vessel", "Anchor Month"],
+      outputs: ["Excel"],
+      icon: BarChart3,
+      priority: "medium",
+      lastGenerated: "—",
+      estimatedTime: "1-2 min"
     }
   ];
 
@@ -1086,6 +1105,47 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         break;
       }
 
+      case 'wo-overview': {
+        const nowD = new Date();
+        let anchorYear: number, anchorMonth: number;
+        if (globalFilters?.dateRange?.from) {
+          anchorYear = globalFilters.dateRange.from.getFullYear();
+          anchorMonth = globalFilters.dateRange.from.getMonth() + 1;
+        } else {
+          anchorYear = nowD.getFullYear();
+          anchorMonth = nowD.getMonth() + 1;
+        }
+        const woUrl = `/technical/api/reports/maintenance/wo-overview/preview?vesselId=${activeVesselId}&anchorYear=${anchorYear}&anchorMonth=${anchorMonth}${vesselIdsParam}`;
+        const woRes = await fetch(woUrl);
+        if (!woRes.ok) {
+          const err = await woRes.json().catch(() => ({ error: 'Failed to fetch WO overview' }));
+          throw new Error(err.error || 'Failed to fetch WO overview');
+        }
+        const woData: WorkOrderOverviewData = await woRes.json();
+
+        if (mode === 'preview') {
+          setWoOverviewData(woData);
+          const mLabel0 = woData.months[0]?.label ?? '';
+          const mLabel11 = woData.months[11]?.label ?? '';
+          return {
+            title: 'Work Orders Overview',
+            subtitle: `12-Month Rolling Matrix · ${mLabel0} – ${mLabel11}`,
+            vessel: woData.vesselName,
+            dateRange: `${mLabel0} – ${mLabel11}`,
+            columns: [],
+            data: [],
+            summary: [],
+          } as ReportPreviewData;
+        }
+
+        // PDF not supported for matrix — suggest Excel
+        toast({
+          title: "Excel Only",
+          description: "Work Orders Overview is a wide matrix. Please use the Excel export instead.",
+        });
+        break;
+      }
+
       default:
         toast({
           title: "Report Not Available",
@@ -1118,6 +1178,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       'monthly-summary': '/technical/api/reports/maintenance/monthly-summary/excel',
       'critical-equipment': '/technical/api/reports/critical-equipment-status/excel',
       'workload-distribution': '/technical/api/reports/crew-workload-distribution/excel',
+      'wo-overview': '/technical/api/reports/maintenance/wo-overview/excel',
     };
 
     const endpoint = reportEndpoints[reportId];
@@ -1142,6 +1203,15 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
     }
     
+    // Add anchor year/month for WO Overview
+    if (reportId === 'wo-overview') {
+      const dateFrom2 = categoryFilters.dateRange?.from || globalFilters?.dateRange?.from;
+      if (dateFrom2) {
+        requestBody.anchorYear = dateFrom2.getFullYear();
+        requestBody.anchorMonth = dateFrom2.getMonth() + 1;
+      }
+    }
+
     // Add date range for reports that support it
     if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'all-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'postponement-log' || reportId === 'critical-equipment' || reportId === 'overdue-jobs') {
       const dateFrom = categoryFilters.dateRange?.from;
@@ -1441,6 +1511,9 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           <span className="text-sm text-muted-foreground">Refreshing report data...</span>
         </div>
       )}
+      {embedded && previewData && woOverviewData && selectedReportId === 'wo-overview' && (
+        <WorkOrderOverviewPreview data={woOverviewData} />
+      )}
       {embedded && previewData && monthlySummaryData && selectedReportId === 'monthly-summary' && (
         <MonthlySummaryPreview
           data={monthlySummaryData.data}
@@ -1459,7 +1532,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           }}
         />
       )}
-      {embedded && previewData && (!monthlySummaryData || selectedReportId !== 'monthly-summary') && (
+      {embedded && previewData && (!monthlySummaryData || selectedReportId !== 'monthly-summary') && selectedReportId !== 'wo-overview' && (
         <InlineReportPreview reportData={previewData ? { ...previewData, reportId: previewData.reportId ?? selectedReportId ?? null } : null} embedded={embedded} />
       )}
       {!embedded && (
