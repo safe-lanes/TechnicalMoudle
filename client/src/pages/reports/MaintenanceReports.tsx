@@ -211,7 +211,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     },
     {
       id: "overdue-jobs",
-      name: "Overdue Jobs",
+      name: "Overdue Work Orders",
       description: "Work orders that are past their due dates requiring immediate attention",
       purpose: "Focus late work & escalation (Vessel/Office)",
       frequency: "Daily",
@@ -225,7 +225,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     },
     {
       id: "completed-jobs",
-      name: "Completed Jobs Register",
+      name: "Completed Work Orders Register",
       description: "Comprehensive register of all completed maintenance work",
       purpose: "Evidence of work done (Audits/Office)",
       frequency: "Weekly/Monthly",
@@ -239,7 +239,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     },
     {
       id: "all-jobs",
-      name: "All Jobs / Work Orders Register",
+      name: "All Work Orders Register",
       description: "Comprehensive register of every work order regardless of status",
       purpose: "Full PMS overview (Audits/Office/Vessel)",
       frequency: "On Demand",
@@ -281,7 +281,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     },
     {
       id: "unplanned-jobs",
-      name: "Unplanned/Breakdown Jobs",
+      name: "Unplanned/Breakdown Work Orders",
       description: "Analysis of breakdown maintenance and unplanned work",
       purpose: "Identify reliability issues (Office/RCA)",
       frequency: "Monthly",
@@ -295,8 +295,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     },
     {
       id: "postponement-log",
-      name: "Job Postponement Log",
-      description: "Audit trail of all postponed jobs with justifications",
+      name: "Work Order Postponement Log",
+      description: "Audit trail of all postponed work orders with justifications",
       purpose: "Audit trail for deferred work (Vessel/Office)",
       frequency: "Monthly",
       fields: ["WO", "Original Due", "New Due", "Postponement Reason", "Approver", "Office Approval"],
@@ -557,11 +557,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Calendar/RH', value: `${calendarCount}/${rhCount}` }
         ];
 
-        if (mode === 'preview') return { title: 'OVERDUE JOBS REPORT', subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', vessel: overdueVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'OVERDUE WORK ORDERS REPORT', subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', vessel: overdueVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateOverdueJobsReport(
           { 
-            title: 'OVERDUE JOBS REPORT', 
+            title: 'OVERDUE WORK ORDERS REPORT', 
             subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', 
             vessel: overdueVessel || vesselName,
             dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to)
@@ -610,14 +610,14 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             { label: 'Total Jobs', value: data.length },
             { label: 'Total Man-Hours', value: filteredManHours.toFixed(1) }
           ];
-          return { title: 'COMPLETED JOBS REGISTER', subtitle: `Vessel: ${completedVessel || vesselName}`, vessel: completedVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns: completedColumns, data, summary: completedSummary } as ReportPreviewData;
+          return { title: 'COMPLETED WORK ORDERS REGISTER', subtitle: `Vessel: ${completedVessel || vesselName}`, vessel: completedVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns: completedColumns, data, summary: completedSummary } as ReportPreviewData;
         }
 
         const pdfManHours = data.reduce((sum: number, d: any) => sum + (parseFloat(d.manHours) || 0), 0);
         pdfReportGenerator.generateReport(
           { 
-            title: 'COMPLETED JOBS REGISTER', 
-            subtitle: `${data.length} completed jobs | ${pdfManHours.toFixed(1)} total man-hours`,
+            title: 'COMPLETED WORK ORDERS REGISTER', 
+            subtitle: `${data.length} completed work orders | ${pdfManHours.toFixed(1)} total man-hours`,
             vessel: completedVessel || vesselName,
             orientation: 'landscape',
             dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to)
@@ -668,12 +668,12 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             { label: 'Total Jobs', value: data.length },
             ...Object.entries(counts).map(([s, c]) => ({ label: s, value: c as number }))
           ];
-          return { title: 'ALL JOBS / WORK ORDERS REGISTER', subtitle: `Vessel: ${allJobsVessel || vesselName}`, vessel: allJobsVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns: allJobsColumns, data, summary: summaryRows } as ReportPreviewData;
+          return { title: 'ALL WORK ORDERS REGISTER', subtitle: `Vessel: ${allJobsVessel || vesselName}`, vessel: allJobsVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns: allJobsColumns, data, summary: summaryRows } as ReportPreviewData;
         }
 
         pdfReportGenerator.generateReport(
           {
-            title: 'ALL JOBS / WORK ORDERS REGISTER',
+            title: 'ALL WORK ORDERS REGISTER',
             subtitle: `${data.length} work orders`,
             vessel: allJobsVessel || vesselName,
             orientation: 'landscape',
@@ -854,11 +854,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Date Range', value: `${startDate} to ${endDate}` }
         ];
 
-        if (mode === 'preview') return { title: 'UNPLANNED/BREAKDOWN JOBS REPORT', subtitle: 'Analysis of breakdown maintenance and unplanned work', vessel: vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data: unplannedData, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'UNPLANNED/BREAKDOWN WORK ORDERS REPORT', subtitle: 'Analysis of breakdown maintenance and unplanned work', vessel: vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data: unplannedData, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateUnplannedBreakdownReport(
           { 
-            title: 'UNPLANNED/BREAKDOWN JOBS REPORT', 
+            title: 'UNPLANNED/BREAKDOWN WORK ORDERS REPORT', 
             subtitle: 'Analysis of breakdown maintenance and unplanned work', 
             vessel: vesselName,
             dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to)
@@ -918,12 +918,12 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Total Postponed Jobs', value: data.length }
         ];
 
-        if (mode === 'preview') return { title: 'Job Postponement Log Report', subtitle: 'Audit trail of all postponed jobs with approvals and justifications', vessel: postponeVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'Work Order Postponement Log Report', subtitle: 'Audit trail of all postponed work orders with approvals and justifications', vessel: postponeVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
           { 
-            title: 'Job Postponement Log Report', 
-            subtitle: 'Audit trail of all postponed jobs with approvals and justifications', 
+            title: 'Work Order Postponement Log Report', 
+            subtitle: 'Audit trail of all postponed work orders with approvals and justifications', 
             vessel: postponeVessel || vesselName,
             orientation: 'landscape',
             dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to)
