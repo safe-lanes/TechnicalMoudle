@@ -238,15 +238,16 @@ class ReportGeneratorService {
   private getReportTitle(reportType: string): string {
     const titles: Record<string, string> = {
       'due-jobs-7': 'Due Jobs (7 days)',
-      'overdue-jobs': 'Overdue Jobs',
-      'completed-jobs': 'Completed Jobs Register',
+      'overdue-jobs': 'Overdue Work Orders',
+      'completed-jobs': 'Completed Work Orders Register',
       'monthly-summary': 'Monthly Maintenance Summary',
       'critical-equipment': 'Critical Equipment Status',
-      'unplanned-jobs': 'Unplanned/Breakdown Jobs',
-      'postponement-log': 'Job Postponement Log',
+      'unplanned-jobs': 'Unplanned/Breakdown Work Orders',
+      'postponement-log': 'Work Order Postponement Log',
       'priority-performance': 'Work Priority Performance',
       'manhours-analysis': 'Man-Hours Planned vs Actual',
       'workload-distribution': 'Crew Workload Distribution',
+    'wo-overview': 'Work Order Overview',
     };
     return titles[reportType] || 'Unknown Report';
   }

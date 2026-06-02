@@ -1747,6 +1747,128 @@ export async function performImport(
     }
 
     console.log(`✅ Spare History import complete: ${result.created} created, ${result.skipped} skipped`);
+  } else if (type === 'store-history') {
+    // ── Store History import ──
+    // Inserts historical stores transaction records directly into stores_ledger.
+    // Does NOT touch the stores item's current ROB — pure ledger backfill.
+    const storeHistVesselId = vesselId || 'V001';
+    console.log(`🚀 Starting store-history import: ${data.length} rows, mode: ${mode}, vesselId: ${storeHistVesselId}`);
+
+    // Helper: parse Excel date serial or string → ISO date string | null
+    const parseStDate = (val: any): string | null => {
+      if (val === undefined || val === null || val === '') return null;
+      if (typeof val === 'number') {
+        const utcMs = Math.round((val - 25569) * 86400 * 1000);
+        const d = new Date(utcMs);
+        if (isNaN(d.getTime())) return null;
+        return d.toISOString().split('T')[0];
+      }
+      const s = String(val).trim();
+      if (!s) return null;
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      const mmmMap: Record<string, string> = {
+        jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',
+        jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'
+      };
+      const mmmMatch = s.match(/^(\d{1,2})[-\/\s]([a-zA-Z]{3})[-\/\s](\d{4})$/);
+      if (mmmMatch) {
+        const mm = mmmMap[mmmMatch[2].toLowerCase()];
+        if (mm) return `${mmmMatch[3]}-${mm}-${mmmMatch[1].padStart(2,'0')}`;
+      }
+      return s;
+    };
+
+    // Pre-load all stores items for the vessel keyed by itemCode
+    const allStoresItems = await storage.getStoresItems(storeHistVesselId);
+    const storesByItemCode = new Map<string, any>(allStoresItems.map((s: any) => [String(s.itemCode).trim(), s]));
+    console.log(`📋 Loaded ${allStoresItems.length} stores items for vessel ${storeHistVesselId}`);
+
+    for (let _idx = 0; _idx < data.length; _idx++) {
+      const row = data[_idx];
+      const _rowNum = row['__meta']?.rowNumber || (_idx + 1);
+      const itemCode = String(row['Item Code'] || '').trim();
+
+      try {
+        // Resolve stores item by Item Code — required
+        const storeItem = storesByItemCode.get(itemCode);
+        if (!storeItem) {
+          result.skipped++;
+          result.rowResults.push({
+            rowNumber: _rowNum,
+            primaryIdentifier: itemCode,
+            action: 'failed',
+            error: `Item Code '${itemCode}' not found in vessel stores register`
+          });
+          _emitProgress('Processing Store History…');
+          continue;
+        }
+
+        // Parse event type
+        const eventType = String(row['Event Type'] || '').trim().toUpperCase();
+        const rawQty = Number(String(row['Quantity'] || '0').trim()) || 0;
+        // CONSUME and TRANSFER_OUT are outflows (negative); others are inflows (positive)
+        const isOutflow = eventType === 'CONSUME' || eventType === 'TRANSFER_OUT';
+        const qtyChange = isOutflow ? -Math.abs(rawQty) : Math.abs(rawQty);
+        const robAfter = Number(String(row['ROB After'] || '0').trim()) || 0;
+
+        // Parse date
+        const dateStr = parseStDate(row['Date']);
+        const timestampUTC = dateStr ? new Date(dateStr) : new Date();
+
+        // Build dateLocal in DD-MMM-YYYY format for stores_ledger
+        const mmmNames = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+        const dateObj = dateStr ? new Date(dateStr) : new Date();
+        const dateLocal = `${String(dateObj.getUTCDate()).padStart(2,'0')}-${mmmNames[dateObj.getUTCMonth()]}-${dateObj.getUTCFullYear()}`;
+
+        const tz = row['Timezone'] ? String(row['Timezone']).trim() : 'UTC';
+        const userId = row['Performed By'] ? String(row['Performed By']).trim() : 'system-import';
+
+        // Build remarks — prepend location if provided
+        const locationNote = row['Location'] ? String(row['Location']).trim() : null;
+        const userRemarks = row['Remarks'] ? String(row['Remarks']).trim() : null;
+        const remarks = locationNote
+          ? (userRemarks ? `[Location: ${locationNote}] ${userRemarks}` : `[Location: ${locationNote}]`)
+          : (userRemarks || null);
+
+        // Build the ledger entry payload
+        const ledgerPayload = {
+          vesselId: storeHistVesselId,
+          section: storeItem.itemType || 'stores',
+          itemId: storeItem.id,
+          storeUuid: storeItem.stuuid,
+          partCode: storeItem.itemCode,
+          itemName: storeItem.itemName,
+          uom: storeItem.uom || null,
+          eventType,
+          qtyChangeBase: String(qtyChange),
+          qtyDisplay: String(qtyChange),
+          uomDisplay: storeItem.uom || null,
+          robAfterBase: String(robAfter),
+          dateLocal,
+          tz,
+          timestampUTC,
+          place: row['Port/Place'] ? String(row['Port/Place']).trim() : null,
+          ref: row['Reference'] ? String(row['Reference']).trim() : null,
+          userId,
+          remarks,
+        };
+
+        await storage.createStoresLedgerEntryForImport(ledgerPayload);
+        result.created++;
+        result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: itemCode, action: 'created' });
+        console.log(`✅ Created store history: ${itemCode} | ${eventType} | qty: ${qtyChange} | robAfter: ${robAfter}`);
+
+      } catch (rowErr: any) {
+        console.error(`❌ Error processing store-history row ${_idx + 1} (Item: ${itemCode}):`, rowErr.message);
+        result.skipped++;
+        result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: itemCode, action: 'failed', error: rowErr.message });
+      } finally {
+        _emitProgress('Processing Store History…');
+      }
+    }
+
+    console.log(`✅ Store History import complete: ${result.created} created, ${result.skipped} skipped`);
   } else if (type === 'jobs') {
     // Import jobs using storage layer
     console.log(`🚀 Starting jobs import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);

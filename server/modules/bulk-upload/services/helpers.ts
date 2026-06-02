@@ -905,6 +905,7 @@ export function getTypeFromSheetName(sheetName: string): string | null {
   if (normalizedName === 'fleet_spare' || normalizedName === 'fleet spare' || normalizedName === 'fleet_spares' || normalizedName === 'fleet spares' || (normalizedName.includes('fleet') && normalizedName.includes('spare'))) return 'fleet-spares';
   if (normalizedName === 'spare history' || normalizedName === 'spare_history' || normalizedName === 'spares history' || normalizedName === 'spares_history' || (normalizedName.includes('spare') && normalizedName.includes('history'))) return 'spare-history';
   if (normalizedName === 'spares' || normalizedName.includes('spare')) return 'spares';
+  if (normalizedName === 'store history' || normalizedName === 'store_history' || normalizedName === 'stores history' || normalizedName === 'stores_history' || (normalizedName.includes('store') && normalizedName.includes('history'))) return 'store-history';
   if (normalizedName === 'components' || normalizedName.includes('component') || normalizedName.includes('machinery')) return 'components';
   if (normalizedName === 'vessel_job' || normalizedName === 'vessel job') return 'jobs';
   if (normalizedName === 'jobs' || normalizedName.includes('job')) return 'jobs';

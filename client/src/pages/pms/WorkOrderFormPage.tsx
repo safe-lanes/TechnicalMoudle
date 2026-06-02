@@ -126,6 +126,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       ];
 
   const [activeStep, setActiveStep] = useState('part-a');
+  const [openDocPopup, setOpenDocPopup] = useState<string | null>(null);
 
   // Scroll tracking for navigation with IntersectionObserver (only if Part B exists)
   useEffect(() => {
@@ -178,6 +179,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       observer.disconnect();
     };
   }, [resolvedMode]);
+
+  // Close attachment popup when clicking outside
+  useEffect(() => {
+    if (!openDocPopup) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Element;
+      if (!target.closest('[data-doc-popup]') && !target.closest('[data-doc-icon]')) {
+        setOpenDocPopup(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [openDocPopup]);
 
   // Use job context endpoint for template mode (viewing job template), 
   // work order context endpoint otherwise
@@ -2095,27 +2109,42 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (docs.length === 0) return null;
     return (
       <div className="mt-1 flex items-center gap-1 flex-wrap" data-testid={`doc-icons-${documentType}`}>
-        {docs.map((doc) => (
-          <div key={doc.id} className="relative group/doc" data-testid={`doc-icon-${documentType}-${doc.id}`}>
-            <div className="p-1.5 rounded border border-gray-200 bg-gray-50 text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 cursor-pointer transition-colors">
-              {getFileIcon(doc.fileName)}
-            </div>
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/doc:flex flex-col items-start bg-white rounded-lg shadow-lg border border-gray-200 p-2 z-50 min-w-[180px]">
-              <span className="text-xs text-gray-700 font-medium truncate max-w-[170px] mb-1" title={doc.fileName}>{doc.fileName}</span>
-              <span className="text-[10px] text-gray-400 mb-2">{formatFileSize(doc.fileSize)}</span>
-              <div className="flex items-center gap-1 w-full">
-                <Button variant="outline" size="sm" className="h-7 text-xs flex-1" onClick={() => handleViewDocument(documentType, doc.id)} data-testid={`button-view-${typeLabel}-${doc.id}`}>
-                  <Eye className="h-3.5 w-3.5 mr-1" /> Preview
-                </Button>
-                {!isReadOnly && !isPartBReadOnly && (
-                  <Button variant="outline" size="sm" className="h-7 text-xs text-red-500 hover:text-red-700 hover:border-red-300" onClick={() => handleDeleteDocumentClick(documentType, doc.id)} data-testid={`button-delete-${typeLabel}-${doc.id}`}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
+        {docs.map((doc) => {
+          const isOpen = openDocPopup === doc.id;
+          return (
+            <div key={doc.id} className="relative" data-testid={`doc-icon-${documentType}-${doc.id}`}>
+              <div
+                data-doc-icon={doc.id}
+                className="p-1.5 rounded border border-gray-200 bg-gray-50 text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 cursor-pointer transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenDocPopup(isOpen ? null : doc.id);
+                }}
+              >
+                {getFileIcon(doc.fileName)}
               </div>
+              {isOpen && (
+                <div
+                  data-doc-popup={doc.id}
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 flex flex-col items-start bg-white rounded-lg shadow-lg border border-gray-200 p-2 z-50 min-w-[180px]"
+                >
+                  <span className="text-xs text-gray-700 font-medium truncate max-w-[170px] mb-1" title={doc.fileName}>{doc.fileName}</span>
+                  <span className="text-[10px] text-gray-400 mb-2">{formatFileSize(doc.fileSize)}</span>
+                  <div className="flex items-center gap-1 w-full">
+                    <Button variant="outline" size="sm" className="h-7 text-xs flex-1" onClick={() => { setOpenDocPopup(null); handleViewDocument(documentType, doc.id); }} data-testid={`button-view-${typeLabel}-${doc.id}`}>
+                      <Eye className="h-3.5 w-3.5 mr-1" /> Preview
+                    </Button>
+                    {!isReadOnly && !isPartBReadOnly && (
+                      <Button variant="outline" size="sm" className="h-7 text-xs text-red-500 hover:text-red-700 hover:border-red-300" onClick={() => { setOpenDocPopup(null); handleDeleteDocumentClick(documentType, doc.id); }} data-testid={`button-delete-${typeLabel}-${doc.id}`}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };

@@ -252,6 +252,10 @@ export class PostgresStorage {
     }
   }
 
+  async createStoresLedgerEntryForImport(values: InsertStoresLedger): Promise<void> {
+    return this.insertStoresLedgerEntry(values);
+  }
+
   // ============= USERS (Module 1) =============
   
   async getUser(id: number): Promise<User | undefined> {

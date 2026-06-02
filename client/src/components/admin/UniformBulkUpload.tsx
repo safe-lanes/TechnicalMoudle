@@ -179,12 +179,14 @@ export default function UniformBulkUpload({
   // correct backend handler instead of the default wo-history handler.
   const effectiveType: string = (() => {
     if (templateType === 'wo-history' && selectedHistorySubType === 'spares') return 'spare-history';
+    if (templateType === 'wo-history' && selectedHistorySubType === 'stores') return 'store-history';
     return templateType;
   })();
 
   // Effective template filename matching the effective type
   const effectiveTemplateFileName: string = (() => {
     if (effectiveType === 'spare-history') return 'spare_history_template.xlsx';
+    if (effectiveType === 'store-history') return 'store_history_template.xlsx';
     return templateFileName;
   })();
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
@@ -733,7 +735,7 @@ export default function UniformBulkUpload({
   };
 
   const isStoresAndNoType = templateType === 'stores' && !selectedStoreType;
-  const isHistoryComingSoon = historySubTypes !== undefined && selectedHistorySubType !== 'work-order' && selectedHistorySubType !== 'spares';
+  const isHistoryComingSoon = historySubTypes !== undefined && selectedHistorySubType !== 'work-order' && selectedHistorySubType !== 'spares' && selectedHistorySubType !== 'stores';
 
   return (
     <div className="space-y-6">

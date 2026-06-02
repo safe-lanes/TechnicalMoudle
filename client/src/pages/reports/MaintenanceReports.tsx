@@ -22,7 +22,8 @@ import {
   Eye,
   Loader2,
   Download,
-  ClipboardList
+  ClipboardList,
+  BarChart3
 } from "lucide-react";
 import { format } from "date-fns";
 import { pdfReportGenerator, fetchReportData, formatDate, formatReportDateRange } from "@/lib/pdfReportGenerator";
@@ -36,6 +37,7 @@ import ReportAgGridTable from "@/components/reports/ReportAgGridTable";
 import type { ReportColumn } from "@/components/reports/ReportPreviewModal";
 import InlineReportPreview from "@/components/reports/InlineReportPreview";
 import MonthlySummaryPreview, { type MonthlySummaryData } from "@/components/reports/MonthlySummaryPreview";
+import WorkOrderOverviewPreview, { type WorkOrderOverviewData } from "@/components/reports/WorkOrderOverviewPreview";
 
 interface MaintenanceReport {
   id: string;
@@ -76,6 +78,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const [previewData, setPreviewData] = useState<ReportPreviewData | null>(null);
   const [monthlySummaryData, setMonthlySummaryData] = useState<{ data: MonthlySummaryData; vesselId: string; year: number; month: number } | null>(null);
+  const [woOverviewData, setWoOverviewData] = useState<WorkOrderOverviewData | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [isFilterRefreshing, setIsFilterRefreshing] = useState(false);
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -119,6 +122,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       const version = ++previewVersionRef.current;
       setPreviewData(null);
       setMonthlySummaryData(null);
+      setWoOverviewData(null);
       setPreviewOpen(false);
       initialLoadRef.current = false;
       generateMaintenancePDF(selectedReportId, 'preview').then((data) => {
@@ -141,6 +145,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     filterTimerRef.current = setTimeout(() => {
       setPreviewData(null);
       setMonthlySummaryData(null);
+      setWoOverviewData(null);
       generateMaintenancePDF(selectedReportId, 'preview').then((data) => {
         if (previewVersionRef.current === version) {
           if (data) setPreviewData(data);
@@ -211,7 +216,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     },
     {
       id: "overdue-jobs",
-      name: "Overdue Jobs",
+      name: "Overdue Work Orders",
       description: "Work orders that are past their due dates requiring immediate attention",
       purpose: "Focus late work & escalation (Vessel/Office)",
       frequency: "Daily",
@@ -225,7 +230,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     },
     {
       id: "completed-jobs",
-      name: "Completed Jobs Register",
+      name: "Completed Work Orders Register",
       description: "Comprehensive register of all completed maintenance work",
       purpose: "Evidence of work done (Audits/Office)",
       frequency: "Weekly/Monthly",
@@ -239,7 +244,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     },
     {
       id: "all-jobs",
-      name: "All Jobs / Work Orders Register",
+      name: "All Work Orders Register",
       description: "Comprehensive register of every work order regardless of status",
       purpose: "Full PMS overview (Audits/Office/Vessel)",
       frequency: "On Demand",
@@ -281,7 +286,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     },
     {
       id: "unplanned-jobs",
-      name: "Unplanned/Breakdown Jobs",
+      name: "Unplanned/Breakdown Work Orders",
       description: "Analysis of breakdown maintenance and unplanned work",
       purpose: "Identify reliability issues (Office/RCA)",
       frequency: "Monthly",
@@ -295,8 +300,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     },
     {
       id: "postponement-log",
-      name: "Job Postponement Log",
-      description: "Audit trail of all postponed jobs with justifications",
+      name: "Work Order Postponement Log",
+      description: "Audit trail of all postponed work orders with justifications",
       purpose: "Audit trail for deferred work (Vessel/Office)",
       frequency: "Monthly",
       fields: ["WO", "Original Due", "New Due", "Postponement Reason", "Approver", "Office Approval"],
@@ -350,6 +355,20 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       priority: "low",
       lastGenerated: "1 week ago",
       estimatedTime: "2-3 min"
+    },
+    {
+      id: "wo-overview",
+      name: "Work Order Overview",
+      description: "12-month rolling matrix of work order volume, completion, overdue % and postponements by month",
+      purpose: "Trend analysis and KPI tracking (Office/Management)",
+      frequency: "Monthly",
+      fields: ["Total/Critical/Non-Critical WOs Due", "Completed", "Not Completed", "Overdue %", "Extended (Postponed)", "Extended %"],
+      filters: ["Vessel", "Anchor Month"],
+      outputs: ["Excel"],
+      icon: BarChart3,
+      priority: "medium",
+      lastGenerated: "—",
+      estimatedTime: "1-2 min"
     }
   ];
 
@@ -557,11 +576,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Calendar/RH', value: `${calendarCount}/${rhCount}` }
         ];
 
-        if (mode === 'preview') return { title: 'OVERDUE JOBS REPORT', subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', vessel: overdueVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'OVERDUE WORK ORDERS REPORT', subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', vessel: overdueVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateOverdueJobsReport(
           { 
-            title: 'OVERDUE JOBS REPORT', 
+            title: 'OVERDUE WORK ORDERS REPORT', 
             subtitle: 'Work orders past grace period (7 days calendar / 168 RH overdue)', 
             vessel: overdueVessel || vesselName,
             dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to)
@@ -610,14 +629,14 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             { label: 'Total Jobs', value: data.length },
             { label: 'Total Man-Hours', value: filteredManHours.toFixed(1) }
           ];
-          return { title: 'COMPLETED JOBS REGISTER', subtitle: `Vessel: ${completedVessel || vesselName}`, vessel: completedVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns: completedColumns, data, summary: completedSummary } as ReportPreviewData;
+          return { title: 'COMPLETED WORK ORDERS REGISTER', subtitle: `Vessel: ${completedVessel || vesselName}`, vessel: completedVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns: completedColumns, data, summary: completedSummary } as ReportPreviewData;
         }
 
         const pdfManHours = data.reduce((sum: number, d: any) => sum + (parseFloat(d.manHours) || 0), 0);
         pdfReportGenerator.generateReport(
           { 
-            title: 'COMPLETED JOBS REGISTER', 
-            subtitle: `${data.length} completed jobs | ${pdfManHours.toFixed(1)} total man-hours`,
+            title: 'COMPLETED WORK ORDERS REGISTER', 
+            subtitle: `${data.length} completed work orders | ${pdfManHours.toFixed(1)} total man-hours`,
             vessel: completedVessel || vesselName,
             orientation: 'landscape',
             dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to)
@@ -668,12 +687,12 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
             { label: 'Total Jobs', value: data.length },
             ...Object.entries(counts).map(([s, c]) => ({ label: s, value: c as number }))
           ];
-          return { title: 'ALL JOBS / WORK ORDERS REGISTER', subtitle: `Vessel: ${allJobsVessel || vesselName}`, vessel: allJobsVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns: allJobsColumns, data, summary: summaryRows } as ReportPreviewData;
+          return { title: 'ALL WORK ORDERS REGISTER', subtitle: `Vessel: ${allJobsVessel || vesselName}`, vessel: allJobsVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns: allJobsColumns, data, summary: summaryRows } as ReportPreviewData;
         }
 
         pdfReportGenerator.generateReport(
           {
-            title: 'ALL JOBS / WORK ORDERS REGISTER',
+            title: 'ALL WORK ORDERS REGISTER',
             subtitle: `${data.length} work orders`,
             vessel: allJobsVessel || vesselName,
             orientation: 'landscape',
@@ -854,11 +873,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Date Range', value: `${startDate} to ${endDate}` }
         ];
 
-        if (mode === 'preview') return { title: 'UNPLANNED/BREAKDOWN JOBS REPORT', subtitle: 'Analysis of breakdown maintenance and unplanned work', vessel: vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data: unplannedData, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'UNPLANNED/BREAKDOWN WORK ORDERS REPORT', subtitle: 'Analysis of breakdown maintenance and unplanned work', vessel: vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data: unplannedData, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateUnplannedBreakdownReport(
           { 
-            title: 'UNPLANNED/BREAKDOWN JOBS REPORT', 
+            title: 'UNPLANNED/BREAKDOWN WORK ORDERS REPORT', 
             subtitle: 'Analysis of breakdown maintenance and unplanned work', 
             vessel: vesselName,
             dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to)
@@ -918,12 +937,12 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           { label: 'Total Postponed Jobs', value: data.length }
         ];
 
-        if (mode === 'preview') return { title: 'Job Postponement Log Report', subtitle: 'Audit trail of all postponed jobs with approvals and justifications', vessel: postponeVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;
+        if (mode === 'preview') return { title: 'Work Order Postponement Log Report', subtitle: 'Audit trail of all postponed work orders with approvals and justifications', vessel: postponeVessel || vesselName, dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to), columns, data, summary } as ReportPreviewData;
 
         pdfReportGenerator.generateReport(
           { 
-            title: 'Job Postponement Log Report', 
-            subtitle: 'Audit trail of all postponed jobs with approvals and justifications', 
+            title: 'Work Order Postponement Log Report', 
+            subtitle: 'Audit trail of all postponed work orders with approvals and justifications', 
             vessel: postponeVessel || vesselName,
             orientation: 'landscape',
             dateRange: formatReportDateRange(effectiveDateRange?.from, effectiveDateRange?.to)
@@ -1086,6 +1105,45 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         break;
       }
 
+      case 'wo-overview': {
+        const nowD = new Date();
+        let anchorYear: number, anchorMonth: number;
+        if (globalFilters?.dateRange?.from) {
+          anchorYear = globalFilters.dateRange.from.getFullYear();
+          anchorMonth = globalFilters.dateRange.from.getMonth() + 1;
+        } else {
+          anchorYear = nowD.getFullYear();
+          anchorMonth = nowD.getMonth() + 1;
+        }
+        const woUrl = `/technical/api/reports/maintenance/work-order-overview/preview?vesselId=${activeVesselId}&year=${anchorYear}&month=${anchorMonth}${vesselIdsParam}`;
+        const woRes = await fetch(woUrl);
+        if (!woRes.ok) {
+          const err = await woRes.json().catch(() => ({ error: 'Failed to fetch WO overview' }));
+          throw new Error(err.error || 'Failed to fetch WO overview');
+        }
+        const woData: WorkOrderOverviewData = await woRes.json();
+
+        if (mode === 'preview') {
+          setWoOverviewData(woData);
+          const mLabel0 = woData.months[0]?.label ?? '';
+          const mLabel11 = woData.months[11]?.label ?? '';
+          return {
+            title: 'Work Order Overview',
+            subtitle: `12-Month Rolling Matrix · ${mLabel0} – ${mLabel11}`,
+            vessel: woData.vesselName,
+            dateRange: `${mLabel0} – ${mLabel11}`,
+            columns: [],
+            data: [],
+            summary: [],
+          } as ReportPreviewData;
+        }
+
+        // PDF is not practical for this wide matrix.
+        // handleGenerateReport routes PDF clicks to generateExcelReport, so this
+        // branch is only reached if called directly — silently break.
+        break;
+      }
+
       default:
         toast({
           title: "Report Not Available",
@@ -1099,7 +1157,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     const activeVesselId = (globalFilters?.vessels !== undefined)
       ? (globalFilters.vessels.length === 1 ? globalFilters.vessels[0] : 'all')
       : effectiveVesselId;
-    if (!activeVesselId || activeVesselId === 'all') {
+    // wo-overview supports multi-vessel; all other reports require a single vessel
+    if (!activeVesselId || (activeVesselId === 'all' && reportId !== 'wo-overview')) {
       toast({
         title: "Vessel Required",
         description: "Please select a specific vessel to generate the report.",
@@ -1118,6 +1177,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       'monthly-summary': '/technical/api/reports/maintenance/monthly-summary/excel',
       'critical-equipment': '/technical/api/reports/critical-equipment-status/excel',
       'workload-distribution': '/technical/api/reports/crew-workload-distribution/excel',
+      'wo-overview': '/technical/api/reports/maintenance/work-order-overview/excel',
     };
 
     const endpoint = reportEndpoints[reportId];
@@ -1142,6 +1202,25 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       }
     }
     
+    // Add anchor year/month and vesselIds for WO Overview
+    if (reportId === 'wo-overview') {
+      // Use globalFilters.dateRange preferentially — same priority order as the preview path.
+      // Always send year/month so the server never has to guess the anchor month.
+      const woAnchor = globalFilters?.dateRange?.from ?? categoryFilters.dateRange?.from;
+      if (woAnchor) {
+        requestBody.year = woAnchor.getFullYear();
+        requestBody.month = woAnchor.getMonth() + 1;
+      } else {
+        const nowD = new Date();
+        requestBody.year = nowD.getFullYear();
+        requestBody.month = nowD.getMonth() + 1;
+      }
+      // Pass selected vessel IDs for multi-vessel export
+      if (activeVesselId === 'all' && (globalFilters?.vessels?.length ?? 0) > 0) {
+        requestBody.vesselIds = globalFilters!.vessels.join(',');
+      }
+    }
+
     // Add date range for reports that support it
     if (reportId === 'monthly-summary' || reportId === 'completed-jobs' || reportId === 'all-jobs' || reportId === 'unplanned-jobs' || reportId === 'workload-distribution' || reportId === 'postponement-log' || reportId === 'critical-equipment' || reportId === 'overdue-jobs') {
       const dateFrom = categoryFilters.dateRange?.from;
@@ -1228,16 +1307,21 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
 
     try {
       setGeneratingReports(prev => new Set(prev).add(reportKey));
-      
+
+      // wo-overview is a wide matrix — PDF is not practical; auto-download as Excel instead.
+      const effectiveFormat = (reportId === 'wo-overview' && format === 'PDF') ? 'Excel' : format;
+
       toast({
         title: "Generating Report",
-        description: `Creating ${format} report...`,
+        description: effectiveFormat === 'Excel' && format === 'PDF'
+          ? "Work Order Overview exported as Excel (PDF not supported for this wide matrix)."
+          : `Creating ${effectiveFormat} report...`,
       });
 
-      if (format === 'PDF') {
-        await generateMaintenancePDF(reportId);
-      } else if (format === 'Excel') {
+      if (effectiveFormat === 'Excel') {
         await generateExcelReport(reportId);
+      } else if (effectiveFormat === 'PDF') {
+        await generateMaintenancePDF(reportId);
       } else {
         toast({
           title: "CSV Export",
@@ -1248,7 +1332,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       
       toast({
         title: "Report Generated",
-        description: `${format} report downloaded successfully!`,
+        description: `${effectiveFormat} report downloaded successfully!`,
       });
       
     } catch (error: any) {
@@ -1441,6 +1525,9 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           <span className="text-sm text-muted-foreground">Refreshing report data...</span>
         </div>
       )}
+      {embedded && previewData && woOverviewData && selectedReportId === 'wo-overview' && (
+        <WorkOrderOverviewPreview data={woOverviewData} />
+      )}
       {embedded && previewData && monthlySummaryData && selectedReportId === 'monthly-summary' && (
         <MonthlySummaryPreview
           data={monthlySummaryData.data}
@@ -1459,7 +1546,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           }}
         />
       )}
-      {embedded && previewData && (!monthlySummaryData || selectedReportId !== 'monthly-summary') && (
+      {embedded && previewData && (!monthlySummaryData || selectedReportId !== 'monthly-summary') && selectedReportId !== 'wo-overview' && (
         <InlineReportPreview reportData={previewData ? { ...previewData, reportId: previewData.reportId ?? selectedReportId ?? null } : null} embedded={embedded} />
       )}
       {!embedded && (

@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import * as repo from '../repositories/reportRepository';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
+import type { VesselGraceSettings } from '@shared/workOrders/status';
 import { storage } from '../../../storage';
 import {
   COLORS, STATUS_COLORS, STANDARD_WORK_ORDER_COLUMNS,
@@ -1646,4 +1647,469 @@ export async function exportMonthlySummary(
   console.log(`[MONTHLY SUMMARY REPORT] Generated: ${filename} (Period: ${reportPeriod})`);
 
   return { buffer: Buffer.from(buffer as ArrayBuffer), filename };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WORK ORDERS OVERVIEW — 12-MONTH ROLLING MATRIX
+// ═══════════════════════════════════════════════════════════════
+
+export interface WoOverviewCellData {
+  count: number;
+  isPct?: boolean;
+  woIds: string[];
+}
+
+export interface WoOverviewMonthMeta {
+  label: string;    // e.g. "Jul 25"
+  yearMonth: string; // e.g. "2025-07"
+}
+
+export interface WoOverviewWoInfo {
+  workOrderNo: string;
+  jobTitle: string;
+  status: string;
+  componentName: string;
+  dueDate: string | null;
+}
+
+export interface WorkOrderOverviewData {
+  vesselName: string;
+  anchorYear: number;
+  anchorMonth: number;
+  months: WoOverviewMonthMeta[];
+  woInfo: Record<string, WoOverviewWoInfo>;
+  matrix: {
+    totalDue: WoOverviewCellData[];
+    criticalDue: WoOverviewCellData[];
+    nonCriticalDue: WoOverviewCellData[];
+    completedTotal: WoOverviewCellData[];
+    completedCritical: WoOverviewCellData[];
+    completedNonCritical: WoOverviewCellData[];
+    notCompletedTotal: WoOverviewCellData[];
+    notCompletedCritical: WoOverviewCellData[];
+    notCompletedNonCritical: WoOverviewCellData[];
+    overdueTotal: WoOverviewCellData[];
+    overdueCritical: WoOverviewCellData[];
+    overdueNonCritical: WoOverviewCellData[];
+    postponedTotal: WoOverviewCellData[];
+    postponedCritical: WoOverviewCellData[];
+    postponedNonCritical: WoOverviewCellData[];
+    extendedPct: WoOverviewCellData[];
+  };
+}
+
+function getYearMonth(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  const d = parseDate(dateStr);
+  if (!d) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
+function buildVesselGraceSettings(vesselSettings: Record<string, unknown> | null | undefined): VesselGraceSettings {
+  if (!vesselSettings) {
+    return { calendarGraceMode: 'COMPANY_STANDARD', calendarGraceDays: 7, rhGraceHours: 50 };
+  }
+  return {
+    calendarGraceMode: ((vesselSettings.calendarGraceMode as string) || 'COMPANY_STANDARD') as 'COMPANY_STANDARD' | 'CUSTOM_DAYS',
+    calendarGraceDays: (vesselSettings.calendarGraceDays as number) ?? 7,
+    rhGraceHours: (vesselSettings.rhGraceHours as number) ?? 50,
+    rhLeadTimeHours: vesselSettings.rhLeadTimeHours as number | undefined,
+  };
+}
+
+export async function getWorkOrderOverviewData(
+  vesselId: string,
+  anchorYear?: number,
+  anchorMonth?: number,
+  vesselIds?: string[]
+): Promise<WorkOrderOverviewData> {
+  const now = new Date();
+  const aYear = anchorYear ?? now.getFullYear();
+  const aMonth = anchorMonth ?? (now.getMonth() + 1);
+
+  const SHORT_MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // Build 12 rolling months (oldest first) ending at anchor month
+  const months: WoOverviewMonthMeta[] = [];
+  for (let i = 11; i >= 0; i--) {
+    let m = aMonth - i;
+    let y = aYear;
+    while (m <= 0) { m += 12; y--; }
+    const ym = `${y}-${String(m).padStart(2, '0')}`;
+    months.push({ label: `${SHORT_MONTH_NAMES[m - 1]} ${String(y).slice(-2)}`, yearMonth: ym });
+  }
+
+  const allVessels = await repo.getVessels();
+  const vessel = allVessels.find(v => v.id === vesselId);
+  const vesselMap = new Map(allVessels.map(v => [v.id, v.name]));
+  const isMultiVessel = vesselId === 'all';
+  const vesselName = isMultiVessel
+    ? (vesselIds && vesselIds.length > 0 ? vesselIds.map(id => vesselMap.get(id) || id).join(', ') : 'All Vessels')
+    : (vessel?.name || vesselId);
+
+  const [workOrders, jobs, components, companyGraceRow] = await Promise.all([
+    repo.getWorkOrders(vesselId, vesselIds),
+    repo.getJobs(vesselId, undefined, vesselIds),
+    repo.getComponents(vesselId, vesselIds),
+    storage.getCompanyStandardGraceSettings(),
+  ]);
+  const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
+
+  const jobsMap = new Map(jobs.map((j: any) => [j.juuid, j]));
+  const componentsByCodeMap = new Map(components.map((c: any) => [c.componentCode, c]));
+  const componentsMap = new Map(components.map((c: any) => [c.cuuid, c]));
+
+  // Build per-vessel grace settings cache
+  const vesselGraceCache = new Map<string, VesselGraceSettings>();
+  const uniqueVesselIds = Array.from(new Set<string>(
+    workOrders.map((wo: any) => wo.vesselId).filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+  ));
+  for (const vid of uniqueVesselIds) {
+    const vs = await repo.getPmsVesselSettings(vid);
+    vesselGraceCache.set(vid, buildVesselGraceSettings(vs as Record<string, unknown> | null));
+  }
+
+  // Eligibility: exclude execution rows, soft-deleted, and cancelled WOs
+  const eligibleWorkOrders = workOrders.filter((wo: any) => {
+    if (wo.isExecution) return false;
+    if (wo.isDeleted === true) return false;
+    const st = (wo.status || '').toLowerCase();
+    if (st === 'cancelled' || st === 'canceled') return false;
+    return true;
+  });
+
+  const isCritical = (wo: any): boolean =>
+    wo.criticality === 'Yes' || wo.jobPriority === 'Critical';
+
+  interface DueBucket {
+    total: WoOverviewCellData;
+    critical: WoOverviewCellData;
+    nonCritical: WoOverviewCellData;
+    notCompletedTotal: WoOverviewCellData;
+    notCompletedCritical: WoOverviewCellData;
+    notCompletedNonCritical: WoOverviewCellData;
+    overdueTotal: WoOverviewCellData;
+    overdueCritical: WoOverviewCellData;
+    overdueNonCritical: WoOverviewCellData;
+    postponedTotal: WoOverviewCellData;
+    postponedCritical: WoOverviewCellData;
+    postponedNonCritical: WoOverviewCellData;
+  }
+
+  interface CompBucket {
+    completedTotal: WoOverviewCellData;
+    completedCritical: WoOverviewCellData;
+    completedNonCritical: WoOverviewCellData;
+  }
+
+  const emptyCell = (): WoOverviewCellData => ({ count: 0, woIds: [] });
+
+  const dueBuckets = new Map<string, DueBucket>();
+  const compBuckets = new Map<string, CompBucket>();
+  for (const m of months) {
+    dueBuckets.set(m.yearMonth, {
+      total: emptyCell(), critical: emptyCell(), nonCritical: emptyCell(),
+      notCompletedTotal: emptyCell(), notCompletedCritical: emptyCell(), notCompletedNonCritical: emptyCell(),
+      overdueTotal: emptyCell(), overdueCritical: emptyCell(), overdueNonCritical: emptyCell(),
+      postponedTotal: emptyCell(), postponedCritical: emptyCell(), postponedNonCritical: emptyCell(),
+    });
+    compBuckets.set(m.yearMonth, {
+      completedTotal: emptyCell(), completedCritical: emptyCell(), completedNonCritical: emptyCell(),
+    });
+  }
+
+  const ymSet = new Set(months.map(m => m.yearMonth));
+  const anchorYM = months[11].yearMonth;
+  const woInfoMap: Record<string, WoOverviewWoInfo> = {};
+
+  const push = (cell: WoOverviewCellData, id: string) => {
+    cell.count++;
+    cell.woIds.push(id);
+  };
+
+  for (const wo of eligibleWorkOrders) {
+    const dueYM = getYearMonth(wo.dueDate);
+    const complYM = getYearMonth(wo.completionDateTime || (wo as any).dateCompleted);
+    if (!dueYM && !complYM) continue;
+
+    const job = wo.jobId ? jobsMap.get(wo.jobId) : jobs.find((j: any) => j.jobNo === wo.templateCode);
+    const component = wo.componentCode
+      ? componentsByCodeMap.get(wo.componentCode)
+      : (wo.component ? componentsMap.get(wo.component) : null);
+
+    const maintenanceBasis = wo.maintenanceBasis || (job as any)?.maintenanceBasis || 'Calendar';
+    const dueRH = parseRH((job as any)?.nextDueRH) ?? parseRH(wo.nextDueReading);
+    const currentRH = parseRH((component as any)?.currentCumulativeRH) ?? parseRH(wo.currentReading);
+
+    const crit = isCritical(wo);
+    const woId: string = wo.wouuid || String(wo.id);
+    const vesselGraceSettings = vesselGraceCache.get(wo.vesselId ?? '') || buildVesselGraceSettings(null);
+
+    const computedStatus = computeWorkOrderStatus({
+      dueDate: wo.dueDate,
+      dueRH: dueRH ?? null,
+      currentRH: currentRH ?? null,
+      isExecution: wo.isExecution,
+      status: wo.status,
+      completionDateTime: wo.completionDateTime,
+      maintenanceBasis,
+      companyGraceConfig,
+      vesselGraceSettings,
+    });
+
+    const isCompleted = computedStatus === 'Completed';
+    const isPostponed = computedStatus === 'Postponed';
+    const isOverdue = computedStatus === 'Overdue';
+
+    // Collect WO info for drilldown (for any WO in scope)
+    if (!woInfoMap[woId]) {
+      woInfoMap[woId] = {
+        workOrderNo: wo.workOrderNo || '-',
+        jobTitle: wo.jobTitle || '-',
+        status: wo.status || '-',
+        componentName: wo.component || '-',
+        dueDate: wo.dueDate || null,
+      };
+    }
+
+    // Due-date bucket: totalDue, notCompleted, overdue, postponed
+    if (dueYM && ymSet.has(dueYM)) {
+      const db = dueBuckets.get(dueYM)!;
+      push(db.total, woId);
+      if (crit) { push(db.critical, woId); } else { push(db.nonCritical, woId); }
+
+      if (!isCompleted) {
+        push(db.notCompletedTotal, woId);
+        if (crit) { push(db.notCompletedCritical, woId); } else { push(db.notCompletedNonCritical, woId); }
+      }
+
+      if (isOverdue) {
+        push(db.overdueTotal, woId);
+        if (crit) { push(db.overdueCritical, woId); } else { push(db.overdueNonCritical, woId); }
+      }
+
+      if (isPostponed) {
+        push(db.postponedTotal, woId);
+        if (crit) { push(db.postponedCritical, woId); } else { push(db.postponedNonCritical, woId); }
+      }
+    }
+
+    // Completion-date bucket: completedTotal/Critical/NonCritical (by month the WO was completed)
+    if (isCompleted && complYM && ymSet.has(complYM)) {
+      const cb = compBuckets.get(complYM)!;
+      push(cb.completedTotal, woId);
+      if (crit) { push(cb.completedCritical, woId); } else { push(cb.completedNonCritical, woId); }
+    }
+  }
+
+  const orderedDue = months.map(m => dueBuckets.get(m.yearMonth)!);
+  const orderedComp = months.map(m => compBuckets.get(m.yearMonth)!);
+
+  const pctCell = (numerator: number, denominator: number, woIds: string[]): WoOverviewCellData => ({
+    count: denominator === 0 ? 0 : Math.round((numerator / denominator) * 100),
+    isPct: true,
+    woIds,
+  });
+
+  return {
+    vesselName,
+    anchorYear: aYear,
+    anchorMonth: aMonth,
+    months,
+    woInfo: woInfoMap,
+    matrix: {
+      totalDue:            orderedDue.map(b => b.total),
+      criticalDue:         orderedDue.map(b => b.critical),
+      nonCriticalDue:      orderedDue.map(b => b.nonCritical),
+      completedTotal:      orderedComp.map(b => b.completedTotal),
+      completedCritical:   orderedComp.map(b => b.completedCritical),
+      completedNonCritical: orderedComp.map(b => b.completedNonCritical),
+      notCompletedTotal:    orderedDue.map(b => b.notCompletedTotal),
+      notCompletedCritical: orderedDue.map(b => b.notCompletedCritical),
+      notCompletedNonCritical: orderedDue.map(b => b.notCompletedNonCritical),
+      overdueTotal:         orderedDue.map(b => pctCell(b.overdueTotal.count, b.total.count, b.overdueTotal.woIds)),
+      overdueCritical:      orderedDue.map(b => pctCell(b.overdueCritical.count, b.critical.count, b.overdueCritical.woIds)),
+      overdueNonCritical:   orderedDue.map(b => pctCell(b.overdueNonCritical.count, b.nonCritical.count, b.overdueNonCritical.woIds)),
+      postponedTotal:       orderedDue.map(b => b.postponedTotal),
+      postponedCritical:    orderedDue.map(b => b.postponedCritical),
+      postponedNonCritical: orderedDue.map(b => b.postponedNonCritical),
+      extendedPct:          orderedDue.map(b => pctCell(b.postponedTotal.count, b.total.count, b.postponedTotal.woIds)),
+    },
+  };
+}
+
+export async function exportWorkOrderOverview(
+  vesselId: string,
+  anchorYear?: number,
+  anchorMonth?: number,
+  vesselIds?: string[]
+): Promise<{ buffer: Buffer; filename: string }> {
+  const data = await getWorkOrderOverviewData(vesselId, anchorYear, anchorMonth, vesselIds);
+  const { vesselName, months, matrix } = data;
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'PMS Reports';
+  workbook.created = new Date();
+
+  const worksheet = workbook.addWorksheet('WO Overview', {
+    views: [{ state: 'frozen', xSplit: 1, ySplit: 4 }],
+  });
+
+  const BLUE_HEADER = '1E3A5F';
+  const SECTIONS: { header: string; bgLabel: string; bgData: string }[] = [
+    { header: 'SECTION 1 — WORK ORDERS DUE',       bgLabel: 'BFD9EF', bgData: 'E8F4FD' },
+    { header: 'SECTION 2 — COMPLETED',             bgLabel: 'A8DDB5', bgData: 'E8F8F0' },
+    { header: 'SECTION 3 — NOT COMPLETED',         bgLabel: 'FFCC80', bgData: 'FFF3E0' },
+    { header: 'SECTION 4 — OVERDUE %',             bgLabel: 'FFAB91', bgData: 'FFEBE8' },
+    { header: 'SECTION 5 — EXTENDED (POSTPONED)',  bgLabel: 'CE93D8', bgData: 'F3E8FF' },
+  ];
+
+  worksheet.getColumn(1).width = 32;
+  for (let c = 2; c <= months.length + 1; c++) {
+    worksheet.getColumn(c).width = 12;
+  }
+
+  // Row 1: Title
+  worksheet.mergeCells(1, 1, 1, months.length + 1);
+  const t = worksheet.getCell(1, 1);
+  t.value = 'WORK ORDERS OVERVIEW — 12-MONTH ROLLING MATRIX';
+  t.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' }, name: 'Arial' };
+  t.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${BLUE_HEADER}` } };
+  t.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(1).height = 28;
+
+  // Row 2: Vessel + period
+  worksheet.mergeCells(2, 1, 2, months.length + 1);
+  const s = worksheet.getCell(2, 1);
+  s.value = `Vessel: ${vesselName}   |   Period: ${months[0].label} – ${months[11].label}`;
+  s.font = { size: 10, color: { argb: 'FFFFFFFF' }, name: 'Arial' };
+  s.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${BLUE_HEADER}` } };
+  s.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(2).height = 18;
+
+  // Row 3: Generated
+  worksheet.mergeCells(3, 1, 3, months.length + 1);
+  const g = worksheet.getCell(3, 1);
+  g.value = `Generated: ${new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+  g.font = { size: 9, italic: true, color: { argb: 'FFFFFFFF' }, name: 'Arial' };
+  g.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${BLUE_HEADER}` } };
+  g.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(3).height = 16;
+
+  // Row 4: Column headers
+  worksheet.getRow(4).height = 22;
+  const lh = worksheet.getCell(4, 1);
+  lh.value = 'Metric';
+  lh.font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Arial', size: 10 };
+  lh.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${BLUE_HEADER}` } };
+  lh.alignment = { horizontal: 'left', vertical: 'middle' };
+  for (let i = 0; i < months.length; i++) {
+    const mh = worksheet.getCell(4, i + 2);
+    mh.value = months[i].label;
+    mh.font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Arial', size: 10 };
+    mh.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${BLUE_HEADER}` } };
+    mh.alignment = { horizontal: 'center', vertical: 'middle' };
+  }
+
+  let curRow = 5;
+
+  const writeSectionHeader = (label: string, bgColor: string) => {
+    worksheet.mergeCells(curRow, 1, curRow, months.length + 1);
+    const row = worksheet.getRow(curRow);
+    row.height = 18;
+    const cell = row.getCell(1);
+    cell.value = label;
+    cell.font = { bold: true, name: 'Arial', size: 9, color: { argb: 'FF1A1A2E' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${bgColor}` } };
+    cell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+    cell.border = { top: { style: 'thin', color: { argb: 'FF888888' } }, bottom: { style: 'thin', color: { argb: 'FF888888' } } };
+    curRow++;
+  };
+
+  const writeDataRow = (
+    label: string,
+    cells: WoOverviewCellData[],
+    bgColor: string,
+    bold: boolean = false,
+    indent: number = 0,
+    italic: boolean = false
+  ) => {
+    const row = worksheet.getRow(curRow);
+    row.height = 16;
+    const lc = row.getCell(1);
+    lc.value = label;
+    lc.font = { bold, italic, name: 'Arial', size: 9, color: { argb: 'FF1A1A2E' } };
+    lc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${bgColor}` } };
+    lc.alignment = { horizontal: 'left', vertical: 'middle', indent };
+    lc.border = { right: { style: 'thin', color: { argb: 'FFAAAAAA' } }, bottom: { style: 'hair', color: { argb: 'FFCCCCCC' } } };
+
+    for (let i = 0; i < months.length; i++) {
+      const cd = cells[i];
+      const dc = row.getCell(i + 2);
+      const display = cd.isPct ? `${cd.count}%` : (cd.count === 0 ? '—' : String(cd.count));
+      dc.value = display;
+      dc.font = { name: 'Arial', size: 9, bold: bold && !cd.isPct, italic, color: { argb: (cd.count === 0 && !cd.isPct) ? 'FF999999' : 'FF1A1A2E' } };
+      dc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${bgColor}` } };
+      dc.alignment = { horizontal: 'center', vertical: 'middle' };
+      dc.border = { bottom: { style: 'hair', color: { argb: 'FFCCCCCC' } }, right: { style: 'hair', color: { argb: 'FFDDDDDD' } } };
+    }
+    curRow++;
+  };
+
+  const [sDue, sComp, sNotComp, sOverdue, sExt] = SECTIONS;
+
+  writeSectionHeader(sDue.header, sDue.bgLabel);
+  writeDataRow('Total WOs Due',        matrix.totalDue,          sDue.bgData, true);
+  writeDataRow('  Critical WOs Due',   matrix.criticalDue,       sDue.bgData, false, 1);
+  writeDataRow('  Non-Critical WOs Due', matrix.nonCriticalDue,  sDue.bgData, false, 1);
+
+  writeSectionHeader(sComp.header, sComp.bgLabel);
+  writeDataRow('Completed (Total)',     matrix.completedTotal,        sComp.bgData, true);
+  writeDataRow('  Completed (Critical)',matrix.completedCritical,     sComp.bgData, false, 1);
+  writeDataRow('  Completed (Non-Crit)', matrix.completedNonCritical, sComp.bgData, false, 1);
+
+  writeSectionHeader(sNotComp.header, sNotComp.bgLabel);
+  writeDataRow('Not Completed (Total)',      matrix.notCompletedTotal,        sNotComp.bgData, true);
+  writeDataRow('  Not Completed (Critical)', matrix.notCompletedCritical,     sNotComp.bgData, false, 1);
+  writeDataRow('  Not Completed (Non-Crit)', matrix.notCompletedNonCritical,  sNotComp.bgData, false, 1);
+
+  writeSectionHeader(sOverdue.header, sOverdue.bgLabel);
+  writeDataRow('Overdue % (Total)',     matrix.overdueTotal,       sOverdue.bgData, true,  0, true);
+  writeDataRow('  Overdue % (Critical)', matrix.overdueCritical,   sOverdue.bgData, false, 1, true);
+  writeDataRow('  Overdue % (Non-Crit)', matrix.overdueNonCritical, sOverdue.bgData, false, 1, true);
+
+  writeSectionHeader(sExt.header, sExt.bgLabel);
+  writeDataRow('Extended Total',        matrix.postponedTotal,       sExt.bgData, true);
+  writeDataRow('  Extended (Critical)', matrix.postponedCritical,    sExt.bgData, false, 1);
+  writeDataRow('  Extended (Non-Crit)', matrix.postponedNonCritical, sExt.bgData, false, 1);
+  writeDataRow('Extended %',            matrix.extendedPct,          sExt.bgData, true,  0, true);
+
+  // Footer note
+  curRow++;
+  worksheet.mergeCells(curRow, 1, curRow, months.length + 1);
+  const fn = worksheet.getCell(curRow, 1);
+  fn.value = 'Note: Critical = criticality "Yes" OR job priority "Critical". Overdue % = (Overdue ÷ Total Due) × 100. Extended % = (Postponed ÷ Total Due) × 100. Overdue classification uses computed status (grace/lead-time aware).';
+  fn.font = { size: 8, italic: true, color: { argb: 'FF666666' }, name: 'Arial' };
+  fn.alignment = { horizontal: 'left', vertical: 'middle' };
+
+  worksheet.pageSetup = {
+    orientation: 'landscape',
+    paperSize: 9,
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 },
+  };
+  worksheet.headerFooter = {
+    oddFooter: `&L&8&"Arial"Confidential — ${vesselName}&C&8&"Arial"Page &P of &N&R&8&"Arial"Generated: &D &T`,
+  };
+
+  const buf = await workbook.xlsx.writeBuffer();
+  const safe = vesselName.replace(/[^a-zA-Z0-9]/g, '_');
+  const filename = `PMS_WOOverview_${safe}_${data.anchorYear}${String(data.anchorMonth).padStart(2, '0')}.xlsx`;
+
+  console.log(`[WO OVERVIEW REPORT] Generated: ${filename}`);
+  return { buffer: Buffer.from(buf as ArrayBuffer), filename };
 }

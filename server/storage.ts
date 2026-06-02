@@ -411,6 +411,7 @@ export interface IStorage {
   getSpareHistory(vesselId: string, vesselIds?: string[]): Promise<SpareHistory[]>;
   getSpareHistoryBySpareId(spareId: number): Promise<SpareHistory[]>;
   createSpareHistory(history: InsertSpareHistory): Promise<SpareHistory>;
+  createStoresLedgerEntryForImport(values: InsertStoresLedger): Promise<void>;
   
   // Change Request methods
   getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string }): Promise<ChangeRequest[]>;

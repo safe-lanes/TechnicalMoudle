@@ -1206,6 +1206,104 @@ export async function generateWoHistoryTemplate(): Promise<Buffer> {
   return Buffer.from(buffer);
 }
 
+export async function generateStoreHistoryTemplate(): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+
+  // ── Sheet 1: Store History (data entry) ───────────────
+  const dataSheet = workbook.addWorksheet('Store History');
+  dataSheet.columns = [
+    { header: 'Item Code',    key: 'itemCode',     width: 20 },
+    { header: 'Event Type',   key: 'eventType',    width: 18 },
+    { header: 'Quantity',     key: 'quantity',     width: 12 },
+    { header: 'ROB After',    key: 'robAfter',     width: 12 },
+    { header: 'Date',         key: 'date',         width: 18 },
+    { header: 'Vessel Code',  key: 'vesselCode',   width: 16 },
+    { header: 'Location',     key: 'location',     width: 25 },
+    { header: 'Remarks',      key: 'remarks',      width: 40 },
+    { header: 'Reference',    key: 'reference',    width: 25 },
+    { header: 'Port/Place',   key: 'place',        width: 20 },
+    { header: 'Timezone',     key: 'tz',           width: 16 },
+    { header: 'Performed By', key: 'performedBy',  width: 25 },
+  ];
+
+  // Style header row — bold; required columns (1–6) get red text
+  dataSheet.getRow(1).font = { bold: true };
+  dataSheet.getRow(1).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFD0E4F7' },
+  };
+  [1, 2, 3, 4, 5, 6].forEach(col => {
+    dataSheet.getRow(1).getCell(col).font = { bold: true, color: { argb: 'FFCC0000' } };
+  });
+
+  // Dropdown validation for Event Type (col 2)
+  for (let row = 2; row <= 1000; row++) {
+    dataSheet.getCell(row, 2).dataValidation = {
+      type: 'list',
+      allowBlank: false,
+      formulae: ['"RECEIVE,CONSUME,ADJUST,TRANSFER_IN,TRANSFER_OUT"'],
+    };
+  }
+
+  // Sample data row
+  dataSheet.addRow({
+    itemCode:    'STORE-001',
+    eventType:   'CONSUME',
+    quantity:    5,
+    robAfter:    45,
+    date:        '15-NOV-2024',
+    vesselCode:  'V001',
+    location:    'Engine Room Store',
+    remarks:     'Used during scheduled maintenance',
+    reference:   '601.001.WO-2024-01',
+    place:       'Singapore',
+    tz:          'Asia/Singapore',
+    performedBy: 'Chief Engineer',
+  });
+
+  // ── Sheet 2: Instructions ──────────────────────────────
+  const instrSheet = workbook.addWorksheet('Instructions');
+  instrSheet.columns = [
+    { header: 'Field',       key: 'field',       width: 28 },
+    { header: 'Required',    key: 'required',    width: 12 },
+    { header: 'Description', key: 'description', width: 70 },
+    { header: 'Example',     key: 'example',     width: 35 },
+  ];
+  instrSheet.getRow(1).font = { bold: true };
+
+  const instrRows = [
+    ['Item Code',    'Required', 'Item code of the stores item — must already exist in the vessel\'s stores register', 'STORE-001'],
+    ['Event Type',   'Required', 'Type of transaction: RECEIVE, CONSUME, ADJUST, TRANSFER_IN, or TRANSFER_OUT (uppercase)', 'CONSUME'],
+    ['Quantity',     'Required', 'Absolute quantity involved (always positive — sign is derived from Event Type)', '5'],
+    ['ROB After',    'Required', 'Remaining on-board balance after this transaction (non-negative number)', '45'],
+    ['Date',         'Required', 'Date of the transaction — use DD-MMM-YYYY format', '15-NOV-2024'],
+    ['Vessel Code',  'Required', 'Vessel code this transaction belongs to (e.g. V001)', 'V001'],
+    ['Location',     'Optional', 'Storage location name (e.g. Engine Room Store). Stored as location note in remarks.', 'Engine Room Store'],
+    ['Remarks',      'Optional', 'Free-text notes about the transaction', 'Used during scheduled maintenance'],
+    ['Reference',    'Optional', 'Work Order or Purchase Order number linked to this event', '601.001.WO-2024-01'],
+    ['Port/Place',   'Optional', 'Port or location where the transaction took place', 'Singapore'],
+    ['Timezone',     'Optional', 'Timezone string (e.g. Asia/Singapore). Omit to use UTC.', 'Asia/Singapore'],
+    ['Performed By', 'Optional', 'Name or rank of person who performed the transaction. Defaults to system.', 'Chief Engineer'],
+    ['', '', '', ''],
+    ['--- NOTES ---', '', '', ''],
+    ['Date format',   '', 'Use DD-MMM-YYYY (e.g. 15-NOV-2024). Month must be a 3-letter abbreviation.', ''],
+    ['Event Type',    '', 'Accepted: RECEIVE | CONSUME | ADJUST | TRANSFER_IN | TRANSFER_OUT (uppercase)', ''],
+    ['Quantity sign', '', 'Always enter a positive number. The system applies the correct sign automatically.', ''],
+    ['ROB After',     '', 'This is the balance AFTER the event, not the change.', ''],
+    ['Red headers',   '', 'Columns with red header text are REQUIRED. Rows missing required fields will be rejected.', ''],
+    ['Import mode',   '', 'Use "Add Only" to load history without risk of overwriting existing records.', ''],
+    ['Current ROB',   '', 'This import does NOT change the item\'s current ROB balance. It only adds records to the transaction history ledger.', ''],
+  ];
+
+  instrRows.forEach(([field, required, description, example]) => {
+    instrSheet.addRow({ field, required, description, example });
+  });
+
+  const buf = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buf);
+}
+
 export async function generateSpareHistoryTemplate(): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
 
