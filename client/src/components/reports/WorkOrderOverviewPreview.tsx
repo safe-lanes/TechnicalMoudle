@@ -50,6 +50,8 @@ export interface WorkOrderOverviewData {
 
 interface WorkOrderOverviewPreviewProps {
   data: WorkOrderOverviewData;
+  isLoading?: boolean;
+  error?: string | null;
 }
 
 interface DrilldownState {
@@ -87,8 +89,26 @@ const SECTION_COLORS = {
   extended:     { header: "bg-[#CE93D8]", data: "bg-[#F3E8FF]", hover: "hover:bg-[#e8d0f8]" },
 };
 
-export default function WorkOrderOverviewPreview({ data }: WorkOrderOverviewPreviewProps) {
+export default function WorkOrderOverviewPreview({ data, isLoading, error }: WorkOrderOverviewPreviewProps) {
   const [drilldown, setDrilldown] = useState<DrilldownState | null>(null);
+
+  if (isLoading) {
+    return (
+      <div className="p-8 flex flex-col items-center gap-3 text-gray-500">
+        <div className="w-8 h-8 border-4 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+        <span className="text-sm">Loading Work Orders Overview…</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+        Failed to load report: {error}
+      </div>
+    );
+  }
+
   const { months, matrix, woInfo } = data;
 
   const openDrilldown = (cellLabel: string, monthLabel: string, cell: WoOverviewCellData) => {

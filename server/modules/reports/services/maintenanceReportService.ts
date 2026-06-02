@@ -1749,9 +1749,17 @@ export async function getWorkOrderOverviewData(
     ? (vesselIds && vesselIds.length > 0 ? vesselIds.map(id => vesselMap.get(id) || id).join(', ') : 'All Vessels')
     : (vessel?.name || vesselId);
 
-  const workOrders = await repo.getWorkOrders(vesselId, vesselIds);
-  const companyGraceRow = await storage.getCompanyStandardGraceSettings();
+  const [workOrders, jobs, components, companyGraceRow] = await Promise.all([
+    repo.getWorkOrders(vesselId, vesselIds),
+    repo.getJobs(vesselId, undefined, vesselIds),
+    repo.getComponents(vesselId, vesselIds),
+    storage.getCompanyStandardGraceSettings(),
+  ]);
   const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
+
+  const jobsMap = new Map(jobs.map((j: any) => [j.juuid, j]));
+  const componentsByCodeMap = new Map(components.map((c: any) => [c.componentCode, c]));
+  const componentsMap = new Map(components.map((c: any) => [c.cuuid, c]));
 
   // Build per-vessel grace settings cache
   const vesselGraceCache = new Map<string, VesselGraceSettings>();
@@ -1762,6 +1770,15 @@ export async function getWorkOrderOverviewData(
     const vs = await repo.getPmsVesselSettings(vid);
     vesselGraceCache.set(vid, buildVesselGraceSettings(vs as Record<string, unknown> | null));
   }
+
+  // Eligibility: exclude execution rows, soft-deleted, and cancelled WOs
+  const eligibleWorkOrders = workOrders.filter((wo: any) => {
+    if (wo.isExecution) return false;
+    if (wo.isDeleted === true) return false;
+    const st = (wo.status || '').toLowerCase();
+    if (st === 'cancelled' || st === 'canceled') return false;
+    return true;
+  });
 
   const isCritical = (wo: any): boolean =>
     wo.criticality === 'Yes' || wo.jobPriority === 'Critical';
@@ -1812,11 +1829,19 @@ export async function getWorkOrderOverviewData(
     cell.woIds.push(id);
   };
 
-  for (const wo of workOrders) {
-    if (wo.isExecution) continue;
+  for (const wo of eligibleWorkOrders) {
     const dueYM = getYearMonth(wo.dueDate);
-    const complYM = getYearMonth(wo.completionDateTime || wo.dateCompleted);
+    const complYM = getYearMonth(wo.completionDateTime || (wo as any).dateCompleted);
     if (!dueYM && !complYM) continue;
+
+    const job = wo.jobId ? jobsMap.get(wo.jobId) : jobs.find((j: any) => j.jobNo === wo.templateCode);
+    const component = wo.componentCode
+      ? componentsByCodeMap.get(wo.componentCode)
+      : (wo.component ? componentsMap.get(wo.component) : null);
+
+    const maintenanceBasis = wo.maintenanceBasis || (job as any)?.maintenanceBasis || 'Calendar';
+    const dueRH = parseRH((job as any)?.nextDueRH) ?? parseRH(wo.nextDueReading);
+    const currentRH = parseRH((component as any)?.currentCumulativeRH) ?? parseRH(wo.currentReading);
 
     const crit = isCritical(wo);
     const woId: string = wo.wouuid || String(wo.id);
@@ -1824,18 +1849,19 @@ export async function getWorkOrderOverviewData(
 
     const computedStatus = computeWorkOrderStatus({
       dueDate: wo.dueDate,
-      dueRH: null,
-      currentRH: null,
+      dueRH: dueRH ?? null,
+      currentRH: currentRH ?? null,
       isExecution: wo.isExecution,
       status: wo.status,
       completionDateTime: wo.completionDateTime,
-      maintenanceBasis: wo.maintenanceBasis || 'Calendar',
+      maintenanceBasis,
       companyGraceConfig,
       vesselGraceSettings,
     });
 
     const isCompleted = computedStatus === 'Completed';
     const isPostponed = computedStatus === 'Postponed';
+    const isOverdue = computedStatus === 'Overdue';
 
     // Collect WO info for drilldown (for any WO in scope)
     if (!woInfoMap[woId]) {
@@ -1859,7 +1885,6 @@ export async function getWorkOrderOverviewData(
         if (crit) { push(db.notCompletedCritical, woId); } else { push(db.notCompletedNonCritical, woId); }
       }
 
-      const isOverdue = !isCompleted && !isPostponed && (dueYM < anchorYM || computedStatus === 'Overdue');
       if (isOverdue) {
         push(db.overdueTotal, woId);
         if (crit) { push(db.overdueCritical, woId); } else { push(db.overdueNonCritical, woId); }
@@ -2065,7 +2090,7 @@ export async function exportWorkOrderOverview(
   curRow++;
   worksheet.mergeCells(curRow, 1, curRow, months.length + 1);
   const fn = worksheet.getCell(curRow, 1);
-  fn.value = 'Note: Critical = criticality "Yes" OR job priority "Critical". Overdue % = (Overdue ÷ Total Due) × 100. Extended % = (Postponed ÷ Total Due) × 100. Past months: all non-completed WOs counted as overdue.';
+  fn.value = 'Note: Critical = criticality "Yes" OR job priority "Critical". Overdue % = (Overdue ÷ Total Due) × 100. Extended % = (Postponed ÷ Total Due) × 100. Overdue classification uses computed status (grace/lead-time aware).';
   fn.font = { size: 8, italic: true, color: { argb: 'FF666666' }, name: 'Arial' };
   fn.alignment = { horizontal: 'left', vertical: 'middle' };
 
