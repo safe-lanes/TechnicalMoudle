@@ -126,6 +126,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       ];
 
   const [activeStep, setActiveStep] = useState('part-a');
+  const [openDocPopup, setOpenDocPopup] = useState<string | null>(null);
 
   // Scroll tracking for navigation with IntersectionObserver (only if Part B exists)
   useEffect(() => {
@@ -472,7 +473,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
   const [woDocuments, setWoDocuments] = useState<Array<{id: string, workOrderId: string, documentType: string, fileName: string, fileKey: string, fileType: string, fileSize: number, uploadedBy: string, uploadedAt: string}>>([]);
   const [previewDoc, setPreviewDoc] = useState<{id: string, fileName: string, fileType: string, fileSize?: number, fetchUrl?: string} | null>(null);
-  const [openDocPopup, setOpenDocPopup] = useState<string | null>(null);
   const [currentReadingWarningAcknowledged, setCurrentReadingWarningAcknowledged] = useState(false);
 
   const [editingConsumedSparePart, setEditingConsumedSparePart] = useState<number | null>(null);
