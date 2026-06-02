@@ -1,7 +1,43 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
+import { AgGridReact } from "ag-grid-react";
+import type {
+  ColDef,
+  ColSpanParams,
+  ICellRendererParams,
+  RowClassParams,
+  GridReadyEvent,
+  GridApi,
+} from "ag-grid-community";
+import { ModuleRegistry } from "ag-grid-community";
+import {
+  MenuModule,
+  ColumnsToolPanelModule,
+  FiltersToolPanelModule,
+  LicenseManager,
+} from "ag-grid-enterprise";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import ReportAgGridTable from "@/components/reports/ReportAgGridTable";
+import type { ReportColumn } from "@/components/reports/ReportPreviewModal";
+
+import "ag-grid-community/styles/ag-grid.css";
+import "ag-grid-community/styles/ag-theme-alpine.css";
+
+try {
+  const licenseKey = import.meta.env.VITE_AG_GRID_LICENSE_KEY || import.meta.env.AG_GRID_LICENSE_KEY;
+  if (licenseKey) LicenseManager.setLicenseKey(licenseKey);
+} catch (_) {}
+
+try {
+  ModuleRegistry.registerModules([
+    MenuModule,
+    ColumnsToolPanelModule,
+    FiltersToolPanelModule,
+  ]);
+} catch (_) {}
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface WoOverviewCellData {
   count: number;
@@ -60,6 +96,20 @@ interface DrilldownState {
   woIds: string[];
 }
 
+type SectionKey = "due" | "completed" | "notCompleted" | "overdue" | "extended";
+
+interface MatrixRow {
+  rowId: string;
+  rowType: "section" | "data";
+  metric: string;
+  sectionKey: SectionKey;
+  bold: boolean;
+  indent: boolean;
+  cells: WoOverviewCellData[];
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const STATUS_COLORS: Record<string, string> = {
   Completed: "bg-green-100 text-green-800",
   Overdue: "bg-red-100 text-red-800",
@@ -68,6 +118,14 @@ const STATUS_COLORS: Record<string, string> = {
   Active: "bg-blue-100 text-blue-800",
   "Due (Grace P)": "bg-orange-100 text-orange-800",
   "Pending Approval": "bg-gray-100 text-gray-800",
+};
+
+const SECTION_STYLES: Record<SectionKey, { headerBg: string; dataBg: string; text: string }> = {
+  due:          { headerBg: "#BFD9EF", dataBg: "#E8F4FD", text: "#1a2e45" },
+  completed:    { headerBg: "#A8DDB5", dataBg: "#E8F8F0", text: "#1a3a22" },
+  notCompleted: { headerBg: "#FFCC80", dataBg: "#FFF3E0", text: "#5a3a00" },
+  overdue:      { headerBg: "#FFAB91", dataBg: "#FFEBE8", text: "#5a1a0a" },
+  extended:     { headerBg: "#CE93D8", dataBg: "#F3E8FF", text: "#3a0a5a" },
 };
 
 function formatDue(dateStr: string | null): string {
@@ -81,16 +139,258 @@ function formatDue(dateStr: string | null): string {
   }
 }
 
-const SECTION_COLORS = {
-  due:          { header: "bg-[#BFD9EF]", data: "bg-[#E8F4FD]", hover: "hover:bg-[#d0e8f5]" },
-  completed:    { header: "bg-[#A8DDB5]", data: "bg-[#E8F8F0]", hover: "hover:bg-[#cef2d8]" },
-  notCompleted: { header: "bg-[#FFCC80]", data: "bg-[#FFF3E0]", hover: "hover:bg-[#ffe8b8]" },
-  overdue:      { header: "bg-[#FFAB91]", data: "bg-[#FFEBE8]", hover: "hover:bg-[#ffd0c8]" },
-  extended:     { header: "bg-[#CE93D8]", data: "bg-[#F3E8FF]", hover: "hover:bg-[#e8d0f8]" },
+// ─── Cell Renderers ───────────────────────────────────────────────────────────
+
+const MetricCellRenderer = (params: ICellRendererParams) => {
+  const row: MatrixRow | undefined = params.data;
+  if (!row) return null;
+
+  if (row.rowType === "section") {
+    const style = SECTION_STYLES[row.sectionKey];
+    return (
+      <div
+        style={{
+          fontWeight: 600,
+          fontSize: "11px",
+          color: style.text,
+          display: "flex",
+          alignItems: "center",
+          height: "100%",
+          paddingLeft: "12px",
+          letterSpacing: "0.03em",
+        }}
+      >
+        {row.metric}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        fontSize: "12px",
+        fontWeight: row.bold ? 600 : 400,
+        paddingLeft: row.indent ? "24px" : "12px",
+        display: "flex",
+        alignItems: "center",
+        height: "100%",
+        color: "#374151",
+      }}
+    >
+      {row.metric}
+    </div>
+  );
 };
+
+const MonthCellRenderer = (params: ICellRendererParams) => {
+  const row: MatrixRow | undefined = params.data;
+  if (!row || row.rowType === "section") return null;
+
+  const cell: WoOverviewCellData | undefined = params.value;
+  if (!cell) return <span style={{ color: "#9ca3af" }}>—</span>;
+
+  const { context } = params;
+  const colIdx: number = params.colDef?.colId ? parseInt(params.colDef.colId.replace("m_", ""), 10) : -1;
+  const monthLabel = context?.months?.[colIdx]?.label ?? "";
+
+  if (cell.isPct) {
+    return (
+      <span style={{ fontStyle: "italic", fontSize: "12px", color: "#374151", fontWeight: row.bold ? 600 : 400 }}>
+        {cell.count}%
+      </span>
+    );
+  }
+
+  if (cell.count === 0) {
+    return <span style={{ color: "#9ca3af" }}>—</span>;
+  }
+
+  const clickable = cell.woIds.length > 0;
+  const handleClick = () => {
+    if (clickable && context?.openDrilldown) {
+      context.openDrilldown(row.metric, monthLabel, cell);
+    }
+  };
+
+  return (
+    <span
+      onClick={handleClick}
+      style={{
+        color: clickable ? "#1d4ed8" : "#374151",
+        textDecoration: clickable ? "underline" : "none",
+        textDecorationStyle: "dotted",
+        cursor: clickable ? "pointer" : "default",
+        fontWeight: row.bold ? 600 : 400,
+        fontSize: "12px",
+      }}
+      data-testid={`wo-overview-cell-${row.metric.replace(/\s+/g, "-")}-${monthLabel}`}
+    >
+      {cell.count}
+    </span>
+  );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function WorkOrderOverviewPreview({ data, isLoading, error }: WorkOrderOverviewPreviewProps) {
   const [drilldown, setDrilldown] = useState<DrilldownState | null>(null);
+  const gridApiRef = useRef<GridApi | null>(null);
+
+  const openDrilldown = useCallback((label: string, monthLabel: string, cell: WoOverviewCellData) => {
+    if (cell.count === 0 || cell.woIds.length === 0) return;
+    setDrilldown({ label, monthLabel, woIds: cell.woIds });
+  }, []);
+
+  const { months, matrix, woInfo } = data ?? { months: [], matrix: {} as WorkOrderOverviewData["matrix"], woInfo: {} };
+
+  // Build flat row data: section header rows + data rows
+  const rowData: MatrixRow[] = useMemo(() => {
+    if (!months?.length || !matrix) return [];
+
+    const mk = (
+      rowId: string,
+      metric: string,
+      sectionKey: SectionKey,
+      cells: WoOverviewCellData[],
+      bold = false,
+      indent = false
+    ): MatrixRow => ({ rowId, rowType: "data", metric, sectionKey, bold, indent, cells });
+
+    const sec = (rowId: string, metric: string, sectionKey: SectionKey): MatrixRow => ({
+      rowId, rowType: "section", metric, sectionKey, bold: false, indent: false, cells: [],
+    });
+
+    return [
+      sec("s1", "SECTION 1 — WORK ORDERS DUE", "due"),
+      mk("totalDue",        "Total WOs Due",           "due",  matrix.totalDue,        true,  false),
+      mk("criticalDue",     "Critical WOs Due",        "due",  matrix.criticalDue,     false, true),
+      mk("nonCriticalDue",  "Non-Critical WOs Due",    "due",  matrix.nonCriticalDue,  false, true),
+
+      sec("s2", "SECTION 2 — COMPLETED", "completed"),
+      mk("compTotal",    "Completed (Total)",     "completed", matrix.completedTotal,       true,  false),
+      mk("compCrit",     "Completed (Critical)",  "completed", matrix.completedCritical,    false, true),
+      mk("compNonCrit",  "Completed (Non-Crit.)", "completed", matrix.completedNonCritical, false, true),
+
+      sec("s3", "SECTION 3 — NOT COMPLETED", "notCompleted"),
+      mk("ncTotal",    "Not Completed (Total)",      "notCompleted", matrix.notCompletedTotal,       true,  false),
+      mk("ncCrit",     "Not Completed (Critical)",   "notCompleted", matrix.notCompletedCritical,    false, true),
+      mk("ncNonCrit",  "Not Completed (Non-Crit.)",  "notCompleted", matrix.notCompletedNonCritical, false, true),
+
+      sec("s4", "SECTION 4 — OVERDUE %", "overdue"),
+      mk("ovdTotal",    "Overdue % (Total)",      "overdue", matrix.overdueTotal,       true,  false),
+      mk("ovdCrit",     "Overdue % (Critical)",   "overdue", matrix.overdueCritical,    false, true),
+      mk("ovdNonCrit",  "Overdue % (Non-Crit.)",  "overdue", matrix.overdueNonCritical, false, true),
+
+      sec("s5", "SECTION 5 — EXTENDED (POSTPONED)", "extended"),
+      mk("extTotal",    "Extended Total",          "extended", matrix.postponedTotal,       true,  false),
+      mk("extCrit",     "Extended (Critical)",     "extended", matrix.postponedCritical,    false, true),
+      mk("extNonCrit",  "Extended (Non-Crit.)",    "extended", matrix.postponedNonCritical, false, true),
+      mk("extPct",      "Extended %",              "extended", matrix.extendedPct,          true,  false),
+    ];
+  }, [months, matrix]);
+
+  // Column definitions
+  const columnDefs: ColDef[] = useMemo(() => {
+    const metricCol: ColDef = {
+      headerName: "Metric",
+      field: "metric",
+      colId: "metric",
+      pinned: "left",
+      minWidth: 210,
+      maxWidth: 260,
+      flex: 0,
+      sortable: false,
+      resizable: true,
+      filter: false,
+      suppressMovable: true,
+      suppressHeaderFilterButton: true,
+      menuTabs: [],
+      cellRenderer: MetricCellRenderer,
+      cellStyle: { padding: 0, border: "none" },
+      headerClass: "wo-overview-metric-header",
+      // Span all month columns for section header rows
+      colSpan: (params: ColSpanParams) => {
+        if (params.data?.rowType === "section") return 1 + months.length;
+        return 1;
+      },
+    };
+
+    const monthCols: ColDef[] = months.map((m, i) => ({
+      headerName: m.label,
+      colId: `m_${i}`,
+      field: `cells`,
+      minWidth: 75,
+      maxWidth: 110,
+      flex: 1,
+      sortable: false,
+      resizable: true,
+      filter: false,
+      suppressMovable: true,
+      suppressHeaderFilterButton: true,
+      menuTabs: [],
+      cellRenderer: MonthCellRenderer,
+      cellStyle: { display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", border: "none" },
+      headerClass: "wo-overview-month-header",
+      valueGetter: (params) => params.data?.cells?.[i],
+    }));
+
+    return [metricCol, ...monthCols];
+  }, [months]);
+
+  // Row styling: section header vs data rows
+  const getRowStyle = useCallback((params: RowClassParams) => {
+    const row: MatrixRow | undefined = params.data;
+    if (!row) return undefined;
+    const s = SECTION_STYLES[row.sectionKey];
+    if (row.rowType === "section") {
+      return { background: s.headerBg, borderBottom: "1px solid rgba(0,0,0,0.12)" };
+    }
+    return { background: s.dataBg, borderBottom: "1px solid rgba(0,0,0,0.06)" };
+  }, []);
+
+  const getRowHeight = useCallback((params: any) => {
+    return params.data?.rowType === "section" ? 30 : 32;
+  }, []);
+
+  const onGridReady = useCallback((e: GridReadyEvent) => {
+    gridApiRef.current = e.api;
+  }, []);
+
+  const gridContext = useMemo(() => ({ openDrilldown, months }), [openDrilldown, months]);
+
+  // Drilldown rows for the dialog
+  const drilldownWos = useMemo(() => {
+    if (!drilldown) return [];
+    return drilldown.woIds.map((id, idx) => ({
+      sno: idx + 1,
+      id,
+      ...(woInfo[id] ?? {}),
+      formattedDueDate: formatDue(woInfo[id]?.dueDate ?? null),
+    })).filter((w) => w.workOrderNo);
+  }, [drilldown, woInfo]);
+
+  const drilldownColumns: ReportColumn[] = useMemo(() => [
+    { header: "S.No",      field: "sno",              width: 60,  flex: 0 },
+    { header: "WO Number", field: "workOrderNo",       width: 160 },
+    { header: "Job Title", field: "jobTitle",          width: 200 },
+    { header: "Component", field: "componentName",     width: 180 },
+    { header: "Due Date",  field: "formattedDueDate",  width: 120 },
+    {
+      header: "Status",
+      field: "status",
+      width: 130,
+      cellRenderer: (params: ICellRendererParams) => {
+        const status: string = params.value ?? "";
+        return (
+          <Badge className={`text-[10px] px-1.5 py-0.5 ${STATUS_COLORS[status] ?? "bg-gray-100 text-gray-700"}`}>
+            {status}
+          </Badge>
+        );
+      },
+    },
+  ], []);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   if (isLoading) {
     return (
@@ -109,211 +409,110 @@ export default function WorkOrderOverviewPreview({ data, isLoading, error }: Wor
     );
   }
 
-  const { months, matrix, woInfo } = data;
-
-  const openDrilldown = (cellLabel: string, monthLabel: string, cell: WoOverviewCellData) => {
-    if (cell.count === 0 || cell.woIds.length === 0) return;
-    setDrilldown({ label: cellLabel, monthLabel, woIds: cell.woIds });
-  };
-
-  const renderCell = (
-    cell: WoOverviewCellData,
-    rowLabel: string,
-    monthLabel: string,
-    sectionKey: keyof typeof SECTION_COLORS,
-    bold = false
-  ) => {
-    const { data: dataBg, hover } = SECTION_COLORS[sectionKey];
-    const clickable = cell.count > 0 && !cell.isPct;
-    const display = cell.isPct
-      ? <span className={bold ? "font-bold" : ""}>{cell.count}%</span>
-      : cell.count === 0
-        ? <span className="text-gray-400">—</span>
-        : <span className={`${bold ? "font-bold" : ""} ${clickable ? "underline decoration-dotted cursor-pointer text-blue-700" : ""}`}>{cell.count}</span>;
-
-    return (
-      <td
-        key={monthLabel}
-        className={`text-center px-2 py-1.5 text-xs border-b border-gray-200 ${dataBg} ${clickable ? `${hover} cursor-pointer` : ""}`}
-        onClick={() => clickable && openDrilldown(rowLabel, monthLabel, cell)}
-        data-testid={`wo-overview-cell-${rowLabel.replace(/\s+/g, '-')}-${monthLabel}`}
-      >
-        {display}
-      </td>
-    );
-  };
-
-  const SectionHeader = ({ label, sectionKey }: { label: string; sectionKey: keyof typeof SECTION_COLORS }) => (
-    <tr>
-      <td
-        colSpan={months.length + 1}
-        className={`px-3 py-1.5 text-xs font-semibold text-gray-800 border-b border-gray-300 ${SECTION_COLORS[sectionKey].header}`}
-      >
-        {label}
-      </td>
-    </tr>
-  );
-
-  const DataRow = ({
-    label,
-    cells,
-    sectionKey,
-    bold = false,
-    indent = false,
-  }: {
-    label: string;
-    cells: WoOverviewCellData[];
-    sectionKey: keyof typeof SECTION_COLORS;
-    bold?: boolean;
-    indent?: boolean;
-  }) => (
-    <tr>
-      <td
-        className={`px-3 py-1.5 text-xs border-b border-gray-200 border-r border-r-gray-300 sticky left-0 z-10 ${SECTION_COLORS[sectionKey].data} ${bold ? "font-semibold" : ""} ${indent ? "pl-6" : ""}`}
-        style={{ minWidth: "200px", maxWidth: "200px" }}
-      >
-        {label}
-      </td>
-      {cells.map((cell, i) => renderCell(cell, label, months[i].label, sectionKey, bold))}
-    </tr>
-  );
-
-  const drilldownWos = drilldown
-    ? drilldown.woIds.map(id => ({ id, ...woInfo[id] })).filter(w => w.workOrderNo)
-    : [];
-
   return (
-    <div className="p-1">
+    <div className="p-1 flex flex-col gap-2">
       {/* Header */}
-      <div className="mb-3">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <h2 className="text-base font-bold text-gray-800">Work Orders Overview</h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              12-month rolling matrix · {data.vesselName} · {months[0]?.label} – {months[11]?.label}
-            </p>
-          </div>
-          <p className="text-[10px] text-gray-400 italic">
-            Click any count to see the work orders
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h2 className="text-base font-bold text-gray-800">Work Orders Overview</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            12-month rolling matrix · {data.vesselName} · {months[0]?.label} – {months[months.length - 1]?.label}
           </p>
         </div>
+        <p className="text-[10px] text-gray-400 italic">Click any count to see the work orders</p>
       </div>
 
-      {/* Matrix Table */}
-      <div className="overflow-x-auto rounded-lg border border-gray-300 shadow-sm">
-        <table className="border-collapse text-xs" style={{ minWidth: `${200 + months.length * 90}px` }}>
-          <thead>
-            <tr className="bg-[#1E3A5F] text-white">
-              <th
-                className="px-3 py-2 text-left font-semibold sticky left-0 z-20 bg-[#1E3A5F] border-r border-blue-400"
-                style={{ minWidth: "200px", maxWidth: "200px" }}
-              >
-                Metric
-              </th>
-              {months.map(m => (
-                <th key={m.yearMonth} className="px-2 py-2 text-center font-semibold" style={{ minWidth: "80px" }}>
-                  {m.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {/* Section 1: Due */}
-            <SectionHeader label="SECTION 1 — WORK ORDERS DUE" sectionKey="due" />
-            <DataRow label="Total WOs Due"         cells={matrix.totalDue}       sectionKey="due"  bold />
-            <DataRow label="Critical WOs Due"      cells={matrix.criticalDue}    sectionKey="due"  indent />
-            <DataRow label="Non-Critical WOs Due"  cells={matrix.nonCriticalDue} sectionKey="due"  indent />
-
-            {/* Section 2: Completed */}
-            <SectionHeader label="SECTION 2 — COMPLETED" sectionKey="completed" />
-            <DataRow label="Completed (Total)"       cells={matrix.completedTotal}       sectionKey="completed" bold />
-            <DataRow label="Completed (Critical)"    cells={matrix.completedCritical}    sectionKey="completed" indent />
-            <DataRow label="Completed (Non-Crit.)"   cells={matrix.completedNonCritical} sectionKey="completed" indent />
-
-            {/* Section 3: Not Completed */}
-            <SectionHeader label="SECTION 3 — NOT COMPLETED" sectionKey="notCompleted" />
-            <DataRow label="Not Completed (Total)"      cells={matrix.notCompletedTotal}       sectionKey="notCompleted" bold />
-            <DataRow label="Not Completed (Critical)"   cells={matrix.notCompletedCritical}    sectionKey="notCompleted" indent />
-            <DataRow label="Not Completed (Non-Crit.)"  cells={matrix.notCompletedNonCritical} sectionKey="notCompleted" indent />
-
-            {/* Section 4: Overdue % */}
-            <SectionHeader label="SECTION 4 — OVERDUE %" sectionKey="overdue" />
-            <DataRow label="Overdue % (Total)"      cells={matrix.overdueTotal}       sectionKey="overdue" bold />
-            <DataRow label="Overdue % (Critical)"   cells={matrix.overdueCritical}    sectionKey="overdue" indent />
-            <DataRow label="Overdue % (Non-Crit.)"  cells={matrix.overdueNonCritical} sectionKey="overdue" indent />
-
-            {/* Section 5: Extended (Postponed) */}
-            <SectionHeader label="SECTION 5 — EXTENDED (POSTPONED)" sectionKey="extended" />
-            <DataRow label="Extended Total"          cells={matrix.postponedTotal}       sectionKey="extended" bold />
-            <DataRow label="Extended (Critical)"     cells={matrix.postponedCritical}    sectionKey="extended" indent />
-            <DataRow label="Extended (Non-Crit.)"    cells={matrix.postponedNonCritical} sectionKey="extended" indent />
-            <DataRow label="Extended %"              cells={matrix.extendedPct}          sectionKey="extended" bold />
-          </tbody>
-        </table>
+      {/* AG Grid Matrix */}
+      <div
+        className="ag-theme-alpine report-ag-grid wo-overview-grid"
+        style={{ width: "100%", minHeight: "560px" }}
+      >
+        <style>{`
+          .wo-overview-grid .ag-header-cell.wo-overview-metric-header {
+            background-color: #1E3A5F;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+          }
+          .wo-overview-grid .ag-header-cell.wo-overview-month-header {
+            background-color: #1E3A5F;
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+            text-align: center;
+          }
+          .wo-overview-grid .ag-header-cell.wo-overview-month-header .ag-header-cell-label {
+            justify-content: center;
+          }
+          .wo-overview-grid .ag-row {
+            border-bottom: none;
+          }
+          .wo-overview-grid .ag-cell {
+            border-right: none !important;
+          }
+          .wo-overview-grid .ag-pinned-left-cols-container .ag-cell {
+            border-right: 1px solid rgba(0,0,0,0.12) !important;
+          }
+          .wo-overview-grid .ag-header {
+            border-bottom: 2px solid #1E3A5F;
+          }
+          .wo-overview-grid .ag-header-cell {
+            border-right: 1px solid rgba(255,255,255,0.15);
+          }
+        `}</style>
+        <AgGridReact
+          rowData={rowData}
+          columnDefs={columnDefs}
+          defaultColDef={{ sortable: false, filter: false, resizable: true }}
+          getRowStyle={getRowStyle}
+          getRowHeight={getRowHeight}
+          getRowId={(params) => params.data.rowId}
+          onGridReady={onGridReady}
+          context={gridContext}
+          suppressHorizontalScroll={false}
+          suppressMovableColumns={true}
+          suppressCellFocus={true}
+          enableCellTextSelection={true}
+          animateRows={false}
+          headerHeight={36}
+          domLayout="autoHeight"
+          reactiveCustomComponents={true}
+          theme="legacy"
+        />
       </div>
 
-      {/* Footer note */}
-      <p className="text-[10px] text-gray-400 mt-2 italic">
-        Critical = criticality "Yes" OR job priority "Critical". Overdue % = (Overdue ÷ Total Due) × 100.
-        Extended % = (Postponed ÷ Total Due) × 100. Past months: all non-completed WOs counted as overdue.
-      </p>
-
-      {/* Drilldown Dialog */}
-      <Dialog open={!!drilldown} onOpenChange={() => setDrilldown(null)}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="text-sm font-bold">
-              {drilldown?.label} — {drilldown?.monthLabel}
-              <span className="ml-2 text-xs font-normal text-gray-500">({drilldownWos.length} work orders)</span>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="overflow-y-auto flex-1">
-            {drilldownWos.length === 0 ? (
-              <p className="text-sm text-gray-500 py-4 text-center">No work orders found.</p>
-            ) : (
-              <table className="w-full text-xs border-collapse">
-                <thead className="sticky top-0 bg-[#1E3A5F] text-white">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-semibold">#</th>
-                    <th className="px-3 py-2 text-left font-semibold">WO Number</th>
-                    <th className="px-3 py-2 text-left font-semibold">Job Title</th>
-                    <th className="px-3 py-2 text-left font-semibold">Component</th>
-                    <th className="px-3 py-2 text-left font-semibold">Due Date</th>
-                    <th className="px-3 py-2 text-left font-semibold">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {drilldownWos.map((wo, idx) => (
-                    <tr
-                      key={wo.id}
-                      className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                      data-testid={`drilldown-wo-row-${wo.id}`}
-                    >
-                      <td className="px-3 py-1.5 text-gray-500">{idx + 1}</td>
-                      <td className="px-3 py-1.5 font-mono text-blue-700">{wo.workOrderNo}</td>
-                      <td className="px-3 py-1.5">{wo.jobTitle}</td>
-                      <td className="px-3 py-1.5 text-gray-600">{wo.componentName}</td>
-                      <td className="px-3 py-1.5 text-gray-600">{formatDue(wo.dueDate)}</td>
-                      <td className="px-3 py-1.5">
-                        <Badge className={`text-[10px] px-1.5 py-0.5 ${STATUS_COLORS[wo.status] || "bg-gray-100 text-gray-700"}`}>
-                          {wo.status}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Footer note */}
-      <div className="mt-3 px-2 py-2 bg-gray-50 border border-gray-200 rounded text-[10px] text-gray-500 italic">
-        Vessel with ≥ 0% jobs pending on the selected month. Critical = criticality &quot;Yes&quot; OR job priority &quot;Critical&quot;.
+      {/* Footer */}
+      <div className="px-2 py-2 bg-gray-50 border border-gray-200 rounded text-[10px] text-gray-500 italic">
+        Critical = criticality "Yes" OR job priority "Critical".
         Overdue % = (Overdue ÷ Total Due) × 100. Extended % = (Postponed ÷ Total Due) × 100.
         Overdue classification uses computed status (grace/lead-time aware). Completed counts by actual completion month.
       </div>
+
+      {/* Drilldown Dialog — AG Grid powered */}
+      <Dialog open={!!drilldown} onOpenChange={() => setDrilldown(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold">
+              {drilldown?.label} — {drilldown?.monthLabel}
+              <span className="ml-2 text-xs font-normal text-gray-500">
+                ({drilldownWos.length} work order{drilldownWos.length !== 1 ? "s" : ""})
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden min-h-[300px]">
+            <ReportAgGridTable
+              columns={drilldownColumns}
+              data={drilldownWos}
+              height="100%"
+              rowHeight={34}
+              headerHeight={36}
+              testId="wo-overview-drilldown-grid"
+              noRowsMessage="No work orders found for this selection."
+              getRowId={(params) => params.data.id}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
