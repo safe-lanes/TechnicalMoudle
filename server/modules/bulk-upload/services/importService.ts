@@ -1822,7 +1822,7 @@ export async function performImport(
         const dateLocal = `${String(dateObj.getUTCDate()).padStart(2,'0')}-${mmmNames[dateObj.getUTCMonth()]}-${dateObj.getUTCFullYear()}`;
 
         const tz = row['Timezone'] ? String(row['Timezone']).trim() : 'UTC';
-        const userId = row['Performed By'] ? String(row['Performed By']).trim() : 'system';
+        const userId = row['Performed By'] ? String(row['Performed By']).trim() : 'system-import';
 
         // Build remarks — prepend location if provided
         const locationNote = row['Location'] ? String(row['Location']).trim() : null;

@@ -1104,8 +1104,8 @@ export async function validateData(type: string, data: any[], mode: string, vess
         errors.push(`Row ${rowNum}: Quantity is required`);
       } else {
         const qtyNum = Number(String(quantity).trim());
-        if (isNaN(qtyNum) || qtyNum < 0) {
-          errors.push(`Row ${rowNum}: Quantity must be a non-negative number (got '${quantity}')`);
+        if (isNaN(qtyNum) || qtyNum <= 0) {
+          errors.push(`Row ${rowNum}: Quantity must be a positive number greater than zero (got '${quantity}')`);
         } else {
           normalized['Quantity'] = qtyNum;
         }
@@ -1132,7 +1132,11 @@ export async function validateData(type: string, data: any[], mode: string, vess
       if (!row['Vessel Code'] || String(row['Vessel Code']).trim() === '') {
         errors.push(`Row ${rowNum}: Vessel Code is required`);
       } else {
-        normalized['Vessel Code'] = String(row['Vessel Code']).trim();
+        const rowVesselCode = String(row['Vessel Code']).trim();
+        normalized['Vessel Code'] = rowVesselCode;
+        if (vesselId && rowVesselCode.toUpperCase() !== vesselId.trim().toUpperCase()) {
+          errors.push(`Row ${rowNum}: Vessel Code '${rowVesselCode}' does not match selected vessel '${vesselId}'. All rows must belong to the same vessel.`);
+        }
       }
 
       // Optional fields — copy as-is
