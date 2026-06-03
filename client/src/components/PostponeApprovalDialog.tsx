@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle, XCircle } from "lucide-react";
@@ -41,11 +42,13 @@ const formatDateDisplay = (val: string | null | undefined): string => {
 };
 
 const ReadOnlyField: React.FC<{ label: string; value: string | null | undefined }> = ({ label, value }) => (
-  <div>
-    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</Label>
-    <p className="mt-0.5 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2 min-h-[36px]">
-      {value || "—"}
-    </p>
+  <div className="space-y-1">
+    <Label className="text-sm">{label}</Label>
+    <Input
+      value={value || "—"}
+      className="bg-gray-50 h-9"
+      readOnly
+    />
   </div>
 );
 
@@ -89,79 +92,87 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-xl w-full max-h-[90vh] overflow-y-auto" data-testid="dialog-postpone-approval">
-        <DialogHeader>
-          <DialogTitle className="text-base font-semibold text-gray-900">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col" data-testid="dialog-postpone-approval">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle>
             Review Postponement Request
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 pt-1">
-          <div className="grid grid-cols-2 gap-4">
-            <ReadOnlyField label="Work Order ID" value={woDisplayId} />
-            <ReadOnlyField label="Component" value={workOrder.component} />
-          </div>
+        <div className="flex-1 overflow-y-auto px-1">
+          <div className="space-y-3 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <ReadOnlyField label="Work Order ID" value={woDisplayId} />
+              <ReadOnlyField label="Component" value={workOrder.component} />
+            </div>
 
-          <ReadOnlyField label="Job Title" value={workOrder.jobTitle} />
+            <ReadOnlyField label="Job Title" value={workOrder.jobTitle} />
 
-          <div className="grid grid-cols-2 gap-4">
-            <ReadOnlyField label="Original Due Date" value={formatDateDisplay(workOrder.dueDate)} />
-            <ReadOnlyField label="Requested New Date" value={formatDateDisplay(workOrder.postponeRequestedDate)} />
-          </div>
+            <div className="grid grid-cols-2 gap-4">
+              <ReadOnlyField label="Original Due Date" value={formatDateDisplay(workOrder.dueDate)} />
+              <ReadOnlyField label="Requested New Date" value={formatDateDisplay(workOrder.postponeRequestedDate)} />
+            </div>
 
-          <ReadOnlyField label="Reason for Postponement" value={workOrder.postponementReason} />
-          <ReadOnlyField label="Remarks / Additional Details" value={workOrder.postponementRemarks} />
+            <ReadOnlyField label="Reason for Postponement" value={workOrder.postponementReason} />
 
-          <div>
-            <Label htmlFor="approver-remarks" className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              Approver Remarks <span className="text-red-500">*</span> (required for rejection)
-            </Label>
-            <Textarea
-              id="approver-remarks"
-              data-testid="textarea-approver-remarks"
-              className={`mt-1 text-sm resize-none ${remarksError ? "border-red-400" : ""}`}
-              rows={3}
-              placeholder="Enter your remarks (required if rejecting)..."
-              value={approverRemarks}
-              onChange={(e) => {
-                setApproverRemarks(e.target.value);
-                if (remarksError) setRemarksError("");
-              }}
-              disabled={isSubmitting}
-            />
-            {remarksError && (
-              <p className="mt-1 text-xs text-red-500" data-testid="error-approver-remarks">{remarksError}</p>
-            )}
-          </div>
+            <div className="space-y-1">
+              <Label className="text-sm">Remarks / Additional Details</Label>
+              <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2 min-h-[60px]">
+                {workOrder.postponementRemarks || "—"}
+              </p>
+            </div>
 
-          <div className="flex justify-end gap-3 pt-2 border-t">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-              data-testid="button-postpone-approval-cancel"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="outline"
-              className="border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
-              onClick={handleReject}
-              disabled={isSubmitting}
-              data-testid="button-postpone-reject"
-            >
-              <XCircle className="h-4 w-4 mr-1.5" />
-              Reject
-            </Button>
-            <Button
-              className="bg-[#1E5A8E] hover:bg-[#174a78] text-white"
-              onClick={handleApprove}
-              disabled={isSubmitting}
-              data-testid="button-postpone-approve"
-            >
-              <CheckCircle className="h-4 w-4 mr-1.5" />
-              Approve
-            </Button>
+            <div className="space-y-1">
+              <Label htmlFor="approver-remarks" className="text-sm">
+                Approver Remarks <span className="text-red-500">*</span> (required for rejection)
+              </Label>
+              <Textarea
+                id="approver-remarks"
+                data-testid="textarea-approver-remarks"
+                className={`text-sm resize-none ${remarksError ? "border-red-400" : ""}`}
+                rows={3}
+                placeholder="Enter your remarks (required if rejecting)..."
+                value={approverRemarks}
+                onChange={(e) => {
+                  setApproverRemarks(e.target.value);
+                  if (remarksError) setRemarksError("");
+                }}
+                disabled={isSubmitting}
+              />
+              {remarksError && (
+                <p className="mt-1 text-xs text-red-500" data-testid="error-approver-remarks">{remarksError}</p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={onClose}
+                disabled={isSubmitting}
+                data-testid="button-postpone-approval-cancel"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                className="border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
+                onClick={handleReject}
+                disabled={isSubmitting}
+                data-testid="button-postpone-reject"
+              >
+                <XCircle className="h-4 w-4 mr-1.5" />
+                Reject
+              </Button>
+              <Button
+                className="bg-[#1E5A8E] hover:bg-[#174a78] text-white"
+                onClick={handleApprove}
+                disabled={isSubmitting}
+                data-testid="button-postpone-approve"
+              >
+                <CheckCircle className="h-4 w-4 mr-1.5" />
+                Approve
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
