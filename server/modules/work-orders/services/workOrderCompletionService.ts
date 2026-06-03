@@ -684,3 +684,204 @@ export async function completeWorkOrder(
     missedCycles
   };
 }
+
+// ── Finalize Work Order Completion Side-Effects ───────────────────────────────
+// Called when a WO transitions to Completed through a path that does NOT go
+// through workOrderService.updateWorkOrder (e.g. reviewer-approve after L2
+// review). Handles maintenance history creation, job cycle date updates, and
+// spare consumption deduction. All operations are idempotent / non-throwing.
+export async function finalizeWorkOrderCompletion(workOrderId: string): Promise<void> {
+  const workOrder = await repo.findById(workOrderId);
+  if (!workOrder) {
+    console.error(`[Finalize] Work order ${workOrderId} not found`);
+    return;
+  }
+
+  // ── 1. Resolve component ─────────────────────────────────────────────────
+  let component: any = await repo.findComponent(workOrder.component);
+  if (!component && workOrder.componentCode && workOrder.vesselId) {
+    const byCode = await repo.findComponentByCode(workOrder.componentCode, workOrder.vesselId);
+    if (byCode && byCode.name === workOrder.component) component = byCode;
+  }
+  if (!component && workOrder.vesselId) {
+    const all = await repo.findComponents(workOrder.vesselId);
+    component = all.find((c: any) => c.name === workOrder.component)
+      ?? all.find((c: any) => c.componentCode === workOrder.componentCode)
+      ?? null;
+  }
+  if (!component) {
+    console.warn(`[Finalize] Could not find component for WO ${workOrder.workOrderNo} — skipping side-effects`);
+    return;
+  }
+
+  const rawCompletionDate: string | null = workOrder.completionDateTime || workOrder.dateCompleted || null;
+  const missedCycles: number = workOrder.missedCycles || 0;
+  const originalDueDate: string | null = workOrder.originalDueDate || workOrder.nextDueDate || workOrder.dueDate || null;
+
+  const normalizeToISO = (d: string): string | null => {
+    if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.split('T')[0];
+    const m = d.match(/^(\d{2})[-\/](\d{2})[-\/](\d{4})/);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+    const p = new Date(d);
+    return !isNaN(p.getTime()) ? p.toISOString().split('T')[0] : null;
+  };
+
+  // ── 2. Create maintenance history (idempotent) ───────────────────────────
+  try {
+    const existing = await repo.findMaintenanceHistoryByWorkOrderId(workOrder.wouuid);
+    if (existing) {
+      console.log(`⚠️ [Finalize] Maintenance history already exists for WO ${workOrder.workOrderNo}, skipping`);
+    } else if (rawCompletionDate) {
+      const dateOfCompletion = normalizeToISO(rawCompletionDate);
+      if (dateOfCompletion) {
+        await repo.createMaintenanceHistory({
+          componentId: component.cuuid,
+          componentCode: workOrder.componentCode || component.componentCode,
+          vesselCode: workOrder.vesselId,
+          jobId: workOrder.jobId || null,
+          jobCode: workOrder.workOrderNo?.match(/^(.+?)-\d+\.\d+/)?.[1] || null,
+          workOrderId: workOrder.wouuid,
+          workOrderNo: workOrder.workOrderNo || `WO-${workOrder.id}`,
+          jobTitle: workOrder.jobTitle,
+          maintenanceType: (workOrder as any).maintenanceType || workOrder.taskType || 'Servicing',
+          dateCompleted: dateOfCompletion,
+          runningHoursAtCompletion: workOrder.runningHours || null,
+          performedBy: workOrder.performedBy || (workOrder as any).executionAssignedTo || 'Unknown',
+          approvedBy: workOrder.approver || null,
+          approvalDate: dateOfCompletion,
+          status: 'Approved' as const,
+          workDescription: (workOrder as any).workCarriedOut || workOrder.briefWorkDescription || null,
+          sparesUsed: workOrder.consumedSpareParts ? JSON.stringify(workOrder.consumedSpareParts) : null,
+          remarks: missedCycles >= 1
+            ? `${missedCycles} cycles skipped — completed late${workOrder.remarks ? '. ' + workOrder.remarks : ''}`
+            : (workOrder.remarks || workOrder.jobExperienceNotes || 'Completed on time'),
+          isComponentReplaced: false,
+          missedCycles,
+          originalDueDate,
+        });
+        console.log(`✅ [Finalize] Created maintenance history for WO ${workOrder.workOrderNo}`);
+      }
+    }
+  } catch (err) {
+    console.error('[Finalize] Failed to create maintenance history:', err);
+  }
+
+  // ── 3. Update job cycle dates ────────────────────────────────────────────
+  try {
+    let job: any = null;
+    if (workOrder.jobId) job = await repo.findJob(workOrder.jobId);
+    if (!job && workOrder.workOrderNo) {
+      const m1 = workOrder.workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
+      const m2 = workOrder.workOrderNo.match(/^(.+)-\d{4}-\d+$/);
+      const extractedJobNo = m1 ? m1[1] : (m2 ? m2[1] : null);
+      if (extractedJobNo && workOrder.vesselId) {
+        const jobs = await repo.findJobs(workOrder.vesselId);
+        job = jobs.find((j: any) => j.jobNo === extractedJobNo) || null;
+      }
+    }
+
+    if (job && rawCompletionDate) {
+      const dateOfCompletionNorm = normalizeToISO(rawCompletionDate);
+      const basis = workOrder.maintenanceBasis;
+
+      if ((basis === 'Calendar' || basis === 'Dual Frequency') && dateOfCompletionNorm) {
+        const { calculateNextDueDate } = await import('@shared/dateUtils');
+        const updates: any = { lastDoneDate: dateOfCompletionNorm };
+        const linkUpdates: any = { lastDoneDate: dateOfCompletionNorm, updatedAt: new Date() };
+        if (job.frequencyValue && job.frequencyUnit) {
+          const nextDue = calculateNextDueDate(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, originalDueDate);
+          if (nextDue) { updates.nextDueDate = nextDue; linkUpdates.nextDueDate = nextDue; }
+        }
+        const vId = workOrder.vesselId || job.vesselId;
+        if (component.cuuid && vId) {
+          await repo.updateJobComponentLinkTracking(vId, job.juuid, component.cuuid, linkUpdates);
+        }
+        await repo.updateJob(job.juuid, updates);
+        console.log(`✅ [Finalize] Updated calendar job ${job.jobNo} lastDoneDate: ${dateOfCompletionNorm}`);
+      }
+
+      if ((basis === 'Running Hours' || basis === 'Dual Frequency') && workOrder.runningHours) {
+        const currentRH = parseInt(workOrder.runningHours);
+        if (!isNaN(currentRH)) {
+          const rhUpdates: any = { lastDoneRH: currentRH };
+          const rhLinkUpdates: any = { lastDoneRH: currentRH.toString(), updatedAt: new Date() };
+          const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
+          if (rhInterval && !isNaN(rhInterval)) {
+            rhUpdates.nextDueRH = currentRH + rhInterval;
+            rhLinkUpdates.nextDueRH = (currentRH + rhInterval).toString();
+          }
+          const vId = workOrder.vesselId || job.vesselId;
+          if (component.cuuid && vId) {
+            await repo.updateJobComponentLinkTracking(vId, job.juuid, component.cuuid, rhLinkUpdates);
+          }
+          await repo.updateJob(job.juuid, rhUpdates);
+          console.log(`✅ [Finalize] Updated RH job ${job.jobNo} lastDoneRH: ${currentRH}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Finalize] Failed to update job cycle dates:', err);
+  }
+
+  // ── 4. Spare consumption at approval (idempotent via prior-txn check) ────
+  try {
+    const consumedSpareParts = ensureArray(workOrder.consumedSpareParts) as Array<{
+      partNo: string; partCode?: string; quantityConsumed: number | string;
+      locationId?: number | null; location?: string; locationName?: string;
+      comments?: string; _deductedQty?: number;
+    }>;
+    if (consumedSpareParts.length > 0) {
+      const woVesselId = workOrder.vesselId || 'V001';
+      const allSpares = await repo.findSpares(woVesselId);
+      for (const cs of consumedSpareParts) {
+        const qty = typeof cs.quantityConsumed === 'string' ? parseFloat(cs.quantityConsumed) : cs.quantityConsumed;
+        const alreadyDeducted = cs._deductedQty || 0;
+
+        let spare: any = cs.partCode ? allSpares.find((s: any) => s.partCode === cs.partCode) : null;
+        if (!spare && cs.partNo) {
+          spare = allSpares.find((s: any) => s.partCode === cs.partNo)
+            || allSpares.find((s: any) => s.partNumber === cs.partNo)
+            || null;
+        }
+        if (!spare) { console.warn(`[Finalize] Spare ${cs.partCode || cs.partNo} not found, skipping`); continue; }
+
+        let locationId: number | null = cs.locationId ? parseInt(String(cs.locationId)) : null;
+        const locName = cs.location || cs.locationName;
+        if ((!locationId || isNaN(locationId)) && locName) {
+          const locObj = await repo.findOrCreateLocation(woVesselId, locName, workOrder.approver || 'system');
+          if (locObj) locationId = locObj.id;
+        }
+        if (!locationId || isNaN(locationId)) { console.warn(`[Finalize] No location for spare ${cs.partCode || cs.partNo}, skipping`); continue; }
+
+        const existingTxns = await repo.getInventoryTransactions(woVesselId, { spareId: spare.id, locationId, eventType: 'CONSUME' });
+        const priorTotal = existingTxns
+          .filter((t: any) => t.referenceId === workOrder.wouuid)
+          .reduce((s: number, t: any) => s + Math.abs(t.qtyChange || 0), 0);
+        const effectiveRemaining = (qty || 0) - Math.max(alreadyDeducted, priorTotal);
+        if (effectiveRemaining <= 0) {
+          console.log(`⏭️ [Finalize] Spare ${cs.partCode || cs.partNo} already fully deducted, skipping`);
+          continue;
+        }
+
+        try {
+          await repo.performInventoryTransaction({
+            vesselId: woVesselId,
+            spareId: spare.id,
+            locationId,
+            eventType: 'CONSUME',
+            qtyChange: -Math.abs(effectiveRemaining),
+            referenceType: 'WORK_ORDER',
+            referenceId: workOrder.wouuid,
+            referenceNote: `WO L2 Approval: ${workOrder.workOrderNo}${cs.comments ? ' - ' + cs.comments : ''}`,
+            userId: workOrder.approver || 'system',
+          });
+          console.log(`✅ [Finalize] Deducted ${effectiveRemaining} of spare ${spare.partCode} at location ${locationId}`);
+        } catch (txnErr: any) {
+          console.error(`[Finalize] Spare transaction failed for ${spare.partCode || cs.partNo}:`, txnErr.message);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Finalize] Failed to process spare consumption:', err);
+  }
+}

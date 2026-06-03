@@ -4,6 +4,7 @@ import { calculateMissedCycles, calculateNextDueDate } from '@shared/dateUtils';
 import { resolveHodForDepartment } from '../../ranks/hodResolutionService';
 import { invalidateComplianceCache } from './complianceAnomalyService';
 import { logFieldChanges } from '../../sync';
+import { finalizeWorkOrderCompletion } from './workOrderCompletionService';
 
 // ── Bulk Approve Work Orders ──
 
@@ -262,6 +263,14 @@ export async function reviewerApprove(workOrderId: string, reviewerComments?: st
     } catch (err) {
       console.error('[BACKFILL ERROR] Reviewer approve skipped cycle records:', err);
     }
+  }
+
+  // Run completion side-effects: maintenance history, job cycle dates, spare consumption.
+  // The WO row is now Completed in the DB so finalizeWorkOrderCompletion reads fresh state.
+  try {
+    await finalizeWorkOrderCompletion(workOrderId);
+  } catch (finalizeErr) {
+    console.error('[ReviewerApprove] finalizeWorkOrderCompletion failed (non-blocking):', finalizeErr);
   }
 
   invalidateComplianceCache();
