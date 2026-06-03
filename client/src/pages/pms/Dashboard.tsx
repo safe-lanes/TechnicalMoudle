@@ -11,6 +11,7 @@ import {
   CheckCircle,
   XCircle,
   Eye,
+  ClipboardList,
   Pencil,
   Download,
   TrendingUp,
@@ -406,6 +407,7 @@ const Dashboard = () => {
     remarks: string;
     submitting: boolean;
   }>({ open: false, wo: null, action: null, remarks: '', submitting: false });
+  const [postponeRemarksError, setPostponeRemarksError] = useState('');
   const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: EnrichedWorkOrder[] }>({ open: false, title: '', workOrders: [] });
   const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
   const [crListModal, setCrListModal] = useState<{ open: boolean; title: string; changeRequests: ChangeRequest[]; statusFilter: string | null }>({ open: false, title: '', changeRequests: [], statusFilter: null });
@@ -465,7 +467,7 @@ const Dashboard = () => {
   type OperationCardFilter = 'overdue' | 'overdue-critical' | 'planned-today' | 'pending-approvals' | 'critical-spares' | 'anomalies' | 'modify-pms' | 'donut-overdue' | 'donut-due' | 'donut-planned';
   const [selectedOpCard, setSelectedOpCard] = useState<OperationCardFilter>('overdue');
   const [hodScope, setHodScope] = useState<'me' | 'myTeam'>('me');
-  const [opViewModal, setOpViewModal] = useState<{ open: boolean; workOrder: EnrichedWorkOrder | null }>({ open: false, workOrder: null });
+  const [opViewModal, setOpViewModal] = useState<{ open: boolean; workOrder: EnrichedWorkOrder | null; mode?: 'template' | 'execution' }>({ open: false, workOrder: null });
   const [opDetailSpare, setOpDetailSpare] = useState<Spare | null>(null);
   const [opDetailChangeRequest, setOpDetailChangeRequest] = useState<ChangeRequest | null>(null);
   const [showBenchmarking, setShowBenchmarking] = useState(false);
@@ -1853,15 +1855,17 @@ const Dashboard = () => {
             <div className="flex items-center gap-1 h-full">
               <Button
                 size="sm"
-                variant="outline"
-                className="h-7 text-xs border-[#1E5A8E] text-[#1E5A8E] hover:bg-blue-50"
+                variant="ghost"
+                className="h-7 w-7 p-0 text-[#1E5A8E] hover:bg-blue-50 hover:text-[#174a78]"
                 onClick={(e) => {
                   e.stopPropagation();
+                  setPostponeRemarksError('');
                   setPostponeDecisionDialog({ open: true, wo, action: 'review', remarks: '', submitting: false });
                 }}
                 data-testid={`button-op-postpone-review-${wo.id}`}
+                title="Review postponement"
               >
-                Review
+                <ClipboardList className="h-4 w-4" />
               </Button>
               <Button
                 size="sm"
@@ -1869,9 +1873,10 @@ const Dashboard = () => {
                 className="h-7 w-7 p-0 text-gray-500 hover:text-gray-800"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setOpViewModal({ open: true, workOrder: wo });
+                  setOpViewModal({ open: true, workOrder: wo, mode: 'execution' });
                 }}
                 data-testid={`button-op-postpone-view-${wo.id}`}
+                title="View work order"
               >
                 <Eye className="h-4 w-4" />
               </Button>
@@ -2916,7 +2921,8 @@ const Dashboard = () => {
                     isOpen={opViewModal.open}
                     onClose={() => setOpViewModal({ open: false, workOrder: null })}
                     workOrder={opViewModal.workOrder}
-                    mode="template"
+                    mode={opViewModal.mode || 'template'}
+                    isApprovalMode={opViewModal.mode === 'execution'}
                   />
                 )}
 
@@ -3026,16 +3032,25 @@ const Dashboard = () => {
                             rows={3}
                             placeholder="Enter your remarks (required if rejecting)..."
                             value={postponeDecisionDialog.remarks}
-                            onChange={(e) => setPostponeDecisionDialog(prev => ({ ...prev, remarks: e.target.value }))}
+                            onChange={(e) => {
+                              setPostponeDecisionDialog(prev => ({ ...prev, remarks: e.target.value }));
+                              if (postponeRemarksError) setPostponeRemarksError('');
+                            }}
                             disabled={postponeDecisionDialog.submitting}
                             data-testid="textarea-postpone-decision-remarks"
                           />
+                          {postponeRemarksError && (
+                            <p className="text-xs text-red-500 mt-1">{postponeRemarksError}</p>
+                          )}
                         </div>
 
                         <div className="flex justify-end gap-3 pt-4 border-t">
                           <Button
                             variant="outline"
-                            onClick={() => setPostponeDecisionDialog({ open: false, wo: null, action: null, remarks: '', submitting: false })}
+                            onClick={() => {
+                              setPostponeRemarksError('');
+                              setPostponeDecisionDialog({ open: false, wo: null, action: null, remarks: '', submitting: false });
+                            }}
                             disabled={postponeDecisionDialog.submitting}
                             data-testid="button-postpone-decision-cancel"
                           >
@@ -3045,10 +3060,13 @@ const Dashboard = () => {
                             <Button
                               variant="outline"
                               className="border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
-                              disabled={postponeDecisionDialog.submitting || !postponeDecisionDialog.remarks.trim()}
+                              disabled={postponeDecisionDialog.submitting}
                               onClick={() => {
                                 if (!postponeDecisionDialog.wo) return;
-                                if (!postponeDecisionDialog.remarks.trim()) return;
+                                if (!postponeDecisionDialog.remarks.trim()) {
+                                  setPostponeRemarksError('Approver remarks are required when rejecting a postponement.');
+                                  return;
+                                }
                                 setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
                                 postponeRejectMutation.mutate({ id: String(postponeDecisionDialog.wo!.id), remarks: postponeDecisionDialog.remarks });
                               }}
