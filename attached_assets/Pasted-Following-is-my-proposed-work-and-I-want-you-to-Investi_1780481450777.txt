@@ -1,0 +1,100 @@
+Following is my proposed work and I want you to Investigate and tell me in detail that what are the straight forward UI part then what is logic building part and finally what are the backend part.
+Create a separate plan for each first with simple UI changes then Backend and logic part Implementation.
+
+Operation Dashboard – Level 2 Reviewer Approval Workflow
+1. Job Form Changes
+Add a new Field in the Job Form:
+•	Level 2 Reviewer
+Allow users to select a reviewer for the job.
+________________________________________
+2. Job Import Changes
+Add a new column in the Job Bulk Import Template:
+•	Reviewer
+Requirements:
+•	Upon successful import, the Reviewer should automatically be populated in the Level 2 Reviewer tab of the Job Form.
+•	Role Name is Office – In future more will be added.
+•	If the Reviewer value is invalid, the import should fail with an appropriate validation message.
+________________________________________
+3. Work Order Approval Workflow
+If a Level 2 Reviewer is selected in the Job Form, then any Work Order generated for that job should follow a two-stage approval process.
+Stage 1 – Vessel HOD Approval
+•	The approval process remains the same as the current workflow.
+•	The Vessel HOD reviews and approves the completed Work Order.
+Stage 2 – Level 2 Reviewer Approval
+•	After Vessel HOD approval, the Work Order should be sent to the selected Level 2 Reviewer for review.
+•	The Work Order should not be moved to the Completed tab after HOD approval.
+•	Instead, it should remain in a pending state awaiting the reviewer's action.
+________________________________________
+4. Operation Dashboard – Pending Approval Tab
+Required Behavior
+•	Work Orders that are still awaiting HOD approval should not be displayed for the Level 2 Reviewer. (Office View: Sail Admin, Client Admin and Tech. Sup. View Modes)
+•	Only Work Orders that have already been approved by the Vessel HOD and are awaiting reviewer action should appear in the office-side Pending Approval tab.
+•	Work Orders pending reviewer action should be clearly identified with a dedicated status.
+•	The Head Of Dept View Mode Operation Dashbord – Pending Approval KPI Card should be same it shoyld not be changed.
+________________________________________
+5. Work Order Status
+After Vessel HOD approval and before reviewer action, display a status such as:
+•	Pending Office Review
+•	Pending Reviewer Approval
+•	Awaiting Level 2 Review
+Recommended Status: Pending Office Review
+This status should be visible:
+•	In the Work Order Form
+•	In the Pending Approval tab
+•	In relevant dashboard listings
+•	In Work Order reports and exports where applicable
+________________________________________
+6. Work Order Form Changes
+Add a new tab at the bottom of the Work Order Form if Reviewer is selected then only. or else no need.
+Reviewer Comments
+This section should contain:
+Reviewer Comments
+•	Multi-line text box
+Actions
+•	Reviewed
+•	Reopen
+________________________________________
+7. Reviewer Actions
+Reviewed
+When the reviewer clicks Reviewed:
+•	Save reviewer comments.
+•	Mark the Work Order as reviewed.
+•	Move the Work Order to the Completed tab.
+•	Record reviewer name, date, and comments in the audit trail.
+Reopen
+When the reviewer clicks Reopen:
+•	Save reviewer comments.
+•	Change the Work Order status to Reopened.
+•	Return the Work Order to the vessel for corrective action.
+•	Display reviewer comments in the Work Order Form.
+________________________________________
+8. Status Flow
+Jobs Without Level 2 Reviewer
+Open
+→ In Progress
+→ Pending HOD Approval
+→ Completed
+Jobs With Level 2 Reviewer
+Open
+→ In Progress
+→ Pending HOD Approval
+→ Pending Office Review
+→ Completed
+or
+Open
+→ In Progress
+→ Pending HOD Approval
+→ Pending Office Review
+→ Reopened
+→ In Progress
+→ Pending HOD Approval
+→ Pending Office Review
+→ Completed
+________________________________________
+9. Audit Trail
+All reviewer actions should be recorded:
+•	Reviewer Name
+•	Action (Reviewed / Reopened)
+•	Date & Time
+•	Reviewer Comments
+
