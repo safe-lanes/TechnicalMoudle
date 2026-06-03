@@ -196,6 +196,7 @@ const JobsFormPage: React.FC = () => {
     taskType: "Inspection",
     assignedTo: "",
     approver: "",
+    level2ReviewerRankId: "",
     jobPriority: "Medium",
     classRelated: "No",
     department: "",
@@ -255,7 +256,8 @@ const JobsFormPage: React.FC = () => {
           intervalRunningHour: String(intervalRunningHour),
           taskType: context.templateData.maintenanceType || context.templateData.taskType || 'Inspection',
           nextDueReading: context.templateData.nextDueRH || '',
-          briefWorkDescription: context.templateData.briefWorkDescription || context.templateData.jobDescription || ''
+          briefWorkDescription: context.templateData.briefWorkDescription || context.templateData.jobDescription || '',
+          level2ReviewerRankId: context.templateData.level2ReviewerRankId || ''
         };
         
         setTemplateData(prev => ({
@@ -277,7 +279,7 @@ const JobsFormPage: React.FC = () => {
 
   const getChangedFields = (): string[] => {
     const changedFields: string[] = [];
-    const fieldsToCheck = ['woTitle', 'assignedTo', 'approver', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive'];
+    const fieldsToCheck = ['woTitle', 'assignedTo', 'approver', 'level2ReviewerRankId', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive'];
     
     for (const field of fieldsToCheck) {
       if (templateData[field as keyof typeof templateData] !== originalData[field]) {
@@ -404,6 +406,9 @@ const JobsFormPage: React.FC = () => {
       }
       if (templateData.approver !== originalData.approver) {
         updatePayload.approver = templateData.approver;
+      }
+      if (templateData.level2ReviewerRankId !== originalData.level2ReviewerRankId) {
+        updatePayload.level2ReviewerRankId = templateData.level2ReviewerRankId || null;
       }
       if (templateData.jobPriority !== originalData.jobPriority) {
         updatePayload.jobPriority = templateData.jobPriority;
@@ -1200,6 +1205,20 @@ const JobsFormPage: React.FC = () => {
                     displayValue={getRankLabel(rankOptions, templateData.approver)}
                     labelMarker="JF.A1.19"
                     valueMarker="JF.A1.20"
+                  />
+                  <EditableField 
+                    label="Level 2 Reviewer (Rank)" 
+                    field="level2ReviewerRankId"
+                    value={templateData.level2ReviewerRankId} 
+                    originalValue={originalData.level2ReviewerRankId}
+                    onChange={handleFieldChange}
+                    isModifyMode={isModifyMode}
+                    isEditMode={isEditMode}
+                    type="select"
+                    options={ensureRankInOptions(rankOptions, templateData.level2ReviewerRankId)}
+                    displayValue={getRankLabel(rankOptions, templateData.level2ReviewerRankId) || '— None —'}
+                    labelMarker="JF.A1.L2R.1"
+                    valueMarker="JF.A1.L2R.2"
                   />
                   <EditableField 
                     label="Job Priority" 

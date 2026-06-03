@@ -408,6 +408,7 @@ const Dashboard = () => {
     submitting: boolean;
   }>({ open: false, wo: null, action: null, remarks: '', submitting: false });
   const [postponeRemarksError, setPostponeRemarksError] = useState('');
+  const [reviewerReopenDialog, setReviewerReopenDialog] = useState<{ open: boolean; wo: EnrichedWorkOrder | null; remarks: string; submitting: boolean }>({ open: false, wo: null, remarks: '', submitting: false });
   const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: EnrichedWorkOrder[] }>({ open: false, title: '', workOrders: [] });
   const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
   const [crListModal, setCrListModal] = useState<{ open: boolean; title: string; changeRequests: ChangeRequest[]; statusFilter: string | null }>({ open: false, title: '', changeRequests: [], statusFilter: null });
@@ -895,6 +896,38 @@ const Dashboard = () => {
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to reject work order", variant: "destructive" });
     }
+  });
+
+  const reviewerApproveMutation = useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const res = await apiRequest('POST', `/technical/api/work-orders/${id}/reviewer-approve`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Reviewed', description: 'Work order has been marked as reviewed.' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to process review', variant: 'destructive' });
+    },
+  });
+
+  const reviewerReopenMutation = useMutation({
+    mutationFn: async ({ id, remarks }: { id: string; remarks: string }) => {
+      const res = await apiRequest('POST', `/technical/api/work-orders/${id}/reviewer-reopen`, {
+        reviewerComments: remarks || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Reopened', description: 'Work order sent back for revision.' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      setReviewerReopenDialog({ open: false, wo: null, remarks: '', submitting: false });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to reopen work order', variant: 'destructive' });
+      setReviewerReopenDialog(prev => ({ ...prev, submitting: false }));
+    },
   });
 
   const handlePendingSelectionChanged = useCallback((event: SelectionChangedEvent) => {
@@ -1564,11 +1597,16 @@ const Dashboard = () => {
     });
     const criticalSparesLowCount = criticalSparesLowList.length;
 
-    const pendingApprovalWOs = safeWOs.filter(wo =>
-      isHeadOfDept
-        ? (wo as EnrichedWorkOrder).computedStatus === 'Pending Approval'
-        : (wo as EnrichedWorkOrder).computedStatus === 'Awaiting Office Approval'
-    );
+    const pendingApprovalWOs = isHeadOfDept
+      ? safeWOs.filter(wo => (wo as EnrichedWorkOrder).computedStatus === 'Pending Approval')
+      : [
+          ...safeWOs
+            .filter(wo => (wo as EnrichedWorkOrder).computedStatus === 'Awaiting Office Approval')
+            .map(wo => ({ ...wo, _pendingType: 'postponement' as const })),
+          ...safeWOs
+            .filter(wo => (wo as EnrichedWorkOrder).computedStatus === 'Pending Office Review')
+            .map(wo => ({ ...wo, _pendingType: 'l2review' as const })),
+        ];
     const pendingApprovalCount = pendingApprovalWOs.length;
 
     const effectiveAnomalyIndicators = complianceAnomalies || null;
@@ -1749,7 +1787,7 @@ const Dashboard = () => {
     ];
   }, [isAllVessels, vessels]);
 
-  const pendingApprovalsColumnDefs: ColDef[] = useMemo(() => {
+  const officePendingUnifiedColumnDefs: ColDef[] = useMemo(() => {
     const formatWoDate = (d: string | null | undefined) => {
       if (!d) return '—';
       try {
@@ -1779,6 +1817,19 @@ const Dashboard = () => {
       ),
     };
     return [
+      {
+        headerName: 'Type',
+        field: '_pendingType',
+        minWidth: 160,
+        flex: 1,
+        cellRenderer: (params: any) => {
+          const t = (params.data as any)?._pendingType;
+          if (t === 'l2review') {
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-800">Level 2 Review</span>;
+          }
+          return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Postponement</span>;
+        },
+      },
       ...(isAllVessels ? [vesselCol] : []),
       {
         headerName: 'WO No',
@@ -1790,8 +1841,9 @@ const Dashboard = () => {
           const text = params.value || (wo?.id ? `WO-${wo.id}` : '—');
           return (
             <span
-              className="text-blue-600"
-              data-testid={wo?.id ? `row-op-pending-approval-wo-${wo.id}` : undefined}
+              className="text-blue-600 cursor-pointer hover:underline"
+              onClick={() => setLocation(`/pms/work-order/${wo?.id}`)}
+              data-testid={wo?.id ? `row-op-pending-unified-wo-${wo.id}` : undefined}
             >
               {text}
             </span>
@@ -1814,32 +1866,11 @@ const Dashboard = () => {
         valueFormatter: (params: any) => params.value || '—',
       },
       {
-        headerName: 'Original Due Date',
-        field: 'originalDueDate',
-        minWidth: 140,
+        headerName: 'Due Date',
+        field: 'dueDate',
+        minWidth: 130,
         flex: 1,
         valueGetter: (params: any) => params.data?.originalDueDate || params.data?.dueDate,
-        valueFormatter: (params: any) => formatWoDate(params.value),
-      },
-      {
-        headerName: 'Requested New Date',
-        field: 'postponeRequestedDate',
-        minWidth: 150,
-        flex: 1,
-        valueFormatter: (params: any) => formatWoDate(params.value),
-      },
-      {
-        headerName: 'Reason',
-        field: 'postponementReason',
-        minWidth: 140,
-        flex: 1,
-        valueFormatter: (params: any) => params.value || '—',
-      },
-      {
-        headerName: 'Submitted',
-        field: 'submittedDate',
-        minWidth: 120,
-        flex: 1,
         valueFormatter: (params: any) => formatWoDate(params.value),
       },
       {
@@ -1851,43 +1882,78 @@ const Dashboard = () => {
         filter: false,
         resizable: false,
         cellRenderer: (params: any) => {
-          const wo = params.data as EnrichedWorkOrder;
+          const wo = params.data as EnrichedWorkOrder & { _pendingType?: string };
           if (!wo) return null;
+          const isL2Review = wo._pendingType === 'l2review';
           return (
             <div className="flex items-center gap-1 h-full">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 w-7 p-0 text-[#1E5A8E] hover:bg-blue-50 hover:text-[#174a78]"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setPostponeRemarksError('');
-                  setPostponeDecisionDialog({ open: true, wo, action: 'review', remarks: '', submitting: false });
-                }}
-                data-testid={`button-op-postpone-review-${wo.id}`}
-                title="Review postponement"
-              >
-                <ClipboardList className="h-4 w-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 w-7 p-0 text-gray-500 hover:text-gray-800"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOpViewModal({ open: true, workOrder: wo, mode: 'execution' });
-                }}
-                data-testid={`button-op-postpone-view-${wo.id}`}
-                title="View work order"
-              >
-                <Eye className="h-4 w-4" />
-              </Button>
+              {isL2Review ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-teal-700 hover:bg-teal-50"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      reviewerApproveMutation.mutate({ id: String(wo.id) });
+                    }}
+                    disabled={reviewerApproveMutation.isPending}
+                    data-testid={`button-op-l2review-approve-${wo.id}`}
+                    title="Mark as reviewed"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-gray-500 hover:text-gray-800"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLocation(`/pms/work-order/${wo.id}`);
+                    }}
+                    data-testid={`button-op-l2review-open-${wo.id}`}
+                    title="Open work order"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-[#1E5A8E] hover:bg-blue-50 hover:text-[#174a78]"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPostponeRemarksError('');
+                      setPostponeDecisionDialog({ open: true, wo: wo as EnrichedWorkOrder, action: 'review', remarks: '', submitting: false });
+                    }}
+                    data-testid={`button-op-postpone-review-${wo.id}`}
+                    title="Review postponement"
+                  >
+                    <ClipboardList className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-gray-500 hover:text-gray-800"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpViewModal({ open: true, workOrder: wo as EnrichedWorkOrder, mode: 'execution' });
+                    }}
+                    data-testid={`button-op-postpone-view-${wo.id}`}
+                    title="View work order"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
             </div>
           );
         },
       },
     ];
-  }, [isAllVessels, vessels, setPostponeDecisionDialog, setOpViewModal]);
+  }, [isAllVessels, vessels, setPostponeDecisionDialog, setOpViewModal, setLocation, reviewerApproveMutation]);
 
   const hodPendingApprovalColumnDefs: ColDef[] = useMemo(() => {
     const formatWoDate = (d: string | null | undefined) => {
@@ -2947,13 +3013,13 @@ const Dashboard = () => {
                       )}
                       <div style={{ height: 'calc(100vh - 360px)', minHeight: '360px' }} data-testid="ag-grid-op-pending-approvals-wrap">
                         <WOAgGridTable
-                          columnDefs={isHeadOfDept ? hodPendingApprovalColumnDefs : pendingApprovalsColumnDefs}
+                          columnDefs={isHeadOfDept ? hodPendingApprovalColumnDefs : officePendingUnifiedColumnDefs}
                           rowData={operationKPIs.pendingApprovalWOs}
                           height="100%"
                           rowHeight={52}
                           rowSelection={isHeadOfDept ? "multiple" : undefined}
                           onSelectionChanged={isHeadOfDept ? handlePendingSelectionChanged : undefined}
-                          noRowsMessage={isHeadOfDept ? "No work orders pending your approval" : "No postponement requests awaiting approval"}
+                          noRowsMessage={isHeadOfDept ? "No work orders pending your approval" : "No items pending office review"}
                           testId="ag-grid-op-pending-approvals"
                           getRowId={(params) => String(params.data.id)}
                           getRowClass={(params) => {

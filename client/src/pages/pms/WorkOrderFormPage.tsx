@@ -138,13 +138,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
     if (!partAElement || !partBElement) return;
 
+    const partCElement = document.getElementById('part-c');
+
     // Check initial position on mount
     const checkInitialPosition = () => {
       const scrollPosition = window.scrollY + 200;
       const partATop = partAElement.offsetTop;
       const partBTop = partBElement.offsetTop;
+      const partCTop = partCElement ? partCElement.offsetTop : Infinity;
 
-      if (scrollPosition >= partBTop) {
+      if (partCElement && scrollPosition >= partCTop) {
+        setActiveStep('part-c');
+      } else if (scrollPosition >= partBTop) {
         setActiveStep('part-b');
       } else {
         setActiveStep('part-a');
@@ -157,7 +162,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             const id = entry.target.getAttribute('id');
-            if (id === 'part-a' || id === 'part-b') {
+            if (id === 'part-a' || id === 'part-b' || id === 'part-c') {
               setActiveStep(id);
             }
           }
@@ -171,6 +176,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
     observer.observe(partAElement);
     observer.observe(partBElement);
+    if (partCElement) observer.observe(partCElement);
 
     // Check initial position after a short delay to ensure layout is ready
     setTimeout(checkInitialPosition, 100);
@@ -208,6 +214,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Combine contexts: use job context for template mode, work order context otherwise
   const workOrderContext = resolvedMode === 'template' ? jobContext : woContext;
   const isContextLoading = resolvedMode === 'template' ? isJobContextLoading : isWoContextLoading;
+
+  const hasReviewerTab = resolvedMode !== 'template' && !!(workOrderContext as any)?.job?.level2ReviewerRankId;
+  const navStepsWithReviewer = hasReviewerTab
+    ? [...navSteps, { id: 'part-c', label: 'C', title: 'Reviewer' }]
+    : navSteps;
 
   const { data: woAnomalies } = useQuery<Array<{ id: number; severity: string; anomalyType: string; daysLate: number; missedCycles: number; detectedAt: string; status: string }>>({
     queryKey: ['/technical/api/anomalies/work-order', workOrderId],
@@ -529,6 +540,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [completionReopenRemarksError, setCompletionReopenRemarksError] = useState('');
   const [isProcessingCompletionReopen, setIsProcessingCompletionReopen] = useState(false);
   const [showCompletionReopenConfirm, setShowCompletionReopenConfirm] = useState(false);
+
+  // Level 2 Reviewer state
+  const [reviewerComments, setReviewerComments] = useState('');
+  const [isProcessingReview, setIsProcessingReview] = useState(false);
 
   // Track work order type to conditionally skip frequency validation for unplanned WOs
   const [workOrderType, setWorkOrderType] = useState<'Planned' | 'Unplanned'>('Planned');
@@ -3415,6 +3430,46 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   };
 
+  const handleReviewerApprove = async () => {
+    if (!workOrderId) return;
+    setIsProcessingReview(true);
+    try {
+      const response = await apiRequest('POST', `/technical/api/work-orders/${workOrderId}/reviewer-approve`, {
+        reviewerComments: reviewerComments || null,
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to mark as reviewed');
+      setCurrentWorkOrderStatus('Completed');
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+      toast({ title: 'Reviewed', description: 'Work order has been marked as reviewed.' });
+      navigate('/pms/work-orders');
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message || 'Failed to process review', variant: 'destructive' });
+    } finally {
+      setIsProcessingReview(false);
+    }
+  };
+
+  const handleReviewerReopen = async () => {
+    if (!workOrderId) return;
+    setIsProcessingReview(true);
+    try {
+      const response = await apiRequest('POST', `/technical/api/work-orders/${workOrderId}/reviewer-reopen`, {
+        reviewerComments: reviewerComments || null,
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to reopen work order');
+      setCurrentWorkOrderStatus('Pending Approval');
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+      toast({ title: 'Reopened', description: 'Work order sent back for revision.' });
+      navigate('/pms/work-orders');
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message || 'Failed to reopen work order', variant: 'destructive' });
+    } finally {
+      setIsProcessingReview(false);
+    }
+  };
+
   const handleBack = () => {
     window.history.back();
   };
@@ -3623,7 +3678,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     <SheetTitle>Navigation</SheetTitle>
                   </SheetHeader>
                   <nav className="mt-6 space-y-4">
-                    {navSteps.map((step) => (
+                    {navStepsWithReviewer.map((step) => (
                       <a
                         key={step.id}
                         href={`#${step.id}`}
@@ -3705,7 +3760,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         <aside className="hidden lg:block w-20 flex-shrink-0">
           <div className="sticky top-6 px-4 py-6">
             <nav className="space-y-6">
-              {navSteps.map((step) => (
+              {navStepsWithReviewer.map((step) => (
                 <a
                   key={step.id}
                   href={`#${step.id}`}
@@ -6569,6 +6624,67 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
             );
           })()}
+
+          {/* Part C - Reviewer (Level 2 Office Review) */}
+          {hasReviewerTab && !embedded && (
+            <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-6 space-y-8">
+              <PartHeader
+                id="part-c"
+                label="Part C"
+                title="Reviewer"
+                description="Level 2 Office Review — reviewer comments and decision"
+                variant="inline"
+              />
+              <SectionBlock
+                id="reviewer-section"
+                number="C1"
+                title="Reviewer Comments & Decision"
+                variant="inline"
+              >
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Reviewer Comments</Label>
+                    <Textarea
+                      value={reviewerComments}
+                      onChange={(e) => setReviewerComments(e.target.value)}
+                      placeholder="Enter reviewer comments..."
+                      rows={4}
+                      className="text-sm"
+                      data-testid="input-reviewer-comments"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 pt-2">
+                    <Button
+                      onClick={handleReviewerApprove}
+                      disabled={isProcessingReview || currentWorkOrderStatus !== 'Pending Office Review'}
+                      className="bg-[#28a745] hover:bg-[#218838] text-white font-semibold px-8 py-2 h-auto text-sm"
+                      data-testid="button-reviewer-approve"
+                    >
+                      {isProcessingReview
+                        ? <Loader2 className="h-4 w-4 animate-spin mr-2 inline" />
+                        : <CheckCircle2 className="h-4 w-4 mr-2 inline" />}
+                      Reviewed
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleReviewerReopen}
+                      disabled={isProcessingReview || currentWorkOrderStatus !== 'Pending Office Review'}
+                      className="border-amber-400 text-amber-700 hover:bg-amber-50"
+                      data-testid="button-reviewer-reopen"
+                    >
+                      {isProcessingReview
+                        ? <Loader2 className="h-4 w-4 animate-spin mr-2 inline" />
+                        : <RefreshCw className="h-4 w-4 mr-2 inline" />}
+                      Reopen
+                    </Button>
+                  </div>
+                  {currentWorkOrderStatus !== 'Pending Office Review' && (
+                    <p className="text-xs text-gray-500 mt-1">Actions are available only when the WO status is "Pending Office Review".</p>
+                  )}
+                </div>
+              </SectionBlock>
+            </div>
+          )}
           </div>
         </div>
       </div>

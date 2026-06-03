@@ -27,6 +27,8 @@ export const getWoStatusBadgeColor = (status: string): string => {
       return "bg-red-200 text-red-900";
     case "pending approval":
       return "bg-purple-100 text-purple-800";
+    case "pending office review":
+      return "bg-teal-100 text-teal-800";
     case "rejected":
       return "bg-red-100 text-red-800";
     case "reopened":
