@@ -263,7 +263,7 @@ export function ModifyPMS() {
         {(isSailAdmin || isClientAdmin) && (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
-            <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
+            <Select value={(vesselId === 'all' || vesselId === 'my') ? '' : vesselId} onValueChange={setVesselId}>
               <SelectTrigger className="w-[200px]" data-testid="vessel-selector-modify">
                 <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>
