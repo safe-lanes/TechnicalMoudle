@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend, BarChart, Bar } from "recharts";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -2926,74 +2927,146 @@ const Dashboard = () => {
                     if (!isOpen) setPostponeDecisionDialog({ open: false, wo: null, action: null, remarks: '', submitting: false });
                   }}
                 >
-                  <DialogContent className="max-w-md">
-                    <DialogHeader>
-                      <DialogTitle className="text-lg font-semibold text-[#0f4c81]">
+                  <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col" data-testid="dialog-postpone-decision">
+                    <DialogHeader className="flex-shrink-0">
+                      <DialogTitle>
                         {postponeDecisionDialog.action === 'approve' ? 'Approve Postponement' : 'Reject Postponement'}
                       </DialogTitle>
-                      <DialogDescription>
-                        {postponeDecisionDialog.action === 'approve'
-                          ? 'Approving will update the work order due date to the requested date.'
-                          : 'Rejecting will revert the work order to Due or Overdue based on the original due date.'}
-                      </DialogDescription>
                     </DialogHeader>
-                    {postponeDecisionDialog.wo && (
-                      <div className="space-y-3 text-sm">
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 bg-gray-50 rounded p-3">
-                          <div><span className="text-gray-500">WO No</span><p className="font-medium">{postponeDecisionDialog.wo.workOrderNo || '—'}</p></div>
-                          <div><span className="text-gray-500">Job</span><p className="font-medium truncate">{postponeDecisionDialog.wo.jobTitle || '—'}</p></div>
-                          <div><span className="text-gray-500">Original Due</span><p className="font-medium">{postponeDecisionDialog.wo.originalDueDate || postponeDecisionDialog.wo.dueDate || '—'}</p></div>
-                          <div><span className="text-gray-500">Requested Date</span><p className="font-medium text-blue-700">{(postponeDecisionDialog.wo as any).postponeRequestedDate || '—'}</p></div>
-                          <div className="col-span-2"><span className="text-gray-500">Reason</span><p className="font-medium">{postponeDecisionDialog.wo.postponementReason || '—'}</p></div>
-                          {postponeDecisionDialog.wo.postponementRemarks && (
-                            <div className="col-span-2"><span className="text-gray-500">Remarks</span><p className="font-medium">{postponeDecisionDialog.wo.postponementRemarks}</p></div>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            {postponeDecisionDialog.action === 'reject' ? 'Rejection Remarks *' : 'Approval Remarks (optional)'}
-                          </label>
-                          <textarea
-                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+
+                    <div className="flex-1 overflow-y-auto px-1">
+                      <div className="space-y-3 py-4">
+                        {postponeDecisionDialog.wo && (
+                          <>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <Label className="text-sm">Work Order ID</Label>
+                                <Input
+                                  value={postponeDecisionDialog.wo.workOrderNo || postponeDecisionDialog.wo.templateCode || '—'}
+                                  className="bg-gray-50 h-9"
+                                  readOnly
+                                  data-testid="input-postpone-decision-wo-id"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-sm">Component</Label>
+                                <Input
+                                  value={postponeDecisionDialog.wo.component || '—'}
+                                  className="bg-gray-50 h-9"
+                                  readOnly
+                                  data-testid="input-postpone-decision-component"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-sm">Job Title</Label>
+                              <Input
+                                value={postponeDecisionDialog.wo.jobTitle || '—'}
+                                className="bg-gray-50 h-9"
+                                readOnly
+                                data-testid="input-postpone-decision-job-title"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <Label className="text-sm">Original Due Date</Label>
+                                <Input
+                                  value={postponeDecisionDialog.wo.originalDueDate || postponeDecisionDialog.wo.dueDate || '—'}
+                                  className="bg-gray-50 h-9"
+                                  readOnly
+                                  data-testid="input-postpone-decision-original-due"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-sm">Requested New Date</Label>
+                                <Input
+                                  value={(postponeDecisionDialog.wo as any).postponeRequestedDate || '—'}
+                                  className="bg-gray-50 h-9"
+                                  readOnly
+                                  data-testid="input-postpone-decision-requested-date"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-sm">Reason for Postponement</Label>
+                              <Input
+                                value={postponeDecisionDialog.wo.postponementReason || '—'}
+                                className="bg-gray-50 h-9"
+                                readOnly
+                                data-testid="input-postpone-decision-reason"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-sm">Remarks / Additional Details</Label>
+                              <p
+                                className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2 min-h-[60px]"
+                                data-testid="display-postpone-decision-remarks"
+                              >
+                                {postponeDecisionDialog.wo.postponementRemarks || '—'}
+                              </p>
+                            </div>
+                          </>
+                        )}
+
+                        <div className="space-y-1">
+                          <Label htmlFor="postpone-decision-approver-remarks" className="text-sm">
+                            Approver Remarks <span className="text-red-500">*</span> (required for rejection)
+                          </Label>
+                          <Textarea
+                            id="postpone-decision-approver-remarks"
+                            className="text-sm resize-none"
                             rows={3}
-                            placeholder={postponeDecisionDialog.action === 'reject' ? 'Required: reason for rejection...' : 'Optional remarks...'}
+                            placeholder="Enter your remarks (required if rejecting)..."
                             value={postponeDecisionDialog.remarks}
                             onChange={(e) => setPostponeDecisionDialog(prev => ({ ...prev, remarks: e.target.value }))}
+                            disabled={postponeDecisionDialog.submitting}
                             data-testid="textarea-postpone-decision-remarks"
                           />
                         </div>
+
+                        <div className="flex justify-end gap-3 pt-4 border-t">
+                          <Button
+                            variant="outline"
+                            onClick={() => setPostponeDecisionDialog({ open: false, wo: null, action: null, remarks: '', submitting: false })}
+                            disabled={postponeDecisionDialog.submitting}
+                            data-testid="button-postpone-decision-cancel"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
+                            disabled={postponeDecisionDialog.submitting || !postponeDecisionDialog.remarks.trim()}
+                            onClick={() => {
+                              if (!postponeDecisionDialog.wo || !postponeDecisionDialog.remarks.trim()) return;
+                              setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
+                              postponeRejectMutation.mutate({ id: String(postponeDecisionDialog.wo!.id), remarks: postponeDecisionDialog.remarks });
+                            }}
+                            data-testid="button-postpone-decision-confirm-reject"
+                          >
+                            <XCircle className="h-4 w-4 mr-1.5" />
+                            {postponeDecisionDialog.submitting && postponeDecisionDialog.action === 'reject' ? 'Rejecting...' : 'Reject'}
+                          </Button>
+                          <Button
+                            className="bg-[#1E5A8E] hover:bg-[#174a78] text-white"
+                            disabled={postponeDecisionDialog.submitting}
+                            onClick={() => {
+                              if (!postponeDecisionDialog.wo) return;
+                              setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
+                              postponeApproveMutation.mutate({ id: String(postponeDecisionDialog.wo!.id), remarks: postponeDecisionDialog.remarks });
+                            }}
+                            data-testid="button-postpone-decision-confirm-approve"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1.5" />
+                            {postponeDecisionDialog.submitting && postponeDecisionDialog.action === 'approve' ? 'Approving...' : 'Approve'}
+                          </Button>
+                        </div>
                       </div>
-                    )}
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => setPostponeDecisionDialog({ open: false, wo: null, action: null, remarks: '', submitting: false })}
-                        disabled={postponeDecisionDialog.submitting}
-                        data-testid="button-postpone-decision-cancel"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        variant={postponeDecisionDialog.action === 'reject' ? 'destructive' : 'default'}
-                        disabled={postponeDecisionDialog.submitting || (postponeDecisionDialog.action === 'reject' && !postponeDecisionDialog.remarks.trim())}
-                        onClick={() => {
-                          if (!postponeDecisionDialog.wo) return;
-                          if (postponeDecisionDialog.action === 'reject' && !postponeDecisionDialog.remarks.trim()) return;
-                          setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
-                          const id = String(postponeDecisionDialog.wo!.id);
-                          if (postponeDecisionDialog.action === 'approve') {
-                            postponeApproveMutation.mutate({ id, remarks: postponeDecisionDialog.remarks });
-                          } else {
-                            postponeRejectMutation.mutate({ id, remarks: postponeDecisionDialog.remarks });
-                          }
-                        }}
-                        data-testid={`button-postpone-decision-confirm-${postponeDecisionDialog.action}`}
-                      >
-                        {postponeDecisionDialog.submitting
-                          ? (postponeDecisionDialog.action === 'approve' ? 'Approving...' : 'Rejecting...')
-                          : (postponeDecisionDialog.action === 'approve' ? 'Approve' : 'Reject')}
-                      </Button>
-                    </DialogFooter>
+                    </div>
                   </DialogContent>
                 </Dialog>
 
