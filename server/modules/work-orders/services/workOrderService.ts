@@ -2313,19 +2313,38 @@ export async function approvePostponement(id: string, body: any) {
     postponementApprovalRemarks: body.approvalRemarks || null,
   });
 
-  // Update the most-recent postponement audit row
-  const rows = await repo.findPostponementsByWorkOrderId(wo.wouuid);
-  if (rows && rows.length > 0) {
-    const latest = rows.reduce((a: any, b: any) =>
-      (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
-    );
-    await storage.updateWorkOrderPostponement(latest.id, {
-      status: 'Approved',
-      approvedDate: today,
-      approvedBy: body.approvedBy || 'Office',
-      approvalRemarks: body.approvalRemarks || null,
-    });
-  }
+  // Insert a new immutable decision audit row (approve)
+  const existingRows = await repo.findPostponementsByWorkOrderId(wo.wouuid);
+  const prevMaxApprove = existingRows?.length
+    ? existingRows.reduce((a: any, b: any) =>
+        (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+      ).postponementNumber || 1
+    : 1;
+  const latestApprove = existingRows?.length
+    ? existingRows.reduce((a: any, b: any) =>
+        (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+      )
+    : null;
+
+  await repo.createPostponement({
+    id: crypto.randomUUID(),
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId!,
+    postponementNumber: prevMaxApprove + 1,
+    originalDueDate: latestApprove?.originalDueDate || wo.originalDueDate || wo.dueDate,
+    newDueDate: newDueDate,
+    postponementReason: latestApprove?.postponementReason || wo.postponementReason,
+    postponementRemarks: latestApprove?.postponementRemarks || wo.postponementRemarks,
+    authorizedBy: body.approvedBy || 'Office',
+    approvedBy: body.approvedBy || 'Office',
+    approvedDate: today,
+    approvalRemarks: body.approvalRemarks || null,
+    approver: body.approvedBy || 'Office',
+    durationDays: latestApprove?.durationDays || null,
+    submittedDate: today,
+    status: 'Approved',
+    informOffice: true,
+  });
 
   return updatedWO;
 }
@@ -2333,6 +2352,7 @@ export async function approvePostponement(id: string, body: any) {
 /**
  * Office rejects a postponement request.
  * Reverts WO status to Due/Overdue based on the original due date.
+ * Inserts a NEW immutable decision row in work_order_postponements.
  */
 export async function rejectPostponement(id: string, body: any) {
   let wo = await repo.findById(id);
@@ -2375,19 +2395,38 @@ export async function rejectPostponement(id: string, body: any) {
     postponementApprovalRemarks: body.approvalRemarks || null,
   });
 
-  // Update the most-recent postponement audit row
-  const rows = await repo.findPostponementsByWorkOrderId(wo.wouuid);
-  if (rows && rows.length > 0) {
-    const latest = rows.reduce((a: any, b: any) =>
-      (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
-    );
-    await storage.updateWorkOrderPostponement(latest.id, {
-      status: 'Rejected',
-      approvedDate: today,
-      approvedBy: body.approvedBy || 'Office',
-      approvalRemarks: body.approvalRemarks || null,
-    });
-  }
+  // Insert a new immutable decision audit row (reject)
+  const rejectRows = await repo.findPostponementsByWorkOrderId(wo.wouuid);
+  const prevMaxReject = rejectRows?.length
+    ? rejectRows.reduce((a: any, b: any) =>
+        (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+      ).postponementNumber || 1
+    : 1;
+  const latestReject = rejectRows?.length
+    ? rejectRows.reduce((a: any, b: any) =>
+        (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+      )
+    : null;
+
+  await repo.createPostponement({
+    id: crypto.randomUUID(),
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId!,
+    postponementNumber: prevMaxReject + 1,
+    originalDueDate: latestReject?.originalDueDate || wo.originalDueDate || wo.dueDate,
+    newDueDate: latestReject?.newDueDate || wo.postponeRequestedDate,
+    postponementReason: latestReject?.postponementReason || wo.postponementReason,
+    postponementRemarks: latestReject?.postponementRemarks || wo.postponementRemarks,
+    authorizedBy: body.approvedBy || 'Office',
+    approvedBy: body.approvedBy || 'Office',
+    approvedDate: today,
+    approvalRemarks: body.approvalRemarks || null,
+    approver: body.approvedBy || 'Office',
+    durationDays: latestReject?.durationDays || null,
+    submittedDate: today,
+    status: 'Rejected',
+    informOffice: true,
+  });
 
   return updatedWO;
 }

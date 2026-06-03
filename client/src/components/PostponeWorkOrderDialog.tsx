@@ -78,6 +78,15 @@ interface PostponeWorkOrderDialogProps {
     jobTitle: string;
     dueDate?: string | null;
     assignedTo?: string | null;
+    /** Pre-fill: existing requested new date (for Awaiting Office Approval / Postponement Rejected WOs) */
+    postponeRequestedDate?: string | null;
+    /** Pre-fill: existing postponement reason */
+    postponementReason?: string | null;
+    /** Pre-fill: existing postponement remarks */
+    postponementRemarks?: string | null;
+    /** Current status — used to detect resubmit mode */
+    status?: string | null;
+    computedStatus?: string | null;
   } | null;
   onConfirm?: (workOrderId: string, postponeData: any) => void;
 }
@@ -200,14 +209,26 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
 
   useEffect(() => {
     if (workOrder) {
+      // Detect resubmit mode: WO is already pending or was rejected by office
+      const isResubmit =
+        workOrder.status === 'Awaiting Office Approval' ||
+        workOrder.computedStatus === 'Awaiting Office Approval' ||
+        workOrder.status === 'Postponement Rejected' ||
+        workOrder.computedStatus === 'Postponement Rejected';
+
+      // Pre-fill with previous request data when resubmitting
+      const prefillPostponeDate = isResubmit ? (workOrder.postponeRequestedDate || "") : "";
+      const prefillReason = isResubmit ? (workOrder.postponementReason || "") : "";
+      const prefillRemarks = isResubmit ? (workOrder.postponementRemarks || "") : "";
+
       setFormData({
         workOrderId: workOrder.templateCode || workOrder.workOrderNo || "",
         component: workOrder.component || "",
         jobTitle: workOrder.jobTitle,
         originalDueDate: workOrder.dueDate || "",
-        postponeDate: "",
-        reasonForPostponement: "",
-        postponementRemarks: "",
+        postponeDate: prefillPostponeDate,
+        reasonForPostponement: prefillReason,
+        postponementRemarks: prefillRemarks,
         approver: "Office",
         approvalRemarks: "",
       });
