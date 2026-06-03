@@ -88,6 +88,7 @@ interface PostponeWorkOrderDialogProps {
     status?: string | null;
     computedStatus?: string | null;
     /** Approved-postponement read-only fields */
+    postponeDate?: string | null;
     postponementEndDate?: string | null;
     postponementAuthorizedBy?: string | null;
     postponementApprovalRemarks?: string | null;
@@ -666,7 +667,12 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
                   <div className="space-y-1">
                     <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Postpone Date</Label>
                     <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2" data-testid="display-approved-postpone-date">
-                      {workOrder.postponeRequestedDate ? formatDDMMMYYYY(new Date(workOrder.postponeRequestedDate + "T00:00:00")) : "—"}
+                      {(() => {
+                        const raw = workOrder.postponeDate ?? workOrder.postponeRequestedDate;
+                        if (!raw) return "—";
+                        const d = parseDateFlexible(raw);
+                        return d ? formatDDMMMYYYY(d) : raw;
+                      })()}
                     </p>
                   </div>
                   <div className="space-y-1">
