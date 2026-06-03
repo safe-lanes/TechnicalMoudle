@@ -84,9 +84,13 @@ interface PostponeWorkOrderDialogProps {
     postponementReason?: string | null;
     /** Pre-fill: existing postponement remarks */
     postponementRemarks?: string | null;
-    /** Current status — used to detect resubmit mode */
+    /** Current status — used to detect resubmit mode and approved mode */
     status?: string | null;
     computedStatus?: string | null;
+    /** Approved-postponement read-only fields */
+    postponementEndDate?: string | null;
+    postponementAuthorizedBy?: string | null;
+    postponementApprovalRemarks?: string | null;
   } | null;
   onConfirm?: (workOrderId: string, postponeData: any) => void;
 }
@@ -533,6 +537,10 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
 
   if (!workOrder) return null;
 
+  const isApproved =
+    workOrder.status === 'Postponement Approved' ||
+    workOrder.computedStatus === 'Postponement Approved';
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
@@ -648,6 +656,58 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
               </div>
             </div>
 
+            {isApproved ? (
+              /* ── Approved read-only summary ── */
+              <div className="space-y-3" data-testid="section-approved-postponement">
+                <div className="rounded-md bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800 font-medium">
+                  Postponement Approved — this work order has been postponed.
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Postpone Date</Label>
+                    <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2" data-testid="display-approved-postpone-date">
+                      {workOrder.postponeRequestedDate ? formatDDMMMYYYY(new Date(workOrder.postponeRequestedDate + "T00:00:00")) : "—"}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Next Due Date</Label>
+                    <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2" data-testid="display-approved-next-due-date">
+                      {workOrder.postponementEndDate ? (() => {
+                        const d = parseDateFlexible(workOrder.postponementEndDate);
+                        return d ? formatDDMMMYYYY(d) : workOrder.postponementEndDate;
+                      })() : "—"}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Selected Reason</Label>
+                  <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2" data-testid="display-approved-reason">
+                    {workOrder.postponementReason || "—"}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Remarks / Additional Details</Label>
+                  <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2 min-h-[60px]" data-testid="display-approved-remarks">
+                    {workOrder.postponementRemarks || "—"}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Approver</Label>
+                    <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2" data-testid="display-approved-approver">
+                      {workOrder.postponementAuthorizedBy || "Office"}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Approver Remarks</Label>
+                    <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2" data-testid="display-approved-approver-remarks">
+                      {workOrder.postponementApprovalRemarks || "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
             {/* Row 4: Postpone Date — mandatory primary input */}
             <div className="space-y-1">
               <Label htmlFor="postponeDate" className="text-sm">
@@ -838,26 +898,40 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
                 </div>
               )}
             </div>
+              </>
+            )}
 
           </div>
         </div>
 
         {/* Action Buttons */}
         <div className="flex justify-end gap-3 pt-4 border-t flex-shrink-0">
-          <Button
-            variant="outline"
-            onClick={onClose}
-            data-testid="button-postpone-cancel"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
-            data-testid="button-postpone-confirm"
-          >
-            Confirm Postpone
-          </Button>
+          {isApproved ? (
+            <Button
+              variant="outline"
+              onClick={onClose}
+              data-testid="button-postpone-close"
+            >
+              Close
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={onClose}
+                data-testid="button-postpone-cancel"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
+                data-testid="button-postpone-confirm"
+              >
+                Confirm Postpone
+              </Button>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>
