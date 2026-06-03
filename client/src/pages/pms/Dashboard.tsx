@@ -1656,9 +1656,13 @@ const Dashboard = () => {
       const s = (wo as EnrichedWorkOrder).computedStatus;
       return s === 'Due' || s === 'Due (Grace P)';
     });
+    // "Scheduled Work Orders (from chart)" drill-down table: show only
+    // work orders whose effective status is Active (Postponed/Completed are
+    // excluded per product direction). The donut "Scheduled" slice count
+    // above intentionally still tallies Active + Postponed + Completed.
     const plannedStatusWOs = safeWOs.filter(wo => {
       const s = (wo as EnrichedWorkOrder).computedStatus;
-      return s === 'Active' || s === 'Postponed' || s === 'Completed';
+      return s === 'Active';
     });
 
     const overdueCriticalWOs = overdueWOs.filter(wo =>
