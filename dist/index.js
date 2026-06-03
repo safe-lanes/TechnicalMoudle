@@ -10709,6 +10709,292 @@ var init_syncEngine = __esm({
   }
 });
 
+// server/modules/sync/autoSyncScheduler.ts
+var autoSyncScheduler_exports = {};
+__export(autoSyncScheduler_exports, {
+  SyncAutoScheduler: () => SyncAutoScheduler,
+  syncAutoScheduler: () => syncAutoScheduler
+});
+function classifyError(error) {
+  const msg = (error?.message || "").toLowerCase();
+  const causeCode = (error?.cause?.code || "").toLowerCase();
+  const causeMsg = (error?.cause?.message || "").toLowerCase();
+  const all = `${msg} ${causeCode} ${causeMsg}`;
+  if (/econnrefused|enotfound|enetunreach|ehostunreach|eai_again/.test(all)) {
+    return "network_unreachable";
+  }
+  if (/timeout|abort|timedout|etimedout|econnaborted|und_err_connect_timeout/.test(all)) {
+    return "timeout";
+  }
+  if (/\b5\d{2}\b|server error/.test(all)) {
+    return "server_error";
+  }
+  if (/\b4\d{2}\b|client error/.test(all)) {
+    return "client_error";
+  }
+  return "unknown_error";
+}
+async function getVesselCode(vesselId) {
+  if (vesselCodeCache2.has(vesselId)) return vesselCodeCache2.get(vesselId);
+  try {
+    const pool2 = await getPool();
+    const result = await pool2.query(
+      `SELECT vessel_code FROM vessels WHERE vuuid = $1 LIMIT 1`,
+      [vesselId]
+    );
+    const code = result.rows[0]?.vessel_code || null;
+    vesselCodeCache2.set(vesselId, code);
+    return code;
+  } catch {
+    return null;
+  }
+}
+var DEFAULT_INTERVAL_MINUTES, BOOT_DELAY_MS, DEFAULT_CATCH_UP_MAX_CYCLES, vesselCodeCache2, SyncAutoScheduler, syncAutoScheduler;
+var init_autoSyncScheduler = __esm({
+  "server/modules/sync/autoSyncScheduler.ts"() {
+    "use strict";
+    init_repository();
+    init_syncEngine();
+    init_syncDiagLogger();
+    init_syncRole();
+    init_db();
+    DEFAULT_INTERVAL_MINUTES = 360;
+    BOOT_DELAY_MS = 18e4;
+    DEFAULT_CATCH_UP_MAX_CYCLES = 20;
+    vesselCodeCache2 = /* @__PURE__ */ new Map();
+    SyncAutoScheduler = class {
+      isRunning = false;
+      intervalId = null;
+      tickIntervalMs = DEFAULT_INTERVAL_MINUTES * 60 * 1e3;
+      /** Per-vessel re-entrancy guard */
+      syncInProgress = /* @__PURE__ */ new Map();
+      async start(intervalMs) {
+        if (this.isRunning) {
+          console.log("[AutoSync] Scheduler already running");
+          return;
+        }
+        this.tickIntervalMs = await this.resolveIntervalMs(intervalMs);
+        const intervalMin = Math.round(this.tickIntervalMs / 6e4);
+        const intervalHours = (this.tickIntervalMs / 1e3 / 60 / 60).toFixed(2);
+        console.log(`[AutoSync] Starting scheduler (tick interval: ${intervalMin}min / ${intervalHours}h, boot delay: ${BOOT_DELAY_MS / 1e3}s)`);
+        setTimeout(() => {
+          this.tick().catch((err) => {
+            console.error("[AutoSync] Error during initial tick:", err);
+          });
+        }, BOOT_DELAY_MS);
+        this.intervalId = setInterval(() => {
+          this.tick().catch((err) => {
+            console.error("[AutoSync] Error during scheduled tick:", err);
+          });
+        }, this.tickIntervalMs);
+        this.isRunning = true;
+      }
+      /**
+       * Resolve the startup tick cadence (ms). Precedence:
+       *   1. DB sync_settings.sync_interval_minutes (admin preference — survives restarts)
+       *   2. the intervalMs arg passed by the caller (routes.ts)
+       *   3. DEFAULT_INTERVAL_MINUTES
+       * No minimum enforced — admin's choice. Falls back gracefully if DB unavailable.
+       */
+      async resolveIntervalMs(argMs) {
+        try {
+          const settings = await getAllSettings();
+          const minutes = parseInt(settings["sync_interval_minutes"] || "0", 10);
+          if (Number.isFinite(minutes) && minutes > 0) {
+            console.log(`[AutoSync] Using sync_interval_minutes=${minutes} from sync_settings`);
+            return minutes * 60 * 1e3;
+          }
+        } catch (err) {
+          console.warn("[AutoSync] Could not read sync_interval_minutes at startup \u2014 falling back:", err?.message || err);
+        }
+        if (argMs && argMs > 0) return argMs;
+        return DEFAULT_INTERVAL_MINUTES * 60 * 1e3;
+      }
+      /**
+       * Reconfigure the live tick cadence immediately. Called by the settings-save
+       * endpoint and by tick() when a direct-DB change is detected. No minimum
+       * enforced beyond > 0 — admin chose, admin gets.
+       */
+      restartWithNewInterval(intervalMinutes) {
+        if (!Number.isFinite(intervalMinutes) || intervalMinutes <= 0) {
+          console.warn(`[AutoSync] Ignoring invalid sync interval: ${intervalMinutes} (must be a positive number of minutes)`);
+          return;
+        }
+        const newMs = intervalMinutes * 60 * 1e3;
+        if (!this.isRunning) {
+          this.tickIntervalMs = newMs;
+          console.log(`[AutoSync] Scheduler not running \u2014 interval preference recorded as ${intervalMinutes}min (applies when started)`);
+          return;
+        }
+        if (newMs === this.tickIntervalMs) {
+          console.log(`[AutoSync] Sync interval already ${intervalMinutes}min \u2014 no change`);
+          return;
+        }
+        if (this.intervalId) {
+          clearInterval(this.intervalId);
+          this.intervalId = null;
+        }
+        this.tickIntervalMs = newMs;
+        this.intervalId = setInterval(() => {
+          this.tick().catch((err) => {
+            console.error("[AutoSync] Error during scheduled tick:", err);
+          });
+        }, this.tickIntervalMs);
+        console.log(`[AutoSync] Sync interval updated to ${intervalMinutes} minutes \u2014 now live`);
+      }
+      stop() {
+        if (this.intervalId) {
+          clearInterval(this.intervalId);
+          this.intervalId = null;
+        }
+        this.isRunning = false;
+        console.log("[AutoSync] Scheduler stopped");
+      }
+      // ────────────────────────────────────────────────
+      // Tick — one scheduler wake-up
+      // ────────────────────────────────────────────────
+      async tick() {
+        try {
+          if (!await isShipInstance()) {
+            syncDiag("[AutoSync] Shore instance detected in tick() \u2014 skipping (sync is ship-initiated)");
+            return;
+          }
+          const settings = await getAllSettings();
+          const enabled = settings["auto_sync_enabled"] === "true";
+          if (!enabled) {
+            syncDiag("[AutoSync] auto_sync_enabled=false \u2014 skipping tick");
+            return;
+          }
+          const intervalMinutes = parseInt(settings["sync_interval_minutes"] || "0", 10);
+          if (intervalMinutes > 0 && intervalMinutes * 60 * 1e3 !== this.tickIntervalMs) {
+            console.log(`[AutoSync] Detected interval change in settings \u2192 applying live (${this.tickIntervalMs / 6e4}min \u2192 ${intervalMinutes}min)`);
+            this.restartWithNewInterval(intervalMinutes);
+          }
+          const instanceId = settings["instance_id"] || process.env.SYNC_INSTANCE_ID || "";
+          if (!instanceId) {
+            console.warn("[AutoSync] No instance_id configured \u2014 cannot determine vessel. Skipping.");
+            return;
+          }
+          const metadata = await getInstanceMetadata(instanceId);
+          const vesselId = metadata?.vesselId;
+          if (!vesselId) {
+            console.warn(`[AutoSync] No vesselId in sync_metadata for instance ${instanceId}. Skipping.`);
+            return;
+          }
+          const maxCatchUp = parseInt(settings["catch_up_max_cycles"] || String(DEFAULT_CATCH_UP_MAX_CYCLES), 10);
+          await this.runWithCatchUp(instanceId, vesselId, maxCatchUp);
+        } catch (error) {
+          console.error("[AutoSync] Tick failed:", error.message);
+        }
+      }
+      // ────────────────────────────────────────────────
+      // Run sync + catch-up cycles
+      // ────────────────────────────────────────────────
+      async runWithCatchUp(instanceId, vesselId, maxCatchUpCycles) {
+        if (this.syncInProgress.get(vesselId)) {
+          console.log(`[AutoSync] Sync already in progress for vessel ${vesselId} \u2014 skipping`);
+          await insertConnectivityLog({
+            instanceId,
+            vesselId,
+            outcome: "skipped_reentrant",
+            triggerType: "auto"
+          });
+          return;
+        }
+        this.syncInProgress.set(vesselId, true);
+        let cycleNumber = 0;
+        try {
+          const primaryResult = await this.executeSingleCycle(instanceId, vesselId, cycleNumber, "auto");
+          if (!primaryResult.success) {
+            return;
+          }
+          if (maxCatchUpCycles <= 0) return;
+          const vesselCode = await getVesselCode(vesselId);
+          let remaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
+          while (remaining > 0 && cycleNumber < maxCatchUpCycles) {
+            cycleNumber++;
+            console.log(`[AutoSync] Catch-up cycle ${cycleNumber}/${maxCatchUpCycles} \u2014 ${remaining} unsynced records remain`);
+            syncDiag(`[AutoSync] catch-up cycle=${cycleNumber}, remaining=${remaining}, cap=${maxCatchUpCycles}`);
+            const catchUpResult = await this.executeSingleCycle(instanceId, vesselId, cycleNumber, "catch_up");
+            if (!catchUpResult.success) {
+              console.log(`[AutoSync] Catch-up cycle ${cycleNumber} failed \u2014 stopping catch-up`);
+              break;
+            }
+            remaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
+          }
+          if (cycleNumber > 0) {
+            const finalRemaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
+            console.log(`[AutoSync] Catch-up complete \u2014 ran ${cycleNumber} extra cycle(s), ${finalRemaining} records still unsynced`);
+          }
+        } finally {
+          this.syncInProgress.set(vesselId, false);
+        }
+      }
+      // ────────────────────────────────────────────────
+      // Execute one sync cycle + log connectivity
+      // ────────────────────────────────────────────────
+      async executeSingleCycle(instanceId, vesselId, cycleNumber, triggerType) {
+        const startMs = Date.now();
+        let result;
+        try {
+          const engine = getSyncEngine();
+          result = await engine.runSync(vesselId);
+        } catch (error) {
+          const latencyMs2 = Date.now() - startMs;
+          const outcome2 = classifyError(error);
+          await insertConnectivityLog({
+            instanceId,
+            vesselId,
+            outcome: outcome2,
+            errorMessage: error.message?.substring(0, 500),
+            errorCategory: outcome2,
+            latencyMs: latencyMs2,
+            catchUpCycle: cycleNumber,
+            triggerType
+          });
+          console.error(`[AutoSync] Cycle ${cycleNumber} threw: ${error.message}`);
+          syncDiag(`[AutoSync] EXCEPTION cycle=${cycleNumber}, outcome=${outcome2}, latency=${latencyMs2}ms, err=${error.message}`);
+          return {
+            success: false,
+            batchUuid: null,
+            recordsPushed: 0,
+            recordsPulled: 0,
+            conflictsFound: 0,
+            conflictsAutoResolved: 0,
+            filesQueued: 0,
+            durationMs: latencyMs2,
+            error: error.message,
+            newCheckpoint: null
+          };
+        }
+        const latencyMs = Date.now() - startMs;
+        const outcome = result.success ? "success" : classifyError({ message: result.error || "" });
+        await insertConnectivityLog({
+          instanceId,
+          vesselId,
+          outcome,
+          errorMessage: result.error?.substring(0, 500) ?? null,
+          errorCategory: result.success ? null : outcome,
+          latencyMs,
+          batchUuid: result.batchUuid,
+          recordsPushed: result.recordsPushed,
+          recordsPulled: result.recordsPulled,
+          catchUpCycle: cycleNumber,
+          triggerType
+        });
+        if (result.success) {
+          console.log(`[AutoSync] Cycle ${cycleNumber} OK \u2014 pushed=${result.recordsPushed}, pulled=${result.recordsPulled}, duration=${result.durationMs}ms`);
+        } else {
+          console.warn(`[AutoSync] Cycle ${cycleNumber} FAILED \u2014 ${result.error}`);
+        }
+        syncDiag(`[AutoSync] cycle=${cycleNumber}, trigger=${triggerType}, outcome=${outcome}, pushed=${result.recordsPushed}, pulled=${result.recordsPulled}, latency=${latencyMs}ms`);
+        return result;
+      }
+    };
+    syncAutoScheduler = new SyncAutoScheduler();
+  }
+});
+
 // server/modules/sync/pruningService.ts
 var pruningService_exports = {};
 __export(pruningService_exports, {
@@ -11172,11 +11458,26 @@ async function updateSettingsHandler(req, res) {
     if (!settings || typeof settings !== "object") {
       return res.status(400).json({ error: "settings object is required" });
     }
+    let newIntervalMinutes = null;
+    if (settings.sync_interval_minutes !== void 0) {
+      const n = Number(settings.sync_interval_minutes);
+      if (!Number.isInteger(n) || n <= 0) {
+        return res.status(400).json({ error: "sync_interval_minutes must be a positive integer (minutes)" });
+      }
+      newIntervalMinutes = n;
+    }
     const userId = req.user?.userUuid || req.user?.username || "system";
     await updateSettings(settings, userId);
     const engine = getSyncEngine();
     engine.reloadSettings();
-    res.json({ success: true, message: "Settings updated. Sync engine will reload on next cycle." });
+    if (newIntervalMinutes !== null && await isShipInstance()) {
+      syncAutoScheduler.restartWithNewInterval(newIntervalMinutes);
+    }
+    res.json({
+      success: true,
+      message: "Settings updated.",
+      ...newIntervalMinutes !== null ? { syncIntervalMinutes: newIntervalMinutes } : {}
+    });
   } catch (error) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error("[Sync] update settings error:", error);
@@ -11281,6 +11582,7 @@ var init_controller = __esm({
     init_repository();
     init_provisioningService();
     init_syncEngine();
+    init_autoSyncScheduler();
     init_fileSyncProcessor();
     init_pruningService();
     init_healthMonitor();
@@ -23529,242 +23831,6 @@ var init_alertEngine = __esm({
     init_schema();
     init_fuelConversionFactors();
     CII_ORDER = { A: 1, B: 2, C: 3, D: 4, E: 5 };
-  }
-});
-
-// server/modules/sync/autoSyncScheduler.ts
-var autoSyncScheduler_exports = {};
-__export(autoSyncScheduler_exports, {
-  SyncAutoScheduler: () => SyncAutoScheduler,
-  syncAutoScheduler: () => syncAutoScheduler
-});
-function classifyError(error) {
-  const msg = (error?.message || "").toLowerCase();
-  const causeCode = (error?.cause?.code || "").toLowerCase();
-  const causeMsg = (error?.cause?.message || "").toLowerCase();
-  const all = `${msg} ${causeCode} ${causeMsg}`;
-  if (/econnrefused|enotfound|enetunreach|ehostunreach|eai_again/.test(all)) {
-    return "network_unreachable";
-  }
-  if (/timeout|abort|timedout|etimedout|econnaborted|und_err_connect_timeout/.test(all)) {
-    return "timeout";
-  }
-  if (/\b5\d{2}\b|server error/.test(all)) {
-    return "server_error";
-  }
-  if (/\b4\d{2}\b|client error/.test(all)) {
-    return "client_error";
-  }
-  return "unknown_error";
-}
-async function getVesselCode(vesselId) {
-  if (vesselCodeCache2.has(vesselId)) return vesselCodeCache2.get(vesselId);
-  try {
-    const pool2 = await getPool();
-    const result = await pool2.query(
-      `SELECT vessel_code FROM vessels WHERE vuuid = $1 LIMIT 1`,
-      [vesselId]
-    );
-    const code = result.rows[0]?.vessel_code || null;
-    vesselCodeCache2.set(vesselId, code);
-    return code;
-  } catch {
-    return null;
-  }
-}
-var DEFAULT_INTERVAL_MINUTES, BOOT_DELAY_MS, DEFAULT_CATCH_UP_MAX_CYCLES, vesselCodeCache2, SyncAutoScheduler, syncAutoScheduler;
-var init_autoSyncScheduler = __esm({
-  "server/modules/sync/autoSyncScheduler.ts"() {
-    "use strict";
-    init_repository();
-    init_syncEngine();
-    init_syncDiagLogger();
-    init_syncRole();
-    init_db();
-    DEFAULT_INTERVAL_MINUTES = 360;
-    BOOT_DELAY_MS = 18e4;
-    DEFAULT_CATCH_UP_MAX_CYCLES = 20;
-    vesselCodeCache2 = /* @__PURE__ */ new Map();
-    SyncAutoScheduler = class {
-      isRunning = false;
-      intervalId = null;
-      tickIntervalMs = DEFAULT_INTERVAL_MINUTES * 60 * 1e3;
-      /** Per-vessel re-entrancy guard */
-      syncInProgress = /* @__PURE__ */ new Map();
-      start(intervalMs) {
-        if (this.isRunning) {
-          console.log("[AutoSync] Scheduler already running");
-          return;
-        }
-        if (intervalMs) {
-          this.tickIntervalMs = intervalMs;
-        }
-        const intervalHours = (this.tickIntervalMs / 1e3 / 60 / 60).toFixed(1);
-        console.log(`[AutoSync] Starting scheduler (tick interval: ${intervalHours}h, boot delay: ${BOOT_DELAY_MS / 1e3}s)`);
-        setTimeout(() => {
-          this.tick().catch((err) => {
-            console.error("[AutoSync] Error during initial tick:", err);
-          });
-        }, BOOT_DELAY_MS);
-        this.intervalId = setInterval(() => {
-          this.tick().catch((err) => {
-            console.error("[AutoSync] Error during scheduled tick:", err);
-          });
-        }, this.tickIntervalMs);
-        this.isRunning = true;
-      }
-      stop() {
-        if (this.intervalId) {
-          clearInterval(this.intervalId);
-          this.intervalId = null;
-        }
-        this.isRunning = false;
-        console.log("[AutoSync] Scheduler stopped");
-      }
-      // ────────────────────────────────────────────────
-      // Tick — one scheduler wake-up
-      // ────────────────────────────────────────────────
-      async tick() {
-        try {
-          if (!await isShipInstance()) {
-            syncDiag("[AutoSync] Shore instance detected in tick() \u2014 skipping (sync is ship-initiated)");
-            return;
-          }
-          const settings = await getAllSettings();
-          const enabled = settings["auto_sync_enabled"] === "true";
-          if (!enabled) {
-            syncDiag("[AutoSync] auto_sync_enabled=false \u2014 skipping tick");
-            return;
-          }
-          const intervalMinutes = parseInt(settings["sync_interval_minutes"] || "0", 10);
-          if (intervalMinutes > 0) {
-            const newIntervalMs = intervalMinutes * 60 * 1e3;
-            if (newIntervalMs !== this.tickIntervalMs) {
-              console.log(`[AutoSync] Interval changed: ${this.tickIntervalMs / 6e4}min \u2192 ${intervalMinutes}min (takes effect next restart)`);
-            }
-          }
-          const instanceId = settings["instance_id"] || process.env.SYNC_INSTANCE_ID || "";
-          if (!instanceId) {
-            console.warn("[AutoSync] No instance_id configured \u2014 cannot determine vessel. Skipping.");
-            return;
-          }
-          const metadata = await getInstanceMetadata(instanceId);
-          const vesselId = metadata?.vesselId;
-          if (!vesselId) {
-            console.warn(`[AutoSync] No vesselId in sync_metadata for instance ${instanceId}. Skipping.`);
-            return;
-          }
-          const maxCatchUp = parseInt(settings["catch_up_max_cycles"] || String(DEFAULT_CATCH_UP_MAX_CYCLES), 10);
-          await this.runWithCatchUp(instanceId, vesselId, maxCatchUp);
-        } catch (error) {
-          console.error("[AutoSync] Tick failed:", error.message);
-        }
-      }
-      // ────────────────────────────────────────────────
-      // Run sync + catch-up cycles
-      // ────────────────────────────────────────────────
-      async runWithCatchUp(instanceId, vesselId, maxCatchUpCycles) {
-        if (this.syncInProgress.get(vesselId)) {
-          console.log(`[AutoSync] Sync already in progress for vessel ${vesselId} \u2014 skipping`);
-          await insertConnectivityLog({
-            instanceId,
-            vesselId,
-            outcome: "skipped_reentrant",
-            triggerType: "auto"
-          });
-          return;
-        }
-        this.syncInProgress.set(vesselId, true);
-        let cycleNumber = 0;
-        try {
-          const primaryResult = await this.executeSingleCycle(instanceId, vesselId, cycleNumber, "auto");
-          if (!primaryResult.success) {
-            return;
-          }
-          if (maxCatchUpCycles <= 0) return;
-          const vesselCode = await getVesselCode(vesselId);
-          let remaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
-          while (remaining > 0 && cycleNumber < maxCatchUpCycles) {
-            cycleNumber++;
-            console.log(`[AutoSync] Catch-up cycle ${cycleNumber}/${maxCatchUpCycles} \u2014 ${remaining} unsynced records remain`);
-            syncDiag(`[AutoSync] catch-up cycle=${cycleNumber}, remaining=${remaining}, cap=${maxCatchUpCycles}`);
-            const catchUpResult = await this.executeSingleCycle(instanceId, vesselId, cycleNumber, "catch_up");
-            if (!catchUpResult.success) {
-              console.log(`[AutoSync] Catch-up cycle ${cycleNumber} failed \u2014 stopping catch-up`);
-              break;
-            }
-            remaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
-          }
-          if (cycleNumber > 0) {
-            const finalRemaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
-            console.log(`[AutoSync] Catch-up complete \u2014 ran ${cycleNumber} extra cycle(s), ${finalRemaining} records still unsynced`);
-          }
-        } finally {
-          this.syncInProgress.set(vesselId, false);
-        }
-      }
-      // ────────────────────────────────────────────────
-      // Execute one sync cycle + log connectivity
-      // ────────────────────────────────────────────────
-      async executeSingleCycle(instanceId, vesselId, cycleNumber, triggerType) {
-        const startMs = Date.now();
-        let result;
-        try {
-          const engine = getSyncEngine();
-          result = await engine.runSync(vesselId);
-        } catch (error) {
-          const latencyMs2 = Date.now() - startMs;
-          const outcome2 = classifyError(error);
-          await insertConnectivityLog({
-            instanceId,
-            vesselId,
-            outcome: outcome2,
-            errorMessage: error.message?.substring(0, 500),
-            errorCategory: outcome2,
-            latencyMs: latencyMs2,
-            catchUpCycle: cycleNumber,
-            triggerType
-          });
-          console.error(`[AutoSync] Cycle ${cycleNumber} threw: ${error.message}`);
-          syncDiag(`[AutoSync] EXCEPTION cycle=${cycleNumber}, outcome=${outcome2}, latency=${latencyMs2}ms, err=${error.message}`);
-          return {
-            success: false,
-            batchUuid: null,
-            recordsPushed: 0,
-            recordsPulled: 0,
-            conflictsFound: 0,
-            conflictsAutoResolved: 0,
-            filesQueued: 0,
-            durationMs: latencyMs2,
-            error: error.message,
-            newCheckpoint: null
-          };
-        }
-        const latencyMs = Date.now() - startMs;
-        const outcome = result.success ? "success" : classifyError({ message: result.error || "" });
-        await insertConnectivityLog({
-          instanceId,
-          vesselId,
-          outcome,
-          errorMessage: result.error?.substring(0, 500) ?? null,
-          errorCategory: result.success ? null : outcome,
-          latencyMs,
-          batchUuid: result.batchUuid,
-          recordsPushed: result.recordsPushed,
-          recordsPulled: result.recordsPulled,
-          catchUpCycle: cycleNumber,
-          triggerType
-        });
-        if (result.success) {
-          console.log(`[AutoSync] Cycle ${cycleNumber} OK \u2014 pushed=${result.recordsPushed}, pulled=${result.recordsPulled}, duration=${result.durationMs}ms`);
-        } else {
-          console.warn(`[AutoSync] Cycle ${cycleNumber} FAILED \u2014 ${result.error}`);
-        }
-        syncDiag(`[AutoSync] cycle=${cycleNumber}, trigger=${triggerType}, outcome=${outcome}, pushed=${result.recordsPushed}, pulled=${result.recordsPulled}, latency=${latencyMs}ms`);
-        return result;
-      }
-    };
-    syncAutoScheduler = new SyncAutoScheduler();
   }
 });
 
@@ -67527,7 +67593,7 @@ async function registerRoutes(app2) {
   const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
   const { syncAutoScheduler: syncAutoScheduler2 } = await Promise.resolve().then(() => (init_autoSyncScheduler(), autoSyncScheduler_exports));
   if (await isShipInstance2()) {
-    syncAutoScheduler2.start(6 * 60 * 60 * 1e3);
+    await syncAutoScheduler2.start(6 * 60 * 60 * 1e3);
     console.log("[AutoSync] Ship instance \u2014 scheduler started (autonomous sync with catch-up and connectivity logging)");
   } else {
     console.log("[AutoSync] Shore instance detected \u2014 auto-sync scheduler not started (sync is ship-initiated)");
