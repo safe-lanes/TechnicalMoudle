@@ -1609,6 +1609,8 @@ const Dashboard = () => {
             .map(wo => ({ ...wo, _pendingType: 'l2review' as const })),
         ];
     const pendingApprovalCount = pendingApprovalWOs.length;
+    const postponementCount = isHeadOfDept ? 0 : pendingApprovalWOs.filter((wo: any) => wo._pendingType === 'postponement').length;
+    const l2ReviewCount = isHeadOfDept ? 0 : pendingApprovalWOs.filter((wo: any) => wo._pendingType === 'l2review').length;
 
     const effectiveAnomalyIndicators = complianceAnomalies || null;
     const anomalyCount = effectiveAnomalyIndicators ? [
@@ -1641,6 +1643,8 @@ const Dashboard = () => {
       criticalSparesLowList,
       pendingApprovalCount,
       pendingApprovalWOs: pendingApprovalWOs as EnrichedWorkOrder[],
+      postponementCount,
+      l2ReviewCount,
       anomalyCount,
       openChangeRequests,
       openChangeRequestsList,
@@ -2904,6 +2908,13 @@ const Dashboard = () => {
                         <CardContent className="py-2 px-3 flex flex-col justify-start flex-1">
                           <p className="font-medium text-gray-600 text-[14px]">{card.label}</p>
                           <p className={`text-xl font-bold mt-0.5 ${card.textColor}`} data-testid={card.valueTestId}>{card.value}</p>
+                          {card.key === 'pending-approvals' && !isHeadOfDept && (operationKPIs.postponementCount > 0 || operationKPIs.l2ReviewCount > 0) && (
+                            <p className="text-[10px] text-gray-500 mt-0.5 leading-tight" data-testid="kpi-pending-approvals-breakdown">
+                              {operationKPIs.postponementCount > 0 && <span>{operationKPIs.postponementCount} Postponement</span>}
+                              {operationKPIs.postponementCount > 0 && operationKPIs.l2ReviewCount > 0 && <span className="mx-0.5">·</span>}
+                              {operationKPIs.l2ReviewCount > 0 && <span>{operationKPIs.l2ReviewCount} Level 2 Review</span>}
+                            </p>
+                          )}
                           <span className={`text-[9px] mt-auto ${!isAdminScope && isScopeActive && card.rankScoped ? 'text-blue-500' : !isAdminScope && fallbackMode === 'own-rank' && card.rankScoped ? 'text-amber-500' : 'text-gray-400'}`} data-testid={`scope-label-${card.key}`}>
                             {isAdminScope
                               ? 'Vessel-wide'

@@ -79,10 +79,13 @@ export function getDisplayStatus(wo: FilterableWorkOrder): string {
   if (wo.workOrderType === 'Unplanned') {
     if (isStoredCompleted(wo)) return 'Completed';
     if (wo.status === 'Pending Approval') return 'Pending Approval';
+    if (wo.status === 'Pending Office Review') return 'Awaiting Level 2 Review';
     if (wo.status === 'Draft') return 'Draft';
     return wo.status || 'Active';
   }
-  return getEffectiveStatus(wo);
+  const es = getEffectiveStatus(wo);
+  if (es === 'Pending Office Review') return 'Awaiting Level 2 Review';
+  return es;
 }
 
 export function matchesTab(wo: FilterableWorkOrder, activeTab: string): boolean {
@@ -104,7 +107,8 @@ export function matchesTab(wo: FilterableWorkOrder, activeTab: string): boolean 
     if (wo.workOrderType === 'Unplanned') return false;
     if (effectiveStatus !== "Completed") return false;
   } else if (activeTab === "Pending Approval") {
-    if (getDisplayStatus(wo) !== "Pending Approval") return false;
+    const ds = getDisplayStatus(wo);
+    if (ds !== "Pending Approval" && ds !== "Awaiting Level 2 Review") return false;
   } else if (activeTab === "Postponed") {
     if (wo.isExecution) return false;
     // Include legacy "Postponed", new "Awaiting Office Approval", and "Postponement Approved".
@@ -240,7 +244,8 @@ export function computeWorkOrderTabCounts(list: FilterableWorkOrder[]): Record<s
     const postponedStatuses = new Set(["Postponed", "Awaiting Office Approval", "Postponement Approved"]);
     if (!wo.isExecution && postponedStatuses.has(getEffectiveStatus(wo))) counts["Postponed"]++;
     if (wo.workOrderType === 'Unplanned') counts["Unplanned"]++;
-    if (getDisplayStatus(wo) === "Pending Approval") counts["Pending Approval"]++;
+    const ds = getDisplayStatus(wo);
+    if (ds === "Pending Approval" || ds === "Awaiting Level 2 Review") counts["Pending Approval"]++;
     if (wo.workOrderType !== 'Unplanned' && getEffectiveStatus(wo) === "Completed") counts["Completed"]++;
   }
 

@@ -765,7 +765,7 @@ const WorkOrders: React.FC = () => {
                     >
                       <Pen className="h-4 w-4 text-gray-600" />
                     </button>
-                    {!isVessel && getDisplayStatus(wo) !== "Pending Approval" && (
+                    {!isVessel && getDisplayStatus(wo) !== "Pending Approval" && getDisplayStatus(wo) !== "Awaiting Level 2 Review" && (
                       <button
                         className="p-1 hover:bg-gray-200 rounded"
                         onClick={(e) => { e.stopPropagation(); handleTimerClick(wo); }}
