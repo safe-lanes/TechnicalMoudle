@@ -139,7 +139,6 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     reasonForPostponement: "",
     postponementRemarks: "",
     approver: "Office",
-    approvalRemarks: "",
   });
 
   const [errors, setErrors] = useState<{
@@ -230,7 +229,6 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
         reasonForPostponement: prefillReason,
         postponementRemarks: prefillRemarks,
         approver: "Office",
-        approvalRemarks: "",
       });
       setErrors({});
     }
@@ -527,7 +525,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
         postponementRemarks: formData.postponementRemarks,
         approver: formData.approver,
         duration: computedDuration,
-        approvalRemarks: formData.approvalRemarks,
+        approvalRemarks: null,
       });
     }
     onClose();
@@ -783,20 +781,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
               <div />
             </div>
 
-            {/* Row 9: Approval Remarks — optional, at the bottom */}
-            <div className="space-y-1">
-              <Label htmlFor="approvalRemarks" className="text-sm">Approval Remarks (Optional)</Label>
-              <Textarea
-                id="approvalRemarks"
-                data-testid="textarea-approval-remarks"
-                value={formData.approvalRemarks}
-                onChange={(e) => setFormData({ ...formData, approvalRemarks: e.target.value })}
-                className="min-h-[50px] resize-none"
-                placeholder="Enter approval remarks..."
-              />
-            </div>
-
-            {/* Row 10: Attach Document */}
+            {/* Row 9: Attach Document */}
             <div className="space-y-1">
               <Label className="text-sm">Attach Document (Optional)</Label>
               <div className="flex flex-col items-start gap-1">
