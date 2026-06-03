@@ -1072,6 +1072,7 @@ export const jobs = pgTable("jobs", {
   briefWorkDescription: text("brief_work_description"),
   jobDescription: text("job_description"), // Detailed job description
   approver: text("approver"), // Rank who approves the job
+  level2ReviewerRankId: text("level2_reviewer_rank_id"), // Optional second-stage reviewer rank (Level 2 Office Review)
   department: text("department"),
   
   // Template data (Part A)
@@ -1263,6 +1264,10 @@ export const workOrders = pgTable("work_orders", {
   generateDateSnapshot: text("generate_date_snapshot"), // GENERATE_DATE = DUE_DATE - LT_days (ISO date)
   dueDateSnapshot: text("due_date_snapshot"), // DUE_DATE (duplicated for clarity)
   lastDoneDateSnapshot: text("last_done_date_snapshot"), // last_done_date stored at WO creation
+
+  // === Level 2 Office Review Fields ===
+  reviewerComments: text("reviewer_comments"), // Comments from Level 2 reviewer
+  reviewedByUuid: text("reviewed_by_uuid"), // UUID/identity of Level 2 reviewer who acted
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
@@ -2347,6 +2352,7 @@ export const fleetJobs = pgTable("fleet_jobs", {
   taskType: text("task_type").notNull(),
   assignedTo: text("assigned_to").notNull(),
   approver: text("approver").notNull(),
+  level2ReviewerRankId: text("level2_reviewer_rank_id"), // Optional second-stage reviewer rank (Level 2 Office Review)
   jobPriority: text("job_priority").notNull(),
   classRelated: text("class_related").notNull(),
   briefWorkDescription: text("brief_work_description").notNull(),

@@ -182,7 +182,8 @@ export async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Tools Required', key: 'toolsRequired', width: 30 },
     { header: 'IS Active', key: 'isActive', width: 12 },
     { header: 'Maker Code', key: 'makerCode', width: 15 },
-    { header: 'Class Survey Code', key: 'classSurveyCode', width: 18 }
+    { header: 'Class Survey Code', key: 'classSurveyCode', width: 18 },
+    { header: 'Reviewer Rank', key: 'reviewerRank', width: 20 }
   ];
   
   // Headers only - no sample data
@@ -213,7 +214,8 @@ export async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'IS Active', key: 'isActive', width: 12 },
     { header: 'Vessel Code', key: 'vesselCode', width: 12 },
     { header: 'Maker Code', key: 'makerCode', width: 15 },
-    { header: 'Class Survey Code', key: 'classSurveyCode', width: 18 }
+    { header: 'Class Survey Code', key: 'classSurveyCode', width: 18 },
+    { header: 'Reviewer Rank', key: 'reviewerRank', width: 20 }
   ];
   
   // Headers only - no sample data
@@ -402,6 +404,12 @@ export async function generateFleetMasterTemplate(): Promise<Buffer> {
       allowBlank: true,
       formulae: ["'Master Data'!$G$2:$G$3"]
     };
+    // Reviewer Rank (col 22)
+    fleetJobSheet.getCell(row, 22).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$B$2:$B$12"]
+    };
   }
   
   // Vessel_Job validations
@@ -441,6 +449,12 @@ export async function generateFleetMasterTemplate(): Promise<Buffer> {
       type: 'list',
       allowBlank: true,
       formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+    // Reviewer Rank (col 22)
+    vesselJobSheet.getCell(row, 22).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$B$2:$B$12"]
     };
   }
   

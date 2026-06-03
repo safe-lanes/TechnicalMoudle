@@ -246,6 +246,22 @@ export async function completeWorkOrder(req: Request, res: Response) {
 
 // ── Bulk Operations ──
 
+export async function reviewerApprove(req: Request, res: Response) {
+  const workOrderId = req.params.id;
+  const { reviewerComments } = req.body;
+  const actor = resolveActorIdentity(req);
+  const result = await woBulkService.reviewerApprove(workOrderId, reviewerComments, actor);
+  res.json(result);
+}
+
+export async function reviewerReopen(req: Request, res: Response) {
+  const workOrderId = req.params.id;
+  const { reviewerComments } = req.body;
+  const actor = resolveActorIdentity(req);
+  const result = await woBulkService.reviewerReopen(workOrderId, reviewerComments, actor);
+  res.json(result);
+}
+
 export async function bulkApprove(req: Request, res: Response) {
   const { workOrderIds, approver, approverRemarks, skippedCyclesJustification } = req.body;
   const result = await woBulkService.bulkApprove(workOrderIds, approver, approverRemarks, skippedCyclesJustification);

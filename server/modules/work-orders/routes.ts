@@ -88,6 +88,18 @@ router.delete('/work-orders/:id', asyncHandler(woCtrl.deleteWorkOrder));
 
 // ── Superintendent Endpoints (Layer 5) ──
 
+// POST /work-orders/:id/reviewer-approve — Level 2 reviewer approves (Pending Office Review → Completed)
+router.post('/work-orders/:id/reviewer-approve',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.reviewerApprove)
+);
+
+// POST /work-orders/:id/reviewer-reopen — Level 2 reviewer sends back for rework
+router.post('/work-orders/:id/reviewer-reopen',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.reviewerReopen)
+);
+
 // POST /work-orders/:id/reject-completion — reject a Completed WO (Office/PMS Admin only)
 router.post('/work-orders/:id/reject-completion',
   requireRole(['Office', 'PMS Admin', 'Sail Admin']),
