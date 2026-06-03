@@ -527,6 +527,8 @@ const Dashboard = () => {
   const isAdminScope = isSailAdmin || isClientAdmin || isTechSuperintendent;
   const [mgmtVesselId, setMgmtVesselId] = useState<string>('');
   useEffect(() => {
+    // 'my' is a valid aggregate sentinel (like 'all'); never auto-reset it.
+    if (mgmtVesselId === 'my') return;
     if (adminDefaultsToAll && vesselId === 'all' && mgmtVesselId !== 'all') {
       setMgmtVesselId('all');
       return;
@@ -557,8 +559,41 @@ const Dashboard = () => {
     scopeMeta: ScopeMeta;
   }
 
-  const { currentUser } = useAuth();
+  const { currentUser, myVessels } = useAuth();
   const userRankName = currentUser?.rank_name ?? '';
+
+  // Task #224: "My Vessel" scope = the set of vessels assigned to the logged-in
+  // user (from AuthContext.myVessels). The 'my' sentinel in mgmtVesselId means
+  // "aggregate across ALL my assigned vessels" (a mini-fleet), distinct from
+  // 'all' (entire fleet) and a single vessel id.
+  const assignedVesselIds = useMemo(
+    () => Array.from(new Set((myVessels || []).map(v => String(v.vesselId)).filter(Boolean))),
+    [myVessels]
+  );
+  const assignedVesselIdSet = useMemo(() => new Set(assignedVesselIds), [assignedVesselIds]);
+  const isMyVessels = effectiveVesselId === 'my';
+  const hasAssignedVessels = assignedVesselIds.length > 0;
+  // Resolve assigned ids to full vessel objects; fall back to a minimal record
+  // so aggregation still fetches even if a vessel isn't in the fleet list yet.
+  const assignedVessels = useMemo(
+    () => assignedVesselIds.map(id => vessels.find(v => v.id === id) || { id, name: id, code: id }),
+    [assignedVesselIds, vessels]
+  );
+  // The vessel-id list to aggregate over for the current scope.
+  const aggregateVessels = isAllVessels ? vessels : isMyVessels ? assignedVessels : [];
+  const aggregateIds = isAllVessels ? vessels.map(v => v.id) : isMyVessels ? assignedVesselIds : [];
+  const isAggregate = isAllVessels || isMyVessels;
+  // When My Vessel is selected but nothing is assigned, render an empty state.
+  const myVesselsEmpty = isMyVessels && !hasAssignedVessels;
+  // Scope dropdown value derived from the current vessel selection.
+  const scopeValue: 'all' | 'my' =
+    effectiveVesselId === 'all'
+      ? 'all'
+      : effectiveVesselId === 'my'
+        ? 'my'
+        : assignedVesselIdSet.has(effectiveVesselId)
+          ? 'my'
+          : 'all';
 
   const { data: scopedResponse } = useQuery<ScopedOperationResponse>({
     queryKey: ['/technical/api/scoped-operation-data', effectiveVesselId, hodScope, userRankName, isAdminScope],
@@ -571,7 +606,7 @@ const Dashboard = () => {
       if (!response.ok) throw new Error('Failed to fetch scoped operation data');
       return response.json();
     },
-    enabled: !!effectiveVesselId && !isAllVessels && !isAdminScope,
+    enabled: !!effectiveVesselId && !isAllVessels && !isMyVessels && !isAdminScope,
   });
 
   const scopeMeta = scopedResponse?.scopeMeta ?? null;
@@ -585,6 +620,14 @@ const Dashboard = () => {
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
     queryKey: ['/technical/api/work-orders', effectiveVesselId],
     queryFn: async () => {
+      if (isMyVessels) {
+        const results = await Promise.allSettled(
+          aggregateIds.map(id =>
+            fetch(`/technical/api/work-orders?vesselId=${id}`).then(r => r.ok ? r.json() : [])
+          )
+        );
+        return results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+      }
       const url = isAllVessels 
         ? '/technical/api/work-orders' 
         : `/technical/api/work-orders?vesselId=${effectiveVesselId}`;
@@ -599,9 +642,9 @@ const Dashboard = () => {
   const { data: sparesData = [], isLoading: isSparesLoading } = useQuery<Spare[]>({
     queryKey: ['/technical/api/spares', effectiveVesselId],
     queryFn: async () => {
-      if (isAllVessels) {
+      if (isAggregate) {
         const allSpares: Spare[] = [];
-        for (const vessel of vessels) {
+        for (const vessel of aggregateVessels) {
           try {
             const response = await fetch(`/technical/api/spares/${vessel.id}`);
             if (response.ok) {
@@ -625,9 +668,9 @@ const Dashboard = () => {
   const { data: storesData = [], isLoading: isStoresLoading } = useQuery<StoresItem[]>({
     queryKey: ['/technical/api/stores', effectiveVesselId],
     queryFn: async () => {
-      if (isAllVessels) {
+      if (isAggregate) {
         const allStores: StoresItem[] = [];
-        for (const vessel of vessels) {
+        for (const vessel of aggregateVessels) {
           try {
             const response = await fetch(`/technical/api/stores/${vessel.id}`);
             if (response.ok) {
@@ -651,9 +694,9 @@ const Dashboard = () => {
   const { data: componentsData = [], isLoading: isComponentsLoading } = useQuery<Component[]>({
     queryKey: ['/technical/api/components', effectiveVesselId],
     queryFn: async () => {
-      if (isAllVessels) {
+      if (isAggregate) {
         const allComponents: Component[] = [];
-        for (const vessel of vessels) {
+        for (const vessel of aggregateVessels) {
           try {
             const response = await fetch(`/technical/api/components/${vessel.id}`);
             if (response.ok) {
@@ -676,9 +719,9 @@ const Dashboard = () => {
   const { data: rhParentsData = [], isLoading: isRHLoading } = useQuery<RHParentComponent[]>({
     queryKey: ['/technical/api/running-hours/parents', effectiveVesselId],
     queryFn: async () => {
-      if (isAllVessels) {
+      if (isAggregate) {
         const results = await Promise.allSettled(
-          vessels.map(vessel =>
+          aggregateVessels.map(vessel =>
             fetch(`/technical/api/running-hours/parents?vesselId=${vessel.id}`)
               .then(r => r.ok ? r.json() : [])
           )
@@ -695,9 +738,9 @@ const Dashboard = () => {
   const { data: sparesHistoryData = [], isLoading: isSparesHistoryLoading } = useQuery<SparesHistoryItem[]>({
     queryKey: ['/technical/api/spares/history', effectiveVesselId],
     queryFn: async () => {
-      if (isAllVessels) {
+      if (isAggregate) {
         const results = await Promise.allSettled(
-          vessels.map(vessel =>
+          aggregateVessels.map(vessel =>
             fetch(`/technical/api/spares/history/${vessel.id}`)
               .then(r => r.ok ? r.json() : [])
           )
@@ -714,6 +757,14 @@ const Dashboard = () => {
   const { data: changeRequestsData = [], isLoading: isChangeRequestsLoading } = useQuery<ChangeRequest[]>({
     queryKey: ['/technical/api/change-requests', effectiveVesselId],
     queryFn: async () => {
+      if (isMyVessels) {
+        const results = await Promise.allSettled(
+          aggregateIds.map(id =>
+            fetch(`/technical/api/change-requests?vesselId=${id}`).then(r => r.ok ? r.json() : [])
+          )
+        );
+        return results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+      }
       const url = isAllVessels
         ? '/technical/api/change-requests'
         : `/technical/api/change-requests?vesselId=${effectiveVesselId}`;
@@ -734,7 +785,9 @@ const Dashboard = () => {
       if (!response.ok) throw new Error('Failed to fetch superintendent summary');
       return response.json();
     },
-    enabled: !!effectiveVesselId,
+    // Object-returning endpoint without a vesselIds allow-list; skip it for the
+    // 'my' aggregate (it only renders on the management tab anyway).
+    enabled: !!effectiveVesselId && !isMyVessels,
   });
 
   const { data: complianceAnomalies } = useQuery<{
@@ -1048,9 +1101,14 @@ const Dashboard = () => {
       dashboardPeriodRange?.to?.toISOString() ?? 'all-time',
     ],
     queryFn: async () => {
-      const params = new URLSearchParams({
-        vesselId: effectiveVesselId || 'all',
-      });
+      const params = new URLSearchParams();
+      if (isMyVessels) {
+        // Server applies the vesselIds allow-list only when vesselId === 'all'.
+        params.set('vesselId', 'all');
+        params.set('vesselIds', aggregateIds.join(','));
+      } else {
+        params.set('vesselId', effectiveVesselId || 'all');
+      }
       if (dashboardPeriodRange) {
         params.set('from', dashboardPeriodRange.from.toISOString());
         params.set('to', dashboardPeriodRange.to.toISOString());
@@ -1059,7 +1117,7 @@ const Dashboard = () => {
       if (!res.ok) throw new Error('Failed to fetch WO status by period');
       return res.json();
     },
-    enabled: !!effectiveVesselId,
+    enabled: !!effectiveVesselId && !myVesselsEmpty,
   });
 
   // Map WO id (wouuid preferred, falling back to id) -> WO object so click
@@ -1276,12 +1334,18 @@ const Dashboard = () => {
     queryKey: ['/technical/api/dashboard/maintenance-trend', effectiveVesselId],
     queryFn: async () => {
       const params = new URLSearchParams();
-      params.set('vesselId', effectiveVesselId || 'all');
+      if (isMyVessels) {
+        // Server applies the vesselIds allow-list only when vesselId === 'all'.
+        params.set('vesselId', 'all');
+        params.set('vesselIds', aggregateIds.join(','));
+      } else {
+        params.set('vesselId', effectiveVesselId || 'all');
+      }
       const res = await fetch(`/technical/api/dashboard/maintenance-trend?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch maintenance trend');
       return res.json();
     },
-    enabled: !!effectiveVesselId,
+    enabled: !!effectiveVesselId && !myVesselsEmpty,
   });
   const maintenanceTrendData = useMemo(() => {
     return {
@@ -1377,7 +1441,24 @@ const Dashboard = () => {
 
   const handleVesselChange = (newVesselId: string) => {
     setMgmtVesselId(newVesselId);
-    setVesselId(newVesselId);
+    // 'my' is the assigned-fleet aggregate sentinel — it's not a real vessel,
+    // so keep it out of the global VesselContext (which validates against the
+    // fleet list and would reset it).
+    if (newVesselId !== 'my') {
+      setVesselId(newVesselId);
+    }
+  };
+
+  // Task #224: Scope dropdown. 'all' -> entire fleet aggregate; 'my' -> assigned
+  // mini-fleet aggregate. Switching scope resets the Vessel dropdown to that
+  // scope's aggregate default.
+  const handleScopeChange = (scope: 'all' | 'my') => {
+    if (scope === 'all') {
+      setMgmtVesselId('all');
+      setVesselId('all');
+    } else {
+      setMgmtVesselId('my');
+    }
   };
 
   const handleAllVesselsChange = (isAll: boolean) => {
@@ -1385,7 +1466,7 @@ const Dashboard = () => {
       setMgmtVesselId('all');
       setVesselId('all');
     } else {
-      if (mgmtVesselId === 'all' && vessels.length > 0) {
+      if ((mgmtVesselId === 'all' || mgmtVesselId === 'my') && vessels.length > 0) {
         setMgmtVesselId(vessels[0].id);
         setVesselId(vessels[0].id);
       }
@@ -1405,9 +1486,15 @@ const Dashboard = () => {
   const isLoading = isWorkOrdersLoading || isSparesLoading || isStoresLoading || isComponentsLoading || isRHLoading || isSparesHistoryLoading;
 
   const summaryLine = useMemo(() => {
-    const scope = isAllVessels ? "Fleet" : (currentVessel?.name || "No vessel");
+    const scope = isAllVessels
+      ? "Fleet"
+      : isMyVessels
+        ? "My Fleet"
+        : (currentVessel?.name || "No vessel");
     const parts: string[] = [`Scope: ${scope}`];
-    if (!isAllVessels) {
+    if (isMyVessels) {
+      parts.push(`${assignedVessels.length} vessels`);
+    } else if (!isAllVessels) {
       parts.push(`${workOrderKPIs.total} work orders`);
       parts.push(`${sparesKPIs.total} spares`);
       parts.push(`${componentsKPIs.total} components`);
@@ -1416,7 +1503,7 @@ const Dashboard = () => {
     }
     parts.push(`Data as of ${format(lastUpdated, 'dd MMM yyyy, HH:mm')}`);
     return parts.join(' \u00b7 ');
-  }, [isAllVessels, currentVessel, workOrderKPIs.total, sparesKPIs.total, componentsKPIs.total, vessels.length, lastUpdated]);
+  }, [isAllVessels, isMyVessels, assignedVessels.length, currentVessel, workOrderKPIs.total, sparesKPIs.total, componentsKPIs.total, vessels.length, lastUpdated]);
 
   const overduePercent = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.overdue / workOrderKPIs.total) * 100) : 0;
 
@@ -2705,17 +2792,28 @@ const Dashboard = () => {
                 <SelectValue placeholder="Select vessel" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all" data-testid="option-vessel-all">All Vessels</SelectItem>
-                {vessels.map(v => (
-                  <SelectItem key={v.id} value={v.id} data-testid={`option-vessel-${v.id}`}>{v.name}</SelectItem>
-                ))}
+                {scopeValue === 'my' ? (
+                  <>
+                    <SelectItem value="my" data-testid="option-vessel-my-all">All My Vessels</SelectItem>
+                    {assignedVessels.map(v => (
+                      <SelectItem key={v.id} value={v.id} data-testid={`option-vessel-${v.id}`}>{v.name}</SelectItem>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    <SelectItem value="all" data-testid="option-vessel-all">All Vessels</SelectItem>
+                    {vessels.map(v => (
+                      <SelectItem key={v.id} value={v.id} data-testid={`option-vessel-${v.id}`}>{v.name}</SelectItem>
+                    ))}
+                  </>
+                )}
               </SelectContent>
             </Select>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 font-medium">Scope:</span>
-            <Select value={mgmtVesselId === 'all' ? 'all' : 'my'} onValueChange={(val) => handleAllVesselsChange(val === 'all')}>
+            <Select value={scopeValue} onValueChange={(val) => handleScopeChange(val as 'all' | 'my')}>
               <SelectTrigger className="w-[140px]" data-testid="select-vessel-scope">
                 <SelectValue />
               </SelectTrigger>
@@ -3495,6 +3593,15 @@ const Dashboard = () => {
         {/* OVERVIEW TAB: Card-based Grid Layout */}
         {activeTab === 'overview' && (
           <div className="p-4 space-y-4">
+
+            {myVesselsEmpty && (
+              <div
+                className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+                data-testid="banner-no-assigned-vessels"
+              >
+                No vessels are assigned to you yet. Switch the Scope to "All Vessel" or contact your administrator to get vessels assigned.
+              </div>
+            )}
 
             {/* DASHBOARD GRID: 3 columns (25% / 50% / 25%), 4 explicit rows */}
             <div

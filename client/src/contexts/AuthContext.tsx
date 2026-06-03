@@ -61,8 +61,36 @@ const DEFAULT_USER: PublicUser = {
   updatedAt: new Date(),
 };
 
+export interface MyVesselAssignment {
+  vesselId: string;
+  vessel?: string;
+  imoNumber?: string;
+}
+
+function normalizeMyVessels(
+  profile: Record<string, any> | null | undefined,
+): MyVesselAssignment[] {
+  const raw = profile?.myVessels ?? profile?.my_vessels ?? [];
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((entry: any) => ({
+      vesselId: String(
+        entry?.vesselId ??
+          entry?.vessel_id ??
+          entry?.vuid ??
+          entry?.vuuid ??
+          entry?.id ??
+          "",
+      ),
+      vessel: entry?.vessel ?? entry?.vesselName ?? entry?.name ?? undefined,
+      imoNumber: entry?.imoNumber ?? entry?.imo_number ?? undefined,
+    }))
+    .filter((v: MyVesselAssignment) => !!v.vesselId);
+}
+
 interface AuthContextType {
   currentUser: PublicUser | null;
+  myVessels: MyVesselAssignment[];
   isAuthenticated: boolean;
   hasRole: (role: UserRole | UserRole[]) => boolean;
   isShipUser: boolean;
@@ -97,11 +125,13 @@ function invalidateRankScopedQueries() {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<PublicUser | null>(null);
+  const [myVessels, setMyVessels] = useState<MyVesselAssignment[]>([]);
   const [userType, setUserType] = useState<UIRole | null>(null);
 
   useEffect(() => {
     let resolvedUser: PublicUser | null = null;
     let resolvedUserType: UIRole | null = null;
+    let resolvedMyVessels: MyVesselAssignment[] = [];
 
     const encryptedProfile = secureGetItem<Record<string, any>>("userProfile");
     const encryptedUserType = secureGetItem<string>("userType");
@@ -157,6 +187,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
+      resolvedMyVessels = normalizeMyVessels(encryptedProfile);
     } else {
       const plainUserType = localStorage.getItem("userType");
       let plainProfile: Record<string, any> | null = null;
@@ -216,6 +247,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           createdAt: new Date(),
           updatedAt: new Date(),
         };
+        resolvedMyVessels = normalizeMyVessels(plainProfile);
       }
     }
 
@@ -228,6 +260,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     setCurrentUser(resolvedUser);
+    setMyVessels(resolvedMyVessels);
     setUserType(resolvedUserType);
     const hydratedRankChanged = setActiveRank(resolvedUser?.rank_name ?? null);
     if (hydratedRankChanged) {
@@ -295,6 +328,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setCurrentUser(sanitizedUser);
     setUserType(derivedUIType);
+
+    // Keep assigned-fleet ("My Vessel") scope in sync with the freshly
+    // logged-in account. The vessel assignments live on the stored
+    // userProfile (encrypted preferred, plain fallback), so re-read it here
+    // rather than relying solely on the initial mount hydration.
+    let loginMyVessels: MyVesselAssignment[] = [];
+    const encLoginProfile =
+      secureGetItem<Record<string, any>>("userProfile");
+    if (encLoginProfile) {
+      loginMyVessels = normalizeMyVessels(encLoginProfile);
+    } else {
+      try {
+        const raw = localStorage.getItem("userProfile");
+        if (raw) loginMyVessels = normalizeMyVessels(JSON.parse(raw));
+      } catch {
+        loginMyVessels = [];
+      }
+    }
+    setMyVessels(loginMyVessels);
+
     const rankChanged = setActiveRank(sanitizedUser.rank_name ?? null);
     if (rankChanged) {
       invalidateRankScopedQueries();
@@ -316,6 +369,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setCurrentUser(null);
     setUserType(null);
+    setMyVessels([]);
     const rankChanged = setActiveRank(null);
     if (rankChanged) {
       invalidateRankScopedQueries();
@@ -324,6 +378,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const value: AuthContextType = {
     currentUser,
+    myVessels,
     isAuthenticated: !!currentUser,
     hasRole,
     isShipUser,
