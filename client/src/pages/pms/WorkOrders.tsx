@@ -44,6 +44,12 @@ import * as XLSX from "xlsx";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import { format } from "date-fns";
 import { POSTPONEMENT_REASONS } from "@shared/postponementReasons";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // Extend WorkOrderWithLeadTime to include computed status and RH data from backend
 type WorkOrderWithHydratedData = WorkOrderWithLeadTime & {
@@ -72,6 +78,43 @@ interface WorkOrdersPageEnvelope {
 
 // Using WorkOrder type from shared schema
 // The WorkOrder interface is now imported from @shared/schema
+
+// Derives the human-readable lock reason messages for a superintendent_locked WO.
+// Re-computes backdatingDays client-side from submittedDate − completionDate
+// (mirrors calculateBackdatingDaysForApproval on the server — no schema change needed).
+function buildLockReasonMessages(wo: any): string[] {
+  const reasons: string[] = [];
+
+  const missedCycles = wo?.missedCycles ?? 0;
+  if (missedCycles >= 3) {
+    reasons.push(`${missedCycles} Work Order cycle${missedCycles === 1 ? '' : 's'} skipped`);
+  }
+
+  const daysLate = wo?.daysLate ?? 0;
+  if (daysLate >= 21) {
+    reasons.push(`Completion is ${daysLate} days past due date`);
+  }
+
+  const completionDate = wo?.completionDateTime || wo?.dateCompleted;
+  const submittedDate = wo?.submittedDate;
+  let backdatingDays = 0;
+  if (completionDate) {
+    const comp = new Date(completionDate);
+    const reference = submittedDate ? new Date(submittedDate) : new Date();
+    if (!isNaN(comp.getTime()) && !isNaN(reference.getTime())) {
+      backdatingDays = Math.max(0, Math.floor((reference.getTime() - comp.getTime()) / (1000 * 60 * 60 * 24)));
+    }
+  }
+  if (backdatingDays >= 7) {
+    reasons.push(`Completion date is ${backdatingDays} days backdated`);
+  }
+
+  if (reasons.length === 0) {
+    reasons.push('Work Order requires Technical Superintendent acknowledgement');
+  }
+
+  return reasons;
+}
 
 // Helper function to generate template code
 const generateTemplateCode = (componentCode: string, taskType: string, basis: string, frequency: string, unit?: string) => {
@@ -557,7 +600,23 @@ const WorkOrders: React.FC = () => {
             const tier = params.value;
             const wo = params.data;
             const approverLabel = wo?.approver || 'HOD';
-            if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
+            if (tier === "superintendent_locked") return (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 cursor-default" data-testid={`approval-tier-locked-${wo?.id}`}>
+                      <Lock className="inline h-3 w-3 mr-0.5" /> Locked
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[280px]">
+                    <p className="font-semibold text-xs mb-1">Reason for Lock:</p>
+                    {buildLockReasonMessages(wo).map((msg, i) => (
+                      <p key={i} className="text-xs">• {msg}</p>
+                    ))}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            );
             if (tier === "superintendent_notification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Supt. Notified</span>;
             if (tier === "ce_with_justification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">{approverLabel} + Remarks</span>;
             return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Standard</span>;
@@ -637,9 +696,26 @@ const WorkOrders: React.FC = () => {
           flex: 0,
           cellRenderer: (params: any) => {
             const tier = params.value;
-            if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
+            const woCompleted = params.data;
+            if (tier === "superintendent_locked") return (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 cursor-default" data-testid={`approval-tier-locked-completed-${woCompleted?.id}`}>
+                      <Lock className="inline h-3 w-3 mr-0.5" /> Locked
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[280px]">
+                    <p className="font-semibold text-xs mb-1">Reason for Lock:</p>
+                    {buildLockReasonMessages(woCompleted).map((msg, i) => (
+                      <p key={i} className="text-xs">• {msg}</p>
+                    ))}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            );
             if (tier === "superintendent_notification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Supt. Notified</span>;
-            if (tier === "ce_with_justification") { const woApprover = params.data?.approver || 'HOD'; return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">{woApprover} + Remarks</span>; }
+            if (tier === "ce_with_justification") { const woApprover = woCompleted?.approver || 'HOD'; return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">{woApprover} + Remarks</span>; }
             return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Standard</span>;
           },
         },
