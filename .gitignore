@@ -8,3 +8,4 @@ env
 ecosystem.config.cjs
 dist/
 ship-deploy/dist/
+node_modules/
