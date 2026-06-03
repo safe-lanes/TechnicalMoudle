@@ -1565,7 +1565,9 @@ const Dashboard = () => {
     const criticalSparesLowCount = criticalSparesLowList.length;
 
     const pendingApprovalWOs = safeWOs.filter(wo =>
-      (wo as EnrichedWorkOrder).computedStatus === 'Awaiting Office Approval'
+      isHeadOfDept
+        ? (wo as EnrichedWorkOrder).computedStatus === 'Pending Approval'
+        : (wo as EnrichedWorkOrder).computedStatus === 'Awaiting Office Approval'
     );
     const pendingApprovalCount = pendingApprovalWOs.length;
 
@@ -1604,7 +1606,7 @@ const Dashboard = () => {
       openChangeRequests,
       openChangeRequestsList,
     };
-  }, [operationWOs, sparesData, changeRequestsData, complianceAnomalies]);
+  }, [operationWOs, sparesData, changeRequestsData, complianceAnomalies, isHeadOfDept]);
 
   const operationTableData = useMemo(() => {
     switch (selectedOpCard) {
@@ -1887,6 +1889,143 @@ const Dashboard = () => {
     ];
   }, [isAllVessels, vessels, setPostponeDecisionDialog, setOpViewModal]);
 
+  const hodPendingApprovalColumnDefs: ColDef[] = useMemo(() => {
+    const formatWoDate = (d: string | null | undefined) => {
+      if (!d) return '—';
+      try {
+        const parsed = parseFlexibleDate(d);
+        if (!parsed || isNaN(parsed.getTime())) {
+          const fallback = new Date(d);
+          if (!isNaN(fallback.getTime())) return format(fallback, 'dd-MMM-yyyy');
+          return d || '—';
+        }
+        return format(parsed, 'dd-MMM-yyyy');
+      } catch {
+        return d || '—';
+      }
+    };
+    const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
+    const vesselCol: ColDef = {
+      headerName: 'Vessel',
+      field: 'vesselId',
+      minWidth: 130,
+      flex: 1,
+      valueGetter: (params: any) => {
+        const vid = params.data?.vesselId;
+        return (vid && vesselNameById.get(String(vid))) || '—';
+      },
+      cellRenderer: (params: any) => (
+        <span className="truncate font-medium">{params.value || '—'}</span>
+      ),
+    };
+    return [
+      {
+        headerName: '',
+        field: 'id',
+        width: 48,
+        minWidth: 48,
+        maxWidth: 48,
+        checkboxSelection: true,
+        headerCheckboxSelection: true,
+        sortable: false,
+        filter: false,
+        resizable: false,
+        pinned: 'left' as const,
+      },
+      ...(isAllVessels ? [vesselCol] : []),
+      {
+        headerName: 'Component',
+        field: 'component',
+        minWidth: 140,
+        flex: 1,
+        valueFormatter: (params: any) => params.value || '—',
+      },
+      {
+        headerName: 'Work Order No',
+        field: 'workOrderNo',
+        minWidth: 160,
+        flex: 1,
+        cellRenderer: (params: any) => {
+          const wo = params.data;
+          const text = params.value || (wo?.id ? `WO-${wo.id}` : '—');
+          return (
+            <span className="text-blue-600 font-medium" data-testid={wo?.id ? `row-hod-pending-wo-${wo.id}` : undefined}>
+              {text}
+            </span>
+          );
+        },
+      },
+      {
+        headerName: 'Job Title',
+        field: 'jobTitle',
+        minWidth: 200,
+        flex: 2,
+        tooltipValueGetter: (params: any) => params.data?.jobTitle || '',
+        valueFormatter: (params: any) => params.value || '—',
+      },
+      {
+        headerName: 'Assigned to',
+        field: 'assignedTo',
+        minWidth: 130,
+        flex: 1,
+        valueGetter: (params: any) => params.data?.assignedTo || params.data?.assignedRank || '—',
+        valueFormatter: (params: any) => params.value || '—',
+      },
+      {
+        headerName: 'Submitted Date',
+        field: 'submittedDate',
+        minWidth: 130,
+        flex: 1,
+        valueFormatter: (params: any) => formatWoDate(params.value),
+      },
+      {
+        headerName: 'Status',
+        field: 'computedStatus',
+        minWidth: 130,
+        flex: 1,
+        sortable: false,
+        filter: false,
+        cellRenderer: () => (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-purple-600">
+            Pending Approval
+          </span>
+        ),
+      },
+      {
+        headerName: 'Actions',
+        field: 'id',
+        colId: 'hod-actions',
+        minWidth: 60,
+        width: 60,
+        sortable: false,
+        filter: false,
+        resizable: false,
+        pinned: 'right' as const,
+        cellRenderer: (params: any) => {
+          const wo = params.data as EnrichedWorkOrder;
+          if (!wo) return null;
+          return (
+            <div className="flex items-center justify-center h-full">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0 text-gray-500 hover:text-gray-800"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpViewModal({ open: true, workOrder: wo, mode: 'execution' });
+                }}
+                data-testid={`button-hod-pending-view-${wo.id}`}
+                title="View work order"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          );
+        },
+      },
+    ];
+  }, [isAllVessels, vessels, setOpViewModal]);
+
   const criticalSparesColumnDefs: ColDef[] = useMemo(() => {
     const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
     const vesselCol: ColDef = {
@@ -2078,7 +2217,7 @@ const Dashboard = () => {
       case 'overdue': return 'Overdue Work Orders';
       case 'overdue-critical': return 'Overdue Work Orders – Critical Equipment';
       case 'planned-today': return 'Work Orders – Planned for Today';
-      case 'pending-approvals': return 'Pending Approval Work Orders';
+      case 'pending-approvals': return isHeadOfDept ? 'Work Orders Pending Your Approval' : 'Pending Approval Work Orders';
       case 'critical-spares': return 'Critical Spares Low';
       case 'anomalies': return 'W.O Anomalies';
       case 'modify-pms': return 'Modify PMS Requests';
@@ -2087,7 +2226,7 @@ const Dashboard = () => {
       case 'donut-planned': return 'Scheduled Work Orders (from chart)';
       default: return 'Work Orders';
     }
-  }, [selectedOpCard]);
+  }, [selectedOpCard, isHeadOfDept]);
 
   const isDonutFilter = selectedOpCard?.startsWith('donut-');
   const isNonWOCard = selectedOpCard === 'anomalies';
@@ -2760,16 +2899,46 @@ const Dashboard = () => {
                     <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white" data-testid="section-op-pending-approvals">
                       <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E0E0E0' }}>
                         <span style={{ fontSize: '13px', fontWeight: 500, color: '#212121' }}>
-                          {operationKPIs.pendingApprovalCount} postponement request{operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} awaiting your decision
+                          {isHeadOfDept
+                            ? `${operationKPIs.pendingApprovalCount} work order${operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} require your review`
+                            : `${operationKPIs.pendingApprovalCount} postponement request${operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} awaiting your decision`
+                          }
                         </span>
+                        {isHeadOfDept && (
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              disabled={pendingSelectedIds.size === 0 || approveMutation.isPending || rejectMutation.isPending}
+                              onClick={() => setRejectDialog({ open: true, type: 'wo', id: '__bulk__', label: `${pendingSelectedIds.size} work order${pendingSelectedIds.size !== 1 ? 's' : ''}` })}
+                              data-testid="button-hod-pending-reject"
+                            >
+                              <XCircle className="h-3.5 w-3.5 mr-1" />
+                              Reject
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-7 text-xs bg-[#1E5A8E] hover:bg-[#174a78] text-white"
+                              disabled={pendingSelectedIds.size === 0 || approveMutation.isPending || rejectMutation.isPending}
+                              onClick={() => setPendingBulkConfirmApprove(true)}
+                              data-testid="button-hod-pending-approve"
+                            >
+                              <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                              Approve
+                            </Button>
+                          </div>
+                        )}
                       </div>
                       <div style={{ height: 'calc(100vh - 360px)', minHeight: '360px' }} data-testid="ag-grid-op-pending-approvals-wrap">
                         <WOAgGridTable
-                          columnDefs={pendingApprovalsColumnDefs}
+                          columnDefs={isHeadOfDept ? hodPendingApprovalColumnDefs : pendingApprovalsColumnDefs}
                           rowData={operationKPIs.pendingApprovalWOs}
                           height="100%"
                           rowHeight={52}
-                          noRowsMessage="No postponement requests awaiting approval"
+                          rowSelection={isHeadOfDept ? "multiple" : undefined}
+                          onSelectionChanged={isHeadOfDept ? handlePendingSelectionChanged : undefined}
+                          noRowsMessage={isHeadOfDept ? "No work orders pending your approval" : "No postponement requests awaiting approval"}
                           testId="ag-grid-op-pending-approvals"
                           getRowId={(params) => String(params.data.id)}
                           getRowClass={(params) => {
