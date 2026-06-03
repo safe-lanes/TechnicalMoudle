@@ -2,8 +2,8 @@ import { storage } from '../../../storage';
 
 // ── Core Job Methods ──
 
-export async function findJobs(vesselId?: string, componentId?: string) {
-  return storage.getJobs(vesselId, componentId);
+export async function findJobs(vesselId?: string, componentId?: string, vesselIds?: string[]) {
+  return storage.getJobs(vesselId, componentId, vesselIds);
 }
 
 export async function findById(id: string) {

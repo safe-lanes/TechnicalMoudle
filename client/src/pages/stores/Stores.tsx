@@ -171,7 +171,11 @@ interface StoresApiItem {
 const Stores: React.FC = () => {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { vesselId, setVesselId } = useVessel();
+  const { vesselId, setVesselId, isMyVessels, assignedVesselIds } = useVessel();
+  // 'my' aggregates across the assigned mini-fleet via the 'all' read path with a
+  // vesselIds allow-list. The URL carries everything so the default fetcher + cache
+  // invalidation patterns stay unchanged.
+  const storesScopeReady = !!vesselId && (!isMyVessels || assignedVesselIds.length > 0);
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
   const { canCreate, canEdit, canDelete } = usePermissions();
   const canCreateStore = canCreate("pms-stores");
@@ -187,6 +191,12 @@ const Stores: React.FC = () => {
     }
     return "stores";
   });
+  const storesInventoryUrl = isMyVessels
+    ? `/technical/api/stores/all?itemType=${activeTab}&vesselIds=${assignedVesselIds.join(',')}`
+    : `/technical/api/stores/${vesselId}?itemType=${activeTab}`;
+  const storesHistoryUrl = isMyVessels
+    ? `/technical/api/stores/all/history?itemType=${activeTab}&vesselIds=${assignedVesselIds.join(',')}`
+    : `/technical/api/stores/${vesselId}/history?itemType=${activeTab}`;
   const [viewMode, setViewMode] = useState<"inventory" | "location" | "history">("inventory");
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -261,8 +271,8 @@ const Stores: React.FC = () => {
   // Fetch stores items from API - uses default TanStack Query fetcher
   // The query key includes the full URL with query parameters
   const { data: storesData = [], isLoading: storesLoading } = useQuery<StoresApiItem[]>({
-    queryKey: vesselId ? [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] : ['stores-disabled'],
-    enabled: !!vesselId,
+    queryKey: storesScopeReady ? [storesInventoryUrl] : ['stores-disabled'],
+    enabled: storesScopeReady,
   });
   
   // Fetch vessel location names
@@ -283,7 +293,7 @@ const Stores: React.FC = () => {
 
   const { data: allVesselLocationsResponse } = useQuery({
     queryKey: [`/technical/api/inventory/locations/${vesselId}`],
-    enabled: vesselId !== 'all' && vesselId !== '' && viewMode === 'location',
+    enabled: vesselId !== 'all' && vesselId !== 'my' && vesselId !== '' && viewMode === 'location',
   });
 
   const allVesselLocations = useMemo(() => {
@@ -439,13 +449,13 @@ const Stores: React.FC = () => {
   
   // Fetch stores history from API
   const { data: historyData = [], isLoading: historyLoading } = useQuery<any[]>({
-    queryKey: vesselId ? [`/technical/api/stores/${vesselId}/history`, activeTab] : ['history-disabled'],
+    queryKey: storesScopeReady ? [`/technical/api/stores/${vesselId}/history`, activeTab, isMyVessels ? assignedVesselIds.join(',') : ''] : ['history-disabled'],
     queryFn: async () => {
-      const response = await fetch(`/technical/api/stores/${vesselId}/history?itemType=${activeTab}`);
+      const response = await fetch(storesHistoryUrl);
       if (!response.ok) throw new Error('Failed to fetch history');
       return response.json();
     },
-    enabled: !!vesselId && viewMode === 'history',
+    enabled: storesScopeReady && viewMode === 'history',
   });
 
   // Map history API data to StoresHistoryItem format
@@ -2772,7 +2782,7 @@ const Stores: React.FC = () => {
         {(isSailAdmin || isClientAdmin || isChangeMode) && (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
-            <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
+            <Select value={(vesselId === 'all' || vesselId === 'my') ? '' : vesselId} onValueChange={setVesselId}>
               <SelectTrigger className="w-[200px]" data-testid="stores-loc-vessel-selector">
                 <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>

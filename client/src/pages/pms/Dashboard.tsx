@@ -533,6 +533,15 @@ const Dashboard = () => {
   // All-Vessel scope from silently flipping the Scope selector to My Vessel.
   const [mgmtScope, setMgmtScope] = useState<'all' | 'my'>('all');
   useEffect(() => {
+    // Task #226: the global scope is now the source of truth for 'my'. When the
+    // global VesselContext is in the 'my' aggregate scope (e.g. restored from a
+    // previous session or set by another module), mirror it into the dashboard's
+    // local scope/vessel selectors.
+    if (vesselId === 'my') {
+      if (mgmtScope !== 'my') setMgmtScope('my');
+      if (mgmtVesselId !== 'my') setMgmtVesselId('my');
+      return;
+    }
     // 'my' is a valid aggregate sentinel (like 'all'); never auto-reset it.
     if (mgmtVesselId === 'my') return;
     if (adminDefaultsToAll && vesselId === 'all' && mgmtVesselId !== 'all') {
@@ -547,7 +556,7 @@ const Dashboard = () => {
       const fallback = vesselId || (adminDefaultsToAll ? 'all' : vessels[0].id);
       setMgmtVesselId(fallback);
     }
-  }, [vesselId, mgmtVesselId, vessels, adminDefaultsToAll]);
+  }, [vesselId, mgmtVesselId, mgmtScope, vessels, adminDefaultsToAll]);
   const effectiveVesselId = activeTab === 'overview' ? mgmtVesselId : vesselId;
   const isAllVessels = effectiveVesselId === 'all';
   
@@ -1441,26 +1450,24 @@ const Dashboard = () => {
 
   const handleVesselChange = (newVesselId: string) => {
     setMgmtVesselId(newVesselId);
-    // 'my' is the assigned-fleet aggregate sentinel — it's not a real vessel,
-    // so keep it out of the global VesselContext (which validates against the
-    // fleet list and would reset it).
-    if (newVesselId !== 'my') {
-      setVesselId(newVesselId);
-    }
+    // Task #226: 'my' is now a first-class GLOBAL aggregate sentinel (alongside
+    // 'all'), so push every selection — including 'my' — to the global
+    // VesselContext so the scope propagates to every other module.
+    setVesselId(newVesselId);
   };
 
-  // Task #224: Scope dropdown. Sets the explicit scope mode and resets the
-  // Vessel dropdown to that scope's aggregate default. 'all' -> entire fleet
-  // aggregate; 'my' -> assigned mini-fleet aggregate.
+  // Task #224/#226: Scope dropdown. Sets the explicit scope mode and resets the
+  // Vessel dropdown to that scope's aggregate default, propagating to the global
+  // VesselContext. 'all' -> entire fleet aggregate; 'my' -> assigned mini-fleet
+  // aggregate.
   const handleScopeChange = (scope: 'all' | 'my') => {
     setMgmtScope(scope);
     if (scope === 'all') {
       setMgmtVesselId('all');
       setVesselId('all');
     } else {
-      // 'my' is the assigned-fleet aggregate sentinel — keep it out of the
-      // global VesselContext (which validates against the fleet list).
       setMgmtVesselId('my');
+      setVesselId('my');
     }
   };
 

@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useMemo, ReactNode } from 'react';
 import { useVessels } from '@/hooks/useVessels';
 import { useUIRole } from '@/contexts/UIRoleContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Vessel {
   id: string;
@@ -9,11 +10,31 @@ interface Vessel {
 }
 
 interface VesselContextType {
+  /** A vessel UUID, the 'all' sentinel (entire fleet) or the 'my' sentinel
+   * (the logged-in user's assigned mini-fleet). 'all' and 'my' are both
+   * aggregate scopes that propagate identically across every module. */
   vesselId: string;
   setVesselId: (id: string) => void;
   isLoading: boolean;
   vessels: Vessel[];
+  /** The assigned mini-fleet ids that 'my' aggregates over (from AuthContext). */
+  assignedVesselIds: string[];
+  isAllVessels: boolean;
+  isMyVessels: boolean;
+  /**
+   * Append vessel scope query params for a fleet-aware read endpoint.
+   * - specific vessel  -> vesselId=<uuid>
+   * - 'all'            -> vesselId=all
+   * - 'my'             -> vesselId=all & vesselIds=<assigned csv> (allow-list).
+   *   When the user has no assigned vessels we send a never-matching sentinel
+   *   so the backend returns zero rows instead of silently falling back to the
+   *   entire fleet.
+   */
+  applyVesselScope: (params: URLSearchParams) => void;
 }
+
+/** Never-matching allow-list sentinel for an empty assigned mini-fleet. */
+const EMPTY_MY_SENTINEL = '00000000-0000-0000-0000-000000000000';
 
 export const VesselContext = createContext<VesselContextType | undefined>(undefined);
 
@@ -22,6 +43,12 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
 
   const { data: vesselData = [], isLoading } = useVessels();
   const { uiRole, isSailAdmin, isClientAdmin } = useUIRole();
+  const { myVessels } = useAuth();
+
+  const assignedVesselIds = useMemo(
+    () => Array.from(new Set((myVessels || []).map(v => String(v.vesselId)).filter(Boolean))),
+    [myVessels]
+  );
 
   const userTouchedRef = useRef(false);
   const lastAppliedRoleRef = useRef<string | null>(null);
@@ -50,7 +77,7 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
       if (roleChanged || !userTouchedRef.current) {
         const stored = localStorage.getItem('selectedVesselId');
         let target: string;
-        if (stored && (stored === 'all' || vessels.some(v => v.id === stored))) {
+        if (stored && (stored === 'all' || stored === 'my' || vessels.some(v => v.id === stored))) {
           target = stored;
           console.log(`🚢 Restoring stored vessel for admin: ${stored} (${uiRole})`);
         } else {
@@ -71,13 +98,15 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
 
     if (vessels.length === 0) return;
 
-    const isAllVessels = vesselId === 'all';
-    const vesselExists = isAllVessels || vessels.some(v => v.id === vesselId);
+    // 'all' (entire fleet) and 'my' (assigned mini-fleet) are both valid
+    // aggregate sentinels; never auto-reset them to a single vessel.
+    const isAggregateScope = vesselId === 'all' || vesselId === 'my';
+    const vesselExists = isAggregateScope || vessels.some(v => v.id === vesselId);
 
-    if (!vesselId || !vesselExists || (isAllVessels && roleChanged)) {
+    if (!vesselId || !vesselExists || (isAggregateScope && roleChanged)) {
       const stored = localStorage.getItem('selectedVesselId');
       let target: string;
-      if (stored && stored !== 'all' && vessels.some(v => v.id === stored)) {
+      if (stored && stored !== 'all' && (stored === 'my' || vessels.some(v => v.id === stored))) {
         target = stored;
         console.log(`🚢 Restoring stored vessel: ${stored} for role ${uiRole}`);
       } else {
@@ -103,8 +132,31 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
     setVesselIdState(id);
   };
 
+  const isAllVessels = vesselId === 'all';
+  const isMyVessels = vesselId === 'my';
+
+  const applyVesselScope = (params: URLSearchParams) => {
+    if (isMyVessels) {
+      params.set('vesselId', 'all');
+      params.set('vesselIds', assignedVesselIds.length ? assignedVesselIds.join(',') : EMPTY_MY_SENTINEL);
+    } else {
+      params.set('vesselId', vesselId);
+    }
+  };
+
   return (
-    <VesselContext.Provider value={{ vesselId, setVesselId, isLoading, vessels }}>
+    <VesselContext.Provider
+      value={{
+        vesselId,
+        setVesselId,
+        isLoading,
+        vessels,
+        assignedVesselIds,
+        isAllVessels,
+        isMyVessels,
+        applyVesselScope,
+      }}
+    >
       {children}
     </VesselContext.Provider>
   );

@@ -9006,6 +9006,7 @@ export class PostgresStorage {
       sortDir?: 'asc' | 'desc';
       activeOnly?: boolean;
       componentId?: string;
+      vesselIds?: string[];
     }
   ): Promise<{ items: SpareWithInventory[]; total: number; page: number; pageSize: number }> {
     const db = await getDb();
@@ -9024,6 +9025,9 @@ export class PostgresStorage {
     ];
     if (vesselId !== 'all') {
       filters.push(sql`s.vessel_id = ${vesselId}`);
+    } else if (opts.vesselIds && opts.vesselIds.length > 0) {
+      // 'my' scope: restrict the all-vessel aggregate to the assigned mini-fleet.
+      filters.push(sql`s.vessel_id = ANY(${opts.vesselIds})`);
     }
 
     if (opts.search && opts.search.trim()) {

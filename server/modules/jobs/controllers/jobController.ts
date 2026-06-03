@@ -9,7 +9,12 @@ import type { AuthenticatedRequest } from '../../../middleware/auth';
 export async function listJobs(req: Request, res: Response) {
   const vesselId = req.query.vesselId as string | undefined;
   const componentId = req.query.componentId as string | undefined;
-  const jobs = await jobService.listJobs(vesselId, componentId);
+  // 'my' scope arrives as vesselId=all + vesselIds=<assigned csv> allow-list.
+  const vesselIdsParam = req.query.vesselIds as string | undefined;
+  const vesselIds = vesselIdsParam
+    ? vesselIdsParam.split(',').map(v => v.trim()).filter(Boolean)
+    : undefined;
+  const jobs = await jobService.listJobs(vesselId, componentId, vesselIds);
   res.json(jobs);
 }
 

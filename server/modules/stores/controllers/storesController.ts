@@ -17,10 +17,14 @@ export async function getAllStores(req: Request, res: Response) {
 
 export async function getStoresByVessel(req: Request, res: Response) {
   try {
-    const { itemType } = req.query;
+    const { itemType, vesselIds } = req.query;
+    const vesselIdList = typeof vesselIds === 'string' && vesselIds.length > 0
+      ? vesselIds.split(',').filter(Boolean)
+      : undefined;
     const stores = await storesService.getStoresByVessel(
       req.params.vesselId,
-      itemType as string | undefined
+      itemType as string | undefined,
+      vesselIdList
     );
     res.json(stores);
   } catch (error) {
@@ -33,10 +37,14 @@ export async function getStoresByVessel(req: Request, res: Response) {
 export async function getTransactionHistory(req: Request, res: Response) {
   try {
     const { vesselId } = req.params;
-    const { itemType } = req.query;
+    const { itemType, vesselIds } = req.query;
+    const vesselIdList = typeof vesselIds === 'string' && vesselIds.length > 0
+      ? vesselIds.split(',').filter(Boolean)
+      : undefined;
     const history = await storesService.getTransactionHistory(
       vesselId,
-      itemType as string | undefined
+      itemType as string | undefined,
+      vesselIdList
     );
     res.json(history);
   } catch (error) {

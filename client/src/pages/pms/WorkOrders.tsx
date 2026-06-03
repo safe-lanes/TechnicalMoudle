@@ -203,7 +203,10 @@ const WorkOrders: React.FC = () => {
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const { vesselId, setVesselId } = useVessel();
+  const { vesselId, setVesselId, isMyVessels, assignedVesselIds, applyVesselScope } = useVessel();
+  // 'my' aggregate scope with no assigned vessels yields nothing — don't fetch.
+  const vesselScopeReady = !!vesselId && (!isMyVessels || assignedVesselIds.length > 0);
+  const vesselScopeKey = isMyVessels ? `my:${assignedVesselIds.join(',')}` : vesselId;
   const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept } = useUIRole();
   const { isOfficeUser } = useAuth();
   const { data: vessels = [] } = useVessels();
@@ -226,10 +229,10 @@ const WorkOrders: React.FC = () => {
   // sorting all run on the server (single source of truth in
   // @shared/utils/workOrderFilters); only one page of rows comes back.
   const { data: woEnvelope, isLoading, error } = useQuery<WorkOrdersPageEnvelope>({
-    queryKey: ['/technical/api/work-orders', vesselId, activeTab, debouncedSearch, periodFilter, selectedRank, criticalityParam, selectedPostponementReason, woSortField, woSortDir, currentPage, itemsPerPage],
+    queryKey: ['/technical/api/work-orders', vesselScopeKey, activeTab, debouncedSearch, periodFilter, selectedRank, criticalityParam, selectedPostponementReason, woSortField, woSortDir, currentPage, itemsPerPage],
     queryFn: async () => {
       const params = new URLSearchParams();
-      params.set('vesselId', vesselId);
+      applyVesselScope(params);
       params.set('page', String(currentPage));
       params.set('pageSize', String(itemsPerPage));
       params.set('status', activeTab);
@@ -247,17 +250,19 @@ const WorkOrders: React.FC = () => {
       const json = await response.json();
       return json.data as WorkOrdersPageEnvelope;
     },
-    enabled: !!vesselId, // Only fetch when vesselId is available
+    enabled: vesselScopeReady, // Only fetch when a usable vessel scope is available
   });
 
   // On-demand full fetch (no `page` param → raw enriched array). Used by the
   // export builders and deep-link navigation that need the complete data set
   // rather than just the current page.
   const fetchAllWorkOrders = useCallback(async (): Promise<WorkOrderWithHydratedData[]> => {
-    const response = await fetch(`/technical/api/work-orders?vesselId=${vesselId}`);
+    const params = new URLSearchParams();
+    applyVesselScope(params);
+    const response = await fetch(`/technical/api/work-orders?${params.toString()}`);
     if (!response.ok) throw new Error('Failed to fetch work orders');
     return await response.json() as WorkOrderWithHydratedData[];
-  }, [vesselId]);
+  }, [applyVesselScope]);
 
   const paginatedWorkOrders: WorkOrderWithHydratedData[] = woEnvelope?.items ?? [];
   const totalItems = woEnvelope?.total ?? 0;
@@ -266,13 +271,15 @@ const WorkOrders: React.FC = () => {
   const uniqueRanks = woEnvelope?.rankOptions ?? [];
 
   const { data: allVesselJobs = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/jobs', vesselId],
+    queryKey: ['/technical/api/jobs', vesselScopeKey],
     queryFn: async () => {
-      const response = await fetch(`/technical/api/jobs?vesselId=${vesselId}`);
+      const params = new URLSearchParams();
+      applyVesselScope(params);
+      const response = await fetch(`/technical/api/jobs?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch jobs');
       return await response.json();
     },
-    enabled: !!vesselId,
+    enabled: vesselScopeReady,
   });
 
   const { data: postponementReasonMasterList } = useQuery<{ listValue: string; displayOrder: number; isActive: boolean }[]>({
@@ -1337,7 +1344,7 @@ const WorkOrders: React.FC = () => {
         {(isSailAdmin || isClientAdmin) && (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
-            <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
+            <Select value={(vesselId === 'all' || vesselId === 'my') ? '' : vesselId} onValueChange={setVesselId}>
               <SelectTrigger className="w-[200px]" data-testid="C15">
                 <Marker id="C15" />
                 <SelectValue placeholder="Choose vessel" />

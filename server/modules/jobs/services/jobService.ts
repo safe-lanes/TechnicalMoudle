@@ -9,8 +9,8 @@ interface UserInfo {
 
 // ── Job Listing with Enrichment ──
 
-export async function listJobs(vesselId?: string, componentId?: string) {
-  const jobs = await repo.findJobs(vesselId, componentId);
+export async function listJobs(vesselId?: string, componentId?: string, vesselIds?: string[]) {
+  const jobs = await repo.findJobs(vesselId, componentId, vesselIds);
 
   // PERFORMANCE OPTIMIZATION: Batch fetch all job-component links
   let jobLinksMap = new Map<string, string[]>();

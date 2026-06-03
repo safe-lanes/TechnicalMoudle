@@ -3,10 +3,14 @@ import type { StoresItem, StoresLedger } from '@shared/schema';
 
 // ── Get All Stores (all vessels) ──
 
-export async function getAllStores(itemType?: string): Promise<StoresItem[]> {
+export async function getAllStores(itemType?: string, vesselIds?: string[]): Promise<StoresItem[]> {
   const allVessels = await repo.getVessels();
+  // 'my' scope: narrow the all-vessel aggregate to the caller's assigned mini-fleet.
+  const scoped = vesselIds && vesselIds.length > 0
+    ? allVessels.filter((v) => vesselIds.includes(v.id))
+    : allVessels;
   const allStores: StoresItem[] = [];
-  for (const vessel of allVessels) {
+  for (const vessel of scoped) {
     const vesselStores = await repo.getStoresItems(vessel.id, itemType);
     allStores.push(...vesselStores);
   }
@@ -15,20 +19,24 @@ export async function getAllStores(itemType?: string): Promise<StoresItem[]> {
 
 // ── Get Stores By Vessel (or all) ──
 
-export async function getStoresByVessel(vesselId: string, itemType?: string): Promise<StoresItem[]> {
+export async function getStoresByVessel(vesselId: string, itemType?: string, vesselIds?: string[]): Promise<StoresItem[]> {
   if (vesselId === 'all') {
-    return getAllStores(itemType);
+    return getAllStores(itemType, vesselIds);
   }
   return repo.getStoresItems(vesselId, itemType);
 }
 
 // ── Transaction History ──
 
-export async function getTransactionHistory(vesselId: string, itemType?: string): Promise<StoresLedger[]> {
+export async function getTransactionHistory(vesselId: string, itemType?: string, vesselIds?: string[]): Promise<StoresLedger[]> {
   if (vesselId === 'all') {
     const allVessels = await repo.getVessels();
+    // 'my' scope: narrow the all-vessel aggregate to the caller's assigned mini-fleet.
+    const scoped = vesselIds && vesselIds.length > 0
+      ? allVessels.filter((v) => vesselIds.includes(v.id))
+      : allVessels;
     const history: StoresLedger[] = [];
-    for (const v of allVessels) {
+    for (const v of scoped) {
       const vHistory = await repo.getStoresTransactionHistory(v.id, itemType);
       history.push(...vHistory);
     }
