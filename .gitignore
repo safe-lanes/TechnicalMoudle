@@ -6,3 +6,4 @@ backup
 uploads
 env
 ecosystem.config.cjs
+dist/
