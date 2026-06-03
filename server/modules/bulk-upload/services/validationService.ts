@@ -1631,9 +1631,10 @@ export async function validateData(type: string, data: any[], mode: string, vess
       if (reviewerRankVal !== undefined && reviewerRankVal !== null && String(reviewerRankVal).trim() !== '') {
         const rr = String(reviewerRankVal).trim();
         if (!RESPONSIBLE_RANKS.includes(rr)) {
-          warnings.push(`Row ${rowNum}: Reviewer Rank '${rr}' is not in the standard rank list. Allowed values: ${RESPONSIBLE_RANKS.join(', ')}`);
+          errors.push(`Row ${rowNum}: Reviewer '${rr}' not found in the rank list. Allowed values: ${RESPONSIBLE_RANKS.join(', ')}`);
+        } else {
+          normalized['Reviewer Rank'] = rr;
         }
-        normalized['Reviewer Rank'] = rr;
       }
       
       // Job Priority - required

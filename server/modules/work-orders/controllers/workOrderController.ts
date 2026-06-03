@@ -249,16 +249,16 @@ export async function completeWorkOrder(req: Request, res: Response) {
 export async function reviewerApprove(req: Request, res: Response) {
   const workOrderId = req.params.id;
   const { reviewerComments } = req.body;
-  const actor = resolveActorIdentity(req);
-  const result = await woBulkService.reviewerApprove(workOrderId, reviewerComments, actor);
+  const reviewedByUuid = (req as AuthenticatedRequest).user?.userUuid || (req as AuthenticatedRequest).user?.username || 'system';
+  const result = await woBulkService.reviewerApprove(workOrderId, reviewerComments, reviewedByUuid);
   res.json(result);
 }
 
 export async function reviewerReopen(req: Request, res: Response) {
   const workOrderId = req.params.id;
   const { reviewerComments } = req.body;
-  const actor = resolveActorIdentity(req);
-  const result = await woBulkService.reviewerReopen(workOrderId, reviewerComments, actor);
+  const reviewedByUuid = (req as AuthenticatedRequest).user?.userUuid || (req as AuthenticatedRequest).user?.username || 'system';
+  const result = await woBulkService.reviewerReopen(workOrderId, reviewerComments, reviewedByUuid);
   res.json(result);
 }
 
