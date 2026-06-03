@@ -13,6 +13,7 @@ import {
   Eye,
   ClipboardList,
   Pencil,
+  RefreshCw,
   Download,
   TrendingUp,
   TrendingDown,
@@ -1906,15 +1907,15 @@ const Dashboard = () => {
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-7 w-7 p-0 text-gray-500 hover:text-gray-800"
+                    className="h-7 w-7 p-0 text-amber-600 hover:bg-amber-50"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setLocation(`/pms/work-order/${wo.id}`);
+                      setReviewerReopenDialog({ open: true, wo: wo as EnrichedWorkOrder, remarks: '', submitting: false });
                     }}
-                    data-testid={`button-op-l2review-open-${wo.id}`}
-                    title="Open work order"
+                    data-testid={`button-op-l2review-reopen-${wo.id}`}
+                    title="Reopen — send back for revision"
                   >
-                    <Pencil className="h-4 w-4" />
+                    <RefreshCw className="h-4 w-4" />
                   </Button>
                 </>
               ) : (
@@ -2981,7 +2982,7 @@ const Dashboard = () => {
                         <span style={{ fontSize: '13px', fontWeight: 500, color: '#212121' }}>
                           {isHeadOfDept
                             ? `${operationKPIs.pendingApprovalCount} work order${operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} awaiting your approval`
-                            : `${operationKPIs.pendingApprovalCount} postponement request${operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} awaiting your decision`
+                            : `${operationKPIs.pendingApprovalCount} item${operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} pending office review`
                           }
                         </span>
                       </div>
@@ -3344,6 +3345,72 @@ const Dashboard = () => {
                         </div>
                       </div>
                     </div>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Reviewer Reopen Dialog */}
+                <Dialog
+                  open={reviewerReopenDialog.open}
+                  onOpenChange={(isOpen) => {
+                    if (!isOpen) setReviewerReopenDialog({ open: false, wo: null, remarks: '', submitting: false });
+                  }}
+                >
+                  <DialogContent className="max-w-md" data-testid="dialog-reviewer-reopen">
+                    <DialogHeader>
+                      <DialogTitle>Reopen Work Order</DialogTitle>
+                      <DialogDescription>
+                        Send this work order back for revision. Optionally add comments explaining what needs to change.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                      {reviewerReopenDialog.wo && (
+                        <div className="bg-gray-50 border border-gray-200 rounded px-3 py-2 text-sm text-gray-700">
+                          <span className="font-medium">{reviewerReopenDialog.wo.workOrderNo || `WO-${reviewerReopenDialog.wo.id}`}</span>
+                          {reviewerReopenDialog.wo.jobTitle && (
+                            <span className="ml-2 text-gray-500">— {reviewerReopenDialog.wo.jobTitle}</span>
+                          )}
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        <Label htmlFor="reviewer-reopen-remarks" className="text-sm">Reviewer Comments (optional)</Label>
+                        <Textarea
+                          id="reviewer-reopen-remarks"
+                          rows={3}
+                          placeholder="Explain what needs to change..."
+                          value={reviewerReopenDialog.remarks}
+                          onChange={(e) => setReviewerReopenDialog(prev => ({ ...prev, remarks: e.target.value }))}
+                          disabled={reviewerReopenDialog.submitting}
+                          className="text-sm resize-none"
+                          data-testid="textarea-reviewer-reopen-remarks"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setReviewerReopenDialog({ open: false, wo: null, remarks: '', submitting: false })}
+                        disabled={reviewerReopenDialog.submitting}
+                        data-testid="button-reviewer-reopen-cancel"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        className="border-amber-400 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                        variant="outline"
+                        disabled={reviewerReopenDialog.submitting}
+                        onClick={() => {
+                          if (!reviewerReopenDialog.wo) return;
+                          setReviewerReopenDialog(prev => ({ ...prev, submitting: true }));
+                          reviewerReopenMutation.mutate({ id: String(reviewerReopenDialog.wo!.id), remarks: reviewerReopenDialog.remarks });
+                        }}
+                        data-testid="button-reviewer-reopen-confirm"
+                      >
+                        {reviewerReopenDialog.submitting
+                          ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5 inline" />Reopening...</>
+                          : <><RefreshCw className="h-4 w-4 mr-1.5 inline" />Reopen</>
+                        }
+                      </Button>
+                    </DialogFooter>
                   </DialogContent>
                 </Dialog>
 
