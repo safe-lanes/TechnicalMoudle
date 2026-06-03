@@ -7706,10 +7706,16 @@ export class PostgresStorage {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
     
-    // Find postponed work orders past their postponed date
+    // Find postponed work orders past their postponed date.
+    // "Awaiting Office Approval" WOs are intentionally excluded — they must not
+    // be auto-reverted until the office acts. Only "Postponed" (legacy) and
+    // "Postponement Approved" (Plan B) WOs are eligible.
     let query = db.select().from(workOrders)
       .where(and(
-        eq(workOrders.status, 'Postponed'),
+        or(
+          eq(workOrders.status, 'Postponed'),
+          eq(workOrders.status, 'Postponement Approved')
+        ),
         eq(workOrders.isActive, true)
       ));
     

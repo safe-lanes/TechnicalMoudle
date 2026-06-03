@@ -920,17 +920,37 @@ const WorkOrders: React.FC = () => {
     updateWorkOrderMutation.mutate({ id: workOrder.id, data: updateData });
   };
 
+  const postponeRequestMutation = useMutation({
+    mutationFn: async ({ id, data, method }: { id: string; data: any; method: 'POST' | 'PUT' }) => {
+      const response = await apiRequest(method, `/technical/api/work-orders/${id}/postpone-request`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      toast({ title: "Postponement Submitted", description: "Your postponement request has been sent to the office for approval." });
+      setPostponeDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to submit postponement request", variant: "destructive" });
+    },
+  });
+
   const handlePostponeConfirm = (workOrderId: string, postponeData: any) => {
-    const updateData = {
-      status: "Postponed",
-      dueDate: postponeData.nextDueDate,
-      postponementEndDate: postponeData.postponementEndDate,
-      postponementReason: postponeData.reason,
-      postponementRemarks: postponeData.postponementRemarks,
-      postponementAuthorizedBy: postponeData.authorizedBy
-    };
-    
-    updateWorkOrderMutation.mutate({ id: workOrderId, data: updateData });
+    const wo = paginatedWorkOrders.find(w => w.id === workOrderId);
+    const isResubmit = wo?.status === 'Awaiting Office Approval' || wo?.computedStatus === 'Awaiting Office Approval' ||
+                       wo?.status === 'Postponement Rejected' || wo?.computedStatus === 'Postponement Rejected';
+    postponeRequestMutation.mutate({
+      id: workOrderId,
+      method: isResubmit ? 'PUT' : 'POST',
+      data: {
+        postponeDate: postponeData.postponeDate,
+        nextDueDate: postponeData.nextDueDate,
+        reason: postponeData.reason,
+        postponementRemarks: postponeData.postponementRemarks,
+        approver: postponeData.approver || 'Office',
+        duration: postponeData.duration,
+      },
+    });
   };
 
   const handleAddWorkOrderClick = () => {

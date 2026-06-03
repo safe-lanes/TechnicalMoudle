@@ -398,6 +398,13 @@ const Dashboard = () => {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [pendingSelectedIds, setPendingSelectedIds] = useState<Set<string>>(new Set());
   const [pendingBulkConfirmApprove, setPendingBulkConfirmApprove] = useState(false);
+  const [postponeDecisionDialog, setPostponeDecisionDialog] = useState<{
+    open: boolean;
+    wo: EnrichedWorkOrder | null;
+    action: 'approve' | 'reject' | null;
+    remarks: string;
+    submitting: boolean;
+  }>({ open: false, wo: null, action: null, remarks: '', submitting: false });
   const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: EnrichedWorkOrder[] }>({ open: false, title: '', workOrders: [] });
   const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
   const [crListModal, setCrListModal] = useState<{ open: boolean; title: string; changeRequests: ChangeRequest[]; statusFilter: string | null }>({ open: false, title: '', changeRequests: [], statusFilter: null });
@@ -810,6 +817,43 @@ const Dashboard = () => {
   }, [filteredWorkOrdersData]);
 
   // Approve work orders mutation (supports single or bulk)
+  // ── Postponement Approval Mutations (Plan B) ──
+  const postponeApproveMutation = useMutation({
+    mutationFn: async ({ id, remarks }: { id: string; remarks: string }) => {
+      const res = await apiRequest('POST', `/technical/api/work-orders/${id}/postpone-approve`, {
+        approvalRemarks: remarks || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Postponement Approved', description: 'Work order due date has been updated.' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      setPostponeDecisionDialog({ open: false, wo: null, action: null, remarks: '', submitting: false });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to approve postponement', variant: 'destructive' });
+      setPostponeDecisionDialog(prev => ({ ...prev, submitting: false }));
+    },
+  });
+
+  const postponeRejectMutation = useMutation({
+    mutationFn: async ({ id, remarks }: { id: string; remarks: string }) => {
+      const res = await apiRequest('POST', `/technical/api/work-orders/${id}/postpone-reject`, {
+        approvalRemarks: remarks,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Postponement Rejected', description: 'Work order has been reverted to Due/Overdue.' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      setPostponeDecisionDialog({ open: false, wo: null, action: null, remarks: '', submitting: false });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to reject postponement', variant: 'destructive' });
+      setPostponeDecisionDialog(prev => ({ ...prev, submitting: false }));
+    },
+  });
+
   const approveMutation = useMutation({
     mutationFn: async (workOrderIds: string[]) => {
       const response = await apiRequest('POST', '/technical/api/work-orders/bulk-approve', {
@@ -1518,7 +1562,7 @@ const Dashboard = () => {
     const criticalSparesLowCount = criticalSparesLowList.length;
 
     const pendingApprovalWOs = safeWOs.filter(wo =>
-      (wo as EnrichedWorkOrder).computedStatus === 'Pending Approval'
+      (wo as EnrichedWorkOrder).computedStatus === 'Awaiting Office Approval'
     );
     const pendingApprovalCount = pendingApprovalWOs.length;
 
@@ -1701,7 +1745,6 @@ const Dashboard = () => {
   }, [isAllVessels, vessels]);
 
   const pendingApprovalsColumnDefs: ColDef[] = useMemo(() => {
-    const hasSelection = pendingSelectedIds.size > 0;
     const formatWoDate = (d: string | null | undefined) => {
       if (!d) return '—';
       try {
@@ -1730,47 +1773,32 @@ const Dashboard = () => {
         <span className="truncate font-medium" data-testid={`cell-pending-approval-vessel-${params.data?.id ?? ''}`}>{params.value || '—'}</span>
       ),
     };
-    const checkboxCol: ColDef = {
-      headerName: '',
-      field: '__select',
-      width: 48,
-      minWidth: 48,
-      maxWidth: 48,
-      checkboxSelection: true,
-      headerCheckboxSelection: true,
-      headerCheckboxSelectionFilteredOnly: true,
-      sortable: false,
-      filter: false,
-      resizable: false,
-      pinned: 'left',
-    };
     return [
-      checkboxCol,
       ...(isAllVessels ? [vesselCol] : []),
       {
-        headerName: 'Component',
-        field: 'component',
-        minWidth: 160,
-        flex: 1,
-        cellRenderer: (params: any) => (
-          <span
-            className="truncate"
-            data-testid={params.data?.id ? `row-op-pending-approval-wo-${params.data.id}` : undefined}
-          >
-            {params.value || '—'}
-          </span>
-        ),
-      },
-      {
-        headerName: 'Work Order No',
+        headerName: 'WO No',
         field: 'workOrderNo',
         minWidth: 150,
         flex: 1,
         cellRenderer: (params: any) => {
           const wo = params.data;
           const text = params.value || (wo?.id ? `WO-${wo.id}` : '—');
-          return <span className="text-blue-600">{text}</span>;
+          return (
+            <span
+              className="text-blue-600"
+              data-testid={wo?.id ? `row-op-pending-approval-wo-${wo.id}` : undefined}
+            >
+              {text}
+            </span>
+          );
         },
+      },
+      {
+        headerName: 'Component',
+        field: 'component',
+        minWidth: 160,
+        flex: 1,
+        valueFormatter: (params: any) => params.value || '—',
       },
       {
         headerName: 'Job Title',
@@ -1781,69 +1809,77 @@ const Dashboard = () => {
         valueFormatter: (params: any) => params.value || '—',
       },
       {
-        headerName: 'Assigned to',
-        field: 'assignedTo',
+        headerName: 'Original Due Date',
+        field: 'originalDueDate',
         minWidth: 140,
         flex: 1,
-        valueGetter: (params: any) =>
-          params.data?.assignedTo || params.data?.assignedRank || '',
-        valueFormatter: (params: any) => params.value || '—',
+        valueGetter: (params: any) => params.data?.originalDueDate || params.data?.dueDate,
+        valueFormatter: (params: any) => formatWoDate(params.value),
       },
       {
-        headerName: 'Submitted Date',
-        field: 'submittedDate',
-        minWidth: 140,
+        headerName: 'Requested New Date',
+        field: 'postponeRequestedDate',
+        minWidth: 150,
         flex: 1,
         valueFormatter: (params: any) => formatWoDate(params.value),
       },
       {
-        headerName: 'Status',
-        field: 'computedStatus',
-        minWidth: 180,
+        headerName: 'Reason',
+        field: 'postponementReason',
+        minWidth: 140,
         flex: 1,
-        valueGetter: (params: any) =>
-          (params.data as EnrichedWorkOrder)?.computedStatus || params.data?.status || 'Pending Approval',
-        cellRenderer: (params: any) => {
-          const wo = params.data;
-          return (
-            <span className="flex items-center gap-2">
-              <WoStatusBadgeCell status={params.value || 'Pending Approval'} />
-              {wo?.wasRejected && wo?.id && (
-                <RejectionHistoryBadge workOrderId={wo.id} />
-              )}
-            </span>
-          );
-        },
+        valueFormatter: (params: any) => params.value || '—',
+      },
+      {
+        headerName: 'Submitted',
+        field: 'submittedDate',
+        minWidth: 120,
+        flex: 1,
+        valueFormatter: (params: any) => formatWoDate(params.value),
       },
       {
         headerName: 'Actions',
         field: 'id',
-        minWidth: 60,
-        width: 60,
-        hide: hasSelection,
+        minWidth: 170,
+        width: 170,
         sortable: false,
         filter: false,
         resizable: false,
         cellRenderer: (params: any) => {
-          const wo = params.data;
+          const wo = params.data as EnrichedWorkOrder;
           if (!wo) return null;
           return (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center gap-1 h-full">
               <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => { e.stopPropagation(); navigateToWorkOrder(wo.id); }}
-                data-testid={`button-op-edit-pending-wo-${wo.id}`}
-                className="text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs border-green-400 text-green-700 hover:bg-green-50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPostponeDecisionDialog({ open: true, wo, action: 'approve', remarks: '', submitting: false });
+                }}
+                data-testid={`button-op-postpone-approve-${wo.id}`}
               >
-                <Pencil className="w-4 h-4" />
+                Approve
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs border-red-400 text-red-700 hover:bg-red-50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPostponeDecisionDialog({ open: true, wo, action: 'reject', remarks: '', submitting: false });
+                }}
+                data-testid={`button-op-postpone-reject-${wo.id}`}
+              >
+                Reject
               </Button>
             </div>
           );
         },
       },
     ];
-  }, [isAllVessels, vessels, navigateToWorkOrder, pendingSelectedIds]);
+  }, [isAllVessels, vessels, setPostponeDecisionDialog]);
 
   const criticalSparesColumnDefs: ColDef[] = useMemo(() => {
     const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
@@ -2718,50 +2754,8 @@ const Dashboard = () => {
                     <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white" data-testid="section-op-pending-approvals">
                       <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E0E0E0' }}>
                         <span style={{ fontSize: '13px', fontWeight: 500, color: '#212121' }}>
-                          {operationKPIs.pendingApprovalCount} work order{operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} require your review
-                          {pendingSelectedIds.size > 0 && (
-                            <span style={{ marginLeft: '8px', color: '#1565C0' }}>
-                              • {pendingSelectedIds.size} selected
-                            </span>
-                          )}
+                          {operationKPIs.pendingApprovalCount} postponement request{operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} awaiting your decision
                         </span>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              style={pendingSelectedIds.size > 0 ? { borderColor: '#E53935', color: '#E53935' } : {}}
-                              onClick={() => {
-                                if (pendingSelectedIds.size === 0) {
-                                  toast({ description: 'Please select at least one checkbox.' });
-                                  return;
-                                }
-                                openRejectDialog('wo', '__bulk__', `${pendingSelectedIds.size} work order${pendingSelectedIds.size !== 1 ? 's' : ''}`);
-                              }}
-                              disabled={rejectMutation.isPending || approveMutation.isPending}
-                              data-testid="button-op-bulk-reject-open"
-                            >
-                              <XCircle className="w-4 h-4 mr-1" />
-                              {pendingSelectedIds.size > 0 ? `Reject (${pendingSelectedIds.size})` : 'Reject'}
-                            </Button>
-                            <Button
-                              size="sm"
-                              style={pendingSelectedIds.size > 0 ? { background: '#2E7D32' } : {}}
-                              className={pendingSelectedIds.size > 0 ? "text-white hover:opacity-90" : ""}
-                              variant={pendingSelectedIds.size > 0 ? undefined : "outline"}
-                              onClick={() => {
-                                if (pendingSelectedIds.size === 0) {
-                                  toast({ description: 'Please select at least one checkbox.' });
-                                  return;
-                                }
-                                setPendingBulkConfirmApprove(true);
-                              }}
-                              disabled={approveMutation.isPending || rejectMutation.isPending}
-                              data-testid="button-op-bulk-approve-confirm"
-                            >
-                              <CheckCircle className="w-4 h-4 mr-1" />
-                              {pendingSelectedIds.size > 0 ? `Approve (${pendingSelectedIds.size})` : 'Approve'}
-                            </Button>
-                          </div>
                       </div>
                       <div style={{ height: 'calc(100vh - 360px)', minHeight: '360px' }} data-testid="ag-grid-op-pending-approvals-wrap">
                         <WOAgGridTable
@@ -2769,18 +2763,13 @@ const Dashboard = () => {
                           rowData={operationKPIs.pendingApprovalWOs}
                           height="100%"
                           rowHeight={52}
-                          noRowsMessage="No work orders pending approval"
+                          noRowsMessage="No postponement requests awaiting approval"
                           testId="ag-grid-op-pending-approvals"
-                          rowSelection="multiple"
-                          onSelectionChanged={handlePendingSelectionChanged}
                           getRowId={(params) => String(params.data.id)}
-                          suppressRowClickSelection={true}
                           getRowClass={(params) => {
                             const id = params.data?.id;
-                            const base = id ? `row-op-pending-approval-wo-${id}` : '';
-                            return params.data?.wasRejected ? `${base} row-pending-resubmitted`.trim() : base || undefined;
+                            return id ? `row-op-pending-approval-wo-${id}` : undefined;
                           }}
-                          getRowStyle={(params) => params.data?.wasRejected ? { background: '#FFEBEE' } : undefined}
                         />
                       </div>
                     </div>
@@ -2929,6 +2918,84 @@ const Dashboard = () => {
                     mode="template"
                   />
                 )}
+
+                {/* Postpone Decision Dialog (Plan B) */}
+                <Dialog
+                  open={postponeDecisionDialog.open}
+                  onOpenChange={(isOpen) => {
+                    if (!isOpen) setPostponeDecisionDialog({ open: false, wo: null, action: null, remarks: '', submitting: false });
+                  }}
+                >
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle className="text-lg font-semibold text-[#0f4c81]">
+                        {postponeDecisionDialog.action === 'approve' ? 'Approve Postponement' : 'Reject Postponement'}
+                      </DialogTitle>
+                      <DialogDescription>
+                        {postponeDecisionDialog.action === 'approve'
+                          ? 'Approving will update the work order due date to the requested date.'
+                          : 'Rejecting will revert the work order to Due or Overdue based on the original due date.'}
+                      </DialogDescription>
+                    </DialogHeader>
+                    {postponeDecisionDialog.wo && (
+                      <div className="space-y-3 text-sm">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 bg-gray-50 rounded p-3">
+                          <div><span className="text-gray-500">WO No</span><p className="font-medium">{postponeDecisionDialog.wo.workOrderNo || '—'}</p></div>
+                          <div><span className="text-gray-500">Job</span><p className="font-medium truncate">{postponeDecisionDialog.wo.jobTitle || '—'}</p></div>
+                          <div><span className="text-gray-500">Original Due</span><p className="font-medium">{postponeDecisionDialog.wo.originalDueDate || postponeDecisionDialog.wo.dueDate || '—'}</p></div>
+                          <div><span className="text-gray-500">Requested Date</span><p className="font-medium text-blue-700">{(postponeDecisionDialog.wo as any).postponeRequestedDate || '—'}</p></div>
+                          <div className="col-span-2"><span className="text-gray-500">Reason</span><p className="font-medium">{postponeDecisionDialog.wo.postponementReason || '—'}</p></div>
+                          {postponeDecisionDialog.wo.postponementRemarks && (
+                            <div className="col-span-2"><span className="text-gray-500">Remarks</span><p className="font-medium">{postponeDecisionDialog.wo.postponementRemarks}</p></div>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            {postponeDecisionDialog.action === 'reject' ? 'Rejection Remarks *' : 'Approval Remarks (optional)'}
+                          </label>
+                          <textarea
+                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                            rows={3}
+                            placeholder={postponeDecisionDialog.action === 'reject' ? 'Required: reason for rejection...' : 'Optional remarks...'}
+                            value={postponeDecisionDialog.remarks}
+                            onChange={(e) => setPostponeDecisionDialog(prev => ({ ...prev, remarks: e.target.value }))}
+                            data-testid="textarea-postpone-decision-remarks"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setPostponeDecisionDialog({ open: false, wo: null, action: null, remarks: '', submitting: false })}
+                        disabled={postponeDecisionDialog.submitting}
+                        data-testid="button-postpone-decision-cancel"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant={postponeDecisionDialog.action === 'reject' ? 'destructive' : 'default'}
+                        disabled={postponeDecisionDialog.submitting || (postponeDecisionDialog.action === 'reject' && !postponeDecisionDialog.remarks.trim())}
+                        onClick={() => {
+                          if (!postponeDecisionDialog.wo) return;
+                          if (postponeDecisionDialog.action === 'reject' && !postponeDecisionDialog.remarks.trim()) return;
+                          setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
+                          const id = String(postponeDecisionDialog.wo!.id);
+                          if (postponeDecisionDialog.action === 'approve') {
+                            postponeApproveMutation.mutate({ id, remarks: postponeDecisionDialog.remarks });
+                          } else {
+                            postponeRejectMutation.mutate({ id, remarks: postponeDecisionDialog.remarks });
+                          }
+                        }}
+                        data-testid={`button-postpone-decision-confirm-${postponeDecisionDialog.action}`}
+                      >
+                        {postponeDecisionDialog.submitting
+                          ? (postponeDecisionDialog.action === 'approve' ? 'Approving...' : 'Rejecting...')
+                          : (postponeDecisionDialog.action === 'approve' ? 'Approve' : 'Reject')}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
 
                 {opDetailSpare && (
                   <Dialog open={!!opDetailSpare} onOpenChange={(isOpen) => !isOpen && setOpDetailSpare(null)}>

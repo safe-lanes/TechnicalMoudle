@@ -107,7 +107,10 @@ export function matchesTab(wo: FilterableWorkOrder, activeTab: string): boolean 
     if (getDisplayStatus(wo) !== "Pending Approval") return false;
   } else if (activeTab === "Postponed") {
     if (wo.isExecution) return false;
-    if (effectiveStatus !== "Postponed") return false;
+    // Include legacy "Postponed", new "Awaiting Office Approval", and "Postponement Approved".
+    // Exclude "Postponement Rejected" — those revert to Due/Overdue and show in their tab.
+    const postponedStatuses = new Set(["Postponed", "Awaiting Office Approval", "Postponement Approved"]);
+    if (!postponedStatuses.has(effectiveStatus)) return false;
   } else if (activeTab === "Unplanned") {
     if (wo.workOrderType !== 'Unplanned') return false;
   }
@@ -234,7 +237,8 @@ export function computeWorkOrderTabCounts(list: FilterableWorkOrder[]): Record<s
       if (es === "Overdue") counts["Overdue"]++;
     }
 
-    if (!wo.isExecution && getEffectiveStatus(wo) === "Postponed") counts["Postponed"]++;
+    const postponedStatuses = new Set(["Postponed", "Awaiting Office Approval", "Postponement Approved"]);
+    if (!wo.isExecution && postponedStatuses.has(getEffectiveStatus(wo))) counts["Postponed"]++;
     if (wo.workOrderType === 'Unplanned') counts["Unplanned"]++;
     if (getDisplayStatus(wo) === "Pending Approval") counts["Pending Approval"]++;
     if (wo.workOrderType !== 'Unplanned' && getEffectiveStatus(wo) === "Completed") counts["Completed"]++;

@@ -1240,6 +1240,12 @@ export const workOrders = pgTable("work_orders", {
   rhJustificationProvidedBy: text("rh_justification_provided_by"),
   rhJustificationDate: timestamp("rh_justification_date"),
 
+  // === Postponement Approval Fields (Plan B) ===
+  postponeRequestedDate: text("postpone_requested_date"), // Ship's requested new due date (populated on postpone-request submit)
+  postponeApprover: text("postpone_approver"), // Static "Office" value stored at request time
+  postponementApprovalDate: text("postponement_approval_date"), // ISO date when office approved/rejected
+  postponementApprovalRemarks: text("postponement_approval_remarks"), // Office remarks on approve/reject
+
   // === WO Generation Cycle Snapshots (for duplicate protection and audit) ===
   // Driver type determines which cycle fields apply
   driverType: text("driver_type"), // 'RH' | 'CALENDAR' | 'DUAL_CALENDAR' | 'DUAL_RH' - from job's maintenanceBasis
@@ -3460,6 +3466,8 @@ export const workOrderPostponements = pgTable("work_order_postponements", {
   approvedDate: text("approved_date"), // When postponement was approved
   approvedBy: text("approved_by"), // Who approved the postponement
   status: text("status").notNull().default("Pending"), // 'Pending' | 'Approved' | 'Rejected'
+  approver: text("approver"), // Designated approver (static "Office" value)
+  postponeDate: text("postpone_date"), // Raw postpone date entered in dialog
   informOffice: boolean("inform_office").notNull().default(false), // Whether office was informed
   attachmentPath: text("attachment_path"), // Path to any attached documents
   createdAt: timestamp("created_at").notNull().defaultNow(),

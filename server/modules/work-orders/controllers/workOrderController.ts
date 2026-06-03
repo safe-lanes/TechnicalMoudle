@@ -286,6 +286,60 @@ export async function checkPostponements(req: Request, res: Response) {
   res.json(result);
 }
 
+// ── Postponement Approval Workflow (Plan B) ──
+
+export async function submitPostponeRequest(req: Request, res: Response) {
+  try {
+    const result = await woService.submitPostponeRequest(req.params.id, req.body);
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+
+export async function editPostponeRequest(req: Request, res: Response) {
+  try {
+    const result = await woService.editPostponeRequest(req.params.id, req.body);
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+
+export async function approvePostponement(req: Request, res: Response) {
+  try {
+    const actor = resolveActorIdentity(req);
+    const result = await woService.approvePostponement(req.params.id, {
+      ...req.body,
+      approvedBy: actor || req.body.approvedBy || 'Office',
+    });
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+
+export async function rejectPostponement(req: Request, res: Response) {
+  try {
+    const actor = resolveActorIdentity(req);
+    const result = await woService.rejectPostponement(req.params.id, {
+      ...req.body,
+      approvedBy: actor || req.body.approvedBy || 'Office',
+    });
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+
 // ── Work Order Executions ──
 
 export async function getExecutions(req: Request, res: Response) {

@@ -146,6 +146,26 @@ router.post('/work-orders/recalculate-statuses', asyncHandler(woCtrl.recalculate
 // POST /work-orders/check-postponements — check and revert postponed work orders
 router.post('/work-orders/check-postponements', asyncHandler(woCtrl.checkPostponements));
 
+// ── Postponement Approval Workflow (Plan B) ──
+
+// POST /work-orders/:id/postpone-request — ship submits initial postponement request
+router.post('/work-orders/:id/postpone-request', asyncHandler(woCtrl.submitPostponeRequest));
+
+// PUT /work-orders/:id/postpone-request — ship edits & resubmits a pending/rejected request
+router.put('/work-orders/:id/postpone-request', asyncHandler(woCtrl.editPostponeRequest));
+
+// POST /work-orders/:id/postpone-approve — office approves a postponement request
+router.post('/work-orders/:id/postpone-approve',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.approvePostponement)
+);
+
+// POST /work-orders/:id/postpone-reject — office rejects a postponement request
+router.post('/work-orders/:id/postpone-reject',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.rejectPostponement)
+);
+
 // ── Work Order Executions ──
 
 // GET  /work-order-executions/:componentId — get executions for component
