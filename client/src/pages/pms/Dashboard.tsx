@@ -1995,8 +1995,8 @@ const Dashboard = () => {
         headerName: 'Actions',
         field: 'id',
         colId: 'hod-actions',
-        minWidth: 60,
-        width: 60,
+        minWidth: 120,
+        width: 120,
         sortable: false,
         filter: false,
         resizable: false,
@@ -2005,7 +2005,35 @@ const Dashboard = () => {
           const wo = params.data as EnrichedWorkOrder;
           if (!wo) return null;
           return (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center gap-1 h-full">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0 text-green-600 hover:bg-green-50 hover:text-green-700"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  approveMutation.mutate([String(wo.id)]);
+                }}
+                data-testid={`button-hod-pending-approve-row-${wo.id}`}
+                title="Approve"
+                disabled={approveMutation.isPending || rejectMutation.isPending}
+              >
+                <CheckCircle className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0 text-red-500 hover:bg-red-50 hover:text-red-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRejectDialog({ open: true, type: 'wo', id: String(wo.id), label: wo.workOrderNo || `WO-${wo.id}` });
+                }}
+                data-testid={`button-hod-pending-reject-row-${wo.id}`}
+                title="Reject"
+                disabled={approveMutation.isPending || rejectMutation.isPending}
+              >
+                <XCircle className="h-4 w-4" />
+              </Button>
               <Button
                 size="sm"
                 variant="ghost"
@@ -2017,14 +2045,14 @@ const Dashboard = () => {
                 data-testid={`button-hod-pending-view-${wo.id}`}
                 title="View work order"
               >
-                <Pencil className="h-3.5 w-3.5" />
+                <Eye className="h-4 w-4" />
               </Button>
             </div>
           );
         },
       },
     ];
-  }, [isAllVessels, vessels, setOpViewModal]);
+  }, [isAllVessels, vessels, setOpViewModal, approveMutation, rejectMutation, setRejectDialog]);
 
   const criticalSparesColumnDefs: ColDef[] = useMemo(() => {
     const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
@@ -2900,36 +2928,37 @@ const Dashboard = () => {
                       <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E0E0E0' }}>
                         <span style={{ fontSize: '13px', fontWeight: 500, color: '#212121' }}>
                           {isHeadOfDept
-                            ? `${operationKPIs.pendingApprovalCount} work order${operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} require your review`
+                            ? `${operationKPIs.pendingApprovalCount} work order${operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} awaiting your approval`
                             : `${operationKPIs.pendingApprovalCount} postponement request${operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} awaiting your decision`
                           }
                         </span>
-                        {isHeadOfDept && (
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-xs border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
-                              disabled={pendingSelectedIds.size === 0 || approveMutation.isPending || rejectMutation.isPending}
-                              onClick={() => setRejectDialog({ open: true, type: 'wo', id: '__bulk__', label: `${pendingSelectedIds.size} work order${pendingSelectedIds.size !== 1 ? 's' : ''}` })}
-                              data-testid="button-hod-pending-reject"
-                            >
-                              <XCircle className="h-3.5 w-3.5 mr-1" />
-                              Reject
-                            </Button>
-                            <Button
-                              size="sm"
-                              className="h-7 text-xs bg-[#1E5A8E] hover:bg-[#174a78] text-white"
-                              disabled={pendingSelectedIds.size === 0 || approveMutation.isPending || rejectMutation.isPending}
-                              onClick={() => setPendingBulkConfirmApprove(true)}
-                              data-testid="button-hod-pending-approve"
-                            >
-                              <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                              Approve
-                            </Button>
-                          </div>
-                        )}
                       </div>
+                      {isHeadOfDept && pendingSelectedIds.size > 0 && (
+                        <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border-b border-gray-200" data-testid="toolbar-hod-bulk-actions">
+                          <span className="text-xs text-gray-600">{pendingSelectedIds.size} selected</span>
+                          <Button
+                            size="sm"
+                            className="h-7 text-xs bg-[#1E5A8E] hover:bg-[#174a78] text-white"
+                            disabled={approveMutation.isPending || rejectMutation.isPending}
+                            onClick={() => setPendingBulkConfirmApprove(true)}
+                            data-testid="button-hod-bulk-approve-selected"
+                          >
+                            <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                            Approve Selected
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
+                            disabled={approveMutation.isPending || rejectMutation.isPending}
+                            onClick={() => setRejectDialog({ open: true, type: 'wo', id: '__bulk__', label: `${pendingSelectedIds.size} work order${pendingSelectedIds.size !== 1 ? 's' : ''}` })}
+                            data-testid="button-hod-bulk-reject-selected"
+                          >
+                            <XCircle className="h-3.5 w-3.5 mr-1" />
+                            Reject Selected
+                          </Button>
+                        </div>
+                      )}
                       <div style={{ height: 'calc(100vh - 360px)', minHeight: '360px' }} data-testid="ag-grid-op-pending-approvals-wrap">
                         <WOAgGridTable
                           columnDefs={isHeadOfDept ? hodPendingApprovalColumnDefs : pendingApprovalsColumnDefs}
