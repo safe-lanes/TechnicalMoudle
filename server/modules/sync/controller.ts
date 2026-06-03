@@ -9,6 +9,7 @@ import * as syncService from './service';
 import * as syncRepo from './repository';
 import * as provisioningService from './provisioningService';
 import { getSyncEngine } from './syncEngine';
+import { syncAutoScheduler } from './autoSyncScheduler';
 import { FileSyncProcessor } from './fileSyncProcessor';
 import { runPruning } from './pruningService';
 import { runHealthCheck, getTableStats } from './healthMonitor';
@@ -433,6 +434,16 @@ export async function updateSettingsHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'settings object is required' });
     }
 
+    // Validate sync_interval_minutes if present: positive integer, no minimum.
+    let newIntervalMinutes: number | null = null;
+    if (settings.sync_interval_minutes !== undefined) {
+      const n = Number(settings.sync_interval_minutes);
+      if (!Number.isInteger(n) || n <= 0) {
+        return res.status(400).json({ error: 'sync_interval_minutes must be a positive integer (minutes)' });
+      }
+      newIntervalMinutes = n;
+    }
+
     const userId = (req as any).user?.userUuid || (req as any).user?.username || 'system';
     await syncRepo.updateSettings(settings, userId);
 
@@ -440,7 +451,17 @@ export async function updateSettingsHandler(req: Request, res: Response) {
     const engine = getSyncEngine();
     engine.reloadSettings();
 
-    res.json({ success: true, message: 'Settings updated. Sync engine will reload on next cycle.' });
+    // Apply the new interval LIVE. The scheduler only runs on a ship instance;
+    // on shore restartWithNewInterval is a graceful no-op (records the preference).
+    if (newIntervalMinutes !== null && (await isShipInstance())) {
+      syncAutoScheduler.restartWithNewInterval(newIntervalMinutes);
+    }
+
+    res.json({
+      success: true,
+      message: 'Settings updated.',
+      ...(newIntervalMinutes !== null ? { syncIntervalMinutes: newIntervalMinutes } : {}),
+    });
   } catch (error: any) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error('[Sync] update settings error:', error);

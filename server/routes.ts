@@ -128,7 +128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { isShipInstance } = await import("./modules/sync/syncRole");
   const { syncAutoScheduler } = await import("./modules/sync/autoSyncScheduler");
   if (await isShipInstance()) {
-    syncAutoScheduler.start(6 * 60 * 60 * 1000); // 6-hour tick cadence (overridable via sync_interval_minutes setting)
+    await syncAutoScheduler.start(6 * 60 * 60 * 1000); // Initial cadence; runtime value comes from sync_interval_minutes setting in sync_settings table.
     console.log('[AutoSync] Ship instance — scheduler started (autonomous sync with catch-up and connectivity logging)');
   } else {
     console.log('[AutoSync] Shore instance detected — auto-sync scheduler not started (sync is ship-initiated)');

@@ -223,8 +223,13 @@ export default function SyncFleetOverview() {
       });
       return res.json();
     },
-    onSuccess: () => {
-      toast({ title: "Settings saved", description: "Sync engine will reload on next cycle." });
+    onSuccess: (_data: any, variables: Record<string, string>) => {
+      const n = variables?.sync_interval_minutes;
+      if (n) {
+        toast({ title: "Sync interval updated", description: `Now running every ${n} minutes.` });
+      } else {
+        toast({ title: "Settings saved", description: "Sync engine will reload on next cycle." });
+      }
       setEditedSettings({});
       refetchSettings();
     },
@@ -644,7 +649,9 @@ export default function SyncFleetOverview() {
                 {[
                   {
                     key: "sync_interval_minutes",
-                    label: "Sync Interval (min)",
+                    label: "Sync Interval (minutes)",
+                    helper:
+                      "Sets how often auto-sync runs. Lower values use more VSAT bandwidth. Changes take effect immediately.",
                   },
                   { key: "max_retries", label: "Max Retries" },
                   { key: "chunk_size", label: "Chunk Size" },
@@ -660,15 +667,20 @@ export default function SyncFleetOverview() {
                     key: "batch_retention_days",
                     label: "Batch Retention (days)",
                   },
-                ].map(({ key, label }) => (
+                ].map(({ key, label, helper }: { key: string; label: string; helper?: string }) => (
                   <div key={key} className="space-y-1">
                     <Label className="text-xs">{label}</Label>
                     <Input
                       type="number"
+                      min={1}
+                      step={1}
                       value={getSettingValue(key)}
                       onChange={(e) => setSettingValue(key, e.target.value)}
                       className="h-8"
                     />
+                    {helper && (
+                      <p className="text-[11px] leading-tight text-gray-400">{helper}</p>
+                    )}
                   </div>
                 ))}
               </div>
