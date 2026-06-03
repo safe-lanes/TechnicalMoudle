@@ -1954,7 +1954,7 @@ const Dashboard = () => {
               data-testid={wo?.id ? `row-hod-pending-wo-${wo.id}` : undefined}
               onClick={(e) => {
                 e.stopPropagation();
-                if (wo) setOpViewModal({ open: true, workOrder: wo, mode: 'execution' });
+                if (wo?.id) setLocation(`/pms/work-order/${wo.id}`);
               }}
             >
               {text}
@@ -2026,19 +2026,19 @@ const Dashboard = () => {
                 className="h-7 w-7 p-0 text-gray-500 hover:text-gray-800"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setOpViewModal({ open: true, workOrder: wo, mode: 'execution' });
+                  setLocation(`/pms/work-order/${wo.id}`);
                 }}
-                data-testid={`button-hod-pending-view-${wo.id}`}
-                title="View work order"
+                data-testid={`button-hod-pending-edit-${wo.id}`}
+                title="Open work order"
               >
-                <Eye className="h-4 w-4" />
+                <Pencil className="h-4 w-4" />
               </Button>
             </div>
           );
         },
       },
     ];
-  }, [isAllVessels, vessels, setOpViewModal, approveMutation, rejectMutation, setRejectDialog]);
+  }, [isAllVessels, vessels, approveMutation, rejectMutation, setRejectDialog, setLocation]);
 
   const criticalSparesColumnDefs: ColDef[] = useMemo(() => {
     const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
