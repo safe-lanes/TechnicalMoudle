@@ -526,6 +526,12 @@ const Dashboard = () => {
   const adminDefaultsToAll = isSailAdmin || isClientAdmin;
   const isAdminScope = isSailAdmin || isClientAdmin || isTechSuperintendent;
   const [mgmtVesselId, setMgmtVesselId] = useState<string>('');
+  // Task #224: Scope is an EXPLICIT mode ('all' = entire fleet, 'my' = assigned
+  // mini-fleet), NOT derived from which vessel is selected. Vessel selection
+  // narrows *within* the active scope. Everyone (incl. admins) defaults to
+  // 'all'. Keeping scope explicit prevents picking an assigned vessel while in
+  // All-Vessel scope from silently flipping the Scope selector to My Vessel.
+  const [mgmtScope, setMgmtScope] = useState<'all' | 'my'>('all');
   useEffect(() => {
     // 'my' is a valid aggregate sentinel (like 'all'); never auto-reset it.
     if (mgmtVesselId === 'my') return;
@@ -570,7 +576,6 @@ const Dashboard = () => {
     () => Array.from(new Set((myVessels || []).map(v => String(v.vesselId)).filter(Boolean))),
     [myVessels]
   );
-  const assignedVesselIdSet = useMemo(() => new Set(assignedVesselIds), [assignedVesselIds]);
   const isMyVessels = effectiveVesselId === 'my';
   const hasAssignedVessels = assignedVesselIds.length > 0;
   // Resolve assigned ids to full vessel objects; fall back to a minimal record
@@ -585,15 +590,10 @@ const Dashboard = () => {
   const isAggregate = isAllVessels || isMyVessels;
   // When My Vessel is selected but nothing is assigned, render an empty state.
   const myVesselsEmpty = isMyVessels && !hasAssignedVessels;
-  // Scope dropdown value derived from the current vessel selection.
-  const scopeValue: 'all' | 'my' =
-    effectiveVesselId === 'all'
-      ? 'all'
-      : effectiveVesselId === 'my'
-        ? 'my'
-        : assignedVesselIdSet.has(effectiveVesselId)
-          ? 'my'
-          : 'all';
+  // Scope dropdown value is the explicit scope mode — never inferred from the
+  // selected vessel. Selecting an assigned vessel while in All-Vessel scope
+  // must NOT flip the Scope selector to My Vessel.
+  const scopeValue: 'all' | 'my' = mgmtScope;
 
   const { data: scopedResponse } = useQuery<ScopedOperationResponse>({
     queryKey: ['/technical/api/scoped-operation-data', effectiveVesselId, hodScope, userRankName, isAdminScope],
@@ -1449,27 +1449,18 @@ const Dashboard = () => {
     }
   };
 
-  // Task #224: Scope dropdown. 'all' -> entire fleet aggregate; 'my' -> assigned
-  // mini-fleet aggregate. Switching scope resets the Vessel dropdown to that
-  // scope's aggregate default.
+  // Task #224: Scope dropdown. Sets the explicit scope mode and resets the
+  // Vessel dropdown to that scope's aggregate default. 'all' -> entire fleet
+  // aggregate; 'my' -> assigned mini-fleet aggregate.
   const handleScopeChange = (scope: 'all' | 'my') => {
+    setMgmtScope(scope);
     if (scope === 'all') {
       setMgmtVesselId('all');
       setVesselId('all');
     } else {
+      // 'my' is the assigned-fleet aggregate sentinel — keep it out of the
+      // global VesselContext (which validates against the fleet list).
       setMgmtVesselId('my');
-    }
-  };
-
-  const handleAllVesselsChange = (isAll: boolean) => {
-    if (isAll) {
-      setMgmtVesselId('all');
-      setVesselId('all');
-    } else {
-      if ((mgmtVesselId === 'all' || mgmtVesselId === 'my') && vessels.length > 0) {
-        setMgmtVesselId(vessels[0].id);
-        setVesselId(vessels[0].id);
-      }
     }
   };
 
@@ -2840,10 +2831,10 @@ const Dashboard = () => {
             className="text-gray-600"
             onClick={() => {
               setSelectedCriticality("");
-              handleAllVesselsChange(false);
-              if (vessels.length > 0) {
-                handleVesselChange(vessels[0].id);
-              }
+              // Reset to the default scope/vessel: All Vessel scope, entire
+              // fleet aggregate. Keeps Scope and Vessel selection consistent
+              // with the explicit scope model.
+              handleScopeChange('all');
             }}
             data-testid="button-clear-dashboard-filters"
           >
