@@ -402,7 +402,7 @@ const Dashboard = () => {
   const [postponeDecisionDialog, setPostponeDecisionDialog] = useState<{
     open: boolean;
     wo: EnrichedWorkOrder | null;
-    action: 'approve' | 'reject' | null;
+    action: 'approve' | 'reject' | 'review' | null;
     remarks: string;
     submitting: boolean;
   }>({ open: false, wo: null, action: null, remarks: '', submitting: false });
@@ -1841,8 +1841,8 @@ const Dashboard = () => {
       {
         headerName: 'Actions',
         field: 'id',
-        minWidth: 170,
-        width: 170,
+        minWidth: 130,
+        width: 130,
         sortable: false,
         filter: false,
         resizable: false,
@@ -1854,33 +1854,33 @@ const Dashboard = () => {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 text-xs border-green-400 text-green-700 hover:bg-green-50"
+                className="h-7 text-xs border-[#1E5A8E] text-[#1E5A8E] hover:bg-blue-50"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setPostponeDecisionDialog({ open: true, wo, action: 'approve', remarks: '', submitting: false });
+                  setPostponeDecisionDialog({ open: true, wo, action: 'review', remarks: '', submitting: false });
                 }}
-                data-testid={`button-op-postpone-approve-${wo.id}`}
+                data-testid={`button-op-postpone-review-${wo.id}`}
               >
-                Approve
+                Review
               </Button>
               <Button
                 size="sm"
-                variant="outline"
-                className="h-7 text-xs border-red-400 text-red-700 hover:bg-red-50"
+                variant="ghost"
+                className="h-7 w-7 p-0 text-gray-500 hover:text-gray-800"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setPostponeDecisionDialog({ open: true, wo, action: 'reject', remarks: '', submitting: false });
+                  setOpViewModal({ open: true, workOrder: wo });
                 }}
-                data-testid={`button-op-postpone-reject-${wo.id}`}
+                data-testid={`button-op-postpone-view-${wo.id}`}
               >
-                Reject
+                <Eye className="h-4 w-4" />
               </Button>
             </div>
           );
         },
       },
     ];
-  }, [isAllVessels, vessels, setPostponeDecisionDialog]);
+  }, [isAllVessels, vessels, setPostponeDecisionDialog, setOpViewModal]);
 
   const criticalSparesColumnDefs: ColDef[] = useMemo(() => {
     const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
@@ -2930,7 +2930,11 @@ const Dashboard = () => {
                   <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col" data-testid="dialog-postpone-decision">
                     <DialogHeader className="flex-shrink-0">
                       <DialogTitle>
-                        {postponeDecisionDialog.action === 'approve' ? 'Approve Postponement' : 'Reject Postponement'}
+                        {postponeDecisionDialog.action === 'review'
+                          ? 'Review Postponement Request'
+                          : postponeDecisionDialog.action === 'approve'
+                            ? 'Approve Postponement'
+                            : 'Reject Postponement'}
                       </DialogTitle>
                     </DialogHeader>
 
@@ -3037,7 +3041,7 @@ const Dashboard = () => {
                           >
                             Cancel
                           </Button>
-                          {postponeDecisionDialog.action === 'reject' ? (
+                          {(postponeDecisionDialog.action === 'reject' || postponeDecisionDialog.action === 'review') && (
                             <Button
                               variant="outline"
                               className="border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
@@ -3048,12 +3052,13 @@ const Dashboard = () => {
                                 setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
                                 postponeRejectMutation.mutate({ id: String(postponeDecisionDialog.wo!.id), remarks: postponeDecisionDialog.remarks });
                               }}
-                              data-testid={`button-postpone-decision-confirm-${postponeDecisionDialog.action}`}
+                              data-testid={`button-postpone-decision-confirm-${postponeDecisionDialog.action === 'review' ? 'reject' : postponeDecisionDialog.action}`}
                             >
                               <XCircle className="h-4 w-4 mr-1.5" />
                               {postponeDecisionDialog.submitting ? 'Rejecting...' : 'Reject'}
                             </Button>
-                          ) : (
+                          )}
+                          {(postponeDecisionDialog.action === 'approve' || postponeDecisionDialog.action === 'review') && (
                             <Button
                               className="bg-[#1E5A8E] hover:bg-[#174a78] text-white"
                               disabled={postponeDecisionDialog.submitting}
@@ -3062,7 +3067,7 @@ const Dashboard = () => {
                                 setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
                                 postponeApproveMutation.mutate({ id: String(postponeDecisionDialog.wo!.id), remarks: postponeDecisionDialog.remarks });
                               }}
-                              data-testid={`button-postpone-decision-confirm-${postponeDecisionDialog.action}`}
+                              data-testid={`button-postpone-decision-confirm-${postponeDecisionDialog.action === 'review' ? 'approve' : postponeDecisionDialog.action}`}
                             >
                               <CheckCircle className="h-4 w-4 mr-1.5" />
                               {postponeDecisionDialog.submitting ? 'Approving...' : 'Approve'}
