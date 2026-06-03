@@ -1636,9 +1636,12 @@ const Dashboard = () => {
       const s = (wo as EnrichedWorkOrder).computedStatus;
       return s === 'Due' || s === 'Due (Grace P)';
     }).length;
+    // "Scheduled" slice counts only work orders whose effective status is
+    // Active, matching the "Scheduled Work Orders (from chart)" drill-down
+    // table exactly so the donut number always equals the table row count.
     const planned = safeWOs.filter(wo => {
       const s = (wo as EnrichedWorkOrder).computedStatus;
-      return s === 'Active' || s === 'Postponed' || s === 'Completed';
+      return s === 'Active';
     }).length;
     return [
       { status: 'Overdue', count: overdue, color: '#ff6961' },
@@ -1659,7 +1662,7 @@ const Dashboard = () => {
     // "Scheduled Work Orders (from chart)" drill-down table: show only
     // work orders whose effective status is Active (Postponed/Completed are
     // excluded per product direction). The donut "Scheduled" slice count
-    // above intentionally still tallies Active + Postponed + Completed.
+    // uses the same Active-only filter so the number matches these rows.
     const plannedStatusWOs = safeWOs.filter(wo => {
       const s = (wo as EnrichedWorkOrder).computedStatus;
       return s === 'Active';
