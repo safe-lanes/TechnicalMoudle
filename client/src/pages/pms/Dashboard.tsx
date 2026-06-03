@@ -1946,12 +1946,19 @@ const Dashboard = () => {
         minWidth: 160,
         flex: 1,
         cellRenderer: (params: any) => {
-          const wo = params.data;
+          const wo = params.data as EnrichedWorkOrder;
           const text = params.value || (wo?.id ? `WO-${wo.id}` : '—');
           return (
-            <span className="text-blue-600 font-medium" data-testid={wo?.id ? `row-hod-pending-wo-${wo.id}` : undefined}>
+            <button
+              className="text-blue-600 font-medium hover:underline cursor-pointer bg-transparent border-0 p-0 text-left"
+              data-testid={wo?.id ? `row-hod-pending-wo-${wo.id}` : undefined}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (wo) setOpViewModal({ open: true, workOrder: wo, mode: 'execution' });
+              }}
+            >
               {text}
-            </span>
+            </button>
           );
         },
       },
@@ -1964,32 +1971,11 @@ const Dashboard = () => {
         valueFormatter: (params: any) => params.value || '—',
       },
       {
-        headerName: 'Assigned to',
-        field: 'assignedTo',
-        minWidth: 130,
-        flex: 1,
-        valueGetter: (params: any) => params.data?.assignedTo || params.data?.assignedRank || '—',
-        valueFormatter: (params: any) => params.value || '—',
-      },
-      {
-        headerName: 'Submitted Date',
-        field: 'submittedDate',
+        headerName: 'Due Date',
+        field: 'dueDate',
         minWidth: 130,
         flex: 1,
         valueFormatter: (params: any) => formatWoDate(params.value),
-      },
-      {
-        headerName: 'Status',
-        field: 'computedStatus',
-        minWidth: 130,
-        flex: 1,
-        sortable: false,
-        filter: false,
-        cellRenderer: () => (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-white bg-purple-600">
-            Pending Approval
-          </span>
-        ),
       },
       {
         headerName: 'Actions',
