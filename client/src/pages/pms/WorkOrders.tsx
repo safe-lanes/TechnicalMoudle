@@ -608,7 +608,7 @@ const WorkOrders: React.FC = () => {
                       <Lock className="inline h-3 w-3 mr-0.5" /> Locked
                     </span>
                   </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[280px]">
+                  <TooltipContent side="left" collisionPadding={8} className="max-w-[280px]">
                     <p className="font-semibold text-xs mb-1">Reason for Lock:</p>
                     {buildLockReasonMessages(wo).map((msg, i) => (
                       <p key={i} className="text-xs">• {msg}</p>
@@ -705,7 +705,7 @@ const WorkOrders: React.FC = () => {
                       <Lock className="inline h-3 w-3 mr-0.5" /> Locked
                     </span>
                   </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[280px]">
+                  <TooltipContent side="left" collisionPadding={8} className="max-w-[280px]">
                     <p className="font-semibold text-xs mb-1">Reason for Lock:</p>
                     {buildLockReasonMessages(woCompleted).map((msg, i) => (
                       <p key={i} className="text-xs">• {msg}</p>
