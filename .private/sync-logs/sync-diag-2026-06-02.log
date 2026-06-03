@@ -1,0 +1,95 @@
+[2026-06-02T04:22:13.013Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=33ac4134-8cb6-4d0a-b415-d810e1276e51 — 7 fields changed, isInsert=true, vesselId=9d88f081-6e0f-41e5-9bdb-124b9d9cc3b8, instanceId=SHORE-PROD
+[2026-06-02T04:27:06.566Z] [SyncDiag] RECEIVE-PUSH START: batch=92c2d7af-2eae-47a0-a8f9-ae7bebcb7cac, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
+[2026-06-02T04:27:06.573Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
+[2026-06-02T04:27:08.609Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-06-01T22:27:09.636Z, shoreInstanceId=SHORE-PROD
+[2026-06-02T04:27:08.925Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65595 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-06-01T22:27:09.636Z instances=[]
+[2026-06-02T04:27:08.926Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
+[2026-06-02T04:27:09.263Z] [SyncDiag] PREPARE-PULL DONE: 102 one-way rows across 2 tables, 0 field logs, 0 conflicts
+[2026-06-02T04:27:09.263Z] [SyncDiag] PREPARE-PULL ONE-WAY: master_lists — 6 rows
+[2026-06-02T04:27:09.264Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_certificates_master — 96 rows
+[2026-06-02T04:27:09.525Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-06-01T22:27:09.636Z excludeInstance=SHIP-Vessel 5
+[2026-06-02T04:27:09.709Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65595 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-06-01T22:27:09.636Z instances=[]
+[2026-06-02T04:27:09.709Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
+[2026-06-02T04:27:09.862Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
+[2026-06-02T04:28:41.552Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=05d85c29-51a5-4876-aab5-2a6e42833cef — 7 fields changed, isInsert=true, vesselId=743feb08-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.047Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=54c62469-4087-4c55-9d3b-efef1b41a075 — 7 fields changed, isInsert=true, vesselId=744cf286-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.072Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=37f781ac-83bb-47ae-af9e-6264b649ea28 — 7 fields changed, isInsert=true, vesselId=744dc41e-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.100Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=e03f8506-1fd4-4ca8-a7da-ecc2c2aadffa — 7 fields changed, isInsert=true, vesselId=4fbd2fab-85d2-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.127Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=a17f8192-8f30-4e2e-a19b-478712844bca — 7 fields changed, isInsert=true, vesselId=7c08b51c-4345-4681-9d98-ec8ae142ac67, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.153Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=dd77b017-54ba-43c6-847f-90b5033fd2d7 — 7 fields changed, isInsert=true, vesselId=cec1b7d6-72a4-45c8-b72c-30e31621a255, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.179Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=fbe1831b-4f50-4483-9bc1-b2b2e24fd572 — 7 fields changed, isInsert=true, vesselId=7cb64519-6008-4189-820e-4b2e1f74504e, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.209Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=e9a3cc9f-daf5-4c54-a949-b718e085503a — 7 fields changed, isInsert=true, vesselId=f6212312-3486-43de-b37b-640a1f14bc75, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.240Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=b3815e63-eaf0-4b98-894d-2f063558e7a6 — 7 fields changed, isInsert=true, vesselId=13421138-e990-45d9-ab09-94f01faeebe2, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.266Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=38839c06-3fd4-474b-a563-d5312f7687a5 — 7 fields changed, isInsert=true, vesselId=9d88f081-6e0f-41e5-9bdb-124b9d9cc3b8, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.292Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=c5ff948e-f197-4302-b3c1-819806d3c27f — 7 fields changed, isInsert=true, vesselId=3ce12bd2-1213-42c7-8fe1-2d3bd5f69249, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.315Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=81b4eab3-ee10-4d3a-aeba-b0b748b142d9 — 7 fields changed, isInsert=true, vesselId=b89759ad-378b-4cec-af80-9cafd44853c9, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.342Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=68f7a8ef-2541-49b1-ba12-1b8e1723d9ac — 7 fields changed, isInsert=true, vesselId=cd03135a-f38a-40de-b7d6-27ba85b633dc, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.370Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=ff555655-042d-4770-ad31-23d74bb069f3 — 7 fields changed, isInsert=true, vesselId=24a0fb38-d8bf-43d2-9e8f-206f20578069, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.400Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=bc63c432-78a2-4477-a360-49ba872918b7 — 7 fields changed, isInsert=true, vesselId=743ef9d1-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.447Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=7ecb6e3f-4517-4d2d-9479-5ea029aa98bb — 7 fields changed, isInsert=true, vesselId=743feb08-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.470Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=a7b82ecd-b28c-4388-af8c-6b782cdce81d — 7 fields changed, isInsert=true, vesselId=7440571a-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.493Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=d0947e18-05a2-451f-b414-f03214210edc — 7 fields changed, isInsert=true, vesselId=744535d0-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.516Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=405bc80c-571b-419b-89af-673c0b7c7370 — 7 fields changed, isInsert=true, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.568Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=f50e8a2f-a357-4597-abdc-5ca96a5c75c1 — 7 fields changed, isInsert=true, vesselId=74481b72-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.590Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=7da016df-cc8a-4a67-90b8-211775d74194 — 7 fields changed, isInsert=true, vesselId=744bafc7-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T04:30:39.613Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=4ec57eb6-e2d7-4729-a8ee-850b420bdead — 7 fields changed, isInsert=true, vesselId=744c8b44-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T06:35:18.826Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=12a26c03-a9f6-4afc-8eba-cd45b44c8d7a — 2 fields changed, isInsert=false, vesselId=4fbd2fab-85d2-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T06:36:04.546Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=c6a9c660-3da3-49ce-8fc8-23f76e85a344 — 7 fields changed, isInsert=true, vesselId=744cf286-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T06:36:04.597Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=f7246712-bdc6-4a2e-b704-09d2011e823c — 7 fields changed, isInsert=true, vesselId=744dc41e-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T06:36:04.832Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=2d49de8e-b143-4eac-9c6a-9f4cbbb386fb — 7 fields changed, isInsert=true, vesselId=4fbd2fab-85d2-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T06:36:04.942Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=db8ff930-81c4-4808-9090-b01ceec9576f — 7 fields changed, isInsert=true, vesselId=7c08b51c-4345-4681-9d98-ec8ae142ac67, instanceId=SHORE-PROD
+[2026-06-02T06:36:05.002Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=d0676985-a87b-48ff-8009-db698f7aa840 — 7 fields changed, isInsert=true, vesselId=cec1b7d6-72a4-45c8-b72c-30e31621a255, instanceId=SHORE-PROD
+[2026-06-02T06:36:05.053Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=61a071cc-4020-4bbd-bbd3-62fb6b8ad9b8 — 7 fields changed, isInsert=true, vesselId=7cb64519-6008-4189-820e-4b2e1f74504e, instanceId=SHORE-PROD
+[2026-06-02T06:36:05.141Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=74ba2a70-ab7b-4542-980b-87766d775802 — 7 fields changed, isInsert=true, vesselId=f6212312-3486-43de-b37b-640a1f14bc75, instanceId=SHORE-PROD
+[2026-06-02T06:36:05.194Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=84755ee7-1a06-4009-a925-d814762ceea8 — 7 fields changed, isInsert=true, vesselId=13421138-e990-45d9-ab09-94f01faeebe2, instanceId=SHORE-PROD
+[2026-06-02T06:36:05.307Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=36c66b3b-d5c9-434a-a79e-fbe36ba9863e — 7 fields changed, isInsert=true, vesselId=9d88f081-6e0f-41e5-9bdb-124b9d9cc3b8, instanceId=SHORE-PROD
+[2026-06-02T06:36:05.399Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=ccdd4939-b6d4-4fcb-88dc-614ac9049f0b — 7 fields changed, isInsert=true, vesselId=3ce12bd2-1213-42c7-8fe1-2d3bd5f69249, instanceId=SHORE-PROD
+[2026-06-02T06:36:05.427Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=94a35351-ebe6-4556-a093-ea007c5e9af3 — 7 fields changed, isInsert=true, vesselId=b89759ad-378b-4cec-af80-9cafd44853c9, instanceId=SHORE-PROD
+[2026-06-02T06:36:05.461Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=991e0138-48cf-434b-baa6-8ce4099eaabb — 7 fields changed, isInsert=true, vesselId=cd03135a-f38a-40de-b7d6-27ba85b633dc, instanceId=SHORE-PROD
+[2026-06-02T06:36:05.491Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=cf3241ff-12f5-4b76-a31a-ceb15bc5521e — 7 fields changed, isInsert=true, vesselId=24a0fb38-d8bf-43d2-9e8f-206f20578069, instanceId=SHORE-PROD
+[2026-06-02T06:36:05.522Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=cc5f1b48-d616-4ab7-aca7-91e53c8ec4a9 — 7 fields changed, isInsert=true, vesselId=743ef9d1-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T06:36:05.555Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=d7b6fd70-77fd-4770-8b3c-b5a71cef6abb — 7 fields changed, isInsert=true, vesselId=743feb08-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T06:36:05.582Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=86936d54-1f08-4437-85cf-f1cf57df4d07 — 7 fields changed, isInsert=true, vesselId=7440571a-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T06:36:06.038Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=1b6254ff-cb6b-41ea-8c94-9f646b83bc06 — 7 fields changed, isInsert=true, vesselId=744535d0-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T06:36:06.057Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=f81eca47-05fe-4889-99f9-c51f6ffef63c — 7 fields changed, isInsert=true, vesselId=7446783c-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T06:36:06.086Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=0ba4729e-39bf-4314-a65c-e02d6e9e951c — 7 fields changed, isInsert=true, vesselId=74481b72-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T06:36:06.104Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=0931a59f-37d6-43d9-b1b0-a25b1297db3f — 7 fields changed, isInsert=true, vesselId=744bafc7-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T06:36:06.123Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=7c5ca84e-f912-4946-8515-537826071f0c — 7 fields changed, isInsert=true, vesselId=744c8b44-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T06:36:53.866Z] [SyncDiag] FIELD-LOGGER: vessel_survey_data row=37064804-ace5-4d67-a2ff-c10b3321e6fe — 7 fields changed, isInsert=true, vesselId=7440571a-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T06:37:20.672Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=da6ba74a-ce40-4b5e-ba95-b3a217c2267f — 2 fields changed, isInsert=false, vesselId=744dc41e-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-02T08:50:47.495Z] [SyncDiag] FIELD-LOGGER: work_orders row=4c5d802e-202c-479c-9535-ed70e7af04e3 — 1 fields changed, isInsert=false, vesselId=cd03135a-f38a-40de-b7d6-27ba85b633dc, instanceId=SHORE-PROD
+[2026-06-02T10:27:06.127Z] [SyncDiag] RECEIVE-PUSH START: batch=496c46e3-304d-4469-b451-a14da3433ca6, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
+[2026-06-02T10:27:06.133Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
+[2026-06-02T10:27:08.172Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-06-02T04:27:09.523Z, shoreInstanceId=SHORE-PROD
+[2026-06-02T10:27:08.555Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 14 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
+[2026-06-02T10:27:08.555Z] [SyncDiag] PREPARE-PULL FIELD LOG TABLES: {"vessel_certificate_data":7,"vessel_survey_data":7}
+[2026-06-02T10:27:10.293Z] [SyncDiag] PREPARE-PULL DONE: 160 one-way rows across 6 tables, 14 field logs, 0 conflicts
+[2026-06-02T10:27:10.293Z] [SyncDiag] PREPARE-PULL ONE-WAY: adm_role_menu_access — 34 rows
+[2026-06-02T10:27:10.294Z] [SyncDiag] PREPARE-PULL ONE-WAY: master_lists — 6 rows
+[2026-06-02T10:27:10.294Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_certificates_master — 99 rows
+[2026-06-02T10:27:10.295Z] [SyncDiag] PREPARE-PULL ONE-WAY: ship_surveys_master — 18 rows
+[2026-06-02T10:27:10.295Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_certificate_applicability — 2 rows
+[2026-06-02T10:27:10.296Z] [SyncDiag] PREPARE-PULL ONE-WAY: vessel_survey_applicability — 1 rows
+[2026-06-02T10:27:12.750Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-06-02T04:27:09.523Z excludeInstance=SHIP-Vessel 5
+[2026-06-02T10:27:12.795Z] [SyncDiag] COMPLETE-SESSION: found 14 shore logs to mark synced
+[2026-06-02T10:27:13.012Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
+[2026-06-02T16:27:05.675Z] [SyncDiag] RECEIVE-PUSH START: batch=7bc17dad-92e2-48b9-b594-411fd9d20c0d, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
+[2026-06-02T16:27:05.683Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
+[2026-06-02T16:27:07.724Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-06-02T10:27:12.715Z, shoreInstanceId=SHORE-PROD
+[2026-06-02T16:27:08.394Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65609 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-06-02T10:27:12.715Z instances=[]
+[2026-06-02T16:27:08.395Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
+[2026-06-02T16:27:09.845Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
+[2026-06-02T16:27:09.865Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-06-02T10:27:12.715Z excludeInstance=SHIP-Vessel 5
+[2026-06-02T16:27:09.968Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65609 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-06-02T10:27:12.715Z instances=[]
+[2026-06-02T16:27:09.968Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
+[2026-06-02T16:27:10.134Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced
+[2026-06-02T22:27:04.909Z] [SyncDiag] RECEIVE-PUSH START: batch=36bd62b5-7d61-4ca0-9c92-ee9557bc6c0b, vessel=7446783c-841a-11ed-aa7c-7003bca91a86, fieldLogs=0, oneWayRows=0
+[2026-06-02T22:27:04.916Z] [SyncDiag] RECEIVE-PUSH DONE: stored=0, applied=0, errors=0, oneWayTables=0
+[2026-06-02T22:27:06.947Z] [SyncDiag] PREPARE-PULL START: vessel=7446783c-841a-11ed-aa7c-7003bca91a86, vesselCode=null, checkpoint=2026-06-02T16:27:09.864Z, shoreInstanceId=SHORE-PROD
+[2026-06-02T22:27:07.243Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65609 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-06-02T16:27:09.864Z instances=[]
+[2026-06-02T22:27:07.243Z] [SyncDiag] PREPARE-PULL FIELD LOGS: 0 shore logs for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 (excluded instance=SHIP-Vessel 5)
+[2026-06-02T22:27:07.497Z] [SyncDiag] PREPARE-PULL DONE: 0 one-way rows across 0 tables, 0 field logs, 0 conflicts
+[2026-06-02T22:27:07.509Z] [SyncDiag] COMPLETE-SESSION: marking shore logs synced for vessel=7446783c-841a-11ed-aa7c-7003bca91a86 checkpointBefore=2026-06-02T16:27:09.864Z excludeInstance=SHIP-Vessel 5
+[2026-06-02T22:27:07.612Z] [SyncDiag] PREPARE-PULL DIAG: vessel=7446783c-841a-11ed-aa7c-7003bca91a86 total_logs=65609 unsynced=0 after_instance_filter=0 exclude=SHIP-Vessel 5 since=2026-06-02T16:27:09.864Z instances=[]
+[2026-06-02T22:27:07.613Z] [SyncDiag] COMPLETE-SESSION: found 0 shore logs to mark synced
+[2026-06-02T22:27:07.769Z] [SyncDiag] COMPLETE-SESSION: found 0 ship logs to mark synced

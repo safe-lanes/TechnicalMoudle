@@ -1945,6 +1945,13 @@ var init_schema = __esm({
       superintendentNotifiedAt: text2("superintendent_notified_at"),
       ceApprovalRemarks: text2("ce_approval_remarks"),
       approvalBlockReason: text2("approval_block_reason"),
+      superintendentRejectionRemarks: text2("superintendent_rejection_remarks"),
+      superintendentRejectedByName: text2("superintendent_rejected_by_name"),
+      // === Layer 8: Superintendent Reopen Completion ===
+      wasReopened: boolean2("was_reopened").notNull().default(false),
+      superintendentReopenRemarks: text2("superintendent_reopen_remarks"),
+      superintendentReopenedByName: text2("superintendent_reopened_by_name"),
+      reopenedAt: text2("reopened_at"),
       // === Layer 7: Running Hours Validation & Isolation ===
       completionRH: decimal2("completion_rh", { precision: 10, scale: 2 }),
       completionRHValidated: boolean2("completion_rh_validated"),
@@ -11833,14 +11840,15 @@ function computeWorkOrderStatus(input) {
     calendarLeadTimeDays,
     companyGraceConfig
   } = input;
-  const FINALIZED_STATUSES = /* @__PURE__ */ new Set(["completed", "approved", "closed", "cancelled", "canceled"]);
+  const FINALIZED_STATUSES2 = /* @__PURE__ */ new Set(["completed", "approved", "closed", "cancelled", "canceled"]);
   const normalizedStatus = status ? status.toLowerCase().trim() : "";
-  if (FINALIZED_STATUSES.has(normalizedStatus)) {
+  if (FINALIZED_STATUSES2.has(normalizedStatus)) {
     return "Completed";
   }
   if (isExecution) {
     if (status === "Pending Approval") return "Pending Approval";
-    if (status === "Rejected") {
+    if (status === "Rejected") return "Rejected";
+    if (status === "Reopened") {
     } else if (completionDateTime) {
       return "Completed";
     } else {
@@ -11849,7 +11857,8 @@ function computeWorkOrderStatus(input) {
   }
   if (status === "Pending Approval") return "Pending Approval";
   if (status === "Postponed") return "Postponed";
-  if (status !== "Rejected" && completionDateTime) {
+  if (status === "Rejected") return "Rejected";
+  if (status !== "Reopened" && completionDateTime) {
     return "Completed";
   }
   if (maintenanceBasis === "Dual Frequency") {
@@ -12187,6 +12196,9 @@ var init_postgresStorage = __esm({
             console.error("[FieldLogger] stores_ledger create:", e);
           }
         }
+      }
+      async createStoresLedgerEntryForImport(values) {
+        return this.insertStoresLedgerEntry(values);
       }
       // ============= USERS (Module 1) =============
       async getUser(id) {
@@ -18679,7 +18691,7 @@ var init_postgresStorage = __esm({
       LEFT JOIN locations l ON sls.location_id = l.id
       LEFT JOIN spare_component_links scl ON scl.spare_id = s.id
       LEFT JOIN components c ON scl.component_id = c.cuuid
-      WHERE s.vessel_id = ${vesselId}
+      WHERE ${vesselId === "all" ? sql5`TRUE` : sql5`s.vessel_id = ${vesselId}`}
         AND s.deleted = false
         AND s.data_scope = 'vessel'
       GROUP BY s.id
@@ -18769,10 +18781,12 @@ var init_postgresStorage = __esm({
         const offset = (page - 1) * pageSize;
         const dir = (opts.sortDir || "asc").toLowerCase() === "desc" ? sql5.raw("DESC") : sql5.raw("ASC");
         const filters = [
-          sql5`s.vessel_id = ${vesselId}`,
           sql5`s.deleted = false`,
           sql5`s.data_scope = 'vessel'`
         ];
+        if (vesselId !== "all") {
+          filters.push(sql5`s.vessel_id = ${vesselId}`);
+        }
         if (opts.search && opts.search.trim()) {
           const q = `%${opts.search.trim()}%`;
           filters.push(sql5`(
@@ -22554,9 +22568,9 @@ function isUnplannedWO(wo, hasLinkedJob) {
   return false;
 }
 function isPendingApprovalExecution(wo) {
-  const FINALIZED_STATUSES = /* @__PURE__ */ new Set(["completed", "approved", "closed", "cancelled"]);
+  const FINALIZED_STATUSES2 = /* @__PURE__ */ new Set(["completed", "approved", "closed", "cancelled"]);
   const normalizedStatus = (wo.status || "").toLowerCase().trim();
-  return wo.isExecution === true && !FINALIZED_STATUSES.has(normalizedStatus);
+  return wo.isExecution === true && !FINALIZED_STATUSES2.has(normalizedStatus);
 }
 function mapStatusToCategory(computedStatus, wo, hasLinkedJob) {
   if (isUnplannedWO(wo, hasLinkedJob)) return "Unplanned";
@@ -27737,6 +27751,253 @@ init_db();
 init_schema();
 init_sync();
 import { eq as eq9 } from "drizzle-orm";
+
+// shared/utils/workOrderFilters.ts
+var FINALIZED_STATUSES = /* @__PURE__ */ new Set(["completed", "approved", "closed", "cancelled", "canceled"]);
+function isStoredCompleted(wo) {
+  return !!wo.status && FINALIZED_STATUSES.has(wo.status.toLowerCase().trim());
+}
+function getEffectiveStatus(wo) {
+  if (wo.workOrderType === "Unplanned") return "Unplanned";
+  if (isStoredCompleted(wo)) return "Completed";
+  return wo.computedStatus || wo.status || "Active";
+}
+function getDisplayStatus(wo) {
+  if (wo.workOrderType === "Unplanned") {
+    if (isStoredCompleted(wo)) return "Completed";
+    if (wo.status === "Pending Approval") return "Pending Approval";
+    if (wo.status === "Draft") return "Draft";
+    return wo.status || "Active";
+  }
+  return getEffectiveStatus(wo);
+}
+function matchesTab(wo, activeTab) {
+  const effectiveStatus = getEffectiveStatus(wo);
+  if (activeTab === "Planned") {
+    if (wo.isExecution) return false;
+    if (wo.workOrderType === "Unplanned") return false;
+    if (effectiveStatus !== "Active") return false;
+  } else if (activeTab === "Due") {
+    const isRejectedExecution = wo.isExecution && wo.status === "Rejected";
+    if (wo.isExecution && !isRejectedExecution) return false;
+    if (effectiveStatus !== "Due" && effectiveStatus !== "Due (Grace P)") return false;
+  } else if (activeTab === "Overdue") {
+    const isRejectedExecution = wo.isExecution && wo.status === "Rejected";
+    if (wo.isExecution && !isRejectedExecution) return false;
+    if (effectiveStatus !== "Overdue") return false;
+  } else if (activeTab === "Completed") {
+    if (wo.workOrderType === "Unplanned") return false;
+    if (effectiveStatus !== "Completed") return false;
+  } else if (activeTab === "Pending Approval") {
+    if (getDisplayStatus(wo) !== "Pending Approval") return false;
+  } else if (activeTab === "Postponed") {
+    if (wo.isExecution) return false;
+    if (effectiveStatus !== "Postponed") return false;
+  } else if (activeTab === "Unplanned") {
+    if (wo.workOrderType !== "Unplanned") return false;
+  }
+  return true;
+}
+function matchesSearch(wo, searchTerm) {
+  if (!searchTerm) return true;
+  const t = searchTerm.toLowerCase();
+  if ((wo.jobTitle || "").toLowerCase().includes(t)) return true;
+  if ((wo.workOrderNo || "").toLowerCase().includes(t)) return true;
+  if (wo.templateCode && wo.templateCode.toLowerCase().includes(t)) return true;
+  if (wo.executionId && wo.executionId.toLowerCase().includes(t)) return true;
+  return false;
+}
+function matchesPeriod(wo, periodFilter) {
+  if (!periodFilter) return true;
+  const isRhBased = wo.maintenanceBasis === "Running Hours";
+  if (isRhBased) {
+    const rhTarget = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null);
+    const rhCurrent = wo.currentRH ?? (wo.currentReading != null ? Number(wo.currentReading) : null);
+    if (rhTarget == null || isNaN(rhTarget) || rhCurrent == null || isNaN(rhCurrent)) {
+      return false;
+    }
+    const rhRemaining = rhTarget - rhCurrent;
+    let periodDays = 0;
+    if (periodFilter.mode === "year-only" && periodFilter.year) {
+      const isLeap = periodFilter.year % 4 === 0 && periodFilter.year % 100 !== 0 || periodFilter.year % 400 === 0;
+      periodDays = isLeap ? 366 : 365;
+    } else if (periodFilter.mode === "year-quarter" && periodFilter.year && periodFilter.quarter) {
+      const qStart = new Date(periodFilter.year, (periodFilter.quarter - 1) * 3, 1);
+      const qEnd = new Date(periodFilter.year, periodFilter.quarter * 3, 0);
+      periodDays = Math.round((qEnd.getTime() - qStart.getTime()) / (1e3 * 60 * 60 * 24)) + 1;
+    } else if (periodFilter.mode === "year-months" && periodFilter.year && periodFilter.months && periodFilter.months.length > 0) {
+      let totalDays = 0;
+      for (const m of periodFilter.months) {
+        const lastDay = new Date(periodFilter.year, m, 0).getDate();
+        totalDays += lastDay;
+      }
+      periodDays = totalDays;
+    } else if (periodFilter.mode === "date-range" && periodFilter.dateFrom && periodFilter.dateTo) {
+      const from = new Date(periodFilter.dateFrom);
+      from.setHours(0, 0, 0, 0);
+      const to = new Date(periodFilter.dateTo);
+      to.setHours(0, 0, 0, 0);
+      periodDays = Math.round((to.getTime() - from.getTime()) / (1e3 * 60 * 60 * 24)) + 1;
+    }
+    const periodHours = periodDays * 24;
+    if (rhRemaining > periodHours) return false;
+  } else {
+    const woDueDate = wo.dueDate ? new Date(wo.dueDate) : null;
+    if (!woDueDate || isNaN(woDueDate.getTime())) {
+      return false;
+    }
+    if (periodFilter.mode === "year-only" && periodFilter.year) {
+      if (woDueDate.getFullYear() !== periodFilter.year) return false;
+    } else if (periodFilter.mode === "year-quarter" && periodFilter.year && periodFilter.quarter) {
+      if (woDueDate.getFullYear() !== periodFilter.year) return false;
+      const woMonth = woDueDate.getMonth() + 1;
+      const qStart = (periodFilter.quarter - 1) * 3 + 1;
+      const qEnd = qStart + 2;
+      if (woMonth < qStart || woMonth > qEnd) return false;
+    } else if (periodFilter.mode === "year-months" && periodFilter.year && periodFilter.months && periodFilter.months.length > 0) {
+      if (woDueDate.getFullYear() !== periodFilter.year) return false;
+      const woMonth = woDueDate.getMonth() + 1;
+      if (!periodFilter.months.includes(woMonth)) return false;
+    } else if (periodFilter.mode === "date-range" && periodFilter.dateFrom && periodFilter.dateTo) {
+      const from = new Date(periodFilter.dateFrom);
+      from.setHours(0, 0, 0, 0);
+      const to = new Date(periodFilter.dateTo);
+      to.setHours(23, 59, 59, 999);
+      const woTime = woDueDate.getTime();
+      if (woTime < from.getTime() || woTime > to.getTime()) return false;
+    }
+  }
+  return true;
+}
+function matchesRank(wo, selectedRank) {
+  if (!selectedRank || selectedRank === "all") return true;
+  return (wo.assignedTo?.trim() ?? "") === selectedRank;
+}
+function matchesCriticality(wo, criticality) {
+  if (!criticality || criticality.length === 0) return true;
+  const set = new Set(criticality);
+  const woCriticality = wo.criticality?.toLowerCase();
+  const isCompCritical = wo.componentCritical === true;
+  let matchesAny = false;
+  if (set.has("critical") && woCriticality === "yes") matchesAny = true;
+  if (set.has("non-critical") && woCriticality !== "yes") matchesAny = true;
+  if (set.has("critical-component") && isCompCritical) matchesAny = true;
+  return matchesAny;
+}
+function matchesPostponementReason(wo, reason) {
+  if (!reason || reason === "all") return true;
+  return wo.postponementReason === reason;
+}
+function computeWorkOrderTabCounts(list) {
+  const counts = {
+    "Planned": 0,
+    "Due": 0,
+    "Overdue": 0,
+    "Postponed": 0,
+    "Unplanned": 0,
+    "Pending Approval": 0,
+    "Completed": 0
+  };
+  for (const wo of list) {
+    if (!wo.isExecution && wo.workOrderType !== "Unplanned" && getEffectiveStatus(wo) === "Active") {
+      counts["Planned"]++;
+    }
+    const isRejectedExecution = wo.isExecution && wo.status === "Rejected";
+    if (!(wo.isExecution && !isRejectedExecution)) {
+      const es = getEffectiveStatus(wo);
+      if (es === "Due" || es === "Due (Grace P)") counts["Due"]++;
+      if (es === "Overdue") counts["Overdue"]++;
+    }
+    if (!wo.isExecution && getEffectiveStatus(wo) === "Postponed") counts["Postponed"]++;
+    if (wo.workOrderType === "Unplanned") counts["Unplanned"]++;
+    if (getDisplayStatus(wo) === "Pending Approval") counts["Pending Approval"]++;
+    if (wo.workOrderType !== "Unplanned" && getEffectiveStatus(wo) === "Completed") counts["Completed"]++;
+  }
+  return counts;
+}
+function computeApprovalTierCounts(list) {
+  return {
+    superintendent_locked: list.filter((wo) => wo.approvalTier === "superintendent_locked").length,
+    superintendent_notification: list.filter((wo) => wo.approvalTier === "superintendent_notification").length,
+    ce_with_justification: list.filter((wo) => wo.approvalTier === "ce_with_justification").length,
+    standard: list.filter((wo) => !wo.approvalTier || wo.approvalTier === "standard").length
+  };
+}
+function compareWorkOrders(a, b, field, dir, activeTab = "") {
+  let cmp = 0;
+  switch (field) {
+    case "component":
+      cmp = (a.component || "").localeCompare(b.component || "");
+      break;
+    case "workOrderNo": {
+      const getWoNo = (wo) => (activeTab === "Pending Approval" || activeTab === "Completed") && wo.executionId ? wo.executionId : wo.workOrderNo || wo.templateCode || "";
+      cmp = getWoNo(a).localeCompare(getWoNo(b));
+      break;
+    }
+    case "jobTitle":
+      cmp = (a.jobTitle || "").localeCompare(b.jobTitle || "");
+      break;
+    case "assignedTo":
+      cmp = (a.assignedTo || "").localeCompare(b.assignedTo || "");
+      break;
+    case "dueDate": {
+      const useSubmitted = activeTab === "Pending Approval" || activeTab === "Completed";
+      const aVal = useSubmitted ? a.submittedDate || "" : a.dueDate || "";
+      const bVal = useSubmitted ? b.submittedDate || "" : b.dueDate || "";
+      cmp = aVal.localeCompare(bVal);
+      break;
+    }
+    case "status": {
+      const STATUS_ORDER = {
+        "Overdue": 0,
+        "Due": 1,
+        "Due (Grace P)": 2,
+        "Active": 3,
+        "Pending Approval": 4,
+        "Postponed": 5,
+        "Draft": 6,
+        "Completed": 7
+      };
+      const aS = a.computedStatus || a.status || "";
+      const bS = b.computedStatus || b.status || "";
+      cmp = (STATUS_ORDER[aS] ?? 99) - (STATUS_ORDER[bS] ?? 99);
+      break;
+    }
+    case "dateCompleted":
+      cmp = (a.dateCompleted || "9999").localeCompare(b.dateCompleted || "9999");
+      break;
+    case "plannedDate":
+      cmp = (a.plannedDate || "9999").localeCompare(b.plannedDate || "9999");
+      break;
+    case "postponeUntil":
+      cmp = (a.postponementEndDate || "9999").localeCompare(b.postponementEndDate || "9999");
+      break;
+    case "postponementReason":
+      cmp = (a.postponementReason || "").localeCompare(b.postponementReason || "");
+      break;
+    case "daysLate":
+      cmp = (a.daysLate || 0) - (b.daysLate || 0);
+      break;
+    case "approvalTier":
+      cmp = (a.approvalTier || "").localeCompare(b.approvalTier || "");
+      break;
+  }
+  return dir === "desc" ? -cmp : cmp;
+}
+function filterAndSortWorkOrders(list, params) {
+  const activeTab = params.activeTab || "Planned";
+  const result = list.filter(
+    (wo) => matchesTab(wo, activeTab) && matchesSearch(wo, params.search || "") && matchesPeriod(wo, params.period) && matchesRank(wo, params.rank || "") && matchesCriticality(wo, params.criticality || []) && matchesPostponementReason(wo, params.postponementReason || "")
+  );
+  if (params.sortField) {
+    const field = params.sortField;
+    const dir = params.sortDir || "asc";
+    return [...result].sort((a, b) => compareWorkOrders(a, b, field, dir, activeTab));
+  }
+  return result;
+}
+
+// server/modules/work-orders/services/workOrderService.ts
 async function resolveRankIdFromLabel(assignedTo) {
   if (!assignedTo) return null;
   const { getAllRanks: getAllRanks3 } = await Promise.resolve().then(() => (init_service2(), service_exports2));
@@ -28056,6 +28317,23 @@ async function listWorkOrders(vesselId, vesselIds) {
   });
   return sortedWorkOrders;
 }
+async function listWorkOrdersPaged(vesselId, vesselIds, params) {
+  const enriched = await listWorkOrders(vesselId, vesselIds);
+  const statusCounts = computeWorkOrderTabCounts(enriched);
+  const rankOptions = Array.from(
+    new Set(
+      enriched.map((wo) => typeof wo.assignedTo === "string" ? wo.assignedTo.trim() : "").filter((rank) => rank.length > 0)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+  const filtered = filterAndSortWorkOrders(enriched, params);
+  const approvalTierCounts = computeApprovalTierCounts(filtered);
+  const total = filtered.length;
+  const pageSize = params.pageSize;
+  const page = params.page;
+  const start = (page - 1) * pageSize;
+  const items = filtered.slice(start, start + pageSize);
+  return { items, total, page, pageSize, statusCounts, approvalTierCounts, rankOptions };
+}
 async function getRejectionHistory(id) {
   let workOrder = await findById3(id);
   if (!workOrder) {
@@ -28070,12 +28348,16 @@ async function getRejectionHistory(id) {
     const entries = await getAuditLogsByEntity("work_order", eid);
     logs.push(...entries);
   }
-  const rejections = logs.filter((entry) => entry.actionType === "reject").map((entry) => {
+  const REJECTION_ACTION_TYPES = /* @__PURE__ */ new Set(["reject", "superintendent_reject_completion", "superintendent_reopen_completion"]);
+  const rejections = logs.filter((entry) => REJECTION_ACTION_TYPES.has(entry.actionType)).map((entry) => {
     const payload = entry.payload || {};
+    const isSuperintendentCompletion = entry.actionType === "superintendent_reject_completion";
+    const isSuperintendentReopen = entry.actionType === "superintendent_reopen_completion";
     return {
-      rejectedAt: payload.rejectedAt || entry.timestamp,
-      rejectedBy: entry.userId,
-      rejectionComments: payload.rejectionComments ?? null
+      rejectedAt: isSuperintendentReopen ? payload.reopenedAt || entry.timestamp : payload.rejectedAt || entry.timestamp,
+      rejectedBy: isSuperintendentCompletion || isSuperintendentReopen ? payload.rejectedByName || payload.reopenedByName || entry.userId : entry.userId,
+      rejectionComments: isSuperintendentCompletion ? payload.rejectionRemarks ?? null : isSuperintendentReopen ? payload.reopenRemarks ?? null : payload.rejectionComments ?? null,
+      rejectionType: isSuperintendentCompletion ? "superintendent_completion_rejection" : isSuperintendentReopen ? "superintendent_completion_reopen" : "approver_rejection"
     };
   }).sort((a, b) => {
     const ta = new Date(a.rejectedAt).getTime();
@@ -28503,13 +28785,16 @@ async function updateWorkOrder(id, body) {
     updateData.superintendentAcknowledged = null;
     console.log("\u{1F4DD} Work order rejected - setting status to Due, wasRejected=true, clearing approval tier for rework");
   }
-  const isRejectedWO = existingWO2.wasRejected === true;
+  const isRejectedWO = existingWO2.wasRejected === true || existingWO2.status === "Rejected";
   if (isRejectedWO && hasCompletionData && !hasExplicitStatus) {
     updateData.status = "Pending Approval";
     updateData.rejectionComments = null;
     updateData.rejectionDate = null;
     updateData.approvalAction = null;
     updateData.submittedDate = (/* @__PURE__ */ new Date()).toISOString();
+    if (existingWO2.status === "Rejected") {
+      updateData.superintendentRejectionRemarks = null;
+    }
     console.log("\u{1F4DD} Previously rejected WO resubmitted - transitioning to Pending Approval");
   }
   const isSubmissionAction = updateData.approvalAction === "submitted" || updateData.approvalAction === "submit" || updateData.status === "Pending Approval";
@@ -29301,6 +29586,188 @@ async function getScopedOperationData(vesselId, userRankId, mode, userRole, user
       fallbackMode: null
     }
   };
+}
+async function rejectCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
+  let existingWO2 = await findById3(id);
+  if (!existingWO2) existingWO2 = await findByCode(id);
+  if (!existingWO2) throw new NotFoundError("Work order not found");
+  if (existingWO2.status !== "Completed") {
+    throw new ValidationError(
+      `Only Completed work orders can be rejected by the superintendent. Current status: ${existingWO2.status}`
+    );
+  }
+  if (!remarks || !remarks.trim()) {
+    throw new ValidationError("Superintendent rejection remarks are mandatory.");
+  }
+  const rejectedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const updatePayload = {
+    status: "Rejected",
+    wasRejected: true,
+    superintendentRejectionRemarks: remarks.trim(),
+    superintendentRejectedByName: actorName || actorUserUuid,
+    rejectionDate: rejectedAt
+  };
+  const updatedWO = await update5(id, updatePayload);
+  await logFieldChanges(
+    "work_orders",
+    existingWO2.wouuid,
+    existingWO2.vesselId || null,
+    existingWO2,
+    updatedWO,
+    actorUserUuid
+  );
+  try {
+    await createAuditLog2({
+      entityType: "work_order",
+      entityId: existingWO2.wouuid || id,
+      actionType: "superintendent_reject_completion",
+      userId: actorUserUuid,
+      source: "web_ui",
+      vesselCode: existingWO2.vesselId || null,
+      componentCode: existingWO2.componentCode || null,
+      fieldName: null,
+      oldValue: null,
+      newValue: null,
+      payload: {
+        workOrderNo: existingWO2.workOrderNo,
+        rejectedAt,
+        rejectedByName: actorName || actorUserUuid,
+        rejectionRemarks: remarks.trim(),
+        rejectionType: "superintendent_completion_rejection"
+      }
+    });
+  } catch (err) {
+    console.error("[AuditLog] Completed WO rejection:", err);
+  }
+  if (existingWO2.jobId && existingWO2.vesselId) {
+    try {
+      const siblings = await findWorkOrdersByJobId2(existingWO2.jobId);
+      const referenceDate = existingWO2.completionDateTime || existingWO2.dueDate || "";
+      const openStatuses = /* @__PURE__ */ new Set(["Active", "Planned", "Due", "Due (Grace P)", "Overdue"]);
+      const toCancel = siblings.filter(
+        (wo) => wo.id !== existingWO2.id && wo.vesselId === existingWO2.vesselId && openStatuses.has(wo.status) && !wo.isDeleted && referenceDate && (wo.dueDate && wo.dueDate > referenceDate || wo.nextDueDate && wo.nextDueDate > referenceDate)
+      );
+      for (const sibling of toCancel) {
+        const cancelled = await update5(sibling.id, { isDeleted: true, isActive: false });
+        try {
+          await logFieldChanges(
+            "work_orders",
+            sibling.wouuid,
+            sibling.vesselId || null,
+            sibling,
+            cancelled,
+            actorUserUuid
+          );
+        } catch (err) {
+          console.error("[FieldLogger] Sibling WO cancellation:", err);
+        }
+        console.log(`\u{1F5D1}\uFE0F [Rejection] Cancelled next-cycle sibling WO: ${sibling.workOrderNo}`);
+      }
+    } catch (err) {
+      console.error("[Rejection] Error cancelling sibling WOs:", err);
+    }
+  }
+  if (existingWO2.jobId && existingWO2.dueDate) {
+    try {
+      const db2 = await getDb();
+      await db2.update(jobs).set({ nextDueDate: existingWO2.dueDate }).where(eq9(jobs.juuid, existingWO2.jobId));
+      console.log(`\u{1F4C5} [Rejection] Reset job nextDueDate to ${existingWO2.dueDate} for job ${existingWO2.jobId}`);
+    } catch (err) {
+      console.error("[Rejection] Error resetting job nextDueDate:", err);
+    }
+  }
+  return updatedWO;
+}
+async function reopenCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
+  let existingWO2 = await findById3(id);
+  if (!existingWO2) existingWO2 = await findByCode(id);
+  if (!existingWO2) throw new NotFoundError("Work order not found");
+  if (existingWO2.status !== "Completed") {
+    throw new ValidationError(
+      `Only Completed work orders can be reopened. Current status: ${existingWO2.status}`
+    );
+  }
+  if (!remarks || !remarks.trim()) {
+    throw new ValidationError("Superintendent reopen remarks are mandatory.");
+  }
+  const reopenedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const updatePayload = {
+    status: "Reopened",
+    wasReopened: true,
+    superintendentReopenRemarks: remarks.trim(),
+    superintendentReopenedByName: actorName || actorUserUuid,
+    reopenedAt
+  };
+  const updatedWO = await update5(id, updatePayload);
+  await logFieldChanges(
+    "work_orders",
+    existingWO2.wouuid,
+    existingWO2.vesselId || null,
+    existingWO2,
+    updatedWO,
+    actorUserUuid
+  );
+  try {
+    await createAuditLog2({
+      entityType: "work_order",
+      entityId: existingWO2.wouuid || id,
+      actionType: "superintendent_reopen_completion",
+      userId: actorUserUuid,
+      source: "web_ui",
+      vesselCode: existingWO2.vesselId || null,
+      componentCode: existingWO2.componentCode || null,
+      fieldName: null,
+      oldValue: null,
+      newValue: null,
+      payload: {
+        workOrderNo: existingWO2.workOrderNo,
+        reopenedAt,
+        reopenedByName: actorName || actorUserUuid,
+        reopenRemarks: remarks.trim(),
+        reopenType: "superintendent_completion_reopen"
+      }
+    });
+  } catch (err) {
+    console.error("[AuditLog] Completed WO reopen:", err);
+  }
+  if (existingWO2.jobId && existingWO2.vesselId) {
+    try {
+      const siblings = await findWorkOrdersByJobId2(existingWO2.jobId);
+      const referenceDate = existingWO2.completionDateTime || existingWO2.dueDate || "";
+      const openStatuses = /* @__PURE__ */ new Set(["Active", "Planned", "Due", "Due (Grace P)", "Overdue"]);
+      const toCancel = siblings.filter(
+        (wo) => wo.id !== existingWO2.id && wo.vesselId === existingWO2.vesselId && openStatuses.has(wo.status) && !wo.isDeleted && referenceDate && (wo.dueDate && wo.dueDate > referenceDate || wo.nextDueDate && wo.nextDueDate > referenceDate)
+      );
+      for (const sibling of toCancel) {
+        const cancelled = await update5(sibling.id, { isDeleted: true, isActive: false });
+        try {
+          await logFieldChanges(
+            "work_orders",
+            sibling.wouuid,
+            sibling.vesselId || null,
+            sibling,
+            cancelled,
+            actorUserUuid
+          );
+        } catch (err) {
+          console.error("[FieldLogger] Sibling WO cancellation (reopen):", err);
+        }
+        console.log(`\u{1F5D1}\uFE0F [Reopen] Cancelled next-cycle sibling WO: ${sibling.workOrderNo}`);
+      }
+    } catch (err) {
+      console.error("[Reopen] Error cancelling sibling WOs:", err);
+    }
+  }
+  if (existingWO2.jobId && existingWO2.dueDate) {
+    try {
+      const db2 = await getDb();
+      await db2.update(jobs).set({ nextDueDate: existingWO2.dueDate }).where(eq9(jobs.juuid, existingWO2.jobId));
+      console.log(`\u{1F4C5} [Reopen] Reset job nextDueDate to ${existingWO2.dueDate} for job ${existingWO2.jobId}`);
+    } catch (err) {
+      console.error("[Reopen] Error resetting job nextDueDate:", err);
+    }
+  }
+  return updatedWO;
 }
 
 // server/modules/work-orders/services/workOrderContextService.ts
@@ -31604,8 +32071,37 @@ async function listWorkOrders2(req, res) {
   const vesselId = req.query.vesselId;
   const vesselIdsRaw = req.query.vesselIds;
   const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(",").filter(Boolean) : void 0;
-  const result = await listWorkOrders(vesselId, vesselIds);
-  res.json(result);
+  if (req.query.page === void 0) {
+    const result2 = await listWorkOrders(vesselId, vesselIds);
+    return res.json(result2);
+  }
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const pageSizeRaw = parseInt(req.query.pageSize, 10) || 10;
+  const pageSize = Math.min(200, Math.max(1, pageSizeRaw));
+  let period = null;
+  if (typeof req.query.period === "string" && req.query.period) {
+    try {
+      period = JSON.parse(req.query.period);
+    } catch {
+      period = null;
+    }
+  }
+  const criticality = typeof req.query.criticality === "string" && req.query.criticality ? req.query.criticality.split(",").filter(Boolean) : [];
+  const sortByRaw = typeof req.query.sortBy === "string" ? req.query.sortBy : "";
+  const sortDirRaw = req.query.sortDir === "desc" ? "desc" : "asc";
+  const result = await listWorkOrdersPaged(vesselId, vesselIds, {
+    page,
+    pageSize,
+    activeTab: typeof req.query.status === "string" ? req.query.status : "Planned",
+    search: typeof req.query.search === "string" ? req.query.search : "",
+    period,
+    rank: typeof req.query.rank === "string" ? req.query.rank : "",
+    criticality,
+    postponementReason: typeof req.query.postponementReason === "string" ? req.query.postponementReason : "",
+    sortField: sortByRaw ? sortByRaw : null,
+    sortDir: sortDirRaw
+  });
+  res.json({ success: true, data: result });
 }
 async function getWorkOrder2(req, res) {
   const result = await getWorkOrder(req.params.id);
@@ -31670,6 +32166,52 @@ async function deleteWorkOrder2(req, res) {
     await deleteWorkOrder(req.params.id);
     res.json({ success: true });
   } catch (error) {
+    if (error.message?.includes("not found")) {
+      return res.status(404).json({ error: error.message });
+    }
+    throw error;
+  }
+}
+async function rejectCompletion(req, res) {
+  try {
+    const actorName = resolveActorIdentity(req);
+    const { remarks } = req.body;
+    const actorUserUuid = req.user?.userUuid || req.user?.username || "system";
+    const result = await rejectCompletedWorkOrder(
+      req.params.id,
+      remarks || "",
+      actorUserUuid,
+      actorName
+    );
+    res.json(result);
+  } catch (error) {
+    console.error("\u274C Completion rejection error:", error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error.message?.includes("not found")) {
+      return res.status(404).json({ error: error.message });
+    }
+    throw error;
+  }
+}
+async function reopenCompletion(req, res) {
+  try {
+    const actorName = resolveActorIdentity(req);
+    const { remarks } = req.body;
+    const actorUserUuid = req.user?.userUuid || req.user?.username || "system";
+    const result = await reopenCompletedWorkOrder(
+      req.params.id,
+      remarks || "",
+      actorUserUuid,
+      actorName
+    );
+    res.json(result);
+  } catch (error) {
+    console.error("\u274C Completion reopen error:", error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     if (error.message?.includes("not found")) {
       return res.status(404).json({ error: error.message });
     }
@@ -32123,6 +32665,16 @@ router5.get("/work-orders/:id/rejection-history", asyncHandler(getRejectionHisto
 router5.post("/work-orders", asyncHandler(createWorkOrder2));
 router5.patch("/work-orders/:id", asyncHandler(updateWorkOrder2));
 router5.delete("/work-orders/:id", asyncHandler(deleteWorkOrder2));
+router5.post(
+  "/work-orders/:id/reject-completion",
+  requireRole(["Office", "PMS Admin", "Sail Admin"]),
+  asyncHandler(rejectCompletion)
+);
+router5.post(
+  "/work-orders/:id/reopen-completion",
+  requireRole(["Office", "PMS Admin", "Sail Admin"]),
+  asyncHandler(reopenCompletion)
+);
 router5.post("/work-orders/:id/superintendent-acknowledge", asyncHandler(superintendentAcknowledge));
 router5.get("/superintendent/notifications", asyncHandler(getSuperintendentNotifications));
 router5.get("/superintendent/notifications/all", asyncHandler(getAllSuperintendentNotifications));
@@ -47675,6 +48227,348 @@ async function exportMonthlySummary(vesselId, year, month) {
   console.log(`[MONTHLY SUMMARY REPORT] Generated: ${filename} (Period: ${reportPeriod})`);
   return { buffer: Buffer.from(buffer), filename };
 }
+function getYearMonth(dateStr) {
+  if (!dateStr) return null;
+  const d = parseDate3(dateStr);
+  if (!d) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+function buildVesselGraceSettings3(vesselSettings) {
+  if (!vesselSettings) {
+    return { calendarGraceMode: "COMPANY_STANDARD", calendarGraceDays: 7, rhGraceHours: 50 };
+  }
+  return {
+    calendarGraceMode: vesselSettings.calendarGraceMode || "COMPANY_STANDARD",
+    calendarGraceDays: vesselSettings.calendarGraceDays ?? 7,
+    rhGraceHours: vesselSettings.rhGraceHours ?? 50,
+    rhLeadTimeHours: vesselSettings.rhLeadTimeHours
+  };
+}
+async function getWorkOrderOverviewData(vesselId, anchorYear, anchorMonth, vesselIds) {
+  const now = /* @__PURE__ */ new Date();
+  const aYear = anchorYear ?? now.getFullYear();
+  const aMonth = anchorMonth ?? now.getMonth() + 1;
+  const SHORT_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const months = [];
+  for (let i = 11; i >= 0; i--) {
+    let m = aMonth - i;
+    let y = aYear;
+    while (m <= 0) {
+      m += 12;
+      y--;
+    }
+    const ym = `${y}-${String(m).padStart(2, "0")}`;
+    months.push({ label: `${SHORT_MONTH_NAMES[m - 1]} ${String(y).slice(-2)}`, yearMonth: ym });
+  }
+  const allVessels = await getVessels6();
+  const vessel = allVessels.find((v) => v.id === vesselId);
+  const vesselMap = new Map(allVessels.map((v) => [v.id, v.name]));
+  const isMultiVessel = vesselId === "all";
+  const vesselName = isMultiVessel ? vesselIds && vesselIds.length > 0 ? vesselIds.map((id) => vesselMap.get(id) || id).join(", ") : "All Vessels" : vessel?.name || vesselId;
+  const [workOrders2, jobs2, components2, companyGraceRow] = await Promise.all([
+    getWorkOrders(vesselId, vesselIds),
+    getJobs(vesselId, void 0, vesselIds),
+    getComponents2(vesselId, vesselIds),
+    storage.getCompanyStandardGraceSettings()
+  ]);
+  const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
+  const jobsMap = new Map(jobs2.map((j) => [j.juuid, j]));
+  const componentsByCodeMap = new Map(components2.map((c) => [c.componentCode, c]));
+  const componentsMap = new Map(components2.map((c) => [c.cuuid, c]));
+  const vesselGraceCache = /* @__PURE__ */ new Map();
+  const uniqueVesselIds = Array.from(new Set(
+    workOrders2.map((wo) => wo.vesselId).filter((id) => typeof id === "string" && id.length > 0)
+  ));
+  for (const vid of uniqueVesselIds) {
+    const vs = await getPmsVesselSettings4(vid);
+    vesselGraceCache.set(vid, buildVesselGraceSettings3(vs));
+  }
+  const eligibleWorkOrders = workOrders2.filter((wo) => {
+    if (wo.isExecution) return false;
+    if (wo.isDeleted === true) return false;
+    const st = (wo.status || "").toLowerCase();
+    if (st === "cancelled" || st === "canceled") return false;
+    return true;
+  });
+  const isCritical = (wo) => wo.criticality === "Yes" || wo.jobPriority === "Critical";
+  const emptyCell = () => ({ count: 0, woIds: [] });
+  const dueBuckets = /* @__PURE__ */ new Map();
+  const compBuckets = /* @__PURE__ */ new Map();
+  for (const m of months) {
+    dueBuckets.set(m.yearMonth, {
+      total: emptyCell(),
+      critical: emptyCell(),
+      nonCritical: emptyCell(),
+      notCompletedTotal: emptyCell(),
+      notCompletedCritical: emptyCell(),
+      notCompletedNonCritical: emptyCell(),
+      overdueTotal: emptyCell(),
+      overdueCritical: emptyCell(),
+      overdueNonCritical: emptyCell(),
+      postponedTotal: emptyCell(),
+      postponedCritical: emptyCell(),
+      postponedNonCritical: emptyCell()
+    });
+    compBuckets.set(m.yearMonth, {
+      completedTotal: emptyCell(),
+      completedCritical: emptyCell(),
+      completedNonCritical: emptyCell()
+    });
+  }
+  const ymSet = new Set(months.map((m) => m.yearMonth));
+  const anchorYM = months[11].yearMonth;
+  const woInfoMap = {};
+  const push = (cell, id) => {
+    cell.count++;
+    cell.woIds.push(id);
+  };
+  for (const wo of eligibleWorkOrders) {
+    const dueYM = getYearMonth(wo.dueDate);
+    const complYM = getYearMonth(wo.completionDateTime || wo.dateCompleted);
+    if (!dueYM && !complYM) continue;
+    const job = wo.jobId ? jobsMap.get(wo.jobId) : jobs2.find((j) => j.jobNo === wo.templateCode);
+    const component = wo.componentCode ? componentsByCodeMap.get(wo.componentCode) : wo.component ? componentsMap.get(wo.component) : null;
+    const maintenanceBasis = wo.maintenanceBasis || job?.maintenanceBasis || "Calendar";
+    const dueRH = parseRH2(job?.nextDueRH) ?? parseRH2(wo.nextDueReading);
+    const currentRH = parseRH2(component?.currentCumulativeRH) ?? parseRH2(wo.currentReading);
+    const crit = isCritical(wo);
+    const woId = wo.wouuid || String(wo.id);
+    const vesselGraceSettings = vesselGraceCache.get(wo.vesselId ?? "") || buildVesselGraceSettings3(null);
+    const computedStatus = computeWorkOrderStatus({
+      dueDate: wo.dueDate,
+      dueRH: dueRH ?? null,
+      currentRH: currentRH ?? null,
+      isExecution: wo.isExecution,
+      status: wo.status,
+      completionDateTime: wo.completionDateTime,
+      maintenanceBasis,
+      companyGraceConfig,
+      vesselGraceSettings
+    });
+    const isCompleted = computedStatus === "Completed";
+    const isPostponed = computedStatus === "Postponed";
+    const isOverdue = computedStatus === "Overdue";
+    if (!woInfoMap[woId]) {
+      woInfoMap[woId] = {
+        workOrderNo: wo.workOrderNo || "-",
+        jobTitle: wo.jobTitle || "-",
+        status: wo.status || "-",
+        componentName: wo.component || "-",
+        dueDate: wo.dueDate || null
+      };
+    }
+    if (dueYM && ymSet.has(dueYM)) {
+      const db2 = dueBuckets.get(dueYM);
+      push(db2.total, woId);
+      if (crit) {
+        push(db2.critical, woId);
+      } else {
+        push(db2.nonCritical, woId);
+      }
+      if (!isCompleted) {
+        push(db2.notCompletedTotal, woId);
+        if (crit) {
+          push(db2.notCompletedCritical, woId);
+        } else {
+          push(db2.notCompletedNonCritical, woId);
+        }
+      }
+      if (isOverdue) {
+        push(db2.overdueTotal, woId);
+        if (crit) {
+          push(db2.overdueCritical, woId);
+        } else {
+          push(db2.overdueNonCritical, woId);
+        }
+      }
+      if (isPostponed) {
+        push(db2.postponedTotal, woId);
+        if (crit) {
+          push(db2.postponedCritical, woId);
+        } else {
+          push(db2.postponedNonCritical, woId);
+        }
+      }
+    }
+    if (isCompleted && complYM && ymSet.has(complYM)) {
+      const cb = compBuckets.get(complYM);
+      push(cb.completedTotal, woId);
+      if (crit) {
+        push(cb.completedCritical, woId);
+      } else {
+        push(cb.completedNonCritical, woId);
+      }
+    }
+  }
+  const orderedDue = months.map((m) => dueBuckets.get(m.yearMonth));
+  const orderedComp = months.map((m) => compBuckets.get(m.yearMonth));
+  const pctCell = (numerator, denominator, woIds) => ({
+    count: denominator === 0 ? 0 : Math.round(numerator / denominator * 100),
+    isPct: true,
+    woIds
+  });
+  return {
+    vesselName,
+    anchorYear: aYear,
+    anchorMonth: aMonth,
+    months,
+    woInfo: woInfoMap,
+    matrix: {
+      totalDue: orderedDue.map((b) => b.total),
+      criticalDue: orderedDue.map((b) => b.critical),
+      nonCriticalDue: orderedDue.map((b) => b.nonCritical),
+      completedTotal: orderedComp.map((b) => b.completedTotal),
+      completedCritical: orderedComp.map((b) => b.completedCritical),
+      completedNonCritical: orderedComp.map((b) => b.completedNonCritical),
+      notCompletedTotal: orderedDue.map((b) => b.notCompletedTotal),
+      notCompletedCritical: orderedDue.map((b) => b.notCompletedCritical),
+      notCompletedNonCritical: orderedDue.map((b) => b.notCompletedNonCritical),
+      overdueTotal: orderedDue.map((b) => pctCell(b.overdueTotal.count, b.total.count, b.overdueTotal.woIds)),
+      overdueCritical: orderedDue.map((b) => pctCell(b.overdueCritical.count, b.critical.count, b.overdueCritical.woIds)),
+      overdueNonCritical: orderedDue.map((b) => pctCell(b.overdueNonCritical.count, b.nonCritical.count, b.overdueNonCritical.woIds)),
+      postponedTotal: orderedDue.map((b) => b.postponedTotal),
+      postponedCritical: orderedDue.map((b) => b.postponedCritical),
+      postponedNonCritical: orderedDue.map((b) => b.postponedNonCritical),
+      extendedPct: orderedDue.map((b) => pctCell(b.postponedTotal.count, b.total.count, b.postponedTotal.woIds))
+    }
+  };
+}
+async function exportWorkOrderOverview(vesselId, anchorYear, anchorMonth, vesselIds) {
+  const data = await getWorkOrderOverviewData(vesselId, anchorYear, anchorMonth, vesselIds);
+  const { vesselName, months, matrix } = data;
+  const workbook = new ExcelJS4.Workbook();
+  workbook.creator = "PMS Reports";
+  workbook.created = /* @__PURE__ */ new Date();
+  const worksheet = workbook.addWorksheet("WO Overview", {
+    views: [{ state: "frozen", xSplit: 1, ySplit: 4 }]
+  });
+  const BLUE_HEADER = "1E3A5F";
+  const SECTIONS = [
+    { header: "SECTION 1 \u2014 WORK ORDERS DUE", bgLabel: "BFD9EF", bgData: "E8F4FD" },
+    { header: "SECTION 2 \u2014 COMPLETED", bgLabel: "A8DDB5", bgData: "E8F8F0" },
+    { header: "SECTION 3 \u2014 NOT COMPLETED", bgLabel: "FFCC80", bgData: "FFF3E0" },
+    { header: "SECTION 4 \u2014 OVERDUE %", bgLabel: "FFAB91", bgData: "FFEBE8" },
+    { header: "SECTION 5 \u2014 EXTENDED (POSTPONED)", bgLabel: "CE93D8", bgData: "F3E8FF" }
+  ];
+  worksheet.getColumn(1).width = 32;
+  for (let c = 2; c <= months.length + 1; c++) {
+    worksheet.getColumn(c).width = 12;
+  }
+  worksheet.mergeCells(1, 1, 1, months.length + 1);
+  const t = worksheet.getCell(1, 1);
+  t.value = "WORK ORDERS OVERVIEW \u2014 12-MONTH ROLLING MATRIX";
+  t.font = { bold: true, size: 14, color: { argb: "FFFFFFFF" }, name: "Arial" };
+  t.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${BLUE_HEADER}` } };
+  t.alignment = { horizontal: "center", vertical: "middle" };
+  worksheet.getRow(1).height = 28;
+  worksheet.mergeCells(2, 1, 2, months.length + 1);
+  const s = worksheet.getCell(2, 1);
+  s.value = `Vessel: ${vesselName}   |   Period: ${months[0].label} \u2013 ${months[11].label}`;
+  s.font = { size: 10, color: { argb: "FFFFFFFF" }, name: "Arial" };
+  s.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${BLUE_HEADER}` } };
+  s.alignment = { horizontal: "center", vertical: "middle" };
+  worksheet.getRow(2).height = 18;
+  worksheet.mergeCells(3, 1, 3, months.length + 1);
+  const g = worksheet.getCell(3, 1);
+  g.value = `Generated: ${(/* @__PURE__ */ new Date()).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}`;
+  g.font = { size: 9, italic: true, color: { argb: "FFFFFFFF" }, name: "Arial" };
+  g.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${BLUE_HEADER}` } };
+  g.alignment = { horizontal: "center", vertical: "middle" };
+  worksheet.getRow(3).height = 16;
+  worksheet.getRow(4).height = 22;
+  const lh = worksheet.getCell(4, 1);
+  lh.value = "Metric";
+  lh.font = { bold: true, color: { argb: "FFFFFFFF" }, name: "Arial", size: 10 };
+  lh.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${BLUE_HEADER}` } };
+  lh.alignment = { horizontal: "left", vertical: "middle" };
+  for (let i = 0; i < months.length; i++) {
+    const mh = worksheet.getCell(4, i + 2);
+    mh.value = months[i].label;
+    mh.font = { bold: true, color: { argb: "FFFFFFFF" }, name: "Arial", size: 10 };
+    mh.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${BLUE_HEADER}` } };
+    mh.alignment = { horizontal: "center", vertical: "middle" };
+  }
+  let curRow = 5;
+  const writeSectionHeader = (label, bgColor) => {
+    worksheet.mergeCells(curRow, 1, curRow, months.length + 1);
+    const row = worksheet.getRow(curRow);
+    row.height = 18;
+    const cell = row.getCell(1);
+    cell.value = label;
+    cell.font = { bold: true, name: "Arial", size: 9, color: { argb: "FF1A1A2E" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${bgColor}` } };
+    cell.alignment = { horizontal: "left", vertical: "middle", indent: 1 };
+    cell.border = { top: { style: "thin", color: { argb: "FF888888" } }, bottom: { style: "thin", color: { argb: "FF888888" } } };
+    curRow++;
+  };
+  const writeDataRow = (label, cells, bgColor, bold = false, indent = 0, italic = false) => {
+    const row = worksheet.getRow(curRow);
+    row.height = 16;
+    const lc = row.getCell(1);
+    lc.value = label;
+    lc.font = { bold, italic, name: "Arial", size: 9, color: { argb: "FF1A1A2E" } };
+    lc.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${bgColor}` } };
+    lc.alignment = { horizontal: "left", vertical: "middle", indent };
+    lc.border = { right: { style: "thin", color: { argb: "FFAAAAAA" } }, bottom: { style: "hair", color: { argb: "FFCCCCCC" } } };
+    for (let i = 0; i < months.length; i++) {
+      const cd = cells[i];
+      const dc = row.getCell(i + 2);
+      const display = cd.isPct ? `${cd.count}%` : cd.count === 0 ? "\u2014" : String(cd.count);
+      dc.value = display;
+      dc.font = { name: "Arial", size: 9, bold: bold && !cd.isPct, italic, color: { argb: cd.count === 0 && !cd.isPct ? "FF999999" : "FF1A1A2E" } };
+      dc.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${bgColor}` } };
+      dc.alignment = { horizontal: "center", vertical: "middle" };
+      dc.border = { bottom: { style: "hair", color: { argb: "FFCCCCCC" } }, right: { style: "hair", color: { argb: "FFDDDDDD" } } };
+    }
+    curRow++;
+  };
+  const [sDue, sComp, sNotComp, sOverdue, sExt] = SECTIONS;
+  writeSectionHeader(sDue.header, sDue.bgLabel);
+  writeDataRow("Total WOs Due", matrix.totalDue, sDue.bgData, true);
+  writeDataRow("  Critical WOs Due", matrix.criticalDue, sDue.bgData, false, 1);
+  writeDataRow("  Non-Critical WOs Due", matrix.nonCriticalDue, sDue.bgData, false, 1);
+  writeSectionHeader(sComp.header, sComp.bgLabel);
+  writeDataRow("Completed (Total)", matrix.completedTotal, sComp.bgData, true);
+  writeDataRow("  Completed (Critical)", matrix.completedCritical, sComp.bgData, false, 1);
+  writeDataRow("  Completed (Non-Crit)", matrix.completedNonCritical, sComp.bgData, false, 1);
+  writeSectionHeader(sNotComp.header, sNotComp.bgLabel);
+  writeDataRow("Not Completed (Total)", matrix.notCompletedTotal, sNotComp.bgData, true);
+  writeDataRow("  Not Completed (Critical)", matrix.notCompletedCritical, sNotComp.bgData, false, 1);
+  writeDataRow("  Not Completed (Non-Crit)", matrix.notCompletedNonCritical, sNotComp.bgData, false, 1);
+  writeSectionHeader(sOverdue.header, sOverdue.bgLabel);
+  writeDataRow("Overdue % (Total)", matrix.overdueTotal, sOverdue.bgData, true, 0, true);
+  writeDataRow("  Overdue % (Critical)", matrix.overdueCritical, sOverdue.bgData, false, 1, true);
+  writeDataRow("  Overdue % (Non-Crit)", matrix.overdueNonCritical, sOverdue.bgData, false, 1, true);
+  writeSectionHeader(sExt.header, sExt.bgLabel);
+  writeDataRow("Extended Total", matrix.postponedTotal, sExt.bgData, true);
+  writeDataRow("  Extended (Critical)", matrix.postponedCritical, sExt.bgData, false, 1);
+  writeDataRow("  Extended (Non-Crit)", matrix.postponedNonCritical, sExt.bgData, false, 1);
+  writeDataRow("Extended %", matrix.extendedPct, sExt.bgData, true, 0, true);
+  curRow++;
+  worksheet.mergeCells(curRow, 1, curRow, months.length + 1);
+  const fn = worksheet.getCell(curRow, 1);
+  fn.value = 'Note: Critical = criticality "Yes" OR job priority "Critical". Overdue % = (Overdue \xF7 Total Due) \xD7 100. Extended % = (Postponed \xF7 Total Due) \xD7 100. Overdue classification uses computed status (grace/lead-time aware).';
+  fn.font = { size: 8, italic: true, color: { argb: "FF666666" }, name: "Arial" };
+  fn.alignment = { horizontal: "left", vertical: "middle" };
+  worksheet.pageSetup = {
+    orientation: "landscape",
+    paperSize: 9,
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 }
+  };
+  worksheet.headerFooter = {
+    oddFooter: `&L&8&"Arial"Confidential \u2014 ${vesselName}&C&8&"Arial"Page &P of &N&R&8&"Arial"Generated: &D &T`
+  };
+  const buf = await workbook.xlsx.writeBuffer();
+  const safe = vesselName.replace(/[^a-zA-Z0-9]/g, "_");
+  const filename = `PMS_WOOverview_${safe}_${data.anchorYear}${String(data.anchorMonth).padStart(2, "0")}.xlsx`;
+  console.log(`[WO OVERVIEW REPORT] Generated: ${filename}`);
+  return { buffer: Buffer.from(buf), filename };
+}
 
 // server/modules/reports/controllers/maintenanceReportsController.ts
 init_monthlySnapshotService();
@@ -47960,6 +48854,46 @@ async function regenerateMonthlySummarySnapshots(req, res) {
     console.error("Error regenerating snapshots:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     res.status(500).json({ error: "Failed to regenerate snapshots: " + message });
+  }
+}
+async function getWorkOrderOverviewPreview(req, res) {
+  try {
+    const vesselId = req.query.vesselId;
+    if (!vesselId) {
+      return res.status(400).json({ error: "Please select a vessel" });
+    }
+    const anchorYear = req.query.year || req.query.anchorYear ? Number(req.query.year || req.query.anchorYear) : void 0;
+    const anchorMonth = req.query.month || req.query.anchorMonth ? Number(req.query.month || req.query.anchorMonth) : void 0;
+    const vesselIds = req.query.vesselIds ? req.query.vesselIds.split(",").filter(Boolean) : void 0;
+    const result = await getWorkOrderOverviewData(vesselId, anchorYear, anchorMonth, vesselIds);
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching Work Orders Overview preview:", error);
+    res.status(500).json({ error: "Failed to fetch report data: " + error.message });
+  }
+}
+async function exportWorkOrderOverview2(req, res) {
+  try {
+    const { vesselId } = req.body;
+    if (!vesselId) {
+      return res.status(400).json({ error: "Please select a vessel" });
+    }
+    const anchorYear = req.body.year || req.body.anchorYear ? Number(req.body.year || req.body.anchorYear) : void 0;
+    const anchorMonth = req.body.month || req.body.anchorMonth ? Number(req.body.month || req.body.anchorMonth) : void 0;
+    const vesselIds = req.body.vesselIds ? String(req.body.vesselIds).split(",").filter(Boolean) : void 0;
+    const { buffer, filename } = await exportWorkOrderOverview(
+      vesselId,
+      anchorYear,
+      anchorMonth,
+      vesselIds
+    );
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (error) {
+    console.error("Error generating Work Orders Overview report:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: "Failed to generate report: " + message });
   }
 }
 async function exportMonthlySummary2(req, res) {
@@ -50241,6 +51175,8 @@ router12.post("/reports/completed-jobs", asyncHandler(exportCompletedJobs2));
 router12.post("/reports/all-jobs", asyncHandler(exportAllJobs2));
 router12.post("/reports/unplanned-jobs", asyncHandler(exportUnplannedJobs2));
 router12.post("/reports/postponement-log", asyncHandler(exportPostponementLog2));
+router12.get("/reports/maintenance/work-order-overview/preview", asyncHandler(getWorkOrderOverviewPreview));
+router12.post("/reports/maintenance/work-order-overview/excel", asyncHandler(exportWorkOrderOverview2));
 router12.get("/reports/maintenance/monthly-summary/preview", asyncHandler(getMonthlySummaryPreview));
 router12.get("/reports/maintenance/monthly-summary/snapshot-detail", asyncHandler(getMonthlySummarySnapshotDetail));
 router12.post("/reports/maintenance/monthly-summary/regenerate", asyncHandler(regenerateMonthlySummarySnapshots));
@@ -51670,6 +52606,7 @@ function getTypeFromSheetName(sheetName) {
   if (normalizedName === "fleet_spare" || normalizedName === "fleet spare" || normalizedName === "fleet_spares" || normalizedName === "fleet spares" || normalizedName.includes("fleet") && normalizedName.includes("spare")) return "fleet-spares";
   if (normalizedName === "spare history" || normalizedName === "spare_history" || normalizedName === "spares history" || normalizedName === "spares_history" || normalizedName.includes("spare") && normalizedName.includes("history")) return "spare-history";
   if (normalizedName === "spares" || normalizedName.includes("spare")) return "spares";
+  if (normalizedName === "store history" || normalizedName === "store_history" || normalizedName === "stores history" || normalizedName === "stores_history" || normalizedName.includes("store") && normalizedName.includes("history")) return "store-history";
   if (normalizedName === "components" || normalizedName.includes("component") || normalizedName.includes("machinery")) return "components";
   if (normalizedName === "vessel_job" || normalizedName === "vessel job") return "jobs";
   if (normalizedName === "jobs" || normalizedName.includes("job")) return "jobs";
@@ -52627,6 +53564,90 @@ async function generateWoHistoryTemplate() {
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }
+async function generateStoreHistoryTemplate() {
+  const workbook = new ExcelJS8.Workbook();
+  const dataSheet = workbook.addWorksheet("Store History");
+  dataSheet.columns = [
+    { header: "Item Code", key: "itemCode", width: 20 },
+    { header: "Event Type", key: "eventType", width: 18 },
+    { header: "Quantity", key: "quantity", width: 12 },
+    { header: "ROB After", key: "robAfter", width: 12 },
+    { header: "Date", key: "date", width: 18 },
+    { header: "Vessel Code", key: "vesselCode", width: 16 },
+    { header: "Location", key: "location", width: 25 },
+    { header: "Remarks", key: "remarks", width: 40 },
+    { header: "Reference", key: "reference", width: 25 },
+    { header: "Port/Place", key: "place", width: 20 },
+    { header: "Timezone", key: "tz", width: 16 },
+    { header: "Performed By", key: "performedBy", width: 25 }
+  ];
+  dataSheet.getRow(1).font = { bold: true };
+  dataSheet.getRow(1).fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFD0E4F7" }
+  };
+  [1, 2, 3, 4, 5, 6].forEach((col) => {
+    dataSheet.getRow(1).getCell(col).font = { bold: true, color: { argb: "FFCC0000" } };
+  });
+  for (let row = 2; row <= 1e3; row++) {
+    dataSheet.getCell(row, 2).dataValidation = {
+      type: "list",
+      allowBlank: false,
+      formulae: ['"RECEIVE,CONSUME,ADJUST,TRANSFER_IN,TRANSFER_OUT"']
+    };
+  }
+  dataSheet.addRow({
+    itemCode: "STORE-001",
+    eventType: "CONSUME",
+    quantity: 5,
+    robAfter: 45,
+    date: "15-NOV-2024",
+    vesselCode: "V001",
+    location: "Engine Room Store",
+    remarks: "Used during scheduled maintenance",
+    reference: "601.001.WO-2024-01",
+    place: "Singapore",
+    tz: "Asia/Singapore",
+    performedBy: "Chief Engineer"
+  });
+  const instrSheet = workbook.addWorksheet("Instructions");
+  instrSheet.columns = [
+    { header: "Field", key: "field", width: 28 },
+    { header: "Required", key: "required", width: 12 },
+    { header: "Description", key: "description", width: 70 },
+    { header: "Example", key: "example", width: 35 }
+  ];
+  instrSheet.getRow(1).font = { bold: true };
+  const instrRows = [
+    ["Item Code", "Required", "Item code of the stores item \u2014 must already exist in the vessel's stores register", "STORE-001"],
+    ["Event Type", "Required", "Type of transaction: RECEIVE, CONSUME, ADJUST, TRANSFER_IN, or TRANSFER_OUT (uppercase)", "CONSUME"],
+    ["Quantity", "Required", "Absolute quantity involved (always positive \u2014 sign is derived from Event Type)", "5"],
+    ["ROB After", "Required", "Remaining on-board balance after this transaction (non-negative number)", "45"],
+    ["Date", "Required", "Date of the transaction \u2014 use DD-MMM-YYYY format", "15-NOV-2024"],
+    ["Vessel Code", "Required", "Vessel code this transaction belongs to (e.g. V001)", "V001"],
+    ["Location", "Optional", "Storage location name (e.g. Engine Room Store). Stored as location note in remarks.", "Engine Room Store"],
+    ["Remarks", "Optional", "Free-text notes about the transaction", "Used during scheduled maintenance"],
+    ["Reference", "Optional", "Work Order or Purchase Order number linked to this event", "601.001.WO-2024-01"],
+    ["Port/Place", "Optional", "Port or location where the transaction took place", "Singapore"],
+    ["Timezone", "Optional", "Timezone string (e.g. Asia/Singapore). Omit to use UTC.", "Asia/Singapore"],
+    ["Performed By", "Optional", "Name or rank of person who performed the transaction. Defaults to system.", "Chief Engineer"],
+    ["", "", "", ""],
+    ["--- NOTES ---", "", "", ""],
+    ["Date format", "", "Use DD-MMM-YYYY (e.g. 15-NOV-2024). Month must be a 3-letter abbreviation.", ""],
+    ["Event Type", "", "Accepted: RECEIVE | CONSUME | ADJUST | TRANSFER_IN | TRANSFER_OUT (uppercase)", ""],
+    ["Quantity sign", "", "Always enter a positive number. The system applies the correct sign automatically.", ""],
+    ["ROB After", "", "This is the balance AFTER the event, not the change.", ""],
+    ["Red headers", "", "Columns with red header text are REQUIRED. Rows missing required fields will be rejected.", ""],
+    ["Import mode", "", 'Use "Add Only" to load history without risk of overwriting existing records.', ""],
+    ["Current ROB", "", "This import does NOT change the item's current ROB balance. It only adds records to the transaction history ledger.", ""]
+  ];
+  instrRows.forEach(([field, required, description, example]) => {
+    instrSheet.addRow({ field, required, description, example });
+  });
+  const buf = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buf);
+}
 async function generateSpareHistoryTemplate() {
   const workbook = new ExcelJS8.Workbook();
   const dataSheet = workbook.addWorksheet("Spare History");
@@ -52764,6 +53785,9 @@ async function validateData(type, data, mode, vesselId) {
       case "spare-history":
         primaryField = "Part Code";
         break;
+      case "store-history":
+        primaryField = "Item Code";
+        break;
       default:
         primaryField = "Component Code";
     }
@@ -52776,6 +53800,18 @@ async function validateData(type, data, mode, vesselId) {
       });
       const partCodePresent = fieldValue && String(fieldValue).trim() !== "";
       if (!partCodePresent && !hasOtherData) {
+        return false;
+      }
+      return true;
+    }
+    if (type === "store-history") {
+      const storeHistoryDataFields = ["Event Type", "Quantity", "ROB After", "Date", "Performed By", "Remarks", "Reference", "Port/Place"];
+      const hasOtherData = storeHistoryDataFields.some((f) => {
+        const v = row[f];
+        return v !== void 0 && v !== null && String(v).trim() !== "";
+      });
+      const itemCodePresent = fieldValue && String(fieldValue).trim() !== "";
+      if (!itemCodePresent && !hasOtherData) {
         return false;
       }
       return true;
@@ -52893,6 +53929,20 @@ async function validateData(type, data, mode, vesselId) {
       console.log(`\u{1F4CB} Loaded ${vesselSparesByPartCode.size} spares for vessel '${vesselId}' (spare-history validation)`);
     } catch (err) {
       console.warn("\u26A0\uFE0F Could not pre-load vessel spares for spare-history validation:", err);
+    }
+  }
+  const vesselStoresByItemCode = /* @__PURE__ */ new Map();
+  if (type === "store-history" && vesselId) {
+    try {
+      const vesselStores = await storage.getStoresItems(vesselId);
+      vesselStores.forEach((s) => {
+        if (s.itemCode) {
+          vesselStoresByItemCode.set(String(s.itemCode).trim(), s);
+        }
+      });
+      console.log(`\u{1F4CB} Loaded ${vesselStoresByItemCode.size} stores items for vessel '${vesselId}' (store-history validation)`);
+    } catch (err) {
+      console.warn("\u26A0\uFE0F Could not pre-load vessel stores for store-history validation:", err);
     }
   }
   let existingMakersByCode = /* @__PURE__ */ new Map();
@@ -53544,6 +54594,71 @@ async function validateData(type, data, mode, vesselId) {
         "Component Spare Code"
       ];
       for (const field of optionalFields) {
+        if (row[field] !== void 0 && row[field] !== null && String(row[field]).trim() !== "") {
+          normalized[field] = row[field];
+        }
+      }
+    } else if (type === "store-history") {
+      const itemCode = row["Item Code"];
+      if (!itemCode || String(itemCode).trim() === "") {
+        errors.push(`Row ${rowNum}: Item Code is required`);
+      } else {
+        const itemCodeStr = String(itemCode).trim();
+        normalized["Item Code"] = itemCodeStr;
+        if (vesselStoresByItemCode.size > 0 && !vesselStoresByItemCode.has(itemCodeStr)) {
+          errors.push(`Row ${rowNum}: Item Code '${itemCodeStr}' not found in vessel's stores register`);
+        }
+      }
+      const eventType = row["Event Type"];
+      const validStoreEventTypes = ["RECEIVE", "CONSUME", "ADJUST", "TRANSFER_IN", "TRANSFER_OUT"];
+      if (!eventType || String(eventType).trim() === "") {
+        errors.push(`Row ${rowNum}: Event Type is required`);
+      } else {
+        const evtNorm = String(eventType).trim().toUpperCase();
+        if (!validStoreEventTypes.includes(evtNorm)) {
+          errors.push(`Row ${rowNum}: Event Type '${eventType}' is invalid. Accepted values: RECEIVE, CONSUME, ADJUST, TRANSFER_IN, TRANSFER_OUT`);
+        } else {
+          normalized["Event Type"] = evtNorm;
+        }
+      }
+      const quantity = row["Quantity"];
+      if (quantity === void 0 || quantity === null || String(quantity).trim() === "") {
+        errors.push(`Row ${rowNum}: Quantity is required`);
+      } else {
+        const qtyNum = Number(String(quantity).trim());
+        if (isNaN(qtyNum) || qtyNum <= 0) {
+          errors.push(`Row ${rowNum}: Quantity must be a positive number greater than zero (got '${quantity}')`);
+        } else {
+          normalized["Quantity"] = qtyNum;
+        }
+      }
+      const robAfter = row["ROB After"];
+      if (robAfter === void 0 || robAfter === null || String(robAfter).trim() === "") {
+        errors.push(`Row ${rowNum}: ROB After is required`);
+      } else {
+        const robNum = Number(String(robAfter).trim());
+        if (isNaN(robNum) || robNum < 0) {
+          errors.push(`Row ${rowNum}: ROB After must be a non-negative number (got '${robAfter}')`);
+        } else {
+          normalized["ROB After"] = robNum;
+        }
+      }
+      if (!row["Date"] && row["Date"] !== 0) {
+        errors.push(`Row ${rowNum}: Date is required`);
+      } else {
+        normalized["Date"] = row["Date"];
+      }
+      if (!row["Vessel Code"] || String(row["Vessel Code"]).trim() === "") {
+        errors.push(`Row ${rowNum}: Vessel Code is required`);
+      } else {
+        const rowVesselCode = String(row["Vessel Code"]).trim();
+        normalized["Vessel Code"] = rowVesselCode;
+        if (vesselId && rowVesselCode.toUpperCase() !== vesselId.trim().toUpperCase()) {
+          errors.push(`Row ${rowNum}: Vessel Code '${rowVesselCode}' does not match selected vessel '${vesselId}'. All rows must belong to the same vessel.`);
+        }
+      }
+      const storeOptionalFields = ["Location", "Remarks", "Reference", "Port/Place", "Timezone", "Performed By"];
+      for (const field of storeOptionalFields) {
         if (row[field] !== void 0 && row[field] !== null && String(row[field]).trim() !== "") {
           normalized[field] = row[field];
         }
@@ -55581,6 +56696,111 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
       }
     }
     console.log(`\u2705 Spare History import complete: ${result.created} created, ${result.skipped} skipped`);
+  } else if (type === "store-history") {
+    const storeHistVesselId = vesselId || "V001";
+    console.log(`\u{1F680} Starting store-history import: ${data.length} rows, mode: ${mode}, vesselId: ${storeHistVesselId}`);
+    const parseStDate = (val) => {
+      if (val === void 0 || val === null || val === "") return null;
+      if (typeof val === "number") {
+        const utcMs = Math.round((val - 25569) * 86400 * 1e3);
+        const d2 = new Date(utcMs);
+        if (isNaN(d2.getTime())) return null;
+        return d2.toISOString().split("T")[0];
+      }
+      const s = String(val).trim();
+      if (!s) return null;
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+      const mmmMap = {
+        jan: "01",
+        feb: "02",
+        mar: "03",
+        apr: "04",
+        may: "05",
+        jun: "06",
+        jul: "07",
+        aug: "08",
+        sep: "09",
+        oct: "10",
+        nov: "11",
+        dec: "12"
+      };
+      const mmmMatch = s.match(/^(\d{1,2})[-\/\s]([a-zA-Z]{3})[-\/\s](\d{4})$/);
+      if (mmmMatch) {
+        const mm = mmmMap[mmmMatch[2].toLowerCase()];
+        if (mm) return `${mmmMatch[3]}-${mm}-${mmmMatch[1].padStart(2, "0")}`;
+      }
+      return s;
+    };
+    const allStoresItems = await storage.getStoresItems(storeHistVesselId);
+    const storesByItemCode = new Map(allStoresItems.map((s) => [String(s.itemCode).trim(), s]));
+    console.log(`\u{1F4CB} Loaded ${allStoresItems.length} stores items for vessel ${storeHistVesselId}`);
+    for (let _idx = 0; _idx < data.length; _idx++) {
+      const row = data[_idx];
+      const _rowNum = row["__meta"]?.rowNumber || _idx + 1;
+      const itemCode = String(row["Item Code"] || "").trim();
+      try {
+        const storeItem = storesByItemCode.get(itemCode);
+        if (!storeItem) {
+          result.skipped++;
+          result.rowResults.push({
+            rowNumber: _rowNum,
+            primaryIdentifier: itemCode,
+            action: "failed",
+            error: `Item Code '${itemCode}' not found in vessel stores register`
+          });
+          _emitProgress("Processing Store History\u2026");
+          continue;
+        }
+        const eventType = String(row["Event Type"] || "").trim().toUpperCase();
+        const rawQty = Number(String(row["Quantity"] || "0").trim()) || 0;
+        const isOutflow = eventType === "CONSUME" || eventType === "TRANSFER_OUT";
+        const qtyChange = isOutflow ? -Math.abs(rawQty) : Math.abs(rawQty);
+        const robAfter = Number(String(row["ROB After"] || "0").trim()) || 0;
+        const dateStr = parseStDate(row["Date"]);
+        const timestampUTC = dateStr ? new Date(dateStr) : /* @__PURE__ */ new Date();
+        const mmmNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+        const dateObj = dateStr ? new Date(dateStr) : /* @__PURE__ */ new Date();
+        const dateLocal = `${String(dateObj.getUTCDate()).padStart(2, "0")}-${mmmNames[dateObj.getUTCMonth()]}-${dateObj.getUTCFullYear()}`;
+        const tz = row["Timezone"] ? String(row["Timezone"]).trim() : "UTC";
+        const userId2 = row["Performed By"] ? String(row["Performed By"]).trim() : "system-import";
+        const locationNote = row["Location"] ? String(row["Location"]).trim() : null;
+        const userRemarks = row["Remarks"] ? String(row["Remarks"]).trim() : null;
+        const remarks = locationNote ? userRemarks ? `[Location: ${locationNote}] ${userRemarks}` : `[Location: ${locationNote}]` : userRemarks || null;
+        const ledgerPayload = {
+          vesselId: storeHistVesselId,
+          section: storeItem.itemType || "stores",
+          itemId: storeItem.id,
+          storeUuid: storeItem.stuuid,
+          partCode: storeItem.itemCode,
+          itemName: storeItem.itemName,
+          uom: storeItem.uom || null,
+          eventType,
+          qtyChangeBase: String(qtyChange),
+          qtyDisplay: String(qtyChange),
+          uomDisplay: storeItem.uom || null,
+          robAfterBase: String(robAfter),
+          dateLocal,
+          tz,
+          timestampUTC,
+          place: row["Port/Place"] ? String(row["Port/Place"]).trim() : null,
+          ref: row["Reference"] ? String(row["Reference"]).trim() : null,
+          userId: userId2,
+          remarks
+        };
+        await storage.createStoresLedgerEntryForImport(ledgerPayload);
+        result.created++;
+        result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: itemCode, action: "created" });
+        console.log(`\u2705 Created store history: ${itemCode} | ${eventType} | qty: ${qtyChange} | robAfter: ${robAfter}`);
+      } catch (rowErr) {
+        console.error(`\u274C Error processing store-history row ${_idx + 1} (Item: ${itemCode}):`, rowErr.message);
+        result.skipped++;
+        result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: itemCode, action: "failed", error: rowErr.message });
+      } finally {
+        _emitProgress("Processing Store History\u2026");
+      }
+    }
+    console.log(`\u2705 Store History import complete: ${result.created} created, ${result.skipped} skipped`);
   } else if (type === "jobs") {
     console.log(`\u{1F680} Starting jobs import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);
     const getJobUniqueKey = (vesselIdVal, componentCodeVal, jobNoVal) => {
@@ -56825,8 +58045,20 @@ async function getTemplate3(req, res) {
       return res.status(500).json({ error: "Failed to generate spare history template" });
     }
   }
+  if (type === "store-history") {
+    try {
+      const buffer2 = await generateStoreHistoryTemplate();
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", 'attachment; filename="store_history_template.xlsx"');
+      res.send(buffer2);
+      return;
+    } catch (error) {
+      console.error("Error generating store-history template:", error);
+      return res.status(500).json({ error: "Failed to generate store history template" });
+    }
+  }
   if (!["components", "spares", "stores", "work-orders", "jobs", "makers", "fleet-components", "fleet-jobs", "fleet-spares"].includes(type)) {
-    return res.status(400).json({ error: "Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-components, fleet-jobs, fleet-spares, wo-history, spare-history" });
+    return res.status(400).json({ error: "Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-components, fleet-jobs, fleet-spares, wo-history, spare-history, store-history" });
   }
   const defaultVesselId = vesselId || "V001";
   const workbook = XLSX4.utils.book_new();
@@ -57495,7 +58727,7 @@ async function dryRun(req, res) {
     const sheetBasedType = sheetName ? getTypeFromSheetName(sheetName) : null;
     const type = sheetBasedType || requestedType;
     console.log(`\u{1F4CB} Type determination: requested='${requestedType}', sheetName='${sheetName}', sheetBasedType='${sheetBasedType}', effective='${type}'`);
-    if (!["components", "spares", "stores", "work-orders", "jobs", "makers", "fleet-components", "fleet-jobs", "fleet-spares", "wo-history", "spare-history"].includes(type)) {
+    if (!["components", "spares", "stores", "work-orders", "jobs", "makers", "fleet-components", "fleet-jobs", "fleet-spares", "wo-history", "spare-history", "store-history"].includes(type)) {
       return res.status(400).json({ error: "Invalid type" });
     }
     if (!["add", "update", "upsert"].includes(mode)) {
@@ -63228,7 +64460,7 @@ function getWorkOrderBucketMonth(wo) {
 
 // server/modules/dashboard/services/maintenanceTrendService.ts
 var MONTH_SHORT2 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-function buildVesselGraceSettings3(vesselSettings) {
+function buildVesselGraceSettings4(vesselSettings) {
   if (!vesselSettings) {
     return {
       calendarGraceMode: "COMPANY_STANDARD",
@@ -63300,7 +64532,7 @@ async function getMaintenanceTrend(options) {
     if (!vid) return void 0;
     if (vesselGraceCache.has(vid)) return vesselGraceCache.get(vid);
     const settings = await storage.getPmsVesselSettings(vid);
-    const built = buildVesselGraceSettings3(settings);
+    const built = buildVesselGraceSettings4(settings);
     vesselGraceCache.set(vid, built);
     return built;
   };
@@ -63347,7 +64579,7 @@ async function getMaintenanceTrend(options) {
 init_storage();
 init_status();
 init_constants();
-function buildVesselGraceSettings4(vesselSettings) {
+function buildVesselGraceSettings5(vesselSettings) {
   if (!vesselSettings) {
     return {
       calendarGraceMode: "COMPANY_STANDARD",
@@ -63539,7 +64771,7 @@ async function getWoStatusByPeriod(options) {
     if (!vid) return void 0;
     if (vesselGraceCache.has(vid)) return vesselGraceCache.get(vid);
     const settings = await storage.getPmsVesselSettings(vid);
-    const built = buildVesselGraceSettings4(
+    const built = buildVesselGraceSettings5(
       settings
     );
     vesselGraceCache.set(vid, built);
@@ -63694,20 +64926,29 @@ import { Router as Router22 } from "express";
 init_errors();
 import crypto3 from "crypto";
 var REQUEST_TIMEOUT_MS = 15e3;
+var ShipskartRoleNotMappedError = class extends Error {
+  constructor(userRole) {
+    super(`No Shipskart externalUserId mapping for role "${userRole || "(none)"}".`);
+    this.userRole = userRole;
+    this.name = "ShipskartRoleNotMappedError";
+  }
+};
 var _cachedConfig = null;
 function getShipskartConfig() {
   if (_cachedConfig !== null) return _cachedConfig;
   const baseUrl = process.env.SHIPSKART_SSO_BASE_URL;
   const apiKey = process.env.SHIPSKART_API_KEY;
   const hmacSecret = process.env.SHIPSKART_HMAC_SECRET;
-  const externalUserId = process.env.SHIPSKART_EXTERNAL_USER_ID;
   const tenantId = process.env.SHIPSKART_TENANT_ID;
   const missing = [];
   if (!baseUrl) missing.push("SHIPSKART_SSO_BASE_URL");
   if (!apiKey) missing.push("SHIPSKART_API_KEY");
   if (!hmacSecret) missing.push("SHIPSKART_HMAC_SECRET");
-  if (!externalUserId) missing.push("SHIPSKART_EXTERNAL_USER_ID");
   if (!tenantId) missing.push("SHIPSKART_TENANT_ID");
+  const hasAnyRoleMapping = !!(process.env.SHIPSKART_USER_VESSEL_ADMIN || process.env.SHIPSKART_USER_ADMIN || process.env.SHIPSKART_USER_REGULAR);
+  if (!hasAnyRoleMapping) {
+    missing.push("at least one of SHIPSKART_USER_VESSEL_ADMIN / SHIPSKART_USER_ADMIN / SHIPSKART_USER_REGULAR");
+  }
   if (missing.length > 0) {
     throw new AppError(
       503,
@@ -63718,7 +64959,6 @@ function getShipskartConfig() {
     baseUrl: baseUrl.replace(/\/+$/, ""),
     apiKey,
     hmacSecret,
-    externalUserId,
     tenantId
   };
   console.log("[Shipskart] SSO config loaded (base host masked):", maskUrl2(_cachedConfig.baseUrl));
@@ -63772,39 +65012,68 @@ async function signedPost(path14, body) {
   }
   return payload;
 }
-async function initiateSso() {
+function resolveExternalUserId(userRole) {
+  const roleMap = {
+    "Vessel Admin": process.env.SHIPSKART_USER_VESSEL_ADMIN,
+    "Admin": process.env.SHIPSKART_USER_ADMIN,
+    "User": process.env.SHIPSKART_USER_REGULAR
+  };
+  const externalUserId = roleMap[userRole];
+  return externalUserId ?? null;
+}
+async function initiateSso(userRole) {
   const cfg = getShipskartConfig();
+  const externalUserId = resolveExternalUserId(userRole);
+  if (externalUserId === null) {
+    throw new ShipskartRoleNotMappedError(userRole);
+  }
   const body = {
-    externalUserId: cfg.externalUserId,
+    externalUserId,
     tenantId: cfg.tenantId
   };
   const result = await signedPost("/api/v1/sso/initiate", body);
   console.log(
-    `[Shipskart] SSO initiate OK (partner=${result?.partnerName}, expiresIn=${result?.expiresIn}s)`
+    `[Shipskart] SSO initiate OK (role=${userRole}, partner=${result?.partnerName}, expiresIn=${result?.expiresIn}s)`
   );
   return result;
 }
-async function logoutSso() {
-  const cfg = getShipskartConfig();
-  const body = { externalUserId: cfg.externalUserId };
+async function logoutSso(userRole) {
+  const externalUserId = resolveExternalUserId(userRole);
+  if (externalUserId === null) {
+    return { success: true, message: "No Shipskart mapping for role \u2014 logout skipped" };
+  }
+  const body = { externalUserId };
   const result = await signedPost("/api/v1/sso/logout", body);
   console.log("[Shipskart] SSO logout OK");
   return result;
 }
 
 // server/modules/shipskart/controllers/shipskartSsoController.ts
-async function initiateHandler(_req, res) {
-  const result = await initiateSso();
-  res.json({
-    success: true,
-    iframeUrl: result.iframeUrl,
-    partnerName: result.partnerName,
-    expiresIn: result.expiresIn
-  });
-}
-async function logoutHandler(_req, res) {
+async function initiateHandler(req, res) {
+  const userRole = req.user?.role ?? "";
   try {
-    const result = await logoutSso();
+    const result = await initiateSso(userRole);
+    res.json({
+      success: true,
+      iframeUrl: result.iframeUrl,
+      partnerName: result.partnerName,
+      expiresIn: result.expiresIn
+    });
+  } catch (err) {
+    if (err instanceof ShipskartRoleNotMappedError) {
+      return res.status(403).json({
+        success: false,
+        errorCode: "ROLE_NOT_MAPPED",
+        message: "Purchasing is not available for your role."
+      });
+    }
+    throw err;
+  }
+}
+async function logoutHandler(req, res) {
+  const userRole = req.user?.role ?? "";
+  try {
+    const result = await logoutSso(userRole);
     res.json({ success: true, message: result?.message });
   } catch (err) {
     console.error("[Shipskart] logout failed (non-blocking):", err?.message || err);
