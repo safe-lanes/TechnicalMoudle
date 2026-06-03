@@ -4094,6 +4094,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   )}
                 </div>
 
+                {!isUnplannedCreate && !!(templateData as any).level2ReviewerRankId && (
+                <div className="space-y-2">
+                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.L2R">Level 2 Reviewer (Rank)</Label>
+                  <div className="flex items-center h-9 px-3 border border-gray-200 rounded-md bg-gray-50 text-sm text-gray-700" data-testid="text-level2-reviewer-rank">
+                    {(templateData as any).level2ReviewerRankId}
+                  </div>
+                </div>
+                )}
+
                 {!isUnplannedCreate && (
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.22"><Marker id="WOF.A1.22" />Job Priority</Label>
@@ -6642,6 +6651,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 variant="inline"
               >
                 <div className="space-y-4">
+                  {!!(templateData as any).level2ReviewerRankId && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800" data-testid="text-reviewer-rank-info">
+                      <span className="font-medium">Reviewer Rank:</span>
+                      <span>{(templateData as any).level2ReviewerRankId}</span>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad]">Reviewer Comments</Label>
                     <Textarea
