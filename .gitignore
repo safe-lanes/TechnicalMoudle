@@ -7,3 +7,4 @@ uploads
 env
 ecosystem.config.cjs
 dist/
+ship-deploy/dist/
