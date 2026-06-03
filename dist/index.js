@@ -1945,6 +1945,13 @@ var init_schema = __esm({
       superintendentNotifiedAt: text2("superintendent_notified_at"),
       ceApprovalRemarks: text2("ce_approval_remarks"),
       approvalBlockReason: text2("approval_block_reason"),
+      superintendentRejectionRemarks: text2("superintendent_rejection_remarks"),
+      superintendentRejectedByName: text2("superintendent_rejected_by_name"),
+      // === Layer 8: Superintendent Reopen Completion ===
+      wasReopened: boolean2("was_reopened").notNull().default(false),
+      superintendentReopenRemarks: text2("superintendent_reopen_remarks"),
+      superintendentReopenedByName: text2("superintendent_reopened_by_name"),
+      reopenedAt: text2("reopened_at"),
       // === Layer 7: Running Hours Validation & Isolation ===
       completionRH: decimal2("completion_rh", { precision: 10, scale: 2 }),
       completionRHValidated: boolean2("completion_rh_validated"),
@@ -1956,7 +1963,9 @@ var init_schema = __esm({
       // === WO Generation Cycle Snapshots (for duplicate protection and audit) ===
       // Driver type determines which cycle fields apply
       driverType: text2("driver_type"),
-      // 'RH' | 'CALENDAR' - from job's maintenanceBasis
+      // 'RH' | 'CALENDAR' | 'DUAL_CALENDAR' | 'DUAL_RH' - from job's maintenanceBasis
+      dualTriggerLeg: text2("dual_trigger_leg"),
+      // 'CALENDAR' | 'RH' — which leg triggered this Dual Frequency WO (D5)
       // RH-based WO cycle snapshots (Trigger 1)
       cycleDueRhSnapshot: decimal2("cycle_due_rh_snapshot", { precision: 10, scale: 2 }),
       // RH_due = RH_last_done + F
@@ -2997,6 +3006,8 @@ var init_schema = __esm({
       ppeRequirements: text2("ppe_requirements"),
       permitRequirements: text2("permit_requirements"),
       otherSafetyRequirements: text2("other_safety_requirements"),
+      intervalRunningHour: integer2("interval_running_hour"),
+      // RH interval for Dual Frequency jobs
       sortOrder: integer2("sort_order").default(0),
       createdAt: timestamp3("created_at").notNull().defaultNow(),
       updatedAt: updatedAtColumn(),
@@ -7285,6 +7296,42 @@ async function updateSettings(settings, userId) {
     await updateSetting(key, value, userId);
   }
 }
+async function insertConnectivityLog(entry) {
+  const pool2 = await getPool();
+  await pool2.query(
+    `INSERT INTO sync_connectivity_log
+       (instance_id, vessel_id, outcome, error_message, error_category, latency_ms,
+        batch_uuid, records_pushed, records_pulled, catch_up_cycle, trigger_type)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [
+      entry.instanceId,
+      entry.vesselId,
+      entry.outcome,
+      entry.errorMessage ?? null,
+      entry.errorCategory ?? null,
+      entry.latencyMs ?? null,
+      entry.batchUuid ?? null,
+      entry.recordsPushed ?? 0,
+      entry.recordsPulled ?? 0,
+      entry.catchUpCycle ?? 0,
+      entry.triggerType ?? "auto"
+    ]
+  );
+}
+async function getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode) {
+  const pool2 = await getPool();
+  const vesselValues = [vesselId];
+  if (vesselCode && vesselCode !== vesselId) vesselValues.push(vesselCode);
+  const placeholders = vesselValues.map((_, i) => `$${i + 2}`).join(", ");
+  const result = await pool2.query(
+    `SELECT count(*)::int AS c FROM sync_field_log
+     WHERE instance_id = $1
+       AND vessel_id IN (${placeholders})
+       AND is_synced = false`,
+    [instanceId, ...vesselValues]
+  );
+  return result.rows[0]?.c ?? 0;
+}
 var init_repository = __esm({
   "server/modules/sync/repository.ts"() {
     "use strict";
@@ -7292,6 +7339,39 @@ var init_repository = __esm({
     init_db();
     init_syncDiagLogger();
     init_schema();
+  }
+});
+
+// server/modules/sync/syncRole.ts
+var syncRole_exports = {};
+__export(syncRole_exports, {
+  getEffectiveInstanceId: () => getEffectiveInstanceId,
+  getInstanceRole: () => getInstanceRole,
+  isShipInstance: () => isShipInstance,
+  isShipInstanceId: () => isShipInstanceId
+});
+function isShipInstanceId(instanceId) {
+  return instanceId.toUpperCase().startsWith("SHIP-");
+}
+async function getEffectiveInstanceId() {
+  let dbInstanceId = null;
+  try {
+    dbInstanceId = await getSetting("instance_id");
+  } catch {
+  }
+  return dbInstanceId && dbInstanceId.trim() || process.env.SYNC_INSTANCE_ID || "UNKNOWN";
+}
+async function isShipInstance() {
+  const id = await getEffectiveInstanceId();
+  return isShipInstanceId(id);
+}
+async function getInstanceRole() {
+  return await isShipInstance() ? "ship" : "shore";
+}
+var init_syncRole = __esm({
+  "server/modules/sync/syncRole.ts"() {
+    "use strict";
+    init_repository();
   }
 });
 
@@ -7317,6 +7397,7 @@ var init_fileSyncProcessor = __esm({
     "use strict";
     init_repository();
     init_syncDiagLogger();
+    init_syncRole();
     CHUNK_SIZE_BYTES = 256 * 1024;
     MAX_FILE_RETRIES = 3;
     TEMP_DIR = path2.resolve(process.cwd(), ".private", "sync-temp");
@@ -7342,7 +7423,7 @@ var init_fileSyncProcessor = __esm({
         let filesProcessed = 0;
         let filesFailed = 0;
         let bytesTransferred = 0;
-        const direction = this.instanceId.toUpperCase().startsWith("SHIP") ? "ship_to_shore" : "shore_to_ship";
+        const direction = isShipInstanceId(this.instanceId) ? "ship_to_shore" : "shore_to_ship";
         const pendingFiles = await getPendingFiles(vesselId, direction, 50);
         syncDiag(`FILE-SYNC START: ${pendingFiles.length} pending files for vessel=${vesselId}, direction=${direction}`);
         console.log(
@@ -7439,7 +7520,7 @@ var init_fileSyncProcessor = __esm({
         try {
           const existing = await getFileQueueEntry(chunk.queueUuid);
           if (!existing && chunk.fileKey && chunk.tableName) {
-            const reverseDirection = this.instanceId.toUpperCase().startsWith("SHIP") ? "shore_to_ship" : "ship_to_shore";
+            const reverseDirection = isShipInstanceId(this.instanceId) ? "shore_to_ship" : "ship_to_shore";
             await queueFileWithUuid({
               queueUuid: chunk.queueUuid,
               tableName: chunk.tableName,
@@ -7595,7 +7676,7 @@ var init_fileSyncProcessor = __esm({
       static async queueFileForSync(tableName, rowUuid, fileKey, fileName, fileSizeBytes, vesselId) {
         try {
           const instanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
-          const direction = instanceId.toUpperCase().startsWith("SHIP") ? "ship_to_shore" : "shore_to_ship";
+          const direction = isShipInstanceId(instanceId) ? "ship_to_shore" : "shore_to_ship";
           let priority = 0;
           if (fileSizeBytes) {
             if (fileSizeBytes < 100 * 1024) priority = 10;
@@ -8054,11 +8135,10 @@ function getFieldDisplayName(fieldName) {
 }
 function getInstanceLabel(instanceId, vesselName) {
   if (!instanceId) return "Unknown";
-  const upper = instanceId.toUpperCase();
-  if (upper.startsWith("SHIP")) {
+  if (isShipInstanceId(instanceId)) {
     return vesselName ? `Ship \u2014 ${vesselName}` : `Ship (${instanceId})`;
   }
-  if (upper.startsWith("SHORE")) {
+  if (instanceId.toUpperCase().startsWith("SHORE")) {
     return "Shore \u2014 Office";
   }
   return instanceId;
@@ -8621,6 +8701,7 @@ var init_conflictReviewRepository = __esm({
     init_db();
     init_syncConfig();
     init_syncDiagLogger();
+    init_syncRole();
   }
 });
 
@@ -8750,44 +8831,10 @@ async function receivePushData(batchUuid, vesselId, payload) {
         if (insertResult.errors.length > 0) {
           insertResult.errors.forEach((e) => console.error(`[Sync Push] INSERT error: ${e}`));
         }
-        if (insertResult.insertedRows > 0) {
-          const DERIVED_APPLICABILITY_MAP = {
-            vessel_survey_data: "vessel_survey_applicability",
-            vessel_certificate_data: "vessel_certificate_applicability"
-          };
-          const appNeeded = /* @__PURE__ */ new Map();
-          for (const log2 of acceptedLogs) {
-            if (!DERIVED_APPLICABILITY_MAP[log2.tableName]) continue;
-            if (log2.oldValue !== null) continue;
-            const groupKey = `${log2.tableName}::${log2.rowUuid}`;
-            if (!appNeeded.has(groupKey)) {
-              appNeeded.set(groupKey, {
-                appTable: DERIVED_APPLICABILITY_MAP[log2.tableName],
-                vesselId: log2.vesselId || "",
-                masterId: "",
-                vesselName: ""
-              });
-            }
-            const entry = appNeeded.get(groupKey);
-            if (log2.fieldName === "masterId" && log2.newValue) entry.masterId = log2.newValue;
-            if (log2.fieldName === "vesselName" && log2.newValue) entry.vesselName = log2.newValue;
-            if (log2.vesselId && !entry.vesselId) entry.vesselId = log2.vesselId;
-          }
-          for (const [, entry] of Array.from(appNeeded)) {
-            if (!entry.vesselId || !entry.masterId) continue;
-            try {
-              const appResult = await client.query(
-                `INSERT INTO "${entry.appTable}" (vessel_id, vessel_name, master_id, is_applicable, is_deleted)
-                 VALUES ($1, $2, $3, true, false)
-                 ON CONFLICT (vessel_id, master_id) WHERE is_deleted = false DO NOTHING`,
-                [entry.vesselId, entry.vesselName || "Unknown", entry.masterId]
-              );
-              if ((appResult.rowCount ?? 0) > 0) {
-                syncDiag(`DERIVED-APPLICABILITY: created ${entry.appTable} vesselId=${entry.vesselId} masterId=${entry.masterId}`);
-              }
-            } catch (appErr) {
-              syncDiag(`DERIVED-APPLICABILITY ERROR: ${entry.appTable} vesselId=${entry.vesselId} masterId=${entry.masterId}: ${appErr.message}`);
-            }
+        const touchedDataTables = /* @__PURE__ */ new Set();
+        for (const log2 of acceptedLogs) {
+          if (log2.tableName === "vessel_certificate_data" || log2.tableName === "vessel_survey_data") {
+            touchedDataTables.add(log2.tableName);
           }
         }
         const receiverInstanceId = process.env.SYNC_INSTANCE_ID || "UNKNOWN";
@@ -8988,6 +9035,133 @@ async function receivePushData(batchUuid, vesselId, payload) {
           } catch (err) {
             fieldLogApplyErrors++;
             console.error(`[Sync Push] Failed to apply field log ${log2.tableName}.${log2.fieldName} for ${log2.rowUuid}: ${err.message}`);
+          }
+        }
+        if (touchedDataTables.size > 0) {
+          const ENSURE_MASTER_PAIRS = [
+            { dataTable: "vessel_certificate_data", masterTable: "ship_certificates_master", nameCol: "certificate_name" },
+            { dataTable: "vessel_survey_data", masterTable: "ship_surveys_master", nameCol: "survey_name" }
+          ];
+          for (const mp of ENSURE_MASTER_PAIRS) {
+            if (!touchedDataTables.has(mp.dataTable)) continue;
+            try {
+              const masterResult = await client.query(
+                `INSERT INTO "${mp.masterTable}" (
+                   sequence, master_id, "${mp.nameCol}", category, "group",
+                   applicable_to_company, is_active, is_deleted, created_at, updated_at
+                 )
+                 SELECT DISTINCT
+                   COALESCE(
+                     NULLIF(SPLIT_PART(d.master_id, '-', 2), '')::int,
+                     0
+                   ),
+                   d.master_id,
+                   d.master_id,
+                   CASE
+                     WHEN d.master_id ~ '^[A-Z][0-9]+-' THEN LEFT(d.master_id, 1)
+                     ELSE SPLIT_PART(d.master_id, '-', 1)
+                   END,
+                   CASE
+                     WHEN d.master_id ~ '^[A-Z][0-9]+-' THEN SUBSTRING(d.master_id, 2, 1)
+                     ELSE ''
+                   END,
+                   false, true, false, NOW(), NOW()
+                 FROM "${mp.dataTable}" d
+                 WHERE d.is_deleted = false
+                   AND d.vessel_id = $1
+                   AND d.master_id IS NOT NULL
+                   AND NOT EXISTS (
+                     SELECT 1 FROM "${mp.masterTable}" m
+                     WHERE m.master_id = d.master_id
+                   )
+                 ON CONFLICT (master_id) DO NOTHING`,
+                [vesselId]
+              );
+              const created = masterResult.rowCount ?? 0;
+              if (created > 0) {
+                syncDiag(`ENSURE-MASTER: created ${created} ${mp.masterTable} placeholder(s) for vessel=${vesselId}`);
+              }
+            } catch (masterErr) {
+              syncDiag(`ENSURE-MASTER ERROR: ${mp.masterTable} vessel=${vesselId}: ${masterErr.message}`);
+            }
+          }
+        }
+        if (touchedDataTables.size > 0) {
+          const ENSURE_APP_PAIRS = [
+            { dataTable: "vessel_certificate_data", appTable: "vessel_certificate_applicability" },
+            { dataTable: "vessel_survey_data", appTable: "vessel_survey_applicability" }
+          ];
+          for (const pair of ENSURE_APP_PAIRS) {
+            if (!touchedDataTables.has(pair.dataTable)) continue;
+            try {
+              const ensureResult = await client.query(
+                `INSERT INTO "${pair.appTable}" (vessel_id, vessel_name, master_id, is_applicable, is_deleted, created_at, updated_at)
+                 SELECT DISTINCT d.vessel_id, COALESCE(d.vessel_name, 'Unknown'), d.master_id, true, false, NOW(), NOW()
+                 FROM "${pair.dataTable}" d
+                 WHERE d.is_deleted = false
+                   AND d.vessel_id = $1
+                   AND d.vessel_id IS NOT NULL
+                   AND d.master_id IS NOT NULL
+                   AND NOT EXISTS (
+                     SELECT 1 FROM "${pair.appTable}" a
+                     WHERE a.vessel_id = d.vessel_id AND a.master_id = d.master_id AND a.is_deleted = false
+                   )
+                 ON CONFLICT (vessel_id, master_id) WHERE is_deleted = false DO NOTHING`,
+                [vesselId]
+              );
+              const created = ensureResult.rowCount ?? 0;
+              if (created > 0) {
+                syncDiag(`ENSURE-APPLICABILITY: created ${created} ${pair.appTable} row(s) for vessel=${vesselId}`);
+              }
+            } catch (appErr) {
+              syncDiag(`ENSURE-APPLICABILITY ERROR: ${pair.appTable} vessel=${vesselId}: ${appErr.message}`);
+            }
+          }
+        }
+        if (payload.masterRecordHints && payload.masterRecordHints.length > 0) {
+          const HINT_TABLE_MAP = {
+            ship_surveys_master: { table: "ship_surveys_master", nameCol: "survey_name", labelCol: "survey_label" },
+            ship_certificates_master: { table: "ship_certificates_master", nameCol: "certificate_name", labelCol: "certificate_label" }
+          };
+          for (const hint of payload.masterRecordHints) {
+            const mapping = HINT_TABLE_MAP[hint.tableName];
+            if (!mapping) continue;
+            for (const row of hint.rows || []) {
+              if (!row.master_id) continue;
+              try {
+                const updateResult = await client.query(
+                  `UPDATE "${mapping.table}" SET
+                     "${mapping.nameCol}"    = COALESCE($2, "${mapping.nameCol}"),
+                     "${mapping.labelCol}"   = COALESCE($3, "${mapping.labelCol}"),
+                     category                = COALESCE($4, category),
+                     "group"                 = COALESCE($5, "group"),
+                     requirement_ref         = COALESCE($6, requirement_ref),
+                     company_id              = COALESCE($7, company_id),
+                     company_group           = COALESCE($8, company_group),
+                     company_sequence        = COALESCE($9, company_sequence),
+                     sequence                = COALESCE($10, sequence),
+                     updated_at              = NOW()
+                   WHERE master_id = $1`,
+                  [
+                    row.master_id,
+                    row[mapping.nameCol] || null,
+                    row[mapping.labelCol] || null,
+                    row.category || null,
+                    row.group || null,
+                    row.requirement_ref || null,
+                    row.company_id || null,
+                    row.company_group || null,
+                    row.company_sequence != null ? row.company_sequence : null,
+                    row.sequence != null ? row.sequence : null
+                  ]
+                );
+                if ((updateResult.rowCount ?? 0) > 0) {
+                  syncDiag(`MASTER-HINT APPLIED: ${mapping.table} master_id=${row.master_id} name=${row[mapping.nameCol]}`);
+                }
+              } catch (hintErr) {
+                syncDiag(`MASTER-HINT ERROR: ${mapping.table} master_id=${row.master_id}: ${hintErr.message}`);
+              }
+            }
           }
         }
         await client.query("COMMIT");
@@ -9806,7 +9980,53 @@ async function verifyProvisioning(manifest) {
 async function exportAndAdd(pool2, bundle, tc, vesselId, vesselCode, vesselScopeColumn, categoryLabel) {
   try {
     let rows;
-    if (vesselScopeColumn && (vesselId || vesselCode)) {
+    let orphanSkipNote = "";
+    if (tc.tableName === "planner_dates" && vesselScopeColumn && (vesselId || vesselCode)) {
+      const scopeValue = vesselScopeColumn === "vessel_code" ? vesselCode : vesselId;
+      const orphanResult = await pool2.query(
+        `SELECT pd.pduuid, pd.component_id,
+                CASE WHEN c.cuuid IS NULL THEN 'component missing'
+                     WHEN COALESCE(c.is_deleted, false) = true THEN 'component soft-deleted'
+                     WHEN c.vessel_id IS DISTINCT FROM pd.vessel_id THEN 'component vessel mismatch'
+                     ELSE 'unknown'
+                END AS reason
+         FROM "planner_dates" pd
+         LEFT JOIN "components" c ON c.cuuid = pd.component_id
+         WHERE pd."${vesselScopeColumn}" = $1
+           AND COALESCE(pd.is_deleted, false) = false
+           AND (
+             c.cuuid IS NULL
+             OR COALESCE(c.is_deleted, false) = true
+             OR c.vessel_id IS DISTINCT FROM pd.vessel_id
+           )`,
+        [scopeValue]
+      );
+      const orphans = orphanResult.rows;
+      if (orphans.length > 0) {
+        const reasonCounts = {};
+        for (const o of orphans) {
+          reasonCounts[o.reason] = (reasonCounts[o.reason] || 0) + 1;
+          console.warn(
+            `[Provisioning] Skipping orphan planner_dates row pduuid=${o.pduuid} component_id=${o.component_id} reason="${o.reason}"`
+          );
+        }
+        const reasonSummary = Object.entries(reasonCounts).map(([r, n]) => `${n} ${r}`).join(", ");
+        orphanSkipNote = ` \u2014 ${orphans.length} orphans skipped (${reasonSummary})`;
+        console.warn(
+          `[Provisioning] planner_dates: skipped ${orphans.length} orphan row(s) for vessel ${scopeValue} (${reasonSummary})`
+        );
+      }
+      rows = await pool2.query(
+        `SELECT pd.* FROM "planner_dates" pd
+           INNER JOIN "components" c ON c.cuuid = pd.component_id
+           WHERE pd."${vesselScopeColumn}" = $1
+             AND COALESCE(pd.is_deleted, false) = false
+             AND COALESCE(c.is_deleted, false) = false
+             AND c.vessel_id = pd.vessel_id
+           ORDER BY COALESCE(pd.created_at, NOW()) ASC`,
+        [scopeValue]
+      ).then((r) => r.rows);
+    } else if (vesselScopeColumn && (vesselId || vesselCode)) {
       const scopeValue = vesselScopeColumn === "vessel_code" ? vesselCode : vesselId;
       rows = await pool2.query(
         `SELECT * FROM "${tc.tableName}" WHERE "${vesselScopeColumn}" = $1 AND COALESCE(is_deleted, false) = false ORDER BY COALESCE(created_at, NOW()) ASC`,
@@ -9821,7 +10041,7 @@ async function exportAndAdd(pool2, bundle, tc, vesselId, vesselCode, vesselScope
     bundle.manifest.tables.push({
       tableName: tc.tableName,
       rowCount: rows.length,
-      category: categoryLabel
+      category: `${categoryLabel}${orphanSkipNote}`
     });
     bundle.manifest.totalRows += rows.length;
   } catch (err) {
@@ -9900,6 +10120,7 @@ var init_syncEngine = __esm({
     init_syncConfig();
     init_db();
     init_syncDiagLogger();
+    init_syncRole();
     CHUNK_SIZE = 200;
     MAX_RETRIES = 3;
     RETRY_DELAYS = [5e3, 15e3, 45e3];
@@ -10020,7 +10241,7 @@ var init_syncEngine = __esm({
               console.warn(`[SyncEngine] Failed to save local checkpoint: ${cpErr.message}`);
             }
           }
-          const isShip = this.instanceId.toUpperCase().startsWith("SHIP");
+          const isShip = isShipInstanceId(this.instanceId);
           if (pushedLogUuids.length > 0 && isShip) {
             try {
               await markFieldLogsSynced(pushedLogUuids, batchUuid);
@@ -10067,13 +10288,14 @@ var init_syncEngine = __esm({
           };
         } catch (error) {
           const durationMs = Date.now() - startTime;
-          syncDiag(`=== SYNC END === vessel=${vesselId}, duration=${durationMs}ms, status=FAILED, error=${error.message}`);
-          console.error(`[SyncEngine] Sync failed for vessel ${vesselId}:`, error.message);
+          const errorDetail = error.message + (error.cause?.code ? ` [${error.cause.code}]` : "");
+          syncDiag(`=== SYNC END === vessel=${vesselId}, duration=${durationMs}ms, status=FAILED, error=${errorDetail}`);
+          console.error(`[SyncEngine] Sync failed for vessel ${vesselId}:`, errorDetail);
           if (batchUuid) {
             try {
               await updateBatch(batchUuid, {
                 status: "failed",
-                errorMessage: error.message,
+                errorMessage: errorDetail,
                 completedAt: /* @__PURE__ */ new Date(),
                 durationMs
               });
@@ -10090,7 +10312,7 @@ var init_syncEngine = __esm({
             conflictsAutoResolved,
             filesQueued: 0,
             durationMs,
-            error: error.message,
+            error: errorDetail,
             newCheckpoint: null
           };
         }
@@ -10101,7 +10323,7 @@ var init_syncEngine = __esm({
       async executePush(batchUuid, vesselId, lastCheckpoint) {
         let totalPushed = 0;
         const shipOnlyRows = [];
-        if (this.instanceId.toUpperCase().startsWith("SHIP")) {
+        if (isShipInstanceId(this.instanceId)) {
           const shipOnlyTables = getTablesByCategory("SHIP_ONLY");
           for (const tableConfig of shipOnlyTables) {
             try {
@@ -10114,11 +10336,11 @@ var init_syncEngine = __esm({
             }
           }
         }
-        const isShipInstance = this.instanceId.toUpperCase().startsWith("SHIP");
+        const isShip = isShipInstanceId(this.instanceId);
         const vesselCode = await this.getVesselCode(vesselId);
         syncDiag(`PUSH START: gathering field logs for vessel=${vesselId}, vesselCode=${vesselCode}`);
-        const fieldLogs = isShipInstance ? await getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode) : [];
-        syncDiag(`PUSH: found ${fieldLogs.length} unsynced field logs${!isShipInstance ? " (shore skips field log push)" : ""}`);
+        const fieldLogs = isShip ? await getUnsyncedFieldLogs(this.instanceId, vesselId, vesselCode) : [];
+        syncDiag(`PUSH: found ${fieldLogs.length} unsynced field logs${!isShip ? " (shore skips field log push)" : ""}`);
         const pushTables = {};
         fieldLogs.forEach((l) => {
           pushTables[l.tableName ?? l.table_name] = (pushTables[l.tableName ?? l.table_name] || 0) + 1;
@@ -10143,6 +10365,49 @@ var init_syncEngine = __esm({
           changedByUserId: log2.changedByUserId ?? log2.changed_by_user_id,
           instanceId: log2.instanceId ?? log2.instance_id
         }));
+        const masterRecordHints = [];
+        if (isShip && fieldLogPayloads.length > 0) {
+          const surveyMasterIds = /* @__PURE__ */ new Set();
+          const certMasterIds = /* @__PURE__ */ new Set();
+          for (const log2 of fieldLogPayloads) {
+            if (log2.tableName === "vessel_survey_data" && log2.fieldName === "masterId" && log2.newValue) {
+              surveyMasterIds.add(log2.newValue);
+            }
+            if (log2.tableName === "vessel_certificate_data" && log2.fieldName === "masterId" && log2.newValue) {
+              certMasterIds.add(log2.newValue);
+            }
+          }
+          const pool2 = await getPool();
+          if (surveyMasterIds.size > 0) {
+            try {
+              const r = await pool2.query(
+                `SELECT master_id, survey_name, category, "group", requirement_ref,
+                    applicable_to_company, survey_label, company_id, company_group, company_sequence, sequence
+             FROM ship_surveys_master WHERE master_id = ANY($1) AND is_deleted = false`,
+                [Array.from(surveyMasterIds)]
+              );
+              if (r.rows.length > 0) masterRecordHints.push({ tableName: "ship_surveys_master", rows: r.rows });
+            } catch (err) {
+              console.warn("[SyncEngine] FIX 58 survey master hints:", err.message);
+            }
+          }
+          if (certMasterIds.size > 0) {
+            try {
+              const r = await pool2.query(
+                `SELECT master_id, certificate_name, category, "group", requirement_ref,
+                    applicable_to_company, certificate_label, company_id, company_group, company_sequence, sequence
+             FROM ship_certificates_master WHERE master_id = ANY($1) AND is_deleted = false`,
+                [Array.from(certMasterIds)]
+              );
+              if (r.rows.length > 0) masterRecordHints.push({ tableName: "ship_certificates_master", rows: r.rows });
+            } catch (err) {
+              console.warn("[SyncEngine] FIX 58 cert master hints:", err.message);
+            }
+          }
+          if (masterRecordHints.length > 0) {
+            syncDiag(`FIX 58: sending ${masterRecordHints.reduce((s, h) => s + h.rows.length, 0)} master record hint(s) to shore`);
+          }
+        }
         if (fieldLogPayloads.length > 0 || shipOnlyRows.length > 0) {
           for (let i = 0; i < Math.max(fieldLogPayloads.length, 1); i += CHUNK_SIZE) {
             const chunk = fieldLogPayloads.slice(i, i + CHUNK_SIZE);
@@ -10151,7 +10416,9 @@ var init_syncEngine = __esm({
               vesselId,
               oneWayRows: i === 0 ? shipOnlyRows : [],
               // One-way rows with first chunk only
-              fieldLogs: chunk
+              fieldLogs: chunk,
+              masterRecordHints: i === 0 ? masterRecordHints : []
+              // Hints with first chunk only
             });
             totalPushed += result.received || 0;
           }
@@ -10289,7 +10556,7 @@ var init_syncEngine = __esm({
           return;
         }
         if (config.businessRules && log2.tableName === "defects" && log2.fieldName === "status") {
-          if (log2.newValue === "verified" && !this.instanceId.toUpperCase().startsWith("SHIP")) {
+          if (log2.newValue === "verified" && !isShipInstanceId(this.instanceId)) {
             console.warn(`[SyncEngine] Business rule: ship cannot verify defects. Skipping.`);
             return;
           }
@@ -10439,6 +10706,292 @@ var init_syncEngine = __esm({
       }
     };
     engineInstance = null;
+  }
+});
+
+// server/modules/sync/autoSyncScheduler.ts
+var autoSyncScheduler_exports = {};
+__export(autoSyncScheduler_exports, {
+  SyncAutoScheduler: () => SyncAutoScheduler,
+  syncAutoScheduler: () => syncAutoScheduler
+});
+function classifyError(error) {
+  const msg = (error?.message || "").toLowerCase();
+  const causeCode = (error?.cause?.code || "").toLowerCase();
+  const causeMsg = (error?.cause?.message || "").toLowerCase();
+  const all = `${msg} ${causeCode} ${causeMsg}`;
+  if (/econnrefused|enotfound|enetunreach|ehostunreach|eai_again/.test(all)) {
+    return "network_unreachable";
+  }
+  if (/timeout|abort|timedout|etimedout|econnaborted|und_err_connect_timeout/.test(all)) {
+    return "timeout";
+  }
+  if (/\b5\d{2}\b|server error/.test(all)) {
+    return "server_error";
+  }
+  if (/\b4\d{2}\b|client error/.test(all)) {
+    return "client_error";
+  }
+  return "unknown_error";
+}
+async function getVesselCode(vesselId) {
+  if (vesselCodeCache2.has(vesselId)) return vesselCodeCache2.get(vesselId);
+  try {
+    const pool2 = await getPool();
+    const result = await pool2.query(
+      `SELECT vessel_code FROM vessels WHERE vuuid = $1 LIMIT 1`,
+      [vesselId]
+    );
+    const code = result.rows[0]?.vessel_code || null;
+    vesselCodeCache2.set(vesselId, code);
+    return code;
+  } catch {
+    return null;
+  }
+}
+var DEFAULT_INTERVAL_MINUTES, BOOT_DELAY_MS, DEFAULT_CATCH_UP_MAX_CYCLES, vesselCodeCache2, SyncAutoScheduler, syncAutoScheduler;
+var init_autoSyncScheduler = __esm({
+  "server/modules/sync/autoSyncScheduler.ts"() {
+    "use strict";
+    init_repository();
+    init_syncEngine();
+    init_syncDiagLogger();
+    init_syncRole();
+    init_db();
+    DEFAULT_INTERVAL_MINUTES = 360;
+    BOOT_DELAY_MS = 18e4;
+    DEFAULT_CATCH_UP_MAX_CYCLES = 20;
+    vesselCodeCache2 = /* @__PURE__ */ new Map();
+    SyncAutoScheduler = class {
+      isRunning = false;
+      intervalId = null;
+      tickIntervalMs = DEFAULT_INTERVAL_MINUTES * 60 * 1e3;
+      /** Per-vessel re-entrancy guard */
+      syncInProgress = /* @__PURE__ */ new Map();
+      async start(intervalMs) {
+        if (this.isRunning) {
+          console.log("[AutoSync] Scheduler already running");
+          return;
+        }
+        this.tickIntervalMs = await this.resolveIntervalMs(intervalMs);
+        const intervalMin = Math.round(this.tickIntervalMs / 6e4);
+        const intervalHours = (this.tickIntervalMs / 1e3 / 60 / 60).toFixed(2);
+        console.log(`[AutoSync] Starting scheduler (tick interval: ${intervalMin}min / ${intervalHours}h, boot delay: ${BOOT_DELAY_MS / 1e3}s)`);
+        setTimeout(() => {
+          this.tick().catch((err) => {
+            console.error("[AutoSync] Error during initial tick:", err);
+          });
+        }, BOOT_DELAY_MS);
+        this.intervalId = setInterval(() => {
+          this.tick().catch((err) => {
+            console.error("[AutoSync] Error during scheduled tick:", err);
+          });
+        }, this.tickIntervalMs);
+        this.isRunning = true;
+      }
+      /**
+       * Resolve the startup tick cadence (ms). Precedence:
+       *   1. DB sync_settings.sync_interval_minutes (admin preference — survives restarts)
+       *   2. the intervalMs arg passed by the caller (routes.ts)
+       *   3. DEFAULT_INTERVAL_MINUTES
+       * No minimum enforced — admin's choice. Falls back gracefully if DB unavailable.
+       */
+      async resolveIntervalMs(argMs) {
+        try {
+          const settings = await getAllSettings();
+          const minutes = parseInt(settings["sync_interval_minutes"] || "0", 10);
+          if (Number.isFinite(minutes) && minutes > 0) {
+            console.log(`[AutoSync] Using sync_interval_minutes=${minutes} from sync_settings`);
+            return minutes * 60 * 1e3;
+          }
+        } catch (err) {
+          console.warn("[AutoSync] Could not read sync_interval_minutes at startup \u2014 falling back:", err?.message || err);
+        }
+        if (argMs && argMs > 0) return argMs;
+        return DEFAULT_INTERVAL_MINUTES * 60 * 1e3;
+      }
+      /**
+       * Reconfigure the live tick cadence immediately. Called by the settings-save
+       * endpoint and by tick() when a direct-DB change is detected. No minimum
+       * enforced beyond > 0 — admin chose, admin gets.
+       */
+      restartWithNewInterval(intervalMinutes) {
+        if (!Number.isFinite(intervalMinutes) || intervalMinutes <= 0) {
+          console.warn(`[AutoSync] Ignoring invalid sync interval: ${intervalMinutes} (must be a positive number of minutes)`);
+          return;
+        }
+        const newMs = intervalMinutes * 60 * 1e3;
+        if (!this.isRunning) {
+          this.tickIntervalMs = newMs;
+          console.log(`[AutoSync] Scheduler not running \u2014 interval preference recorded as ${intervalMinutes}min (applies when started)`);
+          return;
+        }
+        if (newMs === this.tickIntervalMs) {
+          console.log(`[AutoSync] Sync interval already ${intervalMinutes}min \u2014 no change`);
+          return;
+        }
+        if (this.intervalId) {
+          clearInterval(this.intervalId);
+          this.intervalId = null;
+        }
+        this.tickIntervalMs = newMs;
+        this.intervalId = setInterval(() => {
+          this.tick().catch((err) => {
+            console.error("[AutoSync] Error during scheduled tick:", err);
+          });
+        }, this.tickIntervalMs);
+        console.log(`[AutoSync] Sync interval updated to ${intervalMinutes} minutes \u2014 now live`);
+      }
+      stop() {
+        if (this.intervalId) {
+          clearInterval(this.intervalId);
+          this.intervalId = null;
+        }
+        this.isRunning = false;
+        console.log("[AutoSync] Scheduler stopped");
+      }
+      // ────────────────────────────────────────────────
+      // Tick — one scheduler wake-up
+      // ────────────────────────────────────────────────
+      async tick() {
+        try {
+          if (!await isShipInstance()) {
+            syncDiag("[AutoSync] Shore instance detected in tick() \u2014 skipping (sync is ship-initiated)");
+            return;
+          }
+          const settings = await getAllSettings();
+          const enabled = settings["auto_sync_enabled"] === "true";
+          if (!enabled) {
+            syncDiag("[AutoSync] auto_sync_enabled=false \u2014 skipping tick");
+            return;
+          }
+          const intervalMinutes = parseInt(settings["sync_interval_minutes"] || "0", 10);
+          if (intervalMinutes > 0 && intervalMinutes * 60 * 1e3 !== this.tickIntervalMs) {
+            console.log(`[AutoSync] Detected interval change in settings \u2192 applying live (${this.tickIntervalMs / 6e4}min \u2192 ${intervalMinutes}min)`);
+            this.restartWithNewInterval(intervalMinutes);
+          }
+          const instanceId = settings["instance_id"] || process.env.SYNC_INSTANCE_ID || "";
+          if (!instanceId) {
+            console.warn("[AutoSync] No instance_id configured \u2014 cannot determine vessel. Skipping.");
+            return;
+          }
+          const metadata = await getInstanceMetadata(instanceId);
+          const vesselId = metadata?.vesselId;
+          if (!vesselId) {
+            console.warn(`[AutoSync] No vesselId in sync_metadata for instance ${instanceId}. Skipping.`);
+            return;
+          }
+          const maxCatchUp = parseInt(settings["catch_up_max_cycles"] || String(DEFAULT_CATCH_UP_MAX_CYCLES), 10);
+          await this.runWithCatchUp(instanceId, vesselId, maxCatchUp);
+        } catch (error) {
+          console.error("[AutoSync] Tick failed:", error.message);
+        }
+      }
+      // ────────────────────────────────────────────────
+      // Run sync + catch-up cycles
+      // ────────────────────────────────────────────────
+      async runWithCatchUp(instanceId, vesselId, maxCatchUpCycles) {
+        if (this.syncInProgress.get(vesselId)) {
+          console.log(`[AutoSync] Sync already in progress for vessel ${vesselId} \u2014 skipping`);
+          await insertConnectivityLog({
+            instanceId,
+            vesselId,
+            outcome: "skipped_reentrant",
+            triggerType: "auto"
+          });
+          return;
+        }
+        this.syncInProgress.set(vesselId, true);
+        let cycleNumber = 0;
+        try {
+          const primaryResult = await this.executeSingleCycle(instanceId, vesselId, cycleNumber, "auto");
+          if (!primaryResult.success) {
+            return;
+          }
+          if (maxCatchUpCycles <= 0) return;
+          const vesselCode = await getVesselCode(vesselId);
+          let remaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
+          while (remaining > 0 && cycleNumber < maxCatchUpCycles) {
+            cycleNumber++;
+            console.log(`[AutoSync] Catch-up cycle ${cycleNumber}/${maxCatchUpCycles} \u2014 ${remaining} unsynced records remain`);
+            syncDiag(`[AutoSync] catch-up cycle=${cycleNumber}, remaining=${remaining}, cap=${maxCatchUpCycles}`);
+            const catchUpResult = await this.executeSingleCycle(instanceId, vesselId, cycleNumber, "catch_up");
+            if (!catchUpResult.success) {
+              console.log(`[AutoSync] Catch-up cycle ${cycleNumber} failed \u2014 stopping catch-up`);
+              break;
+            }
+            remaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
+          }
+          if (cycleNumber > 0) {
+            const finalRemaining = await getUnsyncedFieldLogCount(instanceId, vesselId, vesselCode);
+            console.log(`[AutoSync] Catch-up complete \u2014 ran ${cycleNumber} extra cycle(s), ${finalRemaining} records still unsynced`);
+          }
+        } finally {
+          this.syncInProgress.set(vesselId, false);
+        }
+      }
+      // ────────────────────────────────────────────────
+      // Execute one sync cycle + log connectivity
+      // ────────────────────────────────────────────────
+      async executeSingleCycle(instanceId, vesselId, cycleNumber, triggerType) {
+        const startMs = Date.now();
+        let result;
+        try {
+          const engine = getSyncEngine();
+          result = await engine.runSync(vesselId);
+        } catch (error) {
+          const latencyMs2 = Date.now() - startMs;
+          const outcome2 = classifyError(error);
+          await insertConnectivityLog({
+            instanceId,
+            vesselId,
+            outcome: outcome2,
+            errorMessage: error.message?.substring(0, 500),
+            errorCategory: outcome2,
+            latencyMs: latencyMs2,
+            catchUpCycle: cycleNumber,
+            triggerType
+          });
+          console.error(`[AutoSync] Cycle ${cycleNumber} threw: ${error.message}`);
+          syncDiag(`[AutoSync] EXCEPTION cycle=${cycleNumber}, outcome=${outcome2}, latency=${latencyMs2}ms, err=${error.message}`);
+          return {
+            success: false,
+            batchUuid: null,
+            recordsPushed: 0,
+            recordsPulled: 0,
+            conflictsFound: 0,
+            conflictsAutoResolved: 0,
+            filesQueued: 0,
+            durationMs: latencyMs2,
+            error: error.message,
+            newCheckpoint: null
+          };
+        }
+        const latencyMs = Date.now() - startMs;
+        const outcome = result.success ? "success" : classifyError({ message: result.error || "" });
+        await insertConnectivityLog({
+          instanceId,
+          vesselId,
+          outcome,
+          errorMessage: result.error?.substring(0, 500) ?? null,
+          errorCategory: result.success ? null : outcome,
+          latencyMs,
+          batchUuid: result.batchUuid,
+          recordsPushed: result.recordsPushed,
+          recordsPulled: result.recordsPulled,
+          catchUpCycle: cycleNumber,
+          triggerType
+        });
+        if (result.success) {
+          console.log(`[AutoSync] Cycle ${cycleNumber} OK \u2014 pushed=${result.recordsPushed}, pulled=${result.recordsPulled}, duration=${result.durationMs}ms`);
+        } else {
+          console.warn(`[AutoSync] Cycle ${cycleNumber} FAILED \u2014 ${result.error}`);
+        }
+        syncDiag(`[AutoSync] cycle=${cycleNumber}, trigger=${triggerType}, outcome=${outcome}, pushed=${result.recordsPushed}, pulled=${result.recordsPulled}, latency=${latencyMs}ms`);
+        return result;
+      }
+    };
+    syncAutoScheduler = new SyncAutoScheduler();
   }
 });
 
@@ -10606,13 +11159,14 @@ async function initiateSyncHandler(req, res) {
 }
 async function pushHandler(req, res) {
   try {
-    const { batchUuid, vesselId, oneWayRows, fieldLogs } = req.body;
+    const { batchUuid, vesselId, oneWayRows, fieldLogs, masterRecordHints } = req.body;
     if (!batchUuid || !vesselId) {
       return res.status(400).json({ error: "batchUuid and vesselId are required" });
     }
     const result = await receivePushData(batchUuid, vesselId, {
       oneWayRows,
-      fieldLogs
+      fieldLogs,
+      masterRecordHints
     });
     res.json(result);
   } catch (error) {
@@ -10722,6 +11276,11 @@ async function unresolvedConflictsHandler(req, res) {
 }
 async function triggerSyncHandler(req, res) {
   try {
+    if (!await isShipInstance()) {
+      return res.status(400).json({
+        error: "Sync can only be triggered from a vessel (ship) instance. Shore is the responder in ship-initiated sync."
+      });
+    }
     const { vesselId } = req.body;
     if (!vesselId) {
       return res.status(400).json({ error: "vesselId is required" });
@@ -10899,11 +11458,26 @@ async function updateSettingsHandler(req, res) {
     if (!settings || typeof settings !== "object") {
       return res.status(400).json({ error: "settings object is required" });
     }
+    let newIntervalMinutes = null;
+    if (settings.sync_interval_minutes !== void 0) {
+      const n = Number(settings.sync_interval_minutes);
+      if (!Number.isInteger(n) || n <= 0) {
+        return res.status(400).json({ error: "sync_interval_minutes must be a positive integer (minutes)" });
+      }
+      newIntervalMinutes = n;
+    }
     const userId = req.user?.userUuid || req.user?.username || "system";
     await updateSettings(settings, userId);
     const engine = getSyncEngine();
     engine.reloadSettings();
-    res.json({ success: true, message: "Settings updated. Sync engine will reload on next cycle." });
+    if (newIntervalMinutes !== null && await isShipInstance()) {
+      syncAutoScheduler.restartWithNewInterval(newIntervalMinutes);
+    }
+    res.json({
+      success: true,
+      message: "Settings updated.",
+      ...newIntervalMinutes !== null ? { syncIntervalMinutes: newIntervalMinutes } : {}
+    });
   } catch (error) {
     if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error("[Sync] update settings error:", error);
@@ -10941,7 +11515,7 @@ async function instanceInfoHandler(req, res) {
     } catch {
     }
     const effectiveId = dbInstanceId && dbInstanceId.trim() || envInstanceId;
-    const isShip = effectiveId.startsWith("SHIP-");
+    const isShip = isShipInstanceId(effectiveId);
     const isShore = !isShip;
     res.json({
       instanceId: effectiveId,
@@ -11008,9 +11582,11 @@ var init_controller = __esm({
     init_repository();
     init_provisioningService();
     init_syncEngine();
+    init_autoSyncScheduler();
     init_fileSyncProcessor();
     init_pruningService();
     init_healthMonitor();
+    init_syncRole();
     init_syncDiagLogger();
   }
 });
@@ -11566,14 +12142,15 @@ function computeWorkOrderStatus(input) {
     calendarLeadTimeDays,
     companyGraceConfig
   } = input;
-  const FINALIZED_STATUSES = /* @__PURE__ */ new Set(["completed", "approved", "closed", "cancelled", "canceled"]);
+  const FINALIZED_STATUSES2 = /* @__PURE__ */ new Set(["completed", "approved", "closed", "cancelled", "canceled"]);
   const normalizedStatus = status ? status.toLowerCase().trim() : "";
-  if (FINALIZED_STATUSES.has(normalizedStatus)) {
+  if (FINALIZED_STATUSES2.has(normalizedStatus)) {
     return "Completed";
   }
   if (isExecution) {
     if (status === "Pending Approval") return "Pending Approval";
-    if (status === "Rejected") {
+    if (status === "Rejected") return "Rejected";
+    if (status === "Reopened") {
     } else if (completionDateTime) {
       return "Completed";
     } else {
@@ -11582,10 +12159,89 @@ function computeWorkOrderStatus(input) {
   }
   if (status === "Pending Approval") return "Pending Approval";
   if (status === "Postponed") return "Postponed";
-  if (status !== "Rejected" && completionDateTime) {
+  if (status === "Rejected") return "Rejected";
+  if (status !== "Reopened" && completionDateTime) {
     return "Completed";
   }
-  if (maintenanceBasis === "Running Hours") {
+  if (maintenanceBasis === "Dual Frequency") {
+    const STATUS_SEVERITY = {
+      "Overdue": 4,
+      "Due (Grace P)": 3,
+      "Due": 2,
+      "Active": 1
+    };
+    let rhStatus = "Active";
+    if (dueRH != null && currentRH != null) {
+      let leadTime;
+      if (rhLeadTimeHours !== void 0 && rhLeadTimeHours !== null) {
+        leadTime = rhLeadTimeHours;
+      } else if (vesselGraceSettings?.rhLeadTimeHours !== void 0 && vesselGraceSettings?.rhLeadTimeHours !== null) {
+        leadTime = vesselGraceSettings.rhLeadTimeHours;
+      } else {
+        leadTime = GRACE_PERIOD_CONSTANTS.DEFAULT_RH_LEAD_TIME;
+      }
+      let graceHours;
+      if (vesselGraceSettings?.vesselRhGraceConfig) {
+        const rhCfg = vesselGraceSettings.vesselRhGraceConfig;
+        if (rhCfg.scope === "ALL_WORK_ORDERS") {
+          graceHours = rhCfg.graceMethod === "FIXED_HOURS" ? rhCfg.graceValue ?? GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS : GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+        } else {
+          let inLastWeek = false;
+          if (dueDate) {
+            const dueDateObj = parseDate(dueDate);
+            if (dueDateObj) {
+              const endOfMonth = new Date(dueDateObj.getFullYear(), dueDateObj.getMonth() + 1, 0);
+              inLastWeek = endOfMonth.getDate() - dueDateObj.getDate() <= 7;
+            }
+          }
+          if (inLastWeek) {
+            graceHours = rhCfg.graceMethod === "FIXED_HOURS" ? rhCfg.graceValue ?? GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS : GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+          } else if (rhCfg.fallbackMethod === "FIXED_HOURS") {
+            graceHours = rhCfg.fallbackGraceHours ?? GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+          } else {
+            graceHours = GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+          }
+        }
+      } else {
+        graceHours = vesselGraceSettings?.rhGraceHours ?? GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+      }
+      const rhCategory = computeRHStatusCategory(dueRH, currentRH, leadTime, graceHours);
+      rhStatus = rhCategoryToDisplayStatus(rhCategory);
+    }
+    let calStatus = "Active";
+    if (dueDate) {
+      const dueDateObj = parseDate(dueDate);
+      if (dueDateObj) {
+        const today = input.referenceDate ? new Date(input.referenceDate) : /* @__PURE__ */ new Date();
+        today.setUTCHours(0, 0, 0, 0);
+        const dueDateTime = new Date(dueDateObj);
+        dueDateTime.setUTCHours(0, 0, 0, 0);
+        const diffTime = dueDateTime.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1e3 * 60 * 60 * 24));
+        let graceEndDate;
+        if (vesselGraceSettings?.calendarGraceMode === "CUSTOM_DAYS") {
+          if (vesselGraceSettings.vesselCalendarGraceConfig) {
+            graceEndDate = calculateCompanyStandardGraceEnd(dueDateTime, vesselGraceSettings.vesselCalendarGraceConfig);
+          } else {
+            graceEndDate = new Date(dueDateTime);
+            graceEndDate.setDate(graceEndDate.getDate() + (vesselGraceSettings.calendarGraceDays || GRACE_PERIOD_CONSTANTS.GRACE_PERIOD_DAYS));
+            graceEndDate.setUTCHours(0, 0, 0, 0);
+          }
+        } else {
+          graceEndDate = calculateCompanyStandardGraceEnd(dueDateTime, companyGraceConfig);
+        }
+        const effectiveLeadDays = calendarLeadTimeDays !== void 0 && calendarLeadTimeDays !== null ? calendarLeadTimeDays : GRACE_PERIOD_CONSTANTS.DUE_HORIZON_DAYS;
+        if (diffDays < 0) {
+          calStatus = today > graceEndDate ? "Overdue" : "Due (Grace P)";
+        } else if (diffDays <= effectiveLeadDays) {
+          calStatus = "Due";
+        } else {
+          calStatus = "Active";
+        }
+      }
+    }
+    return (STATUS_SEVERITY[rhStatus] || 1) >= (STATUS_SEVERITY[calStatus] || 1) ? rhStatus : calStatus;
+  } else if (maintenanceBasis === "Running Hours") {
     if (dueRH == null || currentRH == null) return "Active";
     let leadTime;
     if (rhLeadTimeHours !== void 0 && rhLeadTimeHours !== null) {
@@ -11843,6 +12499,9 @@ var init_postgresStorage = __esm({
           }
         }
       }
+      async createStoresLedgerEntryForImport(values) {
+        return this.insertStoresLedgerEntry(values);
+      }
       // ============= USERS (Module 1) =============
       async getUser(id) {
         const db2 = await getDb();
@@ -11963,7 +12622,9 @@ var init_postgresStorage = __esm({
           id: v.id,
           vuuid: v.vuuid,
           name: v.name,
-          code: v.code
+          code: v.code,
+          imoNumber: v.imoNumber ?? null,
+          vesselType: v.vesselType ?? null
         }));
       }
       async getVessel(id) {
@@ -18332,7 +18993,7 @@ var init_postgresStorage = __esm({
       LEFT JOIN locations l ON sls.location_id = l.id
       LEFT JOIN spare_component_links scl ON scl.spare_id = s.id
       LEFT JOIN components c ON scl.component_id = c.cuuid
-      WHERE s.vessel_id = ${vesselId}
+      WHERE ${vesselId === "all" ? sql5`TRUE` : sql5`s.vessel_id = ${vesselId}`}
         AND s.deleted = false
         AND s.data_scope = 'vessel'
       GROUP BY s.id
@@ -18414,6 +19075,192 @@ var init_postgresStorage = __esm({
             }))
           };
         });
+      }
+      async getSparesWithInventoryByVesselPaged(vesselId, opts) {
+        const db2 = await getDb();
+        const page = Math.max(1, Math.floor(opts.page || 1));
+        const pageSize = Math.min(200, Math.max(1, Math.floor(opts.pageSize || 50)));
+        const offset = (page - 1) * pageSize;
+        const dir = (opts.sortDir || "asc").toLowerCase() === "desc" ? sql5.raw("DESC") : sql5.raw("ASC");
+        const filters = [
+          sql5`s.deleted = false`,
+          sql5`s.data_scope = 'vessel'`
+        ];
+        if (vesselId !== "all") {
+          filters.push(sql5`s.vessel_id = ${vesselId}`);
+        }
+        if (opts.search && opts.search.trim()) {
+          const q = `%${opts.search.trim()}%`;
+          filters.push(sql5`(
+        s.part_code ILIKE ${q} OR
+        s.part_name ILIKE ${q} OR
+        s.component_code ILIKE ${q} OR
+        s.component_name ILIKE ${q} OR
+        s.location ILIKE ${q} OR
+        s.location_2 ILIKE ${q}
+      )`);
+        }
+        if (opts.criticality === "Critical") {
+          filters.push(sql5`(s.critical = 'Critical' OR s.critical = 'Yes')`);
+        } else if (opts.criticality === "Non-critical") {
+          filters.push(sql5`(s.critical IS NULL OR (s.critical <> 'Critical' AND s.critical <> 'Yes'))`);
+        }
+        if (opts.rotation === "Rotation Items") {
+          filters.push(sql5`s.is_rotation_item = true`);
+        } else if (opts.rotation === "Non-Rotation Items") {
+          filters.push(sql5`(s.is_rotation_item IS NULL OR s.is_rotation_item = false)`);
+        }
+        if (opts.stockStatus === "Low") {
+          filters.push(sql5`COALESCE(s.rob, 0) < COALESCE(s.min, 0)`);
+        } else if (opts.stockStatus === "At Min") {
+          filters.push(sql5`COALESCE(s.rob, 0) = COALESCE(s.min, 0)`);
+        } else if (opts.stockStatus === "OK") {
+          filters.push(sql5`COALESCE(s.rob, 0) > COALESCE(s.min, 0)`);
+        }
+        if (opts.activeOnly) {
+          filters.push(sql5`(s.is_active IS NULL OR s.is_active = true)`);
+        }
+        if (opts.componentId && opts.componentId.trim()) {
+          const cid = opts.componentId.trim();
+          const cidPrefix = `${cid}.%`;
+          filters.push(sql5`(
+        s.component_code = ${cid}
+        OR s.component_code LIKE ${cidPrefix}
+        OR EXISTS (
+          SELECT 1 FROM spare_component_links scl
+          JOIN components c ON c.cuuid = scl.component_id
+          WHERE scl.spare_id = s.id
+            AND c.vessel_id = s.vessel_id
+            AND (c.component_code = ${cid} OR c.component_code LIKE ${cidPrefix})
+        )
+      )`);
+        }
+        let whereClause = filters[0];
+        for (let i = 1; i < filters.length; i++) {
+          whereClause = sql5`${whereClause} AND ${filters[i]}`;
+        }
+        const countResult = await db2.execute(sql5`
+      SELECT COUNT(*)::int AS total FROM spares s WHERE ${whereClause}
+    `);
+        const total = Number(countResult.rows[0]?.total || 0);
+        const pageResult = await db2.execute(sql5`
+      WITH filtered AS (
+        SELECT * FROM spares s WHERE ${whereClause}
+        ORDER BY s.part_code ${dir} NULLS LAST, s.id ASC
+        LIMIT ${pageSize} OFFSET ${offset}
+      )
+      SELECT f.*,
+        COALESCE((
+          SELECT json_agg(jsonb_build_object(
+            'locationId', sls.location_id,
+            'locationName', l.location_name,
+            'qty', sls.qty
+          ))
+          FROM spare_location_stock sls
+          JOIN locations l ON l.id = sls.location_id
+          WHERE sls.spare_id = f.id
+            AND LOWER(TRIM(l.location_name)) IN (
+              LOWER(TRIM(COALESCE(f.location, ''))),
+              LOWER(TRIM(COALESCE(f.location_2, '')))
+            )
+        ), '[]'::json) AS locations,
+        COALESCE((
+          SELECT json_agg(jsonb_build_object(
+            'componentId', scl.component_id,
+            'componentCode', c.component_code,
+            'componentName', c.name
+          ))
+          FROM spare_component_links scl
+          JOIN components c ON c.cuuid = scl.component_id
+          WHERE scl.spare_id = f.id AND c.vessel_id = f.vessel_id
+        ), '[]'::json) AS linked_components
+      FROM filtered f
+      ORDER BY f.part_code ${dir} NULLS LAST, f.id ASC
+    `);
+        const rows = pageResult.rows;
+        const items = rows.map((row) => {
+          const locs = typeof row.locations === "string" ? JSON.parse(row.locations) : row.locations || [];
+          const linked = typeof row.linked_components === "string" ? JSON.parse(row.linked_components) : row.linked_components || [];
+          const robTotal = locs.reduce((sum2, l) => sum2 + (l.qty || 0), 0);
+          const spare = {
+            id: row.id,
+            partCode: row.part_code,
+            partName: row.part_name,
+            componentId: row.component_id,
+            componentCode: row.component_code,
+            componentName: row.component_name,
+            componentSpareCode: row.component_spare_code,
+            critical: row.critical,
+            rob: row.rob,
+            robLocationA: row.rob_location_a,
+            robLocationB: row.rob_location_b,
+            min: row.min,
+            max: row.max,
+            unitCost: row.unit_cost,
+            stockingNumber: row.stocking_number,
+            leadTime: row.lead_time,
+            supplier: row.supplier,
+            lastOrderDate: row.last_order_date,
+            location: row.location,
+            vesselId: row.vessel_id,
+            deleted: row.deleted,
+            dataScope: row.data_scope,
+            fleetEquipmentCode: row.fleet_equipment_code,
+            fleetPartCode: row.fleet_part_code,
+            partNumber: row.part_number,
+            uom: row.uom,
+            drawingNumber: row.drawing_number,
+            drawingNo: row.drawing_no,
+            location2: row.location_2,
+            remarks: row.remarks,
+            unit: row.unit,
+            positionNumber: row.position_number,
+            note: row.note,
+            specification: row.specification,
+            maker: row.maker,
+            makerCode: row.maker_code,
+            model: row.model,
+            manualName: row.manual_name,
+            pageNumber: row.page_number,
+            criticality: row.criticality,
+            isActive: row.is_active,
+            ihm: row.ihm,
+            ihmPresence: row.ihm_presence,
+            evidenceType: row.evidence_type,
+            partCategory: row.part_category,
+            applicableVesselIds: row.applicable_vessel_ids,
+            scopeNotes: row.scope_notes,
+            createdAt: row.created_at,
+            createdBy: row.created_by,
+            updatedAt: row.updated_at,
+            updatedBy: row.updated_by,
+            suuid: row.suuid,
+            sortOrder: row.sort_order,
+            createdByUuid: row.created_by_uuid,
+            updatedByUuid: row.updated_by_uuid,
+            isDeleted: row.is_deleted,
+            isSync: row.is_sync,
+            isRotationItem: row.is_rotation_item
+          };
+          return {
+            spare,
+            robTotal,
+            stockStatus: (() => {
+              const rob = Number(spare.rob ?? 0);
+              const min = Number(spare.min ?? 0);
+              if (rob < min) return "Low";
+              if (rob === min) return "At Min";
+              return "OK";
+            })(),
+            locations: locs,
+            linkedComponents: linked.map((l) => ({
+              componentId: l.componentId,
+              componentCode: l.componentCode || "",
+              componentName: l.componentName || ""
+            }))
+          };
+        });
+        return { items, total, page, pageSize };
       }
       async getSparesWithInventoryByComponent(componentId) {
         const db2 = await getDb();
@@ -18924,7 +19771,7 @@ var init_workOrderStatusRecalculator = __esm({
             let currentRH = null;
             let dueRH = null;
             let job;
-            if (wo.maintenanceBasis === "Running Hours") {
+            if (wo.maintenanceBasis === "Running Hours" || wo.maintenanceBasis === "Dual Frequency") {
               if (wo.jobId) {
                 job = jobsCache.get(wo.jobId);
                 if (job?.componentId) {
@@ -18943,8 +19790,11 @@ var init_workOrderStatusRecalculator = __esm({
             }
             const vesselGraceSettings = wo.vesselId ? graceSettingsCache.get(wo.vesselId) : void 0;
             const vesselSettings = wo.vesselId ? vesselSettingsCache.get(wo.vesselId) : null;
+            if (!job && wo.jobId) {
+              job = jobsCache.get(wo.jobId);
+            }
             const isJobCritical3 = job?.jobPriority === "Critical" || job?.classRelated === "true" || String(job?.classRelated) === "true";
-            const rhLeadTimeHours = wo.maintenanceBasis === "Running Hours" ? isJobCritical3 ? vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL : vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL : void 0;
+            const rhLeadTimeHours = wo.maintenanceBasis === "Running Hours" || wo.maintenanceBasis === "Dual Frequency" ? isJobCritical3 ? vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL : vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL : void 0;
             const calendarLeadTimeDays = wo.maintenanceBasis !== "Running Hours" && vesselSettings ? isJobCritical3 ? vesselSettings.calendarLeadDaysCritical : vesselSettings.calendarLeadDaysNonCritical : void 0;
             const computedStatus = computeWorkOrderStatus({
               dueDate: wo.dueDate,
@@ -20334,7 +21184,9 @@ var init_jobDueScanner = __esm({
           calendarJobsChecked: 0,
           calendarWOsGenerated: 0,
           rhJobsChecked: 0,
-          rhWOsGenerated: 0
+          rhWOsGenerated: 0,
+          dualJobsChecked: 0,
+          dualWOsGenerated: 0
         };
         try {
           const calendarResults = await workOrderService.autoGenerateWorkOrdersFromJobs();
@@ -20343,7 +21195,10 @@ var init_jobDueScanner = __esm({
           const rhResults = await this.processRunningHoursJobs();
           results.rhJobsChecked = rhResults.checked;
           results.rhWOsGenerated = rhResults.generated;
-          console.log(`[JobDueScanner] Scan complete: Calendar (${results.calendarWOsGenerated}/${results.calendarJobsChecked} WOs), RH (${results.rhWOsGenerated}/${results.rhJobsChecked} WOs)`);
+          const dualResults = await this.processDualFrequencyJobs();
+          results.dualJobsChecked = dualResults.checked;
+          results.dualWOsGenerated = dualResults.generated;
+          console.log(`[JobDueScanner] Scan complete: Calendar (${results.calendarWOsGenerated}/${results.calendarJobsChecked} WOs), RH (${results.rhWOsGenerated}/${results.rhJobsChecked} WOs), Dual (${results.dualWOsGenerated}/${results.dualJobsChecked} WOs)`);
         } catch (error) {
           console.error("[JobDueScanner] Scan failed:", error);
           throw error;
@@ -20555,6 +21410,193 @@ var init_jobDueScanner = __esm({
         return { checked: rhJobs.length, generated };
       }
       /**
+       * Process Dual Frequency jobs — whichever-first: Calendar OR RH
+       * A WO is generated when EITHER the calendar leg OR the RH leg reaches its threshold.
+       * The WO records BOTH calendar and RH snapshots (D6) plus which leg triggered (D5).
+       *
+       * Applicability:
+       * - job.maintenanceBasis = 'Dual Frequency'
+       * - Component RH Counter Type = MASTER or INHERITED (D3)
+       * - job.isActive = true
+       * - job.intervalRunningHour > 0 AND job.nextDueDate set
+       */
+      async processDualFrequencyJobs() {
+        const skipReasons = {
+          noComponentId: 0,
+          componentNotFound: 0,
+          wrongCounterType: 0,
+          neitherLegDue: 0,
+          legacyBlocking: 0,
+          noLinkedComponents: 0,
+          existingWO: 0,
+          missingCalendarData: 0,
+          missingRHData: 0
+        };
+        const allJobs = await storage.getJobs();
+        const dualJobs = allJobs.filter(
+          (job) => job.maintenanceBasis === "Dual Frequency" && job.isActive !== false && job.intervalRunningHour && job.intervalRunningHour > 0 && job.nextDueDate
+        );
+        if (dualJobs.length === 0) {
+          return { checked: 0, generated: 0 };
+        }
+        const allWorkOrders = await storage.getWorkOrders();
+        const activeWOSets = buildJobsWithActiveWOSet(allWorkOrders);
+        const componentCache = /* @__PURE__ */ new Map();
+        const vesselComponentsFetched = /* @__PURE__ */ new Set();
+        const getComponentFromCache = async (componentId, vesselId) => {
+          if (vesselId && !vesselComponentsFetched.has(vesselId)) {
+            const vesselComponents = await storage.getComponents(vesselId);
+            vesselComponents.forEach((c) => {
+              componentCache.set(c.id, c);
+              if (c.cuuid) componentCache.set(c.cuuid, c);
+            });
+            vesselComponentsFetched.add(vesselId);
+          }
+          return componentCache.get(componentId);
+        };
+        let generated = 0;
+        const today = /* @__PURE__ */ new Date();
+        today.setHours(0, 0, 0, 0);
+        for (const job of dualJobs) {
+          if (!job.componentId) {
+            skipReasons.noComponentId++;
+            continue;
+          }
+          const component = await getComponentFromCache(job.componentId, job.vesselId);
+          if (!component) {
+            skipReasons.componentNotFound++;
+            continue;
+          }
+          const rhCounterType = (component.rhCounterType || "").toUpperCase();
+          if (rhCounterType !== "MASTER" && rhCounterType !== "INHERITED") {
+            skipReasons.wrongCounterType++;
+            continue;
+          }
+          const dueDate = new Date(job.nextDueDate);
+          dueDate.setHours(0, 0, 0, 0);
+          const generateDate = new Date(dueDate);
+          generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
+          const calendarDue = today >= generateDate;
+          let rhEffectiveCurrent;
+          if (rhCounterType === "MASTER") {
+            rhEffectiveCurrent = parseFloat(component.rhCurrentMaster || "0");
+          } else {
+            rhEffectiveCurrent = parseFloat(component.rhCurrentInheritedCached || "0");
+          }
+          const frequencyRH = job.intervalRunningHour || 0;
+          const rhLastDone = parseFloat(job.lastDoneRH || "0");
+          const rhDue = rhLastDone + frequencyRH;
+          const rhGenerate = Math.max(0, rhDue - WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS);
+          const rhLegDue = rhEffectiveCurrent >= rhGenerate;
+          if (!calendarDue && !rhLegDue) {
+            skipReasons.neitherLegDue++;
+            continue;
+          }
+          const triggerLeg = calendarDue ? "CALENDAR" : "RH";
+          const legacyBlockingWO = allWorkOrders.find((wo) => {
+            if (!isBlockingStatus(wo.status)) return false;
+            if (wo.componentCode && wo.componentCode !== "") return false;
+            if (wo.jobId === job.juuid) return true;
+            const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+            if (woJobNo === job.jobNo && wo.vesselId === job.vesselId) return true;
+            return false;
+          });
+          if (legacyBlockingWO) {
+            skipReasons.legacyBlocking++;
+            continue;
+          }
+          const linkedComponents = await storage.getLinkedComponentsForJob(job.juuid);
+          if (linkedComponents.length === 0 && job.componentId) {
+            linkedComponents.push({
+              componentId: job.componentId,
+              componentCode: job.componentCode || component.componentCode || "",
+              componentName: job.componentName || component.name || ""
+            });
+          }
+          if (linkedComponents.length === 0) {
+            skipReasons.noLinkedComponents++;
+            continue;
+          }
+          const dueDateStr = dueDate.toISOString().split("T")[0];
+          const generateDateStr = generateDate.toISOString().split("T")[0];
+          for (const linkedComponent of linkedComponents) {
+            const componentCode = linkedComponent.componentCode;
+            const componentName = linkedComponent.componentName;
+            if (!componentCode) continue;
+            const existingWOForComponent = allWorkOrders.find(
+              (wo) => wo.jobId === job.juuid && wo.componentCode === componentCode && isBlockingStatus(wo.status)
+            );
+            if (existingWOForComponent) {
+              skipReasons.existingWO++;
+              continue;
+            }
+            const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || void 0);
+            const workOrderData = {
+              vesselId: job.vesselId,
+              component: componentName,
+              componentCode,
+              jobId: job.juuid,
+              workOrderNo,
+              templateCode: workOrderNo,
+              jobTitle: job.jobTitle,
+              assignedTo: job.assignedTo || "Unassigned",
+              dueDate: job.nextDueDate,
+              // Calendar due date
+              nextDueReading: String(rhDue),
+              // RH due value
+              currentReading: String(rhEffectiveCurrent),
+              status: "Active",
+              taskType: job.maintenanceType,
+              maintenanceBasis: "Dual Frequency",
+              // D5: WO tag
+              frequencyValue: job.frequencyValue?.toString(),
+              frequencyUnit: job.frequencyUnit,
+              intervalRunningHour: job.intervalRunningHour,
+              jobPriority: job.jobPriority,
+              classRelated: job.classRelated,
+              briefWorkDescription: job.briefWorkDescription,
+              department: job.department,
+              requiredSpareParts: job.requiredSpareParts || [],
+              requiredTools: job.requiredTools || [],
+              safetyRequirements: job.safetyRequirements || {
+                ppeRequirements: [],
+                permitRequirements: [],
+                otherRequirements: []
+              },
+              // D5: Which leg triggered
+              driverType: triggerLeg === "CALENDAR" ? "DUAL_CALENDAR" : "DUAL_RH",
+              dualTriggerLeg: triggerLeg,
+              // Calendar snapshots (always present for Dual)
+              cycleDueDateSnapshot: dueDateStr,
+              generateDateSnapshot: generateDateStr,
+              dueDateSnapshot: dueDateStr,
+              lastDoneDateSnapshot: job.lastDoneDate || null,
+              // RH snapshots (always present for Dual)
+              cycleDueRhSnapshot: String(rhDue),
+              generateRhSnapshot: String(rhGenerate),
+              dueRhSnapshot: String(rhDue),
+              effectiveRhAtGeneration: String(rhEffectiveCurrent),
+              rhLastDoneSnapshot: String(rhLastDone)
+            };
+            try {
+              const createdWO = await workOrderService.createWorkOrder(workOrderData);
+              generated++;
+              allWorkOrders.push(createdWO);
+              const priorityLabel = isJobCritical2(job) ? "Critical" : "Non-Critical";
+              console.log(`\u2705 [Dual Trigger] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode} (trigger: ${triggerLeg})`);
+              console.log(`   Calendar: due=${dueDateStr}, generate=${generateDateStr}, calendarDue=${calendarDue}`);
+              console.log(`   RH: last_done=${rhLastDone}, F=${frequencyRH}, due=${rhDue}, generate=${rhGenerate}, current=${rhEffectiveCurrent}, rhDue=${rhLegDue}`);
+            } catch (error) {
+              console.warn(`\u26A0\uFE0F Failed to create WO for Dual job ${job.jobNo} + component ${componentCode}: ${error.message}`);
+            }
+          }
+        }
+        if (dualJobs.length > 0) {
+          console.log(`\u{1F4CB} [Dual WO Gen] ${dualJobs.length} Dual jobs checked, ${generated} WOs generated. Skip breakdown: neitherLegDue=${skipReasons.neitherLegDue}, wrongCounterType=${skipReasons.wrongCounterType}, existingWO=${skipReasons.existingWO}, legacyBlocking=${skipReasons.legacyBlocking}, noComponentId=${skipReasons.noComponentId}, componentNotFound=${skipReasons.componentNotFound}, noLinkedComponents=${skipReasons.noLinkedComponents}`);
+        }
+        return { checked: dualJobs.length, generated };
+      }
+      /**
        * Generate a work order for a specific job on-demand (Manual Button)
        * TRIGGER 3: Manual "Generate WO" button per new WO generation rules
        * 
@@ -20658,11 +21700,64 @@ var init_jobDueScanner = __esm({
         }
         const settings = job.vesselId ? await storage.getPmsVesselSettings(job.vesselId) : null;
         const isRHJob = job.maintenanceBasis === "Running Hours";
+        const isDualJob = job.maintenanceBasis === "Dual Frequency";
         let cycleSnapshots = {};
         let dueRH = null;
         let currentRH = null;
         let rhLeadTimeHours;
-        if (isRHJob) {
+        if (isDualJob) {
+          if (!componentData) {
+            return { success: false, message: "Component not found for Dual Frequency job" };
+          }
+          const dualRhCounterType = componentData.rhCounterType;
+          if (dualRhCounterType !== "MASTER" && dualRhCounterType !== "INHERITED") {
+            return { success: false, message: `Dual Frequency requires component RH Counter Type to be MASTER or INHERITED (current: ${dualRhCounterType})` };
+          }
+          rhLeadTimeHours = getRhLeadHours(job, settings);
+          if (dualRhCounterType === "MASTER") {
+            currentRH = parseFloat(componentData.rhCurrentMaster || "0");
+          } else {
+            currentRH = parseFloat(componentData.rhCurrentInheritedCached || "0");
+          }
+          const dualRhLastDone = parseFloat(job.lastDoneRH || "0");
+          const dualFrequencyRH = job.intervalRunningHour || 0;
+          const dualRhDueValue = dualRhLastDone + dualFrequencyRH;
+          const dualRhGenerate = Math.max(0, dualRhDueValue - WORK_ORDER_THRESHOLDS.RH_GENERATION_ADVANCE_HOURS);
+          dueRH = dualRhDueValue;
+          const dualDueDate = job.nextDueDate ? new Date(job.nextDueDate) : /* @__PURE__ */ new Date();
+          dualDueDate.setHours(0, 0, 0, 0);
+          const dualDueDateStr = dualDueDate.toISOString().split("T")[0];
+          const dualGenerateDate = new Date(dualDueDate);
+          dualGenerateDate.setDate(dualGenerateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
+          const dualGenerateDateStr = dualGenerateDate.toISOString().split("T")[0];
+          const dualToday = /* @__PURE__ */ new Date();
+          dualToday.setHours(0, 0, 0, 0);
+          const calLegDue = dualToday >= dualGenerateDate;
+          const rhLegDue = currentRH >= dualRhGenerate;
+          const dualTriggerLeg = calLegDue ? "CALENDAR" : rhLegDue ? "RH" : "CALENDAR";
+          cycleSnapshots = {
+            driverType: dualTriggerLeg === "CALENDAR" ? "DUAL_CALENDAR" : "DUAL_RH",
+            dualTriggerLeg,
+            // Calendar snapshots
+            cycleDueDateSnapshot: dualDueDateStr,
+            generateDateSnapshot: dualGenerateDateStr,
+            dueDateSnapshot: dualDueDateStr,
+            lastDoneDateSnapshot: job.lastDoneDate || null,
+            dueDate: job.nextDueDate,
+            // RH snapshots
+            cycleDueRhSnapshot: String(dualRhDueValue),
+            generateRhSnapshot: String(dualRhGenerate),
+            dueRhSnapshot: String(dualRhDueValue),
+            effectiveRhAtGeneration: String(currentRH),
+            rhLastDoneSnapshot: String(dualRhLastDone),
+            nextDueReading: String(dualRhDueValue),
+            currentReading: String(currentRH),
+            intervalRunningHour: job.intervalRunningHour
+          };
+          console.log(`[Manual Trigger 3] Dual Frequency Job: trigger=${dualTriggerLeg}`);
+          console.log(`   Calendar: last_done=${job.lastDoneDate || "N/A"}, DUE_DATE=${dualDueDateStr}, GENERATE_DATE=${dualGenerateDateStr}`);
+          console.log(`   RH: last_done=${dualRhLastDone}, F=${dualFrequencyRH}, RH_due=${dualRhDueValue}, RH_generate=${dualRhGenerate}, RH_current=${currentRH}`);
+        } else if (isRHJob) {
           if (!componentData) {
             return { success: false, message: "Component not found for job" };
           }
@@ -21775,9 +22870,9 @@ function isUnplannedWO(wo, hasLinkedJob) {
   return false;
 }
 function isPendingApprovalExecution(wo) {
-  const FINALIZED_STATUSES = /* @__PURE__ */ new Set(["completed", "approved", "closed", "cancelled"]);
+  const FINALIZED_STATUSES2 = /* @__PURE__ */ new Set(["completed", "approved", "closed", "cancelled"]);
   const normalizedStatus = (wo.status || "").toLowerCase().trim();
-  return wo.isExecution === true && !FINALIZED_STATUSES.has(normalizedStatus);
+  return wo.isExecution === true && !FINALIZED_STATUSES2.has(normalizedStatus);
 }
 function mapStatusToCategory(computedStatus, wo, hasLinkedJob) {
   if (isUnplannedWO(wo, hasLinkedJob)) return "Unplanned";
@@ -22753,7 +23848,7 @@ import * as fs7 from "fs";
 import * as path9 from "path";
 
 // server/modules/index.ts
-import { Router as Router22 } from "express";
+import { Router as Router24 } from "express";
 
 // server/modules/vessels/routes.ts
 init_middleware();
@@ -23991,13 +25086,6 @@ async function listAll2(req, res) {
   const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(",").filter(Boolean) : void 0;
   const components2 = await listAll(vesselId, vesselIds);
   res.json(components2);
-}
-async function getById2(req, res) {
-  const component = await getById(req.params.id);
-  if (!component) {
-    return res.status(404).json({ error: "Component not found" });
-  }
-  res.json(component);
 }
 async function create3(req, res) {
   try {
@@ -25278,7 +26366,6 @@ router3.get("/components/details/:id", asyncHandler(getDetails));
 router3.post("/components/upload", upload2.single("file"), asyncHandler(upload));
 router3.get("/components", asyncHandler(listAll2));
 router3.post("/components", asyncHandler(create3));
-router3.get("/components/:id", asyncHandler(getById2));
 router3.patch("/components/:id", asyncHandler(update3));
 router3.delete("/components/:id", asyncHandler(remove3));
 router3.post("/components/:id/inactivate", asyncHandler(inactivate3));
@@ -25498,6 +26585,14 @@ async function createJob(body) {
       jobData = { ...jobData, componentCode: component.componentCode };
       console.log(`\u2705 Auto-resolved job componentCode: ${component.componentCode} for component "${component.name}"`);
     }
+    if (jobData.maintenanceBasis === "Dual Frequency") {
+      const rhType = (component.rhCounterType || "").toUpperCase();
+      if (rhType !== "MASTER" && rhType !== "INHERITED") {
+        throw new ValidationError(
+          `Dual Frequency maintenance basis requires a component with RH Counter Type set to Master or Inherited. Component "${component.name}" has RH Counter Type "${component.rhCounterType || "not set"}". Please update the component's RH Counter Type first, or choose Calendar or Running Hours basis.`
+        );
+      }
+    }
   }
   if (!jobData.jobNo) {
     const { generateJobNumber: generateJobNumber2 } = await Promise.resolve().then(() => (init_workOrderNumbering(), workOrderNumbering_exports));
@@ -25566,6 +26661,40 @@ async function createJob(body) {
       }
     }
   }
+  if (jobData.maintenanceBasis === "Dual Frequency") {
+    if (!jobData.frequencyValue || !jobData.frequencyUnit) {
+      throw new ValidationError("Dual Frequency jobs require frequencyValue and frequencyUnit for the calendar leg");
+    }
+    const intervalRH = Number(jobData.intervalRunningHour);
+    if (isNaN(intervalRH) || intervalRH <= 0) {
+      throw new ValidationError("Dual Frequency jobs require a valid numeric intervalRunningHour greater than 0 for the running hours leg");
+    }
+    const userProvidedLastDoneRH = jobData.lastDoneRH !== null && jobData.lastDoneRH !== void 0 && jobData.lastDoneRH !== "";
+    const rawLastDoneRH = userProvidedLastDoneRH ? jobData.lastDoneRH : component?.runningHours != null ? String(component.runningHours) : null;
+    if (rawLastDoneRH) {
+      const lastRH = Number(rawLastDoneRH);
+      if (!isNaN(lastRH)) {
+        jobData = {
+          ...jobData,
+          nextDueRH: String(lastRH + intervalRH),
+          lastDoneRH: String(lastRH)
+        };
+      }
+    }
+    if (!jobData.nextDueDate) {
+      const { normalizeDateToDDMMMYYYY: normDate, calculateNextDueDate: calcNext } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
+      const rawLastDone = jobData.lastDoneDate || component?.installationDate;
+      if (rawLastDone && jobData.frequencyValue && jobData.frequencyUnit) {
+        const lastDone = normDate(rawLastDone);
+        if (lastDone) {
+          const calculatedNextDue = calcNext(lastDone, jobData.frequencyValue, jobData.frequencyUnit);
+          if (calculatedNextDue) {
+            jobData = { ...jobData, nextDueDate: calculatedNextDue };
+          }
+        }
+      }
+    }
+  }
   const job = await create4(jobData);
   return job;
 }
@@ -25587,6 +26716,23 @@ async function updateJob(id, body) {
   const existingJob = await findById2(id);
   if (!existingJob) {
     throw new NotFoundError("Job not found");
+  }
+  const effectiveBasis = updateData.maintenanceBasis ?? existingJob.maintenanceBasis;
+  const effectiveComponentId = updateData.componentId ?? existingJob.componentId;
+  const basisChangingToDual = updateData.maintenanceBasis === "Dual Frequency" && existingJob.maintenanceBasis !== "Dual Frequency";
+  const componentChangingOnDual = effectiveBasis === "Dual Frequency" && updateData.componentId !== void 0 && updateData.componentId !== existingJob.componentId;
+  if (basisChangingToDual || componentChangingOnDual) {
+    if (!component && effectiveComponentId) {
+      component = await findComponent(effectiveComponentId);
+    }
+    if (component) {
+      const rhType = (component.rhCounterType || "").toUpperCase();
+      if (rhType !== "MASTER" && rhType !== "INHERITED") {
+        throw new ValidationError(
+          `Dual Frequency maintenance basis requires a component with RH Counter Type set to Master or Inherited. Component "${component.name}" has RH Counter Type "${component.rhCounterType || "not set"}". Please update the component's RH Counter Type first, or choose Calendar or Running Hours basis.`
+        );
+      }
+    }
   }
   const mergedData = { ...existingJob, ...updateData };
   const calendarFieldsChanged = updateData.lastDoneDate !== void 0 || updateData.frequencyValue !== void 0 || updateData.frequencyUnit !== void 0 || updateData.maintenanceBasis !== void 0;
@@ -25755,7 +26901,10 @@ async function getJobContext(jobId) {
   if (!job) {
     throw new NotFoundError("Job not found");
   }
-  const component = job.componentId ? await findComponent(job.componentId) : null;
+  let component = job.componentId ? await findComponent(job.componentId) : null;
+  if (!component && job.componentCode && job.vesselId) {
+    component = await findComponentByCode(job.componentCode, job.vesselId) ?? null;
+  }
   let parentComponent = null;
   if (component?.parentId) {
     parentComponent = await findComponent(component.parentId);
@@ -25901,7 +27050,8 @@ async function getJobContext(jobId) {
       name: component.name,
       parentId: component.parentId,
       currentCumulativeRH: component.currentCumulativeRH,
-      lastUpdated: component.lastUpdated
+      lastUpdated: component.lastUpdated,
+      rhCounterType: component.rhCounterType
     } : null,
     parentComponent: parentComponent ? {
       id: parentComponent.id,
@@ -25923,7 +27073,7 @@ async function getMaintenancePlannerData(filters) {
     vesselId,
     jobType,
     fromDate,
-    toDate,
+    toDate: toDate2,
     remainingHoursMin,
     remainingHoursMax,
     includeOverdue,
@@ -26053,9 +27203,9 @@ async function getMaintenancePlannerData(filters) {
         } else {
           status = "FUTURE";
         }
-        if (fromDate || toDate) {
+        if (fromDate || toDate2) {
           const from = fromDate ? new Date(fromDate) : /* @__PURE__ */ new Date(0);
-          const to = toDate ? new Date(toDate) : /* @__PURE__ */ new Date("2099-12-31");
+          const to = toDate2 ? new Date(toDate2) : /* @__PURE__ */ new Date("2099-12-31");
           if (status === "OVERDUE" && includeOverdue !== "true") continue;
           if (status === "DUE_GRACE" && includeOverdue !== "true" && includeGrace !== "true") continue;
           if (status !== "OVERDUE" && status !== "DUE_GRACE" && (nextDueDate < from || nextDueDate > to)) continue;
@@ -26667,6 +27817,253 @@ init_db();
 init_schema();
 init_sync();
 import { eq as eq9 } from "drizzle-orm";
+
+// shared/utils/workOrderFilters.ts
+var FINALIZED_STATUSES = /* @__PURE__ */ new Set(["completed", "approved", "closed", "cancelled", "canceled"]);
+function isStoredCompleted(wo) {
+  return !!wo.status && FINALIZED_STATUSES.has(wo.status.toLowerCase().trim());
+}
+function getEffectiveStatus(wo) {
+  if (wo.workOrderType === "Unplanned") return "Unplanned";
+  if (isStoredCompleted(wo)) return "Completed";
+  return wo.computedStatus || wo.status || "Active";
+}
+function getDisplayStatus(wo) {
+  if (wo.workOrderType === "Unplanned") {
+    if (isStoredCompleted(wo)) return "Completed";
+    if (wo.status === "Pending Approval") return "Pending Approval";
+    if (wo.status === "Draft") return "Draft";
+    return wo.status || "Active";
+  }
+  return getEffectiveStatus(wo);
+}
+function matchesTab(wo, activeTab) {
+  const effectiveStatus = getEffectiveStatus(wo);
+  if (activeTab === "Planned") {
+    if (wo.isExecution) return false;
+    if (wo.workOrderType === "Unplanned") return false;
+    if (effectiveStatus !== "Active") return false;
+  } else if (activeTab === "Due") {
+    const isRejectedExecution = wo.isExecution && wo.status === "Rejected";
+    if (wo.isExecution && !isRejectedExecution) return false;
+    if (effectiveStatus !== "Due" && effectiveStatus !== "Due (Grace P)") return false;
+  } else if (activeTab === "Overdue") {
+    const isRejectedExecution = wo.isExecution && wo.status === "Rejected";
+    if (wo.isExecution && !isRejectedExecution) return false;
+    if (effectiveStatus !== "Overdue") return false;
+  } else if (activeTab === "Completed") {
+    if (wo.workOrderType === "Unplanned") return false;
+    if (effectiveStatus !== "Completed") return false;
+  } else if (activeTab === "Pending Approval") {
+    if (getDisplayStatus(wo) !== "Pending Approval") return false;
+  } else if (activeTab === "Postponed") {
+    if (wo.isExecution) return false;
+    if (effectiveStatus !== "Postponed") return false;
+  } else if (activeTab === "Unplanned") {
+    if (wo.workOrderType !== "Unplanned") return false;
+  }
+  return true;
+}
+function matchesSearch(wo, searchTerm) {
+  if (!searchTerm) return true;
+  const t = searchTerm.toLowerCase();
+  if ((wo.jobTitle || "").toLowerCase().includes(t)) return true;
+  if ((wo.workOrderNo || "").toLowerCase().includes(t)) return true;
+  if (wo.templateCode && wo.templateCode.toLowerCase().includes(t)) return true;
+  if (wo.executionId && wo.executionId.toLowerCase().includes(t)) return true;
+  return false;
+}
+function matchesPeriod(wo, periodFilter) {
+  if (!periodFilter) return true;
+  const isRhBased = wo.maintenanceBasis === "Running Hours";
+  if (isRhBased) {
+    const rhTarget = wo.dueRH ?? (wo.nextDueReading != null ? Number(wo.nextDueReading) : null);
+    const rhCurrent = wo.currentRH ?? (wo.currentReading != null ? Number(wo.currentReading) : null);
+    if (rhTarget == null || isNaN(rhTarget) || rhCurrent == null || isNaN(rhCurrent)) {
+      return false;
+    }
+    const rhRemaining = rhTarget - rhCurrent;
+    let periodDays = 0;
+    if (periodFilter.mode === "year-only" && periodFilter.year) {
+      const isLeap = periodFilter.year % 4 === 0 && periodFilter.year % 100 !== 0 || periodFilter.year % 400 === 0;
+      periodDays = isLeap ? 366 : 365;
+    } else if (periodFilter.mode === "year-quarter" && periodFilter.year && periodFilter.quarter) {
+      const qStart = new Date(periodFilter.year, (periodFilter.quarter - 1) * 3, 1);
+      const qEnd = new Date(periodFilter.year, periodFilter.quarter * 3, 0);
+      periodDays = Math.round((qEnd.getTime() - qStart.getTime()) / (1e3 * 60 * 60 * 24)) + 1;
+    } else if (periodFilter.mode === "year-months" && periodFilter.year && periodFilter.months && periodFilter.months.length > 0) {
+      let totalDays = 0;
+      for (const m of periodFilter.months) {
+        const lastDay = new Date(periodFilter.year, m, 0).getDate();
+        totalDays += lastDay;
+      }
+      periodDays = totalDays;
+    } else if (periodFilter.mode === "date-range" && periodFilter.dateFrom && periodFilter.dateTo) {
+      const from = new Date(periodFilter.dateFrom);
+      from.setHours(0, 0, 0, 0);
+      const to = new Date(periodFilter.dateTo);
+      to.setHours(0, 0, 0, 0);
+      periodDays = Math.round((to.getTime() - from.getTime()) / (1e3 * 60 * 60 * 24)) + 1;
+    }
+    const periodHours = periodDays * 24;
+    if (rhRemaining > periodHours) return false;
+  } else {
+    const woDueDate = wo.dueDate ? new Date(wo.dueDate) : null;
+    if (!woDueDate || isNaN(woDueDate.getTime())) {
+      return false;
+    }
+    if (periodFilter.mode === "year-only" && periodFilter.year) {
+      if (woDueDate.getFullYear() !== periodFilter.year) return false;
+    } else if (periodFilter.mode === "year-quarter" && periodFilter.year && periodFilter.quarter) {
+      if (woDueDate.getFullYear() !== periodFilter.year) return false;
+      const woMonth = woDueDate.getMonth() + 1;
+      const qStart = (periodFilter.quarter - 1) * 3 + 1;
+      const qEnd = qStart + 2;
+      if (woMonth < qStart || woMonth > qEnd) return false;
+    } else if (periodFilter.mode === "year-months" && periodFilter.year && periodFilter.months && periodFilter.months.length > 0) {
+      if (woDueDate.getFullYear() !== periodFilter.year) return false;
+      const woMonth = woDueDate.getMonth() + 1;
+      if (!periodFilter.months.includes(woMonth)) return false;
+    } else if (periodFilter.mode === "date-range" && periodFilter.dateFrom && periodFilter.dateTo) {
+      const from = new Date(periodFilter.dateFrom);
+      from.setHours(0, 0, 0, 0);
+      const to = new Date(periodFilter.dateTo);
+      to.setHours(23, 59, 59, 999);
+      const woTime = woDueDate.getTime();
+      if (woTime < from.getTime() || woTime > to.getTime()) return false;
+    }
+  }
+  return true;
+}
+function matchesRank(wo, selectedRank) {
+  if (!selectedRank || selectedRank === "all") return true;
+  return (wo.assignedTo?.trim() ?? "") === selectedRank;
+}
+function matchesCriticality(wo, criticality) {
+  if (!criticality || criticality.length === 0) return true;
+  const set = new Set(criticality);
+  const woCriticality = wo.criticality?.toLowerCase();
+  const isCompCritical = wo.componentCritical === true;
+  let matchesAny = false;
+  if (set.has("critical") && woCriticality === "yes") matchesAny = true;
+  if (set.has("non-critical") && woCriticality !== "yes") matchesAny = true;
+  if (set.has("critical-component") && isCompCritical) matchesAny = true;
+  return matchesAny;
+}
+function matchesPostponementReason(wo, reason) {
+  if (!reason || reason === "all") return true;
+  return wo.postponementReason === reason;
+}
+function computeWorkOrderTabCounts(list) {
+  const counts = {
+    "Planned": 0,
+    "Due": 0,
+    "Overdue": 0,
+    "Postponed": 0,
+    "Unplanned": 0,
+    "Pending Approval": 0,
+    "Completed": 0
+  };
+  for (const wo of list) {
+    if (!wo.isExecution && wo.workOrderType !== "Unplanned" && getEffectiveStatus(wo) === "Active") {
+      counts["Planned"]++;
+    }
+    const isRejectedExecution = wo.isExecution && wo.status === "Rejected";
+    if (!(wo.isExecution && !isRejectedExecution)) {
+      const es = getEffectiveStatus(wo);
+      if (es === "Due" || es === "Due (Grace P)") counts["Due"]++;
+      if (es === "Overdue") counts["Overdue"]++;
+    }
+    if (!wo.isExecution && getEffectiveStatus(wo) === "Postponed") counts["Postponed"]++;
+    if (wo.workOrderType === "Unplanned") counts["Unplanned"]++;
+    if (getDisplayStatus(wo) === "Pending Approval") counts["Pending Approval"]++;
+    if (wo.workOrderType !== "Unplanned" && getEffectiveStatus(wo) === "Completed") counts["Completed"]++;
+  }
+  return counts;
+}
+function computeApprovalTierCounts(list) {
+  return {
+    superintendent_locked: list.filter((wo) => wo.approvalTier === "superintendent_locked").length,
+    superintendent_notification: list.filter((wo) => wo.approvalTier === "superintendent_notification").length,
+    ce_with_justification: list.filter((wo) => wo.approvalTier === "ce_with_justification").length,
+    standard: list.filter((wo) => !wo.approvalTier || wo.approvalTier === "standard").length
+  };
+}
+function compareWorkOrders(a, b, field, dir, activeTab = "") {
+  let cmp = 0;
+  switch (field) {
+    case "component":
+      cmp = (a.component || "").localeCompare(b.component || "");
+      break;
+    case "workOrderNo": {
+      const getWoNo = (wo) => (activeTab === "Pending Approval" || activeTab === "Completed") && wo.executionId ? wo.executionId : wo.workOrderNo || wo.templateCode || "";
+      cmp = getWoNo(a).localeCompare(getWoNo(b));
+      break;
+    }
+    case "jobTitle":
+      cmp = (a.jobTitle || "").localeCompare(b.jobTitle || "");
+      break;
+    case "assignedTo":
+      cmp = (a.assignedTo || "").localeCompare(b.assignedTo || "");
+      break;
+    case "dueDate": {
+      const useSubmitted = activeTab === "Pending Approval" || activeTab === "Completed";
+      const aVal = useSubmitted ? a.submittedDate || "" : a.dueDate || "";
+      const bVal = useSubmitted ? b.submittedDate || "" : b.dueDate || "";
+      cmp = aVal.localeCompare(bVal);
+      break;
+    }
+    case "status": {
+      const STATUS_ORDER = {
+        "Overdue": 0,
+        "Due": 1,
+        "Due (Grace P)": 2,
+        "Active": 3,
+        "Pending Approval": 4,
+        "Postponed": 5,
+        "Draft": 6,
+        "Completed": 7
+      };
+      const aS = a.computedStatus || a.status || "";
+      const bS = b.computedStatus || b.status || "";
+      cmp = (STATUS_ORDER[aS] ?? 99) - (STATUS_ORDER[bS] ?? 99);
+      break;
+    }
+    case "dateCompleted":
+      cmp = (a.dateCompleted || "9999").localeCompare(b.dateCompleted || "9999");
+      break;
+    case "plannedDate":
+      cmp = (a.plannedDate || "9999").localeCompare(b.plannedDate || "9999");
+      break;
+    case "postponeUntil":
+      cmp = (a.postponementEndDate || "9999").localeCompare(b.postponementEndDate || "9999");
+      break;
+    case "postponementReason":
+      cmp = (a.postponementReason || "").localeCompare(b.postponementReason || "");
+      break;
+    case "daysLate":
+      cmp = (a.daysLate || 0) - (b.daysLate || 0);
+      break;
+    case "approvalTier":
+      cmp = (a.approvalTier || "").localeCompare(b.approvalTier || "");
+      break;
+  }
+  return dir === "desc" ? -cmp : cmp;
+}
+function filterAndSortWorkOrders(list, params) {
+  const activeTab = params.activeTab || "Planned";
+  const result = list.filter(
+    (wo) => matchesTab(wo, activeTab) && matchesSearch(wo, params.search || "") && matchesPeriod(wo, params.period) && matchesRank(wo, params.rank || "") && matchesCriticality(wo, params.criticality || []) && matchesPostponementReason(wo, params.postponementReason || "")
+  );
+  if (params.sortField) {
+    const field = params.sortField;
+    const dir = params.sortDir || "asc";
+    return [...result].sort((a, b) => compareWorkOrders(a, b, field, dir, activeTab));
+  }
+  return result;
+}
+
+// server/modules/work-orders/services/workOrderService.ts
 async function resolveRankIdFromLabel(assignedTo) {
   if (!assignedTo) return null;
   const { getAllRanks: getAllRanks3 } = await Promise.resolve().then(() => (init_service2(), service_exports2));
@@ -26986,6 +28383,23 @@ async function listWorkOrders(vesselId, vesselIds) {
   });
   return sortedWorkOrders;
 }
+async function listWorkOrdersPaged(vesselId, vesselIds, params) {
+  const enriched = await listWorkOrders(vesselId, vesselIds);
+  const statusCounts = computeWorkOrderTabCounts(enriched);
+  const rankOptions = Array.from(
+    new Set(
+      enriched.map((wo) => typeof wo.assignedTo === "string" ? wo.assignedTo.trim() : "").filter((rank) => rank.length > 0)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+  const filtered = filterAndSortWorkOrders(enriched, params);
+  const approvalTierCounts = computeApprovalTierCounts(filtered);
+  const total = filtered.length;
+  const pageSize = params.pageSize;
+  const page = params.page;
+  const start = (page - 1) * pageSize;
+  const items = filtered.slice(start, start + pageSize);
+  return { items, total, page, pageSize, statusCounts, approvalTierCounts, rankOptions };
+}
 async function getRejectionHistory(id) {
   let workOrder = await findById3(id);
   if (!workOrder) {
@@ -27000,12 +28414,16 @@ async function getRejectionHistory(id) {
     const entries = await getAuditLogsByEntity("work_order", eid);
     logs.push(...entries);
   }
-  const rejections = logs.filter((entry) => entry.actionType === "reject").map((entry) => {
+  const REJECTION_ACTION_TYPES = /* @__PURE__ */ new Set(["reject", "superintendent_reject_completion", "superintendent_reopen_completion"]);
+  const rejections = logs.filter((entry) => REJECTION_ACTION_TYPES.has(entry.actionType)).map((entry) => {
     const payload = entry.payload || {};
+    const isSuperintendentCompletion = entry.actionType === "superintendent_reject_completion";
+    const isSuperintendentReopen = entry.actionType === "superintendent_reopen_completion";
     return {
-      rejectedAt: payload.rejectedAt || entry.timestamp,
-      rejectedBy: entry.userId,
-      rejectionComments: payload.rejectionComments ?? null
+      rejectedAt: isSuperintendentReopen ? payload.reopenedAt || entry.timestamp : payload.rejectedAt || entry.timestamp,
+      rejectedBy: isSuperintendentCompletion || isSuperintendentReopen ? payload.rejectedByName || payload.reopenedByName || entry.userId : entry.userId,
+      rejectionComments: isSuperintendentCompletion ? payload.rejectionRemarks ?? null : isSuperintendentReopen ? payload.reopenRemarks ?? null : payload.rejectionComments ?? null,
+      rejectionType: isSuperintendentCompletion ? "superintendent_completion_rejection" : isSuperintendentReopen ? "superintendent_completion_reopen" : "approver_rejection"
     };
   }).sort((a, b) => {
     const ta = new Date(a.rejectedAt).getTime();
@@ -27433,13 +28851,16 @@ async function updateWorkOrder(id, body) {
     updateData.superintendentAcknowledged = null;
     console.log("\u{1F4DD} Work order rejected - setting status to Due, wasRejected=true, clearing approval tier for rework");
   }
-  const isRejectedWO = existingWO2.wasRejected === true;
+  const isRejectedWO = existingWO2.wasRejected === true || existingWO2.status === "Rejected";
   if (isRejectedWO && hasCompletionData && !hasExplicitStatus) {
     updateData.status = "Pending Approval";
     updateData.rejectionComments = null;
     updateData.rejectionDate = null;
     updateData.approvalAction = null;
     updateData.submittedDate = (/* @__PURE__ */ new Date()).toISOString();
+    if (existingWO2.status === "Rejected") {
+      updateData.superintendentRejectionRemarks = null;
+    }
     console.log("\u{1F4DD} Previously rejected WO resubmitted - transitioning to Pending Approval");
   }
   const isSubmissionAction = updateData.approvalAction === "submitted" || updateData.approvalAction === "submit" || updateData.status === "Pending Approval";
@@ -27783,7 +29204,7 @@ async function updateWorkOrder(id, body) {
         }
         const originalDueDate = freshWorkOrder.nextDueDate || freshWorkOrder.dueDate || null;
         await update5(id, { missedCycles, originalDueDate });
-        if (missedCycles >= 1 && freshWorkOrder.maintenanceBasis === "Calendar") {
+        if (missedCycles >= 1 && (freshWorkOrder.maintenanceBasis === "Calendar" || freshWorkOrder.maintenanceBasis === "Dual Frequency")) {
           try {
             const { createSkippedCycleRecords: createSkippedCycleRecords2 } = await Promise.resolve().then(() => (init_skippedCycleBackfill(), skippedCycleBackfill_exports));
             await createSkippedCycleRecords2({
@@ -27930,6 +29351,41 @@ async function updateWorkOrder(id, body) {
                 await updateJob3(job.juuid, rhUpdates);
                 console.log(`\u{1F4CB} [Layer 7] RH snapshot ${currentRH} recorded for WO ${freshWorkOrder.workOrderNo || freshWorkOrder.id}. Component RH NOT modified (isolation).`);
               }
+            }
+            if (freshWorkOrder.maintenanceBasis === "Dual Frequency" && dateOfCompletionNorm) {
+              const { calculateNextDueDate: calculateNextDueDate2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
+              const dualUpdates = { lastDoneDate: dateOfCompletionNorm };
+              const dualLinkUpdates = { lastDoneDate: dateOfCompletionNorm, updatedAt: /* @__PURE__ */ new Date() };
+              if (job.frequencyValue && job.frequencyUnit) {
+                const nextDue = calculateNextDueDate2(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, freshWorkOrder.nextDueDate || freshWorkOrder.dueDate);
+                if (nextDue) {
+                  dualUpdates.nextDueDate = nextDue;
+                  dualLinkUpdates.nextDueDate = nextDue;
+                  console.log(`\u2705 [Dual] Updated job ${job.jobNo} nextDueDate: ${nextDue}`);
+                }
+              }
+              if (runningHours) {
+                const dualCurrentRH = parseInt(runningHours);
+                if (!isNaN(dualCurrentRH)) {
+                  dualUpdates.lastDoneRH = dualCurrentRH;
+                  dualLinkUpdates.lastDoneRH = dualCurrentRH.toString();
+                  const dualRhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
+                  if (dualRhInterval && !isNaN(dualRhInterval)) {
+                    dualUpdates.nextDueRH = dualCurrentRH + dualRhInterval;
+                    dualLinkUpdates.nextDueRH = (dualCurrentRH + dualRhInterval).toString();
+                    console.log(`\u2705 [Dual] Updated job ${job.jobNo} nextDueRH: ${dualUpdates.nextDueRH}`);
+                  }
+                }
+              } else {
+                console.log(`\u2139\uFE0F [Dual] No RH entered for job ${job.jobNo} \u2014 RH leg stays unchanged (D2)`);
+              }
+              const dualUpdateVesselId = freshWorkOrder.vesselId || job.vesselId;
+              if (component.cuuid && dualUpdateVesselId) {
+                await updateJobComponentLinkTracking(dualUpdateVesselId, job.juuid, component.cuuid, dualLinkUpdates);
+                console.log(`\u2705 [Dual] Updated component tracking for vessel ${dualUpdateVesselId}, job ${job.jobNo} + component ${component.cuuid}`);
+              }
+              await updateJob3(job.juuid, dualUpdates);
+              console.log(`\u2705 [Dual] Updated job ${job.jobNo} with lastDoneDate: ${dateOfCompletionNorm}${runningHours ? ", lastDoneRH: " + runningHours : " (RH unchanged)"}`);
             }
           }
         } catch (jobError) {
@@ -28196,6 +29652,188 @@ async function getScopedOperationData(vesselId, userRankId, mode, userRole, user
       fallbackMode: null
     }
   };
+}
+async function rejectCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
+  let existingWO2 = await findById3(id);
+  if (!existingWO2) existingWO2 = await findByCode(id);
+  if (!existingWO2) throw new NotFoundError("Work order not found");
+  if (existingWO2.status !== "Completed") {
+    throw new ValidationError(
+      `Only Completed work orders can be rejected by the superintendent. Current status: ${existingWO2.status}`
+    );
+  }
+  if (!remarks || !remarks.trim()) {
+    throw new ValidationError("Superintendent rejection remarks are mandatory.");
+  }
+  const rejectedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const updatePayload = {
+    status: "Rejected",
+    wasRejected: true,
+    superintendentRejectionRemarks: remarks.trim(),
+    superintendentRejectedByName: actorName || actorUserUuid,
+    rejectionDate: rejectedAt
+  };
+  const updatedWO = await update5(id, updatePayload);
+  await logFieldChanges(
+    "work_orders",
+    existingWO2.wouuid,
+    existingWO2.vesselId || null,
+    existingWO2,
+    updatedWO,
+    actorUserUuid
+  );
+  try {
+    await createAuditLog2({
+      entityType: "work_order",
+      entityId: existingWO2.wouuid || id,
+      actionType: "superintendent_reject_completion",
+      userId: actorUserUuid,
+      source: "web_ui",
+      vesselCode: existingWO2.vesselId || null,
+      componentCode: existingWO2.componentCode || null,
+      fieldName: null,
+      oldValue: null,
+      newValue: null,
+      payload: {
+        workOrderNo: existingWO2.workOrderNo,
+        rejectedAt,
+        rejectedByName: actorName || actorUserUuid,
+        rejectionRemarks: remarks.trim(),
+        rejectionType: "superintendent_completion_rejection"
+      }
+    });
+  } catch (err) {
+    console.error("[AuditLog] Completed WO rejection:", err);
+  }
+  if (existingWO2.jobId && existingWO2.vesselId) {
+    try {
+      const siblings = await findWorkOrdersByJobId2(existingWO2.jobId);
+      const referenceDate = existingWO2.completionDateTime || existingWO2.dueDate || "";
+      const openStatuses = /* @__PURE__ */ new Set(["Active", "Planned", "Due", "Due (Grace P)", "Overdue"]);
+      const toCancel = siblings.filter(
+        (wo) => wo.id !== existingWO2.id && wo.vesselId === existingWO2.vesselId && openStatuses.has(wo.status) && !wo.isDeleted && referenceDate && (wo.dueDate && wo.dueDate > referenceDate || wo.nextDueDate && wo.nextDueDate > referenceDate)
+      );
+      for (const sibling of toCancel) {
+        const cancelled = await update5(sibling.id, { isDeleted: true, isActive: false });
+        try {
+          await logFieldChanges(
+            "work_orders",
+            sibling.wouuid,
+            sibling.vesselId || null,
+            sibling,
+            cancelled,
+            actorUserUuid
+          );
+        } catch (err) {
+          console.error("[FieldLogger] Sibling WO cancellation:", err);
+        }
+        console.log(`\u{1F5D1}\uFE0F [Rejection] Cancelled next-cycle sibling WO: ${sibling.workOrderNo}`);
+      }
+    } catch (err) {
+      console.error("[Rejection] Error cancelling sibling WOs:", err);
+    }
+  }
+  if (existingWO2.jobId && existingWO2.dueDate) {
+    try {
+      const db2 = await getDb();
+      await db2.update(jobs).set({ nextDueDate: existingWO2.dueDate }).where(eq9(jobs.juuid, existingWO2.jobId));
+      console.log(`\u{1F4C5} [Rejection] Reset job nextDueDate to ${existingWO2.dueDate} for job ${existingWO2.jobId}`);
+    } catch (err) {
+      console.error("[Rejection] Error resetting job nextDueDate:", err);
+    }
+  }
+  return updatedWO;
+}
+async function reopenCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
+  let existingWO2 = await findById3(id);
+  if (!existingWO2) existingWO2 = await findByCode(id);
+  if (!existingWO2) throw new NotFoundError("Work order not found");
+  if (existingWO2.status !== "Completed") {
+    throw new ValidationError(
+      `Only Completed work orders can be reopened. Current status: ${existingWO2.status}`
+    );
+  }
+  if (!remarks || !remarks.trim()) {
+    throw new ValidationError("Superintendent reopen remarks are mandatory.");
+  }
+  const reopenedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const updatePayload = {
+    status: "Reopened",
+    wasReopened: true,
+    superintendentReopenRemarks: remarks.trim(),
+    superintendentReopenedByName: actorName || actorUserUuid,
+    reopenedAt
+  };
+  const updatedWO = await update5(id, updatePayload);
+  await logFieldChanges(
+    "work_orders",
+    existingWO2.wouuid,
+    existingWO2.vesselId || null,
+    existingWO2,
+    updatedWO,
+    actorUserUuid
+  );
+  try {
+    await createAuditLog2({
+      entityType: "work_order",
+      entityId: existingWO2.wouuid || id,
+      actionType: "superintendent_reopen_completion",
+      userId: actorUserUuid,
+      source: "web_ui",
+      vesselCode: existingWO2.vesselId || null,
+      componentCode: existingWO2.componentCode || null,
+      fieldName: null,
+      oldValue: null,
+      newValue: null,
+      payload: {
+        workOrderNo: existingWO2.workOrderNo,
+        reopenedAt,
+        reopenedByName: actorName || actorUserUuid,
+        reopenRemarks: remarks.trim(),
+        reopenType: "superintendent_completion_reopen"
+      }
+    });
+  } catch (err) {
+    console.error("[AuditLog] Completed WO reopen:", err);
+  }
+  if (existingWO2.jobId && existingWO2.vesselId) {
+    try {
+      const siblings = await findWorkOrdersByJobId2(existingWO2.jobId);
+      const referenceDate = existingWO2.completionDateTime || existingWO2.dueDate || "";
+      const openStatuses = /* @__PURE__ */ new Set(["Active", "Planned", "Due", "Due (Grace P)", "Overdue"]);
+      const toCancel = siblings.filter(
+        (wo) => wo.id !== existingWO2.id && wo.vesselId === existingWO2.vesselId && openStatuses.has(wo.status) && !wo.isDeleted && referenceDate && (wo.dueDate && wo.dueDate > referenceDate || wo.nextDueDate && wo.nextDueDate > referenceDate)
+      );
+      for (const sibling of toCancel) {
+        const cancelled = await update5(sibling.id, { isDeleted: true, isActive: false });
+        try {
+          await logFieldChanges(
+            "work_orders",
+            sibling.wouuid,
+            sibling.vesselId || null,
+            sibling,
+            cancelled,
+            actorUserUuid
+          );
+        } catch (err) {
+          console.error("[FieldLogger] Sibling WO cancellation (reopen):", err);
+        }
+        console.log(`\u{1F5D1}\uFE0F [Reopen] Cancelled next-cycle sibling WO: ${sibling.workOrderNo}`);
+      }
+    } catch (err) {
+      console.error("[Reopen] Error cancelling sibling WOs:", err);
+    }
+  }
+  if (existingWO2.jobId && existingWO2.dueDate) {
+    try {
+      const db2 = await getDb();
+      await db2.update(jobs).set({ nextDueDate: existingWO2.dueDate }).where(eq9(jobs.juuid, existingWO2.jobId));
+      console.log(`\u{1F4C5} [Reopen] Reset job nextDueDate to ${existingWO2.dueDate} for job ${existingWO2.jobId}`);
+    } catch (err) {
+      console.error("[Reopen] Error resetting job nextDueDate:", err);
+    }
+  }
+  return updatedWO;
 }
 
 // server/modules/work-orders/services/workOrderContextService.ts
@@ -28927,6 +30565,26 @@ async function completeWorkOrder(workOrderId, body) {
     if (missedCycles > 0) {
       console.log(`\u26A0\uFE0F Skipped cycle detection (RH): ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo} (dueRH: ${dueRH}, completionRH: ${completionRHValue}, interval: ${jobIntervalRH})`);
     }
+  } else if (workOrder.maintenanceBasis === "Dual Frequency") {
+    let dualCalendarDueDate = workOrder.nextDueDate || workOrder.dueDate || null;
+    if (!dualCalendarDueDate && workOrder.jobId) {
+      const jobForDualDue = await findJob(workOrder.jobId);
+      if (jobForDualDue?.nextDueDate) {
+        dualCalendarDueDate = jobForDualDue.nextDueDate;
+      }
+    }
+    missedCycles = calculateMissedCycles(
+      dualCalendarDueDate,
+      dateOfCompletion,
+      workOrder.frequencyValue,
+      workOrder.frequencyUnit
+    );
+    if (missedCycles > 0) {
+      console.log(`\u26A0\uFE0F Skipped cycle detection (Dual/Calendar): ${missedCycles} cycle(s) missed for WO ${workOrder.workOrderNo}`);
+    }
+    if (dualCalendarDueDate && !workOrder.nextDueDate) {
+      workOrder.nextDueDate = dualCalendarDueDate;
+    }
   } else {
     let calendarDueDate = workOrder.nextDueDate || workOrder.dueDate || null;
     if (!calendarDueDate && workOrder.jobId) {
@@ -29062,6 +30720,21 @@ async function completeWorkOrder(workOrderId, body) {
           intervalRH: jobIntervalRH,
           missedCycles
         });
+      } else if (workOrder.maintenanceBasis === "Dual Frequency") {
+        const { createSkippedCycleRecords: createSkippedCycleRecords2 } = await Promise.resolve().then(() => (init_skippedCycleBackfill(), skippedCycleBackfill_exports));
+        await createSkippedCycleRecords2({
+          workOrderId: workOrder.wouuid || workOrder.id,
+          componentId: component.cuuid,
+          componentCode: workOrder.componentCode || component.componentCode || null,
+          vesselCode: workOrder.vesselId || component.vesselId || null,
+          jobId: workOrder.jobId || null,
+          jobCode: workOrder.jobCode || null,
+          jobTitle: workOrder.jobTitle || null,
+          originalDueDate,
+          missedCycles,
+          frequencyValue: workOrder.frequencyValue,
+          frequencyUnit: workOrder.frequencyUnit
+        });
       } else if (workOrder.maintenanceBasis === "Calendar") {
         const { createSkippedCycleRecords: createSkippedCycleRecords2 } = await Promise.resolve().then(() => (init_skippedCycleBackfill(), skippedCycleBackfill_exports));
         await createSkippedCycleRecords2({
@@ -29134,6 +30807,42 @@ async function completeWorkOrder(workOrderId, body) {
         }
         await updateJob3(job.juuid, jobUpdates);
         console.log(`\u2705 Updated calendar job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}`);
+      }
+      if (workOrder.maintenanceBasis === "Dual Frequency" && dateOfCompletion) {
+        const { calculateNextDueDate: calculateNextDueDate2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
+        linkUpdates.lastDoneDate = dateOfCompletion;
+        jobUpdates.lastDoneDate = dateOfCompletion;
+        if (job.frequencyValue && job.frequencyUnit) {
+          const nextDue = calculateNextDueDate2(dateOfCompletion, job.frequencyValue, job.frequencyUnit, originalDueDate);
+          if (nextDue) {
+            linkUpdates.nextDueDate = nextDue;
+            jobUpdates.nextDueDate = nextDue;
+            console.log(`\u2705 [Dual] Auto-calculated next due date for job ${job.jobNo}: ${nextDue}`);
+          }
+        }
+        if (runningHours) {
+          const dualCurrentRH = parseInt(runningHours);
+          if (!isNaN(dualCurrentRH)) {
+            linkUpdates.lastDoneRH = dualCurrentRH.toString();
+            jobUpdates.lastDoneRH = dualCurrentRH;
+            const dualRhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
+            if (dualRhInterval && !isNaN(dualRhInterval)) {
+              const nextDueRH = dualCurrentRH + dualRhInterval;
+              linkUpdates.nextDueRH = nextDueRH.toString();
+              jobUpdates.nextDueRH = nextDueRH;
+              console.log(`\u2705 [Dual] Auto-calculated next due RH for job ${job.jobNo}: ${nextDueRH} (last done RH: ${dualCurrentRH}, interval: ${dualRhInterval})`);
+            }
+          }
+        } else {
+          console.log(`\u2139\uFE0F [Dual] No RH entered for job ${job.jobNo} \u2014 RH leg stays unchanged (D2)`);
+        }
+        const dualUpdateVesselId = workOrder.vesselId || job.vesselId;
+        if (woComponentId && dualUpdateVesselId) {
+          await updateJobComponentLinkTracking(dualUpdateVesselId, job.juuid, woComponentId, linkUpdates);
+          console.log(`\u2705 [Dual] Updated component tracking for vessel ${dualUpdateVesselId}, job ${job.jobNo} + component ${woComponentId}`);
+        }
+        await updateJob3(job.juuid, jobUpdates);
+        console.log(`\u2705 Updated Dual Frequency job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}${runningHours ? ", lastDoneRH: " + runningHours : " (RH unchanged)"}`);
       }
       if (workOrder.maintenanceBasis === "Running Hours" && runningHours) {
         const currentRH = parseInt(runningHours);
@@ -29717,7 +31426,7 @@ var ALLOWED_EXTENSIONS = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png", ".xl
 var MAX_RAW_FILE_SIZE = 25 * 1024 * 1024;
 var TARGET_FILE_SIZE = 10 * 1024 * 1024;
 var MAX_DOCS_PER_TYPE = 5;
-var VALID_DOC_TYPES = ["riskAssessment", "safetyChecklist", "operationalForm", "other"];
+var VALID_DOC_TYPES = ["riskAssessment", "safetyChecklist", "operationalForm", "other", "postponement", "postponementRiskAssessment"];
 var LOCAL_STORAGE_DIR2 = path5.resolve(process.cwd(), ".private", "wo-docs");
 function sanitizeFileName(name) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -30428,8 +32137,37 @@ async function listWorkOrders2(req, res) {
   const vesselId = req.query.vesselId;
   const vesselIdsRaw = req.query.vesselIds;
   const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(",").filter(Boolean) : void 0;
-  const result = await listWorkOrders(vesselId, vesselIds);
-  res.json(result);
+  if (req.query.page === void 0) {
+    const result2 = await listWorkOrders(vesselId, vesselIds);
+    return res.json(result2);
+  }
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const pageSizeRaw = parseInt(req.query.pageSize, 10) || 10;
+  const pageSize = Math.min(200, Math.max(1, pageSizeRaw));
+  let period = null;
+  if (typeof req.query.period === "string" && req.query.period) {
+    try {
+      period = JSON.parse(req.query.period);
+    } catch {
+      period = null;
+    }
+  }
+  const criticality = typeof req.query.criticality === "string" && req.query.criticality ? req.query.criticality.split(",").filter(Boolean) : [];
+  const sortByRaw = typeof req.query.sortBy === "string" ? req.query.sortBy : "";
+  const sortDirRaw = req.query.sortDir === "desc" ? "desc" : "asc";
+  const result = await listWorkOrdersPaged(vesselId, vesselIds, {
+    page,
+    pageSize,
+    activeTab: typeof req.query.status === "string" ? req.query.status : "Planned",
+    search: typeof req.query.search === "string" ? req.query.search : "",
+    period,
+    rank: typeof req.query.rank === "string" ? req.query.rank : "",
+    criticality,
+    postponementReason: typeof req.query.postponementReason === "string" ? req.query.postponementReason : "",
+    sortField: sortByRaw ? sortByRaw : null,
+    sortDir: sortDirRaw
+  });
+  res.json({ success: true, data: result });
 }
 async function getWorkOrder2(req, res) {
   const result = await getWorkOrder(req.params.id);
@@ -30494,6 +32232,52 @@ async function deleteWorkOrder2(req, res) {
     await deleteWorkOrder(req.params.id);
     res.json({ success: true });
   } catch (error) {
+    if (error.message?.includes("not found")) {
+      return res.status(404).json({ error: error.message });
+    }
+    throw error;
+  }
+}
+async function rejectCompletion(req, res) {
+  try {
+    const actorName = resolveActorIdentity(req);
+    const { remarks } = req.body;
+    const actorUserUuid = req.user?.userUuid || req.user?.username || "system";
+    const result = await rejectCompletedWorkOrder(
+      req.params.id,
+      remarks || "",
+      actorUserUuid,
+      actorName
+    );
+    res.json(result);
+  } catch (error) {
+    console.error("\u274C Completion rejection error:", error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error.message?.includes("not found")) {
+      return res.status(404).json({ error: error.message });
+    }
+    throw error;
+  }
+}
+async function reopenCompletion(req, res) {
+  try {
+    const actorName = resolveActorIdentity(req);
+    const { remarks } = req.body;
+    const actorUserUuid = req.user?.userUuid || req.user?.username || "system";
+    const result = await reopenCompletedWorkOrder(
+      req.params.id,
+      remarks || "",
+      actorUserUuid,
+      actorName
+    );
+    res.json(result);
+  } catch (error) {
+    console.error("\u274C Completion reopen error:", error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     if (error.message?.includes("not found")) {
       return res.status(404).json({ error: error.message });
     }
@@ -30947,6 +32731,16 @@ router5.get("/work-orders/:id/rejection-history", asyncHandler(getRejectionHisto
 router5.post("/work-orders", asyncHandler(createWorkOrder2));
 router5.patch("/work-orders/:id", asyncHandler(updateWorkOrder2));
 router5.delete("/work-orders/:id", asyncHandler(deleteWorkOrder2));
+router5.post(
+  "/work-orders/:id/reject-completion",
+  requireRole(["Office", "PMS Admin", "Sail Admin"]),
+  asyncHandler(rejectCompletion)
+);
+router5.post(
+  "/work-orders/:id/reopen-completion",
+  requireRole(["Office", "PMS Admin", "Sail Admin"]),
+  asyncHandler(reopenCompletion)
+);
 router5.post("/work-orders/:id/superintendent-acknowledge", asyncHandler(superintendentAcknowledge));
 router5.get("/superintendent/notifications", asyncHandler(getSuperintendentNotifications));
 router5.get("/superintendent/notifications/all", asyncHandler(getAllSuperintendentNotifications));
@@ -32820,6 +34614,9 @@ async function getInventoryTransactions2(vesselId, options) {
 async function getSparesWithInventoryByVessel(vesselId) {
   return storage.getSparesWithInventoryByVessel(vesselId);
 }
+async function getSparesWithInventoryByVesselPaged(vesselId, opts) {
+  return storage.getSparesWithInventoryByVesselPaged(vesselId, opts);
+}
 async function getSpareWithInventory(spareId) {
   return storage.getSpareWithInventory(spareId);
 }
@@ -32977,6 +34774,9 @@ async function getTransactions(vesselId, query) {
 }
 async function getSparesWithInventoryByVessel2(vesselId) {
   return getSparesWithInventoryByVessel(vesselId);
+}
+async function getSparesWithInventoryByVesselPaged2(vesselId, opts) {
+  return getSparesWithInventoryByVesselPaged(vesselId, opts);
 }
 async function getSpareWithInventory2(spareId) {
   return getSpareWithInventory(spareId);
@@ -33201,8 +35001,41 @@ async function getTransactions2(req, res) {
 }
 async function getSparesWithInventory(req, res) {
   try {
-    const spares2 = await getSparesWithInventoryByVessel2(req.params.vesselId);
-    res.json({ success: true, data: spares2 });
+    const { vesselId } = req.params;
+    const pageRaw = req.query.page;
+    if (pageRaw === void 0 || pageRaw === null || pageRaw === "") {
+      const spares2 = await getSparesWithInventoryByVessel2(vesselId);
+      return res.json({ success: true, data: spares2 });
+    }
+    const page = Math.max(1, parseInt(String(pageRaw), 10) || 1);
+    const pageSize = Math.min(200, Math.max(1, parseInt(String(req.query.pageSize ?? "50"), 10) || 50));
+    const search = typeof req.query.search === "string" ? req.query.search : void 0;
+    const criticalityRaw = typeof req.query.criticality === "string" ? req.query.criticality : void 0;
+    const criticality = criticalityRaw === "Critical" || criticalityRaw === "Non-critical" ? criticalityRaw : void 0;
+    const rotationRaw = typeof req.query.rotation === "string" ? req.query.rotation : void 0;
+    const rotation = rotationRaw === "Rotation Items" || rotationRaw === "Non-Rotation Items" ? rotationRaw : void 0;
+    const stockRaw = typeof req.query.stockStatus === "string" ? req.query.stockStatus : void 0;
+    const stockStatus = stockRaw === "OK" || stockRaw === "Low" || stockRaw === "At Min" ? stockRaw : void 0;
+    const sortByRaw = typeof req.query.sortBy === "string" ? req.query.sortBy : "partCode";
+    const sortBy = sortByRaw === "partCode" ? "partCode" : "partCode";
+    const sortDirRaw = typeof req.query.sortDir === "string" ? req.query.sortDir.toLowerCase() : "asc";
+    const sortDir = sortDirRaw === "desc" ? "desc" : "asc";
+    const activeOnly = String(req.query.activeOnly ?? "").toLowerCase() === "true";
+    const componentIdRaw = typeof req.query.componentId === "string" ? req.query.componentId.trim() : "";
+    const componentId = componentIdRaw ? componentIdRaw : void 0;
+    const result = await getSparesWithInventoryByVesselPaged2(vesselId, {
+      page,
+      pageSize,
+      search,
+      criticality,
+      rotation,
+      stockStatus,
+      sortBy,
+      sortDir,
+      activeOnly,
+      componentId
+    });
+    res.json({ success: true, data: result });
   } catch (error) {
     console.error("Error fetching spares with inventory:", error);
     res.status(500).json({ success: false, error: error.message });
@@ -34988,6 +36821,42 @@ async function updateCertificate(certId, body) {
   if (!existingData) {
     throw Object.assign(new Error("Database not available"), { statusCode: 500 });
   }
+  const normaliseDate = (raw) => {
+    if (typeof raw !== "string") return "";
+    const trimmed = raw.trim();
+    if (!trimmed) return "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    const months = {
+      Jan: "01",
+      Feb: "02",
+      Mar: "03",
+      Apr: "04",
+      May: "05",
+      Jun: "06",
+      Jul: "07",
+      Aug: "08",
+      Sep: "09",
+      Oct: "10",
+      Nov: "11",
+      Dec: "12"
+    };
+    const m = trimmed.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/);
+    if (m) {
+      const [, day, mon, year] = m;
+      const month = months[mon.charAt(0).toUpperCase() + mon.slice(1).toLowerCase()];
+      if (month) return `${year}-${month}-${day.padStart(2, "0")}`;
+    }
+    return "";
+  };
+  const existingRow = existingData[0];
+  const incomingHasIssue = Object.prototype.hasOwnProperty.call(updateData, "issueDate");
+  const incomingHasExpiry = Object.prototype.hasOwnProperty.call(updateData, "expiryDate");
+  const mergedIssue = normaliseDate(incomingHasIssue ? updateData.issueDate : existingRow?.issueDate);
+  const mergedExpiry = normaliseDate(incomingHasExpiry ? updateData.expiryDate : existingRow?.expiryDate);
+  if ((incomingHasIssue || incomingHasExpiry) && mergedIssue && mergedExpiry && mergedIssue > mergedExpiry) {
+    const wording = incomingHasExpiry && !incomingHasIssue ? "Expiry Date cannot be earlier than Issue Date." : "Issue Date cannot be later than Expiry Date.";
+    throw Object.assign(new Error(wording), { statusCode: 400 });
+  }
   let result;
   if (existingData.length > 0) {
     result = await updateCertificateData(vesselId, masterId, updateData);
@@ -35729,6 +37598,8 @@ async function ensureVesselExists(vesselId, vesselName) {
 
 // server/modules/cert-surveys/services/certAdminService.ts
 init_postgresClient();
+init_schema();
+init_fieldLogger();
 async function getMasterCertificates2() {
   const result = await getMasterCertificates();
   if (result === null) {
@@ -35925,6 +37796,50 @@ async function saveMasterCertificates(body) {
     if (staleApplicabilityMasterIds.length > 0) {
       await softDeleteApplicabilityByMasterIds(staleApplicabilityMasterIds, tx);
       console.log(`Soft-deleted ${staleApplicabilityMasterIds.length} stale non-company applicability master IDs: ${staleApplicabilityMasterIds.join(", ")}`);
+    }
+    if (newlyInsertedMasterIds.length > 0) {
+      const vesselSpecificNewIds = newlyInsertedMasterIds.filter(
+        (id) => vesselSpecificSet.has(id) || id.startsWith("VES-")
+      );
+      const companyNewIds = newlyInsertedMasterIds.filter((id) => {
+        if (vesselSpecificSet.has(id) || id.startsWith("VES-")) return false;
+        const c = certificates2.find((x) => x.masterId === id);
+        return c?.applicableToCompany === true;
+      });
+      const dataRowsToCreate = [];
+      for (const masterId of companyNewIds) {
+        for (const vessel of allVessels) {
+          dataRowsToCreate.push({ vesselId: vessel.id, vesselName: vessel.name, masterId });
+        }
+      }
+      for (const masterId of vesselSpecificNewIds) {
+        for (const vessel of targetVessels) {
+          dataRowsToCreate.push({ vesselId: vessel.id, vesselName: vessel.name, masterId });
+        }
+      }
+      let dataRowsCreated = 0;
+      for (const row of dataRowsToCreate) {
+        try {
+          const inserted = await tx.insert(vesselCertificateData).values({ vesselId: row.vesselId, vesselName: row.vesselName, masterId: row.masterId }).onConflictDoNothing().returning();
+          if (inserted.length > 0) {
+            const newRow = inserted[0];
+            await logFieldChanges(
+              "vessel_certificate_data",
+              newRow.vcduuid || String(newRow.id),
+              row.vesselId,
+              null,
+              newRow,
+              "system"
+            );
+            dataRowsCreated++;
+          }
+        } catch (err) {
+          console.error(`[CertAdmin] FIX 57 placeholder error ${row.masterId}/${row.vesselId}:`, err.message);
+        }
+      }
+      if (dataRowsCreated > 0) {
+        console.log(`[CertAdmin] FIX 57: Created ${dataRowsCreated} placeholder vessel_certificate_data row(s) for sync`);
+      }
     }
     console.log(`Ship certificates master saved: ${insertedCount} inserted, ${updatedCount} updated, ${deletedCount} deleted`);
     return {
@@ -36408,6 +38323,9 @@ async function softDeleteApplicabilityByMasterIds2(masterIds) {
 }
 
 // server/modules/cert-surveys/services/surveyAdminService.ts
+init_postgresClient();
+init_schema();
+init_fieldLogger();
 async function getMasterSurveys2() {
   const result = await getMasterSurveys();
   if (result === null) {
@@ -36571,6 +38489,55 @@ async function saveMasterSurveys(body) {
   if (staleApplicabilityMasterIds.length > 0) {
     await softDeleteApplicabilityByMasterIds2(staleApplicabilityMasterIds);
     console.log(`Soft-deleted ${staleApplicabilityMasterIds.length} stale non-company applicability master IDs: ${staleApplicabilityMasterIds.join(", ")}`);
+  }
+  if (newlyInsertedMasterIds.length > 0) {
+    const postgres = getPostgresClient();
+    if (postgres) {
+      const db2 = postgres.db;
+      const vesselSpecificNewIds = newlyInsertedMasterIds.filter(
+        (id) => vesselSpecificSet.has(id) || id.startsWith("VES-")
+      );
+      const companyNewIds = newlyInsertedMasterIds.filter((id) => {
+        if (vesselSpecificSet.has(id) || id.startsWith("VES-")) return false;
+        if (id.startsWith("CMP-")) return true;
+        const s = surveys2.find((x) => x.masterId === id);
+        return s?.applicableToCompany === true;
+      });
+      const dataRowsToCreate = [];
+      for (const masterId of companyNewIds) {
+        for (const vessel of allVessels) {
+          dataRowsToCreate.push({ vesselId: vessel.id, vesselName: vessel.name, masterId });
+        }
+      }
+      for (const masterId of vesselSpecificNewIds) {
+        for (const vessel of targetVessels) {
+          dataRowsToCreate.push({ vesselId: vessel.id, vesselName: vessel.name, masterId });
+        }
+      }
+      let dataRowsCreated = 0;
+      for (const row of dataRowsToCreate) {
+        try {
+          const inserted = await db2.insert(vesselSurveyData).values({ vesselId: row.vesselId, vesselName: row.vesselName, masterId: row.masterId }).onConflictDoNothing({ target: [vesselSurveyData.vesselId, vesselSurveyData.masterId] }).returning();
+          if (inserted.length > 0) {
+            const newRow = inserted[0];
+            await logFieldChanges(
+              "vessel_survey_data",
+              newRow.vsduuid || String(newRow.id),
+              row.vesselId,
+              null,
+              newRow,
+              "system"
+            );
+            dataRowsCreated++;
+          }
+        } catch (err) {
+          console.error(`[SurveyAdmin] FIX 57 placeholder error ${row.masterId}/${row.vesselId}:`, err.message);
+        }
+      }
+      if (dataRowsCreated > 0) {
+        console.log(`[SurveyAdmin] FIX 57: Created ${dataRowsCreated} placeholder vessel_survey_data row(s) for sync`);
+      }
+    }
   }
   console.log(`Ship surveys master saved: ${insertedCount} inserted, ${updatedCount} updated`);
   return {
@@ -38831,9 +40798,10 @@ async function copyVessel(body) {
   }
   const db2 = await getCopyVesselDb();
   const { components: components2, jobs: jobs2, spares: spares2, spareComponentLinks: spareComponentLinks2, storesItems: storesItems2 } = fleetAdminRepository_exports;
-  const copyResults = { components: 0, jobs: 0, spares: 0, spareComponentLinks: 0, stores: 0, errors: [] };
+  const copyResults = { components: 0, jobs: 0, spares: 0, spareComponentLinks: 0, stores: 0, errors: [], warnings: [] };
   const componentIdMap = /* @__PURE__ */ new Map();
   const spareIdMap = /* @__PURE__ */ new Map();
+  const spareUuidMap = /* @__PURE__ */ new Map();
   const generateId = (prefix) => {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 13)}`;
   };
@@ -38910,9 +40878,21 @@ async function copyVessel(body) {
       if (existingJobNos.has(job.jobNo)) continue;
       const newId = generateId("JOB");
       const newComponentId = componentIdMap.get(job.componentId || "") || job.componentId;
+      if (job.maintenanceBasis === "Dual Frequency" && newComponentId) {
+        const [targetComp] = await db2.select().from(components2).where(eq18(components2.cuuid, newComponentId));
+        const targetRhType = (targetComp?.rhCounterType || "").toUpperCase();
+        if (!targetComp || targetRhType !== "MASTER" && targetRhType !== "INHERITED") {
+          const compName = targetComp?.name || job.componentName || newComponentId;
+          copyResults.warnings.push(
+            `Job ${job.jobNo} (Dual Frequency) skipped: target component "${compName}" has RH Counter Type "${targetComp?.rhCounterType || "not set"}" (requires Master or Inherited)`
+          );
+          continue;
+        }
+      }
       try {
         await db2.insert(jobs2).values({
           id: newId,
+          juuid: randomUUID6(),
           vesselId: data.targetVesselCode,
           componentId: newComponentId,
           componentCode: job.componentCode,
@@ -38964,19 +40944,24 @@ async function copyVessel(body) {
     ));
     const targetSpareList = await db2.select().from(spares2).where(eq18(spares2.vesselId, data.targetVesselCode));
     const existingSpareKeyMap = /* @__PURE__ */ new Map();
+    const existingSpareUuidMap = /* @__PURE__ */ new Map();
     for (const s of targetSpareList) {
       existingSpareKeyMap.set(`${s.partCode}|${s.componentCode}`, s.id);
+      if (s.suuid) existingSpareUuidMap.set(s.id, s.suuid);
     }
     for (const spare of sourceSpareList) {
       const spareKey = `${spare.partCode}|${spare.componentCode}`;
       const existingId = existingSpareKeyMap.get(spareKey);
       if (existingId !== void 0) {
         spareIdMap.set(spare.id, existingId);
+        const existingSuuid = existingSpareUuidMap.get(existingId);
+        if (existingSuuid) spareUuidMap.set(spare.id, existingSuuid);
         continue;
       }
       const newComponentId = componentIdMap.get(spare.componentId || "") || spare.componentId;
       try {
         const [inserted] = await db2.insert(spares2).values({
+          suuid: randomUUID6(),
           partCode: spare.partCode,
           partName: spare.partName,
           componentId: newComponentId,
@@ -39004,8 +40989,9 @@ async function copyVessel(body) {
           drawingNo: spare.drawingNo,
           location2: null,
           remarks: spare.remarks
-        }).returning({ id: spares2.id });
+        }).returning({ id: spares2.id, suuid: spares2.suuid });
         spareIdMap.set(spare.id, inserted.id);
+        spareUuidMap.set(spare.id, inserted.suuid);
         copyResults.spares++;
       } catch (e) {
         copyResults.errors.push(`Spare ${spare.partCode}: ${e.message}`);
@@ -39020,12 +41006,15 @@ async function copyVessel(body) {
       const newSpareId = spareIdMap.get(link.spareId);
       const newComponentId = componentIdMap.get(link.componentId) || link.componentId;
       if (newSpareId === void 0) continue;
+      const newSpareUuid = spareUuidMap.get(link.spareId);
+      if (!newSpareUuid) continue;
       const linkKey = `${newSpareId}|${newComponentId}`;
       if (existingLinkKeys.has(linkKey)) continue;
       try {
         await db2.insert(spareComponentLinks2).values({
           vesselId: data.targetVesselCode,
           spareId: newSpareId,
+          spareUuid: newSpareUuid,
           componentId: newComponentId,
           linkedBy: "system-copy-vessel"
         });
@@ -39049,6 +41038,7 @@ async function copyVessel(body) {
       if (existingStoreCodes.has(storeKey)) continue;
       try {
         await db2.insert(storesItems2).values({
+          stuuid: randomUUID6(),
           vesselId: data.targetVesselCode,
           itemType: item.itemType,
           itemCode: item.itemCode,
@@ -39097,9 +41087,13 @@ async function copyVessel(body) {
   }
   const totalCopied = copyResults.components + copyResults.jobs + copyResults.spares + copyResults.spareComponentLinks + copyResults.stores;
   console.log(`[Copy Vessel] ${data.sourceVesselCode} \u2192 ${data.targetVesselCode}: ${copyResults.components} components, ${copyResults.jobs} jobs, ${copyResults.spares} spares, ${copyResults.stores} stores copied`);
+  const hasErrors = copyResults.errors.length > 0;
+  const hasWarnings = copyResults.warnings.length > 0;
+  const success = hasErrors ? totalCopied > 0 ? "partial" : false : true;
+  const message = hasErrors ? `Vessel copy completed with ${copyResults.errors.length} error(s). ${totalCopied} record(s) copied.` : hasWarnings ? `Vessel data replicated with ${copyResults.warnings.length} warning(s). ${totalCopied} record(s) copied.` : `Vessel data successfully replicated. ${totalCopied} record(s) copied.`;
   return {
-    success: true,
-    message: `Vessel data successfully replicated. ${totalCopied} record(s) copied.`,
+    success,
+    message,
     results: copyResults
   };
 }
@@ -40440,6 +42434,7 @@ async function getCriticalSparesPreview(vesselId, stockStatusFilter, departmentF
     }
     return {
       sNo: 0,
+      spareId: spare.spuuid || spare.id,
       vesselName: vesselMap.get(spare.vesselId || "") || vesselName,
       partCode: spare.partCode || "-",
       partName: spare.partName || "-",
@@ -43429,6 +45424,7 @@ async function getCriticalEquipmentStatus(vesselId, startDateStr, endDateStr, ve
     const daysUntilDue = nextDueDate ? Math.ceil((nextDueDate.getTime() - today.getTime()) / (1e3 * 60 * 60 * 24)) : null;
     return {
       sNo: index3 + 1,
+      componentId: component.cuuid || component.id,
       componentCode: component.componentCode || component.id,
       componentName: component.name || "Unnamed Component",
       isCritical: component.critical ? "Yes" : "No",
@@ -43813,6 +45809,7 @@ async function getCriticalComponentsList(vesselId, category, classItemFilter, fo
     const parent = allComponents.find((p) => p.id === c.parentId);
     return {
       sno: i + 1,
+      componentId: c.cuuid || c.id,
       vesselName: vesselMap.get(c.vesselId || "") || "-",
       componentCode: c.componentCode || "-",
       componentName: c.name || "-",
@@ -43906,6 +45903,7 @@ async function getLsaFfaMasterList(vesselId, equipmentType, format3, vesselIds) 
   }
   const data = filteredComponents.map((c, i) => ({
     sno: i + 1,
+    componentId: c.cuuid || c.id,
     componentCode: c.componentCode || "-",
     componentName: c.name || "-",
     equipmentType: getEffectiveDept(c) || "-",
@@ -43986,8 +45984,12 @@ async function getLsaFfaMaintenanceSchedule(vesselId, statusFilter, equipmentTyp
   if (equipmentType && equipmentType !== "all") {
     lsaFfaComponents = lsaFfaComponents.filter((c) => getEffectiveDept(c) === equipmentType);
   }
-  const lsaFfaComponentIds = new Set(lsaFfaComponents.map((c) => c.cuuid));
-  const lsaFfaComponentMap = new Map(lsaFfaComponents.map((c) => [c.cuuid, c]));
+  const lsaFfaCompByCode = /* @__PURE__ */ new Map();
+  for (const comp of lsaFfaComponents) {
+    if (comp.componentCode && !lsaFfaCompByCode.has(comp.componentCode)) {
+      lsaFfaCompByCode.set(comp.componentCode, comp);
+    }
+  }
   const lsaVesselMap = new Map(allVessels.map((v) => [v.id, v.name || v.id]));
   let allJobs = [];
   if (vesselId === "all") {
@@ -43999,15 +46001,6 @@ async function getLsaFfaMaintenanceSchedule(vesselId, statusFilter, equipmentTyp
     allJobs = await getJobs(vesselId);
   }
   const jobMap = new Map(allJobs.map((j) => [j.juuid, j]));
-  let allLinks = [];
-  if (vesselId === "all") {
-    for (const v of scopedVessels) {
-      const links = await getJobComponentLinks(v.id);
-      allLinks.push(...links);
-    }
-  } else {
-    allLinks = await getJobComponentLinks(vesselId);
-  }
   let allWorkOrders = [];
   if (vesselId === "all") {
     for (const v of scopedVessels) {
@@ -44016,15 +46009,6 @@ async function getLsaFfaMaintenanceSchedule(vesselId, statusFilter, equipmentTyp
     }
   } else {
     allWorkOrders = await getWorkOrders(vesselId);
-  }
-  const woByJobId = /* @__PURE__ */ new Map();
-  for (const wo of allWorkOrders) {
-    const jobId = wo.jobId;
-    if (jobId) {
-      const existing = woByJobId.get(jobId) || [];
-      existing.push(wo);
-      woByJobId.set(jobId, existing);
-    }
   }
   const today = /* @__PURE__ */ new Date();
   today.setHours(0, 0, 0, 0);
@@ -44040,57 +46024,44 @@ async function getLsaFfaMaintenanceSchedule(vesselId, statusFilter, equipmentTyp
     }
   };
   const scheduleItems = [];
-  for (const link of allLinks) {
-    if (!lsaFfaComponentIds.has(link.componentId)) continue;
-    const comp = lsaFfaComponentMap.get(link.componentId);
-    const job = jobMap.get(link.jobId);
-    if (!comp || !job) continue;
-    const nextDueDateStr = link.nextDueDate || job.nextDueDate;
+  for (const wo of allWorkOrders) {
+    if (!wo.componentCode) continue;
+    const comp = lsaFfaCompByCode.get(wo.componentCode);
+    if (!comp) continue;
+    const job = wo.jobId ? jobMap.get(wo.jobId) : void 0;
+    const dueDateStr = wo.dueDate;
     let daysUntilDue = null;
-    let status = "On Schedule";
-    if (nextDueDateStr) {
-      const nextDueDate = new Date(nextDueDateStr);
-      if (!isNaN(nextDueDate.getTime())) {
-        nextDueDate.setHours(0, 0, 0, 0);
-        daysUntilDue = Math.ceil((nextDueDate.getTime() - today.getTime()) / (1e3 * 60 * 60 * 24));
-        if (daysUntilDue < 0) {
-          status = "Overdue";
-        } else if (daysUntilDue <= 30) {
-          status = "Due Soon";
-        } else {
-          status = "On Schedule";
+    if (dueDateStr) {
+      try {
+        const dueDate = new Date(dueDateStr);
+        if (!isNaN(dueDate.getTime())) {
+          dueDate.setHours(0, 0, 0, 0);
+          daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1e3 * 60 * 60 * 24));
         }
+      } catch {
       }
     }
-    const jobWorkOrders = woByJobId.get(job.juuid) || [];
-    const sortedWOs = jobWorkOrders.sort((a, b) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateB - dateA;
-    });
-    const lastWO = sortedWOs[0];
-    const lastDoneDateStr = link.lastDoneDate || job.lastDoneDate;
-    const freq = job.frequencyValue ? `${job.frequencyValue} ${job.frequencyUnit || ""}`.trim() : "-";
+    const freq = wo.frequencyValue ? `${wo.frequencyValue} ${wo.frequencyUnit || ""}`.trim() : "-";
     scheduleItems.push({
-      componentId: comp.cuuid,
-      jobId: job.juuid,
-      componentCode: comp.componentCode || "-",
-      componentName: comp.name || "-",
+      wouuid: wo.wouuid,
+      workOrderId: wo.wouuid,
+      componentCode: wo.componentCode || "-",
+      componentName: wo.component || comp.name || "-",
       equipmentType: getEffectiveDept(comp) || "-",
       location: comp.location || "-",
-      jobCode: job.jobNo || "-",
-      jobTitle: job.jobTitle || "-",
-      taskType: job.maintenanceType || "-",
-      maintenanceBasis: job.maintenanceBasis || "-",
+      jobCode: job?.jobNo || "-",
+      jobTitle: wo.jobTitle || "-",
+      taskType: wo.taskType || wo.maintenanceType || "-",
+      maintenanceBasis: wo.maintenanceBasis || "-",
       frequency: freq,
-      nextDueDate: formatDateStr(nextDueDateStr),
+      nextDueDate: formatDateStr(dueDateStr),
       daysUntilDue: daysUntilDue !== null ? daysUntilDue : "-",
-      status,
-      lastDoneDate: formatDateStr(lastDoneDateStr),
-      lastWONumber: lastWO?.workOrderNo || "-",
-      assignedTo: job.assignedTo || "-",
-      vesselId: comp.vesselId,
-      vesselName: lsaVesselMap.get(comp.vesselId || "") || "-"
+      status: wo.status || "Active",
+      lastDoneDate: formatDateStr(wo.dateCompleted),
+      lastWONumber: wo.workOrderNo || "-",
+      assignedTo: wo.assignedTo || "-",
+      vesselId: wo.vesselId,
+      vesselName: lsaVesselMap.get(wo.vesselId || "") || "-"
     });
   }
   if (startDate || endDate) {
@@ -44111,13 +46082,16 @@ async function getLsaFfaMaintenanceSchedule(vesselId, statusFilter, equipmentTyp
   }
   if (statusFilter && statusFilter !== "all") {
     const statusMap = {
-      "on-schedule": "On Schedule",
-      "due-soon": "Due Soon",
-      "overdue": "Overdue"
+      "overdue": ["Overdue"],
+      "due": ["Due", "Due (Grace P)"],
+      "active": ["Active"],
+      "completed": ["Completed"],
+      "pending-approval": ["Pending Approval"],
+      "postponed": ["Postponed"]
     };
-    const filterValue = statusMap[statusFilter];
-    if (filterValue) {
-      const filtered = scheduleItems.filter((item) => item.status === filterValue);
+    const filterValues = statusMap[statusFilter];
+    if (filterValues) {
+      const filtered = scheduleItems.filter((item) => filterValues.includes(item.status));
       scheduleItems.length = 0;
       scheduleItems.push(...filtered);
     }
@@ -44131,9 +46105,12 @@ async function getLsaFfaMaintenanceSchedule(vesselId, statusFilter, equipmentTyp
   scheduleItems.forEach((item, i) => {
     item.sno = i + 1;
   });
-  const onScheduleCount = scheduleItems.filter((i) => i.status === "On Schedule").length;
-  const dueSoonCount = scheduleItems.filter((i) => i.status === "Due Soon").length;
   const overdueCount = scheduleItems.filter((i) => i.status === "Overdue").length;
+  const dueCount = scheduleItems.filter((i) => i.status === "Due" || i.status === "Due (Grace P)").length;
+  const activeCount = scheduleItems.filter((i) => i.status === "Active").length;
+  const completedCount = scheduleItems.filter((i) => i.status === "Completed").length;
+  const numericDays = scheduleItems.filter((i) => typeof i.daysUntilDue === "number").map((i) => i.daysUntilDue);
+  const avgDaysUntilDue = numericDays.length > 0 ? Math.round(numericDays.reduce((a, b) => a + b, 0) / numericDays.length) : 0;
   if (format3 === "excel") {
     const columns = [
       { key: "sno", header: "S.No", width: 6, type: "number", align: "center" },
@@ -44146,11 +46123,11 @@ async function getLsaFfaMaintenanceSchedule(vesselId, statusFilter, equipmentTyp
       { key: "taskType", header: "Task Type", width: 16, type: "text" },
       { key: "maintenanceBasis", header: "Basis", width: 14, type: "text" },
       { key: "frequency", header: "Frequency", width: 14, type: "text" },
-      { key: "nextDueDate", header: "Next Due Date", width: 16, type: "text" },
-      { key: "daysUntilDue", header: "Days", width: 10, type: "number", align: "center" },
-      { key: "status", header: "Status", width: 14, type: "text", align: "center" },
-      { key: "lastDoneDate", header: "Last Done", width: 16, type: "text" },
-      { key: "lastWONumber", header: "Last WO", width: 18, type: "text" },
+      { key: "nextDueDate", header: "Due Date", width: 16, type: "text" },
+      { key: "daysUntilDue", header: "Days Until Due", width: 14, type: "number", align: "center" },
+      { key: "status", header: "Status", width: 16, type: "text", align: "center" },
+      { key: "lastDoneDate", header: "Completed Date", width: 16, type: "text" },
+      { key: "lastWONumber", header: "WO Number", width: 22, type: "text" },
       { key: "assignedTo", header: "Assigned To", width: 16, type: "text" }
     ];
     const conditionalStyles = [
@@ -44159,7 +46136,7 @@ async function getLsaFfaMaintenanceSchedule(vesselId, statusFilter, equipmentTyp
         style: "danger"
       },
       {
-        condition: (row) => row.status === "Due Soon",
+        condition: (row) => row.status === "Due" || row.status === "Due (Grace P)",
         style: "warning"
       }
     ];
@@ -44167,7 +46144,7 @@ async function getLsaFfaMaintenanceSchedule(vesselId, statusFilter, equipmentTyp
     const lastCol = getLastColumnLetter(columns.length);
     const wb = new ExcelJS3.Workbook();
     const ws = wb.addWorksheet("LSA-FFA Maintenance Schedule");
-    applyStandardHeader(ws, "LSA/FFA Maintenance Schedule & Status", `${scheduleItems.length} schedule items`, vesselName, scheduleItems.length, lastCol);
+    applyStandardHeader(ws, "LSA/FFA Maintenance Schedule & Status", `${scheduleItems.length} work orders`, vesselName, scheduleItems.length, lastCol);
     applyStandardTableHeader(ws, columns);
     applyStandardDataRows(ws, scheduleItems, columns, 8, conditionalStyles);
     const lastDataRow = 7 + scheduleItems.length;
@@ -44185,17 +46162,20 @@ async function getLsaFfaMaintenanceSchedule(vesselId, statusFilter, equipmentTyp
     scheduleItems,
     summary: {
       total: scheduleItems.length,
-      onSchedule: onScheduleCount,
-      dueSoon: dueSoonCount,
-      overdue: overdueCount
+      overdue: overdueCount,
+      due: dueCount,
+      active: activeCount,
+      completed: completedCount,
+      avgDaysUntilDue
     }
   };
 }
-async function getCriticalEquipmentSchedule(vesselId, statusFilter, category, format3, startDate, endDate) {
+async function getCriticalEquipmentSchedule(vesselId, statusFilter, category, format3, startDate, endDate, vesselIds) {
   const allVessels = await getVessels6();
+  const scopedVessels = vesselId === "all" && vesselIds?.length ? allVessels.filter((v) => vesselIds.includes(v.id)) : allVessels;
   let allComponents = [];
   if (vesselId === "all") {
-    for (const v of allVessels) {
+    for (const v of scopedVessels) {
       allComponents = allComponents.concat(await getComponents2(v.id));
     }
   } else {
@@ -44205,11 +46185,15 @@ async function getCriticalEquipmentSchedule(vesselId, statusFilter, category, fo
   if (category) {
     criticalComponents = criticalComponents.filter((c) => c.category === category);
   }
-  const criticalComponentIds = new Set(criticalComponents.map((c) => c.cuuid));
-  const criticalComponentMap = new Map(criticalComponents.map((c) => [c.cuuid, c]));
+  const criticalCompByCode = /* @__PURE__ */ new Map();
+  for (const comp of criticalComponents) {
+    if (comp.componentCode && !criticalCompByCode.has(comp.componentCode)) {
+      criticalCompByCode.set(comp.componentCode, comp);
+    }
+  }
   let allJobs = [];
   if (vesselId === "all") {
-    for (const v of allVessels) {
+    for (const v of scopedVessels) {
       const vJobs = await getJobs(v.id);
       allJobs = allJobs.concat(vJobs);
     }
@@ -44217,33 +46201,16 @@ async function getCriticalEquipmentSchedule(vesselId, statusFilter, category, fo
     allJobs = await getJobs(vesselId);
   }
   const jobMap = new Map(allJobs.map((j) => [j.juuid, j]));
-  let allLinks = [];
-  if (vesselId === "all") {
-    for (const v of allVessels) {
-      const links = await getJobComponentLinks(v.id);
-      allLinks.push(...links);
-    }
-  } else {
-    allLinks = await getJobComponentLinks(vesselId);
-  }
   let allWorkOrders = [];
   if (vesselId === "all") {
-    for (const v of allVessels) {
+    for (const v of scopedVessels) {
       const wos = await getWorkOrders(v.id);
       allWorkOrders = allWorkOrders.concat(wos);
     }
   } else {
     allWorkOrders = await getWorkOrders(vesselId);
   }
-  const woByJobId = /* @__PURE__ */ new Map();
-  for (const wo of allWorkOrders) {
-    const jobId = wo.jobId;
-    if (jobId) {
-      const existing = woByJobId.get(jobId) || [];
-      existing.push(wo);
-      woByJobId.set(jobId, existing);
-    }
-  }
+  const vesselMap = new Map(allVessels.map((v) => [v.id, v.name || v.id]));
   const today = /* @__PURE__ */ new Date();
   today.setHours(0, 0, 0, 0);
   const formatDateStr = (d) => {
@@ -44258,57 +46225,43 @@ async function getCriticalEquipmentSchedule(vesselId, statusFilter, category, fo
     }
   };
   const scheduleItems = [];
-  for (const link of allLinks) {
-    if (!criticalComponentIds.has(link.componentId)) continue;
-    const comp = criticalComponentMap.get(link.componentId);
-    const job = jobMap.get(link.jobId);
-    if (!comp || !job) continue;
-    const nextDueDateStr = link.nextDueDate || job.nextDueDate;
+  for (const wo of allWorkOrders) {
+    if (!wo.componentCode) continue;
+    const comp = criticalCompByCode.get(wo.componentCode);
+    if (!comp) continue;
+    const job = wo.jobId ? jobMap.get(wo.jobId) : void 0;
+    const dueDateStr = wo.dueDate;
     let daysUntilDue = null;
-    let status = "On Schedule";
-    if (nextDueDateStr) {
-      const nextDueDate = new Date(nextDueDateStr);
-      if (!isNaN(nextDueDate.getTime())) {
-        nextDueDate.setHours(0, 0, 0, 0);
-        daysUntilDue = Math.ceil((nextDueDate.getTime() - today.getTime()) / (1e3 * 60 * 60 * 24));
-        if (daysUntilDue < 0) {
-          status = "Overdue";
-        } else if (daysUntilDue <= 7) {
-          status = "Due Soon";
-        } else {
-          status = "On Schedule";
+    if (dueDateStr) {
+      try {
+        const dueDate = new Date(dueDateStr);
+        if (!isNaN(dueDate.getTime())) {
+          dueDate.setHours(0, 0, 0, 0);
+          daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1e3 * 60 * 60 * 24));
         }
+      } catch {
       }
     }
-    const jobWorkOrders = woByJobId.get(job.juuid) || [];
-    const sortedWOs = jobWorkOrders.sort((a, b) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateB - dateA;
-    });
-    const lastWO = sortedWOs[0];
-    const lastDoneDateStr = link.lastDoneDate || job.lastDoneDate;
-    const freq = job.frequencyValue ? `${job.frequencyValue} ${job.frequencyUnit || ""}`.trim() : "-";
+    const freq = wo.frequencyValue ? `${wo.frequencyValue} ${wo.frequencyUnit || ""}`.trim() : "-";
     scheduleItems.push({
-      componentId: comp.cuuid,
-      jobId: job.juuid,
-      componentCode: comp.componentCode || "-",
-      componentName: comp.name || "-",
+      wouuid: wo.wouuid,
+      workOrderId: wo.wouuid,
+      componentCode: wo.componentCode || "-",
+      componentName: wo.component || comp.name || "-",
       location: comp.location || "-",
-      jobCode: job.jobNo || "-",
-      jobTitle: job.jobTitle || "-",
-      taskType: job.maintenanceType || "-",
-      maintenanceBasis: job.maintenanceBasis || "-",
+      jobCode: job?.jobNo || "-",
+      jobTitle: wo.jobTitle || "-",
+      taskType: wo.taskType || wo.maintenanceType || "-",
+      maintenanceBasis: wo.maintenanceBasis || "-",
       frequency: freq,
-      nextDueDate: formatDateStr(nextDueDateStr),
+      nextDueDate: formatDateStr(dueDateStr),
       daysUntilDue: daysUntilDue !== null ? daysUntilDue : "-",
-      status,
-      lastDoneDate: formatDateStr(lastDoneDateStr),
-      lastWONumber: lastWO?.workOrderNo || "-",
-      lastWOStatus: lastWO?.status || "-",
-      assignedTo: job.assignedTo || "-",
-      estimatedManHours: "-",
-      runningHours: comp.currentCumulativeRH || "-"
+      status: wo.status || "Active",
+      lastDoneDate: formatDateStr(wo.dateCompleted),
+      lastWONumber: wo.workOrderNo || "-",
+      assignedTo: wo.assignedTo || "-",
+      vesselId: wo.vesselId,
+      vesselName: vesselMap.get(wo.vesselId || "") || "-"
     });
   }
   if (startDate || endDate) {
@@ -44329,13 +46282,16 @@ async function getCriticalEquipmentSchedule(vesselId, statusFilter, category, fo
   }
   if (statusFilter && statusFilter !== "all") {
     const statusMap = {
-      "on-schedule": "On Schedule",
-      "due-soon": "Due Soon",
-      "overdue": "Overdue"
+      "overdue": ["Overdue"],
+      "due": ["Due", "Due (Grace P)"],
+      "active": ["Active"],
+      "completed": ["Completed"],
+      "pending-approval": ["Pending Approval"],
+      "postponed": ["Postponed"]
     };
-    const filterValue = statusMap[statusFilter];
-    if (filterValue) {
-      const filtered = scheduleItems.filter((item) => item.status === filterValue);
+    const filterValues = statusMap[statusFilter];
+    if (filterValues) {
+      const filtered = scheduleItems.filter((item) => filterValues.includes(item.status));
       scheduleItems.length = 0;
       scheduleItems.push(...filtered);
     }
@@ -44349,9 +46305,10 @@ async function getCriticalEquipmentSchedule(vesselId, statusFilter, category, fo
   scheduleItems.forEach((item, i) => {
     item.sno = i + 1;
   });
-  const onScheduleCount = scheduleItems.filter((i) => i.status === "On Schedule").length;
-  const dueSoonCount = scheduleItems.filter((i) => i.status === "Due Soon").length;
   const overdueCount = scheduleItems.filter((i) => i.status === "Overdue").length;
+  const dueCount = scheduleItems.filter((i) => i.status === "Due" || i.status === "Due (Grace P)").length;
+  const activeCount = scheduleItems.filter((i) => i.status === "Active").length;
+  const completedCount = scheduleItems.filter((i) => i.status === "Completed").length;
   const numericDays = scheduleItems.filter((i) => typeof i.daysUntilDue === "number").map((i) => i.daysUntilDue);
   const avgDaysUntilDue = numericDays.length > 0 ? Math.round(numericDays.reduce((a, b) => a + b, 0) / numericDays.length) : 0;
   if (format3 === "excel") {
@@ -44365,15 +46322,12 @@ async function getCriticalEquipmentSchedule(vesselId, statusFilter, category, fo
       { key: "taskType", header: "Task Type", width: 16, type: "text" },
       { key: "maintenanceBasis", header: "Maint. Basis", width: 14, type: "text" },
       { key: "frequency", header: "Frequency", width: 14, type: "text" },
-      { key: "nextDueDate", header: "Next Due Date", width: 16, type: "text" },
+      { key: "nextDueDate", header: "Due Date", width: 16, type: "text" },
       { key: "daysUntilDue", header: "Days Until Due", width: 14, type: "number", align: "center" },
-      { key: "status", header: "Status", width: 14, type: "text", align: "center" },
-      { key: "lastDoneDate", header: "Last Done", width: 16, type: "text" },
-      { key: "lastWONumber", header: "Last WO No", width: 18, type: "text" },
-      { key: "lastWOStatus", header: "Last WO Status", width: 14, type: "text" },
-      { key: "assignedTo", header: "Assigned To", width: 16, type: "text" },
-      { key: "estimatedManHours", header: "Man-Hours", width: 12, type: "number", align: "center" },
-      { key: "runningHours", header: "Running Hours", width: 14, type: "text" }
+      { key: "status", header: "Status", width: 16, type: "text", align: "center" },
+      { key: "lastDoneDate", header: "Completed Date", width: 16, type: "text" },
+      { key: "lastWONumber", header: "WO Number", width: 22, type: "text" },
+      { key: "assignedTo", header: "Assigned To", width: 16, type: "text" }
     ];
     const conditionalStyles = [
       {
@@ -44381,7 +46335,7 @@ async function getCriticalEquipmentSchedule(vesselId, statusFilter, category, fo
         style: "danger"
       },
       {
-        condition: (row) => row.status === "Due Soon",
+        condition: (row) => row.status === "Due" || row.status === "Due (Grace P)",
         style: "warning"
       }
     ];
@@ -44389,7 +46343,7 @@ async function getCriticalEquipmentSchedule(vesselId, statusFilter, category, fo
     const lastCol = getLastColumnLetter(columns.length);
     const wb = new ExcelJS3.Workbook();
     const ws = wb.addWorksheet("Critical Equipment Schedule");
-    applyStandardHeader(ws, "Critical Equipment Maintenance Schedule", `${scheduleItems.length} schedule items`, vesselName, scheduleItems.length, lastCol);
+    applyStandardHeader(ws, "Critical Equipment Maintenance Schedule", `${scheduleItems.length} work orders`, vesselName, scheduleItems.length, lastCol);
     applyStandardTableHeader(ws, columns);
     applyStandardDataRows(ws, scheduleItems, columns, 8, conditionalStyles);
     const lastDataRow = 7 + scheduleItems.length;
@@ -44407,9 +46361,10 @@ async function getCriticalEquipmentSchedule(vesselId, statusFilter, category, fo
     scheduleItems,
     summary: {
       total: scheduleItems.length,
-      onSchedule: onScheduleCount,
-      dueSoon: dueSoonCount,
       overdue: overdueCount,
+      due: dueCount,
+      active: activeCount,
+      completed: completedCount,
       avgDaysUntilDue
     }
   };
@@ -44524,6 +46479,7 @@ async function getClassItemsMasterList(vesselId, componentSearch, departmentFilt
 }
 function _ciMasterRow(comp, cr, vesselNameMap) {
   return {
+    componentId: comp.cuuid || comp.id,
     componentCode: comp.componentCode || "-",
     componentName: comp.name || "-",
     department: comp.eqptSystemDept || comp.deptCategory || comp.department || "-",
@@ -44546,81 +46502,85 @@ async function getClassItemsJobsStatus(vesselId, jobSearch, departmentFilter, da
   const vesselNameMap = new Map(allVessels.map((v) => [v.id, v.name || v.id]));
   let allComponents = [];
   let allJobs = [];
-  let allLinks = [];
+  let allWorkOrders = [];
   for (const v of scopedVessels) {
     allComponents = allComponents.concat(await getComponents2(v.id));
     allJobs = allJobs.concat(await getJobs(v.id));
-    allLinks = allLinks.concat(await getJobComponentLinks(v.id));
+    allWorkOrders = allWorkOrders.concat(await getWorkOrders(v.id));
   }
   const isClassRelated = (val) => val === true || val === "Yes" || val === "true";
-  const classJobs = allJobs.filter(
-    (j) => isClassRelated(j.classRelated) && j.isDeleted !== true && (j.isActive === void 0 || j.isActive === true)
-  );
-  const componentByCuuid = new Map(allComponents.filter((c) => c.isDeleted !== true).map((c) => [c.cuuid, c]));
-  const linksByJobId = /* @__PURE__ */ new Map();
-  for (const link of allLinks) {
-    const arr = linksByJobId.get(link.jobId) || [];
-    arr.push(link.componentId);
-    linksByJobId.set(link.jobId, arr);
+  const jobMap = /* @__PURE__ */ new Map();
+  for (const j of allJobs) {
+    jobMap.set(j.juuid, j);
+  }
+  const componentByCode = /* @__PURE__ */ new Map();
+  const classCompCodes = /* @__PURE__ */ new Set();
+  for (const c of allComponents) {
+    if (c.isDeleted !== true && c.componentCode) {
+      if (!componentByCode.has(c.componentCode)) {
+        componentByCode.set(c.componentCode, c);
+      }
+      if (c.classItem === true) {
+        classCompCodes.add(c.componentCode);
+      }
+    }
   }
   const jobSearchQ = (jobSearch || "").toLowerCase().trim();
   const deptQ = (departmentFilter || "").toLowerCase().trim();
   const dateFromTs = dateFrom ? Date.parse(dateFrom) : NaN;
   const dateToTs = dateTo ? Date.parse(dateTo) : NaN;
-  const today = /* @__PURE__ */ new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayTs = today.getTime();
-  const thirtyDaysTs = 30 * 24 * 60 * 60 * 1e3;
-  const deriveStatus = (nextDueDate) => {
-    if (!nextDueDate || nextDueDate === "-") return "-";
-    const t = _ciParseDate(nextDueDate);
-    if (!isFinite(t)) return "-";
-    if (t < todayTs) return "Overdue";
-    if (t - todayTs <= thirtyDaysTs) return "Due";
-    return "Upcoming";
-  };
   const rows = [];
-  for (const job of classJobs) {
-    const directCompId = job.componentId || null;
-    const linkCompIds = linksByJobId.get(job.juuid) || [];
-    const representativeCompId = directCompId || linkCompIds[0] || null;
-    const comp = representativeCompId ? componentByCuuid.get(representativeCompId) : null;
+  const seenWoIds = /* @__PURE__ */ new Set();
+  for (const wo of allWorkOrders) {
+    const woIsClass = isClassRelated(wo.classRelated);
+    const compIsClass = wo.componentCode ? classCompCodes.has(wo.componentCode) : false;
+    if (!woIsClass && !compIsClass) continue;
+    const dedupKey = wo.wouuid || wo.workOrderNo;
+    if (dedupKey) {
+      if (seenWoIds.has(dedupKey)) continue;
+      seenWoIds.add(dedupKey);
+    }
+    const job = jobMap.get(wo.jobId);
+    const comp = wo.componentCode ? componentByCode.get(wo.componentCode) : null;
     if (jobSearchQ) {
-      const jc = (job.jobNo || "").toLowerCase();
-      const jt = (job.jobTitle || "").toLowerCase();
+      const jc = (wo.workOrderNo || job?.jobNo || "").toLowerCase();
+      const jt = (wo.jobTitle || job?.jobTitle || "").toLowerCase();
       if (!jc.includes(jobSearchQ) && !jt.includes(jobSearchQ)) continue;
     }
     if (deptQ && deptQ !== "all") {
-      const d = (job.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || "").toLowerCase();
+      const d = (wo.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || "").toLowerCase();
       if (d !== deptQ) continue;
     }
     if (!isNaN(dateFromTs) || !isNaN(dateToTs)) {
-      const dueTs = _ciParseDate(job.nextDueDate);
+      const dueTs = _ciParseDate(wo.dueDate);
       if (!isFinite(dueTs)) continue;
       if (!isNaN(dateFromTs) && dueTs < dateFromTs) continue;
       if (!isNaN(dateToTs) && dueTs > dateToTs) continue;
     }
-    const freq = [job.frequencyValue, job.frequencyUnit].filter(Boolean).join(" ");
+    const freq = [wo.frequencyValue || job?.frequencyValue, wo.frequencyUnit || job?.frequencyUnit].filter(Boolean).join(" ");
     rows.push({
-      jobCode: job.jobNo || "-",
-      jobTitle: job.jobTitle || "-",
-      componentCode: comp?.componentCode || "-",
-      componentName: comp?.name || "-",
-      department: job.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || "-",
-      taskType: job.maintenanceType || "-",
-      maintenanceBasis: job.maintenanceBasis || "-",
+      wouuid: wo.wouuid,
+      workOrderId: wo.wouuid,
+      jobCode: job?.jobNo || "-",
+      jobTitle: wo.jobTitle || job?.jobTitle || "-",
+      componentCode: wo.componentCode || comp?.componentCode || "-",
+      componentName: wo.component || comp?.name || "-",
+      department: wo.department || comp?.eqptSystemDept || comp?.deptCategory || comp?.department || "-",
+      taskType: wo.taskType || wo.maintenanceType || job?.maintenanceType || "-",
+      maintenanceBasis: wo.maintenanceBasis || job?.maintenanceBasis || "-",
       frequency: freq || "-",
-      assignedTo: job.assignedTo || "-",
-      approver: job.approver || "-",
-      jobPriority: job.jobPriority || "-",
-      criticality: job.criticality || (comp?.critical === true ? "Yes" : comp?.critical === false ? "No" : "-"),
-      lastDoneDate: job.lastDoneDate || "-",
-      lastDoneRH: job.lastDoneRH || job.lastDoneRunningHours || "-",
-      nextDueDate: job.nextDueDate || "-",
-      nextDueRH: job.nextDueRH || job.nextDueRunningHours || "-",
-      status: deriveStatus(job.nextDueDate),
-      vesselName: vesselNameMap.get(comp?.vesselId || job.vesselId || "") || "-",
-      vesselId: comp?.vesselId || job.vesselId || ""
+      assignedTo: wo.assignedTo || job?.assignedTo || "-",
+      approver: wo.approver || job?.approver || "-",
+      jobPriority: wo.jobPriority || job?.jobPriority || "-",
+      criticality: comp?.critical === true ? "Yes" : comp?.critical === false ? "No" : "-",
+      lastDoneDate: wo.dateCompleted || "-",
+      lastDoneRH: wo.completedRunningHours || "-",
+      nextDueDate: wo.dueDate || "-",
+      nextDueRH: wo.dueRunningHours || "-",
+      workOrderNo: wo.workOrderNo || "-",
+      status: wo.status || "Active",
+      vesselName: vesselNameMap.get(wo.vesselId || comp?.vesselId || "") || "-",
+      vesselId: wo.vesselId || comp?.vesselId || ""
     });
   }
   rows.sort((a, b) => _ciParseDate(a.nextDueDate) - _ciParseDate(b.nextDueDate));
@@ -44628,9 +46588,14 @@ async function getClassItemsJobsStatus(vesselId, jobSearch, departmentFilter, da
     r.sno = i + 1;
   });
   const isMultiVessel = scopedVessels.length > 1 || vesselId === "all";
+  const overdueCount = rows.filter((r) => r.status === "Overdue").length;
+  const dueCount = rows.filter((r) => r.status === "Due" || r.status === "Due (Grace P)").length;
+  const activeCount = rows.filter((r) => r.status === "Active").length;
+  const completedCount = rows.filter((r) => r.status === "Completed").length;
   if (format3 === "excel") {
     const columns = [
       { key: "sno", header: "Sr. No.", width: 6, type: "number", align: "center" },
+      { key: "workOrderNo", header: "WO Number", width: 24, type: "text" },
       { key: "jobCode", header: "Job Code", width: 16, type: "text" },
       { key: "jobTitle", header: "Job Title", width: 32, type: "text" },
       { key: "componentCode", header: "Component Code", width: 16, type: "text" },
@@ -44643,20 +46608,24 @@ async function getClassItemsJobsStatus(vesselId, jobSearch, departmentFilter, da
       { key: "approver", header: "Approver", width: 14, type: "text" },
       { key: "jobPriority", header: "Job Priority", width: 12, type: "text", align: "center" },
       { key: "criticality", header: "Criticality", width: 12, type: "text", align: "center" },
-      { key: "lastDoneDate", header: "Last Done Date", width: 14, type: "text" },
-      { key: "lastDoneRH", header: "Last Done RH", width: 12, type: "text", align: "right" },
-      { key: "nextDueDate", header: "Next Due Date", width: 14, type: "text" },
-      { key: "nextDueRH", header: "Next Due RH", width: 12, type: "text", align: "right" },
-      { key: "status", header: "Status", width: 12, type: "text", align: "center" },
+      { key: "lastDoneDate", header: "Completed Date", width: 16, type: "text" },
+      { key: "lastDoneRH", header: "Completed RH", width: 14, type: "text", align: "right" },
+      { key: "nextDueDate", header: "Due Date", width: 14, type: "text" },
+      { key: "nextDueRH", header: "Due RH", width: 12, type: "text", align: "right" },
+      { key: "status", header: "Status", width: 16, type: "text", align: "center" },
       ...isMultiVessel ? [{ key: "vesselName", header: "Vessel", width: 22, type: "text" }] : []
+    ];
+    const conditionalStyles = [
+      { condition: (row) => row.status === "Overdue", style: "danger" },
+      { condition: (row) => row.status === "Due" || row.status === "Due (Grace P)", style: "warning" }
     ];
     const vesselName = vesselId !== "all" ? allVessels.find((v) => v.id === vesselId)?.name || vesselId : "All Vessels";
     const lastCol = getLastColumnLetter(columns.length);
     const wb = new ExcelJS3.Workbook();
     const ws = wb.addWorksheet("Class Items Jobs");
-    applyStandardHeader(ws, "Class Items Jobs Status", `${rows.length} class-related jobs`, vesselName, rows.length, lastCol);
+    applyStandardHeader(ws, "Class Items Jobs Status", `${rows.length} work orders`, vesselName, rows.length, lastCol);
     applyStandardTableHeader(ws, columns);
-    applyStandardDataRows(ws, rows, columns);
+    applyStandardDataRows(ws, rows, columns, 8, conditionalStyles);
     const lastDataRow = 7 + rows.length;
     applyStandardPageSetup(ws, 7, columns.length, lastDataRow, vesselName);
     const buffer = await wb.xlsx.writeBuffer();
@@ -44671,10 +46640,10 @@ async function getClassItemsJobsStatus(vesselId, jobSearch, departmentFilter, da
     rows,
     summary: {
       total: rows.length,
-      jobs: classJobs.length,
-      overdue: rows.filter((r) => r.status === "Overdue").length,
-      due: rows.filter((r) => r.status === "Due").length,
-      upcoming: rows.filter((r) => r.status === "Upcoming").length
+      overdue: overdueCount,
+      due: dueCount,
+      active: activeCount,
+      completed: completedCount
     }
   };
 }
@@ -44908,10 +46877,11 @@ async function getCriticalEquipmentSchedule2(req, res) {
     const format3 = req.query.format || "json";
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
+    const vesselIds = req.query.vesselIds ? req.query.vesselIds.split(",").filter(Boolean) : void 0;
     if (!vesselId) {
       return res.status(400).json({ error: "vesselId is required" });
     }
-    const result = await getCriticalEquipmentSchedule(vesselId, statusFilter, category, format3, startDate, endDate);
+    const result = await getCriticalEquipmentSchedule(vesselId, statusFilter, category, format3, startDate, endDate, vesselIds);
     if (result.type === "excel") {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${result.filename}"`);
@@ -45113,6 +47083,7 @@ async function getDueJobs7DaysData(vesselId, vesselIds) {
     }
     if (isDue) {
       dueJobs.push({
+        workOrderId: wo.wouuid || wo.id,
         workOrderNo: wo.workOrderNo || wo.id,
         jobTitle: wo.jobTitle || job?.jobTitle || "-",
         componentCode: wo.componentCode || "-",
@@ -45321,6 +47292,7 @@ async function getOverdueJobsData(vesselId, dateFrom, dateTo, vesselIds) {
       }
       if (isCriticalEquipment) debugStats.criticalEquipment++;
       overdueJobs.push({
+        workOrderId: wo.wouuid || wo.id,
         workOrderNo: wo.workOrderNo || wo.id,
         jobTitle: wo.jobTitle || job?.jobTitle || "-",
         componentCode: wo.componentCode || "-",
@@ -45515,6 +47487,7 @@ async function getCompletedJobsData(vesselId, dateFrom, dateTo, vesselIds) {
     totalManHours += manHours;
     return {
       sNo: index3 + 1,
+      workOrderId: wo.wouuid || wo.id,
       workOrderNo: wo.workOrderNo || wo.id || "\u2014",
       componentName: wo.component || comp?.name || "\u2014",
       componentCode: wo.componentCode || "\u2014",
@@ -45658,6 +47631,227 @@ async function exportCompletedJobs(vesselId, dateFrom, dateTo, componentFilter, 
   console.log(`[COMPLETED JOBS REGISTER] Generated: ${filename} (${completedJobs.length} jobs, ${totalManHours.toFixed(1)} man-hours)`);
   return { buffer: Buffer.from(buffer), filename };
 }
+async function getAllJobsData(vesselId, dateFrom, dateTo, vesselIds) {
+  const formatDateDDMMMYYYY = (dateStr) => {
+    if (!dateStr) return "\u2014";
+    try {
+      const d = typeof dateStr === "string" ? new Date(dateStr) : dateStr;
+      if (isNaN(d.getTime())) return "\u2014";
+      const day = d.getDate().toString().padStart(2, "0");
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${day}-${months[d.getMonth()]}-${d.getFullYear()}`;
+    } catch {
+      return "\u2014";
+    }
+  };
+  const allVessels = await getVessels6();
+  const vesselMap = new Map(allVessels.map((v) => [v.id, v.name]));
+  const vessel = allVessels.find((v) => v.id === vesselId);
+  const isMultiVessel = vesselId === "all";
+  const vesselName = isMultiVessel ? vesselIds && vesselIds.length > 0 ? vesselIds.map((id) => vesselMap.get(id) || id).join(", ") : "All Vessels" : vessel?.name || vesselId;
+  const workOrders2 = await getWorkOrders(vesselId, vesselIds);
+  const jobs2 = await getJobs(vesselId, void 0, vesselIds);
+  const components2 = await getComponents2(vesselId, vesselIds);
+  const jobsMap = new Map(jobs2.map((job) => [job.juuid, job]));
+  const componentsByCodeMap = new Map(components2.map((comp) => [comp.componentCode, comp]));
+  const eligibleWorkOrders = workOrders2.filter((wo) => {
+    if (wo.isExecution) return false;
+    if (wo.isDeleted === true) return false;
+    const status = (wo.status || "").toLowerCase();
+    if (status === "cancelled" || status === "canceled") return false;
+    return true;
+  });
+  const filterFromObj = dateFrom ? new Date(dateFrom) : null;
+  const filterToObj = dateTo ? new Date(dateTo) : null;
+  if (filterFromObj) filterFromObj.setHours(0, 0, 0, 0);
+  if (filterToObj) filterToObj.setHours(23, 59, 59, 999);
+  let filteredJobs = eligibleWorkOrders;
+  if (filterFromObj || filterToObj) {
+    filteredJobs = eligibleWorkOrders.filter((wo) => {
+      const due = wo.dueDateSnapshot || wo.dueDate;
+      const d = parseDate3(due);
+      if (!d) return false;
+      if (filterFromObj && d < filterFromObj) return false;
+      if (filterToObj && d > filterToObj) return false;
+      return true;
+    });
+  }
+  filteredJobs.sort((a, b) => {
+    const dateA = parseDate3(a.dueDateSnapshot || a.dueDate)?.getTime() || 0;
+    const dateB = parseDate3(b.dueDateSnapshot || b.dueDate)?.getTime() || 0;
+    if (dateB !== dateA) return dateB - dateA;
+    return (a.workOrderNo || a.id || "").localeCompare(b.workOrderNo || b.id || "");
+  });
+  let totalManHours = 0;
+  const statusCounts = {};
+  const allJobs = filteredJobs.map((wo, index3) => {
+    const job = jobsMap.get(wo.jobId || "");
+    const comp = componentsByCodeMap.get(wo.componentCode || "");
+    const duration = parseFloat(wo.totalTimeHours || "0") || 0;
+    const persons = parseInt(wo.noOfPersons || "1") || 1;
+    const manHours = parseFloat(wo.manhours || "0") || duration * persons;
+    if (manHours > 0) totalManHours += manHours;
+    const status = wo.status || "Active";
+    statusCounts[status] = (statusCounts[status] || 0) + 1;
+    const frequency = job ? `${job.frequencyValue || ""} ${job.frequencyUnit || ""}`.trim() : "";
+    return {
+      sNo: index3 + 1,
+      workOrderId: wo.wouuid || wo.id,
+      workOrderNo: wo.workOrderNo || wo.id || "\u2014",
+      componentName: wo.component || comp?.name || "\u2014",
+      componentCode: wo.componentCode || "\u2014",
+      jobTitle: wo.jobTitle || "\u2014",
+      jobType: wo.taskType || wo.maintenanceType || "\u2014",
+      department: wo.department || "Unassigned",
+      assignedTo: wo.performedBy || wo.assignedTo || job?.assignedTo || "\u2014",
+      frequency: frequency || "\u2014",
+      dueDate: formatDateDDMMMYYYY(wo.dueDateSnapshot || wo.dueDate),
+      completionDate: formatDateDDMMMYYYY(wo.dateCompleted || wo.completionDateTime),
+      status,
+      manHours: manHours > 0 ? manHours.toFixed(1) : "\u2014",
+      remarks: wo.remarks || wo.comments || "\u2014",
+      vesselName: isMultiVessel ? vesselMap.get(wo.vesselId) || wo.vesselId || "-" : vesselName
+    };
+  });
+  return {
+    success: true,
+    data: allJobs,
+    vesselName,
+    totalRecords: allJobs.length,
+    summary: {
+      totalJobs: allJobs.length,
+      totalManHours: totalManHours.toFixed(1),
+      statusCounts
+    }
+  };
+}
+async function exportAllJobs(vesselId, dateFrom, dateTo, componentFilter, departmentFilter) {
+  const formatDateDDMMMYYYY = (dateStr) => {
+    if (!dateStr) return "\u2014";
+    try {
+      const d = typeof dateStr === "string" ? new Date(dateStr) : dateStr;
+      if (isNaN(d.getTime())) return "\u2014";
+      const day = d.getDate().toString().padStart(2, "0");
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${day}-${months[d.getMonth()]}-${d.getFullYear()}`;
+    } catch {
+      return "\u2014";
+    }
+  };
+  const { data: rowsRaw, vesselName, summary } = await getAllJobsData(vesselId, dateFrom, dateTo);
+  const rows = filterByDepartment2(filterByComponent2(rowsRaw, componentFilter), departmentFilter);
+  const isMultiVessel = vesselId === "all";
+  const filteredStatusCounts = {};
+  for (const r of rows) {
+    const s = r.status || "Active";
+    filteredStatusCounts[s] = (filteredStatusCounts[s] || 0) + 1;
+  }
+  const workbook = new ExcelJS4.Workbook();
+  workbook.creator = "PMS System";
+  workbook.created = /* @__PURE__ */ new Date();
+  const worksheet = workbook.addWorksheet("All Jobs Register", {
+    views: [{ state: "frozen", ySplit: 8, xSplit: 2 }]
+  });
+  const columns = [
+    { header: "S.No", key: "sNo", width: 8 },
+    ...isMultiVessel ? [{ header: "Vessel", key: "vesselName", width: 22 }] : [],
+    { header: "WO No", key: "workOrderNo", width: 22 },
+    { header: "Component", key: "componentName", width: 28 },
+    { header: "Job Title", key: "jobTitle", width: 30 },
+    { header: "Job Type", key: "jobType", width: 14 },
+    { header: "Dept", key: "department", width: 12 },
+    { header: "Assigned To", key: "assignedTo", width: 18 },
+    { header: "Frequency", key: "frequency", width: 14 },
+    { header: "Due Date", key: "dueDate", width: 16 },
+    { header: "Completion Date", key: "completionDate", width: 16 },
+    { header: "Status", key: "status", width: 14 },
+    { header: "Man Hours", key: "manHours", width: 12 },
+    { header: "Remarks", key: "remarks", width: 30 }
+  ];
+  const totalColumns = columns.length;
+  const lastColLetter = getLastColumnLetter(totalColumns);
+  const headerRowNum = 8;
+  const dataStartRow = 9;
+  worksheet.mergeCells(`A1:${lastColLetter}1`);
+  const titleCell = worksheet.getCell("A1");
+  titleCell.value = "ALL JOBS / WORK ORDERS REGISTER";
+  titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+  titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E5A8E" } };
+  titleCell.alignment = { horizontal: "center", vertical: "middle" };
+  worksheet.getRow(1).height = 28;
+  worksheet.mergeCells(`A2:${lastColLetter}2`);
+  const subtitleCell = worksheet.getCell("A2");
+  subtitleCell.value = "Comprehensive register of all work orders regardless of status";
+  subtitleCell.font = { size: 11, color: { argb: "FFFFFFFF" } };
+  subtitleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E5A8E" } };
+  subtitleCell.alignment = { horizontal: "center", vertical: "middle" };
+  worksheet.getCell("A3").value = `Vessel: ${vesselName}`;
+  worksheet.getCell("A3").font = { bold: true };
+  worksheet.mergeCells("A3:D3");
+  const periodText = dateFrom && dateTo ? `Report Period: ${formatDateDDMMMYYYY(dateFrom)} to ${formatDateDDMMMYYYY(dateTo)}` : "Report Period: All Time";
+  worksheet.getCell("E3").value = periodText;
+  worksheet.mergeCells("E3:H3");
+  worksheet.getCell("I3").value = `Generated: ${formatDateDDMMMYYYY(/* @__PURE__ */ new Date())}`;
+  worksheet.mergeCells(`I3:${lastColLetter}3`);
+  worksheet.getRow(4).height = 5;
+  worksheet.getRow(5).height = 5;
+  worksheet.getRow(6).height = 5;
+  const statusCounts = filteredStatusCounts;
+  void summary;
+  const statusSummary = Object.entries(statusCounts).map(([s, c]) => `${s}: ${c}`).join(" | ") || `Total: ${rows.length}`;
+  worksheet.mergeCells(`A7:${lastColLetter}7`);
+  const statusCell = worksheet.getCell("A7");
+  statusCell.value = `Total: ${rows.length}  |  ${statusSummary}`;
+  statusCell.font = { italic: true, size: 10 };
+  statusCell.alignment = { horizontal: "left", vertical: "middle" };
+  const headerRow = worksheet.getRow(headerRowNum);
+  columns.forEach((col, idx) => {
+    const cell = headerRow.getCell(idx + 1);
+    cell.value = col.header;
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 9 };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF5DADE2" } };
+    cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    cell.border = {
+      top: { style: "thin", color: { argb: "FFE1E8ED" } },
+      bottom: { style: "thin", color: { argb: "FFE1E8ED" } },
+      left: { style: "thin", color: { argb: "FFE1E8ED" } },
+      right: { style: "thin", color: { argb: "FFE1E8ED" } }
+    };
+    worksheet.getColumn(idx + 1).width = col.width;
+  });
+  headerRow.height = 22;
+  rows.forEach((row, rowIdx) => {
+    const xlRow = worksheet.getRow(dataStartRow + rowIdx);
+    columns.forEach((col, colIdx) => {
+      const cell = xlRow.getCell(colIdx + 1);
+      cell.value = row[col.key] ?? "\u2014";
+      cell.font = { size: 9 };
+      cell.alignment = { vertical: "middle" };
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFE1E8ED" } },
+        bottom: { style: "thin", color: { argb: "FFE1E8ED" } },
+        left: { style: "thin", color: { argb: "FFE1E8ED" } },
+        right: { style: "thin", color: { argb: "FFE1E8ED" } }
+      };
+      if (rowIdx % 2 === 1) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF7F9FC" } };
+      }
+    });
+    xlRow.height = 18;
+  });
+  worksheet.autoFilter = { from: { row: headerRowNum, column: 1 }, to: { row: headerRowNum, column: totalColumns } };
+  worksheet.pageSetup = {
+    orientation: "landscape",
+    paperSize: 8,
+    fitToPage: true,
+    fitToWidth: 1,
+    printTitlesRow: `${headerRowNum}:${headerRowNum}`
+  };
+  const buffer = await workbook.xlsx.writeBuffer();
+  const filename = generateFilename("AllJobsRegister", vesselName);
+  console.log(`[ALL JOBS REGISTER] Generated: ${filename} (${rows.length} rows)`);
+  return { buffer: Buffer.from(buffer), filename };
+}
 async function exportUnplannedJobs(vesselId, dateFrom, dateTo, componentFilter) {
   const workOrders2 = await getWorkOrders(vesselId);
   const jobs2 = await getJobs(vesselId);
@@ -45688,6 +47882,7 @@ async function exportUnplannedJobs(vesselId, dateFrom, dateTo, componentFilter) 
     const comp = componentsByCodeMap.get(wo.componentCode || "");
     const isCritical = comp?.criticalEquipment === true || comp?.criticalEquipment === "Yes";
     return {
+      workOrderId: wo.wouuid || wo.id,
       workOrderNo: wo.workOrderNumber || wo.id,
       templateCode: job?.templateCode || "-",
       jobTitle: wo.title || wo.jobTitle || "-",
@@ -46098,6 +48293,348 @@ async function exportMonthlySummary(vesselId, year, month) {
   console.log(`[MONTHLY SUMMARY REPORT] Generated: ${filename} (Period: ${reportPeriod})`);
   return { buffer: Buffer.from(buffer), filename };
 }
+function getYearMonth(dateStr) {
+  if (!dateStr) return null;
+  const d = parseDate3(dateStr);
+  if (!d) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+function buildVesselGraceSettings3(vesselSettings) {
+  if (!vesselSettings) {
+    return { calendarGraceMode: "COMPANY_STANDARD", calendarGraceDays: 7, rhGraceHours: 50 };
+  }
+  return {
+    calendarGraceMode: vesselSettings.calendarGraceMode || "COMPANY_STANDARD",
+    calendarGraceDays: vesselSettings.calendarGraceDays ?? 7,
+    rhGraceHours: vesselSettings.rhGraceHours ?? 50,
+    rhLeadTimeHours: vesselSettings.rhLeadTimeHours
+  };
+}
+async function getWorkOrderOverviewData(vesselId, anchorYear, anchorMonth, vesselIds) {
+  const now = /* @__PURE__ */ new Date();
+  const aYear = anchorYear ?? now.getFullYear();
+  const aMonth = anchorMonth ?? now.getMonth() + 1;
+  const SHORT_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const months = [];
+  for (let i = 11; i >= 0; i--) {
+    let m = aMonth - i;
+    let y = aYear;
+    while (m <= 0) {
+      m += 12;
+      y--;
+    }
+    const ym = `${y}-${String(m).padStart(2, "0")}`;
+    months.push({ label: `${SHORT_MONTH_NAMES[m - 1]} ${String(y).slice(-2)}`, yearMonth: ym });
+  }
+  const allVessels = await getVessels6();
+  const vessel = allVessels.find((v) => v.id === vesselId);
+  const vesselMap = new Map(allVessels.map((v) => [v.id, v.name]));
+  const isMultiVessel = vesselId === "all";
+  const vesselName = isMultiVessel ? vesselIds && vesselIds.length > 0 ? vesselIds.map((id) => vesselMap.get(id) || id).join(", ") : "All Vessels" : vessel?.name || vesselId;
+  const [workOrders2, jobs2, components2, companyGraceRow] = await Promise.all([
+    getWorkOrders(vesselId, vesselIds),
+    getJobs(vesselId, void 0, vesselIds),
+    getComponents2(vesselId, vesselIds),
+    storage.getCompanyStandardGraceSettings()
+  ]);
+  const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
+  const jobsMap = new Map(jobs2.map((j) => [j.juuid, j]));
+  const componentsByCodeMap = new Map(components2.map((c) => [c.componentCode, c]));
+  const componentsMap = new Map(components2.map((c) => [c.cuuid, c]));
+  const vesselGraceCache = /* @__PURE__ */ new Map();
+  const uniqueVesselIds = Array.from(new Set(
+    workOrders2.map((wo) => wo.vesselId).filter((id) => typeof id === "string" && id.length > 0)
+  ));
+  for (const vid of uniqueVesselIds) {
+    const vs = await getPmsVesselSettings4(vid);
+    vesselGraceCache.set(vid, buildVesselGraceSettings3(vs));
+  }
+  const eligibleWorkOrders = workOrders2.filter((wo) => {
+    if (wo.isExecution) return false;
+    if (wo.isDeleted === true) return false;
+    const st = (wo.status || "").toLowerCase();
+    if (st === "cancelled" || st === "canceled") return false;
+    return true;
+  });
+  const isCritical = (wo) => wo.criticality === "Yes" || wo.jobPriority === "Critical";
+  const emptyCell = () => ({ count: 0, woIds: [] });
+  const dueBuckets = /* @__PURE__ */ new Map();
+  const compBuckets = /* @__PURE__ */ new Map();
+  for (const m of months) {
+    dueBuckets.set(m.yearMonth, {
+      total: emptyCell(),
+      critical: emptyCell(),
+      nonCritical: emptyCell(),
+      notCompletedTotal: emptyCell(),
+      notCompletedCritical: emptyCell(),
+      notCompletedNonCritical: emptyCell(),
+      overdueTotal: emptyCell(),
+      overdueCritical: emptyCell(),
+      overdueNonCritical: emptyCell(),
+      postponedTotal: emptyCell(),
+      postponedCritical: emptyCell(),
+      postponedNonCritical: emptyCell()
+    });
+    compBuckets.set(m.yearMonth, {
+      completedTotal: emptyCell(),
+      completedCritical: emptyCell(),
+      completedNonCritical: emptyCell()
+    });
+  }
+  const ymSet = new Set(months.map((m) => m.yearMonth));
+  const anchorYM = months[11].yearMonth;
+  const woInfoMap = {};
+  const push = (cell, id) => {
+    cell.count++;
+    cell.woIds.push(id);
+  };
+  for (const wo of eligibleWorkOrders) {
+    const dueYM = getYearMonth(wo.dueDate);
+    const complYM = getYearMonth(wo.completionDateTime || wo.dateCompleted);
+    if (!dueYM && !complYM) continue;
+    const job = wo.jobId ? jobsMap.get(wo.jobId) : jobs2.find((j) => j.jobNo === wo.templateCode);
+    const component = wo.componentCode ? componentsByCodeMap.get(wo.componentCode) : wo.component ? componentsMap.get(wo.component) : null;
+    const maintenanceBasis = wo.maintenanceBasis || job?.maintenanceBasis || "Calendar";
+    const dueRH = parseRH2(job?.nextDueRH) ?? parseRH2(wo.nextDueReading);
+    const currentRH = parseRH2(component?.currentCumulativeRH) ?? parseRH2(wo.currentReading);
+    const crit = isCritical(wo);
+    const woId = wo.wouuid || String(wo.id);
+    const vesselGraceSettings = vesselGraceCache.get(wo.vesselId ?? "") || buildVesselGraceSettings3(null);
+    const computedStatus = computeWorkOrderStatus({
+      dueDate: wo.dueDate,
+      dueRH: dueRH ?? null,
+      currentRH: currentRH ?? null,
+      isExecution: wo.isExecution,
+      status: wo.status,
+      completionDateTime: wo.completionDateTime,
+      maintenanceBasis,
+      companyGraceConfig,
+      vesselGraceSettings
+    });
+    const isCompleted = computedStatus === "Completed";
+    const isPostponed = computedStatus === "Postponed";
+    const isOverdue = computedStatus === "Overdue";
+    if (!woInfoMap[woId]) {
+      woInfoMap[woId] = {
+        workOrderNo: wo.workOrderNo || "-",
+        jobTitle: wo.jobTitle || "-",
+        status: wo.status || "-",
+        componentName: wo.component || "-",
+        dueDate: wo.dueDate || null
+      };
+    }
+    if (dueYM && ymSet.has(dueYM)) {
+      const db2 = dueBuckets.get(dueYM);
+      push(db2.total, woId);
+      if (crit) {
+        push(db2.critical, woId);
+      } else {
+        push(db2.nonCritical, woId);
+      }
+      if (!isCompleted) {
+        push(db2.notCompletedTotal, woId);
+        if (crit) {
+          push(db2.notCompletedCritical, woId);
+        } else {
+          push(db2.notCompletedNonCritical, woId);
+        }
+      }
+      if (isOverdue) {
+        push(db2.overdueTotal, woId);
+        if (crit) {
+          push(db2.overdueCritical, woId);
+        } else {
+          push(db2.overdueNonCritical, woId);
+        }
+      }
+      if (isPostponed) {
+        push(db2.postponedTotal, woId);
+        if (crit) {
+          push(db2.postponedCritical, woId);
+        } else {
+          push(db2.postponedNonCritical, woId);
+        }
+      }
+    }
+    if (isCompleted && complYM && ymSet.has(complYM)) {
+      const cb = compBuckets.get(complYM);
+      push(cb.completedTotal, woId);
+      if (crit) {
+        push(cb.completedCritical, woId);
+      } else {
+        push(cb.completedNonCritical, woId);
+      }
+    }
+  }
+  const orderedDue = months.map((m) => dueBuckets.get(m.yearMonth));
+  const orderedComp = months.map((m) => compBuckets.get(m.yearMonth));
+  const pctCell = (numerator, denominator, woIds) => ({
+    count: denominator === 0 ? 0 : Math.round(numerator / denominator * 100),
+    isPct: true,
+    woIds
+  });
+  return {
+    vesselName,
+    anchorYear: aYear,
+    anchorMonth: aMonth,
+    months,
+    woInfo: woInfoMap,
+    matrix: {
+      totalDue: orderedDue.map((b) => b.total),
+      criticalDue: orderedDue.map((b) => b.critical),
+      nonCriticalDue: orderedDue.map((b) => b.nonCritical),
+      completedTotal: orderedComp.map((b) => b.completedTotal),
+      completedCritical: orderedComp.map((b) => b.completedCritical),
+      completedNonCritical: orderedComp.map((b) => b.completedNonCritical),
+      notCompletedTotal: orderedDue.map((b) => b.notCompletedTotal),
+      notCompletedCritical: orderedDue.map((b) => b.notCompletedCritical),
+      notCompletedNonCritical: orderedDue.map((b) => b.notCompletedNonCritical),
+      overdueTotal: orderedDue.map((b) => pctCell(b.overdueTotal.count, b.total.count, b.overdueTotal.woIds)),
+      overdueCritical: orderedDue.map((b) => pctCell(b.overdueCritical.count, b.critical.count, b.overdueCritical.woIds)),
+      overdueNonCritical: orderedDue.map((b) => pctCell(b.overdueNonCritical.count, b.nonCritical.count, b.overdueNonCritical.woIds)),
+      postponedTotal: orderedDue.map((b) => b.postponedTotal),
+      postponedCritical: orderedDue.map((b) => b.postponedCritical),
+      postponedNonCritical: orderedDue.map((b) => b.postponedNonCritical),
+      extendedPct: orderedDue.map((b) => pctCell(b.postponedTotal.count, b.total.count, b.postponedTotal.woIds))
+    }
+  };
+}
+async function exportWorkOrderOverview(vesselId, anchorYear, anchorMonth, vesselIds) {
+  const data = await getWorkOrderOverviewData(vesselId, anchorYear, anchorMonth, vesselIds);
+  const { vesselName, months, matrix } = data;
+  const workbook = new ExcelJS4.Workbook();
+  workbook.creator = "PMS Reports";
+  workbook.created = /* @__PURE__ */ new Date();
+  const worksheet = workbook.addWorksheet("WO Overview", {
+    views: [{ state: "frozen", xSplit: 1, ySplit: 4 }]
+  });
+  const BLUE_HEADER = "1E3A5F";
+  const SECTIONS = [
+    { header: "SECTION 1 \u2014 WORK ORDERS DUE", bgLabel: "BFD9EF", bgData: "E8F4FD" },
+    { header: "SECTION 2 \u2014 COMPLETED", bgLabel: "A8DDB5", bgData: "E8F8F0" },
+    { header: "SECTION 3 \u2014 NOT COMPLETED", bgLabel: "FFCC80", bgData: "FFF3E0" },
+    { header: "SECTION 4 \u2014 OVERDUE %", bgLabel: "FFAB91", bgData: "FFEBE8" },
+    { header: "SECTION 5 \u2014 EXTENDED (POSTPONED)", bgLabel: "CE93D8", bgData: "F3E8FF" }
+  ];
+  worksheet.getColumn(1).width = 32;
+  for (let c = 2; c <= months.length + 1; c++) {
+    worksheet.getColumn(c).width = 12;
+  }
+  worksheet.mergeCells(1, 1, 1, months.length + 1);
+  const t = worksheet.getCell(1, 1);
+  t.value = "WORK ORDERS OVERVIEW \u2014 12-MONTH ROLLING MATRIX";
+  t.font = { bold: true, size: 14, color: { argb: "FFFFFFFF" }, name: "Arial" };
+  t.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${BLUE_HEADER}` } };
+  t.alignment = { horizontal: "center", vertical: "middle" };
+  worksheet.getRow(1).height = 28;
+  worksheet.mergeCells(2, 1, 2, months.length + 1);
+  const s = worksheet.getCell(2, 1);
+  s.value = `Vessel: ${vesselName}   |   Period: ${months[0].label} \u2013 ${months[11].label}`;
+  s.font = { size: 10, color: { argb: "FFFFFFFF" }, name: "Arial" };
+  s.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${BLUE_HEADER}` } };
+  s.alignment = { horizontal: "center", vertical: "middle" };
+  worksheet.getRow(2).height = 18;
+  worksheet.mergeCells(3, 1, 3, months.length + 1);
+  const g = worksheet.getCell(3, 1);
+  g.value = `Generated: ${(/* @__PURE__ */ new Date()).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}`;
+  g.font = { size: 9, italic: true, color: { argb: "FFFFFFFF" }, name: "Arial" };
+  g.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${BLUE_HEADER}` } };
+  g.alignment = { horizontal: "center", vertical: "middle" };
+  worksheet.getRow(3).height = 16;
+  worksheet.getRow(4).height = 22;
+  const lh = worksheet.getCell(4, 1);
+  lh.value = "Metric";
+  lh.font = { bold: true, color: { argb: "FFFFFFFF" }, name: "Arial", size: 10 };
+  lh.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${BLUE_HEADER}` } };
+  lh.alignment = { horizontal: "left", vertical: "middle" };
+  for (let i = 0; i < months.length; i++) {
+    const mh = worksheet.getCell(4, i + 2);
+    mh.value = months[i].label;
+    mh.font = { bold: true, color: { argb: "FFFFFFFF" }, name: "Arial", size: 10 };
+    mh.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${BLUE_HEADER}` } };
+    mh.alignment = { horizontal: "center", vertical: "middle" };
+  }
+  let curRow = 5;
+  const writeSectionHeader = (label, bgColor) => {
+    worksheet.mergeCells(curRow, 1, curRow, months.length + 1);
+    const row = worksheet.getRow(curRow);
+    row.height = 18;
+    const cell = row.getCell(1);
+    cell.value = label;
+    cell.font = { bold: true, name: "Arial", size: 9, color: { argb: "FF1A1A2E" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${bgColor}` } };
+    cell.alignment = { horizontal: "left", vertical: "middle", indent: 1 };
+    cell.border = { top: { style: "thin", color: { argb: "FF888888" } }, bottom: { style: "thin", color: { argb: "FF888888" } } };
+    curRow++;
+  };
+  const writeDataRow = (label, cells, bgColor, bold = false, indent = 0, italic = false) => {
+    const row = worksheet.getRow(curRow);
+    row.height = 16;
+    const lc = row.getCell(1);
+    lc.value = label;
+    lc.font = { bold, italic, name: "Arial", size: 9, color: { argb: "FF1A1A2E" } };
+    lc.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${bgColor}` } };
+    lc.alignment = { horizontal: "left", vertical: "middle", indent };
+    lc.border = { right: { style: "thin", color: { argb: "FFAAAAAA" } }, bottom: { style: "hair", color: { argb: "FFCCCCCC" } } };
+    for (let i = 0; i < months.length; i++) {
+      const cd = cells[i];
+      const dc = row.getCell(i + 2);
+      const display = cd.isPct ? `${cd.count}%` : cd.count === 0 ? "\u2014" : String(cd.count);
+      dc.value = display;
+      dc.font = { name: "Arial", size: 9, bold: bold && !cd.isPct, italic, color: { argb: cd.count === 0 && !cd.isPct ? "FF999999" : "FF1A1A2E" } };
+      dc.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${bgColor}` } };
+      dc.alignment = { horizontal: "center", vertical: "middle" };
+      dc.border = { bottom: { style: "hair", color: { argb: "FFCCCCCC" } }, right: { style: "hair", color: { argb: "FFDDDDDD" } } };
+    }
+    curRow++;
+  };
+  const [sDue, sComp, sNotComp, sOverdue, sExt] = SECTIONS;
+  writeSectionHeader(sDue.header, sDue.bgLabel);
+  writeDataRow("Total WOs Due", matrix.totalDue, sDue.bgData, true);
+  writeDataRow("  Critical WOs Due", matrix.criticalDue, sDue.bgData, false, 1);
+  writeDataRow("  Non-Critical WOs Due", matrix.nonCriticalDue, sDue.bgData, false, 1);
+  writeSectionHeader(sComp.header, sComp.bgLabel);
+  writeDataRow("Completed (Total)", matrix.completedTotal, sComp.bgData, true);
+  writeDataRow("  Completed (Critical)", matrix.completedCritical, sComp.bgData, false, 1);
+  writeDataRow("  Completed (Non-Crit)", matrix.completedNonCritical, sComp.bgData, false, 1);
+  writeSectionHeader(sNotComp.header, sNotComp.bgLabel);
+  writeDataRow("Not Completed (Total)", matrix.notCompletedTotal, sNotComp.bgData, true);
+  writeDataRow("  Not Completed (Critical)", matrix.notCompletedCritical, sNotComp.bgData, false, 1);
+  writeDataRow("  Not Completed (Non-Crit)", matrix.notCompletedNonCritical, sNotComp.bgData, false, 1);
+  writeSectionHeader(sOverdue.header, sOverdue.bgLabel);
+  writeDataRow("Overdue % (Total)", matrix.overdueTotal, sOverdue.bgData, true, 0, true);
+  writeDataRow("  Overdue % (Critical)", matrix.overdueCritical, sOverdue.bgData, false, 1, true);
+  writeDataRow("  Overdue % (Non-Crit)", matrix.overdueNonCritical, sOverdue.bgData, false, 1, true);
+  writeSectionHeader(sExt.header, sExt.bgLabel);
+  writeDataRow("Extended Total", matrix.postponedTotal, sExt.bgData, true);
+  writeDataRow("  Extended (Critical)", matrix.postponedCritical, sExt.bgData, false, 1);
+  writeDataRow("  Extended (Non-Crit)", matrix.postponedNonCritical, sExt.bgData, false, 1);
+  writeDataRow("Extended %", matrix.extendedPct, sExt.bgData, true, 0, true);
+  curRow++;
+  worksheet.mergeCells(curRow, 1, curRow, months.length + 1);
+  const fn = worksheet.getCell(curRow, 1);
+  fn.value = 'Note: Critical = criticality "Yes" OR job priority "Critical". Overdue % = (Overdue \xF7 Total Due) \xD7 100. Extended % = (Postponed \xF7 Total Due) \xD7 100. Overdue classification uses computed status (grace/lead-time aware).';
+  fn.font = { size: 8, italic: true, color: { argb: "FF666666" }, name: "Arial" };
+  fn.alignment = { horizontal: "left", vertical: "middle" };
+  worksheet.pageSetup = {
+    orientation: "landscape",
+    paperSize: 9,
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 }
+  };
+  worksheet.headerFooter = {
+    oddFooter: `&L&8&"Arial"Confidential \u2014 ${vesselName}&C&8&"Arial"Page &P of &N&R&8&"Arial"Generated: &D &T`
+  };
+  const buf = await workbook.xlsx.writeBuffer();
+  const safe = vesselName.replace(/[^a-zA-Z0-9]/g, "_");
+  const filename = `PMS_WOOverview_${safe}_${data.anchorYear}${String(data.anchorMonth).padStart(2, "0")}.xlsx`;
+  console.log(`[WO OVERVIEW REPORT] Generated: ${filename}`);
+  return { buffer: Buffer.from(buf), filename };
+}
 
 // server/modules/reports/controllers/maintenanceReportsController.ts
 init_monthlySnapshotService();
@@ -46145,6 +48682,37 @@ async function getCompletedJobsPreview(req, res) {
   } catch (error) {
     console.error("Error fetching Completed Jobs preview:", error);
     res.status(500).json({ error: "Failed to fetch report data: " + error.message });
+  }
+}
+async function getAllJobsPreview(req, res) {
+  try {
+    const vesselId = req.query.vesselId;
+    const dateFrom = req.query.dateFrom;
+    const dateTo = req.query.dateTo;
+    if (!vesselId) {
+      return res.status(400).json({ error: "Please select a vessel" });
+    }
+    const vesselIds = req.query.vesselIds ? req.query.vesselIds.split(",").filter(Boolean) : void 0;
+    const result = await getAllJobsData(vesselId, dateFrom, dateTo, vesselIds);
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching All Jobs preview:", error);
+    res.status(500).json({ error: "Failed to fetch report data: " + error.message });
+  }
+}
+async function exportAllJobs2(req, res) {
+  try {
+    const { vesselId, dateFrom, dateTo, componentFilter, departmentFilter } = req.body;
+    if (!vesselId) {
+      return res.status(400).json({ error: "Please select a vessel" });
+    }
+    const { buffer, filename } = await exportAllJobs(vesselId, dateFrom, dateTo, componentFilter, departmentFilter);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (error) {
+    console.error("Error generating All Jobs Register report:", error);
+    res.status(500).json({ error: "Failed to generate report: " + error.message });
   }
 }
 async function getPostponementLogPreview(req, res) {
@@ -46354,6 +48922,46 @@ async function regenerateMonthlySummarySnapshots(req, res) {
     res.status(500).json({ error: "Failed to regenerate snapshots: " + message });
   }
 }
+async function getWorkOrderOverviewPreview(req, res) {
+  try {
+    const vesselId = req.query.vesselId;
+    if (!vesselId) {
+      return res.status(400).json({ error: "Please select a vessel" });
+    }
+    const anchorYear = req.query.year || req.query.anchorYear ? Number(req.query.year || req.query.anchorYear) : void 0;
+    const anchorMonth = req.query.month || req.query.anchorMonth ? Number(req.query.month || req.query.anchorMonth) : void 0;
+    const vesselIds = req.query.vesselIds ? req.query.vesselIds.split(",").filter(Boolean) : void 0;
+    const result = await getWorkOrderOverviewData(vesselId, anchorYear, anchorMonth, vesselIds);
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching Work Orders Overview preview:", error);
+    res.status(500).json({ error: "Failed to fetch report data: " + error.message });
+  }
+}
+async function exportWorkOrderOverview2(req, res) {
+  try {
+    const { vesselId } = req.body;
+    if (!vesselId) {
+      return res.status(400).json({ error: "Please select a vessel" });
+    }
+    const anchorYear = req.body.year || req.body.anchorYear ? Number(req.body.year || req.body.anchorYear) : void 0;
+    const anchorMonth = req.body.month || req.body.anchorMonth ? Number(req.body.month || req.body.anchorMonth) : void 0;
+    const vesselIds = req.body.vesselIds ? String(req.body.vesselIds).split(",").filter(Boolean) : void 0;
+    const { buffer, filename } = await exportWorkOrderOverview(
+      vesselId,
+      anchorYear,
+      anchorMonth,
+      vesselIds
+    );
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (error) {
+    console.error("Error generating Work Orders Overview report:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: "Failed to generate report: " + message });
+  }
+}
 async function exportMonthlySummary2(req, res) {
   try {
     const { vesselId, startDate } = req.body;
@@ -46518,6 +49126,7 @@ async function getRunningHoursAnomalyDetection(vesselId, startDate, endDate, ano
           sNo++;
           anomalies.push({
             sNo,
+            componentId: component?.cuuid || log2.componentId || "",
             componentCode: log2.componentCode || component?.componentCode || "-",
             componentName,
             category: component?.componentCategory || component?.category || "-",
@@ -46852,6 +49461,7 @@ async function getIhmInventoryStatus(vesselId, ihmStatusFilter = "all", itemType
     if (ihmStatus !== "present") continue;
     combinedItems.push({
       id: s.id,
+      spareId: s.spuuid || s.id,
       vesselId: s.vesselId || "",
       vesselName: vesselNameMap.get(s.vesselId || "") || "-",
       itemCode: s.partCode || s.componentSpareCode || "",
@@ -46876,6 +49486,7 @@ async function getIhmInventoryStatus(vesselId, ihmStatusFilter = "all", itemType
     if (ihmStatus !== "present") continue;
     combinedItems.push({
       id: st.id + 1e6,
+      itemId: st.suuid || st.storeItemId || st.id,
       vesselId: st.vesselId || "",
       vesselName: vesselNameMap.get(st.vesselId || "") || "-",
       itemCode: st.itemCode || "",
@@ -47647,10 +50258,7 @@ async function getEquipmentUtilizationSummary(vesselId, startDate, endDate, cate
       (c) => c.department === department || c.eqptSystemDept === department
     );
   }
-  const vesselCode = vessel?.code || vesselId;
   const db2 = await getDb();
-  const rhLogs = await db2.select().from(componentRunningHoursLog).where(sql16`${componentRunningHoursLog.vesselCode} = ${vesselCode} OR ${componentRunningHoursLog.vesselCode} = ${vesselId}`);
-  console.log(`[UTILIZATION] Vessel: ${vesselId}, VesselCode: ${vesselCode}, Components: ${rhComponents.length}, RH Logs found: ${rhLogs.length}`);
   const now = /* @__PURE__ */ new Date();
   const defaultStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1e3);
   const periodStart = startDate ? parseDateVal2(startDate) : defaultStartDate;
@@ -47658,11 +50266,13 @@ async function getEquipmentUtilizationSummary(vesselId, startDate, endDate, cate
   if (!periodStart || !periodEnd) {
     throw new Error("Invalid date format");
   }
+  const rhAuditLogs = await db2.select().from(runningHoursAudit).where(sql16`${runningHoursAudit.vesselId} = ${vesselId} AND ${runningHoursAudit.enteredAtUTC} >= ${periodStart.toISOString()} AND ${runningHoursAudit.enteredAtUTC} <= ${periodEnd.toISOString()}`);
+  console.log(`[UTILIZATION] Vessel: ${vesselId}, Components: ${rhComponents.length}, Audit logs in period: ${rhAuditLogs.length}`);
   const daysInPeriod = Math.max(1, Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1e3 * 60 * 60 * 24)));
   const utilizationData = rhComponents.map((component, index3) => {
-    const componentLogs = rhLogs.filter(
-      (log2) => (log2.componentCode === component.componentCode || log2.componentId === component.cuuid) && log2.updatedAt && new Date(log2.updatedAt) >= periodStart && new Date(log2.updatedAt) <= periodEnd
-    ).sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+    const componentLogs = rhAuditLogs.filter(
+      (log2) => log2.componentCode === component.componentCode || log2.componentId === component.cuuid
+    ).sort((a, b) => new Date(a.enteredAtUTC).getTime() - new Date(b.enteredAtUTC).getTime());
     const currentCumulativeReading = component.currentCumulativeRH !== null && component.currentCumulativeRH !== void 0 ? Number(component.currentCumulativeRH) : null;
     const baselineHours = component.runningHours !== null && component.runningHours !== void 0 ? Number(component.runningHours) : null;
     const displayCurrentHours = currentCumulativeReading ?? baselineHours ?? 0;
@@ -47672,7 +50282,7 @@ async function getEquipmentUtilizationSummary(vesselId, startDate, endDate, cate
     const cappedEstimateHours = Math.floor(maxPossibleHours * 0.8);
     if (componentLogs.length > 0) {
       periodHours = componentLogs.reduce((sum2, log2) => {
-        const delta = Number(log2.deltaRh) || 0;
+        const delta = (Number(log2.newRH) || 0) - (Number(log2.previousRH) || 0);
         return sum2 + Math.max(0, delta);
       }, 0);
       dataSource = "Actual";
@@ -47707,6 +50317,7 @@ async function getEquipmentUtilizationSummary(vesselId, startDate, endDate, cate
     const utilizationPercent = avgDailyHours / ratedHoursPerDay * 100;
     return {
       sNo: index3 + 1,
+      componentId: component.cuuid || component.id,
       componentCode: component.componentCode || component.id,
       componentName: component.name || component.fleetEquipmentName || "Unnamed",
       category: component.componentCategory || component.category || "-",
@@ -47774,10 +50385,7 @@ async function exportEquipmentUtilizationSummaryExcel(vesselId, startDate, endDa
       (c) => c.department === department || c.eqptSystemDept === department
     );
   }
-  const vesselCode = vessel?.code || vesselId;
   const db2 = await getDb();
-  const rhLogs = await db2.select().from(componentRunningHoursLog).where(sql16`${componentRunningHoursLog.vesselCode} = ${vesselCode} OR ${componentRunningHoursLog.vesselCode} = ${vesselId}`);
-  console.log(`[UTILIZATION EXCEL] Vessel: ${vesselId}, VesselCode: ${vesselCode}, Components: ${rhComponents.length}, RH Logs found: ${rhLogs.length}`);
   const now = /* @__PURE__ */ new Date();
   const defaultStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1e3);
   const periodStart = startDate ? parseDateVal2(startDate) : defaultStartDate;
@@ -47785,11 +50393,13 @@ async function exportEquipmentUtilizationSummaryExcel(vesselId, startDate, endDa
   if (!periodStart || !periodEnd) {
     throw new Error("Invalid date format");
   }
+  const rhAuditLogs = await db2.select().from(runningHoursAudit).where(sql16`${runningHoursAudit.vesselId} = ${vesselId} AND ${runningHoursAudit.enteredAtUTC} >= ${periodStart.toISOString()} AND ${runningHoursAudit.enteredAtUTC} <= ${periodEnd.toISOString()}`);
+  console.log(`[UTILIZATION EXCEL] Vessel: ${vesselId}, Components: ${rhComponents.length}, Audit logs in period: ${rhAuditLogs.length}`);
   const daysInPeriod = Math.max(1, Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1e3 * 60 * 60 * 24)));
   const utilizationData = rhComponents.map((component, index3) => {
-    const componentLogs = rhLogs.filter(
-      (log2) => (log2.componentCode === component.componentCode || log2.componentId === component.cuuid) && log2.updatedAt && new Date(log2.updatedAt) >= periodStart && new Date(log2.updatedAt) <= periodEnd
-    ).sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+    const componentLogs = rhAuditLogs.filter(
+      (log2) => log2.componentCode === component.componentCode || log2.componentId === component.cuuid
+    ).sort((a, b) => new Date(a.enteredAtUTC).getTime() - new Date(b.enteredAtUTC).getTime());
     const currentCumulativeReading = component.currentCumulativeRH !== null && component.currentCumulativeRH !== void 0 ? Number(component.currentCumulativeRH) : null;
     const baselineHours = component.runningHours !== null && component.runningHours !== void 0 ? Number(component.runningHours) : null;
     const displayCurrentHours = currentCumulativeReading ?? baselineHours ?? 0;
@@ -47799,7 +50409,7 @@ async function exportEquipmentUtilizationSummaryExcel(vesselId, startDate, endDa
     const cappedEstimateHours = Math.floor(maxPossibleHours * 0.8);
     if (componentLogs.length > 0) {
       periodHours = componentLogs.reduce((sum2, log2) => {
-        const delta = Number(log2.deltaRh) || 0;
+        const delta = (Number(log2.newRH) || 0) - (Number(log2.previousRH) || 0);
         return sum2 + Math.max(0, delta);
       }, 0);
       dataSource = "Actual";
@@ -48623,12 +51233,16 @@ router12.get("/reports/class-items-jobs", asyncHandler(getClassItemsJobsStatus2)
 router12.get("/reports/due-jobs-7-days/preview", asyncHandler(getDueJobs7DaysPreview));
 router12.get("/reports/overdue-jobs/preview", asyncHandler(getOverdueJobsPreview));
 router12.get("/reports/completed-jobs/preview", asyncHandler(getCompletedJobsPreview));
+router12.get("/reports/all-jobs/preview", asyncHandler(getAllJobsPreview));
 router12.get("/reports/postponement-log/preview", asyncHandler(getPostponementLogPreview));
 router12.post("/reports/due-jobs-7-days", asyncHandler(exportDueJobs7Days2));
 router12.post("/reports/overdue-jobs", asyncHandler(exportOverdueJobs2));
 router12.post("/reports/completed-jobs", asyncHandler(exportCompletedJobs2));
+router12.post("/reports/all-jobs", asyncHandler(exportAllJobs2));
 router12.post("/reports/unplanned-jobs", asyncHandler(exportUnplannedJobs2));
 router12.post("/reports/postponement-log", asyncHandler(exportPostponementLog2));
+router12.get("/reports/maintenance/work-order-overview/preview", asyncHandler(getWorkOrderOverviewPreview));
+router12.post("/reports/maintenance/work-order-overview/excel", asyncHandler(exportWorkOrderOverview2));
 router12.get("/reports/maintenance/monthly-summary/preview", asyncHandler(getMonthlySummaryPreview));
 router12.get("/reports/maintenance/monthly-summary/snapshot-detail", asyncHandler(getMonthlySummarySnapshotDetail));
 router12.post("/reports/maintenance/monthly-summary/regenerate", asyncHandler(regenerateMonthlySummarySnapshots));
@@ -48740,7 +51354,7 @@ var JOB_FIELDS = [
   { columnName: "jobNo", displayName: "Job Number", type: "text", editable: false },
   { columnName: "assignedTo", displayName: "Assigned To", type: "text", editable: true },
   { columnName: "maintenanceType", displayName: "Maintenance Type", type: "select", editable: true, options: ["Inspection", "Overhaul", "Service", "Testing"] },
-  { columnName: "maintenanceBasis", displayName: "Maintenance Basis", type: "select", editable: true, options: ["Calendar", "Running Hours"] },
+  { columnName: "maintenanceBasis", displayName: "Maintenance Basis", type: "select", editable: true, options: ["Calendar", "Running Hours", "Dual Frequency"] },
   { columnName: "frequencyValue", displayName: "Frequency Value", type: "text", editable: true },
   { columnName: "frequencyUnit", displayName: "Frequency Unit", type: "select", editable: true, options: ["Months", "Years", "Weeks", "Days", "Hours"] },
   { columnName: "intervalRunningHour", displayName: "Interval Running Hours", type: "number", editable: true },
@@ -48769,7 +51383,7 @@ var WORK_ORDER_FIELDS = [
   { columnName: "status", displayName: "Status", type: "select", editable: false, options: ["Completed", "Due", "Due (Grace P)", "Overdue", "Postponed", "Pending Approval", "Active"] },
   { columnName: "taskType", displayName: "Task Type", type: "select", editable: true, options: ["Inspection", "Overhaul", "Service", "Testing"] },
   { columnName: "maintenanceType", displayName: "Maintenance Type", type: "select", editable: true, options: ["Inspection", "Overhaul", "Service", "Testing"] },
-  { columnName: "maintenanceBasis", displayName: "Maintenance Basis", type: "select", editable: false, options: ["Calendar", "Running Hours"] },
+  { columnName: "maintenanceBasis", displayName: "Maintenance Basis", type: "select", editable: false, options: ["Calendar", "Running Hours", "Dual Frequency"] },
   { columnName: "frequencyValue", displayName: "Frequency Value", type: "text", editable: true },
   { columnName: "frequencyUnit", displayName: "Frequency Unit", type: "select", editable: true, options: ["Months", "Years", "Weeks", "Days"] },
   { columnName: "approverRemarks", displayName: "Approver Remarks", type: "text", editable: true },
@@ -49440,7 +52054,121 @@ var COLUMN_MAPPINGS = {
     "uom": "UOM",
     "totalrob": "Total ROB",
     "total_rob": "Total ROB",
-    "total rob": "Total ROB"
+    "total rob": "Total ROB",
+    "rotationitem": "Rotation Item",
+    "rotation_item": "Rotation Item",
+    "rotation item": "Rotation Item"
+  },
+  "spare-history": {
+    // Part Code
+    "partcode": "Part Code",
+    "part_code": "Part Code",
+    "part code": "Part Code",
+    "sparepartcode": "Part Code",
+    "spare_part_code": "Part Code",
+    "spare part code": "Part Code",
+    // Event Type
+    "eventtype": "Event Type",
+    "event_type": "Event Type",
+    "event type": "Event Type",
+    "transactiontype": "Event Type",
+    "transaction_type": "Event Type",
+    "transaction type": "Event Type",
+    "type": "Event Type",
+    // Quantity
+    "quantity": "Quantity",
+    "qty": "Quantity",
+    "qtychange": "Quantity",
+    "qty_change": "Quantity",
+    "qty change": "Quantity",
+    "amount": "Quantity",
+    // ROB After
+    "robafter": "ROB After",
+    "rob_after": "ROB After",
+    "rob after": "ROB After",
+    "balanceafter": "ROB After",
+    "balance_after": "ROB After",
+    "balance after": "ROB After",
+    "closingbalance": "ROB After",
+    "closing_balance": "ROB After",
+    "closing balance": "ROB After",
+    "rob": "ROB After",
+    "stock": "ROB After",
+    // Date
+    "date": "Date",
+    "transactiondate": "Date",
+    "transaction_date": "Date",
+    "transaction date": "Date",
+    "eventdate": "Date",
+    "event_date": "Date",
+    "event date": "Date",
+    "datetime": "Date",
+    "dateofevent": "Date",
+    "date of event": "Date",
+    // Component Code
+    "componentcode": "Component Code",
+    "component_code": "Component Code",
+    "component code": "Component Code",
+    // Performed By
+    "performedby": "Performed By",
+    "performed_by": "Performed By",
+    "performed by": "Performed By",
+    "doneby": "Performed By",
+    "done_by": "Performed By",
+    "done by": "Performed By",
+    "userid": "Performed By",
+    "user_id": "Performed By",
+    "user id": "Performed By",
+    "user": "Performed By",
+    "operator": "Performed By",
+    // Remarks
+    "remarks": "Remarks",
+    "remark": "Remarks",
+    "notes": "Remarks",
+    "note": "Remarks",
+    "comments": "Remarks",
+    "comment": "Remarks",
+    // Reference
+    "reference": "Reference",
+    "ref": "Reference",
+    "woreference": "Reference",
+    "wo_reference": "Reference",
+    "wo reference": "Reference",
+    "poreference": "Reference",
+    "po_reference": "Reference",
+    "po reference": "Reference",
+    "ponumber": "Reference",
+    "po_number": "Reference",
+    "po number": "Reference",
+    "workorderref": "Reference",
+    "work order ref": "Reference",
+    // Port/Place
+    "place": "Port/Place",
+    "port": "Port/Place",
+    "portplace": "Port/Place",
+    "port_place": "Port/Place",
+    "port place": "Port/Place",
+    "location": "Port/Place",
+    "portofcall": "Port/Place",
+    "port_of_call": "Port/Place",
+    "port of call": "Port/Place",
+    // Timezone
+    "tz": "Timezone",
+    "timezone": "Timezone",
+    "time_zone": "Timezone",
+    "time zone": "Timezone",
+    // Component Spare Code
+    "componentsparecode": "Component Spare Code",
+    "component_spare_code": "Component Spare Code",
+    "component spare code": "Component Spare Code",
+    "sparecode": "Component Spare Code",
+    "spare_code": "Component Spare Code",
+    "spare code": "Component Spare Code",
+    // Vessel Code
+    "vesselcode": "Vessel Code",
+    "vessel_code": "Vessel Code",
+    "vessel code": "Vessel Code",
+    "vessel": "Vessel Code"
   },
   components: {
     "componentcode": "Component Code",
@@ -49670,6 +52398,75 @@ var COLUMN_MAPPINGS = {
     "evidencetype": "Evidence Type",
     "evidence_type": "Evidence Type",
     "evidence type": "Evidence Type"
+  },
+  "wo-history": {
+    "wonumber": "WO Number",
+    "wo_number": "WO Number",
+    "wo number": "WO Number",
+    "work order number": "WO Number",
+    "workordernumber": "WO Number",
+    "componentcode": "Component Code",
+    "component_code": "Component Code",
+    "component code": "Component Code",
+    "jobtitle": "Job Title",
+    "job_title": "Job Title",
+    "job title": "Job Title",
+    "maintenancetype": "Maintenance Type",
+    "maintenance_type": "Maintenance Type",
+    "maintenance type": "Maintenance Type",
+    "datecompleted": "Date Completed",
+    "date_completed": "Date Completed",
+    "date completed": "Date Completed",
+    "completiondate": "Date Completed",
+    "completion_date": "Date Completed",
+    "performedby": "Performed By",
+    "performed_by": "Performed By",
+    "performed by": "Performed By",
+    "wodescription": "WO Description",
+    "wo_description": "WO Description",
+    "wo description": "WO Description",
+    "workdescription": "WO Description",
+    "work_description": "WO Description",
+    "work description": "WO Description",
+    "durationhours": "Duration Hours",
+    "duration_hours": "Duration Hours",
+    "duration hours": "Duration Hours",
+    "duration (hours)": "Duration Hours",
+    "runninghoursatcompletion": "Running Hours at Completion",
+    "running_hours_at_completion": "Running Hours at Completion",
+    "running hours at completion": "Running Hours at Completion",
+    "runninghours": "Running Hours at Completion",
+    "running hours": "Running Hours at Completion",
+    "remarks": "Remarks",
+    "remark": "Remarks",
+    "notes": "Remarks",
+    "nextduedate": "Next Due Date",
+    "next_due_date": "Next Due Date",
+    "next due date": "Next Due Date",
+    "sparepartsused": "Spare Parts Used",
+    "spare_parts_used": "Spare Parts Used",
+    "spare parts used": "Spare Parts Used",
+    "spares used": "Spare Parts Used",
+    "sparesused": "Spare Parts Used",
+    "jobapprovedby": "Job Approved By",
+    "job_approved_by": "Job Approved By",
+    "job approved by": "Job Approved By",
+    "approvedby": "Job Approved By",
+    "approved by": "Job Approved By",
+    "woduedate": "WO Due Date",
+    "wo_due_date": "WO Due Date",
+    "wo due date": "WO Due Date",
+    "duedate": "WO Due Date",
+    "due date": "WO Due Date",
+    "woduehour": "WO Due Hour",
+    "wo_due_hour": "WO Due Hour",
+    "wo due hour": "WO Due Hour",
+    "duehour": "WO Due Hour",
+    "due hour": "WO Due Hour",
+    "nextduehour": "Next Due Hour",
+    "next_due_hour": "Next Due Hour",
+    "next due hour": "Next Due Hour",
+    "status": "Status"
   }
 };
 function getExplicitParentFromRowEarly(row) {
@@ -49804,7 +52601,11 @@ function getParentSFICode(sfiCode) {
     return parts.join(".");
   }
   const baseCode = cleanCode;
-  if (baseCode.length > 2) {
+  if (baseCode.length >= 7) {
+    return baseCode.substring(0, baseCode.length - 3);
+  } else if (baseCode.length >= 4) {
+    return baseCode.substring(0, 3);
+  } else if (baseCode.length === 3) {
     return baseCode.substring(0, 2);
   } else if (baseCode.length === 2) {
     return baseCode.charAt(0);
@@ -49813,8 +52614,9 @@ function getParentSFICode(sfiCode) {
 }
 function validateSFICode(sfiCode) {
   const cleanCode = stripSFISuffix(sfiCode);
-  const pattern = /^\d{1,3}(\.\d{1,3})*$/;
-  return pattern.test(cleanCode);
+  const dottedPattern = /^\d{1,3}(\.\d{1,3})*$/;
+  const undottedPattern = /^\d{1,9}$/;
+  return dottedPattern.test(cleanCode) || undottedPattern.test(cleanCode);
 }
 function getExplicitParentFromRow(row) {
   const parentVariants = [
@@ -49847,7 +52649,7 @@ var STORES_CATEGORIES = [
   "Safety",
   "Consumables"
 ];
-var DEPARTMENTS = ["Engine", "Deck", "Electrical", "Galley", "LSA", "FFA"];
+var DEPARTMENTS = ["Engine", "Deck", "Electrical", "Galley", "LSA", "FFA", "Null"];
 var RESPONSIBLE_RANKS = [
   "Master",
   "Chief Officer",
@@ -49861,14 +52663,16 @@ var RESPONSIBLE_RANKS = [
   "Bosun",
   "Fitter"
 ];
-var SCHEDULE_TYPES = ["Running Hours", "Calendar", "Both"];
+var SCHEDULE_TYPES = ["Running Hours", "Calendar", "Dual Frequency"];
 var INTERVAL_UNITS = ["Days", "Weeks", "Months", "Years"];
 function getTypeFromSheetName(sheetName) {
   const normalizedName = sheetName.toLowerCase().trim();
   if (normalizedName === "fleet_component" || normalizedName === "fleet component" || normalizedName.includes("fleet") && normalizedName.includes("component")) return "fleet-components";
   if (normalizedName === "fleet_job" || normalizedName === "fleet job" || normalizedName.includes("fleet") && normalizedName.includes("job")) return "fleet-jobs";
   if (normalizedName === "fleet_spare" || normalizedName === "fleet spare" || normalizedName === "fleet_spares" || normalizedName === "fleet spares" || normalizedName.includes("fleet") && normalizedName.includes("spare")) return "fleet-spares";
+  if (normalizedName === "spare history" || normalizedName === "spare_history" || normalizedName === "spares history" || normalizedName === "spares_history" || normalizedName.includes("spare") && normalizedName.includes("history")) return "spare-history";
   if (normalizedName === "spares" || normalizedName.includes("spare")) return "spares";
+  if (normalizedName === "store history" || normalizedName === "store_history" || normalizedName === "stores history" || normalizedName === "stores_history" || normalizedName.includes("store") && normalizedName.includes("history")) return "store-history";
   if (normalizedName === "components" || normalizedName.includes("component") || normalizedName.includes("machinery")) return "components";
   if (normalizedName === "vessel_job" || normalizedName === "vessel job") return "jobs";
   if (normalizedName === "jobs" || normalizedName.includes("job")) return "jobs";
@@ -50169,7 +52973,7 @@ async function generateFleetMasterTemplate() {
     vesselComponentSheet.getCell(row, 19).dataValidation = {
       type: "list",
       allowBlank: true,
-      formulae: ["'Master Data'!$A$2:$A$4"]
+      formulae: ["'Master Data'!$A$2:$A$8"]
     };
     vesselComponentSheet.getCell(row, 22).dataValidation = {
       type: "list",
@@ -50181,7 +52985,7 @@ async function generateFleetMasterTemplate() {
     fleetJobSheet.getCell(row, 6).dataValidation = {
       type: "list",
       allowBlank: true,
-      formulae: ["'Master Data'!$A$2:$A$4"]
+      formulae: ["'Master Data'!$A$2:$A$8"]
     };
     fleetJobSheet.getCell(row, 7).dataValidation = {
       type: "list",
@@ -50213,7 +53017,7 @@ async function generateFleetMasterTemplate() {
     vesselJobSheet.getCell(row, 7).dataValidation = {
       type: "list",
       allowBlank: true,
-      formulae: ["'Master Data'!$A$2:$A$4"]
+      formulae: ["'Master Data'!$A$2:$A$8"]
     };
     vesselJobSheet.getCell(row, 8).dataValidation = {
       type: "list",
@@ -50265,6 +53069,11 @@ async function generateFleetMasterTemplate() {
       formulae: ["'Master Data'!$E$2:$E$11"]
     };
     vesselSpareSheet.getCell(row, 24).dataValidation = {
+      type: "list",
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+    vesselSpareSheet.getCell(row, 28).dataValidation = {
       type: "list",
       allowBlank: true,
       formulae: ["'Master Data'!$G$2:$G$3"]
@@ -50459,6 +53268,7 @@ async function generateJobsTemplate(vesselId) {
     { header: "Maintenance Basis", key: "maintenanceBasis", width: 18 },
     { header: "Interval Value", key: "intervalValue", width: 15 },
     { header: "Unit", key: "unit", width: 12 },
+    { header: "Interval Running Hours", key: "intervalRunningHours", width: 22 },
     { header: "Task Type", key: "taskType", width: 20 },
     { header: "Assigned To", key: "assignedTo", width: 20 },
     { header: "Approver", key: "approver", width: 20 },
@@ -50489,6 +53299,7 @@ async function generateJobsTemplate(vesselId) {
       maintenanceBasis: "",
       intervalValue: "",
       unit: "",
+      intervalRunningHours: "",
       taskType: "",
       assignedTo: "",
       approver: "",
@@ -50521,7 +53332,7 @@ async function generateJobsTemplate(vesselId) {
   const listValues = [
     { maintenanceBasis: "Calendar", intervalUnit: "Days", taskType: "Inspection", jobPriority: "Low", department: "Engine", yesNo: "Yes" },
     { maintenanceBasis: "Running Hours", intervalUnit: "Weeks", taskType: "Overhaul", jobPriority: "Medium", department: "Deck", yesNo: "No" },
-    { maintenanceBasis: "", intervalUnit: "Months", taskType: "Service", jobPriority: "High", department: "Electrical", yesNo: "" },
+    { maintenanceBasis: "Dual Frequency", intervalUnit: "Months", taskType: "Service", jobPriority: "High", department: "Electrical", yesNo: "" },
     { maintenanceBasis: "", intervalUnit: "Years", taskType: "Testing", jobPriority: "Critical", department: "C/E", yesNo: "" },
     { maintenanceBasis: "", intervalUnit: "Hours", taskType: "Repair", jobPriority: "", department: "2/E", yesNo: "" },
     { maintenanceBasis: "", intervalUnit: "", taskType: "Replacement", jobPriority: "", department: "3/E", yesNo: "" },
@@ -50534,8 +53345,8 @@ async function generateJobsTemplate(vesselId) {
       cell.dataValidation = {
         type: "list",
         allowBlank: true,
-        formulae: ["=Lists!$A$2:$A$3"]
-        // Only Calendar and Running Hours
+        formulae: ["=Lists!$A$2:$A$4"]
+        // Calendar, Running Hours, Dual Frequency
       };
     }
   });
@@ -50548,7 +53359,7 @@ async function generateJobsTemplate(vesselId) {
       };
     }
   });
-  jobsSheet.getColumn(10).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  jobsSheet.getColumn(11).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: "list",
@@ -50557,7 +53368,7 @@ async function generateJobsTemplate(vesselId) {
       };
     }
   });
-  jobsSheet.getColumn(13).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  jobsSheet.getColumn(14).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: "list",
@@ -50566,21 +53377,12 @@ async function generateJobsTemplate(vesselId) {
       };
     }
   });
-  jobsSheet.getColumn(14).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  jobsSheet.getColumn(15).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: "list",
         allowBlank: true,
         formulae: ["=Lists!$F$2:$F$3"]
-      };
-    }
-  });
-  jobsSheet.getColumn(17).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
-    if (rowNumber > 1) {
-      cell.dataValidation = {
-        type: "list",
-        allowBlank: true,
-        formulae: ["=Lists!$E$2:$E$9"]
       };
     }
   });
@@ -50589,11 +53391,20 @@ async function generateJobsTemplate(vesselId) {
       cell.dataValidation = {
         type: "list",
         allowBlank: true,
-        formulae: ["=Lists!$F$2:$F$3"]
+        formulae: ["=Lists!$E$2:$E$9"]
       };
     }
   });
   jobsSheet.getColumn(19).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+    if (rowNumber > 1) {
+      cell.dataValidation = {
+        type: "list",
+        allowBlank: true,
+        formulae: ["=Lists!$F$2:$F$3"]
+      };
+    }
+  });
+  jobsSheet.getColumn(20).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: "list",
@@ -50706,10 +53517,289 @@ async function generateSparesTemplate(vesselId) {
       allowBlank: true,
       formulae: ["=Lists!$B$2:$B$3"]
     };
+    sparesSheet.getCell(row, 28).dataValidation = {
+      type: "list",
+      allowBlank: true,
+      formulae: ["=Lists!$B$2:$B$3"]
+    };
   }
-  addVersionInfoToSheet(sparesSheet, 28);
+  addVersionInfoToSheet(sparesSheet, 29);
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
+}
+async function generateWoHistoryTemplate() {
+  const workbook = new ExcelJS8.Workbook();
+  const woSheet = workbook.addWorksheet("WO History");
+  woSheet.columns = [
+    { header: "WO Number", key: "woNumber", width: 25 },
+    { header: "Component Code", key: "componentCode", width: 20 },
+    { header: "Job Title", key: "jobTitle", width: 40 },
+    { header: "Maintenance Type", key: "maintenanceType", width: 20 },
+    { header: "Date Completed", key: "dateCompleted", width: 18 },
+    { header: "Performed By", key: "performedBy", width: 25 },
+    { header: "WO Description", key: "woDescription", width: 50 },
+    { header: "Duration Hours", key: "durationHours", width: 16 },
+    { header: "Running Hours at Completion", key: "rhAtCompletion", width: 25 },
+    { header: "Remarks", key: "remarks", width: 40 },
+    { header: "Next Due Date", key: "nextDueDate", width: 18 },
+    { header: "Spare Parts Used", key: "sparePartsUsed", width: 40 },
+    { header: "Job Approved By", key: "jobApprovedBy", width: 25 },
+    { header: "WO Due Date", key: "woDueDate", width: 18 },
+    { header: "WO Due Hour", key: "woDueHour", width: 16 },
+    { header: "Next Due Hour", key: "nextDueHour", width: 16 },
+    { header: "Status", key: "status", width: 20 }
+  ];
+  woSheet.getRow(1).font = { bold: true };
+  woSheet.getRow(1).fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFD0E4F7" }
+  };
+  [1, 2, 3, 4, 5, 6].forEach((col) => {
+    woSheet.getRow(1).getCell(col).font = { bold: true, color: { argb: "FFCC0000" } };
+  });
+  for (let row = 2; row <= 1e3; row++) {
+    woSheet.getCell(row, 4).dataValidation = {
+      type: "list",
+      allowBlank: false,
+      formulae: ['"Planned,Unplanned,Condition-Based"']
+    };
+  }
+  for (let row = 2; row <= 1e3; row++) {
+    woSheet.getCell(row, 17).dataValidation = {
+      type: "list",
+      allowBlank: true,
+      formulae: ['"Completed,Due,Overdue,Postponed,Pending Approval,Active"']
+    };
+  }
+  woSheet.addRow({
+    woNumber: "601.001.WO-2024-01",
+    componentCode: "601.001.AA",
+    jobTitle: "Main Engine Oil Change",
+    maintenanceType: "Planned",
+    dateCompleted: "15-NOV-2024",
+    performedBy: "Chief Engineer",
+    woDescription: "Routine oil change as per PMS schedule",
+    durationHours: 3,
+    rhAtCompletion: 8250,
+    remarks: "Completed without issues. Oil sample sent for analysis.",
+    nextDueDate: "15-MAY-2025",
+    sparePartsUsed: "OIL-FILTER-001, GASKET-001",
+    jobApprovedBy: "Chief Engineer",
+    woDueDate: "10-NOV-2024",
+    woDueHour: 8200,
+    nextDueHour: 9200,
+    status: "Completed"
+  });
+  const instrSheet = workbook.addWorksheet("Instructions");
+  instrSheet.columns = [
+    { header: "Field", key: "field", width: 30 },
+    { header: "Required", key: "required", width: 12 },
+    { header: "Description", key: "description", width: 70 },
+    { header: "Example", key: "example", width: 40 }
+  ];
+  instrSheet.getRow(1).font = { bold: true };
+  const rows = [
+    ["WO Number", "Required", "Unique work order number", "601.001.WO-2024-01"],
+    ["Component Code", "Required", "Equipment component code \u2014 must exist in the vessel register", "601.001.AA"],
+    ["Job Title", "Required", "Title of the maintenance job performed", "Main Engine Oil Change"],
+    ["Maintenance Type", "Required", "One of: Planned, Unplanned, Condition-Based", "Planned"],
+    ["Date Completed", "Required", "Date work was completed \u2014 use DD-MMM-YYYY format", "15-NOV-2024"],
+    ["Performed By", "Required", "Name or rank of person who performed the work", "Chief Engineer"],
+    ["WO Description", "Optional", "Detailed description of the work carried out", "Routine oil change per PMS schedule"],
+    ["Duration Hours", "Optional", "Time taken to complete the work (decimal hours)", "3.5"],
+    ["Running Hours at Completion", "Optional", "Component running hours recorded at time of completion", "8250"],
+    ["Remarks", "Optional", "Observations, findings, or follow-up notes", "Oil sample sent for analysis"],
+    ["Next Due Date", "Optional", "Next scheduled maintenance date \u2014 use DD-MMM-YYYY format", "15-MAY-2025"],
+    ["Spare Parts Used", "Optional", "Comma-separated part codes of spare parts consumed", "OIL-FILTER-001, GASKET-001"],
+    ["Job Approved By", "Optional", "Name or rank of person who approved the work order", "Chief Engineer"],
+    ["WO Due Date", "Optional", "Date the work order was due \u2014 use DD-MMM-YYYY format", "10-NOV-2024"],
+    ["WO Due Hour", "Optional", "Running hours at which the work order became due (numeric)", "8200"],
+    ["Next Due Hour", "Optional", "Running hours at which the next maintenance is due (numeric)", "9200"],
+    ["Status", "Optional", "One of: Completed, Due, Overdue, Postponed, Pending Approval, Active", "Completed"],
+    ["", "", "", ""],
+    ["--- NOTES ---", "", "", ""],
+    ["Date format", "", "Use DD-MMM-YYYY (e.g. 15-NOV-2024). Month must be 3-letter abbreviation.", ""],
+    ["Maintenance Type", "", "Accepted values: Planned | Unplanned | Condition-Based (case-sensitive)", ""],
+    ["Red column headers", "", "Columns with red header text are REQUIRED. Rows missing required fields will be rejected.", ""],
+    ["Import mode", "", 'Use "Add Only" to load history without overwriting existing completed records.', ""]
+  ];
+  rows.forEach(([field, required, description, example]) => {
+    instrSheet.addRow({ field, required, description, example });
+  });
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+async function generateStoreHistoryTemplate() {
+  const workbook = new ExcelJS8.Workbook();
+  const dataSheet = workbook.addWorksheet("Store History");
+  dataSheet.columns = [
+    { header: "Item Code", key: "itemCode", width: 20 },
+    { header: "Event Type", key: "eventType", width: 18 },
+    { header: "Quantity", key: "quantity", width: 12 },
+    { header: "ROB After", key: "robAfter", width: 12 },
+    { header: "Date", key: "date", width: 18 },
+    { header: "Vessel Code", key: "vesselCode", width: 16 },
+    { header: "Location", key: "location", width: 25 },
+    { header: "Remarks", key: "remarks", width: 40 },
+    { header: "Reference", key: "reference", width: 25 },
+    { header: "Port/Place", key: "place", width: 20 },
+    { header: "Timezone", key: "tz", width: 16 },
+    { header: "Performed By", key: "performedBy", width: 25 }
+  ];
+  dataSheet.getRow(1).font = { bold: true };
+  dataSheet.getRow(1).fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFD0E4F7" }
+  };
+  [1, 2, 3, 4, 5, 6].forEach((col) => {
+    dataSheet.getRow(1).getCell(col).font = { bold: true, color: { argb: "FFCC0000" } };
+  });
+  for (let row = 2; row <= 1e3; row++) {
+    dataSheet.getCell(row, 2).dataValidation = {
+      type: "list",
+      allowBlank: false,
+      formulae: ['"RECEIVE,CONSUME,ADJUST,TRANSFER_IN,TRANSFER_OUT"']
+    };
+  }
+  dataSheet.addRow({
+    itemCode: "STORE-001",
+    eventType: "CONSUME",
+    quantity: 5,
+    robAfter: 45,
+    date: "15-NOV-2024",
+    vesselCode: "V001",
+    location: "Engine Room Store",
+    remarks: "Used during scheduled maintenance",
+    reference: "601.001.WO-2024-01",
+    place: "Singapore",
+    tz: "Asia/Singapore",
+    performedBy: "Chief Engineer"
+  });
+  const instrSheet = workbook.addWorksheet("Instructions");
+  instrSheet.columns = [
+    { header: "Field", key: "field", width: 28 },
+    { header: "Required", key: "required", width: 12 },
+    { header: "Description", key: "description", width: 70 },
+    { header: "Example", key: "example", width: 35 }
+  ];
+  instrSheet.getRow(1).font = { bold: true };
+  const instrRows = [
+    ["Item Code", "Required", "Item code of the stores item \u2014 must already exist in the vessel's stores register", "STORE-001"],
+    ["Event Type", "Required", "Type of transaction: RECEIVE, CONSUME, ADJUST, TRANSFER_IN, or TRANSFER_OUT (uppercase)", "CONSUME"],
+    ["Quantity", "Required", "Absolute quantity involved (always positive \u2014 sign is derived from Event Type)", "5"],
+    ["ROB After", "Required", "Remaining on-board balance after this transaction (non-negative number)", "45"],
+    ["Date", "Required", "Date of the transaction \u2014 use DD-MMM-YYYY format", "15-NOV-2024"],
+    ["Vessel Code", "Required", "Vessel code this transaction belongs to (e.g. V001)", "V001"],
+    ["Location", "Optional", "Storage location name (e.g. Engine Room Store). Stored as location note in remarks.", "Engine Room Store"],
+    ["Remarks", "Optional", "Free-text notes about the transaction", "Used during scheduled maintenance"],
+    ["Reference", "Optional", "Work Order or Purchase Order number linked to this event", "601.001.WO-2024-01"],
+    ["Port/Place", "Optional", "Port or location where the transaction took place", "Singapore"],
+    ["Timezone", "Optional", "Timezone string (e.g. Asia/Singapore). Omit to use UTC.", "Asia/Singapore"],
+    ["Performed By", "Optional", "Name or rank of person who performed the transaction. Defaults to system.", "Chief Engineer"],
+    ["", "", "", ""],
+    ["--- NOTES ---", "", "", ""],
+    ["Date format", "", "Use DD-MMM-YYYY (e.g. 15-NOV-2024). Month must be a 3-letter abbreviation.", ""],
+    ["Event Type", "", "Accepted: RECEIVE | CONSUME | ADJUST | TRANSFER_IN | TRANSFER_OUT (uppercase)", ""],
+    ["Quantity sign", "", "Always enter a positive number. The system applies the correct sign automatically.", ""],
+    ["ROB After", "", "This is the balance AFTER the event, not the change.", ""],
+    ["Red headers", "", "Columns with red header text are REQUIRED. Rows missing required fields will be rejected.", ""],
+    ["Import mode", "", 'Use "Add Only" to load history without risk of overwriting existing records.', ""],
+    ["Current ROB", "", "This import does NOT change the item's current ROB balance. It only adds records to the transaction history ledger.", ""]
+  ];
+  instrRows.forEach(([field, required, description, example]) => {
+    instrSheet.addRow({ field, required, description, example });
+  });
+  const buf = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buf);
+}
+async function generateSpareHistoryTemplate() {
+  const workbook = new ExcelJS8.Workbook();
+  const dataSheet = workbook.addWorksheet("Spare History");
+  dataSheet.columns = [
+    { header: "Part Code", key: "partCode", width: 20 },
+    { header: "Event Type", key: "eventType", width: 16 },
+    { header: "Quantity", key: "quantity", width: 12 },
+    { header: "ROB After", key: "robAfter", width: 12 },
+    { header: "Date", key: "date", width: 18 },
+    { header: "Vessel Code", key: "vesselCode", width: 16 },
+    { header: "Component Code", key: "componentCode", width: 20 },
+    { header: "Performed By", key: "performedBy", width: 25 },
+    { header: "Remarks", key: "remarks", width: 40 },
+    { header: "Reference", key: "reference", width: 25 },
+    { header: "Port/Place", key: "place", width: 20 },
+    { header: "Timezone", key: "tz", width: 16 },
+    { header: "Component Spare Code", key: "componentSpareCode", width: 24 }
+  ];
+  dataSheet.getRow(1).font = { bold: true };
+  dataSheet.getRow(1).fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFD0E4F7" }
+  };
+  [1, 2, 3, 4, 5, 6].forEach((col) => {
+    dataSheet.getRow(1).getCell(col).font = { bold: true, color: { argb: "FFCC0000" } };
+  });
+  for (let row = 2; row <= 1e3; row++) {
+    dataSheet.getCell(row, 2).dataValidation = {
+      type: "list",
+      allowBlank: false,
+      formulae: ['"CONSUME,RECEIVE,ADJUST"']
+    };
+  }
+  dataSheet.addRow({
+    partCode: "PT-000123",
+    eventType: "CONSUME",
+    quantity: 2,
+    robAfter: 8,
+    date: "15-NOV-2024",
+    vesselCode: "V001",
+    componentCode: "601.001.AA",
+    performedBy: "Chief Engineer",
+    remarks: "Used during scheduled maintenance",
+    reference: "601.001.WO-2024-01",
+    place: "Singapore",
+    tz: "Asia/Singapore",
+    componentSpareCode: "SP-601.001.AA-001"
+  });
+  const instrSheet = workbook.addWorksheet("Instructions");
+  instrSheet.columns = [
+    { header: "Field", key: "field", width: 28 },
+    { header: "Required", key: "required", width: 12 },
+    { header: "Description", key: "description", width: 70 },
+    { header: "Example", key: "example", width: 35 }
+  ];
+  instrSheet.getRow(1).font = { bold: true };
+  const instrRows = [
+    ["Part Code", "Required", "Part code of the spare \u2014 must already exist in the vessel's spares register", "PT-000123"],
+    ["Event Type", "Required", "Type of transaction: CONSUME, RECEIVE, or ADJUST (uppercase)", "CONSUME"],
+    ["Quantity", "Required", "Absolute quantity involved (always positive \u2014 sign is derived from Event Type)", "2"],
+    ["ROB After", "Required", "Remaining on-board balance after this transaction (non-negative integer)", "8"],
+    ["Date", "Required", "Date of the transaction \u2014 use DD-MMM-YYYY format", "15-NOV-2024"],
+    ["Vessel Code", "Required", "Vessel code this transaction belongs to (e.g. V001)", "V001"],
+    ["Component Code", "Optional", "Component this spare is linked to \u2014 used for cross-check only", "601.001.AA"],
+    ["Performed By", "Optional", "Name or rank of person who performed the transaction. Defaults to system.", "Chief Engineer"],
+    ["Remarks", "Optional", "Free-text notes about the transaction", "Used during scheduled maintenance"],
+    ["Reference", "Optional", "Work Order or Purchase Order number linked to this event", "601.001.WO-2024-01"],
+    ["Port/Place", "Optional", "Port or location where the transaction took place", "Singapore"],
+    ["Timezone", "Optional", "Timezone string (e.g. Asia/Singapore). Omit to use UTC.", "Asia/Singapore"],
+    ["Component Spare Code", "Optional", "Spare code as registered against the component (e.g. SP-601.001.AA-001)", "SP-601.001.AA-001"],
+    ["", "", "", ""],
+    ["--- NOTES ---", "", "", ""],
+    ["Date format", "", "Use DD-MMM-YYYY (e.g. 15-NOV-2024). Month must be a 3-letter abbreviation.", ""],
+    ["Event Type", "", "Accepted values: CONSUME | RECEIVE | ADJUST (case-sensitive, uppercase)", ""],
+    ["Quantity sign", "", "Always enter a positive number. The system applies the correct sign automatically (CONSUME \u2192 negative qtyChange, RECEIVE/ADJUST \u2192 positive).", ""],
+    ["ROB After", "", "This is the balance AFTER the event, not the change. You must supply it \u2014 the system cannot auto-compute it from historical events.", ""],
+    ["Red headers", "", "Columns with red header text are REQUIRED. Rows missing required fields will be rejected during dry-run validation.", ""],
+    ["Import mode", "", 'Use "Add Only" to load history without risk of overwriting. All rows create new history records.', ""],
+    ["Current ROB", "", "This import does NOT change the spare's current ROB balance. It only adds records to the transaction history ledger.", ""]
+  ];
+  instrRows.forEach(([field, required, description, example]) => {
+    instrSheet.addRow({ field, required, description, example });
+  });
+  const buf = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buf);
 }
 
 // server/modules/bulk-upload/services/validationService.ts
@@ -50743,6 +53833,9 @@ async function validateData(type, data, mode, vesselId) {
       case "work-orders":
         primaryField = "Work Order Number";
         break;
+      case "wo-history":
+        primaryField = "WO Number";
+        break;
       case "makers":
         primaryField = "Maker Code";
         break;
@@ -50755,10 +53848,40 @@ async function validateData(type, data, mode, vesselId) {
       case "fleet-spares":
         primaryField = "Part Code";
         break;
+      case "spare-history":
+        primaryField = "Part Code";
+        break;
+      case "store-history":
+        primaryField = "Item Code";
+        break;
       default:
         primaryField = "Component Code";
     }
     const fieldValue = row[primaryField];
+    if (type === "spare-history") {
+      const spareHistoryDataFields = ["Event Type", "Quantity", "ROB After", "Date", "Performed By", "Remarks", "Reference", "Port/Place"];
+      const hasOtherData = spareHistoryDataFields.some((f) => {
+        const v = row[f];
+        return v !== void 0 && v !== null && String(v).trim() !== "";
+      });
+      const partCodePresent = fieldValue && String(fieldValue).trim() !== "";
+      if (!partCodePresent && !hasOtherData) {
+        return false;
+      }
+      return true;
+    }
+    if (type === "store-history") {
+      const storeHistoryDataFields = ["Event Type", "Quantity", "ROB After", "Date", "Performed By", "Remarks", "Reference", "Port/Place"];
+      const hasOtherData = storeHistoryDataFields.some((f) => {
+        const v = row[f];
+        return v !== void 0 && v !== null && String(v).trim() !== "";
+      });
+      const itemCodePresent = fieldValue && String(fieldValue).trim() !== "";
+      if (!itemCodePresent && !hasOtherData) {
+        return false;
+      }
+      return true;
+    }
     if (!fieldValue) {
       console.log(`[${type}] Row ${index3 + 2}: Skipping - no ${primaryField} value`);
       return false;
@@ -50860,6 +53983,34 @@ async function validateData(type, data, mode, vesselId) {
       }
     });
   }
+  const vesselSparesByPartCode = /* @__PURE__ */ new Map();
+  if (type === "spare-history" && vesselId) {
+    try {
+      const vesselSpares = await storage.getSpares(vesselId);
+      vesselSpares.forEach((s) => {
+        if (s.partCode) {
+          vesselSparesByPartCode.set(String(s.partCode).trim(), s);
+        }
+      });
+      console.log(`\u{1F4CB} Loaded ${vesselSparesByPartCode.size} spares for vessel '${vesselId}' (spare-history validation)`);
+    } catch (err) {
+      console.warn("\u26A0\uFE0F Could not pre-load vessel spares for spare-history validation:", err);
+    }
+  }
+  const vesselStoresByItemCode = /* @__PURE__ */ new Map();
+  if (type === "store-history" && vesselId) {
+    try {
+      const vesselStores = await storage.getStoresItems(vesselId);
+      vesselStores.forEach((s) => {
+        if (s.itemCode) {
+          vesselStoresByItemCode.set(String(s.itemCode).trim(), s);
+        }
+      });
+      console.log(`\u{1F4CB} Loaded ${vesselStoresByItemCode.size} stores items for vessel '${vesselId}' (store-history validation)`);
+    } catch (err) {
+      console.warn("\u26A0\uFE0F Could not pre-load vessel stores for store-history validation:", err);
+    }
+  }
   let existingMakersByCode = /* @__PURE__ */ new Map();
   let existingMakersByName = /* @__PURE__ */ new Map();
   let makerListLoaded = false;
@@ -50926,7 +54077,7 @@ async function validateData(type, data, mode, vesselId) {
       } else {
         const codeStr = String(componentCode).trim();
         if (!validateSFICode(codeStr)) {
-          errors.push(`Row ${rowNum}: Invalid Component Code format. Expected SFI format: 6, 61, 612, 612.005, etc.`);
+          errors.push(`Row ${rowNum}: Invalid Component Code format. Expected SFI format: 6, 61, 612, 612.005, 601001, 601001001, etc.`);
         } else {
           normalized["Component Code"] = codeStr;
           const codeUpperCase = codeStr.toUpperCase();
@@ -51054,7 +54205,8 @@ async function validateData(type, data, mode, vesselId) {
         }
       });
       const deptValue = normalized["Equipment / System Department"] || normalized["Eqpt / System Department"];
-      if (deptValue && !DEPARTMENTS.includes(deptValue)) {
+      const deptIsNullSentinel = deptValue && deptValue.toLowerCase() === "null";
+      if (deptValue && !deptIsNullSentinel && !DEPARTMENTS.includes(deptValue)) {
         errors.push(`Row ${rowNum}: Invalid Equipment / System Department '${deptValue}'. Allowed values are: ${DEPARTMENTS.join(", ")}.`);
       }
       if (makerListLoaded) {
@@ -51175,6 +54327,15 @@ async function validateData(type, data, mode, vesselId) {
           errors.push(`Row ${rowNum}: IHM must be Yes or No`);
         } else {
           normalized["IHM (Inventory of Hazardous Materials)"] = ["yes", "y"].includes(value) ? "Yes" : "No";
+        }
+      }
+      const rotationField = row["Rotation Item"];
+      const rawRotation = typeof rotationField === "boolean" ? rotationField ? "yes" : "no" : rotationField === void 0 || rotationField === null ? "" : String(rotationField).toLowerCase().trim();
+      if (rawRotation !== "") {
+        if (!["yes", "no", "y", "n", "true", "false", "1", "0"].includes(rawRotation)) {
+          errors.push(`Row ${rowNum}: Rotation Item must be Yes or No`);
+        } else {
+          normalized["Rotation Item"] = ["yes", "y", "true", "1"].includes(rawRotation) ? "Yes" : "No";
         }
       }
       if (row["Fleet Equipment Code"]) {
@@ -51309,7 +54470,7 @@ async function validateData(type, data, mode, vesselId) {
       } else if (row["Responsible_Rank"]) {
         normalized["Responsible_Rank"] = row["Responsible_Rank"];
       }
-      const validScheduleTypes = ["Calendar", "Running Hours"];
+      const validScheduleTypes = ["Calendar", "Running Hours", "Dual Frequency"];
       if (row["Schedule_Type"] && !validScheduleTypes.includes(row["Schedule_Type"])) {
         errors.push(`Row ${rowNum}: Invalid Schedule_Type. Allowed: ${validScheduleTypes.join(", ")}`);
       } else if (row["Schedule_Type"]) {
@@ -51375,6 +54536,199 @@ async function validateData(type, data, mode, vesselId) {
           normalized[key] = row[key];
         }
       });
+    } else if (type === "wo-history") {
+      const woNumber = row["WO Number"];
+      if (!woNumber || String(woNumber).trim() === "") {
+        errors.push(`Row ${rowNum}: WO Number is required`);
+      } else {
+        normalized["WO Number"] = String(woNumber).trim();
+      }
+      const componentCode = row["Component Code"];
+      if (!componentCode || String(componentCode).trim() === "") {
+        errors.push(`Row ${rowNum}: Component Code is required`);
+      } else {
+        normalized["Component Code"] = String(componentCode).trim();
+      }
+      const jobTitle = row["Job Title"];
+      if (!jobTitle || String(jobTitle).trim() === "") {
+        errors.push(`Row ${rowNum}: Job Title is required`);
+      } else {
+        normalized["Job Title"] = String(jobTitle).trim();
+      }
+      const maintenanceType = row["Maintenance Type"];
+      if (!maintenanceType || String(maintenanceType).trim() === "") {
+        errors.push(`Row ${rowNum}: Maintenance Type is required`);
+      } else {
+        normalized["Maintenance Type"] = String(maintenanceType).trim();
+      }
+      if (!row["Date Completed"] && row["Date Completed"] !== 0) {
+        errors.push(`Row ${rowNum}: Date Completed is required`);
+      } else {
+        normalized["Date Completed"] = row["Date Completed"];
+      }
+      const performedBy = row["Performed By"];
+      if (!performedBy || String(performedBy).trim() === "") {
+        errors.push(`Row ${rowNum}: Performed By is required`);
+      } else {
+        normalized["Performed By"] = String(performedBy).trim();
+      }
+      const validStatuses = ["Completed", "Approved"];
+      const rawStatus = row["Status"] ? String(row["Status"]).trim() : "";
+      if (rawStatus && !validStatuses.includes(rawStatus)) {
+        warnings.push(`Row ${rowNum}: Status '${rawStatus}' is not standard. Will default to 'Completed'.`);
+        normalized["Status"] = "Completed";
+      } else {
+        normalized["Status"] = rawStatus || "Completed";
+      }
+      const optionalFields = [
+        "WO Description",
+        "Duration Hours",
+        "Running Hours at Completion",
+        "Remarks",
+        "Next Due Date",
+        "Spare Parts Used",
+        "Job Approved By",
+        "WO Due Date",
+        "WO Due Hour",
+        "Next Due Hour"
+      ];
+      for (const field of optionalFields) {
+        if (row[field] !== void 0 && row[field] !== null && String(row[field]).trim() !== "") {
+          normalized[field] = row[field];
+        }
+      }
+    } else if (type === "spare-history") {
+      const partCode = row["Part Code"];
+      if (!partCode || String(partCode).trim() === "") {
+        errors.push(`Row ${rowNum}: Part Code is required`);
+      } else {
+        const partCodeStr = String(partCode).trim();
+        normalized["Part Code"] = partCodeStr;
+        if (vesselSparesByPartCode.size > 0 && !vesselSparesByPartCode.has(partCodeStr)) {
+          errors.push(`Row ${rowNum}: Part Code '${partCodeStr}' not found in vessel's spares register`);
+        }
+      }
+      const eventType = row["Event Type"];
+      const validEventTypes = ["CONSUME", "RECEIVE", "ADJUST"];
+      if (!eventType || String(eventType).trim() === "") {
+        errors.push(`Row ${rowNum}: Event Type is required`);
+      } else {
+        const evtNorm = String(eventType).trim().toUpperCase();
+        if (!validEventTypes.includes(evtNorm)) {
+          errors.push(`Row ${rowNum}: Event Type '${eventType}' is invalid. Accepted values: CONSUME, RECEIVE, ADJUST`);
+        } else {
+          normalized["Event Type"] = evtNorm;
+        }
+      }
+      const quantity = row["Quantity"];
+      if (quantity === void 0 || quantity === null || String(quantity).trim() === "") {
+        errors.push(`Row ${rowNum}: Quantity is required`);
+      } else {
+        const qtyStr = String(quantity).trim();
+        const qtyNum = Number(qtyStr);
+        if (!Number.isInteger(qtyNum) || qtyNum < 0 || isNaN(qtyNum)) {
+          errors.push(`Row ${rowNum}: Quantity must be a non-negative integer (got '${qtyStr}')`);
+        } else {
+          normalized["Quantity"] = qtyNum;
+        }
+      }
+      const robAfter = row["ROB After"];
+      if (robAfter === void 0 || robAfter === null || String(robAfter).trim() === "") {
+        errors.push(`Row ${rowNum}: ROB After is required`);
+      } else {
+        const robStr = String(robAfter).trim();
+        const robNum = Number(robStr);
+        if (!Number.isInteger(robNum) || robNum < 0 || isNaN(robNum)) {
+          errors.push(`Row ${rowNum}: ROB After must be a non-negative integer (got '${robStr}')`);
+        } else {
+          normalized["ROB After"] = robNum;
+        }
+      }
+      if (!row["Date"] && row["Date"] !== 0) {
+        errors.push(`Row ${rowNum}: Date is required`);
+      } else {
+        normalized["Date"] = row["Date"];
+      }
+      const optionalFields = [
+        "Vessel Code",
+        "Component Code",
+        "Performed By",
+        "Remarks",
+        "Reference",
+        "Port/Place",
+        "Timezone",
+        "Component Spare Code"
+      ];
+      for (const field of optionalFields) {
+        if (row[field] !== void 0 && row[field] !== null && String(row[field]).trim() !== "") {
+          normalized[field] = row[field];
+        }
+      }
+    } else if (type === "store-history") {
+      const itemCode = row["Item Code"];
+      if (!itemCode || String(itemCode).trim() === "") {
+        errors.push(`Row ${rowNum}: Item Code is required`);
+      } else {
+        const itemCodeStr = String(itemCode).trim();
+        normalized["Item Code"] = itemCodeStr;
+        if (vesselStoresByItemCode.size > 0 && !vesselStoresByItemCode.has(itemCodeStr)) {
+          errors.push(`Row ${rowNum}: Item Code '${itemCodeStr}' not found in vessel's stores register`);
+        }
+      }
+      const eventType = row["Event Type"];
+      const validStoreEventTypes = ["RECEIVE", "CONSUME", "ADJUST", "TRANSFER_IN", "TRANSFER_OUT"];
+      if (!eventType || String(eventType).trim() === "") {
+        errors.push(`Row ${rowNum}: Event Type is required`);
+      } else {
+        const evtNorm = String(eventType).trim().toUpperCase();
+        if (!validStoreEventTypes.includes(evtNorm)) {
+          errors.push(`Row ${rowNum}: Event Type '${eventType}' is invalid. Accepted values: RECEIVE, CONSUME, ADJUST, TRANSFER_IN, TRANSFER_OUT`);
+        } else {
+          normalized["Event Type"] = evtNorm;
+        }
+      }
+      const quantity = row["Quantity"];
+      if (quantity === void 0 || quantity === null || String(quantity).trim() === "") {
+        errors.push(`Row ${rowNum}: Quantity is required`);
+      } else {
+        const qtyNum = Number(String(quantity).trim());
+        if (isNaN(qtyNum) || qtyNum <= 0) {
+          errors.push(`Row ${rowNum}: Quantity must be a positive number greater than zero (got '${quantity}')`);
+        } else {
+          normalized["Quantity"] = qtyNum;
+        }
+      }
+      const robAfter = row["ROB After"];
+      if (robAfter === void 0 || robAfter === null || String(robAfter).trim() === "") {
+        errors.push(`Row ${rowNum}: ROB After is required`);
+      } else {
+        const robNum = Number(String(robAfter).trim());
+        if (isNaN(robNum) || robNum < 0) {
+          errors.push(`Row ${rowNum}: ROB After must be a non-negative number (got '${robAfter}')`);
+        } else {
+          normalized["ROB After"] = robNum;
+        }
+      }
+      if (!row["Date"] && row["Date"] !== 0) {
+        errors.push(`Row ${rowNum}: Date is required`);
+      } else {
+        normalized["Date"] = row["Date"];
+      }
+      if (!row["Vessel Code"] || String(row["Vessel Code"]).trim() === "") {
+        errors.push(`Row ${rowNum}: Vessel Code is required`);
+      } else {
+        const rowVesselCode = String(row["Vessel Code"]).trim();
+        normalized["Vessel Code"] = rowVesselCode;
+        if (vesselId && rowVesselCode.toUpperCase() !== vesselId.trim().toUpperCase()) {
+          errors.push(`Row ${rowNum}: Vessel Code '${rowVesselCode}' does not match selected vessel '${vesselId}'. All rows must belong to the same vessel.`);
+        }
+      }
+      const storeOptionalFields = ["Location", "Remarks", "Reference", "Port/Place", "Timezone", "Performed By"];
+      for (const field of storeOptionalFields) {
+        if (row[field] !== void 0 && row[field] !== null && String(row[field]).trim() !== "") {
+          normalized[field] = row[field];
+        }
+      }
     } else if (type === "jobs") {
       if (!row["WO Title"] || String(row["WO Title"]).trim() === "") {
         continue;
@@ -51410,11 +54764,11 @@ async function validateData(type, data, mode, vesselId) {
       if (row["Fleet Equipment Name"]) {
         normalized["Fleet Equipment Name"] = String(row["Fleet Equipment Name"]).trim();
       }
-      const validMaintenanceBasis = ["Calendar", "Running Hours"];
+      const validMaintenanceBasis = ["Calendar", "Running Hours", "Dual Frequency"];
       if (!row["Maintenance Basis"]) {
-        errors.push(`Row ${rowNum}: Maintenance Basis is required (must be 'Calendar' or 'Running Hours')`);
+        errors.push(`Row ${rowNum}: Maintenance Basis is required (must be 'Calendar', 'Running Hours', or 'Dual Frequency')`);
       } else if (!validMaintenanceBasis.includes(row["Maintenance Basis"])) {
-        errors.push(`Row ${rowNum}: Invalid Maintenance Basis '${row["Maintenance Basis"]}'. Must be 'Calendar' or 'Running Hours'`);
+        errors.push(`Row ${rowNum}: Invalid Maintenance Basis '${row["Maintenance Basis"]}'. Must be 'Calendar', 'Running Hours', or 'Dual Frequency'`);
       } else {
         normalized["Maintenance Basis"] = row["Maintenance Basis"];
       }
@@ -51450,6 +54804,26 @@ async function validateData(type, data, mode, vesselId) {
         normalized["Unit"] = "Hours";
         if (!row["Interval Running Hours"] && row["Interval Value"]) {
           normalized["Interval Running Hours"] = String(row["Interval Value"]).trim();
+        }
+      } else if (maintenanceBasis === "Dual Frequency") {
+        const validCalendarUnits = ["Hours", "Days", "Weeks", "Months", "Years"];
+        if (!row["Unit"]) {
+          errors.push(`Row ${rowNum}: Unit is REQUIRED for Dual Frequency (calendar leg). Allowed: ${validCalendarUnits.join(", ")}`);
+        } else if (!validCalendarUnits.includes(row["Unit"])) {
+          errors.push(`Row ${rowNum}: Invalid Unit '${row["Unit"]}' for Dual Frequency. Allowed: ${validCalendarUnits.join(", ")}`);
+        } else {
+          normalized["Unit"] = row["Unit"];
+        }
+        const dualIntervalRH = row["Interval Running Hours"];
+        if (!dualIntervalRH || String(dualIntervalRH).trim() === "") {
+          errors.push(`Row ${rowNum}: Interval Running Hours is REQUIRED for Dual Frequency jobs (RH leg)`);
+        } else {
+          const dualRH = parseFloat(String(dualIntervalRH).trim());
+          if (isNaN(dualRH) || dualRH <= 0) {
+            errors.push(`Row ${rowNum}: Interval Running Hours must be a positive number for Dual Frequency (got: '${dualIntervalRH}')`);
+          } else {
+            normalized["Interval Running Hours"] = String(dualRH);
+          }
         }
       }
       const validTaskTypes = ["Inspection", "Overhaul", "Service", "Test", "Renew/Replace", "Measurement/Calibration", "Megger Test", "Cleaning", "Lubrication", "Survey", "Analysis", "Checks"];
@@ -52027,10 +55401,75 @@ function createRecordSnapshot(record) {
 }
 
 // server/modules/bulk-upload/services/importService.ts
+init_workOrderRepository();
 init_sync();
+async function writeOneLocation(spareId, spareUuid, vesselId, locationName, delta, userId, touchedStockKeys, recordOpeningBalance, out) {
+  if (delta == null) return;
+  const loc = await storage.findOrCreateLocation(vesselId, locationName.trim(), userId);
+  const key = `${spareId}:${loc.id}`;
+  const existingStock = await storage.getSpareLocationStockItem(spareId, loc.id);
+  const preQty = existingStock?.qty ?? 0;
+  const alreadyTouched = touchedStockKeys.has(key);
+  let newQty;
+  let createTx;
+  if (alreadyTouched) {
+    newQty = preQty + delta;
+    createTx = recordOpeningBalance && delta > 0;
+  } else {
+    newQty = delta;
+    createTx = recordOpeningBalance && existingStock == null && delta > 0;
+  }
+  if (newQty < 0) newQty = 0;
+  const totalBefore = await storage.getSpareRobTotal(spareId);
+  await storage.upsertSpareLocationStock({
+    vesselId,
+    spareId,
+    spareUuid,
+    locationId: loc.id,
+    qty: newQty
+  });
+  touchedStockKeys.add(key);
+  if (existingStock == null && !alreadyTouched) {
+    out.stockRowsCreated++;
+  } else {
+    out.stockRowsUpdated++;
+  }
+  if (createTx) {
+    const qtyChange = newQty - preQty;
+    await storage.createInventoryTransaction({
+      vesselId,
+      spareId,
+      spareUuid,
+      locationId: loc.id,
+      eventType: "ADJUST",
+      qtyChange,
+      robTotalBefore: totalBefore,
+      robTotalAfter: totalBefore + qtyChange,
+      robLocationBefore: preQty,
+      robLocationAfter: newQty,
+      referenceType: "OTHER",
+      referenceNote: "Opening balance from Excel import",
+      userId
+    });
+    out.txCreated++;
+    console.log(`\u{1F4CA} Opening-balance tx for spare ${spareId} at ${locationName}: ${preQty} \u2192 ${newQty} (\u0394${qtyChange})`);
+  }
+}
 async function processSpareInventory(params) {
-  const { spareId, spareUuid, vesselId, componentId, locationAName, locationBName, robLocationA, robLocationB, isNewSpare, userId } = params;
-  let linkCreated = false;
+  const {
+    spareId,
+    spareUuid,
+    vesselId,
+    componentId,
+    locationAName,
+    locationBName,
+    robLocationA,
+    robLocationB,
+    userId
+  } = params;
+  const touchedStockKeys = params.touchedStockKeys ?? /* @__PURE__ */ new Set();
+  const recordOpeningBalance = params.recordOpeningBalance ?? true;
+  const out = { linkCreated: false, stockRowsCreated: 0, stockRowsUpdated: 0, txCreated: 0 };
   try {
     const existingLinks = await storage.getSpareComponentLinksBySpare(spareId);
     const alreadyLinked = existingLinks.some((link) => link.componentId === componentId);
@@ -52042,7 +55481,7 @@ async function processSpareInventory(params) {
         vesselId,
         linkedBy: userId
       }, true);
-      linkCreated = true;
+      out.linkCreated = true;
       console.log(`\u{1F517} Linked spare ${spareId} to component ${componentId}`);
     }
   } catch (linkError) {
@@ -52050,78 +55489,16 @@ async function processSpareInventory(params) {
     throw linkError;
   }
   try {
-    if (locationAName && locationAName.trim()) {
-      const locationA = await storage.findOrCreateLocation(vesselId, locationAName.trim(), userId);
-      const currentTotalRobA = await storage.getSpareRobTotal(spareId);
-      const currentLocStockA = await storage.getSpareLocationStockItem(spareId, locationA.id);
-      const currentLocQtyA = currentLocStockA?.qty ?? 0;
-      if (robLocationA >= 0) {
-        await storage.upsertSpareLocationStock({
-          vesselId,
-          spareId,
-          spareUuid,
-          locationId: locationA.id,
-          qty: robLocationA
-        });
-        if (isNewSpare && robLocationA > 0) {
-          const newTotalRobA = currentTotalRobA + robLocationA;
-          await storage.createInventoryTransaction({
-            vesselId,
-            spareId,
-            spareUuid,
-            locationId: locationA.id,
-            eventType: "ADJUST",
-            qtyChange: robLocationA,
-            robTotalBefore: currentTotalRobA,
-            robTotalAfter: newTotalRobA,
-            robLocationBefore: currentLocQtyA,
-            robLocationAfter: robLocationA,
-            referenceType: "OTHER",
-            referenceNote: "Opening balance from Excel import",
-            userId
-          });
-          console.log(`\u{1F4CA} Created opening balance for spare ${spareId} at ${locationAName}: ${robLocationA}`);
-        }
-      }
+    if (locationAName && locationAName.trim() && robLocationA != null && robLocationA >= 0) {
+      await writeOneLocation(spareId, spareUuid, vesselId, locationAName, robLocationA, userId, touchedStockKeys, recordOpeningBalance, out);
     }
-    if (locationBName && locationBName.trim()) {
-      const locationB = await storage.findOrCreateLocation(vesselId, locationBName.trim(), userId);
-      const currentTotalRobB = await storage.getSpareRobTotal(spareId);
-      const currentLocStockB = await storage.getSpareLocationStockItem(spareId, locationB.id);
-      const currentLocQtyB = currentLocStockB?.qty ?? 0;
-      if (robLocationB >= 0) {
-        await storage.upsertSpareLocationStock({
-          vesselId,
-          spareId,
-          spareUuid,
-          locationId: locationB.id,
-          qty: robLocationB
-        });
-        if (isNewSpare && robLocationB > 0) {
-          const newTotalRobB = currentTotalRobB + robLocationB;
-          await storage.createInventoryTransaction({
-            vesselId,
-            spareId,
-            spareUuid,
-            locationId: locationB.id,
-            eventType: "ADJUST",
-            qtyChange: robLocationB,
-            robTotalBefore: currentTotalRobB,
-            robTotalAfter: newTotalRobB,
-            robLocationBefore: currentLocQtyB,
-            robLocationAfter: robLocationB,
-            referenceType: "OTHER",
-            referenceNote: "Opening balance from Excel import",
-            userId
-          });
-          console.log(`\u{1F4CA} Created opening balance for spare ${spareId} at ${locationBName}: ${robLocationB}`);
-        }
-      }
+    if (locationBName && locationBName.trim() && robLocationB != null && robLocationB >= 0) {
+      await writeOneLocation(spareId, spareUuid, vesselId, locationBName, robLocationB, userId, touchedStockKeys, recordOpeningBalance, out);
     }
   } catch (error) {
-    console.error(`\u26A0\uFE0F Error processing location/stock for spare ${spareId} (link was ${linkCreated ? "created" : "skipped"}):`, error.message);
+    console.error(`\u26A0\uFE0F Error processing location/stock for spare ${spareId} (link was ${out.linkCreated ? "created" : "skipped"}):`, error.message);
   }
-  return { linkCreated };
+  return out;
 }
 async function trackChange(importHistoryId, operation, entityType, entityId, previousData, newData) {
   const previousSnapshot = createRecordSnapshot(previousData);
@@ -52144,11 +55521,13 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
     updated: 0,
     skipped: 0,
     archived: 0,
-    jobComponentLinksCreated: 0,
     spareComponentLinksCreated: 0,
     spareComponentLinksExpected: 0,
     spareComponentLinksDbTotal: 0,
     spareComponentLinksDbDelta: 0,
+    spareLocationStockRowsCreated: 0,
+    spareLocationStockRowsUpdated: 0,
+    inventoryTransactionsCreated: 0,
     rowResults: [],
     warnings: []
   };
@@ -52199,6 +55578,17 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
         parentsToCreate.add(explicitParent);
       }
     });
+    const parentCodesToCheck = Array.from(parentsToCreate);
+    if (parentCodesToCheck.length > 0) {
+      const existingParents = await storage.getComponentsByCodes(parentCodesToCheck, vesselId);
+      existingParents.forEach((comp, code) => {
+        existingComponentsMap.set(code, comp);
+        parentsToCreate.delete(code);
+      });
+      if (existingParents.size > 0) {
+        console.log(`\u{1F4CB} Found ${existingParents.size} inferred parents already in DB \u2014 skipping creation`);
+      }
+    }
     const sortedParents = Array.from(parentsToCreate).sort((a, b) => {
       const aDepth = (a.match(/\./g) || []).length;
       const bDepth = (b.match(/\./g) || []).length;
@@ -52360,6 +55750,19 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
     let nextPartCodeNum = maxPartCodeNum + 1;
     console.log(`\u{1F522} Next auto-generated Part Code will be: PT-${String(nextPartCodeNum).padStart(6, "0")}`);
     const preImportLinkCount = await storage.getSpareComponentLinkCountByVessel(sparesVesselId);
+    const processedPartCodes = /* @__PURE__ */ new Set();
+    const touchedStockKeys = /* @__PURE__ */ new Set();
+    const parseRowRob = (val) => {
+      if (val === void 0 || val === null || val === "") return null;
+      const n = parseInt(val);
+      return Number.isFinite(n) ? n : null;
+    };
+    const accumulateInventory = (r) => {
+      if (r.linkCreated) result.spareComponentLinksCreated++;
+      result.spareLocationStockRowsCreated += r.stockRowsCreated;
+      result.spareLocationStockRowsUpdated += r.stockRowsUpdated;
+      result.inventoryTransactionsCreated += r.txCreated;
+    };
     for (let _spareIdx = 0; _spareIdx < data.length; _spareIdx++) {
       const row = data[_spareIdx];
       const _spareRowNum = row["__meta"]?.rowNumber || _spareIdx + 1;
@@ -52383,28 +55786,40 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
         if (mode === "add") {
           if (existingSpare) {
             try {
-              const existingLinks = await storage.getSpareComponentLinksBySpare(existingSpare.id);
-              const linkAlreadyExists = existingLinks.some((link) => link.componentId === component.cuuid);
               result.spareComponentLinksExpected++;
-              if (!linkAlreadyExists) {
-                await storage.createSpareComponentLink({
-                  vesselId: sparesVesselId,
-                  spareId: existingSpare.id,
-                  spareUuid: existingSpare.suuid,
-                  componentId: component.cuuid,
-                  linkedBy: "system-bulk-import"
-                }, true);
-                result.spareComponentLinksCreated++;
-                console.log(`\u{1F517} Linked spare ${partCode} to additional component ${componentCode}`);
+              const inv = await processSpareInventory({
+                spareId: existingSpare.id,
+                spareUuid: existingSpare.suuid,
+                vesselId: sparesVesselId,
+                componentId: component.cuuid,
+                locationAName: row["Location A"] ? String(row["Location A"]).trim() : null,
+                locationBName: row["Location B"] ? String(row["Location B"]).trim() : null,
+                robLocationA: parseRowRob(row["Location A - ROB"]),
+                robLocationB: parseRowRob(row["Location B - ROB"]),
+                userId: "system-import",
+                touchedStockKeys
+              });
+              accumulateInventory(inv);
+              if (row["Minimum Stock"] !== void 0 && row["Minimum Stock"] !== null && row["Minimum Stock"] !== "") {
+                result.warnings.push(`Row ${_spareRowNum}: 'Minimum Stock' was provided for partCode '${partCode}' on a link-only row, but minimum stock lives on the spare row itself (not per component or per location). The existing spare's minimum was NOT modified.`);
+              }
+              const stocked = inv.stockRowsCreated + inv.stockRowsUpdated > 0;
+              if (inv.linkCreated || stocked) {
                 result.updated++;
-                result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: "updated" });
+                const parts = [];
+                if (inv.linkCreated) parts.push(`linked to ${componentCode}`);
+                else parts.push(`already linked to ${componentCode}`);
+                if (inv.stockRowsCreated > 0) parts.push(`${inv.stockRowsCreated} stock row(s) created`);
+                if (inv.stockRowsUpdated > 0) parts.push(`${inv.stockRowsUpdated} stock row(s) updated`);
+                if (inv.txCreated > 0) parts.push(`${inv.txCreated} opening-balance tx`);
+                result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: "linked", info: parts.join("; ") });
+                console.log(`\u{1F517} Spare ${partCode}: ${parts.join("; ")}`);
               } else {
-                console.log(`\u23ED\uFE0F Spare ${partCode} already linked to component ${componentCode}, skipping`);
                 result.skipped++;
-                result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: "skipped", error: "Already linked to component" });
+                result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: "skipped", error: "Already linked to component; no stock changes from this row" });
               }
             } catch (linkError) {
-              console.warn(`\u26A0\uFE0F Failed to create spare-component link for ${partCode} -> ${componentCode}: ${linkError.message}`);
+              console.warn(`\u26A0\uFE0F Failed to process link/stock for ${partCode} -> ${componentCode}: ${linkError.message}`);
               result.skipped++;
               result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: "failed", error: linkError.message });
             }
@@ -52413,6 +55828,9 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
           const criticalVal = row["Criticality"] || row["Critical Yes/No"] || row["Criticality (Yes/No)"];
           const isActiveVal = row["Is Active"] || row["IS Active"];
           const ihmVal = row["IHM (Inventory of Hazardous Materials)"];
+          const rotationVal = row["Rotation Item"];
+          const rotationProvided = rotationVal !== void 0 && rotationVal !== null && rotationVal !== "";
+          const parsedRotation = rotationProvided ? typeof rotationVal === "boolean" ? rotationVal : ["yes", "y", "true", "1"].includes(String(rotationVal).toLowerCase().trim()) : false;
           let totalRob = 0;
           if (row["Total ROB"] !== void 0 && row["Total ROB"] !== null && row["Total ROB"] !== "") {
             totalRob = parseInt(row["Total ROB"]) || 0;
@@ -52421,8 +55839,8 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             const locBRob = parseInt(row["Location B - ROB"]) || 0;
             totalRob = locARob + locBRob;
           }
-          const robLocationAVal = parseInt(row["Location A - ROB"]) || 0;
-          const robLocationBVal = parseInt(row["Location B - ROB"]) || 0;
+          const robLocationAVal = parseRowRob(row["Location A - ROB"]);
+          const robLocationBVal = parseRowRob(row["Location B - ROB"]);
           const newSpare = await storage.createSpare({
             partCode,
             partName: String(row["Part Name"]).trim(),
@@ -52432,8 +55850,8 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             componentSpareCode: `SP-${componentCode}-${String(result.created + 1).padStart(3, "0")}`,
             critical: criticalVal === "Yes" || criticalVal === true ? "Yes" : "No",
             rob: totalRob,
-            robLocationA: robLocationAVal,
-            robLocationB: robLocationBVal,
+            robLocationA: robLocationAVal ?? 0,
+            robLocationB: robLocationBVal ?? 0,
             min: row["Minimum Stock"] ? parseInt(row["Minimum Stock"]) : 0,
             location: row["Location A"] ? String(row["Location A"]).trim() : null,
             location2: row["Location B"] ? String(row["Location B"]).trim() : null,
@@ -52452,9 +55870,11 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             ihm: ihmVal === "Yes" || ihmVal === true ? "Yes" : "No",
             remarks: row["Evidence Type"] ? String(row["Evidence Type"]).trim() : null,
             fleetEquipmentCode: row["Fleet Equipment Code"] ? String(row["Fleet Equipment Code"]).trim() : null,
+            isRotationItem: parsedRotation,
             dataScope: "vessel"
           }, true);
           sparesByPartCode.set(partCode, newSpare);
+          processedPartCodes.add(partCode);
           result.created++;
           if (importHistoryId) {
             await trackChange(importHistoryId, "created", "spare", String(newSpare.id), null, newSpare);
@@ -52469,10 +55889,10 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             locationBName: row["Location B"] ? String(row["Location B"]).trim() : null,
             robLocationA: robLocationAVal,
             robLocationB: robLocationBVal,
-            isNewSpare: true,
-            userId: "system-import"
+            userId: "system-import",
+            touchedStockKeys
           });
-          if (addNewResult.linkCreated) result.spareComponentLinksCreated++;
+          accumulateInventory(addNewResult);
           result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: "created" });
           console.log(`\u2705 Created spare: ${partCode} - ${newSpare.partName}`);
         } else if (mode === "update") {
@@ -52482,9 +55902,38 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: "skipped", error: "Part Code not found for update" });
             continue;
           }
+          if (processedPartCodes.has(partCode)) {
+            result.spareComponentLinksExpected++;
+            const subResult = await processSpareInventory({
+              spareId: existingSpare.id,
+              spareUuid: existingSpare.suuid,
+              vesselId: sparesVesselId,
+              componentId: component.cuuid,
+              locationAName: row["Location A"] ? String(row["Location A"]).trim() : null,
+              locationBName: row["Location B"] ? String(row["Location B"]).trim() : null,
+              robLocationA: parseRowRob(row["Location A - ROB"]),
+              robLocationB: parseRowRob(row["Location B - ROB"]),
+              userId: "system-import",
+              touchedStockKeys
+            });
+            accumulateInventory(subResult);
+            if (row["Minimum Stock"] !== void 0 && row["Minimum Stock"] !== null && row["Minimum Stock"] !== "") {
+              result.warnings.push(`Row ${_spareRowNum}: 'Minimum Stock' was provided for partCode '${partCode}' but was NOT applied \u2014 spare row was already updated by an earlier row in this import (minimum stock is a single per-spare value).`);
+            }
+            result.updated++;
+            const parts = [`linked to ${componentCode}${subResult.linkCreated ? "" : " (already linked)"}`];
+            if (subResult.stockRowsCreated > 0) parts.push(`${subResult.stockRowsCreated} stock row(s) created`);
+            if (subResult.stockRowsUpdated > 0) parts.push(`${subResult.stockRowsUpdated} stock row(s) updated`);
+            if (subResult.txCreated > 0) parts.push(`${subResult.txCreated} opening-balance tx`);
+            result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: "linked", info: `subsequent row for ${partCode}: ${parts.join("; ")}` });
+            continue;
+          }
           const criticalValUpdate = row["Criticality"] || row["Critical Yes/No"] || row["Criticality (Yes/No)"];
           const isActiveValUpdate = row["Is Active"] || row["IS Active"];
           const ihmValUpdate = row["IHM (Inventory of Hazardous Materials)"];
+          const rotationValUpdate = row["Rotation Item"];
+          const rotationProvidedUpdate = rotationValUpdate !== void 0 && rotationValUpdate !== null && rotationValUpdate !== "";
+          const parsedRotationUpdate = rotationProvidedUpdate ? typeof rotationValUpdate === "boolean" ? rotationValUpdate : ["yes", "y", "true", "1"].includes(String(rotationValUpdate).toLowerCase().trim()) : existingSpare.isRotationItem;
           let totalRobUpdate = existingSpare.rob;
           if (row["Total ROB"] !== void 0 && row["Total ROB"] !== null && row["Total ROB"] !== "") {
             totalRobUpdate = parseInt(row["Total ROB"]) || 0;
@@ -52493,8 +55942,8 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             const locBRob = parseInt(row["Location B - ROB"]) || 0;
             totalRobUpdate = locARob + locBRob;
           }
-          const robLocationAUpdate = row["Location A - ROB"] !== void 0 ? parseInt(row["Location A - ROB"]) || 0 : existingSpare.robLocationA;
-          const robLocationBUpdate = row["Location B - ROB"] !== void 0 ? parseInt(row["Location B - ROB"]) || 0 : existingSpare.robLocationB;
+          const robLocationAUpdate = parseRowRob(row["Location A - ROB"]) ?? existingSpare.robLocationA ?? null;
+          const robLocationBUpdate = parseRowRob(row["Location B - ROB"]) ?? existingSpare.robLocationB ?? null;
           const updatedSpare = await storage.updateSpare(existingSpare.suuid, {
             partName: String(row["Part Name"]).trim(),
             componentId: component.cuuid,
@@ -52520,9 +55969,11 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             isActive: isActiveValUpdate === "Yes" || isActiveValUpdate === true ? true : isActiveValUpdate === "No" ? false : existingSpare.isActive,
             ihm: ihmValUpdate === "Yes" || ihmValUpdate === true ? "Yes" : ihmValUpdate === "No" ? "No" : existingSpare.ihm,
             remarks: row["Evidence Type"] ? String(row["Evidence Type"]).trim() : existingSpare.remarks,
-            fleetEquipmentCode: row["Fleet Equipment Code"] ? String(row["Fleet Equipment Code"]).trim() : existingSpare.fleetEquipmentCode
+            fleetEquipmentCode: row["Fleet Equipment Code"] ? String(row["Fleet Equipment Code"]).trim() : existingSpare.fleetEquipmentCode,
+            isRotationItem: parsedRotationUpdate
           }, true);
           sparesByPartCode.set(partCode, updatedSpare);
+          processedPartCodes.add(partCode);
           result.updated++;
           if (importHistoryId) {
             await trackChange(importHistoryId, "updated", "spare", String(updatedSpare.id), existingSpare, updatedSpare);
@@ -52537,16 +55988,19 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             locationBName: row["Location B"] ? String(row["Location B"]).trim() : existingSpare.location2,
             robLocationA: robLocationAUpdate,
             robLocationB: robLocationBUpdate,
-            isNewSpare: false,
-            userId: "system-import"
+            userId: "system-import",
+            touchedStockKeys
           });
-          if (updateResult.linkCreated) result.spareComponentLinksCreated++;
+          accumulateInventory(updateResult);
           result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: "updated" });
           console.log(`\u{1F504} Updated spare: ${partCode} - ${updatedSpare.partName}`);
         } else if (mode === "upsert") {
           const criticalValUpsert = row["Criticality"] || row["Critical Yes/No"] || row["Criticality (Yes/No)"];
           const isActiveValUpsert = row["Is Active"] || row["IS Active"];
           const ihmValUpsert = row["IHM (Inventory of Hazardous Materials)"];
+          const rotationValUpsert = row["Rotation Item"];
+          const rotationProvidedUpsert = rotationValUpsert !== void 0 && rotationValUpsert !== null && rotationValUpsert !== "";
+          const parsedRotationUpsert = rotationProvidedUpsert ? typeof rotationValUpsert === "boolean" ? rotationValUpsert : ["yes", "y", "true", "1"].includes(String(rotationValUpsert).toLowerCase().trim()) : null;
           let totalRobUpsert = 0;
           if (row["Total ROB"] !== void 0 && row["Total ROB"] !== null && row["Total ROB"] !== "") {
             totalRobUpsert = parseInt(row["Total ROB"]) || 0;
@@ -52555,9 +56009,41 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             const locBRob = parseInt(row["Location B - ROB"]) || 0;
             totalRobUpsert = locARob + locBRob;
           }
-          const robLocationAUpsert = parseInt(row["Location A - ROB"]) || 0;
-          const robLocationBUpsert = parseInt(row["Location B - ROB"]) || 0;
+          const robLocationAUpsert = parseRowRob(row["Location A - ROB"]);
+          const robLocationBUpsert = parseRowRob(row["Location B - ROB"]);
           if (existingSpare) {
+            if (processedPartCodes.has(partCode)) {
+              try {
+                result.spareComponentLinksExpected++;
+                const subUpsert = await processSpareInventory({
+                  spareId: existingSpare.id,
+                  spareUuid: existingSpare.suuid,
+                  vesselId: sparesVesselId,
+                  componentId: component.cuuid,
+                  locationAName: row["Location A"] ? String(row["Location A"]).trim() : null,
+                  locationBName: row["Location B"] ? String(row["Location B"]).trim() : null,
+                  robLocationA: robLocationAUpsert,
+                  robLocationB: robLocationBUpsert,
+                  userId: "system-import",
+                  touchedStockKeys
+                });
+                accumulateInventory(subUpsert);
+                if (row["Minimum Stock"] !== void 0 && row["Minimum Stock"] !== null && row["Minimum Stock"] !== "") {
+                  result.warnings.push(`Row ${_spareRowNum}: 'Minimum Stock' was provided for partCode '${partCode}' but was NOT applied \u2014 spare row was already updated by an earlier row in this import (minimum stock is a single per-spare value).`);
+                }
+                result.updated++;
+                const parts = [`linked to ${componentCode}${subUpsert.linkCreated ? "" : " (already linked)"}`];
+                if (subUpsert.stockRowsCreated > 0) parts.push(`${subUpsert.stockRowsCreated} stock row(s) created`);
+                if (subUpsert.stockRowsUpdated > 0) parts.push(`${subUpsert.stockRowsUpdated} stock row(s) updated`);
+                if (subUpsert.txCreated > 0) parts.push(`${subUpsert.txCreated} opening-balance tx`);
+                result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: "linked", info: `subsequent row for ${partCode}: ${parts.join("; ")}` });
+              } catch (subErr) {
+                console.warn(`\u26A0\uFE0F Failed subsequent-row processing for ${partCode} -> ${componentCode}: ${subErr.message}`);
+                result.skipped++;
+                result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: "failed", error: subErr.message });
+              }
+              continue;
+            }
             try {
               const existingLinks = await storage.getSpareComponentLinksBySpare(existingSpare.id);
               const linkAlreadyExists = existingLinks.some((link) => link.componentId === component.cuuid);
@@ -52580,8 +56066,8 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
                 componentName: component.name || "",
                 critical: criticalValUpsert === "Yes" || criticalValUpsert === true ? "Yes" : "No",
                 rob: totalRobUpsert || existingSpare.rob,
-                robLocationA: row["Location A - ROB"] !== void 0 ? robLocationAUpsert : existingSpare.robLocationA,
-                robLocationB: row["Location B - ROB"] !== void 0 ? robLocationBUpsert : existingSpare.robLocationB,
+                robLocationA: robLocationAUpsert ?? existingSpare.robLocationA,
+                robLocationB: robLocationBUpsert ?? existingSpare.robLocationB,
                 min: row["Minimum Stock"] ? parseInt(row["Minimum Stock"]) : existingSpare.min,
                 location: row["Location A"] ? String(row["Location A"]).trim() : existingSpare.location,
                 location2: row["Location B"] ? String(row["Location B"]).trim() : existingSpare.location2,
@@ -52598,25 +56084,30 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
                 isActive: isActiveValUpsert === "Yes" || isActiveValUpsert === true ? true : isActiveValUpsert === "No" ? false : existingSpare.isActive,
                 ihm: ihmValUpsert === "Yes" || ihmValUpsert === true ? "Yes" : ihmValUpsert === "No" ? "No" : existingSpare.ihm,
                 remarks: row["Evidence Type"] ? String(row["Evidence Type"]).trim() : existingSpare.remarks,
-                fleetEquipmentCode: row["Fleet Equipment Code"] ? String(row["Fleet Equipment Code"]).trim() : existingSpare.fleetEquipmentCode
+                fleetEquipmentCode: row["Fleet Equipment Code"] ? String(row["Fleet Equipment Code"]).trim() : existingSpare.fleetEquipmentCode,
+                isRotationItem: parsedRotationUpsert !== null ? parsedRotationUpsert : existingSpare.isRotationItem
               }, true);
               sparesByPartCode.set(partCode, updatedSpare);
+              processedPartCodes.add(partCode);
               result.updated++;
               if (importHistoryId) {
                 await trackChange(importHistoryId, "updated", "spare", String(updatedSpare.id), existingSpare, updatedSpare);
               }
-              await processSpareInventory({
+              const upsertExistingInv = await processSpareInventory({
                 spareId: updatedSpare.id,
                 spareUuid: updatedSpare.suuid,
                 vesselId: sparesVesselId,
                 componentId: component.cuuid,
                 locationAName: row["Location A"] ? String(row["Location A"]).trim() : existingSpare.location,
                 locationBName: row["Location B"] ? String(row["Location B"]).trim() : existingSpare.location2,
-                robLocationA: row["Location A - ROB"] !== void 0 ? robLocationAUpsert : existingSpare.robLocationA,
-                robLocationB: row["Location B - ROB"] !== void 0 ? robLocationBUpsert : existingSpare.robLocationB,
-                isNewSpare: false,
-                userId: "system-import"
+                robLocationA: robLocationAUpsert ?? existingSpare.robLocationA ?? null,
+                robLocationB: robLocationBUpsert ?? existingSpare.robLocationB ?? null,
+                userId: "system-import",
+                touchedStockKeys
               });
+              result.spareLocationStockRowsCreated += upsertExistingInv.stockRowsCreated;
+              result.spareLocationStockRowsUpdated += upsertExistingInv.stockRowsUpdated;
+              result.inventoryTransactionsCreated += upsertExistingInv.txCreated;
               result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: "updated" });
               console.log(`\u{1F504} Updated spare (upsert): ${partCode} - ${updatedSpare.partName}`);
             } catch (linkError) {
@@ -52634,8 +56125,8 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
               componentSpareCode: `SP-${componentCode}-${String(result.created + 1).padStart(3, "0")}`,
               critical: criticalValUpsert === "Yes" || criticalValUpsert === true ? "Yes" : "No",
               rob: totalRobUpsert,
-              robLocationA: robLocationAUpsert,
-              robLocationB: robLocationBUpsert,
+              robLocationA: robLocationAUpsert ?? 0,
+              robLocationB: robLocationBUpsert ?? 0,
               min: row["Minimum Stock"] ? parseInt(row["Minimum Stock"]) : 0,
               location: row["Location A"] ? String(row["Location A"]).trim() : null,
               location2: row["Location B"] ? String(row["Location B"]).trim() : null,
@@ -52654,9 +56145,11 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
               ihm: ihmValUpsert === "Yes" || ihmValUpsert === true ? "Yes" : "No",
               remarks: row["Evidence Type"] ? String(row["Evidence Type"]).trim() : null,
               fleetEquipmentCode: row["Fleet Equipment Code"] ? String(row["Fleet Equipment Code"]).trim() : null,
+              isRotationItem: parsedRotationUpsert === true,
               dataScope: "vessel"
             }, true);
             sparesByPartCode.set(partCode, newSpare);
+            processedPartCodes.add(partCode);
             result.created++;
             if (importHistoryId) {
               await trackChange(importHistoryId, "created", "spare", String(newSpare.id), null, newSpare);
@@ -52671,10 +56164,10 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
               locationBName: row["Location B"] ? String(row["Location B"]).trim() : null,
               robLocationA: robLocationAUpsert,
               robLocationB: robLocationBUpsert,
-              isNewSpare: true,
-              userId: "system-import"
+              userId: "system-import",
+              touchedStockKeys
             });
-            if (upsertNewResult.linkCreated) result.spareComponentLinksCreated++;
+            accumulateInventory(upsertNewResult);
             result.rowResults.push({ rowNumber: _spareRowNum, primaryIdentifier: partCode, action: "created" });
             console.log(`\u2705 Created spare (upsert): ${partCode} - ${newSpare.partName}`);
           }
@@ -52981,6 +56474,399 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
       }
     }
     console.log(`\u2705 Work-orders import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.archived} archived`);
+  } else if (type === "wo-history") {
+    console.log(`\u{1F680} Starting wo-history import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);
+    const parseExcelDate = (val) => {
+      if (val === void 0 || val === null || val === "") return null;
+      if (typeof val === "number") {
+        const utcMs = Math.round((val - 25569) * 86400 * 1e3);
+        const d2 = new Date(utcMs);
+        if (isNaN(d2.getTime())) return null;
+        return d2.toISOString().split("T")[0];
+      }
+      const s = String(val).trim();
+      if (!s) return null;
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+      const mmmMap = {
+        jan: "01",
+        feb: "02",
+        mar: "03",
+        apr: "04",
+        may: "05",
+        jun: "06",
+        jul: "07",
+        aug: "08",
+        sep: "09",
+        oct: "10",
+        nov: "11",
+        dec: "12"
+      };
+      const mmmMatch = s.match(/^(\d{1,2})[-\/\s]([a-zA-Z]{3})[-\/\s](\d{4})$/);
+      if (mmmMatch) {
+        const mm = mmmMap[mmmMatch[2].toLowerCase()];
+        if (mm) return `${mmmMatch[3]}-${mm}-${mmmMatch[1].padStart(2, "0")}`;
+      }
+      return s;
+    };
+    const allExistingWOs = await storage.getWorkOrders(vesselId);
+    const woByNumber = new Map(
+      allExistingWOs.filter((wo) => wo.workOrderNo).map((wo) => [String(wo.workOrderNo).trim(), wo])
+    );
+    const allCompCodes = data.map((row) => String(row["Component Code"] || "").trim()).filter(Boolean);
+    const componentsByCode = await storage.getComponentsByCodes(allCompCodes, vesselId);
+    const allJobs = await storage.getJobs(vesselId);
+    for (let _idx = 0; _idx < data.length; _idx++) {
+      const row = data[_idx];
+      const _rowNum = row["__meta"]?.rowNumber || _idx + 1;
+      const woNumber = String(row["WO Number"] || "").trim();
+      const compCode = String(row["Component Code"] || "").trim();
+      const jobTitle = String(row["Job Title"] || "").trim();
+      try {
+        const component = componentsByCode.get(compCode) || componentsByCode.get(compCode.toUpperCase());
+        if (!component) {
+          result.skipped++;
+          result.rowResults.push({
+            rowNumber: _rowNum,
+            primaryIdentifier: woNumber,
+            action: "failed",
+            error: `Component Code '${compCode}' not found in vessel`
+          });
+          _emitProgress("Processing WO History\u2026");
+          continue;
+        }
+        const matchingJob = allJobs.find(
+          (j) => j.componentId === component.cuuid && j.jobTitle === jobTitle
+        ) || allJobs.find(
+          (j) => j.componentCode === compCode && j.jobTitle === jobTitle
+        );
+        const dateCompleted = parseExcelDate(row["Date Completed"]);
+        const dueDate = parseExcelDate(row["WO Due Date"]) || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+        const nextDueDate = parseExcelDate(row["Next Due Date"]);
+        const approvalDate = parseExcelDate(row["Job Approved By"] ? row["Date Completed"] : null);
+        const status = String(row["Status"] || "Completed").trim();
+        const maintenanceType = String(row["Maintenance Type"] || "").trim();
+        const performedBy = String(row["Performed By"] || "").trim();
+        const approver = row["Job Approved By"] ? String(row["Job Approved By"]).trim() : null;
+        const workDone = row["WO Description"] ? String(row["WO Description"]).trim() : null;
+        const remarks = row["Remarks"] ? String(row["Remarks"]).trim() : null;
+        const sparesUsed = row["Spare Parts Used"] ? String(row["Spare Parts Used"]).trim() : null;
+        const rhAtCompletion = row["Running Hours at Completion"] != null ? String(row["Running Hours at Completion"]).trim() : null;
+        const dueRhSnapshot = row["WO Due Hour"] != null ? String(row["WO Due Hour"]).trim() : null;
+        const nextDueHour = row["Next Due Hour"] != null ? String(row["Next Due Hour"]).trim() : null;
+        const existingWO2 = woByNumber.get(woNumber);
+        let savedWO;
+        const woPayload = {
+          vesselId,
+          component: component.description || component.name || compCode,
+          componentCode: compCode,
+          jobId: matchingJob?.juuid || matchingJob?.id || null,
+          workOrderNo: woNumber,
+          templateCode: woNumber,
+          jobTitle,
+          assignedTo: performedBy || "",
+          approver: approver || void 0,
+          dueDate,
+          status,
+          taskType: maintenanceType || null,
+          briefWorkDescription: workDone || void 0,
+          isExecution: true,
+          dataScope: "vessel",
+          // Correct work_orders schema field names (see shared/schema.ts)
+          dateCompleted: dateCompleted || void 0,
+          // text("date_completed")
+          performedBy: performedBy || void 0,
+          // text("performed_by")
+          workCarriedOut: workDone || void 0,
+          // text("work_carried_out")
+          remarks: remarks || void 0,
+          // text("remarks")
+          nextDueDate: nextDueDate || void 0,
+          // text("next_due_date")
+          nextDueReading: nextDueHour || void 0,
+          // text("next_due_reading")
+          runningHours: rhAtCompletion || void 0,
+          // text("running_hours") — RH at completion
+          dueRhSnapshot: dueRhSnapshot ? parseFloat(dueRhSnapshot) || void 0 : void 0
+          // decimal
+        };
+        if (!existingWO2) {
+          if (mode === "update") {
+            result.skipped++;
+            result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: woNumber, action: "skipped", error: "WO not found for update" });
+            _emitProgress("Processing WO History\u2026");
+            continue;
+          }
+          savedWO = await storage.createWorkOrder(woPayload);
+          woByNumber.set(woNumber, savedWO);
+          result.created++;
+          result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: woNumber, action: "created" });
+        } else {
+          if (mode === "add") {
+            result.skipped++;
+            result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: woNumber, action: "skipped", error: "WO already exists" });
+            _emitProgress("Processing WO History\u2026");
+            continue;
+          }
+          savedWO = await storage.updateWorkOrder(existingWO2.id, woPayload);
+          woByNumber.set(woNumber, savedWO);
+          result.updated++;
+          result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: woNumber, action: "updated" });
+        }
+        const workOrderUuid = savedWO?.wouuid || existingWO2?.wouuid;
+        if (workOrderUuid) {
+          try {
+            const existingHistory = await findMaintenanceHistoryByWorkOrderId(workOrderUuid);
+            if (!existingHistory) {
+              const historyPayload = {
+                componentId: component.cuuid,
+                componentCode: compCode,
+                vesselCode: vesselId,
+                jobId: matchingJob?.juuid || matchingJob?.id || null,
+                jobCode: matchingJob?.jobNo || null,
+                workOrderId: workOrderUuid,
+                workOrderNo: woNumber,
+                jobTitle,
+                maintenanceType: maintenanceType || "Servicing",
+                dateCompleted: dateCompleted || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+                runningHoursAtCompletion: rhAtCompletion || null,
+                performedBy: performedBy || "Unknown",
+                approvedBy: approver || null,
+                approvalDate: approver && dateCompleted ? dateCompleted : null,
+                status: "Approved",
+                workDescription: workDone || null,
+                sparesUsed: sparesUsed || null,
+                remarks: remarks || "Imported from history",
+                isComponentReplaced: false,
+                missedCycles: 0,
+                originalDueDate: dueDate || null
+              };
+              await createMaintenanceHistory(historyPayload);
+              console.log(`\u2705 Created maintenance history for WO ${woNumber} (component: ${compCode})`);
+            } else {
+              console.log(`\u2139\uFE0F Maintenance history already exists for WO ${woNumber}, skipping`);
+            }
+          } catch (histErr) {
+            console.error(`\u26A0\uFE0F Failed to write maintenance history for WO ${woNumber}:`, histErr.message);
+          }
+        }
+      } catch (rowErr) {
+        console.error(`\u274C Error processing wo-history row ${_idx + 1} (WO: ${woNumber}):`, rowErr.message);
+        result.skipped++;
+        result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: woNumber, action: "failed", error: rowErr.message });
+      } finally {
+        _emitProgress("Processing WO History\u2026");
+      }
+    }
+    console.log(`\u2705 WO History import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
+  } else if (type === "spare-history") {
+    const spareHistVesselId = vesselId || "V001";
+    console.log(`\u{1F680} Starting spare-history import: ${data.length} rows, mode: ${mode}, vesselId: ${spareHistVesselId}`);
+    const parseShDate = (val) => {
+      if (val === void 0 || val === null || val === "") return null;
+      if (typeof val === "number") {
+        const utcMs = Math.round((val - 25569) * 86400 * 1e3);
+        const d2 = new Date(utcMs);
+        if (isNaN(d2.getTime())) return null;
+        return d2.toISOString().split("T")[0];
+      }
+      const s = String(val).trim();
+      if (!s) return null;
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+      const mmmMap = {
+        jan: "01",
+        feb: "02",
+        mar: "03",
+        apr: "04",
+        may: "05",
+        jun: "06",
+        jul: "07",
+        aug: "08",
+        sep: "09",
+        oct: "10",
+        nov: "11",
+        dec: "12"
+      };
+      const mmmMatch = s.match(/^(\d{1,2})[-\/\s]([a-zA-Z]{3})[-\/\s](\d{4})$/);
+      if (mmmMatch) {
+        const mm = mmmMap[mmmMatch[2].toLowerCase()];
+        if (mm) return `${mmmMatch[3]}-${mm}-${mmmMatch[1].padStart(2, "0")}`;
+      }
+      return s;
+    };
+    const allSpares = await storage.getSpares(spareHistVesselId);
+    const sparesByPartCode = new Map(allSpares.map((s) => [String(s.partCode).trim(), s]));
+    console.log(`\u{1F4CB} Loaded ${allSpares.length} spares for vessel ${spareHistVesselId}`);
+    const allComponents = await storage.getComponents(spareHistVesselId);
+    const componentsByCode = new Map(allComponents.map((c) => [String(c.componentCode).trim(), c]));
+    for (let _shIdx = 0; _shIdx < data.length; _shIdx++) {
+      const row = data[_shIdx];
+      const _shRowNum = row["__meta"]?.rowNumber || _shIdx + 1;
+      const partCode = String(row["Part Code"] || "").trim();
+      try {
+        const spare = sparesByPartCode.get(partCode);
+        if (!spare) {
+          result.skipped++;
+          result.rowResults.push({
+            rowNumber: _shRowNum,
+            primaryIdentifier: partCode,
+            action: "failed",
+            error: `Part Code '${partCode}' not found in vessel spares register`
+          });
+          _emitProgress("Processing Spare History\u2026");
+          continue;
+        }
+        const eventType = String(row["Event Type"] || "").trim().toUpperCase();
+        const rawQty = parseInt(String(row["Quantity"] || "0"), 10) || 0;
+        const qtyChange = eventType === "CONSUME" ? -Math.abs(rawQty) : Math.abs(rawQty);
+        const robAfter = parseInt(String(row["ROB After"] || "0"), 10) || 0;
+        const dateStr = parseShDate(row["Date"]);
+        const timestampUTC = dateStr ? new Date(dateStr) : /* @__PURE__ */ new Date();
+        const componentCodeFromRow = row["Component Code"] ? String(row["Component Code"]).trim() : null;
+        const component = componentCodeFromRow ? componentsByCode.get(componentCodeFromRow) || componentsByCode.get(componentCodeFromRow.toUpperCase()) : null;
+        const componentId = spare.componentId || component?.cuuid || "";
+        const componentCode = spare.componentCode || componentCodeFromRow || "";
+        const componentName = spare.componentName || component?.name || component?.description || "";
+        const historyPayload = {
+          timestampUTC,
+          vesselId: spareHistVesselId,
+          spareId: spare.id,
+          spareUuid: spare.suuid,
+          partCode: spare.partCode,
+          partName: spare.partName || spare.name || partCode,
+          componentId,
+          componentCode: componentCode || null,
+          componentName: componentName || "",
+          componentSpareCode: row["Component Spare Code"] ? String(row["Component Spare Code"]).trim() : spare.componentSpareCode || null,
+          eventType,
+          qtyChange,
+          robAfter,
+          userId: row["Performed By"] ? String(row["Performed By"]).trim() : "system",
+          remarks: row["Remarks"] ? String(row["Remarks"]).trim() : null,
+          reference: row["Reference"] ? String(row["Reference"]).trim() : null,
+          dateLocal: dateStr || null,
+          tz: row["Timezone"] ? String(row["Timezone"]).trim() : null,
+          place: row["Port/Place"] ? String(row["Port/Place"]).trim() : null
+        };
+        await storage.createSpareHistory(historyPayload);
+        result.created++;
+        result.rowResults.push({ rowNumber: _shRowNum, primaryIdentifier: partCode, action: "created" });
+        console.log(`\u2705 Created spare history: ${partCode} | ${eventType} | qty: ${qtyChange} | robAfter: ${robAfter}`);
+      } catch (rowErr) {
+        console.error(`\u274C Error processing spare-history row ${_shIdx + 1} (Part: ${partCode}):`, rowErr.message);
+        result.skipped++;
+        result.rowResults.push({ rowNumber: _shRowNum, primaryIdentifier: partCode, action: "failed", error: rowErr.message });
+      } finally {
+        _emitProgress("Processing Spare History\u2026");
+      }
+    }
+    console.log(`\u2705 Spare History import complete: ${result.created} created, ${result.skipped} skipped`);
+  } else if (type === "store-history") {
+    const storeHistVesselId = vesselId || "V001";
+    console.log(`\u{1F680} Starting store-history import: ${data.length} rows, mode: ${mode}, vesselId: ${storeHistVesselId}`);
+    const parseStDate = (val) => {
+      if (val === void 0 || val === null || val === "") return null;
+      if (typeof val === "number") {
+        const utcMs = Math.round((val - 25569) * 86400 * 1e3);
+        const d2 = new Date(utcMs);
+        if (isNaN(d2.getTime())) return null;
+        return d2.toISOString().split("T")[0];
+      }
+      const s = String(val).trim();
+      if (!s) return null;
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+      const mmmMap = {
+        jan: "01",
+        feb: "02",
+        mar: "03",
+        apr: "04",
+        may: "05",
+        jun: "06",
+        jul: "07",
+        aug: "08",
+        sep: "09",
+        oct: "10",
+        nov: "11",
+        dec: "12"
+      };
+      const mmmMatch = s.match(/^(\d{1,2})[-\/\s]([a-zA-Z]{3})[-\/\s](\d{4})$/);
+      if (mmmMatch) {
+        const mm = mmmMap[mmmMatch[2].toLowerCase()];
+        if (mm) return `${mmmMatch[3]}-${mm}-${mmmMatch[1].padStart(2, "0")}`;
+      }
+      return s;
+    };
+    const allStoresItems = await storage.getStoresItems(storeHistVesselId);
+    const storesByItemCode = new Map(allStoresItems.map((s) => [String(s.itemCode).trim(), s]));
+    console.log(`\u{1F4CB} Loaded ${allStoresItems.length} stores items for vessel ${storeHistVesselId}`);
+    for (let _idx = 0; _idx < data.length; _idx++) {
+      const row = data[_idx];
+      const _rowNum = row["__meta"]?.rowNumber || _idx + 1;
+      const itemCode = String(row["Item Code"] || "").trim();
+      try {
+        const storeItem = storesByItemCode.get(itemCode);
+        if (!storeItem) {
+          result.skipped++;
+          result.rowResults.push({
+            rowNumber: _rowNum,
+            primaryIdentifier: itemCode,
+            action: "failed",
+            error: `Item Code '${itemCode}' not found in vessel stores register`
+          });
+          _emitProgress("Processing Store History\u2026");
+          continue;
+        }
+        const eventType = String(row["Event Type"] || "").trim().toUpperCase();
+        const rawQty = Number(String(row["Quantity"] || "0").trim()) || 0;
+        const isOutflow = eventType === "CONSUME" || eventType === "TRANSFER_OUT";
+        const qtyChange = isOutflow ? -Math.abs(rawQty) : Math.abs(rawQty);
+        const robAfter = Number(String(row["ROB After"] || "0").trim()) || 0;
+        const dateStr = parseStDate(row["Date"]);
+        const timestampUTC = dateStr ? new Date(dateStr) : /* @__PURE__ */ new Date();
+        const mmmNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+        const dateObj = dateStr ? new Date(dateStr) : /* @__PURE__ */ new Date();
+        const dateLocal = `${String(dateObj.getUTCDate()).padStart(2, "0")}-${mmmNames[dateObj.getUTCMonth()]}-${dateObj.getUTCFullYear()}`;
+        const tz = row["Timezone"] ? String(row["Timezone"]).trim() : "UTC";
+        const userId2 = row["Performed By"] ? String(row["Performed By"]).trim() : "system-import";
+        const locationNote = row["Location"] ? String(row["Location"]).trim() : null;
+        const userRemarks = row["Remarks"] ? String(row["Remarks"]).trim() : null;
+        const remarks = locationNote ? userRemarks ? `[Location: ${locationNote}] ${userRemarks}` : `[Location: ${locationNote}]` : userRemarks || null;
+        const ledgerPayload = {
+          vesselId: storeHistVesselId,
+          section: storeItem.itemType || "stores",
+          itemId: storeItem.id,
+          storeUuid: storeItem.stuuid,
+          partCode: storeItem.itemCode,
+          itemName: storeItem.itemName,
+          uom: storeItem.uom || null,
+          eventType,
+          qtyChangeBase: String(qtyChange),
+          qtyDisplay: String(qtyChange),
+          uomDisplay: storeItem.uom || null,
+          robAfterBase: String(robAfter),
+          dateLocal,
+          tz,
+          timestampUTC,
+          place: row["Port/Place"] ? String(row["Port/Place"]).trim() : null,
+          ref: row["Reference"] ? String(row["Reference"]).trim() : null,
+          userId: userId2,
+          remarks
+        };
+        await storage.createStoresLedgerEntryForImport(ledgerPayload);
+        result.created++;
+        result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: itemCode, action: "created" });
+        console.log(`\u2705 Created store history: ${itemCode} | ${eventType} | qty: ${qtyChange} | robAfter: ${robAfter}`);
+      } catch (rowErr) {
+        console.error(`\u274C Error processing store-history row ${_idx + 1} (Item: ${itemCode}):`, rowErr.message);
+        result.skipped++;
+        result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: itemCode, action: "failed", error: rowErr.message });
+      } finally {
+        _emitProgress("Processing Store History\u2026");
+      }
+    }
+    console.log(`\u2705 Store History import complete: ${result.created} created, ${result.skipped} skipped`);
   } else if (type === "jobs") {
     console.log(`\u{1F680} Starting jobs import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);
     const getJobUniqueKey = (vesselIdVal, componentCodeVal, jobNoVal) => {
@@ -53038,7 +56924,7 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
         const frequencyUnit = row["Unit"] ? String(row["Unit"]).trim() : null;
         const maintenanceBasis = row["Maintenance Basis"];
         let nextDueDate = null;
-        if (maintenanceBasis === "Calendar" && lastDoneDate && frequencyValue && frequencyUnit) {
+        if ((maintenanceBasis === "Calendar" || maintenanceBasis === "Dual Frequency") && lastDoneDate && frequencyValue && frequencyUnit) {
           nextDueDate = calculateNextDueDate(lastDoneDate, frequencyValue, frequencyUnit);
         }
         let nextDueRH = null;
@@ -53051,12 +56937,13 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
         } else if (maintenanceBasis === "Running Hours" && frequencyValue) {
           intervalRH = Number(frequencyValue);
         }
-        if (maintenanceBasis === "Running Hours") {
+        if (maintenanceBasis === "Running Hours" || maintenanceBasis === "Dual Frequency") {
           if (intervalRH === null || isNaN(intervalRH) || intervalRH <= 0) {
             result.skipped++;
             const _jobCode2 = row["Job Code"] ? String(row["Job Code"]).trim() : `row-${_jobRowNum}`;
-            result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: _jobCode2, action: "skipped", error: "Invalid or missing Interval Running Hours (must be > 0)" });
-            console.warn(`\u26A0\uFE0F Skipping RH job for component ${componentCode}: Invalid or missing Interval Running Hours (must be > 0)`);
+            const basisLabel = maintenanceBasis === "Dual Frequency" ? "Dual Frequency" : "RH";
+            result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: _jobCode2, action: "skipped", error: `Invalid or missing Interval Running Hours (must be > 0 for ${basisLabel} jobs)` });
+            console.warn(`\u26A0\uFE0F Skipping ${basisLabel} job for component ${componentCode}: Invalid or missing Interval Running Hours (must be > 0)`);
             continue;
           }
           const rawLastDoneRH = row["Last Done RH"];
@@ -53204,6 +57091,20 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
         }
         const compositeKey = getJobUniqueKey(canonicalVesselId, componentCode, jobData.jobNo);
         const existingJob = jobsByCompositeKey.get(compositeKey);
+        if (maintenanceBasis === "Dual Frequency") {
+          const rhType = (component.rhCounterType || "").toUpperCase();
+          if (rhType !== "MASTER" && rhType !== "INHERITED") {
+            console.warn(`\u26A0\uFE0F D3 BLOCK: Job ${jobData.jobNo} row ${_jobRowNum} \u2014 Dual Frequency requires component RH Counter Type MASTER or INHERITED, got "${component.rhCounterType || "not set"}"`);
+            result.skipped++;
+            result.rowResults.push({
+              rowNumber: _jobRowNum,
+              primaryIdentifier: jobData.jobNo,
+              action: "skipped",
+              error: `Dual Frequency requires component "${component.name}" to have RH Counter Type Master or Inherited (current: ${component.rhCounterType || "not set"})`
+            });
+            continue;
+          }
+        }
         if (mode === "add") {
           if (!existingJob) {
             const newJobData = { ...jobData, ...componentFields };
@@ -53212,19 +57113,6 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             jobsByCompositeKey.set(newKey, createdJob);
             result.created++;
             result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: "created" });
-            try {
-              await storage.createJobComponentLink({
-                vesselId: canonicalVesselId,
-                jobId: createdJob.id,
-                componentId: component.cuuid,
-                componentCode,
-                linkedBy: "system-bulk-import"
-              });
-              result.jobComponentLinksCreated++;
-              console.log(`\u{1F517} Created job ${createdJob.jobNo} for component ${componentCode}`);
-            } catch (linkError) {
-              console.warn(`\u26A0\uFE0F Job created but failed to create job-component link: ${linkError.message}`);
-            }
             if (importHistoryId) {
               const canonicalJob = await storage.getJob(createdJob.id);
               await trackChange(importHistoryId, "created", "job", createdJob.id, null, canonicalJob);
@@ -53236,23 +57124,6 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
           }
         } else if (mode === "update") {
           if (existingJob) {
-            try {
-              const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
-              const linkAlreadyExists = existingLinks.some((link) => link.componentId === component.cuuid);
-              if (!linkAlreadyExists) {
-                await storage.createJobComponentLink({
-                  vesselId: canonicalVesselId,
-                  jobId: existingJob.id,
-                  componentId: component.cuuid,
-                  componentCode,
-                  linkedBy: "system-bulk-import"
-                });
-                result.jobComponentLinksCreated++;
-                console.log(`\u{1F517} Linked job ${jobData.jobNo} to component ${componentCode} (update mode)`);
-              }
-            } catch (linkError) {
-              console.warn(`\u26A0\uFE0F Failed to create job-component link: ${linkError.message}`);
-            }
             const previousSnapshot = createRecordSnapshot(existingJob);
             const updatedJob = await storage.updateJob(existingJob.id, jobData);
             const updateKey = getJobUniqueKey(canonicalVesselId, componentCode, updatedJob.jobNo);
@@ -53269,34 +57140,15 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
           }
         } else if (mode === "upsert") {
           if (existingJob) {
-            try {
-              const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
-              const linkAlreadyExists = existingLinks.some((link) => link.componentId === component.cuuid);
-              if (!linkAlreadyExists) {
-                await storage.createJobComponentLink({
-                  vesselId: canonicalVesselId,
-                  jobId: existingJob.id,
-                  componentId: component.cuuid,
-                  componentCode,
-                  linkedBy: "system-bulk-import"
-                });
-                result.jobComponentLinksCreated++;
-                console.log(`\u{1F517} Linked job ${jobData.jobNo} to component ${componentCode} (upsert mode)`);
-              }
-              const previousSnapshot = createRecordSnapshot(existingJob);
-              const updatedJob = await storage.updateJob(existingJob.id, jobData);
-              const upsertKey = getJobUniqueKey(canonicalVesselId, componentCode, updatedJob.jobNo);
-              jobsByCompositeKey.set(upsertKey, updatedJob);
-              result.updated++;
-              result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: "updated" });
-              if (importHistoryId) {
-                const canonicalJob = await storage.getJob(updatedJob.id);
-                await trackChange(importHistoryId, "updated", "job", updatedJob.id, existingJob, canonicalJob);
-              }
-            } catch (linkError) {
-              console.warn(`\u26A0\uFE0F Failed to process job-component link for ${jobData.jobNo} -> ${componentCode}: ${linkError.message}`);
-              result.skipped++;
-              result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: "failed", error: linkError.message });
+            const previousSnapshot = createRecordSnapshot(existingJob);
+            const updatedJob = await storage.updateJob(existingJob.id, jobData);
+            const upsertKey = getJobUniqueKey(canonicalVesselId, componentCode, updatedJob.jobNo);
+            jobsByCompositeKey.set(upsertKey, updatedJob);
+            result.updated++;
+            result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: "updated" });
+            if (importHistoryId) {
+              const canonicalJob = await storage.getJob(updatedJob.id);
+              await trackChange(importHistoryId, "updated", "job", updatedJob.id, existingJob, canonicalJob);
             }
           } else {
             const newJobData = { ...jobData, ...componentFields };
@@ -53305,19 +57157,6 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
             jobsByCompositeKey.set(newKey, createdJob);
             result.created++;
             result.rowResults.push({ rowNumber: _jobRowNum, primaryIdentifier: jobData.jobNo, action: "created" });
-            try {
-              await storage.createJobComponentLink({
-                vesselId: canonicalVesselId,
-                jobId: createdJob.id,
-                componentId: component.cuuid,
-                componentCode,
-                linkedBy: "system-bulk-import"
-              });
-              result.jobComponentLinksCreated++;
-              console.log(`\u{1F517} Created job ${createdJob.jobNo} for component ${componentCode}`);
-            } catch (linkError) {
-              console.warn(`\u26A0\uFE0F Job created but failed to create job-component link: ${linkError.message}`);
-            }
             if (importHistoryId) {
               const canonicalJob = await storage.getJob(createdJob.id);
               await trackChange(importHistoryId, "created", "job", createdJob.id, null, canonicalJob);
@@ -53359,7 +57198,7 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
         }
       }
     }
-    console.log(`\u2705 Jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.archived} archived, ${result.jobComponentLinksCreated || 0} job-component links created`);
+    console.log(`\u2705 Jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.archived} archived`);
   } else if (type === "makers") {
     console.log(`\u{1F680} Starting makers import: ${data.length} rows, mode: ${mode}`);
     const existingMakers = await storage.getMakerList();
@@ -53853,7 +57692,8 @@ async function createComponentFromRow(row, vesselId) {
       makerName = maker.makerName;
     }
   }
-  const departmentValue = row["Equipment / System Department"] || row["Eqpt / System Department"] || null;
+  const rawDeptValue = row["Equipment / System Department"] || row["Eqpt / System Department"] || null;
+  const departmentValue = rawDeptValue && rawDeptValue.toLowerCase() === "null" ? null : rawDeptValue;
   const criticalValue = row["Criticality"] ?? row["Critical Yes/No"] ?? row["Critical (Yes/No)"];
   const isCritical = criticalValue === true || criticalValue === "Yes";
   const conditionBasedValue = row["Condition Based"] ?? row["Condition Based Yes/No"] ?? row["Condition Based (Yes/No)"];
@@ -53974,8 +57814,9 @@ async function updateComponentFromRow(componentCode, row, vesselId, existingComp
   if (modelCodeValue) updateData.modelCode = modelCodeValue;
   if (row["Serial No"]) updateData.serialNo = row["Serial No"];
   if (row["Drawing No"]) updateData.drawingNo = row["Drawing No"];
-  const deptValue = row["Equipment / System Department"] || row["Eqpt / System Department"];
-  if (deptValue) {
+  const rawUpdateDeptValue = row["Equipment / System Department"] || row["Eqpt / System Department"];
+  const deptValue = rawUpdateDeptValue && rawUpdateDeptValue.toLowerCase() === "null" ? null : rawUpdateDeptValue;
+  if (rawUpdateDeptValue !== void 0) {
     updateData.department = deptValue;
     updateData.deptCategory = deptValue;
     updateData.equipmentDepartment = deptValue;
@@ -54246,8 +58087,44 @@ async function getTemplate3(req, res) {
       return res.status(500).json({ error: "Failed to generate template" });
     }
   }
+  if (type === "wo-history") {
+    try {
+      const buffer2 = await generateWoHistoryTemplate();
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", 'attachment; filename="wo_history_template.xlsx"');
+      res.send(buffer2);
+      return;
+    } catch (error) {
+      console.error("Error generating wo-history template:", error);
+      return res.status(500).json({ error: "Failed to generate WO history template" });
+    }
+  }
+  if (type === "spare-history") {
+    try {
+      const buffer2 = await generateSpareHistoryTemplate();
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", 'attachment; filename="spare_history_template.xlsx"');
+      res.send(buffer2);
+      return;
+    } catch (error) {
+      console.error("Error generating spare-history template:", error);
+      return res.status(500).json({ error: "Failed to generate spare history template" });
+    }
+  }
+  if (type === "store-history") {
+    try {
+      const buffer2 = await generateStoreHistoryTemplate();
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", 'attachment; filename="store_history_template.xlsx"');
+      res.send(buffer2);
+      return;
+    } catch (error) {
+      console.error("Error generating store-history template:", error);
+      return res.status(500).json({ error: "Failed to generate store history template" });
+    }
+  }
   if (!["components", "spares", "stores", "work-orders", "jobs", "makers", "fleet-components", "fleet-jobs", "fleet-spares"].includes(type)) {
-    return res.status(400).json({ error: "Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-components, fleet-jobs, fleet-spares" });
+    return res.status(400).json({ error: "Invalid template type. Valid types: components, spares, stores, work-orders, jobs, makers, fleet-components, fleet-jobs, fleet-spares, wo-history, spare-history, store-history" });
   }
   const defaultVesselId = vesselId || "V001";
   const workbook = XLSX4.utils.book_new();
@@ -54348,7 +58225,8 @@ async function getTemplate3(req, res) {
         "Minimum Stock",
         "Is Active",
         "IHM (Inventory of Hazardous Materials)",
-        "Evidence Type"
+        "Evidence Type",
+        "Rotation Item"
       ];
       validValues = [
         "Text (Part ID)",
@@ -54377,7 +58255,8 @@ async function getTemplate3(req, res) {
         "Number >= 0",
         "Yes/No",
         "Yes/No",
-        "Text (Evidence type)"
+        "Text (Evidence type)",
+        "Yes/No"
       ];
       example = [];
       break;
@@ -54914,7 +58793,7 @@ async function dryRun(req, res) {
     const sheetBasedType = sheetName ? getTypeFromSheetName(sheetName) : null;
     const type = sheetBasedType || requestedType;
     console.log(`\u{1F4CB} Type determination: requested='${requestedType}', sheetName='${sheetName}', sheetBasedType='${sheetBasedType}', effective='${type}'`);
-    if (!["components", "spares", "stores", "work-orders", "jobs", "makers", "fleet-components", "fleet-jobs", "fleet-spares"].includes(type)) {
+    if (!["components", "spares", "stores", "work-orders", "jobs", "makers", "fleet-components", "fleet-jobs", "fleet-spares", "wo-history", "spare-history", "store-history"].includes(type)) {
       return res.status(400).json({ error: "Invalid type" });
     }
     if (!["add", "update", "upsert"].includes(mode)) {
@@ -55112,6 +58991,15 @@ data: ${JSON.stringify(data)}
 
 `);
   };
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(`: keepalive ${Date.now()}
+
+`);
+    } catch (_e) {
+    }
+  }, 15e3);
+  req.on("close", () => clearInterval(heartbeat));
   try {
     const { fileToken, type, mode, archiveMissing, vesselId, rowIndices, storeType } = req.body;
     console.log(`\u{1F4E6} [IMPORT_STREAM] Type: ${type}, Mode: ${mode}, VesselId: ${vesselId}, FileToken: ${fileToken ? "present" : "missing"}`);
@@ -55132,7 +59020,7 @@ data: ${JSON.stringify(data)}
     }
     const effectiveType = cachedData.type || type;
     const totalRows = dataToImport.length;
-    sendEvent("progress", { processed: 0, total: totalRows, remaining: totalRows, percent: 0, status: "Initializing Import\u2026", errors: 0 });
+    sendEvent("progress", { processed: 0, total: totalRows, remaining: totalRows, percent: 0, status: "Initializing Import\u2026", errors: 0, historyId });
     await storeImportHistory({
       id: historyId,
       type: effectiveType,
@@ -55195,6 +59083,8 @@ data: ${JSON.stringify(data)}
     }
     sendEvent("error", { message: error?.message || "Unknown error" });
     res.end();
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 async function doLocationsImportStream(req, res) {
@@ -55209,6 +59099,15 @@ data: ${JSON.stringify(data)}
 
 `);
   };
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(`: keepalive ${Date.now()}
+
+`);
+    } catch (_e) {
+    }
+  }, 15e3);
+  req.on("close", () => clearInterval(heartbeat));
   try {
     const file = req.file;
     if (!file) {
@@ -55282,6 +59181,35 @@ data: ${JSON.stringify(data)}
     console.error("Error importing locations (stream):", error);
     sendEvent("error", { message: error?.message || "Failed to import locations" });
     res.end();
+  } finally {
+    clearInterval(heartbeat);
+  }
+}
+var UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+async function getImportStatus(req, res) {
+  try {
+    const { id } = req.params;
+    if (!id || !UUID_RE.test(id)) {
+      return res.status(400).json({ error: "Invalid import id" });
+    }
+    const history = await getImportHistoryById(id);
+    if (!history) {
+      return res.status(404).json({ error: "Import history not found" });
+    }
+    res.json({
+      id: history.id,
+      status: history.status,
+      created: history.created ?? 0,
+      updated: history.updated ?? 0,
+      skipped: history.skipped ?? 0,
+      archived: history.archived ?? 0,
+      startedAt: history.startedAt,
+      completedAt: history.completedAt ?? null,
+      originalName: history.originalName
+    });
+  } catch (error) {
+    console.error("getImportStatus error:", error);
+    res.status(500).json({ error: "Failed to fetch import status" });
   }
 }
 async function getHistoryList(req, res) {
@@ -56185,6 +60113,7 @@ router14.post("/bulk/import", asyncHandler(doImport));
 router14.post("/bulk/import-stream", asyncHandler(doImportStream));
 router14.post("/bulk/export-summary", asyncHandler(exportSummary));
 router14.get("/bulk/history", asyncHandler(getHistoryList));
+router14.get("/bulk/import-status/:id", asyncHandler(getImportStatus));
 router14.get("/bulk/history/:id/download-original", asyncHandler(downloadOriginal));
 router14.get("/bulk/history/:id/:fileType", asyncHandler(getHistoryFileHandler));
 router14.post("/bulk/undo/:historyId", asyncHandler(undoImport));
@@ -60484,8 +64413,748 @@ var routes_default20 = router20;
 // server/modules/index.ts
 init_routes();
 
-// server/modules/noon-report/routes.ts
+// server/modules/dashboard/routes.ts
+init_middleware();
 import { Router as Router21 } from "express";
+
+// server/modules/dashboard/services/maintenanceTrendService.ts
+init_storage();
+init_status();
+init_constants();
+
+// shared/workOrders/pointInTimeStatus.ts
+init_status();
+function toDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+  const normalized = normalizeDueDateString(value);
+  if (normalized) {
+    const m = normalized.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+    if (m) {
+      const dd = parseInt(m[1], 10);
+      const mIdx = MONTH_SHORT.findIndex((s) => s.toLowerCase() === m[2].toLowerCase());
+      const yyyy = parseInt(m[3], 10);
+      if (mIdx >= 0) return new Date(Date.UTC(yyyy, mIdx, dd));
+    }
+  }
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
+var MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function normalizeDueDateString(value) {
+  if (!value) return null;
+  if (/^\d{1,2}-[A-Za-z]{3}-\d{4}$/.test(value)) return value;
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+    const d2 = new Date(value);
+    if (isNaN(d2.getTime())) return null;
+    return `${String(d2.getUTCDate()).padStart(2, "0")}-${MONTH_SHORT[d2.getUTCMonth()]}-${d2.getUTCFullYear()}`;
+  }
+  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(value)) {
+    const [dd, mm, yyyy] = value.split("-").map((p) => parseInt(p, 10));
+    if (mm >= 1 && mm <= 12) {
+      return `${String(dd).padStart(2, "0")}-${MONTH_SHORT[mm - 1]}-${yyyy}`;
+    }
+  }
+  const d = new Date(value);
+  if (!isNaN(d.getTime())) {
+    return `${String(d.getUTCDate()).padStart(2, "0")}-${MONTH_SHORT[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
+  }
+  return null;
+}
+function parseNumber(value) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return isNaN(n) ? null : n;
+}
+function findActivePostponementAt(postponements, refDate) {
+  if (!postponements || postponements.length === 0) return null;
+  const eligible = postponements.filter((p) => {
+    const normalizedStatus = (p.status || "").toLowerCase().trim();
+    if (normalizedStatus !== "approved") return false;
+    const approved = toDate(p.approvedDate) || toDate(p.submittedDate) || toDate(p.createdAt);
+    if (!approved) return false;
+    return approved <= refDate;
+  });
+  if (eligible.length === 0) return null;
+  eligible.sort((a, b) => {
+    const numDiff = (b.postponementNumber || 0) - (a.postponementNumber || 0);
+    if (numDiff !== 0) return numDiff;
+    const aDate = toDate(a.approvedDate) || toDate(a.submittedDate) || toDate(a.createdAt);
+    const bDate = toDate(b.approvedDate) || toDate(b.submittedDate) || toDate(b.createdAt);
+    const at = aDate ? aDate.getTime() : 0;
+    const bt = bDate ? bDate.getTime() : 0;
+    return bt - at;
+  });
+  return eligible[0];
+}
+function computePointInTimeStatus(input) {
+  const { wo, postponements = [], refDate } = input;
+  const completionDt = toDate(wo.completionDateTime);
+  if (completionDt && completionDt <= refDate) {
+    return "Completed";
+  }
+  const woId = wo.wouuid || wo.id;
+  const woPostponements = woId ? postponements.filter((p) => p.workOrderId === woId) : [];
+  const activePostponement = findActivePostponementAt(woPostponements, refDate);
+  const effectiveDueDate = activePostponement?.newDueDate ?? (woPostponements.length > 0 ? wo.originalDueDate ?? wo.dueDate ?? null : wo.dueDate ?? wo.originalDueDate ?? null);
+  const computed = computeWorkOrderStatus({
+    dueDate: normalizeDueDateString(effectiveDueDate),
+    dueRH: parseNumber(wo.nextDueReading),
+    currentRH: parseNumber(wo.currentReading),
+    isExecution: wo.isExecution ?? false,
+    status: "Active",
+    // neutral — let the date math decide
+    completionDateTime: null,
+    maintenanceBasis: wo.maintenanceBasis || "Calendar",
+    vesselGraceSettings: input.vesselGraceSettings,
+    companyGraceConfig: input.companyGraceConfig,
+    calendarLeadTimeDays: input.calendarLeadTimeDays,
+    rhLeadTimeHours: input.rhLeadTimeHours,
+    referenceDate: refDate
+  });
+  if (computed === "Overdue") return "Overdue";
+  if (activePostponement) return "Postponed";
+  return "Outstanding";
+}
+function getWorkOrderBucketMonth(wo) {
+  const raw = wo.originalDueDate || wo.dueDate || null;
+  if (!raw) return null;
+  const d = toDate(raw);
+  if (!d) return null;
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() };
+}
+
+// server/modules/dashboard/services/maintenanceTrendService.ts
+var MONTH_SHORT2 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function buildVesselGraceSettings4(vesselSettings) {
+  if (!vesselSettings) {
+    return {
+      calendarGraceMode: "COMPANY_STANDARD",
+      calendarGraceDays: WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+      rhGraceHours: WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS
+    };
+  }
+  return {
+    calendarGraceMode: vesselSettings.calendarGraceMode || "COMPANY_STANDARD",
+    calendarGraceDays: vesselSettings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+    rhGraceHours: vesselSettings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+    rhLeadTimeHours: vesselSettings.rhLeadTimeHours
+  };
+}
+function monthEndUTC(year, monthIndex0) {
+  return new Date(Date.UTC(year, monthIndex0 + 1, 0, 23, 59, 59, 999));
+}
+function emptyMonthDatum(year, monthIndex0) {
+  return {
+    month: `${MONTH_SHORT2[monthIndex0]} ${year}`,
+    monthShort: MONTH_SHORT2[monthIndex0],
+    year,
+    monthIndex: monthIndex0,
+    totalPlanned: 0,
+    completed: 0,
+    outstanding: 0,
+    overdue: 0,
+    postponed: 0,
+    completedPercent: 0,
+    outstandingPercent: 0,
+    overduePercent: 0,
+    postponedPercent: 0
+  };
+}
+function finalizePercentages(d) {
+  if (d.totalPlanned > 0) {
+    d.completedPercent = Math.round(d.completed / d.totalPlanned * 100);
+    d.outstandingPercent = Math.round(d.outstanding / d.totalPlanned * 100);
+    d.overduePercent = Math.round(d.overdue / d.totalPlanned * 100);
+    d.postponedPercent = Math.round(d.postponed / d.totalPlanned * 100);
+  }
+}
+async function getMaintenanceTrend(options) {
+  const monthsBack = options.monthsBack ?? 6;
+  const today = /* @__PURE__ */ new Date();
+  const endYear = options.endMonth?.year ?? today.getUTCFullYear();
+  const endMonth0 = options.endMonth?.monthIndex0 ?? today.getUTCMonth();
+  const buckets = [];
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(endYear, endMonth0 - i, 1));
+    const y = d.getUTCFullYear();
+    const m = d.getUTCMonth();
+    buckets.push({ year: y, monthIndex0: m, key: `${y}-${m}` });
+  }
+  const isAll = !options.vesselId || options.vesselId === "all";
+  const workOrders2 = await storage.getWorkOrders(
+    isAll ? "all" : options.vesselId,
+    isAll ? options.vesselIds : void 0
+  );
+  const postponements = await storage.getWorkOrderPostponements(
+    isAll ? "all" : options.vesselId,
+    void 0,
+    isAll ? options.vesselIds : void 0
+  );
+  const companyGraceRow = await storage.getCompanyStandardGraceSettings();
+  const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
+  const vesselGraceCache = /* @__PURE__ */ new Map();
+  const getVesselGrace = async (vid) => {
+    if (!vid) return void 0;
+    if (vesselGraceCache.has(vid)) return vesselGraceCache.get(vid);
+    const settings = await storage.getPmsVesselSettings(vid);
+    const built = buildVesselGraceSettings4(settings);
+    vesselGraceCache.set(vid, built);
+    return built;
+  };
+  const bucketIndex = /* @__PURE__ */ new Map();
+  const months = buckets.map((b) => {
+    const datum = emptyMonthDatum(b.year, b.monthIndex0);
+    bucketIndex.set(b.key, datum);
+    return datum;
+  });
+  const vesselWOs = workOrders2.filter((wo) => {
+    if (wo.dataScope && wo.dataScope !== "vessel") return false;
+    if (wo.isExecution) return false;
+    return true;
+  });
+  for (const wo of vesselWOs) {
+    const bucket = getWorkOrderBucketMonth(wo);
+    if (!bucket) continue;
+    const key = `${bucket.year}-${bucket.month}`;
+    const datum = bucketIndex.get(key);
+    if (!datum) continue;
+    datum.totalPlanned += 1;
+    const monthEnd = monthEndUTC(datum.year, datum.monthIndex);
+    const evalDate = monthEnd > today ? today : monthEnd;
+    const vesselGrace = await getVesselGrace(wo.vesselId);
+    const status = computePointInTimeStatus({
+      wo,
+      postponements,
+      refDate: evalDate,
+      vesselGraceSettings: vesselGrace,
+      companyGraceConfig
+    });
+    if (status === "Completed") datum.completed += 1;
+    else if (status === "Postponed") datum.postponed += 1;
+    else if (status === "Overdue") datum.overdue += 1;
+    else datum.outstanding += 1;
+  }
+  months.forEach(finalizePercentages);
+  const current = months[months.length - 1]?.outstandingPercent ?? 0;
+  const prev = months[months.length - 2]?.outstandingPercent ?? 0;
+  return { months, delta: current - prev };
+}
+
+// server/modules/dashboard/services/woStatusByPeriodService.ts
+init_storage();
+init_status();
+init_constants();
+function buildVesselGraceSettings5(vesselSettings) {
+  if (!vesselSettings) {
+    return {
+      calendarGraceMode: "COMPANY_STANDARD",
+      calendarGraceDays: WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+      rhGraceHours: WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS
+    };
+  }
+  return {
+    calendarGraceMode: vesselSettings.calendarGraceMode || "COMPANY_STANDARD",
+    calendarGraceDays: vesselSettings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+    rhGraceHours: vesselSettings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+    rhLeadTimeHours: vesselSettings.rhLeadTimeHours
+  };
+}
+var MONTH_NAMES2 = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec"
+];
+function normalizeDueDateString2(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    if (isNaN(value.getTime())) return null;
+    return `${String(value.getUTCDate()).padStart(2, "0")}-${MONTH_NAMES2[value.getUTCMonth()]}-${value.getUTCFullYear()}`;
+  }
+  if (/^\d{1,2}-[A-Za-z]{3}-\d{4}$/.test(value)) return value;
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+    const d2 = new Date(value);
+    if (isNaN(d2.getTime())) return null;
+    return `${String(d2.getUTCDate()).padStart(2, "0")}-${MONTH_NAMES2[d2.getUTCMonth()]}-${d2.getUTCFullYear()}`;
+  }
+  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(value)) {
+    const [dd, mm, yyyy] = value.split("-").map((p) => parseInt(p, 10));
+    if (mm >= 1 && mm <= 12) {
+      return `${String(dd).padStart(2, "0")}-${MONTH_NAMES2[mm - 1]}-${yyyy}`;
+    }
+  }
+  const d = new Date(value);
+  if (!isNaN(d.getTime())) {
+    return `${String(d.getUTCDate()).padStart(2, "0")}-${MONTH_NAMES2[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
+  }
+  return null;
+}
+function toDateLoose(value) {
+  if (!value) return null;
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+  const m = value.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (m) {
+    const dd = parseInt(m[1], 10);
+    const mIdx = MONTH_NAMES2.findIndex((s) => s.toLowerCase() === m[2].toLowerCase());
+    const yyyy = parseInt(m[3], 10);
+    if (mIdx >= 0) return new Date(Date.UTC(yyyy, mIdx, dd));
+  }
+  const m2 = value.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (m2) {
+    const dd = parseInt(m2[1], 10);
+    const mm = parseInt(m2[2], 10);
+    const yyyy = parseInt(m2[3], 10);
+    if (mm >= 1 && mm <= 12) return new Date(Date.UTC(yyyy, mm - 1, dd));
+  }
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
+function emptyBuckets() {
+  return {
+    scheduled: { count: 0, woIds: [] },
+    due: { count: 0, woIds: [] },
+    overdue: { count: 0, woIds: [] },
+    postponed: { count: 0, woIds: [] },
+    completed: { count: 0, woIds: [] },
+    pendingApproval: { count: 0, woIds: [] }
+  };
+}
+function classifySlice(args) {
+  const { wo, postponements, vesselGrace, companyGrace } = args;
+  const from = args.from;
+  const to = args.to;
+  const woId = wo.wouuid || wo.id;
+  const woPostponements = woId ? postponements.filter((p) => p.workOrderId === woId) : [];
+  const today = /* @__PURE__ */ new Date();
+  const windowEnd = to < today ? to : today;
+  if (windowEnd < from) {
+  }
+  const refDates = [];
+  const pushIfInWindow = (d) => {
+    if (!d) return;
+    if (d < from || d > windowEnd) return;
+    refDates.push(d);
+  };
+  pushIfInWindow(from);
+  pushIfInWindow(windowEnd);
+  const dueDateObj = toDateLoose(wo.originalDueDate || wo.dueDate || null);
+  if (dueDateObj) {
+    pushIfInWindow(dueDateObj);
+    const graceDays = vesselGrace?.calendarGraceMode === "CUSTOM_DAYS" ? vesselGrace.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS : companyGrace.graceValue ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS;
+    const justOverdue = new Date(dueDateObj);
+    justOverdue.setUTCDate(justOverdue.getUTCDate() + graceDays + 1);
+    pushIfInWindow(justOverdue);
+  }
+  for (const p of woPostponements) {
+    pushIfInWindow(toDateLoose(p.approvedDate ?? p.submittedDate ?? p.createdAt));
+    const nd = toDateLoose(p.newDueDate ?? null);
+    if (nd) {
+      pushIfInWindow(nd);
+      const graceDays = vesselGrace?.calendarGraceMode === "CUSTOM_DAYS" ? vesselGrace.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS : companyGrace.graceValue ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS;
+      const justOverdue = new Date(nd);
+      justOverdue.setUTCDate(justOverdue.getUTCDate() + graceDays + 1);
+      pushIfInWindow(justOverdue);
+    }
+  }
+  pushIfInWindow(toDateLoose(wo.completionDateTime ?? null));
+  if (refDates.length === 0) {
+    refDates.push(today >= from && today <= to ? today : from);
+  }
+  let sawOverdue = false;
+  let sawPostponed = false;
+  let sawCompleted = false;
+  let sawDue = false;
+  let sawScheduled = false;
+  for (const r of refDates) {
+    const completion = toDateLoose(wo.completionDateTime ?? null);
+    if (completion && completion <= r) {
+      sawCompleted = true;
+      continue;
+    }
+    const activePostp = findActivePostponementAt(woPostponements, r);
+    const effectiveDue = activePostp?.newDueDate ?? (woPostponements.length > 0 ? wo.originalDueDate ?? wo.dueDate ?? null : wo.dueDate ?? wo.originalDueDate ?? null);
+    const computed = computeWorkOrderStatus({
+      dueDate: normalizeDueDateString2(effectiveDue ?? null),
+      dueRH: wo.nextDueReading != null && wo.nextDueReading !== "" ? Number(wo.nextDueReading) : null,
+      currentRH: wo.currentReading != null && wo.currentReading !== "" ? Number(wo.currentReading) : null,
+      isExecution: wo.isExecution ?? false,
+      status: "Active",
+      completionDateTime: null,
+      maintenanceBasis: wo.maintenanceBasis || "Calendar",
+      vesselGraceSettings: vesselGrace,
+      companyGraceConfig: companyGrace,
+      referenceDate: r
+    });
+    if (computed === "Overdue") {
+      sawOverdue = true;
+    } else if (activePostp) {
+      sawPostponed = true;
+    } else if (computed === "Due" || computed === "Due (Grace P)") {
+      sawDue = true;
+    } else {
+      sawScheduled = true;
+    }
+  }
+  if (sawOverdue) return "overdue";
+  if (sawPostponed) return "postponed";
+  if ((wo.status || "") === "Pending Approval") return "pendingApproval";
+  if (sawCompleted) return "completed";
+  if (sawDue) return "due";
+  if (sawScheduled) return "scheduled";
+  return "scheduled";
+}
+async function getWoStatusByPeriod(options) {
+  const ALL_TIME_FROM = new Date(Date.UTC(1970, 0, 1));
+  const ALL_TIME_TO = new Date(Date.UTC(9999, 11, 31, 23, 59, 59, 999));
+  const from = options.from ?? ALL_TIME_FROM;
+  const to = options.to ?? ALL_TIME_TO;
+  const isAllTime = !options.from || !options.to;
+  const isAll = !options.vesselId || options.vesselId === "all";
+  const workOrders2 = await storage.getWorkOrders(
+    isAll ? "all" : options.vesselId,
+    isAll ? options.vesselIds : void 0
+  );
+  const postponements = await storage.getWorkOrderPostponements(
+    isAll ? "all" : options.vesselId,
+    void 0,
+    isAll ? options.vesselIds : void 0
+  );
+  const companyGraceRow = await storage.getCompanyStandardGraceSettings();
+  const companyGrace = buildCompanyGraceConfig(
+    companyGraceRow
+  );
+  const vesselGraceCache = /* @__PURE__ */ new Map();
+  const getVesselGrace = async (vid) => {
+    if (!vid) return void 0;
+    if (vesselGraceCache.has(vid)) return vesselGraceCache.get(vid);
+    const settings = await storage.getPmsVesselSettings(vid);
+    const built = buildVesselGraceSettings5(
+      settings
+    );
+    vesselGraceCache.set(vid, built);
+    return built;
+  };
+  const vesselWOs = workOrders2.filter((wo) => {
+    if (wo.dataScope && wo.dataScope !== "vessel") return false;
+    if (wo.isExecution) return false;
+    return true;
+  });
+  const periodWOs = vesselWOs.filter((wo) => {
+    const bucket = getWorkOrderBucketMonth(wo);
+    if (!bucket) return false;
+    if (isAllTime) return true;
+    const monthEnd = new Date(
+      Date.UTC(bucket.year, bucket.month + 1, 0, 23, 59, 59, 999)
+    );
+    return monthEnd >= from && monthEnd <= to;
+  });
+  const all = emptyBuckets();
+  const critical = emptyBuckets();
+  for (const wo of periodWOs) {
+    const vesselGrace = await getVesselGrace(wo.vesselId);
+    const slice = classifySlice({
+      wo,
+      postponements,
+      from,
+      to,
+      vesselGrace,
+      companyGrace
+    });
+    const rawId = wo.wouuid ?? wo.id;
+    const woId = rawId != null ? String(rawId) : "";
+    all[slice].count += 1;
+    if (woId) all[slice].woIds.push(woId);
+    if ((wo.criticality ?? "").toLowerCase() === "yes") {
+      critical[slice].count += 1;
+      if (woId) critical[slice].woIds.push(woId);
+    }
+  }
+  const inWindow = (d) => {
+    if (isAllTime) return true;
+    if (!d) return false;
+    return d >= from && d <= to;
+  };
+  const postponedInWindowIds = /* @__PURE__ */ new Set();
+  for (const p of postponements) {
+    if (!p.workOrderId) continue;
+    const eventDate = toDateLoose(
+      p.approvedDate ?? p.submittedDate ?? p.createdAt ?? null
+    );
+    if (!inWindow(eventDate)) continue;
+    postponedInWindowIds.add(String(p.workOrderId));
+  }
+  let postponedDen = 0;
+  let postponedNum = 0;
+  let unplannedDen = 0;
+  let unplannedNum = 0;
+  const postponedNumIds = /* @__PURE__ */ new Set();
+  const unplannedNumIds = /* @__PURE__ */ new Set();
+  for (const wo of vesselWOs) {
+    const woIdRaw = wo.wouuid ?? wo.id;
+    const woIdStr = woIdRaw != null ? String(woIdRaw) : "";
+    const dueDate = toDateLoose(wo.dueDate ?? null);
+    if (inWindow(dueDate)) {
+      postponedDen += 1;
+      if (woIdStr && postponedInWindowIds.has(woIdStr)) {
+        postponedNum += 1;
+        postponedNumIds.add(woIdStr);
+      }
+    }
+    const createdAtDate = toDateLoose(
+      wo.createdAt
+    );
+    if (inWindow(createdAtDate)) {
+      unplannedDen += 1;
+      if ((wo.workOrderType ?? "") === "Unplanned") {
+        unplannedNum += 1;
+        if (woIdStr) unplannedNumIds.add(woIdStr);
+      }
+    }
+  }
+  return {
+    all,
+    critical,
+    postponedGauge: {
+      numerator: postponedNum,
+      denominator: postponedDen,
+      numeratorWoIds: Array.from(postponedNumIds)
+    },
+    unplannedGauge: {
+      numerator: unplannedNum,
+      denominator: unplannedDen,
+      numeratorWoIds: Array.from(unplannedNumIds)
+    }
+  };
+}
+
+// server/modules/dashboard/routes.ts
+var router21 = Router21();
+router21.get("/dashboard/maintenance-trend", asyncHandler(async (req, res) => {
+  const vesselId = req.query.vesselId || "all";
+  const yearParam = req.query.year ? parseInt(String(req.query.year), 10) : void 0;
+  const monthParam = req.query.month ? parseInt(String(req.query.month), 10) : void 0;
+  const vesselIdsParam = req.query.vesselIds;
+  const vesselIds = Array.isArray(vesselIdsParam) ? vesselIdsParam : typeof vesselIdsParam === "string" && vesselIdsParam.length > 0 ? vesselIdsParam.split(",").filter(Boolean) : void 0;
+  let endMonth;
+  const now = /* @__PURE__ */ new Date();
+  if (yearParam && !isNaN(yearParam)) {
+    if (monthParam && !isNaN(monthParam)) {
+      endMonth = { year: yearParam, monthIndex0: monthParam - 1 };
+    } else if (yearParam === now.getUTCFullYear()) {
+      endMonth = { year: yearParam, monthIndex0: now.getUTCMonth() };
+    } else {
+      endMonth = { year: yearParam, monthIndex0: 11 };
+    }
+  }
+  const result = await getMaintenanceTrend({ vesselId, vesselIds, endMonth });
+  res.json(result);
+}));
+router21.get("/dashboard/wo-status-by-period", asyncHandler(async (req, res) => {
+  const vesselId = req.query.vesselId || "all";
+  const fromStr = req.query.from;
+  const toStr = req.query.to;
+  let from = null;
+  let to = null;
+  if (fromStr || toStr) {
+    if (!fromStr || !toStr) {
+      return res.status(400).json({ error: "from and to must both be provided, or both omitted for all-time" });
+    }
+    from = new Date(fromStr);
+    to = new Date(toStr);
+    if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+      return res.status(400).json({ error: "invalid from or to date" });
+    }
+    if (to < from) {
+      return res.status(400).json({ error: "to must be >= from" });
+    }
+  }
+  const vesselIdsParam = req.query.vesselIds;
+  const vesselIds = Array.isArray(vesselIdsParam) ? vesselIdsParam : typeof vesselIdsParam === "string" && vesselIdsParam.length > 0 ? vesselIdsParam.split(",").filter(Boolean) : void 0;
+  const result = await getWoStatusByPeriod({ vesselId, vesselIds, from, to });
+  res.json(result);
+}));
+var routes_default21 = router21;
+
+// server/modules/shipskart/routes.ts
+init_middleware();
+import { Router as Router22 } from "express";
+
+// server/modules/shipskart/services/shipskartSsoService.ts
+init_errors();
+import crypto3 from "crypto";
+var REQUEST_TIMEOUT_MS = 15e3;
+var ShipskartRoleNotMappedError = class extends Error {
+  constructor(userRole) {
+    super(`No Shipskart externalUserId mapping for role "${userRole || "(none)"}".`);
+    this.userRole = userRole;
+    this.name = "ShipskartRoleNotMappedError";
+  }
+};
+var _cachedConfig = null;
+function getShipskartConfig() {
+  if (_cachedConfig !== null) return _cachedConfig;
+  const baseUrl = process.env.SHIPSKART_SSO_BASE_URL;
+  const apiKey = process.env.SHIPSKART_API_KEY;
+  const hmacSecret = process.env.SHIPSKART_HMAC_SECRET;
+  const tenantId = process.env.SHIPSKART_TENANT_ID;
+  const missing = [];
+  if (!baseUrl) missing.push("SHIPSKART_SSO_BASE_URL");
+  if (!apiKey) missing.push("SHIPSKART_API_KEY");
+  if (!hmacSecret) missing.push("SHIPSKART_HMAC_SECRET");
+  if (!tenantId) missing.push("SHIPSKART_TENANT_ID");
+  const hasAnyRoleMapping = !!(process.env.SHIPSKART_USER_VESSEL_ADMIN || process.env.SHIPSKART_USER_ADMIN || process.env.SHIPSKART_USER_REGULAR);
+  if (!hasAnyRoleMapping) {
+    missing.push("at least one of SHIPSKART_USER_VESSEL_ADMIN / SHIPSKART_USER_ADMIN / SHIPSKART_USER_REGULAR");
+  }
+  if (missing.length > 0) {
+    throw new AppError(
+      503,
+      `[Shipskart] Missing required environment variables: ${missing.join(", ")}. Set them before using the Purchasing SSO integration.`
+    );
+  }
+  _cachedConfig = {
+    baseUrl: baseUrl.replace(/\/+$/, ""),
+    apiKey,
+    hmacSecret,
+    tenantId
+  };
+  console.log("[Shipskart] SSO config loaded (base host masked):", maskUrl2(_cachedConfig.baseUrl));
+  return _cachedConfig;
+}
+function maskUrl2(url) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url.substring(0, 30) + "...";
+  }
+}
+function computeHmacSignature(raw, hmacSecret) {
+  return crypto3.createHmac("sha256", hmacSecret).update(raw, "utf8").digest("hex");
+}
+async function signedPost(path14, body) {
+  const cfg = getShipskartConfig();
+  const raw = JSON.stringify(body);
+  const signature = computeHmacSignature(raw, cfg.hmacSecret);
+  const url = `${cfg.baseUrl}${path14}`;
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Api-Key": cfg.apiKey,
+        "X-Signature": signature
+      },
+      body: raw,
+      // never the object — that would re-serialize and break the signature
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    });
+  } catch (err) {
+    const code = err?.cause?.code ? ` (${err.cause.code})` : "";
+    throw new AppError(502, `[Shipskart] Network error calling ${path14}${code}: ${err?.message || err}`);
+  }
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+  }
+  if (!response.ok || payload && payload.success === false) {
+    const errorCode = payload?.errorCode || `HTTP_${response.status}`;
+    const message = payload?.message || `Shipskart ${path14} failed with status ${response.status}`;
+    const retryable = payload?.retryable === true;
+    throw new AppError(response.status || 502, `[Shipskart] ${errorCode}: ${message}`, {
+      errorCode,
+      retryable
+    });
+  }
+  return payload;
+}
+function resolveExternalUserId(userRole) {
+  const roleMap = {
+    "Vessel Admin": process.env.SHIPSKART_USER_VESSEL_ADMIN,
+    "Admin": process.env.SHIPSKART_USER_ADMIN,
+    "User": process.env.SHIPSKART_USER_REGULAR
+  };
+  const externalUserId = roleMap[userRole];
+  return externalUserId ?? null;
+}
+async function initiateSso(userRole) {
+  const cfg = getShipskartConfig();
+  const externalUserId = resolveExternalUserId(userRole);
+  if (externalUserId === null) {
+    throw new ShipskartRoleNotMappedError(userRole);
+  }
+  const body = {
+    externalUserId,
+    tenantId: cfg.tenantId
+  };
+  const result = await signedPost("/api/v1/sso/initiate", body);
+  console.log(
+    `[Shipskart] SSO initiate OK (role=${userRole}, partner=${result?.partnerName}, expiresIn=${result?.expiresIn}s)`
+  );
+  return result;
+}
+async function logoutSso(userRole) {
+  const externalUserId = resolveExternalUserId(userRole);
+  if (externalUserId === null) {
+    return { success: true, message: "No Shipskart mapping for role \u2014 logout skipped" };
+  }
+  const body = { externalUserId };
+  const result = await signedPost("/api/v1/sso/logout", body);
+  console.log("[Shipskart] SSO logout OK");
+  return result;
+}
+
+// server/modules/shipskart/controllers/shipskartSsoController.ts
+async function initiateHandler(req, res) {
+  const userRole = req.user?.role ?? "";
+  try {
+    const result = await initiateSso(userRole);
+    res.json({
+      success: true,
+      iframeUrl: result.iframeUrl,
+      partnerName: result.partnerName,
+      expiresIn: result.expiresIn
+    });
+  } catch (err) {
+    if (err instanceof ShipskartRoleNotMappedError) {
+      return res.status(403).json({
+        success: false,
+        errorCode: "ROLE_NOT_MAPPED",
+        message: "Purchasing is not available for your role."
+      });
+    }
+    throw err;
+  }
+}
+async function logoutHandler(req, res) {
+  const userRole = req.user?.role ?? "";
+  try {
+    const result = await logoutSso(userRole);
+    res.json({ success: true, message: result?.message });
+  } catch (err) {
+    console.error("[Shipskart] logout failed (non-blocking):", err?.message || err);
+    res.json({ success: true, message: "Shipskart logout skipped (remote error logged)" });
+  }
+}
+
+// server/modules/shipskart/routes.ts
+var router22 = Router22();
+router22.post("/shipskart/sso/initiate", asyncHandler(initiateHandler));
+router22.post("/shipskart/sso/logout", asyncHandler(logoutHandler));
+var routes_default22 = router22;
+
+// server/modules/noon-report/routes.ts
+import { Router as Router23 } from "express";
 
 // server/modules/noon-report/config.ts
 var NOON_MODULE_ENABLED = false;
@@ -61545,38 +66214,38 @@ async function emailNoonReport(req, res) {
 }
 
 // server/modules/noon-report/routes.ts
-var router21 = Router21();
+var router23 = Router23();
 if (!NOON_MODULE_ENABLED) {
-  router21.all("/nr-*", (_req, res) => res.status(404).json({ error: "Noon Report module is disabled" }));
+  router23.all("/nr-*", (_req, res) => res.status(404).json({ error: "Noon Report module is disabled" }));
 } else {
-  router21.get("/nr-reports", asyncHandler(getNoonReports3));
-  router21.post("/nr-reports", asyncHandler(createNoonReport2));
-  router21.get("/nr-reports/:id", asyncHandler(getNoonReport2));
-  router21.patch("/nr-reports/:id", asyncHandler(updateNoonReport2));
-  router21.patch("/nr-reports/:id/draft", asyncHandler(saveDraft3));
-  router21.post("/nr-reports/:id/submit", asyncHandler(submitNoonReport2));
-  router21.delete("/nr-reports/:id", asyncHandler(deleteNoonReport2));
-  router21.get("/nr-fuel-rob", asyncHandler(getFuelRob2));
-  router21.get("/nr-kpis", asyncHandler(getVesselKPIs2));
-  router21.get("/nr-fuel-dashboard/:vesselId", asyncHandler(getFuelDashboard2));
-  router21.get("/nr-alerts/:vesselId/count", asyncHandler(getActiveAlertCount2));
-  router21.get("/nr-alerts/:vesselId/all", asyncHandler(getAllAlerts2));
-  router21.get("/nr-alerts/:vesselId", asyncHandler(getActiveAlerts2));
-  router21.patch("/nr-alerts/:alertId/acknowledge", requireOfficeOrAdmin, asyncHandler(acknowledgeAlert2));
-  router21.get("/nr-bunker", asyncHandler(getBunkerRecords3));
-  router21.post("/nr-bunker", asyncHandler(createBunkerRecord3));
-  router21.get("/nr-bunker-cost", asyncHandler(getBunkerCostSummary3));
-  router21.get("/nr-bunker/:id", asyncHandler(getBunkerRecord2));
-  router21.patch("/nr-bunker/:id", asyncHandler(updateBunkerRecord3));
-  router21.delete("/nr-bunker/:id", asyncHandler(deleteBunkerRecord3));
-  router21.get("/nr-fleet-summary", asyncHandler(getFleetSummary2));
-  router21.get("/nr-smtp-status", asyncHandler(getSmtpStatus));
-  router21.post("/nr-reports/:id/email", asyncHandler(emailNoonReport));
+  router23.get("/nr-reports", asyncHandler(getNoonReports3));
+  router23.post("/nr-reports", asyncHandler(createNoonReport2));
+  router23.get("/nr-reports/:id", asyncHandler(getNoonReport2));
+  router23.patch("/nr-reports/:id", asyncHandler(updateNoonReport2));
+  router23.patch("/nr-reports/:id/draft", asyncHandler(saveDraft3));
+  router23.post("/nr-reports/:id/submit", asyncHandler(submitNoonReport2));
+  router23.delete("/nr-reports/:id", asyncHandler(deleteNoonReport2));
+  router23.get("/nr-fuel-rob", asyncHandler(getFuelRob2));
+  router23.get("/nr-kpis", asyncHandler(getVesselKPIs2));
+  router23.get("/nr-fuel-dashboard/:vesselId", asyncHandler(getFuelDashboard2));
+  router23.get("/nr-alerts/:vesselId/count", asyncHandler(getActiveAlertCount2));
+  router23.get("/nr-alerts/:vesselId/all", asyncHandler(getAllAlerts2));
+  router23.get("/nr-alerts/:vesselId", asyncHandler(getActiveAlerts2));
+  router23.patch("/nr-alerts/:alertId/acknowledge", requireOfficeOrAdmin, asyncHandler(acknowledgeAlert2));
+  router23.get("/nr-bunker", asyncHandler(getBunkerRecords3));
+  router23.post("/nr-bunker", asyncHandler(createBunkerRecord3));
+  router23.get("/nr-bunker-cost", asyncHandler(getBunkerCostSummary3));
+  router23.get("/nr-bunker/:id", asyncHandler(getBunkerRecord2));
+  router23.patch("/nr-bunker/:id", asyncHandler(updateBunkerRecord3));
+  router23.delete("/nr-bunker/:id", asyncHandler(deleteBunkerRecord3));
+  router23.get("/nr-fleet-summary", asyncHandler(getFleetSummary2));
+  router23.get("/nr-smtp-status", asyncHandler(getSmtpStatus));
+  router23.post("/nr-reports/:id/email", asyncHandler(emailNoonReport));
 }
-var routes_default21 = router21;
+var routes_default23 = router23;
 
 // server/modules/index.ts
-var moduleRouter = Router22();
+var moduleRouter = Router24();
 moduleRouter.use(routes_default2);
 moduleRouter.use(routes_default3);
 moduleRouter.use(routes_default4);
@@ -61598,6 +66267,8 @@ moduleRouter.use(routes_default19);
 moduleRouter.use(routes_default20);
 moduleRouter.use(routes_default);
 moduleRouter.use(routes_default21);
+moduleRouter.use(routes_default22);
+moduleRouter.use(routes_default23);
 var modules_default = moduleRouter;
 
 // server/routes.ts
@@ -62919,6 +67590,14 @@ async function registerRoutes(app2) {
   const { syncHealthScheduler: syncHealthScheduler2 } = await Promise.resolve().then(() => (init_healthMonitor(), healthMonitor_exports));
   syncHealthScheduler2.start(6 * 60 * 60 * 1e3);
   console.log("[SyncHealth] Health monitor started - will check stale syncs, conflicts, stuck files, log overflow");
+  const { isShipInstance: isShipInstance2 } = await Promise.resolve().then(() => (init_syncRole(), syncRole_exports));
+  const { syncAutoScheduler: syncAutoScheduler2 } = await Promise.resolve().then(() => (init_autoSyncScheduler(), autoSyncScheduler_exports));
+  if (await isShipInstance2()) {
+    await syncAutoScheduler2.start(6 * 60 * 60 * 1e3);
+    console.log("[AutoSync] Ship instance \u2014 scheduler started (autonomous sync with catch-up and connectivity logging)");
+  } else {
+    console.log("[AutoSync] Shore instance detected \u2014 auto-sync scheduler not started (sync is ship-initiated)");
+  }
   if (process.env.NODE_ENV === "development") {
     app2.post("/dev/seed/recurring-defects", async (req, res) => {
       try {
@@ -63239,12 +67918,14 @@ async function registerRoutes(app2) {
     clearInterval(postponementCheckInterval);
     syncPruningScheduler2.stop();
     syncHealthScheduler2.stop();
+    syncAutoScheduler2.stop();
   });
   process.on("SIGINT", () => {
     console.log("Cleaning up scheduled tasks...");
     clearInterval(postponementCheckInterval);
     syncPruningScheduler2.stop();
     syncHealthScheduler2.stop();
+    syncAutoScheduler2.stop();
   });
   return httpServer;
 }
