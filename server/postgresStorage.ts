@@ -9027,7 +9027,12 @@ export class PostgresStorage {
       filters.push(sql`s.vessel_id = ${vesselId}`);
     } else if (opts.vesselIds && opts.vesselIds.length > 0) {
       // 'my' scope: restrict the all-vessel aggregate to the assigned mini-fleet.
-      filters.push(sql`s.vessel_id = ANY(${opts.vesselIds})`);
+      // Bind each id as an explicit text-array parameter (matching the proven
+      // pattern elsewhere in this file). A raw `ANY(${jsArray})` does NOT bind a
+      // JS array as a Postgres text[] under node-postgres, so it matched nothing.
+      filters.push(
+        sql`s.vessel_id = ANY(ARRAY[${sql.join(opts.vesselIds.map((id) => sql`${id}`), sql`, `)}]::text[])`
+      );
     }
 
     if (opts.search && opts.search.trim()) {
