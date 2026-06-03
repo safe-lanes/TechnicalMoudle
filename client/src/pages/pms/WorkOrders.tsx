@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import PostponeWorkOrderDialog from "@/components/PostponeWorkOrderDialog";
+import PostponeApprovalDialog from "@/components/PostponeApprovalDialog";
 import OverdueReasonDialog from "@/components/OverdueReasonDialog";
 import UnplannedWorkOrderForm from "@/components/UnplannedWorkOrderForm";
 import { useModifyMode } from "@/hooks/useModifyMode";
@@ -40,6 +41,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils";
 import { Marker } from "@/components/Marker";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useAuth } from "@/contexts/AuthContext";
 import * as XLSX from "xlsx";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import { format } from "date-fns";
@@ -183,6 +185,8 @@ const WorkOrders: React.FC = () => {
   }, [activeTab]);
   const [showPlanner, setShowPlanner] = useState(false);
   const [postponeDialogOpen, setPostponeDialogOpen] = useState(false);
+  const [postponeApprovalDialogOpen, setPostponeApprovalDialogOpen] = useState(false);
+  const [postponeApprovalWorkOrder, setPostponeApprovalWorkOrder] = useState<WorkOrderWithHydratedData | null>(null);
   const [overdueReasonDialogOpen, setOverdueReasonDialogOpen] = useState(false);
   const [overdueReasonWorkOrder, setOverdueReasonWorkOrder] = useState<WorkOrderWithHydratedData | null>(null);
   const [unplannedWorkOrderFormOpen, setUnplannedWorkOrderFormOpen] = useState(false);
@@ -201,6 +205,7 @@ const WorkOrders: React.FC = () => {
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
   const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept } = useUIRole();
+  const { isOfficeUser } = useAuth();
   const { data: vessels = [] } = useVessels();
   
   // Debounce the search box so each keystroke doesn't fire a server round-trip
@@ -837,9 +842,17 @@ const WorkOrders: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const handlePostponeClick = (workOrder: WorkOrder) => {
-    setSelectedWorkOrder(workOrder);
-    setPostponeDialogOpen(true);
+  const isAwaitingOfficeApproval = (wo: WorkOrderWithHydratedData): boolean =>
+    wo.computedStatus === 'Awaiting Office Approval' || wo.status === 'Awaiting Office Approval';
+
+  const handlePostponeClick = (workOrder: WorkOrderWithHydratedData) => {
+    if (isOfficeUser && isAwaitingOfficeApproval(workOrder)) {
+      setPostponeApprovalWorkOrder(workOrder);
+      setPostponeApprovalDialogOpen(true);
+    } else {
+      setSelectedWorkOrder(workOrder);
+      setPostponeDialogOpen(true);
+    }
   };
 
   const handleWorkOrderClick = (workOrder: WorkOrder) => {
@@ -851,10 +864,51 @@ const WorkOrders: React.FC = () => {
     setLocation(`/pms/work-order/${workOrder.id}`);
   };
 
-  const handleTimerClick = (workOrder: WorkOrder) => {
-    setSelectedWorkOrder(workOrder);
-    setPostponeDialogOpen(true);
+  const handleTimerClick = (workOrder: WorkOrderWithHydratedData) => {
+    if (isOfficeUser && isAwaitingOfficeApproval(workOrder)) {
+      setPostponeApprovalWorkOrder(workOrder);
+      setPostponeApprovalDialogOpen(true);
+    } else {
+      setSelectedWorkOrder(workOrder);
+      setPostponeDialogOpen(true);
+    }
   };
+
+  const postponeApproveMutation = useMutation({
+    mutationFn: async ({ id, remarks }: { id: string; remarks: string }) => {
+      const res = await apiRequest('POST', `/technical/api/work-orders/${id}/postpone-approve`, {
+        approvalRemarks: remarks || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      toast({ title: 'Postponement Approved', description: 'Work order due date has been updated.' });
+      setPostponeApprovalDialogOpen(false);
+      setPostponeApprovalWorkOrder(null);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to approve postponement', variant: 'destructive' });
+    },
+  });
+
+  const postponeRejectMutation = useMutation({
+    mutationFn: async ({ id, remarks }: { id: string; remarks: string }) => {
+      const res = await apiRequest('POST', `/technical/api/work-orders/${id}/postpone-reject`, {
+        approvalRemarks: remarks,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      toast({ title: 'Postponement Rejected', description: 'Work order has been reverted to Due/Overdue.' });
+      setPostponeApprovalDialogOpen(false);
+      setPostponeApprovalWorkOrder(null);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to reject postponement', variant: 'destructive' });
+    },
+  });
 
   const handleApprove = (workOrderId: string, approverRemarks?: string) => {
     const workOrder = paginatedWorkOrders.find(wo => wo.executionId === workOrderId || wo.id === workOrderId);
@@ -1575,6 +1629,16 @@ const WorkOrders: React.FC = () => {
         onClose={() => setPostponeDialogOpen(false)}
         workOrder={selectedWorkOrder}
         onConfirm={handlePostponeConfirm}
+      />
+
+      {/* Office: Postponement Approval Dialog */}
+      <PostponeApprovalDialog
+        isOpen={postponeApprovalDialogOpen}
+        onClose={() => { setPostponeApprovalDialogOpen(false); setPostponeApprovalWorkOrder(null); }}
+        workOrder={postponeApprovalWorkOrder}
+        onApprove={(id, remarks) => postponeApproveMutation.mutate({ id, remarks })}
+        onReject={(id, remarks) => postponeRejectMutation.mutate({ id, remarks })}
+        isSubmitting={postponeApproveMutation.isPending || postponeRejectMutation.isPending}
       />
 
       {/* Overdue Reason Dialog */}
