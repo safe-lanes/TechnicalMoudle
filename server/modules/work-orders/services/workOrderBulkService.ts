@@ -297,8 +297,8 @@ export async function reviewerReopen(workOrderId: string, reviewerComments?: str
     reviewedByUuid: reviewedByUuid || null,
     rejectionDate: new Date().toISOString(),
     rejectionComments: reviewerComments || null,
-    completionDateTime: null,
-    dateCompleted: null,
+    // Intentionally preserve completionDateTime and dateCompleted so the vessel
+    // form loads pre-populated and hasCompletionData evaluates true on resubmit.
   };
 
   await repo.update(workOrderId, updateData);

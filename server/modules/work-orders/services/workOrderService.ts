@@ -1107,12 +1107,24 @@ export async function updateWorkOrder(id: string, body: any) {
     updateData.rejectionComments = null;
     updateData.rejectionDate = null;
     updateData.approvalAction = null;
+    updateData.wasRejected = false;
     updateData.submittedDate = new Date().toISOString();
     // Clear superintendent rejection remarks when a completion-rejected WO is resubmitted
     if (existingWO.status === 'Rejected') {
       updateData.superintendentRejectionRemarks = null;
     }
     console.log('📝 Previously rejected WO resubmitted - transitioning to Pending Approval');
+  }
+
+  // When vessel explicitly sends status='Pending Approval' for a reviewer-reopened WO,
+  // also clear the rejection flags so the banner doesn't reappear after the HOD approves.
+  if (isRejectedWO && updateData.status === 'Pending Approval' && hasExplicitStatus) {
+    updateData.wasRejected = false;
+    updateData.rejectionComments = null;
+    updateData.rejectionDate = null;
+    updateData.approvalAction = null;
+    if (!updateData.submittedDate) updateData.submittedDate = new Date().toISOString();
+    console.log('📝 Reviewer-reopened WO explicitly resubmitted to Pending Approval - clearing rejection flags');
   }
 
   // AUDIT TRAIL: Capture submittedDate

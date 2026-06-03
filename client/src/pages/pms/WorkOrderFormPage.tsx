@@ -2717,7 +2717,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           ...templateData,
           ...saveExecutionData,
           nextDueDate: recalculatedNextDueDate,
-          status: hasCompletionData ? 'Pending Approval' : undefined,
+          status: (hasCompletionData || (isRejectedWO && currentWorkOrderStatus === 'Due')) ? 'Pending Approval' : undefined,
           // Layer 7: Include RH justification if provided via modal
           ...(pendingSaveAfterJustification && rhJustificationText ? {
             rhJustification: rhJustificationText,
@@ -3524,6 +3524,25 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </span>
               <span className="text-sm text-amber-900 whitespace-pre-wrap" data-testid="text-superintendent-reopen-remarks">
                 {(workOrderContext as any).workOrder.superintendentReopenRemarks}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+      {!embedded &&
+        (workOrderContext as any)?.workOrder?.wasRejected === true &&
+        !!(workOrderContext as any)?.workOrder?.reviewerComments &&
+        currentWorkOrderStatus !== 'Completed' &&
+        currentWorkOrderStatus !== 'Pending Approval' && (
+        <div className="sticky top-0 z-50 bg-amber-50 border-b border-amber-300 px-4 py-3" data-testid="banner-reviewer-reopen">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
+            <div>
+              <span className="text-sm font-semibold text-amber-800 block">
+                Sent back by Level 2 Reviewer — please review and resubmit
+              </span>
+              <span className="text-sm text-amber-900 whitespace-pre-wrap" data-testid="text-reviewer-reopen-comments">
+                {(workOrderContext as any).workOrder.reviewerComments}
               </span>
             </div>
           </div>
