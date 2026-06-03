@@ -3567,7 +3567,7 @@ const Spares: React.FC = () => {
           <div className="flex items-center gap-2" data-testid="E4">
             <Marker id="E4" />
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
-            <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
+            <Select value={(vesselId === 'all' || vesselId === 'my') ? '' : vesselId} onValueChange={setVesselId}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>
@@ -3714,7 +3714,7 @@ const Spares: React.FC = () => {
                 <div className="p-4 text-center text-gray-500 text-sm">Loading locations...</div>
               ) : allLocations.length === 0 ? (
                 <div className="p-4 text-center text-gray-500 text-sm">
-                  {vesselId === 'all' || !vesselId ? 'Select a vessel first' : 'No locations found'}
+                  {vesselId === 'all' || vesselId === 'my' || !vesselId ? 'Select a vessel first' : 'No locations found'}
                 </div>
               ) : (
                 allLocations.map((loc: any) => {
