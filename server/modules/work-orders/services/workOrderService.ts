@@ -1220,7 +1220,27 @@ export async function updateWorkOrder(id: string, body: any) {
 
   const isApprovalTransition = (updateData.approvalAction === 'approved' && updateData.status === 'Completed') ||
     (updateData.status === 'Completed' && existingWO.status === 'Pending Approval');
-  if (isApprovalTransition) {
+
+  // ── Level 2 Review Interception ──────────────────────────────────────────
+  // If the linked job requires a Level 2 Office reviewer, redirect the WO to
+  // "Pending Office Review" instead of completing it. This gate covers the
+  // direct-PATCH path; the bulk-approve path has its own identical check.
+  let interceptedForL2Review = false;
+  if (isApprovalTransition && existingWO.jobId) {
+    try {
+      const linkedJob = await repo.findJob(existingWO.jobId);
+      if (linkedJob && (linkedJob as any).level2ReviewerRankId) {
+        interceptedForL2Review = true;
+        updateData.status = 'Pending Office Review';
+        updateData.approvalDate = new Date().toISOString();
+        console.log(`🔒 [L2 Review] WO ${existingWO.workOrderNo} intercepted — job requires Level 2 reviewer rank "${(linkedJob as any).level2ReviewerRankId}"`);
+      }
+    } catch (err) {
+      console.warn(`[L2 Review] Could not load linked job ${existingWO.jobId} for L2 check — proceeding without interception:`, err);
+    }
+  }
+
+  if (isApprovalTransition && !interceptedForL2Review) {
     const { resolveHodForDepartment, getHodShortLabel } = await import('../../ranks/hodResolutionService');
     const hodResolution = await resolveHodForDepartment(
       existingWO.vesselId,
@@ -1350,7 +1370,7 @@ export async function updateWorkOrder(id: string, body: any) {
 
   // ========== SPARE CONSUMPTION ON SAVE (Real-time ROB update) ==========
   const isApprovalAction = updateData.approvalAction === 'approved' && updateData.status === 'Completed';
-  if (!isApprovalAction && !isBeingRejected && !woIsCompleted) {
+  if (!isApprovalAction && !isBeingRejected && !woIsCompleted && !interceptedForL2Review) {
     const currentConsumed = ensureArray(updateData.consumedSpareParts) as ConsumedSpareEntry[];
     const previousConsumed = ensureArray(existingWO.consumedSpareParts) as ConsumedSpareEntry[];
 
