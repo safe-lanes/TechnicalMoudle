@@ -3037,33 +3037,37 @@ const Dashboard = () => {
                           >
                             Cancel
                           </Button>
-                          <Button
-                            variant="outline"
-                            className="border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
-                            disabled={postponeDecisionDialog.submitting || !postponeDecisionDialog.remarks.trim()}
-                            onClick={() => {
-                              if (!postponeDecisionDialog.wo || !postponeDecisionDialog.remarks.trim()) return;
-                              setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
-                              postponeRejectMutation.mutate({ id: String(postponeDecisionDialog.wo!.id), remarks: postponeDecisionDialog.remarks });
-                            }}
-                            data-testid="button-postpone-decision-confirm-reject"
-                          >
-                            <XCircle className="h-4 w-4 mr-1.5" />
-                            {postponeDecisionDialog.submitting && postponeDecisionDialog.action === 'reject' ? 'Rejecting...' : 'Reject'}
-                          </Button>
-                          <Button
-                            className="bg-[#1E5A8E] hover:bg-[#174a78] text-white"
-                            disabled={postponeDecisionDialog.submitting}
-                            onClick={() => {
-                              if (!postponeDecisionDialog.wo) return;
-                              setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
-                              postponeApproveMutation.mutate({ id: String(postponeDecisionDialog.wo!.id), remarks: postponeDecisionDialog.remarks });
-                            }}
-                            data-testid="button-postpone-decision-confirm-approve"
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1.5" />
-                            {postponeDecisionDialog.submitting && postponeDecisionDialog.action === 'approve' ? 'Approving...' : 'Approve'}
-                          </Button>
+                          {postponeDecisionDialog.action === 'reject' ? (
+                            <Button
+                              variant="outline"
+                              className="border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              disabled={postponeDecisionDialog.submitting || !postponeDecisionDialog.remarks.trim()}
+                              onClick={() => {
+                                if (!postponeDecisionDialog.wo) return;
+                                if (!postponeDecisionDialog.remarks.trim()) return;
+                                setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
+                                postponeRejectMutation.mutate({ id: String(postponeDecisionDialog.wo!.id), remarks: postponeDecisionDialog.remarks });
+                              }}
+                              data-testid={`button-postpone-decision-confirm-${postponeDecisionDialog.action}`}
+                            >
+                              <XCircle className="h-4 w-4 mr-1.5" />
+                              {postponeDecisionDialog.submitting ? 'Rejecting...' : 'Reject'}
+                            </Button>
+                          ) : (
+                            <Button
+                              className="bg-[#1E5A8E] hover:bg-[#174a78] text-white"
+                              disabled={postponeDecisionDialog.submitting}
+                              onClick={() => {
+                                if (!postponeDecisionDialog.wo) return;
+                                setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
+                                postponeApproveMutation.mutate({ id: String(postponeDecisionDialog.wo!.id), remarks: postponeDecisionDialog.remarks });
+                              }}
+                              data-testid={`button-postpone-decision-confirm-${postponeDecisionDialog.action}`}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1.5" />
+                              {postponeDecisionDialog.submitting ? 'Approving...' : 'Approve'}
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
