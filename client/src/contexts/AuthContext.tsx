@@ -70,21 +70,50 @@ export interface MyVesselAssignment {
 function normalizeMyVessels(
   profile: Record<string, any> | null | undefined,
 ): MyVesselAssignment[] {
-  const raw = profile?.myVessels ?? profile?.my_vessels ?? [];
+  let raw = profile?.myVessels ?? profile?.my_vessels ?? [];
+
+  // The external login can deliver the assigned mini-fleet in several shapes:
+  // a JSON-encoded array string, a CSV/semicolon list, an array of bare vessel
+  // id strings, or an array of assignment objects. Normalize every shape so a
+  // populated profile never silently resolves to an empty fleet.
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith("[")) {
+      try {
+        raw = JSON.parse(trimmed);
+      } catch {
+        raw = trimmed.split(/[,;]/);
+      }
+    } else {
+      raw = trimmed.split(/[,;]/);
+    }
+  }
+
   if (!Array.isArray(raw)) return [];
+
   return raw
-    .map((entry: any) => ({
-      vesselId: String(
-        entry?.vesselId ??
-          entry?.vessel_id ??
-          entry?.vuid ??
-          entry?.vuuid ??
-          entry?.id ??
-          "",
-      ),
-      vessel: entry?.vessel ?? entry?.vesselName ?? entry?.name ?? undefined,
-      imoNumber: entry?.imoNumber ?? entry?.imo_number ?? undefined,
-    }))
+    .map((entry: any) => {
+      if (typeof entry === "string") {
+        return {
+          vesselId: entry.trim(),
+          vessel: undefined,
+          imoNumber: undefined,
+        };
+      }
+      return {
+        vesselId: String(
+          entry?.vesselId ??
+            entry?.vessel_id ??
+            entry?.vuid ??
+            entry?.vuuid ??
+            entry?.id ??
+            "",
+        ).trim(),
+        vessel: entry?.vessel ?? entry?.vesselName ?? entry?.name ?? undefined,
+        imoNumber: entry?.imoNumber ?? entry?.imo_number ?? undefined,
+      };
+    })
     .filter((v: MyVesselAssignment) => !!v.vesselId);
 }
 

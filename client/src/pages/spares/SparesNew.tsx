@@ -130,6 +130,10 @@ const Spares: React.FC = () => {
   const sparesScopeSegment = isMyVessels ? 'all' : vesselId;
   const sparesScopeKey = isMyVessels ? `my:${assignedVesselIds.join(',')}` : vesselId;
   const sparesScopeReady = !!vesselId && (!isMyVessels || assignedVesselIds.length > 0);
+  // "My Vessel" scope with no assigned mini-fleet has nothing to aggregate, so the
+  // spares query stays disabled. Surface an explicit banner (mirroring the Dashboard)
+  // instead of the generic "No spares found" empty grid.
+  const myVesselsEmpty = isMyVessels && assignedVesselIds.length === 0;
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportingType, setExportingType] = useState<string | null>(null);
   
@@ -3658,6 +3662,15 @@ const Spares: React.FC = () => {
       )}
       </div>
 
+      {myVesselsEmpty && (
+        <div
+          className="flex-shrink-0 mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          data-testid="banner-no-assigned-vessels"
+        >
+          No vessels are assigned to you yet. Switch the Scope to "All Vessel" or contact your administrator to get vessels assigned.
+        </div>
+      )}
+
       {/* Main Content - Scrollable */}
       <div className="flex-1 overflow-y-auto flex gap-4 min-h-0">
         {/* Left Panel - Component Tree (only shown in inventory tab) */}
@@ -3776,7 +3789,7 @@ const Spares: React.FC = () => {
                       columnDefs={inventoryColumnDefs}
                       rowData={paginatedSpares}
                       getRowClass={inventoryGetRowClass}
-                      noRowsMessage="No spares found. Try adjusting your filters."
+                      noRowsMessage={myVesselsEmpty ? "No vessels are assigned to you yet." : "No spares found. Try adjusting your filters."}
                       testId="spares-inventory-grid"
                     />
                   )}
