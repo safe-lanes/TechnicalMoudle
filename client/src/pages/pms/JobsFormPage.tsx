@@ -437,6 +437,12 @@ const JobsFormPage: React.FC = () => {
       if (templateData.taskType !== originalData.taskType) {
         updatePayload.maintenanceType = templateData.taskType;
       }
+      if (templateData.department !== originalData.department) {
+        updatePayload.department = templateData.department || null;
+      }
+      if (templateData.criticality !== originalData.criticality) {
+        updatePayload.criticality = templateData.criticality || null;
+      }
       
       if (Object.keys(updatePayload).length === 0) {
         toast({
@@ -1298,8 +1304,31 @@ const JobsFormPage: React.FC = () => {
                       </div>
                     );
                   })()}
-                  <ReadOnlyField label="Department" value={templateData.department} labelMarker="JF.A1.27" valueMarker="JF.A1.28" />
-                  <ReadOnlyField label="Criticality" value={templateData.criticality} labelMarker="JF.A1.29" valueMarker="JF.A1.30" />
+                  <EditableField
+                    label="Department"
+                    field="department"
+                    value={templateData.department}
+                    originalValue={originalData.department}
+                    onChange={handleFieldChange}
+                    isModifyMode={isModifyMode}
+                    isEditMode={isEditMode}
+                    type="text"
+                    labelMarker="JF.A1.27"
+                    valueMarker="JF.A1.28"
+                  />
+                  <EditableField
+                    label="Criticality"
+                    field="criticality"
+                    value={templateData.criticality}
+                    originalValue={originalData.criticality}
+                    onChange={handleFieldChange}
+                    isModifyMode={isModifyMode}
+                    isEditMode={isEditMode}
+                    type="select"
+                    options={['Yes', 'No']}
+                    labelMarker="JF.A1.29"
+                    valueMarker="JF.A1.30"
+                  />
                   <EditableField 
                     label="Is Active" 
                     field="isActive"
