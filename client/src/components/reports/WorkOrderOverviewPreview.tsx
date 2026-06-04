@@ -490,7 +490,7 @@ export default function WorkOrderOverviewPreview({ data, isLoading, error }: Wor
 
       {/* Drilldown Dialog — AG Grid powered */}
       <Dialog open={!!drilldown} onOpenChange={() => setDrilldown(null)}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-4xl h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-sm font-bold">
               {drilldown?.label} — {drilldown?.monthLabel}
