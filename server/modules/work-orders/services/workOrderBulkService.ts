@@ -299,9 +299,11 @@ export async function reviewerReopen(workOrderId: string, reviewerComments?: str
     rejectionComments: reviewerComments || null,
     // Intentionally preserve completionDateTime and dateCompleted so the vessel
     // form loads pre-populated and hasCompletionData evaluates true on resubmit.
-    // status='Reopened' (not 'Due') is required: the status engine returns 'Completed'
-    // for any status other than 'Reopened' when completionDateTime is present.
-    // 'Reopened' bypasses that early-return and re-computes Due/Overdue from schedule.
+    // wasRejected=true (set above) is the permanent guard in computeWorkOrderStatus:
+    // it prevents the status engine from returning 'Completed' for this WO on any
+    // recalculation cycle, regardless of completionDateTime being present.
+    // status='Reopened' provides the initial guard for cycle 1; wasRejected covers
+    // all subsequent cycles after the recalculator transitions Reopened → Due.
   };
 
   await repo.update(workOrderId, updateData);

@@ -140,6 +140,7 @@ export interface WorkOrderStatusInput {
   isExecution?: boolean;
   status?: string;
   completionDateTime?: string | null;
+  wasRejected?: boolean;
   maintenanceBasis?: string;
   vesselGraceSettings?: VesselGraceSettings;
   rhLeadTimeHours?: number;
@@ -255,7 +256,8 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
     currentRH, 
     isExecution, 
     status, 
-    completionDateTime, 
+    completionDateTime,
+    wasRejected,
     maintenanceBasis, 
     vesselGraceSettings,
     rhLeadTimeHours,
@@ -273,9 +275,11 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
   if (isExecution) {
     if (status === 'Pending Approval') return 'Pending Approval';
     if (status === 'Rejected') return 'Rejected';
-    if (status === 'Reopened') {
-      // Reopened WOs preserve completionDateTime but must re-compute Due/Overdue/Active
-      // Fall through to the calendar/RH computation block below
+    if (status === 'Reopened' || wasRejected) {
+      // Reopened/wasRejected WOs must re-compute Due/Overdue/Active regardless of completionDateTime.
+      // wasRejected=true is the permanent guard — it survives the Reopened→Due status transition
+      // and prevents the recalculator from auto-completing the WO on the next cycle.
+      // Fall through to the calendar/RH computation block below.
     } else if (completionDateTime) {
       return 'Completed';
     } else {
@@ -293,9 +297,9 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
 
   if (status === 'Rejected') return 'Rejected';
   
-  // 'Reopened' WOs preserve completionDateTime by design — skip the Completed early-return
-  // so they re-enter the calendar/RH computation and naturally surface as Due/Overdue/Active.
-  if (status !== 'Reopened' && completionDateTime) {
+  // wasRejected=true or status='Reopened': skip the Completed early-return so the WO
+  // re-enters calendar/RH computation and surfaces correctly as Due/Overdue/Active.
+  if (status !== 'Reopened' && !wasRejected && completionDateTime) {
     return 'Completed';
   }
   
