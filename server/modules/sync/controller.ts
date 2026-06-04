@@ -434,6 +434,19 @@ export async function updateSettingsHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'settings object is required' });
     }
 
+    // Phase B defense: the auto-sync scheduler runs only on the ship, so these
+    // keys are meaningless on shore (and shore's sync_settings doesn't sync to
+    // ship). If a shore caller ever sends them, strip them rather than persisting
+    // dead values. Shore may still save OTHER keys (shore_url, retention, etc.).
+    const SCHEDULER_ONLY_KEYS = ['auto_sync_enabled', 'sync_interval_minutes'];
+    if (!(await isShipInstance())) {
+      const stripped = SCHEDULER_ONLY_KEYS.filter((k) => k in settings);
+      if (stripped.length > 0) {
+        for (const k of stripped) delete settings[k];
+        console.log(`[Sync Settings] Ignoring scheduler-only keys on shore: ${stripped.join(', ')}`);
+      }
+    }
+
     // Validate sync_interval_minutes if present: positive integer, no minimum.
     let newIntervalMinutes: number | null = null;
     if (settings.sync_interval_minutes !== undefined) {

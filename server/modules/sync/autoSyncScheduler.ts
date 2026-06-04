@@ -114,6 +114,7 @@ export class SyncAutoScheduler {
     }, this.tickIntervalMs);
 
     this.isRunning = true;
+    console.log(`[AutoSync] Scheduler started — will run every ${Math.round(this.tickIntervalMs / 60000)} minutes`);
   }
 
   /**
@@ -126,11 +127,13 @@ export class SyncAutoScheduler {
   private async resolveIntervalMs(argMs?: number): Promise<number> {
     try {
       const settings = await syncRepo.getAllSettings();
-      const minutes = parseInt(settings['sync_interval_minutes'] || '0', 10);
+      const raw = settings['sync_interval_minutes'];
+      const minutes = parseInt(raw || '0', 10);
       if (Number.isFinite(minutes) && minutes > 0) {
-        console.log(`[AutoSync] Using sync_interval_minutes=${minutes} from sync_settings`);
+        console.log(`[AutoSync] Using interval from DB: ${minutes} minutes`);
         return minutes * 60 * 1000;
       }
+      console.log(`[AutoSync] DB sync_interval_minutes invalid ("${raw ?? 'null'}") — falling back to default ${DEFAULT_INTERVAL_MINUTES} minutes`);
     } catch (err: any) {
       console.warn('[AutoSync] Could not read sync_interval_minutes at startup — falling back:', err?.message || err);
     }
