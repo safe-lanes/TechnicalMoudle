@@ -279,7 +279,7 @@ const JobsFormPage: React.FC = () => {
 
   const getChangedFields = (): string[] => {
     const changedFields: string[] = [];
-    const fieldsToCheck = ['woTitle', 'assignedTo', 'approver', 'level2ReviewerRankId', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive'];
+    const fieldsToCheck = ['woTitle', 'assignedTo', 'approver', 'level2ReviewerRankId', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive', 'department', 'criticality'];
     
     for (const field of fieldsToCheck) {
       if (templateData[field as keyof typeof templateData] !== originalData[field]) {
