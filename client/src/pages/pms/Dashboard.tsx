@@ -1793,7 +1793,7 @@ const Dashboard = () => {
       ),
     };
     return [
-      ...(isAllVessels ? [vesselCol] : []),
+      ...((isAllVessels || isMyVessels) ? [vesselCol] : []),
       {
         headerName: 'Component',
         field: 'component',
@@ -1886,7 +1886,7 @@ const Dashboard = () => {
         },
       },
     ];
-  }, [isAllVessels, vessels]);
+  }, [isAllVessels, isMyVessels, vessels]);
 
   const officePendingUnifiedColumnDefs: ColDef[] = useMemo(() => {
     const formatWoDate = (d: string | null | undefined) => {
@@ -1931,7 +1931,7 @@ const Dashboard = () => {
           return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Postponement</span>;
         },
       },
-      ...(isAllVessels ? [vesselCol] : []),
+      ...((isAllVessels || isMyVessels) ? [vesselCol] : []),
       {
         headerName: 'WO No',
         field: 'workOrderNo',
@@ -2053,7 +2053,7 @@ const Dashboard = () => {
         },
       },
     ];
-  }, [isAllVessels, vessels, setPostponeDecisionDialog, setLocation, setReviewerActionDialog]);
+  }, [isAllVessels, isMyVessels, vessels, setPostponeDecisionDialog, setOpViewModal, setLocation, setReviewerActionDialog]);
 
   const hodPendingApprovalColumnDefs: ColDef[] = useMemo(() => {
     const formatWoDate = (d: string | null | undefined) => {
@@ -2098,7 +2098,7 @@ const Dashboard = () => {
         resizable: false,
         pinned: 'left' as const,
       },
-      ...(isAllVessels ? [vesselCol] : []),
+      ...((isAllVessels || isMyVessels) ? [vesselCol] : []),
       {
         headerName: 'Component',
         field: 'component',
@@ -2204,7 +2204,7 @@ const Dashboard = () => {
         },
       },
     ];
-  }, [isAllVessels, vessels, approveMutation, rejectMutation, setRejectDialog, setLocation]);
+  }, [isAllVessels, isMyVessels, vessels, approveMutation, rejectMutation, setRejectDialog, setLocation]);
 
   const criticalSparesColumnDefs: ColDef[] = useMemo(() => {
     const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
@@ -2218,7 +2218,7 @@ const Dashboard = () => {
       cellRenderer: (p: any) => <span className="font-medium">{p.value || '—'}</span>,
     };
     return [
-      ...(isAllVessels ? [vesselCol] : []),
+      ...((isAllVessels || isMyVessels) ? [vesselCol] : []),
       {
         headerName: 'Part Code',
         field: 'partCode',
@@ -2313,7 +2313,7 @@ const Dashboard = () => {
         },
       },
     ];
-  }, [isAllVessels, vessels]);
+  }, [isAllVessels, isMyVessels, vessels]);
 
   const modifyPmsColumnDefs: ColDef[] = useMemo(() => {
     const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
@@ -2340,7 +2340,7 @@ const Dashboard = () => {
       cellRenderer: (p: any) => <span className="font-medium">{p.value || '—'}</span>,
     };
     return [
-      ...(isAllVessels ? [vesselCol] : []),
+      ...((isAllVessels || isMyVessels) ? [vesselCol] : []),
       {
         headerName: 'Request Title',
         field: 'title',
@@ -2390,7 +2390,7 @@ const Dashboard = () => {
         },
       },
     ];
-  }, [isAllVessels, vessels]);
+  }, [isAllVessels, isMyVessels, vessels]);
 
   const operationTableTitle = useMemo(() => {
     switch (selectedOpCard) {

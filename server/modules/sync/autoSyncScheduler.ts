@@ -86,18 +86,19 @@ export class SyncAutoScheduler {
   /** Per-vessel re-entrancy guard */
   private syncInProgress = new Map<string, boolean>();
 
-  start(intervalMs?: number): void {
+  async start(intervalMs?: number): Promise<void> {
     if (this.isRunning) {
       console.log('[AutoSync] Scheduler already running');
       return;
     }
 
-    if (intervalMs) {
-      this.tickIntervalMs = intervalMs;
-    }
+    // Resolve cadence: DB admin preference > caller arg > DEFAULT. So an admin's
+    // saved sync_interval_minutes survives server restarts.
+    this.tickIntervalMs = await this.resolveIntervalMs(intervalMs);
 
-    const intervalHours = (this.tickIntervalMs / 1000 / 60 / 60).toFixed(1);
-    console.log(`[AutoSync] Starting scheduler (tick interval: ${intervalHours}h, boot delay: ${BOOT_DELAY_MS / 1000}s)`);
+    const intervalMin = Math.round(this.tickIntervalMs / 60000);
+    const intervalHours = (this.tickIntervalMs / 1000 / 60 / 60).toFixed(2);
+    console.log(`[AutoSync] Starting scheduler (tick interval: ${intervalMin}min / ${intervalHours}h, boot delay: ${BOOT_DELAY_MS / 1000}s)`);
 
     // Deferred initial tick — allow DB and migrations to complete first
     setTimeout(() => {
@@ -113,6 +114,68 @@ export class SyncAutoScheduler {
     }, this.tickIntervalMs);
 
     this.isRunning = true;
+  }
+
+  /**
+   * Resolve the startup tick cadence (ms). Precedence:
+   *   1. DB sync_settings.sync_interval_minutes (admin preference — survives restarts)
+   *   2. the intervalMs arg passed by the caller (routes.ts)
+   *   3. DEFAULT_INTERVAL_MINUTES
+   * No minimum enforced — admin's choice. Falls back gracefully if DB unavailable.
+   */
+  private async resolveIntervalMs(argMs?: number): Promise<number> {
+    try {
+      const settings = await syncRepo.getAllSettings();
+      const minutes = parseInt(settings['sync_interval_minutes'] || '0', 10);
+      if (Number.isFinite(minutes) && minutes > 0) {
+        console.log(`[AutoSync] Using sync_interval_minutes=${minutes} from sync_settings`);
+        return minutes * 60 * 1000;
+      }
+    } catch (err: any) {
+      console.warn('[AutoSync] Could not read sync_interval_minutes at startup — falling back:', err?.message || err);
+    }
+    if (argMs && argMs > 0) return argMs;
+    return DEFAULT_INTERVAL_MINUTES * 60 * 1000;
+  }
+
+  /**
+   * Reconfigure the live tick cadence immediately. Called by the settings-save
+   * endpoint and by tick() when a direct-DB change is detected. No minimum
+   * enforced beyond > 0 — admin chose, admin gets.
+   */
+  restartWithNewInterval(intervalMinutes: number): void {
+    if (!Number.isFinite(intervalMinutes) || intervalMinutes <= 0) {
+      console.warn(`[AutoSync] Ignoring invalid sync interval: ${intervalMinutes} (must be a positive number of minutes)`);
+      return;
+    }
+
+    const newMs = intervalMinutes * 60 * 1000;
+
+    if (!this.isRunning) {
+      // Not started (shore instance, or auto-sync disabled at boot). Record the
+      // preference so a later start() honors it; nothing to clear.
+      this.tickIntervalMs = newMs;
+      console.log(`[AutoSync] Scheduler not running — interval preference recorded as ${intervalMinutes}min (applies when started)`);
+      return;
+    }
+
+    if (newMs === this.tickIntervalMs) {
+      console.log(`[AutoSync] Sync interval already ${intervalMinutes}min — no change`);
+      return;
+    }
+
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+    this.tickIntervalMs = newMs;
+    this.intervalId = setInterval(() => {
+      this.tick().catch(err => {
+        console.error('[AutoSync] Error during scheduled tick:', err);
+      });
+    }, this.tickIntervalMs);
+    // Intentionally NOT firing an immediate tick — let the new cadence's first tick happen naturally.
+    console.log(`[AutoSync] Sync interval updated to ${intervalMinutes} minutes — now live`);
   }
 
   stop(): void {
@@ -146,17 +209,14 @@ export class SyncAutoScheduler {
         return; // silent skip — don't log connectivity for disabled state
       }
 
-      // 2. Resolve interval from settings (may differ from timer cadence)
+      // 2. Resolve interval from settings — apply LIVE if it changed. This catches
+      // a direct DB edit (one not made through the settings endpoint, which already
+      // calls restartWithNewInterval). The current tick continues; the new cadence
+      // governs subsequent ticks.
       const intervalMinutes = parseInt(settings['sync_interval_minutes'] || '0', 10);
-      if (intervalMinutes > 0) {
-        const newIntervalMs = intervalMinutes * 60 * 1000;
-        if (newIntervalMs !== this.tickIntervalMs) {
-          console.log(`[AutoSync] Interval changed: ${this.tickIntervalMs / 60000}min → ${intervalMinutes}min (takes effect next restart)`);
-          // Note: full hot-swap of setInterval is complex and fragile.
-          // The setting is checked, but the actual timer cadence only changes
-          // on next server restart. This is acceptable — the dashboard shows
-          // the configured vs actual interval.
-        }
+      if (intervalMinutes > 0 && intervalMinutes * 60 * 1000 !== this.tickIntervalMs) {
+        console.log(`[AutoSync] Detected interval change in settings → applying live (${this.tickIntervalMs / 60000}min → ${intervalMinutes}min)`);
+        this.restartWithNewInterval(intervalMinutes);
       }
 
       // 3. Determine vessel ID for this ship instance
