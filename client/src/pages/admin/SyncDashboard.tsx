@@ -50,6 +50,7 @@ import {
   GitPullRequest,
 } from "lucide-react";
 import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
+import AutoSyncSettingsCard from "@/components/sync/AutoSyncSettingsCard";
 
 // ── Types ──
 
@@ -544,6 +545,24 @@ export default function SyncDashboard() {
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Auto-Sync Settings (ship-only — the scheduler runs here) ── */}
+      {isShip && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Clock className="h-5 w-5 text-blue-500" />
+              Auto-Sync Settings
+            </CardTitle>
+            <CardDescription>
+              Configure automatic background sync for this vessel.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AutoSyncSettingsCard />
           </CardContent>
         </Card>
       )}

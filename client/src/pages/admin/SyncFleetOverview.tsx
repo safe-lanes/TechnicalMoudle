@@ -223,13 +223,9 @@ export default function SyncFleetOverview() {
       });
       return res.json();
     },
-    onSuccess: (_data: any, variables: Record<string, string>) => {
-      const n = variables?.sync_interval_minutes;
-      if (n) {
-        toast({ title: "Sync interval updated", description: `Now running every ${n} minutes.` });
-      } else {
-        toast({ title: "Settings saved", description: "Sync engine will reload on next cycle." });
-      }
+    onSuccess: () => {
+      // sync_interval_minutes / auto_sync_enabled moved to ship-side SyncDashboard.
+      toast({ title: "Settings saved", description: "Sync engine will reload on next cycle." });
       setEditedSettings({});
       refetchSettings();
     },
@@ -609,24 +605,9 @@ export default function SyncFleetOverview() {
               </div>
 
               {/* Boolean toggles */}
+              {/* Auto-Sync toggle moved to ship-side SyncDashboard (AutoSyncSettingsCard) —
+                  the scheduler runs only on the ship, so shore edits were dead. */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center justify-between border rounded-md p-3">
-                  <div>
-                    <Label>Auto-Sync</Label>
-                    <p className="text-xs text-gray-400">
-                      Enable automatic scheduled sync
-                    </p>
-                  </div>
-                  <Switch
-                    checked={getSettingValue("auto_sync_enabled") === "true"}
-                    onCheckedChange={(checked) =>
-                      setSettingValue(
-                        "auto_sync_enabled",
-                        checked ? "true" : "false"
-                      )
-                    }
-                  />
-                </div>
                 <div className="flex items-center justify-between border rounded-md p-3">
                   <div>
                     <Label>Local Mode</Label>
@@ -647,12 +628,7 @@ export default function SyncFleetOverview() {
               {/* Numeric settings */}
               <div className="grid grid-cols-3 gap-4">
                 {[
-                  {
-                    key: "sync_interval_minutes",
-                    label: "Sync Interval (minutes)",
-                    helper:
-                      "Sets how often auto-sync runs. Lower values use more VSAT bandwidth. Changes take effect immediately.",
-                  },
+                  // sync_interval_minutes moved to ship-side SyncDashboard (AutoSyncSettingsCard).
                   { key: "max_retries", label: "Max Retries" },
                   { key: "chunk_size", label: "Chunk Size" },
                   {

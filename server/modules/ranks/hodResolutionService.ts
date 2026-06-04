@@ -116,7 +116,9 @@ export async function resolveHodForDepartment(
     return result;
   }
 
-  console.warn(`[HOD Resolution] No HOD found in org chart for department "${dept}" (vessel: ${vesselId || 'none'}), using fallback`);
+  if (process.env.DEBUG_HOD === 'true') {
+    console.warn(`[HOD Resolution] No HOD found in org chart for department "${dept}" (vessel: ${vesselId || 'none'}), using fallback`);
+  }
   return buildFallback(dept, storedApprover);
 }
 
