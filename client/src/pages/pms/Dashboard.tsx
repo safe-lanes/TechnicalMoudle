@@ -1989,19 +1989,34 @@ const Dashboard = () => {
           return (
             <div className="flex items-center gap-1 h-full">
               {isL2Review ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 w-7 p-0 text-[#1E5A8E] hover:bg-blue-50 hover:text-[#174a78]"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setReviewerActionDialog({ open: true, wo: wo as EnrichedWorkOrder, comments: '', submitting: false });
-                  }}
-                  data-testid={`button-op-l2review-action-${wo.id}`}
-                  title="Review work order"
-                >
-                  <ClipboardList className="h-4 w-4" />
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-[#1E5A8E] hover:bg-blue-50 hover:text-[#174a78]"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setReviewerActionDialog({ open: true, wo: wo as EnrichedWorkOrder, comments: '', submitting: false });
+                    }}
+                    data-testid={`button-op-l2review-action-${wo.id}`}
+                    title="Review work order"
+                  >
+                    <ClipboardList className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-gray-500 hover:text-gray-800"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLocation(`/pms/work-order/${wo.id}`);
+                    }}
+                    data-testid={`button-op-l2review-view-${wo.id}`}
+                    title="View work order"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </>
               ) : (
                 <>
                   <Button
@@ -2024,7 +2039,7 @@ const Dashboard = () => {
                     className="h-7 w-7 p-0 text-gray-500 hover:text-gray-800"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setOpViewModal({ open: true, workOrder: wo as EnrichedWorkOrder, mode: 'execution' });
+                      setLocation(`/pms/work-order/${wo.id}`);
                     }}
                     data-testid={`button-op-postpone-view-${wo.id}`}
                     title="View work order"
@@ -2038,7 +2053,7 @@ const Dashboard = () => {
         },
       },
     ];
-  }, [isAllVessels, vessels, setPostponeDecisionDialog, setOpViewModal, setLocation, setReviewerActionDialog]);
+  }, [isAllVessels, vessels, setPostponeDecisionDialog, setLocation, setReviewerActionDialog]);
 
   const hodPendingApprovalColumnDefs: ColDef[] = useMemo(() => {
     const formatWoDate = (d: string | null | undefined) => {
