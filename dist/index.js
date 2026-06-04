@@ -19671,6 +19671,9 @@ var init_workOrderStatusRecalculator = __esm({
     init_constants();
     WorkOrderStatusRecalculatorService = class {
       isRunning = false;
+      // guards double-start() of the scheduler
+      runInProgress = false;
+      // guards re-entrant ticks (a run still in progress)
       intervalId = null;
       scanIntervalMs = 1 * 60 * 1e3;
       // 1 minute
@@ -19723,7 +19726,11 @@ var init_workOrderStatusRecalculator = __esm({
        * Only recalculates non-terminal work orders
        */
       async runRecalculation() {
-        console.log("[StatusRecalculator] Starting status recalculation...");
+        if (this.runInProgress) {
+          console.log("[StatusRecalculator] Previous recalc still running \u2014 skipping this tick");
+          return { workOrdersChecked: 0, statusesUpdated: 0 };
+        }
+        this.runInProgress = true;
         const results = {
           workOrdersChecked: 0,
           statusesUpdated: 0
@@ -19733,9 +19740,9 @@ var init_workOrderStatusRecalculator = __esm({
           const activeWorkOrders = allWorkOrders.filter((wo) => !this.isTerminalStatus(wo.status));
           results.workOrdersChecked = activeWorkOrders.length;
           if (activeWorkOrders.length === 0) {
-            console.log("[StatusRecalculator] No active work orders to recalculate");
             return results;
           }
+          console.log(`[StatusRecalculator] Recalculating ${activeWorkOrders.length} active work orders...`);
           const vesselSettingsCache = /* @__PURE__ */ new Map();
           const graceSettingsCache = /* @__PURE__ */ new Map();
           const jobsCache = /* @__PURE__ */ new Map();
@@ -19850,13 +19857,16 @@ var init_workOrderStatusRecalculator = __esm({
                 console.error("[FieldLogger] WO status recalc:", e);
               }
               results.statusesUpdated++;
-              console.log(`\u{1F4DD} [StatusRecalculator] Updated WO ${wo.workOrderNo}: ${wo.status} \u2192 ${computedStatus}`);
             }
           }
-          console.log(`[StatusRecalculator] Recalculation complete: ${results.statusesUpdated}/${results.workOrdersChecked} statuses updated`);
+          if (results.statusesUpdated > 0) {
+            console.log(`[StatusRecalculator] Updated status for ${results.statusesUpdated} of ${results.workOrdersChecked} work orders`);
+          }
         } catch (error) {
           console.error("[StatusRecalculator] Recalculation failed:", error);
           throw error;
+        } finally {
+          this.runInProgress = false;
         }
         return results;
       }
@@ -21170,6 +21180,9 @@ var init_jobDueScanner = __esm({
     init_workOrderStatus();
     JobDueScannerService = class {
       isRunning = false;
+      // guards double-start() of the scheduler
+      runInProgress = false;
+      // guards re-entrant ticks (a run still in progress)
       intervalId = null;
       scanIntervalMs = 1 * 60 * 1e3;
       // 1 minute
@@ -21212,6 +21225,18 @@ var init_jobDueScanner = __esm({
        * Run a full scan of all jobs and generate work orders as needed
        */
       async runScan() {
+        if (this.runInProgress) {
+          console.log("[JobDueScanner] Previous scan still running \u2014 skipping this tick");
+          return {
+            calendarJobsChecked: 0,
+            calendarWOsGenerated: 0,
+            rhJobsChecked: 0,
+            rhWOsGenerated: 0,
+            dualJobsChecked: 0,
+            dualWOsGenerated: 0
+          };
+        }
+        this.runInProgress = true;
         console.log("[JobDueScanner] Starting job due scan...");
         const results = {
           calendarJobsChecked: 0,
@@ -21235,6 +21260,8 @@ var init_jobDueScanner = __esm({
         } catch (error) {
           console.error("[JobDueScanner] Scan failed:", error);
           throw error;
+        } finally {
+          this.runInProgress = false;
         }
         return results;
       }
