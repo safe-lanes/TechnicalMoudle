@@ -290,7 +290,7 @@ export async function reviewerReopen(workOrderId: string, reviewerComments?: str
   }
 
   const updateData: Record<string, any> = {
-    status: 'Due',
+    status: 'Reopened',
     approvalAction: 'rejected',
     wasRejected: true,
     reviewerComments: reviewerComments || null,
@@ -299,6 +299,9 @@ export async function reviewerReopen(workOrderId: string, reviewerComments?: str
     rejectionComments: reviewerComments || null,
     // Intentionally preserve completionDateTime and dateCompleted so the vessel
     // form loads pre-populated and hasCompletionData evaluates true on resubmit.
+    // status='Reopened' (not 'Due') is required: the status engine returns 'Completed'
+    // for any status other than 'Reopened' when completionDateTime is present.
+    // 'Reopened' bypasses that early-return and re-computes Due/Overdue from schedule.
   };
 
   await repo.update(workOrderId, updateData);
@@ -321,7 +324,7 @@ export async function reviewerReopen(workOrderId: string, reviewerComments?: str
       newValue: null,
       payload: {
         workOrderNo: existingWO.workOrderNo,
-        status: 'Due',
+        status: 'Reopened',
         reopenedAt: new Date().toISOString(),
         reviewerComments: reviewerComments || null,
       },
