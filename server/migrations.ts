@@ -3081,7 +3081,19 @@ export async function createDatabaseBackup(): Promise<string | null> {
     if (!fs.existsSync(backupDir)) {
       fs.mkdirSync(backupDir, { recursive: true });
     }
-    
+
+    // Skip the dump if a backup was already taken in the last 24h. PM2 restarts
+    // were producing a full ~1.25 GB pg_dump every boot (up to 6.25 GB/day of
+    // near-identical backups). This preserves a daily safety net while removing
+    // the per-restart cost. To force a fresh backup, delete the recent file.
+    const recentBackupMs = fs.readdirSync(backupDir)
+      .filter(f => f.startsWith('backup_') && f.endsWith('.sql'))
+      .map(f => fs.statSync(path.join(backupDir, f)).mtime.getTime());
+    if (recentBackupMs.length > 0 && (Date.now() - Math.max(...recentBackupMs)) < 24 * 60 * 60 * 1000) {
+      console.log('⏭️  Skipping startup backup — recent backup exists (<24h old)');
+      return null;
+    }
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupFile = path.join(backupDir, `backup_${timestamp}.sql`);
     

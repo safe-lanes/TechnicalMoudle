@@ -458,7 +458,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (oldFormatMatch) parentJobNo = oldFormatMatch[1];
             }
             if (parentJobNo && !parentJob) {
-              const allJobs = await storage.getJobsByVessel(woAny.vesselId);
+              const allJobs = await storage.getJobs(woAny.vesselId);
               parentJob = allJobs.find((j: any) => j.jobNo === parentJobNo) || null;
             }
           }
