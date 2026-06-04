@@ -46,6 +46,8 @@ export interface FilterableWorkOrder {
   criticality?: string | null;
   componentCritical?: boolean | null;
   postponementReason?: string | null;
+  wasRejected?: boolean | null;
+  reviewerComments?: string | null;
   // sort-only fields
   component?: string | null;
   submittedDate?: string | null;
@@ -75,16 +77,25 @@ export function getEffectiveStatus(wo: FilterableWorkOrder): string {
 }
 
 // Used for BADGE DISPLAY — shows the real status for Unplanned WOs.
+// Returns "Returned for Correction" when a WO was reopened by an L2 reviewer
+// (wasRejected=true + reviewerComments set), to distinguish it from a
+// superintendent reopen which uses the plain "Reopened" label.
 export function getDisplayStatus(wo: FilterableWorkOrder): string {
   if (wo.workOrderType === 'Unplanned') {
     if (isStoredCompleted(wo)) return 'Completed';
     if (wo.status === 'Pending Approval') return 'Pending Approval';
     if (wo.status === 'Pending Office Review') return 'Awaiting Level 2 Review';
     if (wo.status === 'Draft') return 'Draft';
+    if (wo.status === 'Reopened' && wo.wasRejected === true && !!wo.reviewerComments) {
+      return 'Returned for Correction';
+    }
     return wo.status || 'Active';
   }
   const es = getEffectiveStatus(wo);
   if (es === 'Pending Office Review') return 'Awaiting Level 2 Review';
+  if (es === 'Reopened' && wo.wasRejected === true && !!wo.reviewerComments) {
+    return 'Returned for Correction';
+  }
   return es;
 }
 
