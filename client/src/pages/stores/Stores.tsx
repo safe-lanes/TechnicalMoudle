@@ -1996,6 +1996,7 @@ const Stores: React.FC = () => {
           headerName: 'Expiry',
           flex: 0.8,
           minWidth: 90,
+          filter: 'agTextColumnFilter',
           cellRenderer: (params: ICellRendererParams) => {
             const item = params.data as StoreItem;
             if (!item.expiryDate) return <span className="text-xs">-</span>;
@@ -2015,6 +2016,7 @@ const Stores: React.FC = () => {
           headerName: 'Batch #',
           flex: 0.8,
           minWidth: 90,
+          filter: 'agTextColumnFilter',
           cellRenderer: (params: ICellRendererParams) => {
             const item = params.data as StoreItem;
             return <span className="text-xs truncate">{item.batchNumber || '-'}</span>;
@@ -2025,6 +2027,7 @@ const Stores: React.FC = () => {
           headerName: 'Hazard',
           flex: 0.8,
           minWidth: 100,
+          filter: 'agTextColumnFilter',
           cellRenderer: (params: ICellRendererParams) => {
             const item = params.data as StoreItem;
             if (!item.hazardClassification || item.hazardClassification === 'None') return <span>-</span>;
@@ -2051,6 +2054,8 @@ const Stores: React.FC = () => {
         headerName: 'IHM',
         flex: 0.5,
         minWidth: 60,
+        sortable: false,
+        filter: false,
         headerComponent: () => (
           <span data-testid={getMarkerId(activeTab, '18')}>
             <span className="sr-only"><Marker id={getMarkerId(activeTab, '18')} /></span>IHM
