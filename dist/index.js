@@ -1740,6 +1740,8 @@ var init_schema = __esm({
       // Detailed job description
       approver: text2("approver"),
       // Rank who approves the job
+      level2ReviewerRankId: text2("level2_reviewer_rank_id"),
+      // Optional second-stage reviewer rank (Level 2 Office Review)
       department: text2("department"),
       // Template data (Part A)
       requiredSpareParts: json("required_spare_parts").notNull().default([]),
@@ -1960,6 +1962,15 @@ var init_schema = __esm({
       rhJustification: text2("rh_justification"),
       rhJustificationProvidedBy: text2("rh_justification_provided_by"),
       rhJustificationDate: timestamp3("rh_justification_date"),
+      // === Postponement Approval Fields (Plan B) ===
+      postponeRequestedDate: text2("postpone_requested_date"),
+      // Ship's requested new due date (populated on postpone-request submit)
+      postponeApprover: text2("postpone_approver"),
+      // Static "Office" value stored at request time
+      postponementApprovalDate: text2("postponement_approval_date"),
+      // ISO date when office approved/rejected
+      postponementApprovalRemarks: text2("postponement_approval_remarks"),
+      // Office remarks on approve/reject
       // === WO Generation Cycle Snapshots (for duplicate protection and audit) ===
       // Driver type determines which cycle fields apply
       driverType: text2("driver_type"),
@@ -1986,6 +1997,11 @@ var init_schema = __esm({
       // DUE_DATE (duplicated for clarity)
       lastDoneDateSnapshot: text2("last_done_date_snapshot"),
       // last_done_date stored at WO creation
+      // === Level 2 Office Review Fields ===
+      reviewerComments: text2("reviewer_comments"),
+      // Comments from Level 2 reviewer
+      reviewedByUuid: text2("reviewed_by_uuid"),
+      // UUID/identity of Level 2 reviewer who acted
       createdAt: timestamp3("created_at").notNull().defaultNow(),
       updatedAt: updatedAtColumn(),
       isSync: boolean2("is_sync").default(false),
@@ -2995,6 +3011,8 @@ var init_schema = __esm({
       taskType: text2("task_type").notNull(),
       assignedTo: text2("assigned_to").notNull(),
       approver: text2("approver").notNull(),
+      level2ReviewerRankId: text2("level2_reviewer_rank_id"),
+      // Optional second-stage reviewer rank (Level 2 Office Review)
       jobPriority: text2("job_priority").notNull(),
       classRelated: text2("class_related").notNull(),
       briefWorkDescription: text2("brief_work_description").notNull(),
@@ -4038,6 +4056,10 @@ var init_schema = __esm({
       // Who approved the postponement
       status: text2("status").notNull().default("Pending"),
       // 'Pending' | 'Approved' | 'Rejected'
+      approver: text2("approver"),
+      // Designated approver (static "Office" value)
+      postponeDate: text2("postpone_date"),
+      // Raw postpone date entered in dialog
       informOffice: boolean2("inform_office").notNull().default(false),
       // Whether office was informed
       attachmentPath: text2("attachment_path"),
@@ -7378,7 +7400,7 @@ var init_syncRole = __esm({
 // server/modules/sync/fileSyncProcessor.ts
 import * as fs2 from "fs";
 import * as path2 from "path";
-import * as crypto from "crypto";
+import * as crypto2 from "crypto";
 function getStorageDir(tableName) {
   switch (tableName) {
     case "component_documents":
@@ -7440,7 +7462,7 @@ var init_fileSyncProcessor = __esm({
             if (!fileBuffer) {
               throw new Error(`File not found: ${fileEntry.fileKey}`);
             }
-            const hash = crypto.createHash("sha256").update(fileBuffer).digest("hex");
+            const hash = crypto2.createHash("sha256").update(fileBuffer).digest("hex");
             const totalChunks = Math.ceil(fileBuffer.length / CHUNK_SIZE_BYTES);
             const startChunk = fileEntry.chunkOffset || 0;
             for (let i = startChunk; i < totalChunks; i++) {
@@ -7543,7 +7565,7 @@ var init_fileSyncProcessor = __esm({
         }
         if (chunk.chunkIndex === chunk.totalChunks - 1) {
           const assembled = this.assembleChunks(tempPath, chunk.totalChunks);
-          const hash = crypto.createHash("sha256").update(assembled).digest("hex");
+          const hash = crypto2.createHash("sha256").update(assembled).digest("hex");
           if (hash !== chunk.fileHash) {
             console.error(
               `[FileSyncProcessor] Hash mismatch for ${chunk.queueUuid}: expected ${chunk.fileHash}, got ${hash}`
@@ -7688,7 +7710,7 @@ var init_fileSyncProcessor = __esm({
             const resolvedPath = fileKey.startsWith("local://") ? path2.join(getStorageDir(tableName), fileKey.replace("local://", "")) : fileKey;
             if (fs2.existsSync(resolvedPath)) {
               const buffer = fs2.readFileSync(resolvedPath);
-              fileHash = crypto.createHash("sha256").update(buffer).digest("hex");
+              fileHash = crypto2.createHash("sha256").update(buffer).digest("hex");
             }
           } catch {
           }
@@ -12158,7 +12180,11 @@ function computeWorkOrderStatus(input) {
     }
   }
   if (status === "Pending Approval") return "Pending Approval";
+  if (status === "Pending Office Review" || normalizedStatus === "pending_office_review") return "Pending Office Review";
   if (status === "Postponed") return "Postponed";
+  if (status === "Awaiting Office Approval") return "Awaiting Office Approval";
+  if (status === "Postponement Approved") return "Postponement Approved";
+  if (status === "Postponement Rejected") return "Postponement Rejected";
   if (status === "Rejected") return "Rejected";
   if (status !== "Reopened" && completionDateTime) {
     return "Completed";
@@ -18116,7 +18142,10 @@ var init_postgresStorage = __esm({
         const today = /* @__PURE__ */ new Date();
         const todayStr = today.toISOString().split("T")[0];
         let query = db2.select().from(workOrders).where(and2(
-          eq2(workOrders.status, "Postponed"),
+          or(
+            eq2(workOrders.status, "Postponed"),
+            eq2(workOrders.status, "Postponement Approved")
+          ),
           eq2(workOrders.isActive, true)
         ));
         const postponedWOs = await query;
@@ -19088,6 +19117,10 @@ var init_postgresStorage = __esm({
         ];
         if (vesselId !== "all") {
           filters.push(sql5`s.vessel_id = ${vesselId}`);
+        } else if (opts.vesselIds && opts.vesselIds.length > 0) {
+          filters.push(
+            sql5`s.vessel_id = ANY(ARRAY[${sql5.join(opts.vesselIds.map((id) => sql5`${id}`), sql5`, `)}]::text[])`
+          );
         }
         if (opts.search && opts.search.trim()) {
           const q = `%${opts.search.trim()}%`;
@@ -19548,7 +19581,7 @@ __export(storage_exports, {
   sortObjectKeys: () => sortObjectKeys,
   storage: () => storage
 });
-import crypto2 from "crypto";
+import crypto3 from "crypto";
 function sortObjectKeys(obj) {
   if (obj === null || obj === void 0) {
     return obj;
@@ -19585,10 +19618,10 @@ function calculateRecordChecksum(record) {
       }
       return value;
     });
-    return crypto2.createHash("sha256").update(canonicalJson).digest("hex");
+    return crypto3.createHash("sha256").update(canonicalJson).digest("hex");
   } catch (error) {
     console.error("Error calculating checksum:", error);
-    return crypto2.createHash("sha256").update(JSON.stringify(record)).digest("hex");
+    return crypto3.createHash("sha256").update(JSON.stringify(record)).digest("hex");
   }
 }
 function getStorageInstance() {
@@ -19638,6 +19671,9 @@ var init_workOrderStatusRecalculator = __esm({
     init_constants();
     WorkOrderStatusRecalculatorService = class {
       isRunning = false;
+      // guards double-start() of the scheduler
+      runInProgress = false;
+      // guards re-entrant ticks (a run still in progress)
       intervalId = null;
       scanIntervalMs = 1 * 60 * 1e3;
       // 1 minute
@@ -19690,7 +19726,11 @@ var init_workOrderStatusRecalculator = __esm({
        * Only recalculates non-terminal work orders
        */
       async runRecalculation() {
-        console.log("[StatusRecalculator] Starting status recalculation...");
+        if (this.runInProgress) {
+          console.log("[StatusRecalculator] Previous recalc still running \u2014 skipping this tick");
+          return { workOrdersChecked: 0, statusesUpdated: 0 };
+        }
+        this.runInProgress = true;
         const results = {
           workOrdersChecked: 0,
           statusesUpdated: 0
@@ -19700,9 +19740,9 @@ var init_workOrderStatusRecalculator = __esm({
           const activeWorkOrders = allWorkOrders.filter((wo) => !this.isTerminalStatus(wo.status));
           results.workOrdersChecked = activeWorkOrders.length;
           if (activeWorkOrders.length === 0) {
-            console.log("[StatusRecalculator] No active work orders to recalculate");
             return results;
           }
+          console.log(`[StatusRecalculator] Recalculating ${activeWorkOrders.length} active work orders...`);
           const vesselSettingsCache = /* @__PURE__ */ new Map();
           const graceSettingsCache = /* @__PURE__ */ new Map();
           const jobsCache = /* @__PURE__ */ new Map();
@@ -19817,13 +19857,16 @@ var init_workOrderStatusRecalculator = __esm({
                 console.error("[FieldLogger] WO status recalc:", e);
               }
               results.statusesUpdated++;
-              console.log(`\u{1F4DD} [StatusRecalculator] Updated WO ${wo.workOrderNo}: ${wo.status} \u2192 ${computedStatus}`);
             }
           }
-          console.log(`[StatusRecalculator] Recalculation complete: ${results.statusesUpdated}/${results.workOrdersChecked} statuses updated`);
+          if (results.statusesUpdated > 0) {
+            console.log(`[StatusRecalculator] Updated status for ${results.statusesUpdated} of ${results.workOrdersChecked} work orders`);
+          }
         } catch (error) {
           console.error("[StatusRecalculator] Recalculation failed:", error);
           throw error;
+        } finally {
+          this.runInProgress = false;
         }
         return results;
       }
@@ -20263,8 +20306,8 @@ var init_jobService = __esm({
 
 // server/modules/running-hours/repositories/runningHoursRepository.ts
 import { desc as desc3, asc as asc3, eq as eq5, and as and4, gte as gte2, lte as lte2, or as or2, ilike as ilike3, sql as sql6 } from "drizzle-orm";
-async function getComponents(vesselId) {
-  return storage.getComponents(vesselId);
+async function getComponents(vesselId, vesselIds) {
+  return storage.getComponents(vesselId, vesselIds);
 }
 async function getComponent(id) {
   return storage.getComponent(id);
@@ -21137,6 +21180,9 @@ var init_jobDueScanner = __esm({
     init_workOrderStatus();
     JobDueScannerService = class {
       isRunning = false;
+      // guards double-start() of the scheduler
+      runInProgress = false;
+      // guards re-entrant ticks (a run still in progress)
       intervalId = null;
       scanIntervalMs = 1 * 60 * 1e3;
       // 1 minute
@@ -21179,6 +21225,18 @@ var init_jobDueScanner = __esm({
        * Run a full scan of all jobs and generate work orders as needed
        */
       async runScan() {
+        if (this.runInProgress) {
+          console.log("[JobDueScanner] Previous scan still running \u2014 skipping this tick");
+          return {
+            calendarJobsChecked: 0,
+            calendarWOsGenerated: 0,
+            rhJobsChecked: 0,
+            rhWOsGenerated: 0,
+            dualJobsChecked: 0,
+            dualWOsGenerated: 0
+          };
+        }
+        this.runInProgress = true;
         console.log("[JobDueScanner] Starting job due scan...");
         const results = {
           calendarJobsChecked: 0,
@@ -21202,6 +21260,8 @@ var init_jobDueScanner = __esm({
         } catch (error) {
           console.error("[JobDueScanner] Scan failed:", error);
           throw error;
+        } finally {
+          this.runInProgress = false;
         }
         return results;
       }
@@ -22034,6 +22094,17 @@ async function findUser(userId) {
 }
 async function checkAndRevertPostponedWorkOrders(vesselId) {
   return storage.checkAndRevertPostponedWorkOrders(vesselId);
+}
+async function findPostponementsByWorkOrderId(workOrderId) {
+  return storage.getWorkOrderPostponementsByWorkOrderId(workOrderId);
+}
+async function createPostponement(data) {
+  return storage.createWorkOrderPostponement(data);
+}
+async function getMaxPostponementNumber(workOrderId) {
+  const rows = await storage.getWorkOrderPostponementsByWorkOrderId(workOrderId);
+  if (!rows || rows.length === 0) return 0;
+  return Math.max(...rows.map((r) => r.postponementNumber || 1));
 }
 async function createAuditLog2(data) {
   return storage.createAuditLog(data);
@@ -26401,8 +26472,8 @@ import { Router as Router4 } from "express";
 
 // server/modules/jobs/repositories/jobRepository.ts
 init_storage();
-async function findJobs(vesselId, componentId) {
-  return storage.getJobs(vesselId, componentId);
+async function findJobs(vesselId, componentId, vesselIds) {
+  return storage.getJobs(vesselId, componentId, vesselIds);
 }
 async function findById2(id) {
   return storage.getJob(id);
@@ -26458,8 +26529,8 @@ async function createAuditLog(data) {
 
 // server/modules/jobs/services/jobService.ts
 init_errors();
-async function listJobs(vesselId, componentId) {
-  const jobs2 = await findJobs(vesselId, componentId);
+async function listJobs(vesselId, componentId, vesselIds) {
+  const jobs2 = await findJobs(vesselId, componentId, vesselIds);
   let jobLinksMap = /* @__PURE__ */ new Map();
   let jobLinkTrackingMap = /* @__PURE__ */ new Map();
   if (vesselId && vesselId !== "all") {
@@ -26471,8 +26542,8 @@ async function listJobs(vesselId, componentId) {
       jobLinkTrackingMap.set(`${link.jobId}:${link.componentId}`, link);
     }
   } else if (jobs2.length > 0) {
-    const vesselIds = Array.from(new Set(jobs2.map((j) => j.vesselId).filter((v) => v != null)));
-    for (const vid of vesselIds) {
+    const vesselIds2 = Array.from(new Set(jobs2.map((j) => j.vesselId).filter((v) => v != null)));
+    for (const vid of vesselIds2) {
       const links = await findJobComponentLinks(vid);
       for (const link of links) {
         const existing = jobLinksMap.get(link.jobId) || [];
@@ -27024,6 +27095,7 @@ async function getJobContext(jobId) {
     intervalRunningHour: job.intervalRunningHour?.toString() || "",
     assignedTo: job.assignedTo,
     approver: job.approver,
+    level2ReviewerRankId: job.level2ReviewerRankId || null,
     department: job.department,
     jobPriority: job.jobPriority,
     classRelated: job.classRelated,
@@ -27417,7 +27489,9 @@ async function exportMaintenancePlanner(filters, format3) {
 async function listJobs2(req, res) {
   const vesselId = req.query.vesselId;
   const componentId = req.query.componentId;
-  const jobs2 = await listJobs(vesselId, componentId);
+  const vesselIdsParam = req.query.vesselIds;
+  const vesselIds = vesselIdsParam ? vesselIdsParam.split(",").map((v) => v.trim()).filter(Boolean) : void 0;
+  const jobs2 = await listJobs(vesselId, componentId, vesselIds);
   res.json(jobs2);
 }
 async function getJob2(req, res) {
@@ -27832,10 +27906,13 @@ function getDisplayStatus(wo) {
   if (wo.workOrderType === "Unplanned") {
     if (isStoredCompleted(wo)) return "Completed";
     if (wo.status === "Pending Approval") return "Pending Approval";
+    if (wo.status === "Pending Office Review") return "Awaiting Level 2 Review";
     if (wo.status === "Draft") return "Draft";
     return wo.status || "Active";
   }
-  return getEffectiveStatus(wo);
+  const es = getEffectiveStatus(wo);
+  if (es === "Pending Office Review") return "Awaiting Level 2 Review";
+  return es;
 }
 function matchesTab(wo, activeTab) {
   const effectiveStatus = getEffectiveStatus(wo);
@@ -27855,10 +27932,12 @@ function matchesTab(wo, activeTab) {
     if (wo.workOrderType === "Unplanned") return false;
     if (effectiveStatus !== "Completed") return false;
   } else if (activeTab === "Pending Approval") {
-    if (getDisplayStatus(wo) !== "Pending Approval") return false;
+    const ds = getDisplayStatus(wo);
+    if (ds !== "Pending Approval" && ds !== "Awaiting Level 2 Review") return false;
   } else if (activeTab === "Postponed") {
     if (wo.isExecution) return false;
-    if (effectiveStatus !== "Postponed") return false;
+    const postponedStatuses = /* @__PURE__ */ new Set(["Postponed", "Awaiting Office Approval", "Postponement Approved"]);
+    if (!postponedStatuses.has(effectiveStatus)) return false;
   } else if (activeTab === "Unplanned") {
     if (wo.workOrderType !== "Unplanned") return false;
   }
@@ -27974,9 +28053,11 @@ function computeWorkOrderTabCounts(list) {
       if (es === "Due" || es === "Due (Grace P)") counts["Due"]++;
       if (es === "Overdue") counts["Overdue"]++;
     }
-    if (!wo.isExecution && getEffectiveStatus(wo) === "Postponed") counts["Postponed"]++;
+    const postponedStatuses = /* @__PURE__ */ new Set(["Postponed", "Awaiting Office Approval", "Postponement Approved"]);
+    if (!wo.isExecution && postponedStatuses.has(getEffectiveStatus(wo))) counts["Postponed"]++;
     if (wo.workOrderType === "Unplanned") counts["Unplanned"]++;
-    if (getDisplayStatus(wo) === "Pending Approval") counts["Pending Approval"]++;
+    const ds = getDisplayStatus(wo);
+    if (ds === "Pending Approval" || ds === "Awaiting Level 2 Review") counts["Pending Approval"]++;
     if (wo.workOrderType !== "Unplanned" && getEffectiveStatus(wo) === "Completed") counts["Completed"]++;
   }
   return counts;
@@ -28857,11 +28938,20 @@ async function updateWorkOrder(id, body) {
     updateData.rejectionComments = null;
     updateData.rejectionDate = null;
     updateData.approvalAction = null;
+    updateData.wasRejected = false;
     updateData.submittedDate = (/* @__PURE__ */ new Date()).toISOString();
     if (existingWO2.status === "Rejected") {
       updateData.superintendentRejectionRemarks = null;
     }
     console.log("\u{1F4DD} Previously rejected WO resubmitted - transitioning to Pending Approval");
+  }
+  if (isRejectedWO && updateData.status === "Pending Approval" && hasExplicitStatus) {
+    updateData.wasRejected = false;
+    updateData.rejectionComments = null;
+    updateData.rejectionDate = null;
+    updateData.approvalAction = null;
+    if (!updateData.submittedDate) updateData.submittedDate = (/* @__PURE__ */ new Date()).toISOString();
+    console.log("\u{1F4DD} Reviewer-reopened WO explicitly resubmitted to Pending Approval - clearing rejection flags");
   }
   const isSubmissionAction = updateData.approvalAction === "submitted" || updateData.approvalAction === "submit" || updateData.status === "Pending Approval";
   if (isSubmissionAction && !existingWO2.submittedDate) {
@@ -28948,7 +29038,21 @@ async function updateWorkOrder(id, body) {
     }
   }
   const isApprovalTransition = updateData.approvalAction === "approved" && updateData.status === "Completed" || updateData.status === "Completed" && existingWO2.status === "Pending Approval";
-  if (isApprovalTransition) {
+  let interceptedForL2Review = false;
+  if (isApprovalTransition && existingWO2.jobId) {
+    try {
+      const linkedJob = await findJob(existingWO2.jobId);
+      if (linkedJob && linkedJob.level2ReviewerRankId) {
+        interceptedForL2Review = true;
+        updateData.status = "Pending Office Review";
+        updateData.approvalDate = (/* @__PURE__ */ new Date()).toISOString();
+        console.log(`\u{1F512} [L2 Review] WO ${existingWO2.workOrderNo} intercepted \u2014 job requires Level 2 reviewer rank "${linkedJob.level2ReviewerRankId}"`);
+      }
+    } catch (err) {
+      console.warn(`[L2 Review] Could not load linked job ${existingWO2.jobId} for L2 check \u2014 proceeding without interception:`, err);
+    }
+  }
+  if (isApprovalTransition && !interceptedForL2Review) {
     const { resolveHodForDepartment: resolveHodForDepartment2, getHodShortLabel: getHodShortLabel2 } = await Promise.resolve().then(() => (init_hodResolutionService(), hodResolutionService_exports));
     const hodResolution = await resolveHodForDepartment2(
       existingWO2.vesselId,
@@ -29064,7 +29168,7 @@ async function updateWorkOrder(id, body) {
     }
   }
   const isApprovalAction = updateData.approvalAction === "approved" && updateData.status === "Completed";
-  if (!isApprovalAction && !isBeingRejected && !woIsCompleted) {
+  if (!isApprovalAction && !isBeingRejected && !woIsCompleted && !interceptedForL2Review) {
     const currentConsumed = ensureArray(updateData.consumedSpareParts);
     const previousConsumed = ensureArray(existingWO2.consumedSpareParts);
     const sparesToProcess = computeSpareConsumptionDelta(currentConsumed, previousConsumed);
@@ -29744,6 +29848,153 @@ async function rejectCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
   }
   return updatedWO;
 }
+async function submitPostponeRequest(id, body) {
+  let wo = await findById3(id);
+  if (!wo) wo = await findByCode(id);
+  if (!wo) throw new NotFoundError("Work order not found");
+  const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  const updatedWO = await update5(id, {
+    status: "Awaiting Office Approval",
+    postponeRequestedDate: body.nextDueDate || body.postponeDate,
+    postponementReason: body.reason || body.postponementReason,
+    postponementRemarks: body.postponementRemarks,
+    postponeApprover: body.approver || "Office",
+    // Clear any previous approval decision fields
+    postponementApprovalDate: null,
+    postponementApprovalRemarks: null
+  });
+  const prevMax = await getMaxPostponementNumber(wo.wouuid);
+  await createPostponement({
+    id: crypto.randomUUID(),
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId,
+    postponementNumber: prevMax + 1,
+    originalDueDate: wo.originalDueDate || wo.dueDate,
+    newDueDate: body.nextDueDate || body.postponeDate,
+    postponementReason: body.reason || body.postponementReason,
+    postponementRemarks: body.postponementRemarks,
+    approver: body.approver || "Office",
+    postponeDate: body.postponeDate,
+    durationDays: body.duration ? parseInt(String(body.duration), 10) : null,
+    submittedDate: today,
+    status: "Awaiting Approval",
+    informOffice: true
+  });
+  return updatedWO;
+}
+async function editPostponeRequest(id, body) {
+  return submitPostponeRequest(id, body);
+}
+async function approvePostponement(id, body) {
+  let wo = await findById3(id);
+  if (!wo) wo = await findByCode(id);
+  if (!wo) throw new NotFoundError("Work order not found");
+  if (wo.status !== "Awaiting Office Approval") {
+    throw new ValidationError(
+      `Only work orders with status "Awaiting Office Approval" can be approved. Current status: ${wo.status}`
+    );
+  }
+  const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  const newDueDate = wo.postponeRequestedDate || body.newDueDate;
+  const updatedWO = await update5(id, {
+    status: "Postponement Approved",
+    dueDate: newDueDate,
+    postponementEndDate: newDueDate,
+    postponeApprover: body.approvedBy || "Office",
+    postponementApprovalDate: today,
+    postponementApprovalRemarks: body.approvalRemarks || null
+  });
+  const existingRows = await findPostponementsByWorkOrderId(wo.wouuid);
+  const prevMaxApprove = existingRows?.length ? existingRows.reduce(
+    (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+  ).postponementNumber || 1 : 1;
+  const latestApprove = existingRows?.length ? existingRows.reduce(
+    (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+  ) : null;
+  await createPostponement({
+    id: crypto.randomUUID(),
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId,
+    postponementNumber: prevMaxApprove + 1,
+    originalDueDate: latestApprove?.originalDueDate || wo.originalDueDate || wo.dueDate,
+    newDueDate,
+    postponementReason: latestApprove?.postponementReason || wo.postponementReason,
+    postponementRemarks: latestApprove?.postponementRemarks || wo.postponementRemarks,
+    authorizedBy: body.approvedBy || "Office",
+    approvedBy: body.approvedBy || "Office",
+    approvedDate: today,
+    approvalRemarks: body.approvalRemarks || null,
+    approver: body.approvedBy || "Office",
+    durationDays: latestApprove?.durationDays || null,
+    submittedDate: today,
+    status: "Approved",
+    informOffice: true
+  });
+  return updatedWO;
+}
+async function rejectPostponement(id, body) {
+  let wo = await findById3(id);
+  if (!wo) wo = await findByCode(id);
+  if (!wo) throw new NotFoundError("Work order not found");
+  if (wo.status !== "Awaiting Office Approval") {
+    throw new ValidationError(
+      `Only work orders with status "Awaiting Office Approval" can be rejected. Current status: ${wo.status}`
+    );
+  }
+  const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  const companyGraceRow = await storage.getCompanyStandardGraceSettings();
+  const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
+  const vesselSettings = wo.vesselId ? await findPmsVesselSettings2(wo.vesselId) : null;
+  const vesselGraceSettings = vesselSettings ? {
+    calendarGraceMode: vesselSettings.calendarGraceMode || "COMPANY_STANDARD",
+    calendarGraceDays: vesselSettings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+    rhGraceHours: vesselSettings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+    rhLeadTimeHours: vesselSettings.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
+  } : void 0;
+  const revertDueDate = wo.originalDueDate || wo.dueDate;
+  const revertedStatus = computeWorkOrderStatus({
+    dueDate: revertDueDate,
+    isExecution: wo.isExecution,
+    status: "Due",
+    // force calendar path — let computeWorkOrderStatus decide
+    maintenanceBasis: wo.maintenanceBasis || void 0,
+    vesselGraceSettings,
+    companyGraceConfig
+  });
+  const updatedWO = await update5(id, {
+    status: revertedStatus,
+    postponeApprover: body.approvedBy || "Office",
+    postponementApprovalDate: today,
+    postponementApprovalRemarks: body.approvalRemarks || null
+  });
+  const rejectRows = await findPostponementsByWorkOrderId(wo.wouuid);
+  const prevMaxReject = rejectRows?.length ? rejectRows.reduce(
+    (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+  ).postponementNumber || 1 : 1;
+  const latestReject = rejectRows?.length ? rejectRows.reduce(
+    (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+  ) : null;
+  await createPostponement({
+    id: crypto.randomUUID(),
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId,
+    postponementNumber: prevMaxReject + 1,
+    originalDueDate: latestReject?.originalDueDate || wo.originalDueDate || wo.dueDate,
+    newDueDate: latestReject?.newDueDate || wo.postponeRequestedDate,
+    postponementReason: latestReject?.postponementReason || wo.postponementReason,
+    postponementRemarks: latestReject?.postponementRemarks || wo.postponementRemarks,
+    authorizedBy: body.approvedBy || "Office",
+    approvedBy: body.approvedBy || "Office",
+    approvedDate: today,
+    approvalRemarks: body.approvalRemarks || null,
+    approver: body.approvedBy || "Office",
+    durationDays: latestReject?.durationDays || null,
+    submittedDate: today,
+    status: "Rejected",
+    informOffice: true
+  });
+  return updatedWO;
+}
 async function reopenCompletedWorkOrder(id, remarks, actorUserUuid, actorName) {
   let existingWO2 = await findById3(id);
   if (!existingWO2) existingWO2 = await findByCode(id);
@@ -30097,6 +30348,7 @@ async function getWorkOrderContext(workOrderId) {
     intervalRunningHour: job.intervalRunningHour?.toString() || "",
     assignedTo: job.assignedTo || workOrder.assignedTo,
     approver: job.approver,
+    level2ReviewerRankId: job.level2ReviewerRankId || null,
     department: job.department,
     jobPriority: job.jobPriority,
     classRelated: job.classRelated,
@@ -30948,6 +31200,181 @@ async function completeWorkOrder(workOrderId, body) {
     missedCycles
   };
 }
+async function finalizeWorkOrderCompletion(workOrderId) {
+  const workOrder = await findById3(workOrderId);
+  if (!workOrder) {
+    console.error(`[Finalize] Work order ${workOrderId} not found`);
+    return;
+  }
+  let component = await findComponent2(workOrder.component);
+  if (!component && workOrder.componentCode && workOrder.vesselId) {
+    const byCode = await findComponentByCode2(workOrder.componentCode, workOrder.vesselId);
+    if (byCode && byCode.name === workOrder.component) component = byCode;
+  }
+  if (!component && workOrder.vesselId) {
+    const all = await findComponents2(workOrder.vesselId);
+    component = all.find((c) => c.name === workOrder.component) ?? all.find((c) => c.componentCode === workOrder.componentCode) ?? null;
+  }
+  if (!component) {
+    console.warn(`[Finalize] Could not find component for WO ${workOrder.workOrderNo} \u2014 skipping side-effects`);
+    return;
+  }
+  const rawCompletionDate = workOrder.completionDateTime || workOrder.dateCompleted || null;
+  const missedCycles = workOrder.missedCycles || 0;
+  const originalDueDate = workOrder.originalDueDate || workOrder.nextDueDate || workOrder.dueDate || null;
+  const normalizeToISO = (d) => {
+    if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.split("T")[0];
+    const m = d.match(/^(\d{2})[-\/](\d{2})[-\/](\d{4})/);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+    const p = new Date(d);
+    return !isNaN(p.getTime()) ? p.toISOString().split("T")[0] : null;
+  };
+  try {
+    const existing = await findMaintenanceHistoryByWorkOrderId(workOrder.wouuid);
+    if (existing) {
+      console.log(`\u26A0\uFE0F [Finalize] Maintenance history already exists for WO ${workOrder.workOrderNo}, skipping`);
+    } else if (rawCompletionDate) {
+      const dateOfCompletion = normalizeToISO(rawCompletionDate);
+      if (dateOfCompletion) {
+        await createMaintenanceHistory({
+          componentId: component.cuuid,
+          componentCode: workOrder.componentCode || component.componentCode,
+          vesselCode: workOrder.vesselId,
+          jobId: workOrder.jobId || null,
+          jobCode: workOrder.workOrderNo?.match(/^(.+?)-\d+\.\d+/)?.[1] || null,
+          workOrderId: workOrder.wouuid,
+          workOrderNo: workOrder.workOrderNo || `WO-${workOrder.id}`,
+          jobTitle: workOrder.jobTitle,
+          maintenanceType: workOrder.maintenanceType || workOrder.taskType || "Servicing",
+          dateCompleted: dateOfCompletion,
+          runningHoursAtCompletion: workOrder.runningHours || null,
+          performedBy: workOrder.performedBy || workOrder.executionAssignedTo || "Unknown",
+          approvedBy: workOrder.approver || null,
+          approvalDate: dateOfCompletion,
+          status: "Approved",
+          workDescription: workOrder.workCarriedOut || workOrder.briefWorkDescription || null,
+          sparesUsed: workOrder.consumedSpareParts ? JSON.stringify(workOrder.consumedSpareParts) : null,
+          remarks: missedCycles >= 1 ? `${missedCycles} cycles skipped \u2014 completed late${workOrder.remarks ? ". " + workOrder.remarks : ""}` : workOrder.remarks || workOrder.jobExperienceNotes || "Completed on time",
+          isComponentReplaced: false,
+          missedCycles,
+          originalDueDate
+        });
+        console.log(`\u2705 [Finalize] Created maintenance history for WO ${workOrder.workOrderNo}`);
+      }
+    }
+  } catch (err) {
+    console.error("[Finalize] Failed to create maintenance history:", err);
+  }
+  try {
+    let job = null;
+    if (workOrder.jobId) job = await findJob(workOrder.jobId);
+    if (!job && workOrder.workOrderNo) {
+      const m1 = workOrder.workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
+      const m2 = workOrder.workOrderNo.match(/^(.+)-\d{4}-\d+$/);
+      const extractedJobNo = m1 ? m1[1] : m2 ? m2[1] : null;
+      if (extractedJobNo && workOrder.vesselId) {
+        const jobs2 = await findJobs2(workOrder.vesselId);
+        job = jobs2.find((j) => j.jobNo === extractedJobNo) || null;
+      }
+    }
+    if (job && rawCompletionDate) {
+      const dateOfCompletionNorm = normalizeToISO(rawCompletionDate);
+      const basis = workOrder.maintenanceBasis;
+      if ((basis === "Calendar" || basis === "Dual Frequency") && dateOfCompletionNorm) {
+        const { calculateNextDueDate: calculateNextDueDate2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
+        const updates = { lastDoneDate: dateOfCompletionNorm };
+        const linkUpdates = { lastDoneDate: dateOfCompletionNorm, updatedAt: /* @__PURE__ */ new Date() };
+        if (job.frequencyValue && job.frequencyUnit) {
+          const nextDue = calculateNextDueDate2(dateOfCompletionNorm, job.frequencyValue, job.frequencyUnit, originalDueDate);
+          if (nextDue) {
+            updates.nextDueDate = nextDue;
+            linkUpdates.nextDueDate = nextDue;
+          }
+        }
+        const vId = workOrder.vesselId || job.vesselId;
+        if (component.cuuid && vId) {
+          await updateJobComponentLinkTracking(vId, job.juuid, component.cuuid, linkUpdates);
+        }
+        await updateJob3(job.juuid, updates);
+        console.log(`\u2705 [Finalize] Updated calendar job ${job.jobNo} lastDoneDate: ${dateOfCompletionNorm}`);
+      }
+      if ((basis === "Running Hours" || basis === "Dual Frequency") && workOrder.runningHours) {
+        const currentRH = parseInt(workOrder.runningHours);
+        if (!isNaN(currentRH)) {
+          const rhUpdates = { lastDoneRH: currentRH };
+          const rhLinkUpdates = { lastDoneRH: currentRH.toString(), updatedAt: /* @__PURE__ */ new Date() };
+          const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
+          if (rhInterval && !isNaN(rhInterval)) {
+            rhUpdates.nextDueRH = currentRH + rhInterval;
+            rhLinkUpdates.nextDueRH = (currentRH + rhInterval).toString();
+          }
+          const vId = workOrder.vesselId || job.vesselId;
+          if (component.cuuid && vId) {
+            await updateJobComponentLinkTracking(vId, job.juuid, component.cuuid, rhLinkUpdates);
+          }
+          await updateJob3(job.juuid, rhUpdates);
+          console.log(`\u2705 [Finalize] Updated RH job ${job.jobNo} lastDoneRH: ${currentRH}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[Finalize] Failed to update job cycle dates:", err);
+  }
+  try {
+    const consumedSpareParts = ensureArray(workOrder.consumedSpareParts);
+    if (consumedSpareParts.length > 0) {
+      const woVesselId = workOrder.vesselId || "V001";
+      const allSpares = await findSpares2(woVesselId);
+      for (const cs of consumedSpareParts) {
+        const qty = typeof cs.quantityConsumed === "string" ? parseFloat(cs.quantityConsumed) : cs.quantityConsumed;
+        const alreadyDeducted = cs._deductedQty || 0;
+        let spare = cs.partCode ? allSpares.find((s) => s.partCode === cs.partCode) : null;
+        if (!spare && cs.partNo) {
+          spare = allSpares.find((s) => s.partCode === cs.partNo) || allSpares.find((s) => s.partNumber === cs.partNo) || null;
+        }
+        if (!spare) {
+          console.warn(`[Finalize] Spare ${cs.partCode || cs.partNo} not found, skipping`);
+          continue;
+        }
+        let locationId = cs.locationId ? parseInt(String(cs.locationId)) : null;
+        const locName = cs.location || cs.locationName;
+        if ((!locationId || isNaN(locationId)) && locName) {
+          const locObj = await findOrCreateLocation(woVesselId, locName, workOrder.approver || "system");
+          if (locObj) locationId = locObj.id;
+        }
+        if (!locationId || isNaN(locationId)) {
+          console.warn(`[Finalize] No location for spare ${cs.partCode || cs.partNo}, skipping`);
+          continue;
+        }
+        const existingTxns = await getInventoryTransactions(woVesselId, { spareId: spare.id, locationId, eventType: "CONSUME" });
+        const priorTotal = existingTxns.filter((t) => t.referenceId === workOrder.wouuid).reduce((s, t) => s + Math.abs(t.qtyChange || 0), 0);
+        const effectiveRemaining = (qty || 0) - Math.max(alreadyDeducted, priorTotal);
+        if (effectiveRemaining <= 0) {
+          console.log(`\u23ED\uFE0F [Finalize] Spare ${cs.partCode || cs.partNo} already fully deducted, skipping`);
+          continue;
+        }
+        try {
+          await performInventoryTransaction({
+            vesselId: woVesselId,
+            spareId: spare.id,
+            locationId,
+            eventType: "CONSUME",
+            qtyChange: -Math.abs(effectiveRemaining),
+            referenceType: "WORK_ORDER",
+            referenceId: workOrder.wouuid,
+            referenceNote: `WO L2 Approval: ${workOrder.workOrderNo}${cs.comments ? " - " + cs.comments : ""}`,
+            userId: workOrder.approver || "system"
+          });
+          console.log(`\u2705 [Finalize] Deducted ${effectiveRemaining} of spare ${spare.partCode} at location ${locationId}`);
+        } catch (txnErr) {
+          console.error(`[Finalize] Spare transaction failed for ${spare.partCode || cs.partNo}:`, txnErr.message);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[Finalize] Failed to process spare consumption:", err);
+  }
+}
 
 // server/modules/work-orders/services/workOrderBulkService.ts
 init_workOrderRepository();
@@ -31020,19 +31447,32 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
           continue;
         }
       }
+      let requiresLevel2Review = false;
+      if (existingWO2.jobId) {
+        try {
+          const linkedJob = await findJob(existingWO2.jobId);
+          if (linkedJob && linkedJob.level2ReviewerRankId) {
+            requiresLevel2Review = true;
+          }
+        } catch (err) {
+          console.warn(`[Bulk Approve] Could not load linked job ${existingWO2.jobId}:`, err);
+        }
+      }
       const updateData = {
-        status: "Completed",
+        status: requiresLevel2Review ? "Pending Office Review" : "Completed",
         approvalAction: "approved",
         approver: resolvedApprover,
         approverRemarks,
         skippedCyclesJustification: missedCycles >= 1 && skippedCyclesJustification ? skippedCyclesJustification : null,
         approvalDate: (/* @__PURE__ */ new Date()).toISOString(),
-        nextDueDate,
-        nextDueReading,
-        missedCycles,
-        originalDueDate,
         wasRejected: false
       };
+      if (!requiresLevel2Review) {
+        updateData.nextDueDate = nextDueDate;
+        updateData.nextDueReading = nextDueReading;
+        updateData.missedCycles = missedCycles;
+        updateData.originalDueDate = originalDueDate;
+      }
       if (actualCompletionDate) {
         updateData.dateCompleted = actualCompletionDate;
       }
@@ -31042,7 +31482,7 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
       } catch (err) {
         console.error("[FieldLogger] WO bulkApprove:", err);
       }
-      if (missedCycles >= 1 && existingWO2.maintenanceBasis === "Calendar") {
+      if (!requiresLevel2Review && missedCycles >= 1 && existingWO2.maintenanceBasis === "Calendar") {
         try {
           const { createSkippedCycleRecords: createSkippedCycleRecords2 } = await Promise.resolve().then(() => (init_skippedCycleBackfill(), skippedCycleBackfill_exports));
           await createSkippedCycleRecords2({
@@ -31076,6 +31516,150 @@ async function bulkApprove(workOrderIds, approver, approverRemarks, skippedCycle
     message: `Bulk approval completed: ${results.success.length} approved, ${results.failed.length} failed`,
     results
   };
+}
+async function reviewerApprove(workOrderId, reviewerComments, reviewedByUuid) {
+  const existingWO2 = await findById3(workOrderId);
+  if (!existingWO2) {
+    throw new ValidationError("Work order not found");
+  }
+  if (existingWO2.status !== "Pending Office Review") {
+    throw new ValidationError(`Work order is not pending office review (status: ${existingWO2.status})`);
+  }
+  const actualCompletionDate = existingWO2.completionDateTime || existingWO2.dateCompleted;
+  const originalDueDate = existingWO2.nextDueDate || existingWO2.dueDate || null;
+  let nextDueDate;
+  let nextDueReading;
+  if (existingWO2.maintenanceBasis === "Calendar" && actualCompletionDate) {
+    if (existingWO2.frequencyValue && existingWO2.frequencyUnit) {
+      const { calculateNextDueDate: calculateNextDueDate2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
+      const computed = calculateNextDueDate2(actualCompletionDate, existingWO2.frequencyValue, existingWO2.frequencyUnit, originalDueDate);
+      if (computed) nextDueDate = computed;
+    }
+  } else if (existingWO2.maintenanceBasis === "Running Hours" && existingWO2.currentReading) {
+    nextDueReading = (parseInt(existingWO2.currentReading) + parseInt(existingWO2.frequencyValue || "0")).toString();
+  }
+  const { calculateMissedCycles: calculateMissedCycles2 } = await Promise.resolve().then(() => (init_dateUtils(), dateUtils_exports));
+  const completionDateForCalc = actualCompletionDate || existingWO2.completionDateTime || existingWO2.dateCompleted;
+  const missedCycles = existingWO2.maintenanceBasis === "Running Hours" ? 0 : calculateMissedCycles2(existingWO2.nextDueDate || existingWO2.dueDate, completionDateForCalc, existingWO2.frequencyValue, existingWO2.frequencyUnit);
+  const updateData = {
+    status: "Completed",
+    reviewerComments: reviewerComments || null,
+    reviewedByUuid: reviewedByUuid || null,
+    nextDueDate,
+    nextDueReading,
+    missedCycles,
+    originalDueDate
+  };
+  if (actualCompletionDate) {
+    updateData.dateCompleted = actualCompletionDate;
+  }
+  await update5(workOrderId, updateData);
+  try {
+    await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, existingWO2, { ...existingWO2, ...updateData }, reviewedByUuid || "system");
+  } catch (err) {
+    console.error("[FieldLogger] WO reviewerApprove:", err);
+  }
+  try {
+    await createAuditLog2({
+      entityType: "work_order",
+      entityId: existingWO2.wouuid || workOrderId,
+      actionType: "reviewer_approve",
+      userId: reviewedByUuid || "system",
+      source: "web_ui",
+      vesselCode: existingWO2.vesselId || null,
+      componentCode: existingWO2.componentCode || null,
+      fieldName: null,
+      oldValue: null,
+      newValue: null,
+      payload: {
+        workOrderNo: existingWO2.workOrderNo,
+        status: "Completed",
+        approvedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        reviewerComments: reviewerComments || null
+      }
+    });
+  } catch (auditError) {
+    console.error("Failed to create audit log for reviewer approve:", auditError);
+  }
+  if (missedCycles >= 1 && existingWO2.maintenanceBasis === "Calendar") {
+    try {
+      const { createSkippedCycleRecords: createSkippedCycleRecords2 } = await Promise.resolve().then(() => (init_skippedCycleBackfill(), skippedCycleBackfill_exports));
+      await createSkippedCycleRecords2({
+        workOrderId: existingWO2.wouuid || workOrderId,
+        componentId: existingWO2.component || "",
+        componentCode: existingWO2.componentCode || null,
+        vesselCode: existingWO2.vesselId || null,
+        jobId: existingWO2.jobId || null,
+        jobCode: existingWO2.templateCode || null,
+        jobTitle: existingWO2.jobTitle || null,
+        originalDueDate,
+        missedCycles,
+        frequencyValue: existingWO2.frequencyValue || "0",
+        frequencyUnit: existingWO2.frequencyUnit || ""
+      });
+    } catch (err) {
+      console.error("[BACKFILL ERROR] Reviewer approve skipped cycle records:", err);
+    }
+  }
+  try {
+    await finalizeWorkOrderCompletion(workOrderId);
+  } catch (finalizeErr) {
+    console.error("[ReviewerApprove] finalizeWorkOrderCompletion failed (non-blocking):", finalizeErr);
+  }
+  invalidateComplianceCache();
+  console.log(`\u2705 Reviewer approved work order: ${workOrderId}`);
+  return { message: "Work order approved by reviewer", workOrderId };
+}
+async function reviewerReopen(workOrderId, reviewerComments, reviewedByUuid) {
+  const existingWO2 = await findById3(workOrderId);
+  if (!existingWO2) {
+    throw new ValidationError("Work order not found");
+  }
+  if (existingWO2.status !== "Pending Office Review") {
+    throw new ValidationError(`Work order is not pending office review (status: ${existingWO2.status})`);
+  }
+  const updateData = {
+    status: "Due",
+    approvalAction: "rejected",
+    wasRejected: true,
+    reviewerComments: reviewerComments || null,
+    reviewedByUuid: reviewedByUuid || null,
+    rejectionDate: (/* @__PURE__ */ new Date()).toISOString(),
+    rejectionComments: reviewerComments || null
+    // Intentionally preserve completionDateTime and dateCompleted so the vessel
+    // form loads pre-populated and hasCompletionData evaluates true on resubmit.
+  };
+  await update5(workOrderId, updateData);
+  try {
+    await logFieldChanges("work_orders", existingWO2.wouuid, existingWO2.vesselId || null, existingWO2, { ...existingWO2, ...updateData }, reviewedByUuid || "system");
+  } catch (err) {
+    console.error("[FieldLogger] WO reviewerReopen:", err);
+  }
+  try {
+    await createAuditLog2({
+      entityType: "work_order",
+      entityId: existingWO2.wouuid || workOrderId,
+      actionType: "reviewer_reopen",
+      userId: reviewedByUuid || "system",
+      source: "web_ui",
+      vesselCode: existingWO2.vesselId || null,
+      componentCode: existingWO2.componentCode || null,
+      fieldName: null,
+      oldValue: null,
+      newValue: null,
+      payload: {
+        workOrderNo: existingWO2.workOrderNo,
+        status: "Due",
+        reopenedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        reviewerComments: reviewerComments || null
+      }
+    });
+  } catch (auditError) {
+    console.error("Failed to create audit log for reviewer reopen:", auditError);
+  }
+  invalidateComplianceCache();
+  console.log(`\u{1F504} Reviewer reopened work order: ${workOrderId}`);
+  return { message: "Work order sent back for rework by reviewer", workOrderId };
 }
 async function bulkReject(workOrderIds, approver, rejectionComments, actor) {
   if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
@@ -32302,6 +32886,20 @@ async function completeWorkOrder2(req, res) {
     throw error;
   }
 }
+async function reviewerApprove2(req, res) {
+  const workOrderId = req.params.id;
+  const { reviewerComments } = req.body;
+  const reviewedByUuid = req.user?.userUuid || req.user?.username || "system";
+  const result = await reviewerApprove(workOrderId, reviewerComments, reviewedByUuid);
+  res.json(result);
+}
+async function reviewerReopen2(req, res) {
+  const workOrderId = req.params.id;
+  const { reviewerComments } = req.body;
+  const reviewedByUuid = req.user?.userUuid || req.user?.username || "system";
+  const result = await reviewerReopen(workOrderId, reviewerComments, reviewedByUuid);
+  res.json(result);
+}
 async function bulkApprove2(req, res) {
   const { workOrderIds, approver, approverRemarks, skippedCyclesJustification } = req.body;
   const result = await bulkApprove(workOrderIds, approver, approverRemarks, skippedCyclesJustification);
@@ -32331,6 +32929,54 @@ async function checkPostponements2(req, res) {
   const vesselId = req.body.vesselId || req.query.vesselId;
   const result = await checkPostponements(vesselId);
   res.json(result);
+}
+async function submitPostponeRequest2(req, res) {
+  try {
+    const result = await submitPostponeRequest(req.params.id, req.body);
+    res.json(result);
+  } catch (error) {
+    if (error.message?.includes("not found")) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+async function editPostponeRequest2(req, res) {
+  try {
+    const result = await editPostponeRequest(req.params.id, req.body);
+    res.json(result);
+  } catch (error) {
+    if (error.message?.includes("not found")) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+async function approvePostponement2(req, res) {
+  try {
+    const actor = resolveActorIdentity(req);
+    const result = await approvePostponement(req.params.id, {
+      ...req.body,
+      approvedBy: actor || req.body.approvedBy || "Office"
+    });
+    res.json(result);
+  } catch (error) {
+    if (error.message?.includes("not found")) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+async function rejectPostponement2(req, res) {
+  try {
+    const actor = resolveActorIdentity(req);
+    const result = await rejectPostponement(req.params.id, {
+      ...req.body,
+      approvedBy: actor || req.body.approvedBy || "Office"
+    });
+    res.json(result);
+  } catch (error) {
+    if (error.message?.includes("not found")) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
 }
 async function getExecutions2(req, res) {
   const result = await getExecutions(req.params.componentId);
@@ -32732,6 +33378,16 @@ router5.post("/work-orders", asyncHandler(createWorkOrder2));
 router5.patch("/work-orders/:id", asyncHandler(updateWorkOrder2));
 router5.delete("/work-orders/:id", asyncHandler(deleteWorkOrder2));
 router5.post(
+  "/work-orders/:id/reviewer-approve",
+  requireRole(["Office", "PMS Admin", "Sail Admin"]),
+  asyncHandler(reviewerApprove2)
+);
+router5.post(
+  "/work-orders/:id/reviewer-reopen",
+  requireRole(["Office", "PMS Admin", "Sail Admin"]),
+  asyncHandler(reviewerReopen2)
+);
+router5.post(
   "/work-orders/:id/reject-completion",
   requireRole(["Office", "PMS Admin", "Sail Admin"]),
   asyncHandler(rejectCompletion)
@@ -32753,6 +33409,18 @@ router5.post("/work-orders/backfill-job-ids", asyncHandler(backfillJobIds2));
 router5.post("/work-orders/:id/overdue-reason", asyncHandler(saveOverdueReason2));
 router5.post("/work-orders/recalculate-statuses", asyncHandler(recalculateStatuses2));
 router5.post("/work-orders/check-postponements", asyncHandler(checkPostponements2));
+router5.post("/work-orders/:id/postpone-request", asyncHandler(submitPostponeRequest2));
+router5.put("/work-orders/:id/postpone-request", asyncHandler(editPostponeRequest2));
+router5.post(
+  "/work-orders/:id/postpone-approve",
+  requireRole(["Office", "PMS Admin", "Sail Admin"]),
+  asyncHandler(approvePostponement2)
+);
+router5.post(
+  "/work-orders/:id/postpone-reject",
+  requireRole(["Office", "PMS Admin", "Sail Admin"]),
+  asyncHandler(rejectPostponement2)
+);
 router5.get("/work-order-executions/:componentId", asyncHandler(getExecutions2));
 router5.get("/work-order-executions/details/:id", asyncHandler(getExecution2));
 router5.post("/work-order-executions", asyncHandler(createExecution3));
@@ -32943,8 +33611,8 @@ async function cascadeUpdate(body) {
     }
   };
 }
-async function listParents(vesselId, period = "monthly", customFrom, customTo) {
-  const allComponents = await getComponents(vesselId);
+async function listParents(vesselId, period = "monthly", customFrom, customTo, vesselIds) {
+  const allComponents = await getComponents(vesselId, vesselIds);
   const masterComponents = allComponents.filter(
     (component) => component.rhCounterType === "MASTER" && component.isActive !== false
   );
@@ -32970,7 +33638,7 @@ async function listParents(vesselId, period = "monthly", customFrom, customTo) {
   const totalPeriodHours = periodDays * 24;
   const parentsWithCounts = await Promise.all(
     masterComponents.map(async (component) => {
-      const allInheritedComponents = await getInheritedComponents2(component.cuuid, vesselId);
+      const allInheritedComponents = await getInheritedComponents2(component.cuuid, component.vesselId ?? vesselId);
       const inheritedComponents = allInheritedComponents.filter((c) => c.isActive !== false);
       const meterReplacedLastRh = parseFloat(component.meterReplacedLastRh || "0");
       const currentMeterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || "0");
@@ -33444,14 +34112,16 @@ async function listParents2(req, res) {
     const vesselId = req.query.vesselId || "V001";
     const periodFrom = req.query.periodFrom;
     const periodTo = req.query.periodTo;
+    const vesselIdsRaw = typeof req.query.vesselIds === "string" ? req.query.vesselIds : "";
+    const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(",").filter(Boolean) : void 0;
     if (periodFrom && periodTo) {
-      const result = await listParents(vesselId, "custom", new Date(periodFrom), new Date(periodTo));
+      const result = await listParents(vesselId, "custom", new Date(periodFrom), new Date(periodTo), vesselIds);
       res.json(result);
     } else {
       const period = req.query.period || "monthly";
       const validPeriods = ["weekly", "monthly", "quarterly", "yearly"];
       const safePeriod = validPeriods.includes(period) ? period : "monthly";
-      const result = await listParents(vesselId, safePeriod);
+      const result = await listParents(vesselId, safePeriod, void 0, void 0, vesselIds);
       res.json(result);
     }
   } catch (error) {
@@ -33797,8 +34467,8 @@ async function adjustSpareAtLocation(id, newRob, location, userId, remarks, plac
 async function transferSpareLocation(id, newRobLocationA, newRobLocationB, userId, remarks, place, dateLocal, tz) {
   return storage.transferSpareLocation(id, newRobLocationA, newRobLocationB, userId, remarks, place, dateLocal, tz);
 }
-async function getSpareHistory(vesselId) {
-  return storage.getSpareHistory(vesselId);
+async function getSpareHistory(vesselId, vesselIds) {
+  return storage.getSpareHistory(vesselId, vesselIds);
 }
 async function getVessels4() {
   return storage.getVessels();
@@ -34237,8 +34907,8 @@ async function receiveToLocation(paramsRaw, bodyRaw) {
   );
   return { validationError: false, response: { success: true, data: result } };
 }
-async function getSpareHistory2(vesselId) {
-  return getSpareHistory(vesselId);
+async function getSpareHistory2(vesselId, vesselIds) {
+  return getSpareHistory(vesselId, vesselIds);
 }
 async function getLowStockSpares(vesselId) {
   const spares2 = await getSpares(vesselId);
@@ -34267,8 +34937,10 @@ async function getAllSpares3(req, res) {
 async function getSpareHistoryByVessel(req, res) {
   try {
     const { vesselId } = req.params;
+    const vesselIdsRaw = typeof req.query.vesselIds === "string" ? req.query.vesselIds : "";
+    const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(",").filter(Boolean) : void 0;
     console.log("[API] Fetching spare history for vessel:", vesselId);
-    const history = await getSpareHistory2(vesselId);
+    const history = await getSpareHistory2(vesselId, vesselIds);
     console.log("[API] Found", history.length, "history entries");
     res.json(history);
   } catch (error) {
@@ -35023,6 +35695,8 @@ async function getSparesWithInventory(req, res) {
     const activeOnly = String(req.query.activeOnly ?? "").toLowerCase() === "true";
     const componentIdRaw = typeof req.query.componentId === "string" ? req.query.componentId.trim() : "";
     const componentId = componentIdRaw ? componentIdRaw : void 0;
+    const vesselIdsRaw = typeof req.query.vesselIds === "string" ? req.query.vesselIds : "";
+    const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(",").filter(Boolean) : void 0;
     const result = await getSparesWithInventoryByVesselPaged2(vesselId, {
       page,
       pageSize,
@@ -35033,7 +35707,8 @@ async function getSparesWithInventory(req, res) {
       sortBy,
       sortDir,
       activeOnly,
-      componentId
+      componentId,
+      vesselIds
     });
     res.json({ success: true, data: result });
   } catch (error) {
@@ -35174,26 +35849,28 @@ async function getVessels5() {
 }
 
 // server/modules/stores/services/storesService.ts
-async function getAllStores(itemType) {
+async function getAllStores(itemType, vesselIds) {
   const allVessels = await getVessels5();
+  const scoped = vesselIds && vesselIds.length > 0 ? allVessels.filter((v) => vesselIds.includes(v.id)) : allVessels;
   const allStores = [];
-  for (const vessel of allVessels) {
+  for (const vessel of scoped) {
     const vesselStores = await getStoresItems(vessel.id, itemType);
     allStores.push(...vesselStores);
   }
   return allStores;
 }
-async function getStoresByVessel(vesselId, itemType) {
+async function getStoresByVessel(vesselId, itemType, vesselIds) {
   if (vesselId === "all") {
-    return getAllStores(itemType);
+    return getAllStores(itemType, vesselIds);
   }
   return getStoresItems(vesselId, itemType);
 }
-async function getTransactionHistory(vesselId, itemType) {
+async function getTransactionHistory(vesselId, itemType, vesselIds) {
   if (vesselId === "all") {
     const allVessels = await getVessels5();
+    const scoped = vesselIds && vesselIds.length > 0 ? allVessels.filter((v) => vesselIds.includes(v.id)) : allVessels;
     const history = [];
-    for (const v of allVessels) {
+    for (const v of scoped) {
       const vHistory = await getStoresTransactionHistory(v.id, itemType);
       history.push(...vHistory);
     }
@@ -35352,10 +36029,12 @@ async function getAllStores2(req, res) {
 }
 async function getStoresByVessel2(req, res) {
   try {
-    const { itemType } = req.query;
+    const { itemType, vesselIds } = req.query;
+    const vesselIdList = typeof vesselIds === "string" && vesselIds.length > 0 ? vesselIds.split(",").filter(Boolean) : void 0;
     const stores = await getStoresByVessel(
       req.params.vesselId,
-      itemType
+      itemType,
+      vesselIdList
     );
     res.json(stores);
   } catch (error) {
@@ -35365,10 +36044,12 @@ async function getStoresByVessel2(req, res) {
 async function getTransactionHistory2(req, res) {
   try {
     const { vesselId } = req.params;
-    const { itemType } = req.query;
+    const { itemType, vesselIds } = req.query;
+    const vesselIdList = typeof vesselIds === "string" && vesselIds.length > 0 ? vesselIds.split(",").filter(Boolean) : void 0;
     const history = await getTransactionHistory(
       vesselId,
-      itemType
+      itemType,
+      vesselIdList
     );
     res.json(history);
   } catch (error) {
@@ -52254,7 +52935,16 @@ var COLUMN_MAPPINGS = {
     "fleet equipment code": "Fleet Equipment Code",
     "fleetequipmentname": "Fleet Equipment Name",
     "fleet_equipment_name": "Fleet Equipment Name",
-    "fleet equipment name": "Fleet Equipment Name"
+    "fleet equipment name": "Fleet Equipment Name",
+    "reviewer": "Reviewer Rank",
+    "reviewer rank": "Reviewer Rank",
+    "reviewerrank": "Reviewer Rank",
+    "reviewer_rank": "Reviewer Rank",
+    "level2reviewer": "Reviewer Rank",
+    "level_2_reviewer": "Reviewer Rank",
+    "level 2 reviewer": "Reviewer Rank",
+    "l2reviewer": "Reviewer Rank",
+    "l2 reviewer": "Reviewer Rank"
   },
   "fleet-jobs": {
     "jobcode": "Job Code",
@@ -52339,7 +53029,16 @@ var COLUMN_MAPPINGS = {
     "other safety requirements": "Other Safety Requirements",
     "safetyprocedure": "Other Safety Requirements",
     "safety_procedure": "Other Safety Requirements",
-    "safety procedure": "Other Safety Requirements"
+    "safety procedure": "Other Safety Requirements",
+    "reviewer": "Reviewer Rank",
+    "reviewer rank": "Reviewer Rank",
+    "reviewerrank": "Reviewer Rank",
+    "reviewer_rank": "Reviewer Rank",
+    "level2reviewer": "Reviewer Rank",
+    "level_2_reviewer": "Reviewer Rank",
+    "level 2 reviewer": "Reviewer Rank",
+    "l2reviewer": "Reviewer Rank",
+    "l2 reviewer": "Reviewer Rank"
   },
   "fleet-spares": {
     "partcode": "Part Code",
@@ -52847,7 +53546,8 @@ async function generateFleetMasterTemplate() {
     { header: "Tools Required", key: "toolsRequired", width: 30 },
     { header: "IS Active", key: "isActive", width: 12 },
     { header: "Maker Code", key: "makerCode", width: 15 },
-    { header: "Class Survey Code", key: "classSurveyCode", width: 18 }
+    { header: "Class Survey Code", key: "classSurveyCode", width: 18 },
+    { header: "Reviewer Rank", key: "reviewerRank", width: 20 }
   ];
   fleetJobSheet.getRow(1).font = { bold: true };
   const vesselJobSheet = workbook.addWorksheet("Vessel_Job");
@@ -52872,7 +53572,8 @@ async function generateFleetMasterTemplate() {
     { header: "IS Active", key: "isActive", width: 12 },
     { header: "Vessel Code", key: "vesselCode", width: 12 },
     { header: "Maker Code", key: "makerCode", width: 15 },
-    { header: "Class Survey Code", key: "classSurveyCode", width: 18 }
+    { header: "Class Survey Code", key: "classSurveyCode", width: 18 },
+    { header: "Reviewer Rank", key: "reviewerRank", width: 20 }
   ];
   vesselJobSheet.getRow(1).font = { bold: true };
   const fleetSpareSheet = workbook.addWorksheet("Fleet_Spare");
@@ -53012,6 +53713,11 @@ async function generateFleetMasterTemplate() {
       allowBlank: true,
       formulae: ["'Master Data'!$G$2:$G$3"]
     };
+    fleetJobSheet.getCell(row, 22).dataValidation = {
+      type: "list",
+      allowBlank: true,
+      formulae: ["'Master Data'!$B$2:$B$12"]
+    };
   }
   for (let row = 2; row <= 1e3; row++) {
     vesselJobSheet.getCell(row, 7).dataValidation = {
@@ -53043,6 +53749,11 @@ async function generateFleetMasterTemplate() {
       type: "list",
       allowBlank: true,
       formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+    vesselJobSheet.getCell(row, 22).dataValidation = {
+      type: "list",
+      allowBlank: true,
+      formulae: ["'Master Data'!$B$2:$B$12"]
     };
   }
   for (let row = 2; row <= 1e3; row++) {
@@ -55078,6 +55789,15 @@ async function validateData(type, data, mode, vesselId) {
       } else {
         normalized["Approver"] = String(approver).trim();
       }
+      const reviewerRankVal = row["Reviewer Rank"];
+      if (reviewerRankVal !== void 0 && reviewerRankVal !== null && String(reviewerRankVal).trim() !== "") {
+        const rr = String(reviewerRankVal).trim();
+        if (!RESPONSIBLE_RANKS.includes(rr)) {
+          errors.push(`Row ${rowNum}: Reviewer '${rr}' not found in the rank list. Allowed values: ${RESPONSIBLE_RANKS.join(", ")}`);
+        } else {
+          normalized["Reviewer Rank"] = rr;
+        }
+      }
       const jobPriority = row["Job Priority"];
       if (jobPriority === void 0 || jobPriority === null || String(jobPriority).trim() === "") {
         errors.push(`Row ${rowNum}: Job Priority is required`);
@@ -57052,6 +57772,7 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
           // Store in both fields for compatibility
           assignedTo: row["Assigned To"] || null,
           approver: row["Approver"] || null,
+          level2ReviewerRankId: row["Reviewer Rank"] ? String(row["Reviewer Rank"]).trim() || null : null,
           jobPriority: row["Job Priority"] || null,
           // Schema expects text 'Yes'/'No', not boolean
           classRelated: row["Class Related"] ? row["Class Related"].toString().toLowerCase() === "yes" ? "Yes" : "No" : null,
@@ -57480,6 +58201,8 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
         continue;
       }
       const fleetComponentsUuid = matchedComponent.fleetComponentsUuid;
+      const reviewerRankRaw = row["Reviewer Rank"] || null;
+      const level2ReviewerRankId = reviewerRankRaw ? String(reviewerRankRaw).trim() || null : null;
       const fleetJobData = {
         jobCode,
         fleetComponentsUuid,
@@ -57492,6 +58215,7 @@ async function performImport(type, data, mode, archiveMissing, vesselId, userId,
         taskType,
         assignedTo,
         approver,
+        level2ReviewerRankId,
         jobPriority,
         classRelated,
         briefWorkDescription,
@@ -64990,7 +65714,7 @@ import { Router as Router22 } from "express";
 
 // server/modules/shipskart/services/shipskartSsoService.ts
 init_errors();
-import crypto3 from "crypto";
+import crypto4 from "crypto";
 var REQUEST_TIMEOUT_MS = 15e3;
 var ShipskartRoleNotMappedError = class extends Error {
   constructor(userRole) {
@@ -65038,7 +65762,7 @@ function maskUrl2(url) {
   }
 }
 function computeHmacSignature(raw, hmacSecret) {
-  return crypto3.createHmac("sha256", hmacSecret).update(raw, "utf8").digest("hex");
+  return crypto4.createHmac("sha256", hmacSecret).update(raw, "utf8").digest("hex");
 }
 async function signedPost(path14, body) {
   const cfg = getShipskartConfig();
