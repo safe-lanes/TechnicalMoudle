@@ -18,7 +18,8 @@ import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
  */
 
 export class WorkOrderStatusRecalculatorService {
-  private isRunning = false;
+  private isRunning = false;        // guards double-start() of the scheduler
+  private runInProgress = false;    // guards re-entrant ticks (a run still in progress)
   private intervalId: NodeJS.Timeout | null = null;
   private scanIntervalMs = 1 * 60 * 1000; // 1 minute
 
@@ -84,8 +85,14 @@ export class WorkOrderStatusRecalculatorService {
     workOrdersChecked: number;
     statusesUpdated: number;
   }> {
-    console.log('[StatusRecalculator] Starting status recalculation...');
-    
+    // Re-entrancy guard: skip this tick if the previous recalc is still running,
+    // rather than stacking concurrent runs (which compounds heap + blocks the event loop).
+    if (this.runInProgress) {
+      console.log('[StatusRecalculator] Previous recalc still running — skipping this tick');
+      return { workOrdersChecked: 0, statusesUpdated: 0 };
+    }
+    this.runInProgress = true;
+
     const results = {
       workOrdersChecked: 0,
       statusesUpdated: 0
@@ -94,15 +101,17 @@ export class WorkOrderStatusRecalculatorService {
     try {
       // Get all work orders
       const allWorkOrders = await storage.getWorkOrders();
-      
+
       // Filter to only non-terminal work orders
       const activeWorkOrders = allWorkOrders.filter(wo => !this.isTerminalStatus(wo.status));
       results.workOrdersChecked = activeWorkOrders.length;
 
       if (activeWorkOrders.length === 0) {
-        console.log('[StatusRecalculator] No active work orders to recalculate');
-        return results;
+        return results; // nothing to do — stay quiet
       }
+
+      // Only log "starting" when there is actual work to do.
+      console.log(`[StatusRecalculator] Recalculating ${activeWorkOrders.length} active work orders...`);
 
       // Cache vessel settings, jobs, and components
       const vesselSettingsCache = new Map<string, PmsVesselSettings | null>();
@@ -257,14 +266,17 @@ export class WorkOrderStatusRecalculatorService {
           // Sync field logging — workOrderStatusRecalculator
           try { await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updated, 'system'); } catch (e) { console.error('[FieldLogger] WO status recalc:', e); }
           results.statusesUpdated++;
-          console.log(`📝 [StatusRecalculator] Updated WO ${wo.workOrderNo}: ${wo.status} → ${computedStatus}`);
         }
       }
 
-      console.log(`[StatusRecalculator] Recalculation complete: ${results.statusesUpdated}/${results.workOrdersChecked} statuses updated`);
+      if (results.statusesUpdated > 0) {
+        console.log(`[StatusRecalculator] Updated status for ${results.statusesUpdated} of ${results.workOrdersChecked} work orders`);
+      }
     } catch (error) {
       console.error('[StatusRecalculator] Recalculation failed:', error);
       throw error;
+    } finally {
+      this.runInProgress = false;
     }
 
     return results;
