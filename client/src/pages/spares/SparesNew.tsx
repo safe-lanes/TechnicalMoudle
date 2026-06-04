@@ -124,7 +124,16 @@ const Spares: React.FC = () => {
     }
     return "";
   });
-  const { vesselId, setVesselId } = useVessel();
+  const { vesselId, setVesselId, isMyVessels, assignedVesselIds } = useVessel();
+  // 'my' aggregates across the assigned mini-fleet via the 'all' read path with a
+  // vesselIds allow-list. The path segment becomes 'all'; the allow-list narrows it.
+  const sparesScopeSegment = isMyVessels ? 'all' : vesselId;
+  const sparesScopeKey = isMyVessels ? `my:${assignedVesselIds.join(',')}` : vesselId;
+  const sparesScopeReady = !!vesselId && (!isMyVessels || assignedVesselIds.length > 0);
+  // "My Vessel" scope with no assigned mini-fleet has nothing to aggregate, so the
+  // spares query stays disabled. Surface an explicit banner (mirroring the Dashboard)
+  // instead of the generic "No spares found" empty grid.
+  const myVesselsEmpty = isMyVessels && assignedVesselIds.length === 0;
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportingType, setExportingType] = useState<string | null>(null);
   
@@ -1139,7 +1148,7 @@ const Spares: React.FC = () => {
   const { data: sparesResponse, isLoading, refetch } = useQuery<{ items: any[]; total: number }>({
     queryKey: [
       '/technical/api/inventory/spares-with-inventory',
-      vesselId,
+      sparesScopeKey,
       'paged',
       currentPage,
       itemsPerPage,
@@ -1160,8 +1169,9 @@ const Spares: React.FC = () => {
       if (stockFilter && stockFilter !== 'All') params.set('stockStatus', stockFilter);
       if (activeOnlyForRole) params.set('activeOnly', 'true');
       if (selectedComponentId) params.set('componentId', selectedComponentId);
+      if (isMyVessels) params.set('vesselIds', assignedVesselIds.join(','));
       const response = await fetch(
-        `/technical/api/inventory/spares-with-inventory/${vesselId}?${params.toString()}`
+        `/technical/api/inventory/spares-with-inventory/${sparesScopeSegment}?${params.toString()}`
       );
       if (!response.ok) throw new Error('Failed to fetch spares');
       const json = await response.json();
@@ -1177,6 +1187,7 @@ const Spares: React.FC = () => {
       };
     },
     placeholderData: keepPreviousData,
+    enabled: sparesScopeReady,
   });
 
   const sparesData = sparesResponse?.items ?? [];
@@ -1184,13 +1195,16 @@ const Spares: React.FC = () => {
 
   // Fetch history data
   const { data: historyData = [] } = useQuery({
-    queryKey: ['/technical/api/spares/history', vesselId],
+    queryKey: ['/technical/api/spares/history', sparesScopeKey],
     queryFn: async () => {
-      const response = await fetch(`/technical/api/spares/history/${vesselId}`);
+      const params = new URLSearchParams();
+      if (isMyVessels) params.set('vesselIds', assignedVesselIds.join(','));
+      const qs = params.toString();
+      const response = await fetch(`/technical/api/spares/history/${sparesScopeSegment}${qs ? `?${qs}` : ''}`);
       if (!response.ok) throw new Error('Failed to fetch history');
       return response.json();
     },
-    enabled: activeTab === 'history'
+    enabled: activeTab === 'history' && sparesScopeReady
   });
 
   // Fetch components for tree display.
@@ -1201,7 +1215,7 @@ const Spares: React.FC = () => {
   // the spares list still shows cross-vessel data with search/filter/pagination.
   const { data: fetchedComponents = [] } = useQuery<any[]>({
     queryKey: [`/technical/api/components/${vesselId}`],
-    enabled: vesselId !== 'all',
+    enabled: vesselId !== 'all' && vesselId !== 'my',
   });
   
   // Build component tree from fetched data (same logic as Components.tsx)
@@ -1376,7 +1390,7 @@ const Spares: React.FC = () => {
   
   const { data: vesselLocationsResponse, isLoading: isLocationsLoading } = useQuery({
     queryKey: [`/technical/api/inventory/stock/locations-with-stock/${vesselId}`],
-    enabled: vesselId !== 'all' && vesselId !== '' && activeTab === 'by-location',
+    enabled: vesselId !== 'all' && vesselId !== 'my' && vesselId !== '' && activeTab === 'by-location',
   });
 
   const vesselLocations = useMemo(() => {
@@ -1385,7 +1399,7 @@ const Spares: React.FC = () => {
 
   const { data: allVesselLocationsResponse } = useQuery({
     queryKey: [`/technical/api/inventory/locations/${vesselId}`],
-    enabled: vesselId !== 'all' && vesselId !== '',
+    enabled: vesselId !== 'all' && vesselId !== 'my' && vesselId !== '',
   });
 
   const allVesselLocations = useMemo(() => {
@@ -1394,7 +1408,7 @@ const Spares: React.FC = () => {
 
   const { data: locationSparesResponse, isLoading: isLocationSparesLoading } = useQuery({
     queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${selectedLocationId}`],
-    enabled: !!selectedLocationId && !!vesselId && vesselId !== 'all' && activeTab === 'by-location',
+    enabled: !!selectedLocationId && !!vesselId && vesselId !== 'all' && vesselId !== 'my' && activeTab === 'by-location',
   });
 
   const locationSpares: Spare[] = useMemo(() => {
@@ -3557,7 +3571,7 @@ const Spares: React.FC = () => {
           <div className="flex items-center gap-2" data-testid="E4">
             <Marker id="E4" />
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
-            <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
+            <Select value={(vesselId === 'all' || vesselId === 'my') ? '' : vesselId} onValueChange={setVesselId}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>
@@ -3648,6 +3662,15 @@ const Spares: React.FC = () => {
       )}
       </div>
 
+      {myVesselsEmpty && (
+        <div
+          className="flex-shrink-0 mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          data-testid="banner-no-assigned-vessels"
+        >
+          No vessels are assigned to you yet. Switch the Scope to "All Vessel" or contact your administrator to get vessels assigned.
+        </div>
+      )}
+
       {/* Main Content - Scrollable */}
       <div className="flex-1 overflow-y-auto flex gap-4 min-h-0">
         {/* Left Panel - Component Tree (only shown in inventory tab) */}
@@ -3704,7 +3727,7 @@ const Spares: React.FC = () => {
                 <div className="p-4 text-center text-gray-500 text-sm">Loading locations...</div>
               ) : allLocations.length === 0 ? (
                 <div className="p-4 text-center text-gray-500 text-sm">
-                  {vesselId === 'all' || !vesselId ? 'Select a vessel first' : 'No locations found'}
+                  {vesselId === 'all' || vesselId === 'my' || !vesselId ? 'Select a vessel first' : 'No locations found'}
                 </div>
               ) : (
                 allLocations.map((loc: any) => {
@@ -3766,7 +3789,7 @@ const Spares: React.FC = () => {
                       columnDefs={inventoryColumnDefs}
                       rowData={paginatedSpares}
                       getRowClass={inventoryGetRowClass}
-                      noRowsMessage="No spares found. Try adjusting your filters."
+                      noRowsMessage={myVesselsEmpty ? "No vessels are assigned to you yet." : "No spares found. Try adjusting your filters."}
                       testId="spares-inventory-grid"
                     />
                   )}

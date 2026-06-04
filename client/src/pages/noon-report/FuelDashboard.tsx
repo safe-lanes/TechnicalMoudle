@@ -315,7 +315,7 @@ export default function FuelDashboard() {
       if (!res.ok) throw new Error("Failed to fetch fuel dashboard");
       return res.json() as Promise<DashboardData>;
     },
-    enabled: !!vesselId,
+    enabled: !!vesselId && vesselId !== 'all' && vesselId !== 'my',
     refetchInterval: 60_000,
   });
 
@@ -333,7 +333,7 @@ export default function FuelDashboard() {
     <div className="space-y-6 animate-fade-in" data-testid="fuel-dashboard">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-800">Fuel Dashboard</h1>
-        {!vesselId && (
+        {(!vesselId || vesselId === 'all' || vesselId === 'my') && (
           <p className="text-sm text-amber-600">Select a vessel to view the dashboard.</p>
         )}
       </div>

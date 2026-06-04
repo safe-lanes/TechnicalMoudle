@@ -408,7 +408,16 @@ const COLUMN_MAPPINGS: { [key: string]: { [variant: string]: string } } = {
     'fleet equipment code': 'Fleet Equipment Code',
     'fleetequipmentname': 'Fleet Equipment Name',
     'fleet_equipment_name': 'Fleet Equipment Name',
-    'fleet equipment name': 'Fleet Equipment Name'
+    'fleet equipment name': 'Fleet Equipment Name',
+    'reviewer': 'Reviewer Rank',
+    'reviewer rank': 'Reviewer Rank',
+    'reviewerrank': 'Reviewer Rank',
+    'reviewer_rank': 'Reviewer Rank',
+    'level2reviewer': 'Reviewer Rank',
+    'level_2_reviewer': 'Reviewer Rank',
+    'level 2 reviewer': 'Reviewer Rank',
+    'l2reviewer': 'Reviewer Rank',
+    'l2 reviewer': 'Reviewer Rank'
   },
   'fleet-jobs': {
     'jobcode': 'Job Code',
@@ -493,7 +502,16 @@ const COLUMN_MAPPINGS: { [key: string]: { [variant: string]: string } } = {
     'other safety requirements': 'Other Safety Requirements',
     'safetyprocedure': 'Other Safety Requirements',
     'safety_procedure': 'Other Safety Requirements',
-    'safety procedure': 'Other Safety Requirements'
+    'safety procedure': 'Other Safety Requirements',
+    'reviewer': 'Reviewer Rank',
+    'reviewer rank': 'Reviewer Rank',
+    'reviewerrank': 'Reviewer Rank',
+    'reviewer_rank': 'Reviewer Rank',
+    'level2reviewer': 'Reviewer Rank',
+    'level_2_reviewer': 'Reviewer Rank',
+    'level 2 reviewer': 'Reviewer Rank',
+    'l2reviewer': 'Reviewer Rank',
+    'l2 reviewer': 'Reviewer Rank'
   },
   'fleet-spares': {
     'partcode': 'Part Code',

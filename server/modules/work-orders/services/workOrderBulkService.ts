@@ -4,6 +4,7 @@ import { calculateMissedCycles, calculateNextDueDate } from '@shared/dateUtils';
 import { resolveHodForDepartment } from '../../ranks/hodResolutionService';
 import { invalidateComplianceCache } from './complianceAnomalyService';
 import { logFieldChanges } from '../../sync';
+import { finalizeWorkOrderCompletion } from './workOrderCompletionService';
 
 // ── Bulk Approve Work Orders ──
 
@@ -88,19 +89,35 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         }
       }
 
+      // Check if linked job requires Level 2 Office Review
+      let requiresLevel2Review = false;
+      if (existingWO.jobId) {
+        try {
+          const linkedJob = await repo.findJob(existingWO.jobId);
+          if (linkedJob && (linkedJob as any).level2ReviewerRankId) {
+            requiresLevel2Review = true;
+          }
+        } catch (err) {
+          console.warn(`[Bulk Approve] Could not load linked job ${existingWO.jobId}:`, err);
+        }
+      }
+
       const updateData: Record<string, any> = {
-        status: "Completed",
+        status: requiresLevel2Review ? "Pending Office Review" : "Completed",
         approvalAction: "approved",
         approver: resolvedApprover,
         approverRemarks,
         skippedCyclesJustification: (missedCycles >= 1 && skippedCyclesJustification) ? skippedCyclesJustification : null,
         approvalDate: new Date().toISOString(),
-        nextDueDate,
-        nextDueReading,
-        missedCycles,
-        originalDueDate,
         wasRejected: false
       };
+
+      if (!requiresLevel2Review) {
+        updateData.nextDueDate = nextDueDate;
+        updateData.nextDueReading = nextDueReading;
+        updateData.missedCycles = missedCycles;
+        updateData.originalDueDate = originalDueDate;
+      }
 
       if (actualCompletionDate) {
         updateData.dateCompleted = actualCompletionDate;
@@ -113,7 +130,7 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
         await logFieldChanges('work_orders', existingWO.wouuid, existingWO.vesselId || null, existingWO, { ...existingWO, ...updateData }, approver || 'system');
       } catch (err) { console.error('[FieldLogger] WO bulkApprove:', err); }
 
-      if (missedCycles >= 1 && existingWO.maintenanceBasis === 'Calendar') {
+      if (!requiresLevel2Review && missedCycles >= 1 && existingWO.maintenanceBasis === 'Calendar') {
         try {
           const { createSkippedCycleRecords } = await import('../utils/skippedCycleBackfill');
           await createSkippedCycleRecords({
@@ -150,6 +167,172 @@ export async function bulkApprove(workOrderIds: string[], approver?: string, app
     message: `Bulk approval completed: ${results.success.length} approved, ${results.failed.length} failed`,
     results
   };
+}
+
+// ── Reviewer Approve (Level 2 Office Review → Completed) ──
+
+export async function reviewerApprove(workOrderId: string, reviewerComments?: string, reviewedByUuid?: string) {
+  const existingWO = await repo.findById(workOrderId);
+  if (!existingWO) {
+    throw new ValidationError('Work order not found');
+  }
+  if (existingWO.status !== 'Pending Office Review') {
+    throw new ValidationError(`Work order is not pending office review (status: ${existingWO.status})`);
+  }
+
+  const actualCompletionDate = existingWO.completionDateTime || existingWO.dateCompleted;
+  const originalDueDate = existingWO.nextDueDate || existingWO.dueDate || null;
+
+  let nextDueDate: string | undefined;
+  let nextDueReading: string | undefined;
+
+  if (existingWO.maintenanceBasis === 'Calendar' && actualCompletionDate) {
+    if (existingWO.frequencyValue && existingWO.frequencyUnit) {
+      const { calculateNextDueDate } = await import('@shared/dateUtils');
+      const computed = calculateNextDueDate(actualCompletionDate, existingWO.frequencyValue, existingWO.frequencyUnit, originalDueDate);
+      if (computed) nextDueDate = computed;
+    }
+  } else if (existingWO.maintenanceBasis === 'Running Hours' && existingWO.currentReading) {
+    nextDueReading = (parseInt(existingWO.currentReading) + parseInt(existingWO.frequencyValue || '0')).toString();
+  }
+
+  const { calculateMissedCycles } = await import('@shared/dateUtils');
+  const completionDateForCalc = actualCompletionDate || existingWO.completionDateTime || existingWO.dateCompleted;
+  const missedCycles = existingWO.maintenanceBasis === 'Running Hours'
+    ? 0
+    : calculateMissedCycles(existingWO.nextDueDate || existingWO.dueDate, completionDateForCalc, existingWO.frequencyValue, existingWO.frequencyUnit);
+
+  const updateData: Record<string, any> = {
+    status: 'Completed',
+    reviewerComments: reviewerComments || null,
+    reviewedByUuid: reviewedByUuid || null,
+    nextDueDate,
+    nextDueReading,
+    missedCycles,
+    originalDueDate,
+  };
+  if (actualCompletionDate) {
+    updateData.dateCompleted = actualCompletionDate;
+  }
+
+  await repo.update(workOrderId, updateData);
+
+  try {
+    await logFieldChanges('work_orders', existingWO.wouuid, existingWO.vesselId || null, existingWO, { ...existingWO, ...updateData }, reviewedByUuid || 'system');
+  } catch (err) { console.error('[FieldLogger] WO reviewerApprove:', err); }
+
+  try {
+    await repo.createAuditLog({
+      entityType: 'work_order',
+      entityId: existingWO.wouuid || workOrderId,
+      actionType: 'reviewer_approve',
+      userId: reviewedByUuid || 'system',
+      source: 'web_ui',
+      vesselCode: existingWO.vesselId || null,
+      componentCode: existingWO.componentCode || null,
+      fieldName: null,
+      oldValue: null,
+      newValue: null,
+      payload: {
+        workOrderNo: existingWO.workOrderNo,
+        status: 'Completed',
+        approvedAt: new Date().toISOString(),
+        reviewerComments: reviewerComments || null,
+      },
+    });
+  } catch (auditError) {
+    console.error('Failed to create audit log for reviewer approve:', auditError);
+  }
+
+  if (missedCycles >= 1 && existingWO.maintenanceBasis === 'Calendar') {
+    try {
+      const { createSkippedCycleRecords } = await import('../utils/skippedCycleBackfill');
+      await createSkippedCycleRecords({
+        workOrderId: existingWO.wouuid || workOrderId,
+        componentId: existingWO.component || '',
+        componentCode: existingWO.componentCode || null,
+        vesselCode: existingWO.vesselId || null,
+        jobId: existingWO.jobId || null,
+        jobCode: existingWO.templateCode || null,
+        jobTitle: existingWO.jobTitle || null,
+        originalDueDate,
+        missedCycles,
+        frequencyValue: existingWO.frequencyValue || '0',
+        frequencyUnit: existingWO.frequencyUnit || ''
+      });
+    } catch (err) {
+      console.error('[BACKFILL ERROR] Reviewer approve skipped cycle records:', err);
+    }
+  }
+
+  // Run completion side-effects: maintenance history, job cycle dates, spare consumption.
+  // The WO row is now Completed in the DB so finalizeWorkOrderCompletion reads fresh state.
+  try {
+    await finalizeWorkOrderCompletion(workOrderId);
+  } catch (finalizeErr) {
+    console.error('[ReviewerApprove] finalizeWorkOrderCompletion failed (non-blocking):', finalizeErr);
+  }
+
+  invalidateComplianceCache();
+  console.log(`✅ Reviewer approved work order: ${workOrderId}`);
+  return { message: 'Work order approved by reviewer', workOrderId };
+}
+
+// ── Reviewer Reopen (Level 2 Office Review → send back for rework) ──
+
+export async function reviewerReopen(workOrderId: string, reviewerComments?: string, reviewedByUuid?: string) {
+  const existingWO = await repo.findById(workOrderId);
+  if (!existingWO) {
+    throw new ValidationError('Work order not found');
+  }
+  if (existingWO.status !== 'Pending Office Review') {
+    throw new ValidationError(`Work order is not pending office review (status: ${existingWO.status})`);
+  }
+
+  const updateData: Record<string, any> = {
+    status: 'Due',
+    approvalAction: 'rejected',
+    wasRejected: true,
+    reviewerComments: reviewerComments || null,
+    reviewedByUuid: reviewedByUuid || null,
+    rejectionDate: new Date().toISOString(),
+    rejectionComments: reviewerComments || null,
+    // Intentionally preserve completionDateTime and dateCompleted so the vessel
+    // form loads pre-populated and hasCompletionData evaluates true on resubmit.
+  };
+
+  await repo.update(workOrderId, updateData);
+
+  try {
+    await logFieldChanges('work_orders', existingWO.wouuid, existingWO.vesselId || null, existingWO, { ...existingWO, ...updateData }, reviewedByUuid || 'system');
+  } catch (err) { console.error('[FieldLogger] WO reviewerReopen:', err); }
+
+  try {
+    await repo.createAuditLog({
+      entityType: 'work_order',
+      entityId: existingWO.wouuid || workOrderId,
+      actionType: 'reviewer_reopen',
+      userId: reviewedByUuid || 'system',
+      source: 'web_ui',
+      vesselCode: existingWO.vesselId || null,
+      componentCode: existingWO.componentCode || null,
+      fieldName: null,
+      oldValue: null,
+      newValue: null,
+      payload: {
+        workOrderNo: existingWO.workOrderNo,
+        status: 'Due',
+        reopenedAt: new Date().toISOString(),
+        reviewerComments: reviewerComments || null,
+      },
+    });
+  } catch (auditError) {
+    console.error('Failed to create audit log for reviewer reopen:', auditError);
+  }
+
+  invalidateComplianceCache();
+  console.log(`🔄 Reviewer reopened work order: ${workOrderId}`);
+  return { message: 'Work order sent back for rework by reviewer', workOrderId };
 }
 
 // ── Bulk Reject Work Orders ──

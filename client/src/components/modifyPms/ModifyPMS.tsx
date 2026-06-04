@@ -109,7 +109,7 @@ export function ModifyPMS() {
   const [viewingRequest, setViewingRequest] = useState<ChangeRequest | null>(null);
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const { vesselId, setVesselId } = useVessel();
+  const { vesselId, setVesselId, applyVesselScope } = useVessel();
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
   const { data: vessels = [] } = useVessels();
 
@@ -119,7 +119,11 @@ export function ModifyPMS() {
     queryKey: ['/technical/api/change-requests', vesselId, categoryFilter, periodDateRange?.from?.toISOString(), periodDateRange?.to?.toISOString()],
     queryFn: async () => {
       const params = new URLSearchParams();
-      params.append('vesselId', vesselId);
+      // Normalize vessel scope the same way every other module does:
+      // single vessel -> vesselId=<uuid>; All Vessel -> vesselId=all;
+      // My Vessel -> vesselId=all + vesselIds=<assigned csv>. This keeps My
+      // Vessel routing through the identical path as All Vessel.
+      applyVesselScope(params);
       
       if (categoryFilter !== 'all') {
         params.append('category', categoryFilter);
@@ -263,7 +267,7 @@ export function ModifyPMS() {
         {(isSailAdmin || isClientAdmin) && (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
-            <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
+            <Select value={(vesselId === 'all' || vesselId === 'my') ? '' : vesselId} onValueChange={setVesselId}>
               <SelectTrigger className="w-[200px]" data-testid="vessel-selector-modify">
                 <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>

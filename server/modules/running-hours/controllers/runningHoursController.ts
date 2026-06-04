@@ -73,15 +73,18 @@ export async function listParents(req: Request, res: Response) {
     const vesselId = (req.query.vesselId as string) || 'V001';
     const periodFrom = req.query.periodFrom as string | undefined;
     const periodTo = req.query.periodTo as string | undefined;
+    // 'my' scope: vesselId='all' carries a vesselIds allow-list narrowing the aggregate.
+    const vesselIdsRaw = typeof req.query.vesselIds === 'string' ? req.query.vesselIds : '';
+    const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined;
 
     if (periodFrom && periodTo) {
-      const result = await rhService.listParents(vesselId, 'custom', new Date(periodFrom), new Date(periodTo));
+      const result = await rhService.listParents(vesselId, 'custom', new Date(periodFrom), new Date(periodTo), vesselIds);
       res.json(result);
     } else {
       const period = (req.query.period as string) || 'monthly';
       const validPeriods = ['weekly', 'monthly', 'quarterly', 'yearly'];
       const safePeriod = validPeriods.includes(period) ? period : 'monthly';
-      const result = await rhService.listParents(vesselId, safePeriod);
+      const result = await rhService.listParents(vesselId, safePeriod, undefined, undefined, vesselIds);
       res.json(result);
     }
   } catch (error: any) {

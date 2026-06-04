@@ -117,7 +117,11 @@ export type ComputedWorkOrderStatus =
   | 'Completed'
   | 'Pending Approval'
   | 'Rejected'
-  | 'Postponed';
+  | 'Postponed'
+  | 'Awaiting Office Approval'
+  | 'Postponement Approved'
+  | 'Postponement Rejected'
+  | 'Pending Office Review';
 
 /**
  * RH-specific status for maintenance planning
@@ -280,8 +284,12 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
   }
   
   if (status === 'Pending Approval') return 'Pending Approval';
+  if (status === 'Pending Office Review' || normalizedStatus === 'pending_office_review') return 'Pending Office Review';
   
   if (status === 'Postponed') return 'Postponed';
+  if (status === 'Awaiting Office Approval') return 'Awaiting Office Approval';
+  if (status === 'Postponement Approved') return 'Postponement Approved';
+  if (status === 'Postponement Rejected') return 'Postponement Rejected';
 
   if (status === 'Rejected') return 'Rejected';
   

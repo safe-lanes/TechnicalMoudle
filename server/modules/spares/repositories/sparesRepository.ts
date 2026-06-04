@@ -73,8 +73,8 @@ export async function transferSpareLocation(
 
 // ── History ──
 
-export async function getSpareHistory(vesselId: string): Promise<SpareHistory[]> {
-  return storage.getSpareHistory(vesselId);
+export async function getSpareHistory(vesselId: string, vesselIds?: string[]): Promise<SpareHistory[]> {
+  return storage.getSpareHistory(vesselId, vesselIds);
 }
 
 // ── Vessels (needed for 'all' queries) ──

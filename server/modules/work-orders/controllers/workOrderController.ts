@@ -246,6 +246,22 @@ export async function completeWorkOrder(req: Request, res: Response) {
 
 // ── Bulk Operations ──
 
+export async function reviewerApprove(req: Request, res: Response) {
+  const workOrderId = req.params.id;
+  const { reviewerComments } = req.body;
+  const reviewedByUuid = (req as AuthenticatedRequest).user?.userUuid || (req as AuthenticatedRequest).user?.username || 'system';
+  const result = await woBulkService.reviewerApprove(workOrderId, reviewerComments, reviewedByUuid);
+  res.json(result);
+}
+
+export async function reviewerReopen(req: Request, res: Response) {
+  const workOrderId = req.params.id;
+  const { reviewerComments } = req.body;
+  const reviewedByUuid = (req as AuthenticatedRequest).user?.userUuid || (req as AuthenticatedRequest).user?.username || 'system';
+  const result = await woBulkService.reviewerReopen(workOrderId, reviewerComments, reviewedByUuid);
+  res.json(result);
+}
+
 export async function bulkApprove(req: Request, res: Response) {
   const { workOrderIds, approver, approverRemarks, skippedCyclesJustification } = req.body;
   const result = await woBulkService.bulkApprove(workOrderIds, approver, approverRemarks, skippedCyclesJustification);
@@ -284,6 +300,60 @@ export async function checkPostponements(req: Request, res: Response) {
   const vesselId = req.body.vesselId || req.query.vesselId;
   const result = await woAutoService.checkPostponements(vesselId as string);
   res.json(result);
+}
+
+// ── Postponement Approval Workflow (Plan B) ──
+
+export async function submitPostponeRequest(req: Request, res: Response) {
+  try {
+    const result = await woService.submitPostponeRequest(req.params.id, req.body);
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+
+export async function editPostponeRequest(req: Request, res: Response) {
+  try {
+    const result = await woService.editPostponeRequest(req.params.id, req.body);
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+
+export async function approvePostponement(req: Request, res: Response) {
+  try {
+    const actor = resolveActorIdentity(req);
+    const result = await woService.approvePostponement(req.params.id, {
+      ...req.body,
+      approvedBy: actor || req.body.approvedBy || 'Office',
+    });
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+}
+
+export async function rejectPostponement(req: Request, res: Response) {
+  try {
+    const actor = resolveActorIdentity(req);
+    const result = await woService.rejectPostponement(req.params.id, {
+      ...req.body,
+      approvedBy: actor || req.body.approvedBy || 'Office',
+    });
+    res.json(result);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) return res.status(404).json({ error: error.message });
+    if (error instanceof ValidationError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
 }
 
 // ── Work Order Executions ──

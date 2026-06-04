@@ -1625,6 +1625,17 @@ export async function validateData(type: string, data: any[], mode: string, vess
       } else {
         normalized['Approver'] = String(approver).trim();
       }
+
+      // Reviewer Rank - optional, but if provided must be a known rank
+      const reviewerRankVal = row['Reviewer Rank'];
+      if (reviewerRankVal !== undefined && reviewerRankVal !== null && String(reviewerRankVal).trim() !== '') {
+        const rr = String(reviewerRankVal).trim();
+        if (!RESPONSIBLE_RANKS.includes(rr)) {
+          errors.push(`Row ${rowNum}: Reviewer '${rr}' not found in the rank list. Allowed values: ${RESPONSIBLE_RANKS.join(', ')}`);
+        } else {
+          normalized['Reviewer Rank'] = rr;
+        }
+      }
       
       // Job Priority - required
       const jobPriority = row['Job Priority'];

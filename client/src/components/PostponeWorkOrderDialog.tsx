@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -17,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Loader2,
   Paperclip,
@@ -79,6 +78,20 @@ interface PostponeWorkOrderDialogProps {
     jobTitle: string;
     dueDate?: string | null;
     assignedTo?: string | null;
+    /** Pre-fill: existing requested new date (for Awaiting Office Approval / Postponement Rejected WOs) */
+    postponeRequestedDate?: string | null;
+    /** Pre-fill: existing postponement reason */
+    postponementReason?: string | null;
+    /** Pre-fill: existing postponement remarks */
+    postponementRemarks?: string | null;
+    /** Current status — used to detect resubmit mode and approved mode */
+    status?: string | null;
+    computedStatus?: string | null;
+    /** Approved-postponement read-only fields */
+    postponeDate?: string | null;
+    postponementEndDate?: string | null;
+    postponementAuthorizedBy?: string | null;
+    postponementApprovalRemarks?: string | null;
   } | null;
   onConfirm?: (workOrderId: string, postponeData: any) => void;
 }
@@ -90,6 +103,27 @@ const getFileIcon = (fileName: string) => {
   if (ext === "pdf") return <FileText className="h-3.5 w-3.5" />;
   if (["xls", "xlsx"].includes(ext)) return <FileSpreadsheet className="h-3.5 w-3.5" />;
   return <Paperclip className="h-3.5 w-3.5" />;
+};
+
+const parseDateFlexible = (s: string | null | undefined): Date | null => {
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const d = new Date(s + "T00:00:00");
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const months: Record<string, number> = {
+    Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+    Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+  };
+  const m = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (m) return new Date(+m[3], months[m[2]] ?? 0, +m[1]);
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+const formatDDMMMYYYY = (date: Date): string => {
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `${String(date.getDate()).padStart(2,"0")}-${months[date.getMonth()]}-${date.getFullYear()}`;
 };
 
 const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
@@ -106,17 +140,17 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     component: "",
     jobTitle: "",
     originalDueDate: "",
+    postponeDate: "",
     reasonForPostponement: "",
     postponementRemarks: "",
-    authorizedBy: "",
-    approvalRemarks: "",
-    nextDueDate: "",
-    durationOfPostponement: "5 Days",
-    informOfficer: false,
+    approver: "Office",
   });
 
-  const [validationError, setValidationError] = useState("");
-  const [remarksError, setRemarksError] = useState("");
+  const [errors, setErrors] = useState<{
+    postponeDate?: string;
+    reason?: string;
+    remarks?: string;
+  }>({});
 
   const [postponementDocs, setPostponementDocs] = useState<PostponementDoc[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -151,23 +185,57 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
 
   const isOtherReason = formData.reasonForPostponement === OTHER_REASON;
 
+  const computedNextDueDate = useMemo(() => {
+    if (!formData.postponeDate) return "";
+    const d = new Date(formData.postponeDate + "T00:00:00");
+    if (isNaN(d.getTime())) return "";
+    return formatDDMMMYYYY(d);
+  }, [formData.postponeDate]);
+
+  const computedDuration = useMemo(() => {
+    if (!formData.postponeDate) return "";
+    const orig = parseDateFlexible(formData.originalDueDate);
+    const postpone = new Date(formData.postponeDate + "T00:00:00");
+    if (!orig || isNaN(orig.getTime()) || isNaN(postpone.getTime())) return "";
+    orig.setHours(0, 0, 0, 0);
+    postpone.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((postpone.getTime() - orig.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays === 1 ? "1 day" : `${diffDays} days`;
+  }, [formData.postponeDate, formData.originalDueDate]);
+
+  const postponeDateMinValue = useMemo(() => {
+    const orig = parseDateFlexible(formData.originalDueDate);
+    if (!orig || isNaN(orig.getTime())) return undefined;
+    const next = new Date(orig);
+    next.setDate(next.getDate() + 1);
+    return next.toISOString().split("T")[0];
+  }, [formData.originalDueDate]);
+
   useEffect(() => {
     if (workOrder) {
+      // Detect resubmit mode: WO is already pending or was rejected by office
+      const isResubmit =
+        workOrder.status === 'Awaiting Office Approval' ||
+        workOrder.computedStatus === 'Awaiting Office Approval' ||
+        workOrder.status === 'Postponement Rejected' ||
+        workOrder.computedStatus === 'Postponement Rejected';
+
+      // Pre-fill with previous request data when resubmitting
+      const prefillPostponeDate = isResubmit ? (workOrder.postponeRequestedDate || "") : "";
+      const prefillReason = isResubmit ? (workOrder.postponementReason || "") : "";
+      const prefillRemarks = isResubmit ? (workOrder.postponementRemarks || "") : "";
+
       setFormData({
         workOrderId: workOrder.templateCode || workOrder.workOrderNo || "",
         component: workOrder.component || "",
         jobTitle: workOrder.jobTitle,
         originalDueDate: workOrder.dueDate || "",
-        reasonForPostponement: "",
-        postponementRemarks: "",
-        authorizedBy: "superintendent",
-        approvalRemarks: "",
-        nextDueDate: "",
-        durationOfPostponement: "5 Days",
-        informOfficer: false,
+        postponeDate: prefillPostponeDate,
+        reasonForPostponement: prefillReason,
+        postponementRemarks: prefillRemarks,
+        approver: "Office",
       });
-      setValidationError("");
-      setRemarksError("");
+      setErrors({});
     }
   }, [workOrder]);
 
@@ -200,41 +268,8 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
       }
     };
     loadDocs();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [isOpen, workOrder?.id]);
-
-  const calculatePostponementEndDate = (duration: string): string => {
-    const today = new Date();
-    let endDate = new Date(today);
-
-    switch (duration) {
-      case '1 Day':
-        endDate.setDate(today.getDate() + 1);
-        break;
-      case '3 Days':
-        endDate.setDate(today.getDate() + 3);
-        break;
-      case '5 Days':
-        endDate.setDate(today.getDate() + 5);
-        break;
-      case '1 Week':
-        endDate.setDate(today.getDate() + 7);
-        break;
-      case '2 Weeks':
-        endDate.setDate(today.getDate() + 14);
-        break;
-      case '1 Month':
-        endDate.setMonth(today.getMonth() + 1);
-        break;
-      default:
-        endDate.setDate(today.getDate() + 5);
-    }
-
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return `${String(endDate.getDate()).padStart(2, '0')}-${months[endDate.getMonth()]}-${endDate.getFullYear()}`;
-  };
 
   const handleUploadClick = () => {
     if (isUploading) return;
@@ -297,10 +332,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
       validFiles.push(file);
     }
 
-    if (validFiles.length === 0) {
-      event.target.value = "";
-      return;
-    }
+    if (validFiles.length === 0) { event.target.value = ""; return; }
 
     const filesToUpload = validFiles.slice(0, slotsAvailable);
     if (validFiles.length > slotsAvailable) {
@@ -319,22 +351,18 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
         fd.append("file", file);
         fd.append("documentType", DOC_TYPE);
         fd.append("vesselId", vesselId);
-
         const response = await fetch(`/technical/api/work-orders/${workOrder.id}/documents`, {
           method: "POST",
           body: fd,
         });
-
         if (!response.ok) {
           const errBody = await response.json().catch(() => ({}));
           throw new Error(errBody.message || errBody.error || `Failed to upload ${file.name}`);
         }
-
         const result: PostponementDoc = await response.json();
         setPostponementDocs((prev) => [...prev, result]);
         uploadedCount++;
       }
-
       toast({
         title: "Documents uploaded",
         description:
@@ -368,7 +396,6 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     const files = event.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
-
     if (!workOrder?.id) {
       toast({ title: "Upload failed", description: "Work order is not available.", variant: "destructive" });
       event.target.value = "";
@@ -379,7 +406,6 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
       event.target.value = "";
       return;
     }
-
     const ext = "." + (file.name.split(".").pop()?.toLowerCase() || "");
     if (!ALLOWED_MIME.includes(file.type) && !ALLOWED_EXT.includes(ext)) {
       toast({
@@ -399,7 +425,6 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
       event.target.value = "";
       return;
     }
-
     setIsRAUploading(true);
     const previousDoc = riskAssessmentDoc;
     try {
@@ -407,7 +432,6 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
       fd.append("file", file);
       fd.append("documentType", RA_DOC_TYPE);
       fd.append("vesselId", vesselId);
-
       const response = await fetch(`/technical/api/work-orders/${workOrder.id}/documents`, {
         method: "POST",
         body: fd,
@@ -418,7 +442,6 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
       }
       const result: PostponementDoc = await response.json();
       setRiskAssessmentDoc(result);
-
       if (previousDoc?.id) {
         try {
           await fetch(`/technical/api/work-order-documents/${previousDoc.id}`, { method: "DELETE" });
@@ -426,11 +449,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
           console.error("Failed to remove previous Risk Assessment doc:", delErr);
         }
       }
-
-      toast({
-        title: "Risk Assessment uploaded",
-        description: `${file.name} has been attached.`,
-      });
+      toast({ title: "Risk Assessment uploaded", description: `${file.name} has been attached.` });
     } catch (error: any) {
       console.error("Risk Assessment upload error:", error);
       toast({
@@ -461,9 +480,7 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
 
   const handleDeleteDoc = async (docId: string) => {
     try {
-      const response = await fetch(`/technical/api/work-order-documents/${docId}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(`/technical/api/work-order-documents/${docId}`, { method: "DELETE" });
       if (!response.ok) throw new Error("Failed to delete document");
       setPostponementDocs((prev) => prev.filter((d) => d.id !== docId));
       toast({ title: "Document deleted", description: "The document has been removed." });
@@ -478,41 +495,52 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
   };
 
   const handleSubmit = () => {
-    let hasError = false;
+    const newErrors: typeof errors = {};
+
+    if (!formData.postponeDate) {
+      newErrors.postponeDate = "Please select a postpone date.";
+    } else {
+      const orig = parseDateFlexible(formData.originalDueDate);
+      const postpone = new Date(formData.postponeDate + "T00:00:00");
+      if (orig && !isNaN(orig.getTime())) {
+        orig.setHours(0, 0, 0, 0);
+        postpone.setHours(0, 0, 0, 0);
+        if (postpone <= orig) {
+          newErrors.postponeDate = "Postpone date must be after the original due date.";
+        }
+      }
+    }
 
     if (!formData.reasonForPostponement) {
-      setValidationError("Please select a reason for postponement.");
-      hasError = true;
-    } else {
-      setValidationError("");
+      newErrors.reason = "Please select a reason for postponement.";
     }
 
     if (isOtherReason && !formData.postponementRemarks.trim()) {
-      setRemarksError("Please enter the custom postponement reason.");
-      hasError = true;
-    } else {
-      setRemarksError("");
+      newErrors.remarks = "Please enter the custom postponement reason.";
     }
 
-    if (hasError) return;
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
 
     if (onConfirm && workOrder) {
-      const postponementEndDate = calculatePostponementEndDate(formData.durationOfPostponement);
-
       onConfirm(workOrder.id || "", {
-        nextDueDate: formData.nextDueDate,
+        postponeDate: formData.postponeDate,
+        nextDueDate: computedNextDueDate,
         reason: formData.reasonForPostponement,
         postponementRemarks: formData.postponementRemarks,
-        authorizedBy: formData.authorizedBy,
-        duration: formData.durationOfPostponement,
-        approvalRemarks: formData.approvalRemarks,
-        postponementEndDate: postponementEndDate,
+        approver: formData.approver,
+        duration: computedDuration,
+        approvalRemarks: null,
       });
     }
     onClose();
   };
 
   if (!workOrder) return null;
+
+  const isApproved =
+    workOrder.status === 'Postponement Approved' ||
+    workOrder.computedStatus === 'Postponement Approved';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -523,16 +551,17 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
 
         <div className="flex-1 overflow-y-auto px-1">
           <div className="space-y-3 py-4">
-            {/* Row 1: Work Order ID and Component */}
+
+            {/* Row 1: Work Order ID / Component */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label htmlFor="workOrderId" className="text-sm">Work Order ID</Label>
                 <Input
                   id="workOrderId"
                   value={formData.workOrderId}
-                  onChange={(e) => setFormData({ ...formData, workOrderId: e.target.value })}
                   className="bg-gray-50 h-9"
                   readOnly
+                  data-testid="input-postpone-wo-id"
                 />
               </div>
               <div className="space-y-1">
@@ -540,49 +569,35 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
                 <Input
                   id="component"
                   value={formData.component}
-                  onChange={(e) => setFormData({ ...formData, component: e.target.value })}
                   className="bg-gray-50 h-9"
                   readOnly
+                  data-testid="input-postpone-component"
                 />
               </div>
             </div>
 
-            {/* Row 2: Job Title and Inform Officer */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label htmlFor="jobTitle" className="text-sm">Job Title</Label>
-                <Input
-                  id="jobTitle"
-                  value={formData.jobTitle}
-                  onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
-                  className="bg-gray-50 h-9"
-                  readOnly
-                />
-              </div>
-              <div className="flex items-end">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="informOfficer"
-                    checked={formData.informOfficer}
-                    onCheckedChange={(checked) =>
-                      setFormData({ ...formData, informOfficer: checked as boolean })
-                    }
-                  />
-                  <Label htmlFor="informOfficer" className="text-sm">Inform Office</Label>
-                </div>
-              </div>
+            {/* Row 2: Job Title — full width */}
+            <div className="space-y-1">
+              <Label htmlFor="jobTitle" className="text-sm">Job Title</Label>
+              <Input
+                id="jobTitle"
+                value={formData.jobTitle}
+                className="bg-gray-50 h-9"
+                readOnly
+                data-testid="input-postpone-job-title"
+              />
             </div>
 
-            {/* Row 3: Original Due Date */}
+            {/* Row 3: Original Due Date / Risk Assessment */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label htmlFor="originalDueDate" className="text-sm">Original Due Date</Label>
                 <Input
                   id="originalDueDate"
                   value={formData.originalDueDate}
-                  onChange={(e) => setFormData({ ...formData, originalDueDate: e.target.value })}
                   className="bg-gray-50 h-9"
                   readOnly
+                  data-testid="input-postpone-original-due-date"
                 />
               </div>
               <div className="space-y-1">
@@ -642,7 +657,86 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
               </div>
             </div>
 
-            {/* Row 4: Reason for Postponement — mandatory dropdown */}
+            {isApproved ? (
+              /* ── Approved read-only summary ── */
+              <div className="space-y-3" data-testid="section-approved-postponement">
+                <div className="rounded-md bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800 font-medium">
+                  Postponement Approved — this work order has been postponed.
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Postpone Date</Label>
+                    <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2" data-testid="display-approved-postpone-date">
+                      {(() => {
+                        const raw = workOrder.postponeDate ?? workOrder.postponeRequestedDate;
+                        if (!raw) return "—";
+                        const d = parseDateFlexible(raw);
+                        return d ? formatDDMMMYYYY(d) : raw;
+                      })()}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Next Due Date</Label>
+                    <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2" data-testid="display-approved-next-due-date">
+                      {workOrder.postponementEndDate ? (() => {
+                        const d = parseDateFlexible(workOrder.postponementEndDate);
+                        return d ? formatDDMMMYYYY(d) : workOrder.postponementEndDate;
+                      })() : "—"}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Selected Reason</Label>
+                  <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2" data-testid="display-approved-reason">
+                    {workOrder.postponementReason || "—"}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Remarks / Additional Details</Label>
+                  <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2 min-h-[60px]" data-testid="display-approved-remarks">
+                    {workOrder.postponementRemarks || "—"}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Approver</Label>
+                    <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2" data-testid="display-approved-approver">
+                      {workOrder.postponementAuthorizedBy || "Office"}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Approver Remarks</Label>
+                    <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2" data-testid="display-approved-approver-remarks">
+                      {workOrder.postponementApprovalRemarks || "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+            {/* Row 4: Postpone Date — mandatory primary input */}
+            <div className="space-y-1">
+              <Label htmlFor="postponeDate" className="text-sm">
+                Postpone Date <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="postponeDate"
+                type="date"
+                value={formData.postponeDate}
+                min={postponeDateMinValue}
+                onChange={(e) => {
+                  setFormData({ ...formData, postponeDate: e.target.value });
+                  if (e.target.value) setErrors((prev) => ({ ...prev, postponeDate: undefined }));
+                }}
+                className={`h-9 max-w-xs${errors.postponeDate ? " border-red-500" : ""}`}
+                data-testid="input-postpone-date"
+              />
+              {errors.postponeDate && (
+                <p className="text-sm text-red-500" data-testid="error-postpone-date">{errors.postponeDate}</p>
+              )}
+            </div>
+
+            {/* Row 5: Reason for Postponement */}
             <div className="space-y-1">
               <Label htmlFor="reasonForPostponement" className="text-sm">
                 Reason for Postponement <span className="text-red-500">*</span>
@@ -651,14 +745,13 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
                 value={formData.reasonForPostponement}
                 onValueChange={(value) => {
                   setFormData({ ...formData, reasonForPostponement: value, postponementRemarks: "" });
-                  if (value) setValidationError("");
-                  setRemarksError("");
+                  setErrors((prev) => ({ ...prev, reason: undefined, remarks: undefined }));
                 }}
               >
                 <SelectTrigger
                   id="reasonForPostponement"
                   data-testid="select-postponement-reason"
-                  className={validationError ? "border-red-500" : ""}
+                  className={errors.reason ? "border-red-500" : ""}
                 >
                   <SelectValue placeholder="Select a reason for postponement..." />
                 </SelectTrigger>
@@ -670,19 +763,17 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
                     </div>
                   ) : (
                     allReasons.map((reason) => (
-                      <SelectItem key={reason} value={reason}>
-                        {reason}
-                      </SelectItem>
+                      <SelectItem key={reason} value={reason}>{reason}</SelectItem>
                     ))
                   )}
                 </SelectContent>
               </Select>
-              {validationError && (
-                <p className="text-sm text-red-500" data-testid="postponement-reason-error">{validationError}</p>
+              {errors.reason && (
+                <p className="text-sm text-red-500" data-testid="postponement-reason-error">{errors.reason}</p>
               )}
             </div>
 
-            {/* Row 4b: Remarks / Additional Details — optional for standard, mandatory for Other Reason */}
+            {/* Row 6: Remarks — optional unless Other Reason */}
             <div className="space-y-1">
               <Label htmlFor="postponementRemarks" className="text-sm">
                 {isOtherReason ? (
@@ -697,88 +788,66 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
                 value={formData.postponementRemarks}
                 onChange={(e) => {
                   setFormData({ ...formData, postponementRemarks: e.target.value });
-                  if (e.target.value.trim()) setRemarksError("");
+                  if (e.target.value.trim()) setErrors((prev) => ({ ...prev, remarks: undefined }));
                 }}
-                className={`min-h-[60px] resize-none${remarksError ? " border-red-500" : ""}`}
+                className={`min-h-[60px] resize-none${errors.remarks ? " border-red-500" : ""}`}
                 placeholder={
                   isOtherReason
                     ? "Enter custom postponement reason..."
                     : "Enter additional remarks or details..."
                 }
               />
-              {remarksError && (
-                <p className="text-sm text-red-500" data-testid="postponement-remarks-error">{remarksError}</p>
+              {errors.remarks && (
+                <p className="text-sm text-red-500" data-testid="postponement-remarks-error">{errors.remarks}</p>
               )}
             </div>
 
-            {/* Row 5: Authorized By */}
+            {/* Row 7: Next Due Date (display-only) / Postponement Duration (display-only) */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label htmlFor="authorizedBy" className="text-sm">Authorized By</Label>
-                <Select
-                  value={formData.authorizedBy}
-                  onValueChange={(value) => setFormData({ ...formData, authorizedBy: value })}
+                <Label className="text-sm">Next Due Date</Label>
+                <div
+                  className="flex items-center h-9 px-3 rounded-md border border-gray-200 bg-gray-50 text-sm text-gray-700"
+                  data-testid="display-next-due-date"
                 >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Select authorizer" />
+                  {computedNextDueDate || <span className="text-gray-400">—</span>}
+                </div>
+                <p className="text-xs text-gray-400">Auto-calculated from Postpone Date</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-sm">Postponement Duration</Label>
+                <div
+                  className="flex items-center h-9 px-3 rounded-md border border-gray-200 bg-gray-50 text-sm text-gray-700"
+                  data-testid="display-postponement-duration"
+                >
+                  {computedDuration || <span className="text-gray-400">—</span>}
+                </div>
+                <p className="text-xs text-gray-400">Postpone Date − Original Due Date</p>
+              </div>
+            </div>
+
+            {/* Row 8: Approver — mandatory, single "Office" option */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="approver" className="text-sm">
+                  Approver <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.approver}
+                  onValueChange={(value) => setFormData({ ...formData, approver: value })}
+                >
+                  <SelectTrigger id="approver" className="h-9" data-testid="select-approver">
+                    <SelectValue placeholder="Select approver" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="superintendent">Superintendent</SelectItem>
-                    <SelectItem value="technical-manager">Technical Manager</SelectItem>
-                    <SelectItem value="dpa">DPA</SelectItem>
+                    <SelectItem value="Office">Office</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div></div>
+              <div />
             </div>
 
-            {/* Row 6: Approval Remarks */}
-            <div className="space-y-1">
-              <Label htmlFor="approvalRemarks" className="text-sm">Approval Remarks (Optional)</Label>
-              <Textarea
-                id="approvalRemarks"
-                value={formData.approvalRemarks}
-                onChange={(e) => setFormData({ ...formData, approvalRemarks: e.target.value })}
-                className="min-h-[50px] resize-none"
-                placeholder="Enter approval remarks..."
-              />
-            </div>
-
-            {/* Row 7: Next Due Date and Duration */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label htmlFor="nextDueDate" className="text-sm">Next Due Date</Label>
-                <Input
-                  id="nextDueDate"
-                  type="date"
-                  value={formData.nextDueDate}
-                  onChange={(e) => setFormData({ ...formData, nextDueDate: e.target.value })}
-                  placeholder="dd-mm-yyyy"
-                  className="h-9"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="durationOfPostponement" className="text-sm">Duration of Postponement</Label>
-                <Select
-                  value={formData.durationOfPostponement}
-                  onValueChange={(value) => setFormData({ ...formData, durationOfPostponement: value })}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1 Day">1 Day</SelectItem>
-                    <SelectItem value="3 Days">3 Days</SelectItem>
-                    <SelectItem value="5 Days">5 Days</SelectItem>
-                    <SelectItem value="1 Week">1 Week</SelectItem>
-                    <SelectItem value="2 Weeks">2 Weeks</SelectItem>
-                    <SelectItem value="1 Month">1 Month</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Row 8: Attach Document (Upload) */}
+            {/* Row 9: Attach Document */}
             <div className="space-y-1">
               <Label className="text-sm">Attach Document (Optional)</Label>
               <div className="flex flex-col items-start gap-1">
@@ -835,25 +904,40 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
                 </div>
               )}
             </div>
+              </>
+            )}
+
           </div>
         </div>
 
         {/* Action Buttons */}
         <div className="flex justify-end gap-3 pt-4 border-t flex-shrink-0">
-          <Button
-            variant="outline"
-            onClick={onClose}
-            data-testid="button-postpone-cancel"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
-            data-testid="button-postpone-confirm"
-          >
-            Confirm Postpone
-          </Button>
+          {isApproved ? (
+            <Button
+              variant="outline"
+              onClick={onClose}
+              data-testid="button-postpone-close"
+            >
+              Close
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={onClose}
+                data-testid="button-postpone-cancel"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
+                data-testid="button-postpone-confirm"
+              >
+                Confirm Postpone
+              </Button>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>

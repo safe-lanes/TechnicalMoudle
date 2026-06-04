@@ -1107,12 +1107,24 @@ export async function updateWorkOrder(id: string, body: any) {
     updateData.rejectionComments = null;
     updateData.rejectionDate = null;
     updateData.approvalAction = null;
+    updateData.wasRejected = false;
     updateData.submittedDate = new Date().toISOString();
     // Clear superintendent rejection remarks when a completion-rejected WO is resubmitted
     if (existingWO.status === 'Rejected') {
       updateData.superintendentRejectionRemarks = null;
     }
     console.log('📝 Previously rejected WO resubmitted - transitioning to Pending Approval');
+  }
+
+  // When vessel explicitly sends status='Pending Approval' for a reviewer-reopened WO,
+  // also clear the rejection flags so the banner doesn't reappear after the HOD approves.
+  if (isRejectedWO && updateData.status === 'Pending Approval' && hasExplicitStatus) {
+    updateData.wasRejected = false;
+    updateData.rejectionComments = null;
+    updateData.rejectionDate = null;
+    updateData.approvalAction = null;
+    if (!updateData.submittedDate) updateData.submittedDate = new Date().toISOString();
+    console.log('📝 Reviewer-reopened WO explicitly resubmitted to Pending Approval - clearing rejection flags');
   }
 
   // AUDIT TRAIL: Capture submittedDate
@@ -1220,7 +1232,27 @@ export async function updateWorkOrder(id: string, body: any) {
 
   const isApprovalTransition = (updateData.approvalAction === 'approved' && updateData.status === 'Completed') ||
     (updateData.status === 'Completed' && existingWO.status === 'Pending Approval');
-  if (isApprovalTransition) {
+
+  // ── Level 2 Review Interception ──────────────────────────────────────────
+  // If the linked job requires a Level 2 Office reviewer, redirect the WO to
+  // "Pending Office Review" instead of completing it. This gate covers the
+  // direct-PATCH path; the bulk-approve path has its own identical check.
+  let interceptedForL2Review = false;
+  if (isApprovalTransition && existingWO.jobId) {
+    try {
+      const linkedJob = await repo.findJob(existingWO.jobId);
+      if (linkedJob && (linkedJob as any).level2ReviewerRankId) {
+        interceptedForL2Review = true;
+        updateData.status = 'Pending Office Review';
+        updateData.approvalDate = new Date().toISOString();
+        console.log(`🔒 [L2 Review] WO ${existingWO.workOrderNo} intercepted — job requires Level 2 reviewer rank "${(linkedJob as any).level2ReviewerRankId}"`);
+      }
+    } catch (err) {
+      console.warn(`[L2 Review] Could not load linked job ${existingWO.jobId} for L2 check — proceeding without interception:`, err);
+    }
+  }
+
+  if (isApprovalTransition && !interceptedForL2Review) {
     const { resolveHodForDepartment, getHodShortLabel } = await import('../../ranks/hodResolutionService');
     const hodResolution = await resolveHodForDepartment(
       existingWO.vesselId,
@@ -1350,7 +1382,7 @@ export async function updateWorkOrder(id: string, body: any) {
 
   // ========== SPARE CONSUMPTION ON SAVE (Real-time ROB update) ==========
   const isApprovalAction = updateData.approvalAction === 'approved' && updateData.status === 'Completed';
-  if (!isApprovalAction && !isBeingRejected && !woIsCompleted) {
+  if (!isApprovalAction && !isBeingRejected && !woIsCompleted && !interceptedForL2Review) {
     const currentConsumed = ensureArray(updateData.consumedSpareParts) as ConsumedSpareEntry[];
     const previousConsumed = ensureArray(existingWO.consumedSpareParts) as ConsumedSpareEntry[];
 
@@ -2228,6 +2260,208 @@ export async function rejectCompletedWorkOrder(
 }
 
 // ── Superintendent Reopen Completed Work Order ──
+
+// ── Postponement Approval Workflow (Plan B) ──
+
+/**
+ * Ship submits a new postponement request.
+ * Sets WO status → "Awaiting Office Approval" and creates a postponements audit row.
+ */
+export async function submitPostponeRequest(id: string, body: any) {
+  let wo = await repo.findById(id);
+  if (!wo) wo = await repo.findByCode(id);
+  if (!wo) throw new NotFoundError('Work order not found');
+
+  const today = new Date().toISOString().split('T')[0];
+
+  // Update the work order
+  const updatedWO = await repo.update(id, {
+    status: 'Awaiting Office Approval',
+    postponeRequestedDate: body.nextDueDate || body.postponeDate,
+    postponementReason: body.reason || body.postponementReason,
+    postponementRemarks: body.postponementRemarks,
+    postponeApprover: body.approver || 'Office',
+    // Clear any previous approval decision fields
+    postponementApprovalDate: null,
+    postponementApprovalRemarks: null,
+  });
+
+  // Create a new postponement audit row
+  const prevMax = await repo.getMaxPostponementNumber(wo.wouuid);
+  await repo.createPostponement({
+    id: crypto.randomUUID(),
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId!,
+    postponementNumber: prevMax + 1,
+    originalDueDate: wo.originalDueDate || wo.dueDate,
+    newDueDate: body.nextDueDate || body.postponeDate,
+    postponementReason: body.reason || body.postponementReason,
+    postponementRemarks: body.postponementRemarks,
+    approver: body.approver || 'Office',
+    postponeDate: body.postponeDate,
+    durationDays: body.duration ? parseInt(String(body.duration), 10) : null,
+    submittedDate: today,
+    status: 'Awaiting Approval',
+    informOffice: true,
+  });
+
+  return updatedWO;
+}
+
+/**
+ * Ship edits and resubmits an existing postponement request.
+ * Resets status to "Awaiting Office Approval" and inserts a NEW audit row
+ * with an incremented postponementNumber — prior rows are never modified.
+ */
+export async function editPostponeRequest(id: string, body: any) {
+  // Reuse the same logic as submitPostponeRequest (always creates a new audit row)
+  return submitPostponeRequest(id, body);
+}
+
+/**
+ * Office approves a postponement request.
+ * Updates the WO due date and records the decision.
+ */
+export async function approvePostponement(id: string, body: any) {
+  let wo = await repo.findById(id);
+  if (!wo) wo = await repo.findByCode(id);
+  if (!wo) throw new NotFoundError('Work order not found');
+
+  if (wo.status !== 'Awaiting Office Approval') {
+    throw new ValidationError(
+      `Only work orders with status "Awaiting Office Approval" can be approved. Current status: ${wo.status}`
+    );
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  const newDueDate = wo.postponeRequestedDate || body.newDueDate;
+
+  const updatedWO = await repo.update(id, {
+    status: 'Postponement Approved',
+    dueDate: newDueDate,
+    postponementEndDate: newDueDate,
+    postponeApprover: body.approvedBy || 'Office',
+    postponementApprovalDate: today,
+    postponementApprovalRemarks: body.approvalRemarks || null,
+  });
+
+  // Insert a new immutable decision audit row (approve)
+  const existingRows = await repo.findPostponementsByWorkOrderId(wo.wouuid);
+  const prevMaxApprove = existingRows?.length
+    ? existingRows.reduce((a: any, b: any) =>
+        (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+      ).postponementNumber || 1
+    : 1;
+  const latestApprove = existingRows?.length
+    ? existingRows.reduce((a: any, b: any) =>
+        (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+      )
+    : null;
+
+  await repo.createPostponement({
+    id: crypto.randomUUID(),
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId!,
+    postponementNumber: prevMaxApprove + 1,
+    originalDueDate: latestApprove?.originalDueDate || wo.originalDueDate || wo.dueDate,
+    newDueDate: newDueDate,
+    postponementReason: latestApprove?.postponementReason || wo.postponementReason,
+    postponementRemarks: latestApprove?.postponementRemarks || wo.postponementRemarks,
+    authorizedBy: body.approvedBy || 'Office',
+    approvedBy: body.approvedBy || 'Office',
+    approvedDate: today,
+    approvalRemarks: body.approvalRemarks || null,
+    approver: body.approvedBy || 'Office',
+    durationDays: latestApprove?.durationDays || null,
+    submittedDate: today,
+    status: 'Approved',
+    informOffice: true,
+  });
+
+  return updatedWO;
+}
+
+/**
+ * Office rejects a postponement request.
+ * Reverts WO status to Due/Overdue based on the original due date.
+ * Inserts a NEW immutable decision row in work_order_postponements.
+ */
+export async function rejectPostponement(id: string, body: any) {
+  let wo = await repo.findById(id);
+  if (!wo) wo = await repo.findByCode(id);
+  if (!wo) throw new NotFoundError('Work order not found');
+
+  if (wo.status !== 'Awaiting Office Approval') {
+    throw new ValidationError(
+      `Only work orders with status "Awaiting Office Approval" can be rejected. Current status: ${wo.status}`
+    );
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+
+  // Compute revert status from the original due date
+  const companyGraceRow = await storage.getCompanyStandardGraceSettings();
+  const companyGraceConfig = buildCompanyGraceConfig(companyGraceRow);
+  const vesselSettings = wo.vesselId ? await repo.findPmsVesselSettings(wo.vesselId) : null;
+  const vesselGraceSettings = vesselSettings ? {
+    calendarGraceMode: (vesselSettings.calendarGraceMode || 'COMPANY_STANDARD') as 'COMPANY_STANDARD' | 'CUSTOM_DAYS',
+    calendarGraceDays: vesselSettings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+    rhGraceHours: vesselSettings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+    rhLeadTimeHours: vesselSettings.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS,
+  } : undefined;
+
+  const revertDueDate = wo.originalDueDate || wo.dueDate;
+  const revertedStatus = computeWorkOrderStatus({
+    dueDate: revertDueDate,
+    isExecution: wo.isExecution,
+    status: 'Due', // force calendar path — let computeWorkOrderStatus decide
+    maintenanceBasis: wo.maintenanceBasis || undefined,
+    vesselGraceSettings,
+    companyGraceConfig,
+  });
+
+  const updatedWO = await repo.update(id, {
+    status: revertedStatus,
+    postponeApprover: body.approvedBy || 'Office',
+    postponementApprovalDate: today,
+    postponementApprovalRemarks: body.approvalRemarks || null,
+  });
+
+  // Insert a new immutable decision audit row (reject)
+  const rejectRows = await repo.findPostponementsByWorkOrderId(wo.wouuid);
+  const prevMaxReject = rejectRows?.length
+    ? rejectRows.reduce((a: any, b: any) =>
+        (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+      ).postponementNumber || 1
+    : 1;
+  const latestReject = rejectRows?.length
+    ? rejectRows.reduce((a: any, b: any) =>
+        (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
+      )
+    : null;
+
+  await repo.createPostponement({
+    id: crypto.randomUUID(),
+    workOrderId: wo.wouuid,
+    vesselId: wo.vesselId!,
+    postponementNumber: prevMaxReject + 1,
+    originalDueDate: latestReject?.originalDueDate || wo.originalDueDate || wo.dueDate,
+    newDueDate: latestReject?.newDueDate || wo.postponeRequestedDate,
+    postponementReason: latestReject?.postponementReason || wo.postponementReason,
+    postponementRemarks: latestReject?.postponementRemarks || wo.postponementRemarks,
+    authorizedBy: body.approvedBy || 'Office',
+    approvedBy: body.approvedBy || 'Office',
+    approvedDate: today,
+    approvalRemarks: body.approvalRemarks || null,
+    approver: body.approvedBy || 'Office',
+    durationDays: latestReject?.durationDays || null,
+    submittedDate: today,
+    status: 'Rejected',
+    informOffice: true,
+  });
+
+  return updatedWO;
+}
 
 export async function reopenCompletedWorkOrder(
   id: string,

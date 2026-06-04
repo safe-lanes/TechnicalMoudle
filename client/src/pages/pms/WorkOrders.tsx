@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import PostponeWorkOrderDialog from "@/components/PostponeWorkOrderDialog";
+import PostponeApprovalDialog from "@/components/PostponeApprovalDialog";
 import OverdueReasonDialog from "@/components/OverdueReasonDialog";
 import UnplannedWorkOrderForm from "@/components/UnplannedWorkOrderForm";
 import { useModifyMode } from "@/hooks/useModifyMode";
@@ -40,10 +41,17 @@ import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils";
 import { Marker } from "@/components/Marker";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useAuth } from "@/contexts/AuthContext";
 import * as XLSX from "xlsx";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import { format } from "date-fns";
 import { POSTPONEMENT_REASONS } from "@shared/postponementReasons";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // Extend WorkOrderWithLeadTime to include computed status and RH data from backend
 type WorkOrderWithHydratedData = WorkOrderWithLeadTime & {
@@ -72,6 +80,43 @@ interface WorkOrdersPageEnvelope {
 
 // Using WorkOrder type from shared schema
 // The WorkOrder interface is now imported from @shared/schema
+
+// Derives the human-readable lock reason messages for a superintendent_locked WO.
+// Re-computes backdatingDays client-side from submittedDate − completionDate
+// (mirrors calculateBackdatingDaysForApproval on the server — no schema change needed).
+function buildLockReasonMessages(wo: any): string[] {
+  const reasons: string[] = [];
+
+  const missedCycles = wo?.missedCycles ?? 0;
+  if (missedCycles >= 3) {
+    reasons.push(`${missedCycles} Work Order cycle${missedCycles === 1 ? '' : 's'} skipped`);
+  }
+
+  const daysLate = wo?.daysLate ?? 0;
+  if (daysLate >= 21) {
+    reasons.push(`Completion is ${daysLate} days past due date`);
+  }
+
+  const completionDate = wo?.completionDateTime || wo?.dateCompleted;
+  const submittedDate = wo?.submittedDate;
+  let backdatingDays = 0;
+  if (completionDate) {
+    const comp = new Date(completionDate);
+    const reference = submittedDate ? new Date(submittedDate) : new Date();
+    if (!isNaN(comp.getTime()) && !isNaN(reference.getTime())) {
+      backdatingDays = Math.max(0, Math.floor((reference.getTime() - comp.getTime()) / (1000 * 60 * 60 * 24)));
+    }
+  }
+  if (backdatingDays >= 7) {
+    reasons.push(`Completion date is ${backdatingDays} days backdated`);
+  }
+
+  if (reasons.length === 0) {
+    reasons.push('Work Order requires Technical Superintendent acknowledgement');
+  }
+
+  return reasons;
+}
 
 // Helper function to generate template code
 const generateTemplateCode = (componentCode: string, taskType: string, basis: string, frequency: string, unit?: string) => {
@@ -140,6 +185,8 @@ const WorkOrders: React.FC = () => {
   }, [activeTab]);
   const [showPlanner, setShowPlanner] = useState(false);
   const [postponeDialogOpen, setPostponeDialogOpen] = useState(false);
+  const [postponeApprovalDialogOpen, setPostponeApprovalDialogOpen] = useState(false);
+  const [postponeApprovalWorkOrder, setPostponeApprovalWorkOrder] = useState<WorkOrderWithHydratedData | null>(null);
   const [overdueReasonDialogOpen, setOverdueReasonDialogOpen] = useState(false);
   const [overdueReasonWorkOrder, setOverdueReasonWorkOrder] = useState<WorkOrderWithHydratedData | null>(null);
   const [unplannedWorkOrderFormOpen, setUnplannedWorkOrderFormOpen] = useState(false);
@@ -156,8 +203,12 @@ const WorkOrders: React.FC = () => {
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const { vesselId, setVesselId } = useVessel();
+  const { vesselId, setVesselId, isMyVessels, assignedVesselIds, applyVesselScope } = useVessel();
+  // 'my' aggregate scope with no assigned vessels yields nothing — don't fetch.
+  const vesselScopeReady = !!vesselId && (!isMyVessels || assignedVesselIds.length > 0);
+  const vesselScopeKey = isMyVessels ? `my:${assignedVesselIds.join(',')}` : vesselId;
   const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept } = useUIRole();
+  const { isOfficeUser } = useAuth();
   const { data: vessels = [] } = useVessels();
   
   // Debounce the search box so each keystroke doesn't fire a server round-trip
@@ -178,10 +229,10 @@ const WorkOrders: React.FC = () => {
   // sorting all run on the server (single source of truth in
   // @shared/utils/workOrderFilters); only one page of rows comes back.
   const { data: woEnvelope, isLoading, error } = useQuery<WorkOrdersPageEnvelope>({
-    queryKey: ['/technical/api/work-orders', vesselId, activeTab, debouncedSearch, periodFilter, selectedRank, criticalityParam, selectedPostponementReason, woSortField, woSortDir, currentPage, itemsPerPage],
+    queryKey: ['/technical/api/work-orders', vesselScopeKey, activeTab, debouncedSearch, periodFilter, selectedRank, criticalityParam, selectedPostponementReason, woSortField, woSortDir, currentPage, itemsPerPage],
     queryFn: async () => {
       const params = new URLSearchParams();
-      params.set('vesselId', vesselId);
+      applyVesselScope(params);
       params.set('page', String(currentPage));
       params.set('pageSize', String(itemsPerPage));
       params.set('status', activeTab);
@@ -199,17 +250,19 @@ const WorkOrders: React.FC = () => {
       const json = await response.json();
       return json.data as WorkOrdersPageEnvelope;
     },
-    enabled: !!vesselId, // Only fetch when vesselId is available
+    enabled: vesselScopeReady, // Only fetch when a usable vessel scope is available
   });
 
   // On-demand full fetch (no `page` param → raw enriched array). Used by the
   // export builders and deep-link navigation that need the complete data set
   // rather than just the current page.
   const fetchAllWorkOrders = useCallback(async (): Promise<WorkOrderWithHydratedData[]> => {
-    const response = await fetch(`/technical/api/work-orders?vesselId=${vesselId}`);
+    const params = new URLSearchParams();
+    applyVesselScope(params);
+    const response = await fetch(`/technical/api/work-orders?${params.toString()}`);
     if (!response.ok) throw new Error('Failed to fetch work orders');
     return await response.json() as WorkOrderWithHydratedData[];
-  }, [vesselId]);
+  }, [applyVesselScope]);
 
   const paginatedWorkOrders: WorkOrderWithHydratedData[] = woEnvelope?.items ?? [];
   const totalItems = woEnvelope?.total ?? 0;
@@ -218,13 +271,15 @@ const WorkOrders: React.FC = () => {
   const uniqueRanks = woEnvelope?.rankOptions ?? [];
 
   const { data: allVesselJobs = [] } = useQuery<any[]>({
-    queryKey: ['/technical/api/jobs', vesselId],
+    queryKey: ['/technical/api/jobs', vesselScopeKey],
     queryFn: async () => {
-      const response = await fetch(`/technical/api/jobs?vesselId=${vesselId}`);
+      const params = new URLSearchParams();
+      applyVesselScope(params);
+      const response = await fetch(`/technical/api/jobs?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch jobs');
       return await response.json();
     },
-    enabled: !!vesselId,
+    enabled: vesselScopeReady,
   });
 
   const { data: postponementReasonMasterList } = useQuery<{ listValue: string; displayOrder: number; isActive: boolean }[]>({
@@ -557,7 +612,23 @@ const WorkOrders: React.FC = () => {
             const tier = params.value;
             const wo = params.data;
             const approverLabel = wo?.approver || 'HOD';
-            if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
+            if (tier === "superintendent_locked") return (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 cursor-default" data-testid={`approval-tier-locked-${wo?.id}`}>
+                      <Lock className="inline h-3 w-3 mr-0.5" /> Locked
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" collisionPadding={8} className="max-w-[280px]">
+                    <p className="font-semibold text-xs mb-1">Reason for Lock:</p>
+                    {buildLockReasonMessages(wo).map((msg, i) => (
+                      <p key={i} className="text-xs">• {msg}</p>
+                    ))}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            );
             if (tier === "superintendent_notification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Supt. Notified</span>;
             if (tier === "ce_with_justification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">{approverLabel} + Remarks</span>;
             return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Standard</span>;
@@ -637,9 +708,26 @@ const WorkOrders: React.FC = () => {
           flex: 0,
           cellRenderer: (params: any) => {
             const tier = params.value;
-            if (tier === "superintendent_locked") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><Lock className="inline h-3 w-3 mr-0.5" /> Locked</span>;
+            const woCompleted = params.data;
+            if (tier === "superintendent_locked") return (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 cursor-default" data-testid={`approval-tier-locked-completed-${woCompleted?.id}`}>
+                      <Lock className="inline h-3 w-3 mr-0.5" /> Locked
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" collisionPadding={8} className="max-w-[280px]">
+                    <p className="font-semibold text-xs mb-1">Reason for Lock:</p>
+                    {buildLockReasonMessages(woCompleted).map((msg, i) => (
+                      <p key={i} className="text-xs">• {msg}</p>
+                    ))}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            );
             if (tier === "superintendent_notification") return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Supt. Notified</span>;
-            if (tier === "ce_with_justification") { const woApprover = params.data?.approver || 'HOD'; return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">{woApprover} + Remarks</span>; }
+            if (tier === "ce_with_justification") { const woApprover = woCompleted?.approver || 'HOD'; return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">{woApprover} + Remarks</span>; }
             return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Standard</span>;
           },
         },
@@ -684,7 +772,7 @@ const WorkOrders: React.FC = () => {
                     >
                       <Pen className="h-4 w-4 text-gray-600" />
                     </button>
-                    {!isVessel && getDisplayStatus(wo) !== "Pending Approval" && (
+                    {!isVessel && getDisplayStatus(wo) !== "Pending Approval" && getDisplayStatus(wo) !== "Awaiting Level 2 Review" && (
                       <button
                         className="p-1 hover:bg-gray-200 rounded"
                         onClick={(e) => { e.stopPropagation(); handleTimerClick(wo); }}
@@ -761,9 +849,17 @@ const WorkOrders: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const handlePostponeClick = (workOrder: WorkOrder) => {
-    setSelectedWorkOrder(workOrder);
-    setPostponeDialogOpen(true);
+  const isAwaitingOfficeApproval = (wo: WorkOrderWithHydratedData): boolean =>
+    wo.computedStatus === 'Awaiting Office Approval' || wo.status === 'Awaiting Office Approval';
+
+  const handlePostponeClick = (workOrder: WorkOrderWithHydratedData) => {
+    if (isOfficeUser && isAwaitingOfficeApproval(workOrder)) {
+      setPostponeApprovalWorkOrder(workOrder);
+      setPostponeApprovalDialogOpen(true);
+    } else {
+      setSelectedWorkOrder(workOrder);
+      setPostponeDialogOpen(true);
+    }
   };
 
   const handleWorkOrderClick = (workOrder: WorkOrder) => {
@@ -775,10 +871,51 @@ const WorkOrders: React.FC = () => {
     setLocation(`/pms/work-order/${workOrder.id}`);
   };
 
-  const handleTimerClick = (workOrder: WorkOrder) => {
-    setSelectedWorkOrder(workOrder);
-    setPostponeDialogOpen(true);
+  const handleTimerClick = (workOrder: WorkOrderWithHydratedData) => {
+    if (isOfficeUser && isAwaitingOfficeApproval(workOrder)) {
+      setPostponeApprovalWorkOrder(workOrder);
+      setPostponeApprovalDialogOpen(true);
+    } else {
+      setSelectedWorkOrder(workOrder);
+      setPostponeDialogOpen(true);
+    }
   };
+
+  const postponeApproveMutation = useMutation({
+    mutationFn: async ({ id, remarks }: { id: string; remarks: string }) => {
+      const res = await apiRequest('POST', `/technical/api/work-orders/${id}/postpone-approve`, {
+        approvalRemarks: remarks || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      toast({ title: 'Postponement Approved', description: 'Work order due date has been updated.' });
+      setPostponeApprovalDialogOpen(false);
+      setPostponeApprovalWorkOrder(null);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to approve postponement', variant: 'destructive' });
+    },
+  });
+
+  const postponeRejectMutation = useMutation({
+    mutationFn: async ({ id, remarks }: { id: string; remarks: string }) => {
+      const res = await apiRequest('POST', `/technical/api/work-orders/${id}/postpone-reject`, {
+        approvalRemarks: remarks,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      toast({ title: 'Postponement Rejected', description: 'Work order has been reverted to Due/Overdue.' });
+      setPostponeApprovalDialogOpen(false);
+      setPostponeApprovalWorkOrder(null);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to reject postponement', variant: 'destructive' });
+    },
+  });
 
   const handleApprove = (workOrderId: string, approverRemarks?: string) => {
     const workOrder = paginatedWorkOrders.find(wo => wo.executionId === workOrderId || wo.id === workOrderId);
@@ -844,17 +981,37 @@ const WorkOrders: React.FC = () => {
     updateWorkOrderMutation.mutate({ id: workOrder.id, data: updateData });
   };
 
+  const postponeRequestMutation = useMutation({
+    mutationFn: async ({ id, data, method }: { id: string; data: any; method: 'POST' | 'PUT' }) => {
+      const response = await apiRequest(method, `/technical/api/work-orders/${id}/postpone-request`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      toast({ title: "Postponement Submitted", description: "Your postponement request has been sent to the office for approval." });
+      setPostponeDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to submit postponement request", variant: "destructive" });
+    },
+  });
+
   const handlePostponeConfirm = (workOrderId: string, postponeData: any) => {
-    const updateData = {
-      status: "Postponed",
-      dueDate: postponeData.nextDueDate,
-      postponementEndDate: postponeData.postponementEndDate,
-      postponementReason: postponeData.reason,
-      postponementRemarks: postponeData.postponementRemarks,
-      postponementAuthorizedBy: postponeData.authorizedBy
-    };
-    
-    updateWorkOrderMutation.mutate({ id: workOrderId, data: updateData });
+    const wo = paginatedWorkOrders.find(w => w.id === workOrderId);
+    const isResubmit = wo?.status === 'Awaiting Office Approval' || wo?.computedStatus === 'Awaiting Office Approval' ||
+                       wo?.status === 'Postponement Rejected' || wo?.computedStatus === 'Postponement Rejected';
+    postponeRequestMutation.mutate({
+      id: workOrderId,
+      method: isResubmit ? 'PUT' : 'POST',
+      data: {
+        postponeDate: postponeData.postponeDate,
+        nextDueDate: postponeData.nextDueDate,
+        reason: postponeData.reason,
+        postponementRemarks: postponeData.postponementRemarks,
+        approver: postponeData.approver || 'Office',
+        duration: postponeData.duration,
+      },
+    });
   };
 
   const handleAddWorkOrderClick = () => {
@@ -1187,7 +1344,7 @@ const WorkOrders: React.FC = () => {
         {(isSailAdmin || isClientAdmin) && (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600">Vessel:</span>
-            <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
+            <Select value={(vesselId === 'all' || vesselId === 'my') ? '' : vesselId} onValueChange={setVesselId}>
               <SelectTrigger className="w-[200px]" data-testid="C15">
                 <Marker id="C15" />
                 <SelectValue placeholder="Choose vessel" />
@@ -1479,6 +1636,16 @@ const WorkOrders: React.FC = () => {
         onClose={() => setPostponeDialogOpen(false)}
         workOrder={selectedWorkOrder}
         onConfirm={handlePostponeConfirm}
+      />
+
+      {/* Office: Postponement Approval Dialog */}
+      <PostponeApprovalDialog
+        isOpen={postponeApprovalDialogOpen}
+        onClose={() => { setPostponeApprovalDialogOpen(false); setPostponeApprovalWorkOrder(null); }}
+        workOrder={postponeApprovalWorkOrder}
+        onApprove={(id, remarks) => postponeApproveMutation.mutate({ id, remarks })}
+        onReject={(id, remarks) => postponeRejectMutation.mutate({ id, remarks })}
+        isSubmitting={postponeApproveMutation.isPending || postponeRejectMutation.isPending}
       />
 
       {/* Overdue Reason Dialog */}

@@ -6,8 +6,8 @@ import type { InsertRunningHoursAudit, RunningHoursAudit, Component } from '@sha
 
 // ── Component Queries ──
 
-export async function getComponents(vesselId: string): Promise<Component[]> {
-  return storage.getComponents(vesselId);
+export async function getComponents(vesselId: string, vesselIds?: string[]): Promise<Component[]> {
+  return storage.getComponents(vesselId, vesselIds);
 }
 
 export async function getComponent(id: string): Promise<Component | undefined> {

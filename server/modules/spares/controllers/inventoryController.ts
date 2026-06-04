@@ -300,6 +300,10 @@ export async function getSparesWithInventory(req: Request, res: Response) {
     const componentIdRaw = typeof req.query.componentId === 'string' ? req.query.componentId.trim() : '';
     const componentId = componentIdRaw ? componentIdRaw : undefined;
 
+    // 'my' scope: vesselId='all' carries a vesselIds allow-list narrowing the aggregate.
+    const vesselIdsRaw = typeof req.query.vesselIds === 'string' ? req.query.vesselIds : '';
+    const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined;
+
     const result = await inventoryService.getSparesWithInventoryByVesselPaged(vesselId, {
       page,
       pageSize,
@@ -311,6 +315,7 @@ export async function getSparesWithInventory(req: Request, res: Response) {
       sortDir,
       activeOnly,
       componentId,
+      vesselIds,
     });
 
     res.json({ success: true, data: result });

@@ -142,7 +142,12 @@ const RunningHours = () => {
   } | null>(null);
   
   const { toast } = useToast();
-  const { vesselId, setVesselId } = useVessel();
+  const { vesselId, setVesselId, isMyVessels, assignedVesselIds } = useVessel();
+  // 'my' aggregates across the assigned mini-fleet via the 'all' read path with a
+  // vesselIds allow-list. The path segment becomes 'all'; the allow-list narrows it.
+  const rhScopeSegment = isMyVessels ? 'all' : vesselId;
+  const rhScopeKey = isMyVessels ? `my:${assignedVesselIds.join(',')}` : vesselId;
+  const rhScopeReady = !!vesselId && (!isMyVessels || assignedVesselIds.length > 0);
   const { isSailAdmin, isClientAdmin, isExternal } = useUIRole();
   const { canEdit: canEditPerm } = usePermissions();
   const canEditRH = canEditPerm("pms-running-hrs");
@@ -172,9 +177,10 @@ const RunningHours = () => {
   const periodLabel = useMemo(() => getPeriodLabel(periodFilter) || 'Monthly', [periodFilter]);
 
   const { data: rawRunningHoursData = [], isLoading: isLoadingParents, refetch } = useQuery<any[]>({
-    queryKey: ['/technical/api/running-hours/parents', vesselId, periodFilter],
+    queryKey: ['/technical/api/running-hours/parents', rhScopeKey, periodFilter],
     queryFn: async () => {
-      const params = new URLSearchParams({ vesselId });
+      const params = new URLSearchParams({ vesselId: rhScopeSegment });
+      if (isMyVessels) params.append('vesselIds', assignedVesselIds.join(','));
       if (periodDateRange) {
         params.append('periodFrom', periodDateRange.from.toISOString());
         params.append('periodTo', periodDateRange.to.toISOString());
@@ -185,7 +191,7 @@ const RunningHours = () => {
       if (!response.ok) throw new Error('Failed to fetch running hour parents');
       return response.json();
     },
-    enabled: true
+    enabled: rhScopeReady
   });
 
   // Map API data to display format
@@ -1438,7 +1444,7 @@ const RunningHours = () => {
             {(isSailAdmin || isClientAdmin || isExternal) && (
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-gray-600">Vessel:</span>
-                <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
+                <Select value={(vesselId === 'all' || vesselId === 'my') ? '' : vesselId} onValueChange={setVesselId}>
                   <SelectTrigger className="w-[200px]" data-testid="vessel-selector-rh">
                     <SelectValue placeholder="Choose vessel" />
                   </SelectTrigger>

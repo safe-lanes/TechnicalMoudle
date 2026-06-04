@@ -172,6 +172,7 @@ export async function getJobContext(jobId: string) {
     intervalRunningHour: job.intervalRunningHour?.toString() || '',
     assignedTo: job.assignedTo,
     approver: job.approver,
+    level2ReviewerRankId: (job as any).level2ReviewerRankId || null,
     department: job.department,
     jobPriority: job.jobPriority,
     classRelated: job.classRelated,

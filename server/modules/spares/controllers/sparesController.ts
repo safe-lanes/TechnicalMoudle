@@ -30,8 +30,11 @@ export async function getAllSpares(req: Request, res: Response) {
 export async function getSpareHistoryByVessel(req: Request, res: Response) {
   try {
     const { vesselId } = req.params;
+    // 'my' scope: vesselId='all' carries a vesselIds allow-list narrowing the aggregate.
+    const vesselIdsRaw = typeof req.query.vesselIds === 'string' ? req.query.vesselIds : '';
+    const vesselIds = vesselIdsRaw ? vesselIdsRaw.split(',').filter(Boolean) : undefined;
     console.log('[API] Fetching spare history for vessel:', vesselId);
-    const history = await sparesService.getSpareHistory(vesselId);
+    const history = await sparesService.getSpareHistory(vesselId, vesselIds);
     console.log('[API] Found', history.length, 'history entries');
     res.json(history);
   } catch (error) {

@@ -203,6 +203,7 @@ export async function getSparesWithInventoryByVesselPaged(
     sortDir?: 'asc' | 'desc';
     activeOnly?: boolean;
     componentId?: string;
+    vesselIds?: string[];
   }
 ): Promise<{ items: SpareWithInventory[]; total: number; page: number; pageSize: number }> {
   return repo.getSparesWithInventoryByVesselPaged(vesselId, opts);

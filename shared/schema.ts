@@ -1072,6 +1072,7 @@ export const jobs = pgTable("jobs", {
   briefWorkDescription: text("brief_work_description"),
   jobDescription: text("job_description"), // Detailed job description
   approver: text("approver"), // Rank who approves the job
+  level2ReviewerRankId: text("level2_reviewer_rank_id"), // Optional second-stage reviewer rank (Level 2 Office Review)
   department: text("department"),
   
   // Template data (Part A)
@@ -1240,6 +1241,12 @@ export const workOrders = pgTable("work_orders", {
   rhJustificationProvidedBy: text("rh_justification_provided_by"),
   rhJustificationDate: timestamp("rh_justification_date"),
 
+  // === Postponement Approval Fields (Plan B) ===
+  postponeRequestedDate: text("postpone_requested_date"), // Ship's requested new due date (populated on postpone-request submit)
+  postponeApprover: text("postpone_approver"), // Static "Office" value stored at request time
+  postponementApprovalDate: text("postponement_approval_date"), // ISO date when office approved/rejected
+  postponementApprovalRemarks: text("postponement_approval_remarks"), // Office remarks on approve/reject
+
   // === WO Generation Cycle Snapshots (for duplicate protection and audit) ===
   // Driver type determines which cycle fields apply
   driverType: text("driver_type"), // 'RH' | 'CALENDAR' | 'DUAL_CALENDAR' | 'DUAL_RH' - from job's maintenanceBasis
@@ -1257,6 +1264,10 @@ export const workOrders = pgTable("work_orders", {
   generateDateSnapshot: text("generate_date_snapshot"), // GENERATE_DATE = DUE_DATE - LT_days (ISO date)
   dueDateSnapshot: text("due_date_snapshot"), // DUE_DATE (duplicated for clarity)
   lastDoneDateSnapshot: text("last_done_date_snapshot"), // last_done_date stored at WO creation
+
+  // === Level 2 Office Review Fields ===
+  reviewerComments: text("reviewer_comments"), // Comments from Level 2 reviewer
+  reviewedByUuid: text("reviewed_by_uuid"), // UUID/identity of Level 2 reviewer who acted
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
@@ -2341,6 +2352,7 @@ export const fleetJobs = pgTable("fleet_jobs", {
   taskType: text("task_type").notNull(),
   assignedTo: text("assigned_to").notNull(),
   approver: text("approver").notNull(),
+  level2ReviewerRankId: text("level2_reviewer_rank_id"), // Optional second-stage reviewer rank (Level 2 Office Review)
   jobPriority: text("job_priority").notNull(),
   classRelated: text("class_related").notNull(),
   briefWorkDescription: text("brief_work_description").notNull(),
@@ -3460,6 +3472,8 @@ export const workOrderPostponements = pgTable("work_order_postponements", {
   approvedDate: text("approved_date"), // When postponement was approved
   approvedBy: text("approved_by"), // Who approved the postponement
   status: text("status").notNull().default("Pending"), // 'Pending' | 'Approved' | 'Rejected'
+  approver: text("approver"), // Designated approver (static "Office" value)
+  postponeDate: text("postpone_date"), // Raw postpone date entered in dialog
   informOffice: boolean("inform_office").notNull().default(false), // Whether office was informed
   attachmentPath: text("attachment_path"), // Path to any attached documents
   createdAt: timestamp("created_at").notNull().defaultNow(),

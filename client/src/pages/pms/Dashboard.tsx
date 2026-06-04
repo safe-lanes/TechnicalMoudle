@@ -11,7 +11,9 @@ import {
   CheckCircle,
   XCircle,
   Eye,
+  ClipboardList,
   Pencil,
+  RefreshCw,
   Download,
   TrendingUp,
   TrendingDown,
@@ -26,6 +28,7 @@ import {
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend, BarChart, Bar } from "recharts";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -398,6 +401,15 @@ const Dashboard = () => {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [pendingSelectedIds, setPendingSelectedIds] = useState<Set<string>>(new Set());
   const [pendingBulkConfirmApprove, setPendingBulkConfirmApprove] = useState(false);
+  const [postponeDecisionDialog, setPostponeDecisionDialog] = useState<{
+    open: boolean;
+    wo: EnrichedWorkOrder | null;
+    action: 'approve' | 'reject' | 'review' | null;
+    remarks: string;
+    submitting: boolean;
+  }>({ open: false, wo: null, action: null, remarks: '', submitting: false });
+  const [postponeRemarksError, setPostponeRemarksError] = useState('');
+  const [reviewerActionDialog, setReviewerActionDialog] = useState<{ open: boolean; wo: EnrichedWorkOrder | null; comments: string; submitting: boolean }>({ open: false, wo: null, comments: '', submitting: false });
   const [woListModal, setWoListModal] = useState<{ open: boolean; title: string; workOrders: EnrichedWorkOrder[] }>({ open: false, title: '', workOrders: [] });
   const [sparesListModal, setSparesListModal] = useState<{ open: boolean; title: string; spares: Spare[] }>({ open: false, title: '', spares: [] });
   const [crListModal, setCrListModal] = useState<{ open: boolean; title: string; changeRequests: ChangeRequest[]; statusFilter: string | null }>({ open: false, title: '', changeRequests: [], statusFilter: null });
@@ -457,7 +469,7 @@ const Dashboard = () => {
   type OperationCardFilter = 'overdue' | 'overdue-critical' | 'planned-today' | 'pending-approvals' | 'critical-spares' | 'anomalies' | 'modify-pms' | 'donut-overdue' | 'donut-due' | 'donut-planned';
   const [selectedOpCard, setSelectedOpCard] = useState<OperationCardFilter>('overdue');
   const [hodScope, setHodScope] = useState<'me' | 'myTeam'>('me');
-  const [opViewModal, setOpViewModal] = useState<{ open: boolean; workOrder: EnrichedWorkOrder | null }>({ open: false, workOrder: null });
+  const [opViewModal, setOpViewModal] = useState<{ open: boolean; workOrder: EnrichedWorkOrder | null; mode?: 'template' | 'execution' }>({ open: false, workOrder: null });
   const [opDetailSpare, setOpDetailSpare] = useState<Spare | null>(null);
   const [opDetailChangeRequest, setOpDetailChangeRequest] = useState<ChangeRequest | null>(null);
   const [showBenchmarking, setShowBenchmarking] = useState(false);
@@ -514,7 +526,24 @@ const Dashboard = () => {
   const adminDefaultsToAll = isSailAdmin || isClientAdmin;
   const isAdminScope = isSailAdmin || isClientAdmin || isTechSuperintendent;
   const [mgmtVesselId, setMgmtVesselId] = useState<string>('');
+  // Task #224: Scope is an EXPLICIT mode ('all' = entire fleet, 'my' = assigned
+  // mini-fleet), NOT derived from which vessel is selected. Vessel selection
+  // narrows *within* the active scope. Everyone (incl. admins) defaults to
+  // 'all'. Keeping scope explicit prevents picking an assigned vessel while in
+  // All-Vessel scope from silently flipping the Scope selector to My Vessel.
+  const [mgmtScope, setMgmtScope] = useState<'all' | 'my'>('all');
   useEffect(() => {
+    // Task #226: the global scope is now the source of truth for 'my'. When the
+    // global VesselContext is in the 'my' aggregate scope (e.g. restored from a
+    // previous session or set by another module), mirror it into the dashboard's
+    // local scope/vessel selectors.
+    if (vesselId === 'my') {
+      if (mgmtScope !== 'my') setMgmtScope('my');
+      if (mgmtVesselId !== 'my') setMgmtVesselId('my');
+      return;
+    }
+    // 'my' is a valid aggregate sentinel (like 'all'); never auto-reset it.
+    if (mgmtVesselId === 'my') return;
     if (adminDefaultsToAll && vesselId === 'all' && mgmtVesselId !== 'all') {
       setMgmtVesselId('all');
       return;
@@ -527,7 +556,7 @@ const Dashboard = () => {
       const fallback = vesselId || (adminDefaultsToAll ? 'all' : vessels[0].id);
       setMgmtVesselId(fallback);
     }
-  }, [vesselId, mgmtVesselId, vessels, adminDefaultsToAll]);
+  }, [vesselId, mgmtVesselId, mgmtScope, vessels, adminDefaultsToAll]);
   const effectiveVesselId = activeTab === 'overview' ? mgmtVesselId : vesselId;
   const isAllVessels = effectiveVesselId === 'all';
   
@@ -545,8 +574,35 @@ const Dashboard = () => {
     scopeMeta: ScopeMeta;
   }
 
-  const { currentUser } = useAuth();
+  const { currentUser, myVessels } = useAuth();
   const userRankName = currentUser?.rank_name ?? '';
+
+  // Task #224: "My Vessel" scope = the set of vessels assigned to the logged-in
+  // user (from AuthContext.myVessels). The 'my' sentinel in mgmtVesselId means
+  // "aggregate across ALL my assigned vessels" (a mini-fleet), distinct from
+  // 'all' (entire fleet) and a single vessel id.
+  const assignedVesselIds = useMemo(
+    () => Array.from(new Set((myVessels || []).map(v => String(v.vesselId)).filter(Boolean))),
+    [myVessels]
+  );
+  const isMyVessels = effectiveVesselId === 'my';
+  const hasAssignedVessels = assignedVesselIds.length > 0;
+  // Resolve assigned ids to full vessel objects; fall back to a minimal record
+  // so aggregation still fetches even if a vessel isn't in the fleet list yet.
+  const assignedVessels = useMemo(
+    () => assignedVesselIds.map(id => vessels.find(v => v.id === id) || { id, name: id, code: id }),
+    [assignedVesselIds, vessels]
+  );
+  // The vessel-id list to aggregate over for the current scope.
+  const aggregateVessels = isAllVessels ? vessels : isMyVessels ? assignedVessels : [];
+  const aggregateIds = isAllVessels ? vessels.map(v => v.id) : isMyVessels ? assignedVesselIds : [];
+  const isAggregate = isAllVessels || isMyVessels;
+  // When My Vessel is selected but nothing is assigned, render an empty state.
+  const myVesselsEmpty = isMyVessels && !hasAssignedVessels;
+  // Scope dropdown value is the explicit scope mode — never inferred from the
+  // selected vessel. Selecting an assigned vessel while in All-Vessel scope
+  // must NOT flip the Scope selector to My Vessel.
+  const scopeValue: 'all' | 'my' = mgmtScope;
 
   const { data: scopedResponse } = useQuery<ScopedOperationResponse>({
     queryKey: ['/technical/api/scoped-operation-data', effectiveVesselId, hodScope, userRankName, isAdminScope],
@@ -559,7 +615,7 @@ const Dashboard = () => {
       if (!response.ok) throw new Error('Failed to fetch scoped operation data');
       return response.json();
     },
-    enabled: !!effectiveVesselId && !isAllVessels && !isAdminScope,
+    enabled: !!effectiveVesselId && !isAllVessels && !isMyVessels && !isAdminScope,
   });
 
   const scopeMeta = scopedResponse?.scopeMeta ?? null;
@@ -573,6 +629,14 @@ const Dashboard = () => {
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
     queryKey: ['/technical/api/work-orders', effectiveVesselId],
     queryFn: async () => {
+      if (isMyVessels) {
+        const results = await Promise.allSettled(
+          aggregateIds.map(id =>
+            fetch(`/technical/api/work-orders?vesselId=${id}`).then(r => r.ok ? r.json() : [])
+          )
+        );
+        return results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+      }
       const url = isAllVessels 
         ? '/technical/api/work-orders' 
         : `/technical/api/work-orders?vesselId=${effectiveVesselId}`;
@@ -587,9 +651,9 @@ const Dashboard = () => {
   const { data: sparesData = [], isLoading: isSparesLoading } = useQuery<Spare[]>({
     queryKey: ['/technical/api/spares', effectiveVesselId],
     queryFn: async () => {
-      if (isAllVessels) {
+      if (isAggregate) {
         const allSpares: Spare[] = [];
-        for (const vessel of vessels) {
+        for (const vessel of aggregateVessels) {
           try {
             const response = await fetch(`/technical/api/spares/${vessel.id}`);
             if (response.ok) {
@@ -613,9 +677,9 @@ const Dashboard = () => {
   const { data: storesData = [], isLoading: isStoresLoading } = useQuery<StoresItem[]>({
     queryKey: ['/technical/api/stores', effectiveVesselId],
     queryFn: async () => {
-      if (isAllVessels) {
+      if (isAggregate) {
         const allStores: StoresItem[] = [];
-        for (const vessel of vessels) {
+        for (const vessel of aggregateVessels) {
           try {
             const response = await fetch(`/technical/api/stores/${vessel.id}`);
             if (response.ok) {
@@ -639,9 +703,9 @@ const Dashboard = () => {
   const { data: componentsData = [], isLoading: isComponentsLoading } = useQuery<Component[]>({
     queryKey: ['/technical/api/components', effectiveVesselId],
     queryFn: async () => {
-      if (isAllVessels) {
+      if (isAggregate) {
         const allComponents: Component[] = [];
-        for (const vessel of vessels) {
+        for (const vessel of aggregateVessels) {
           try {
             const response = await fetch(`/technical/api/components/${vessel.id}`);
             if (response.ok) {
@@ -664,9 +728,9 @@ const Dashboard = () => {
   const { data: rhParentsData = [], isLoading: isRHLoading } = useQuery<RHParentComponent[]>({
     queryKey: ['/technical/api/running-hours/parents', effectiveVesselId],
     queryFn: async () => {
-      if (isAllVessels) {
+      if (isAggregate) {
         const results = await Promise.allSettled(
-          vessels.map(vessel =>
+          aggregateVessels.map(vessel =>
             fetch(`/technical/api/running-hours/parents?vesselId=${vessel.id}`)
               .then(r => r.ok ? r.json() : [])
           )
@@ -683,9 +747,9 @@ const Dashboard = () => {
   const { data: sparesHistoryData = [], isLoading: isSparesHistoryLoading } = useQuery<SparesHistoryItem[]>({
     queryKey: ['/technical/api/spares/history', effectiveVesselId],
     queryFn: async () => {
-      if (isAllVessels) {
+      if (isAggregate) {
         const results = await Promise.allSettled(
-          vessels.map(vessel =>
+          aggregateVessels.map(vessel =>
             fetch(`/technical/api/spares/history/${vessel.id}`)
               .then(r => r.ok ? r.json() : [])
           )
@@ -702,6 +766,14 @@ const Dashboard = () => {
   const { data: changeRequestsData = [], isLoading: isChangeRequestsLoading } = useQuery<ChangeRequest[]>({
     queryKey: ['/technical/api/change-requests', effectiveVesselId],
     queryFn: async () => {
+      if (isMyVessels) {
+        const results = await Promise.allSettled(
+          aggregateIds.map(id =>
+            fetch(`/technical/api/change-requests?vesselId=${id}`).then(r => r.ok ? r.json() : [])
+          )
+        );
+        return results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+      }
       const url = isAllVessels
         ? '/technical/api/change-requests'
         : `/technical/api/change-requests?vesselId=${effectiveVesselId}`;
@@ -722,7 +794,9 @@ const Dashboard = () => {
       if (!response.ok) throw new Error('Failed to fetch superintendent summary');
       return response.json();
     },
-    enabled: !!effectiveVesselId,
+    // Object-returning endpoint without a vesselIds allow-list; skip it for the
+    // 'my' aggregate (it only renders on the management tab anyway).
+    enabled: !!effectiveVesselId && !isMyVessels,
   });
 
   const { data: complianceAnomalies } = useQuery<{
@@ -810,6 +884,43 @@ const Dashboard = () => {
   }, [filteredWorkOrdersData]);
 
   // Approve work orders mutation (supports single or bulk)
+  // ── Postponement Approval Mutations (Plan B) ──
+  const postponeApproveMutation = useMutation({
+    mutationFn: async ({ id, remarks }: { id: string; remarks: string }) => {
+      const res = await apiRequest('POST', `/technical/api/work-orders/${id}/postpone-approve`, {
+        approvalRemarks: remarks || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Postponement Approved', description: 'Work order due date has been updated.' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      setPostponeDecisionDialog({ open: false, wo: null, action: null, remarks: '', submitting: false });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to approve postponement', variant: 'destructive' });
+      setPostponeDecisionDialog(prev => ({ ...prev, submitting: false }));
+    },
+  });
+
+  const postponeRejectMutation = useMutation({
+    mutationFn: async ({ id, remarks }: { id: string; remarks: string }) => {
+      const res = await apiRequest('POST', `/technical/api/work-orders/${id}/postpone-reject`, {
+        approvalRemarks: remarks,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Postponement Rejected', description: 'Work order has been reverted to Due/Overdue.' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      setPostponeDecisionDialog({ open: false, wo: null, action: null, remarks: '', submitting: false });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to reject postponement', variant: 'destructive' });
+      setPostponeDecisionDialog(prev => ({ ...prev, submitting: false }));
+    },
+  });
+
   const approveMutation = useMutation({
     mutationFn: async (workOrderIds: string[]) => {
       const response = await apiRequest('POST', '/technical/api/work-orders/bulk-approve', {
@@ -848,6 +959,42 @@ const Dashboard = () => {
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to reject work order", variant: "destructive" });
     }
+  });
+
+  const reviewerApproveMutation = useMutation({
+    mutationFn: async ({ id, comments }: { id: string; comments: string }) => {
+      const res = await apiRequest('POST', `/technical/api/work-orders/${id}/reviewer-approve`, {
+        reviewerComments: comments || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Reviewed', description: 'Work order has been marked as reviewed.' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      setReviewerActionDialog({ open: false, wo: null, comments: '', submitting: false });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to process review', variant: 'destructive' });
+      setReviewerActionDialog(prev => ({ ...prev, submitting: false }));
+    },
+  });
+
+  const reviewerReopenMutation = useMutation({
+    mutationFn: async ({ id, remarks }: { id: string; remarks: string }) => {
+      const res = await apiRequest('POST', `/technical/api/work-orders/${id}/reviewer-reopen`, {
+        reviewerComments: remarks || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Reopened', description: 'Work order sent back for revision.' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      setReviewerActionDialog({ open: false, wo: null, comments: '', submitting: false });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to reopen work order', variant: 'destructive' });
+      setReviewerActionDialog(prev => ({ ...prev, submitting: false }));
+    },
   });
 
   const handlePendingSelectionChanged = useCallback((event: SelectionChangedEvent) => {
@@ -963,9 +1110,14 @@ const Dashboard = () => {
       dashboardPeriodRange?.to?.toISOString() ?? 'all-time',
     ],
     queryFn: async () => {
-      const params = new URLSearchParams({
-        vesselId: effectiveVesselId || 'all',
-      });
+      const params = new URLSearchParams();
+      if (isMyVessels) {
+        // Server applies the vesselIds allow-list only when vesselId === 'all'.
+        params.set('vesselId', 'all');
+        params.set('vesselIds', aggregateIds.join(','));
+      } else {
+        params.set('vesselId', effectiveVesselId || 'all');
+      }
       if (dashboardPeriodRange) {
         params.set('from', dashboardPeriodRange.from.toISOString());
         params.set('to', dashboardPeriodRange.to.toISOString());
@@ -974,7 +1126,7 @@ const Dashboard = () => {
       if (!res.ok) throw new Error('Failed to fetch WO status by period');
       return res.json();
     },
-    enabled: !!effectiveVesselId,
+    enabled: !!effectiveVesselId && !myVesselsEmpty,
   });
 
   // Map WO id (wouuid preferred, falling back to id) -> WO object so click
@@ -1191,12 +1343,18 @@ const Dashboard = () => {
     queryKey: ['/technical/api/dashboard/maintenance-trend', effectiveVesselId],
     queryFn: async () => {
       const params = new URLSearchParams();
-      params.set('vesselId', effectiveVesselId || 'all');
+      if (isMyVessels) {
+        // Server applies the vesselIds allow-list only when vesselId === 'all'.
+        params.set('vesselId', 'all');
+        params.set('vesselIds', aggregateIds.join(','));
+      } else {
+        params.set('vesselId', effectiveVesselId || 'all');
+      }
       const res = await fetch(`/technical/api/dashboard/maintenance-trend?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch maintenance trend');
       return res.json();
     },
-    enabled: !!effectiveVesselId,
+    enabled: !!effectiveVesselId && !myVesselsEmpty,
   });
   const maintenanceTrendData = useMemo(() => {
     return {
@@ -1292,18 +1450,24 @@ const Dashboard = () => {
 
   const handleVesselChange = (newVesselId: string) => {
     setMgmtVesselId(newVesselId);
+    // Task #226: 'my' is now a first-class GLOBAL aggregate sentinel (alongside
+    // 'all'), so push every selection — including 'my' — to the global
+    // VesselContext so the scope propagates to every other module.
     setVesselId(newVesselId);
   };
 
-  const handleAllVesselsChange = (isAll: boolean) => {
-    if (isAll) {
+  // Task #224/#226: Scope dropdown. Sets the explicit scope mode and resets the
+  // Vessel dropdown to that scope's aggregate default, propagating to the global
+  // VesselContext. 'all' -> entire fleet aggregate; 'my' -> assigned mini-fleet
+  // aggregate.
+  const handleScopeChange = (scope: 'all' | 'my') => {
+    setMgmtScope(scope);
+    if (scope === 'all') {
       setMgmtVesselId('all');
       setVesselId('all');
     } else {
-      if (mgmtVesselId === 'all' && vessels.length > 0) {
-        setMgmtVesselId(vessels[0].id);
-        setVesselId(vessels[0].id);
-      }
+      setMgmtVesselId('my');
+      setVesselId('my');
     }
   };
 
@@ -1320,9 +1484,15 @@ const Dashboard = () => {
   const isLoading = isWorkOrdersLoading || isSparesLoading || isStoresLoading || isComponentsLoading || isRHLoading || isSparesHistoryLoading;
 
   const summaryLine = useMemo(() => {
-    const scope = isAllVessels ? "Fleet" : (currentVessel?.name || "No vessel");
+    const scope = isAllVessels
+      ? "Fleet"
+      : isMyVessels
+        ? "My Fleet"
+        : (currentVessel?.name || "No vessel");
     const parts: string[] = [`Scope: ${scope}`];
-    if (!isAllVessels) {
+    if (isMyVessels) {
+      parts.push(`${assignedVessels.length} vessels`);
+    } else if (!isAllVessels) {
       parts.push(`${workOrderKPIs.total} work orders`);
       parts.push(`${sparesKPIs.total} spares`);
       parts.push(`${componentsKPIs.total} components`);
@@ -1331,7 +1501,7 @@ const Dashboard = () => {
     }
     parts.push(`Data as of ${format(lastUpdated, 'dd MMM yyyy, HH:mm')}`);
     return parts.join(' \u00b7 ');
-  }, [isAllVessels, currentVessel, workOrderKPIs.total, sparesKPIs.total, componentsKPIs.total, vessels.length, lastUpdated]);
+  }, [isAllVessels, isMyVessels, assignedVessels.length, currentVessel, workOrderKPIs.total, sparesKPIs.total, componentsKPIs.total, vessels.length, lastUpdated]);
 
   const overduePercent = workOrderKPIs.total > 0 ? Math.round((workOrderKPIs.overdue / workOrderKPIs.total) * 100) : 0;
 
@@ -1466,9 +1636,12 @@ const Dashboard = () => {
       const s = (wo as EnrichedWorkOrder).computedStatus;
       return s === 'Due' || s === 'Due (Grace P)';
     }).length;
+    // "Scheduled" slice counts only work orders whose effective status is
+    // Active, matching the "Scheduled Work Orders (from chart)" drill-down
+    // table exactly so the donut number always equals the table row count.
     const planned = safeWOs.filter(wo => {
       const s = (wo as EnrichedWorkOrder).computedStatus;
-      return s === 'Active' || s === 'Postponed' || s === 'Completed';
+      return s === 'Active';
     }).length;
     return [
       { status: 'Overdue', count: overdue, color: '#ff6961' },
@@ -1486,9 +1659,13 @@ const Dashboard = () => {
       const s = (wo as EnrichedWorkOrder).computedStatus;
       return s === 'Due' || s === 'Due (Grace P)';
     });
+    // "Scheduled Work Orders (from chart)" drill-down table: show only
+    // work orders whose effective status is Active (Postponed/Completed are
+    // excluded per product direction). The donut "Scheduled" slice count
+    // uses the same Active-only filter so the number matches these rows.
     const plannedStatusWOs = safeWOs.filter(wo => {
       const s = (wo as EnrichedWorkOrder).computedStatus;
-      return s === 'Active' || s === 'Postponed' || s === 'Completed';
+      return s === 'Active';
     });
 
     const overdueCriticalWOs = overdueWOs.filter(wo =>
@@ -1517,10 +1694,19 @@ const Dashboard = () => {
     });
     const criticalSparesLowCount = criticalSparesLowList.length;
 
-    const pendingApprovalWOs = safeWOs.filter(wo =>
-      (wo as EnrichedWorkOrder).computedStatus === 'Pending Approval'
-    );
+    const pendingApprovalWOs = isHeadOfDept
+      ? safeWOs.filter(wo => (wo as EnrichedWorkOrder).computedStatus === 'Pending Approval')
+      : [
+          ...safeWOs
+            .filter(wo => (wo as EnrichedWorkOrder).computedStatus === 'Awaiting Office Approval')
+            .map(wo => ({ ...wo, _pendingType: 'postponement' as const })),
+          ...safeWOs
+            .filter(wo => (wo as EnrichedWorkOrder).computedStatus === 'Pending Office Review')
+            .map(wo => ({ ...wo, _pendingType: 'l2review' as const })),
+        ];
     const pendingApprovalCount = pendingApprovalWOs.length;
+    const postponementCount = isHeadOfDept ? 0 : pendingApprovalWOs.filter((wo: any) => wo._pendingType === 'postponement').length;
+    const l2ReviewCount = isHeadOfDept ? 0 : pendingApprovalWOs.filter((wo: any) => wo._pendingType === 'l2review').length;
 
     const effectiveAnomalyIndicators = complianceAnomalies || null;
     const anomalyCount = effectiveAnomalyIndicators ? [
@@ -1553,11 +1739,13 @@ const Dashboard = () => {
       criticalSparesLowList,
       pendingApprovalCount,
       pendingApprovalWOs: pendingApprovalWOs as EnrichedWorkOrder[],
+      postponementCount,
+      l2ReviewCount,
       anomalyCount,
       openChangeRequests,
       openChangeRequestsList,
     };
-  }, [operationWOs, sparesData, changeRequestsData, complianceAnomalies]);
+  }, [operationWOs, sparesData, changeRequestsData, complianceAnomalies, isHeadOfDept]);
 
   const operationTableData = useMemo(() => {
     switch (selectedOpCard) {
@@ -1700,8 +1888,7 @@ const Dashboard = () => {
     ];
   }, [isAllVessels, vessels]);
 
-  const pendingApprovalsColumnDefs: ColDef[] = useMemo(() => {
-    const hasSelection = pendingSelectedIds.size > 0;
+  const officePendingUnifiedColumnDefs: ColDef[] = useMemo(() => {
     const formatWoDate = (d: string | null | undefined) => {
       if (!d) return '—';
       try {
@@ -1730,47 +1917,46 @@ const Dashboard = () => {
         <span className="truncate font-medium" data-testid={`cell-pending-approval-vessel-${params.data?.id ?? ''}`}>{params.value || '—'}</span>
       ),
     };
-    const checkboxCol: ColDef = {
-      headerName: '',
-      field: '__select',
-      width: 48,
-      minWidth: 48,
-      maxWidth: 48,
-      checkboxSelection: true,
-      headerCheckboxSelection: true,
-      headerCheckboxSelectionFilteredOnly: true,
-      sortable: false,
-      filter: false,
-      resizable: false,
-      pinned: 'left',
-    };
     return [
-      checkboxCol,
-      ...(isAllVessels ? [vesselCol] : []),
       {
-        headerName: 'Component',
-        field: 'component',
+        headerName: 'Type',
+        field: '_pendingType',
         minWidth: 160,
         flex: 1,
-        cellRenderer: (params: any) => (
-          <span
-            className="truncate"
-            data-testid={params.data?.id ? `row-op-pending-approval-wo-${params.data.id}` : undefined}
-          >
-            {params.value || '—'}
-          </span>
-        ),
+        cellRenderer: (params: any) => {
+          const t = (params.data as any)?._pendingType;
+          if (t === 'l2review') {
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-800">Level 2 Review</span>;
+          }
+          return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Postponement</span>;
+        },
       },
+      ...(isAllVessels ? [vesselCol] : []),
       {
-        headerName: 'Work Order No',
+        headerName: 'WO No',
         field: 'workOrderNo',
         minWidth: 150,
         flex: 1,
         cellRenderer: (params: any) => {
           const wo = params.data;
           const text = params.value || (wo?.id ? `WO-${wo.id}` : '—');
-          return <span className="text-blue-600">{text}</span>;
+          return (
+            <span
+              className="text-blue-600 cursor-pointer hover:underline"
+              onClick={() => setLocation(`/pms/work-order/${wo?.id}`)}
+              data-testid={wo?.id ? `row-op-pending-unified-wo-${wo.id}` : undefined}
+            >
+              {text}
+            </span>
+          );
         },
+      },
+      {
+        headerName: 'Component',
+        field: 'component',
+        minWidth: 160,
+        flex: 1,
+        valueFormatter: (params: any) => params.value || '—',
       },
       {
         headerName: 'Job Title',
@@ -1781,69 +1967,229 @@ const Dashboard = () => {
         valueFormatter: (params: any) => params.value || '—',
       },
       {
-        headerName: 'Assigned to',
-        field: 'assignedTo',
-        minWidth: 140,
+        headerName: 'Due Date',
+        field: 'dueDate',
+        minWidth: 130,
         flex: 1,
-        valueGetter: (params: any) =>
-          params.data?.assignedTo || params.data?.assignedRank || '',
-        valueFormatter: (params: any) => params.value || '—',
-      },
-      {
-        headerName: 'Submitted Date',
-        field: 'submittedDate',
-        minWidth: 140,
-        flex: 1,
+        valueGetter: (params: any) => params.data?.originalDueDate || params.data?.dueDate,
         valueFormatter: (params: any) => formatWoDate(params.value),
-      },
-      {
-        headerName: 'Status',
-        field: 'computedStatus',
-        minWidth: 180,
-        flex: 1,
-        valueGetter: (params: any) =>
-          (params.data as EnrichedWorkOrder)?.computedStatus || params.data?.status || 'Pending Approval',
-        cellRenderer: (params: any) => {
-          const wo = params.data;
-          return (
-            <span className="flex items-center gap-2">
-              <WoStatusBadgeCell status={params.value || 'Pending Approval'} />
-              {wo?.wasRejected && wo?.id && (
-                <RejectionHistoryBadge workOrderId={wo.id} />
-              )}
-            </span>
-          );
-        },
       },
       {
         headerName: 'Actions',
         field: 'id',
-        minWidth: 60,
-        width: 60,
-        hide: hasSelection,
+        minWidth: 130,
+        width: 130,
         sortable: false,
         filter: false,
         resizable: false,
         cellRenderer: (params: any) => {
-          const wo = params.data;
+          const wo = params.data as EnrichedWorkOrder & { _pendingType?: string };
+          if (!wo) return null;
+          const isL2Review = wo._pendingType === 'l2review';
+          return (
+            <div className="flex items-center gap-1 h-full">
+              {isL2Review ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 text-teal-700 hover:bg-teal-50"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setReviewerActionDialog({ open: true, wo: wo as EnrichedWorkOrder, comments: '', submitting: false });
+                  }}
+                  data-testid={`button-op-l2review-action-${wo.id}`}
+                  title="Review work order"
+                >
+                  <ClipboardList className="h-4 w-4" />
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-[#1E5A8E] hover:bg-blue-50 hover:text-[#174a78]"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPostponeRemarksError('');
+                      setPostponeDecisionDialog({ open: true, wo: wo as EnrichedWorkOrder, action: 'review', remarks: '', submitting: false });
+                    }}
+                    data-testid={`button-op-postpone-review-${wo.id}`}
+                    title="Review postponement"
+                  >
+                    <ClipboardList className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-gray-500 hover:text-gray-800"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpViewModal({ open: true, workOrder: wo as EnrichedWorkOrder, mode: 'execution' });
+                    }}
+                    data-testid={`button-op-postpone-view-${wo.id}`}
+                    title="View work order"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+          );
+        },
+      },
+    ];
+  }, [isAllVessels, vessels, setPostponeDecisionDialog, setOpViewModal, setLocation, setReviewerActionDialog]);
+
+  const hodPendingApprovalColumnDefs: ColDef[] = useMemo(() => {
+    const formatWoDate = (d: string | null | undefined) => {
+      if (!d) return '—';
+      try {
+        const parsed = parseFlexibleDate(d);
+        if (!parsed || isNaN(parsed.getTime())) {
+          const fallback = new Date(d);
+          if (!isNaN(fallback.getTime())) return format(fallback, 'dd-MMM-yyyy');
+          return d || '—';
+        }
+        return format(parsed, 'dd-MMM-yyyy');
+      } catch {
+        return d || '—';
+      }
+    };
+    const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
+    const vesselCol: ColDef = {
+      headerName: 'Vessel',
+      field: 'vesselId',
+      minWidth: 130,
+      flex: 1,
+      valueGetter: (params: any) => {
+        const vid = params.data?.vesselId;
+        return (vid && vesselNameById.get(String(vid))) || '—';
+      },
+      cellRenderer: (params: any) => (
+        <span className="truncate font-medium">{params.value || '—'}</span>
+      ),
+    };
+    return [
+      {
+        headerName: '',
+        field: 'id',
+        width: 48,
+        minWidth: 48,
+        maxWidth: 48,
+        checkboxSelection: true,
+        headerCheckboxSelection: true,
+        sortable: false,
+        filter: false,
+        resizable: false,
+        pinned: 'left' as const,
+      },
+      ...(isAllVessels ? [vesselCol] : []),
+      {
+        headerName: 'Component',
+        field: 'component',
+        minWidth: 140,
+        flex: 1,
+        valueFormatter: (params: any) => params.value || '—',
+      },
+      {
+        headerName: 'Work Order No',
+        field: 'workOrderNo',
+        minWidth: 160,
+        flex: 1,
+        cellRenderer: (params: any) => {
+          const wo = params.data as EnrichedWorkOrder;
+          const text = params.value || (wo?.id ? `WO-${wo.id}` : '—');
+          return (
+            <button
+              className="text-blue-600 font-medium hover:underline cursor-pointer bg-transparent border-0 p-0 text-left"
+              data-testid={wo?.id ? `row-hod-pending-wo-${wo.id}` : undefined}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (wo?.id) setLocation(`/pms/work-order/${wo.id}`);
+              }}
+            >
+              {text}
+            </button>
+          );
+        },
+      },
+      {
+        headerName: 'Job Title',
+        field: 'jobTitle',
+        minWidth: 200,
+        flex: 2,
+        tooltipValueGetter: (params: any) => params.data?.jobTitle || '',
+        valueFormatter: (params: any) => params.value || '—',
+      },
+      {
+        headerName: 'Due Date',
+        field: 'dueDate',
+        minWidth: 130,
+        flex: 1,
+        valueFormatter: (params: any) => formatWoDate(params.value),
+      },
+      {
+        headerName: 'Actions',
+        field: 'id',
+        colId: 'hod-actions',
+        minWidth: 120,
+        width: 120,
+        sortable: false,
+        filter: false,
+        resizable: false,
+        pinned: 'right' as const,
+        cellRenderer: (params: any) => {
+          const wo = params.data as EnrichedWorkOrder;
           if (!wo) return null;
           return (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center gap-1 h-full">
               <Button
+                size="sm"
                 variant="ghost"
-                size="icon"
-                onClick={(e) => { e.stopPropagation(); navigateToWorkOrder(wo.id); }}
-                data-testid={`button-op-edit-pending-wo-${wo.id}`}
-                className="text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                className="h-7 w-7 p-0 text-green-600 hover:bg-green-50 hover:text-green-700"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  approveMutation.mutate([String(wo.id)]);
+                }}
+                data-testid={`button-hod-pending-approve-row-${wo.id}`}
+                title="Approve"
+                disabled={approveMutation.isPending || rejectMutation.isPending}
               >
-                <Pencil className="w-4 h-4" />
+                <CheckCircle className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0 text-red-500 hover:bg-red-50 hover:text-red-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRejectDialog({ open: true, type: 'wo', id: String(wo.id), label: wo.workOrderNo || `WO-${wo.id}` });
+                }}
+                data-testid={`button-hod-pending-reject-row-${wo.id}`}
+                title="Reject"
+                disabled={approveMutation.isPending || rejectMutation.isPending}
+              >
+                <XCircle className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0 text-gray-500 hover:text-gray-800"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLocation(`/pms/work-order/${wo.id}`);
+                }}
+                data-testid={`button-hod-pending-edit-${wo.id}`}
+                title="Open work order"
+              >
+                <Pencil className="h-4 w-4" />
               </Button>
             </div>
           );
         },
       },
     ];
-  }, [isAllVessels, vessels, navigateToWorkOrder, pendingSelectedIds]);
+  }, [isAllVessels, vessels, approveMutation, rejectMutation, setRejectDialog, setLocation]);
 
   const criticalSparesColumnDefs: ColDef[] = useMemo(() => {
     const vesselNameById = new Map(vessels.map(v => [v.id, v.name]));
@@ -2036,7 +2382,7 @@ const Dashboard = () => {
       case 'overdue': return 'Overdue Work Orders';
       case 'overdue-critical': return 'Overdue Work Orders – Critical Equipment';
       case 'planned-today': return 'Work Orders – Planned for Today';
-      case 'pending-approvals': return 'Pending Approval Work Orders';
+      case 'pending-approvals': return isHeadOfDept ? 'Work Orders Pending Your Approval' : 'Pending Approval Work Orders';
       case 'critical-spares': return 'Critical Spares Low';
       case 'anomalies': return 'W.O Anomalies';
       case 'modify-pms': return 'Modify PMS Requests';
@@ -2045,7 +2391,7 @@ const Dashboard = () => {
       case 'donut-planned': return 'Scheduled Work Orders (from chart)';
       default: return 'Work Orders';
     }
-  }, [selectedOpCard]);
+  }, [selectedOpCard, isHeadOfDept]);
 
   const isDonutFilter = selectedOpCard?.startsWith('donut-');
   const isNonWOCard = selectedOpCard === 'anomalies';
@@ -2451,17 +2797,28 @@ const Dashboard = () => {
                 <SelectValue placeholder="Select vessel" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all" data-testid="option-vessel-all">All Vessels</SelectItem>
-                {vessels.map(v => (
-                  <SelectItem key={v.id} value={v.id} data-testid={`option-vessel-${v.id}`}>{v.name}</SelectItem>
-                ))}
+                {scopeValue === 'my' ? (
+                  <>
+                    <SelectItem value="my" data-testid="option-vessel-my-all">All My Vessels</SelectItem>
+                    {assignedVessels.map(v => (
+                      <SelectItem key={v.id} value={v.id} data-testid={`option-vessel-${v.id}`}>{v.name}</SelectItem>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    <SelectItem value="all" data-testid="option-vessel-all">All Vessels</SelectItem>
+                    {vessels.map(v => (
+                      <SelectItem key={v.id} value={v.id} data-testid={`option-vessel-${v.id}`}>{v.name}</SelectItem>
+                    ))}
+                  </>
+                )}
               </SelectContent>
             </Select>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 font-medium">Scope:</span>
-            <Select value={mgmtVesselId === 'all' ? 'all' : 'my'} onValueChange={(val) => handleAllVesselsChange(val === 'all')}>
+            <Select value={scopeValue} onValueChange={(val) => handleScopeChange(val as 'all' | 'my')}>
               <SelectTrigger className="w-[140px]" data-testid="select-vessel-scope">
                 <SelectValue />
               </SelectTrigger>
@@ -2488,10 +2845,10 @@ const Dashboard = () => {
             className="text-gray-600"
             onClick={() => {
               setSelectedCriticality("");
-              handleAllVesselsChange(false);
-              if (vessels.length > 0) {
-                handleVesselChange(vessels[0].id);
-              }
+              // Reset to the default scope/vessel: All Vessel scope, entire
+              // fleet aggregate. Keeps Scope and Vessel selection consistent
+              // with the explicit scope model.
+              handleScopeChange('all');
             }}
             data-testid="button-clear-dashboard-filters"
           >
@@ -2642,6 +2999,13 @@ const Dashboard = () => {
                         <CardContent className="py-2 px-3 flex flex-col justify-start flex-1">
                           <p className="font-medium text-gray-600 text-[14px]">{card.label}</p>
                           <p className={`text-xl font-bold mt-0.5 ${card.textColor}`} data-testid={card.valueTestId}>{card.value}</p>
+                          {card.key === 'pending-approvals' && !isHeadOfDept && (operationKPIs.postponementCount > 0 || operationKPIs.l2ReviewCount > 0) && (
+                            <p className="text-[10px] text-gray-500 mt-0.5 leading-tight" data-testid="kpi-pending-approvals-breakdown">
+                              {operationKPIs.postponementCount > 0 && <span>{operationKPIs.postponementCount} Postponement</span>}
+                              {operationKPIs.postponementCount > 0 && operationKPIs.l2ReviewCount > 0 && <span className="mx-0.5">·</span>}
+                              {operationKPIs.l2ReviewCount > 0 && <span>{operationKPIs.l2ReviewCount} Level 2 Review</span>}
+                            </p>
+                          )}
                           <span className={`text-[9px] mt-auto ${!isAdminScope && isScopeActive && card.rankScoped ? 'text-blue-500' : !isAdminScope && fallbackMode === 'own-rank' && card.rankScoped ? 'text-amber-500' : 'text-gray-400'}`} data-testid={`scope-label-${card.key}`}>
                             {isAdminScope
                               ? 'Vessel-wide'
@@ -2718,69 +3082,53 @@ const Dashboard = () => {
                     <div className="flex-1 overflow-auto border border-gray-200 rounded-lg bg-white" data-testid="section-op-pending-approvals">
                       <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E0E0E0' }}>
                         <span style={{ fontSize: '13px', fontWeight: 500, color: '#212121' }}>
-                          {operationKPIs.pendingApprovalCount} work order{operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} require your review
-                          {pendingSelectedIds.size > 0 && (
-                            <span style={{ marginLeft: '8px', color: '#1565C0' }}>
-                              • {pendingSelectedIds.size} selected
-                            </span>
-                          )}
+                          {isHeadOfDept
+                            ? `${operationKPIs.pendingApprovalCount} work order${operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} awaiting your approval`
+                            : `${operationKPIs.pendingApprovalCount} item${operationKPIs.pendingApprovalCount !== 1 ? 's' : ''} pending office review`
+                          }
                         </span>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              style={pendingSelectedIds.size > 0 ? { borderColor: '#E53935', color: '#E53935' } : {}}
-                              onClick={() => {
-                                if (pendingSelectedIds.size === 0) {
-                                  toast({ description: 'Please select at least one checkbox.' });
-                                  return;
-                                }
-                                openRejectDialog('wo', '__bulk__', `${pendingSelectedIds.size} work order${pendingSelectedIds.size !== 1 ? 's' : ''}`);
-                              }}
-                              disabled={rejectMutation.isPending || approveMutation.isPending}
-                              data-testid="button-op-bulk-reject-open"
-                            >
-                              <XCircle className="w-4 h-4 mr-1" />
-                              {pendingSelectedIds.size > 0 ? `Reject (${pendingSelectedIds.size})` : 'Reject'}
-                            </Button>
-                            <Button
-                              size="sm"
-                              style={pendingSelectedIds.size > 0 ? { background: '#2E7D32' } : {}}
-                              className={pendingSelectedIds.size > 0 ? "text-white hover:opacity-90" : ""}
-                              variant={pendingSelectedIds.size > 0 ? undefined : "outline"}
-                              onClick={() => {
-                                if (pendingSelectedIds.size === 0) {
-                                  toast({ description: 'Please select at least one checkbox.' });
-                                  return;
-                                }
-                                setPendingBulkConfirmApprove(true);
-                              }}
-                              disabled={approveMutation.isPending || rejectMutation.isPending}
-                              data-testid="button-op-bulk-approve-confirm"
-                            >
-                              <CheckCircle className="w-4 h-4 mr-1" />
-                              {pendingSelectedIds.size > 0 ? `Approve (${pendingSelectedIds.size})` : 'Approve'}
-                            </Button>
-                          </div>
                       </div>
+                      {isHeadOfDept && pendingSelectedIds.size > 0 && (
+                        <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border-b border-gray-200" data-testid="toolbar-hod-bulk-actions">
+                          <span className="text-xs text-gray-600">{pendingSelectedIds.size} selected</span>
+                          <Button
+                            size="sm"
+                            className="h-7 text-xs bg-[#1E5A8E] hover:bg-[#174a78] text-white"
+                            disabled={approveMutation.isPending || rejectMutation.isPending}
+                            onClick={() => setPendingBulkConfirmApprove(true)}
+                            data-testid="button-hod-bulk-approve-selected"
+                          >
+                            <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                            Approve Selected
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
+                            disabled={approveMutation.isPending || rejectMutation.isPending}
+                            onClick={() => setRejectDialog({ open: true, type: 'wo', id: '__bulk__', label: `${pendingSelectedIds.size} work order${pendingSelectedIds.size !== 1 ? 's' : ''}` })}
+                            data-testid="button-hod-bulk-reject-selected"
+                          >
+                            <XCircle className="h-3.5 w-3.5 mr-1" />
+                            Reject Selected
+                          </Button>
+                        </div>
+                      )}
                       <div style={{ height: 'calc(100vh - 360px)', minHeight: '360px' }} data-testid="ag-grid-op-pending-approvals-wrap">
                         <WOAgGridTable
-                          columnDefs={pendingApprovalsColumnDefs}
+                          columnDefs={isHeadOfDept ? hodPendingApprovalColumnDefs : officePendingUnifiedColumnDefs}
                           rowData={operationKPIs.pendingApprovalWOs}
                           height="100%"
                           rowHeight={52}
-                          noRowsMessage="No work orders pending approval"
+                          rowSelection={isHeadOfDept ? "multiple" : undefined}
+                          onSelectionChanged={isHeadOfDept ? handlePendingSelectionChanged : undefined}
+                          noRowsMessage={isHeadOfDept ? "No work orders pending your approval" : "No items pending office review"}
                           testId="ag-grid-op-pending-approvals"
-                          rowSelection="multiple"
-                          onSelectionChanged={handlePendingSelectionChanged}
                           getRowId={(params) => String(params.data.id)}
-                          suppressRowClickSelection={true}
                           getRowClass={(params) => {
                             const id = params.data?.id;
-                            const base = id ? `row-op-pending-approval-wo-${id}` : '';
-                            return params.data?.wasRejected ? `${base} row-pending-resubmitted`.trim() : base || undefined;
+                            return id ? `row-op-pending-approval-wo-${id}` : undefined;
                           }}
-                          getRowStyle={(params) => params.data?.wasRejected ? { background: '#FFEBEE' } : undefined}
                         />
                       </div>
                     </div>
@@ -2926,9 +3274,263 @@ const Dashboard = () => {
                     isOpen={opViewModal.open}
                     onClose={() => setOpViewModal({ open: false, workOrder: null })}
                     workOrder={opViewModal.workOrder}
-                    mode="template"
+                    mode={opViewModal.mode || 'template'}
+                    isApprovalMode={opViewModal.mode === 'execution'}
                   />
                 )}
+
+                {/* Postpone Decision Dialog (Plan B) */}
+                <Dialog
+                  open={postponeDecisionDialog.open}
+                  onOpenChange={(isOpen) => {
+                    if (!isOpen) setPostponeDecisionDialog({ open: false, wo: null, action: null, remarks: '', submitting: false });
+                  }}
+                >
+                  <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col" data-testid="dialog-postpone-decision">
+                    <DialogHeader className="flex-shrink-0">
+                      <DialogTitle>
+                        {postponeDecisionDialog.action === 'review'
+                          ? 'Review Postponement Request'
+                          : postponeDecisionDialog.action === 'approve'
+                            ? 'Approve Postponement'
+                            : 'Reject Postponement'}
+                      </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="flex-1 overflow-y-auto px-1">
+                      <div className="space-y-3 py-4">
+                        {postponeDecisionDialog.wo && (
+                          <>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <Label className="text-sm">Work Order ID</Label>
+                                <Input
+                                  value={postponeDecisionDialog.wo.workOrderNo || postponeDecisionDialog.wo.templateCode || '—'}
+                                  className="bg-gray-50 h-9"
+                                  readOnly
+                                  data-testid="input-postpone-decision-wo-id"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-sm">Component</Label>
+                                <Input
+                                  value={postponeDecisionDialog.wo.component || '—'}
+                                  className="bg-gray-50 h-9"
+                                  readOnly
+                                  data-testid="input-postpone-decision-component"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-sm">Job Title</Label>
+                              <Input
+                                value={postponeDecisionDialog.wo.jobTitle || '—'}
+                                className="bg-gray-50 h-9"
+                                readOnly
+                                data-testid="input-postpone-decision-job-title"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <Label className="text-sm">Original Due Date</Label>
+                                <Input
+                                  value={postponeDecisionDialog.wo.originalDueDate || postponeDecisionDialog.wo.dueDate || '—'}
+                                  className="bg-gray-50 h-9"
+                                  readOnly
+                                  data-testid="input-postpone-decision-original-due"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-sm">Requested New Date</Label>
+                                <Input
+                                  value={(postponeDecisionDialog.wo as any).postponeRequestedDate || '—'}
+                                  className="bg-gray-50 h-9"
+                                  readOnly
+                                  data-testid="input-postpone-decision-requested-date"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-sm">Reason for Postponement</Label>
+                              <Input
+                                value={postponeDecisionDialog.wo.postponementReason || '—'}
+                                className="bg-gray-50 h-9"
+                                readOnly
+                                data-testid="input-postpone-decision-reason"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-sm">Remarks / Additional Details</Label>
+                              <p
+                                className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2 min-h-[60px]"
+                                data-testid="display-postpone-decision-remarks"
+                              >
+                                {postponeDecisionDialog.wo.postponementRemarks || '—'}
+                              </p>
+                            </div>
+                          </>
+                        )}
+
+                        <div className="space-y-1">
+                          <Label htmlFor="postpone-decision-approver-remarks" className="text-sm">
+                            Approver Remarks <span className="text-red-500">*</span> (required for rejection)
+                          </Label>
+                          <Textarea
+                            id="postpone-decision-approver-remarks"
+                            className="text-sm resize-none"
+                            rows={3}
+                            placeholder="Enter your remarks (required if rejecting)..."
+                            value={postponeDecisionDialog.remarks}
+                            onChange={(e) => {
+                              setPostponeDecisionDialog(prev => ({ ...prev, remarks: e.target.value }));
+                              if (postponeRemarksError) setPostponeRemarksError('');
+                            }}
+                            disabled={postponeDecisionDialog.submitting}
+                            data-testid="textarea-postpone-decision-remarks"
+                          />
+                          {postponeRemarksError && (
+                            <p className="text-xs text-red-500 mt-1">{postponeRemarksError}</p>
+                          )}
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-4 border-t">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setPostponeRemarksError('');
+                              setPostponeDecisionDialog({ open: false, wo: null, action: null, remarks: '', submitting: false });
+                            }}
+                            disabled={postponeDecisionDialog.submitting}
+                            data-testid="button-postpone-decision-cancel"
+                          >
+                            Cancel
+                          </Button>
+                          {(postponeDecisionDialog.action === 'reject' || postponeDecisionDialog.action === 'review') && (
+                            <Button
+                              variant="outline"
+                              className="border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              disabled={postponeDecisionDialog.submitting}
+                              onClick={() => {
+                                if (!postponeDecisionDialog.wo) return;
+                                if (!postponeDecisionDialog.remarks.trim()) {
+                                  setPostponeRemarksError('Approver remarks are required when rejecting a postponement.');
+                                  return;
+                                }
+                                setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
+                                postponeRejectMutation.mutate({ id: String(postponeDecisionDialog.wo!.id), remarks: postponeDecisionDialog.remarks });
+                              }}
+                              data-testid={`button-postpone-decision-confirm-${postponeDecisionDialog.action === 'review' ? 'reject' : postponeDecisionDialog.action}`}
+                            >
+                              <XCircle className="h-4 w-4 mr-1.5" />
+                              {postponeDecisionDialog.submitting ? 'Rejecting...' : 'Reject'}
+                            </Button>
+                          )}
+                          {(postponeDecisionDialog.action === 'approve' || postponeDecisionDialog.action === 'review') && (
+                            <Button
+                              className="bg-[#1E5A8E] hover:bg-[#174a78] text-white"
+                              disabled={postponeDecisionDialog.submitting}
+                              onClick={() => {
+                                if (!postponeDecisionDialog.wo) return;
+                                setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
+                                postponeApproveMutation.mutate({ id: String(postponeDecisionDialog.wo!.id), remarks: postponeDecisionDialog.remarks });
+                              }}
+                              data-testid={`button-postpone-decision-confirm-${postponeDecisionDialog.action === 'review' ? 'approve' : postponeDecisionDialog.action}`}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1.5" />
+                              {postponeDecisionDialog.submitting ? 'Approving...' : 'Approve'}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Reviewer Action Dialog — unified Reviewed / Reopen popup */}
+                <Dialog
+                  open={reviewerActionDialog.open}
+                  onOpenChange={(isOpen) => {
+                    if (!isOpen) setReviewerActionDialog({ open: false, wo: null, comments: '', submitting: false });
+                  }}
+                >
+                  <DialogContent className="max-w-md" data-testid="dialog-reviewer-action">
+                    <DialogHeader>
+                      <DialogTitle>Review Work Order</DialogTitle>
+                      <DialogDescription>
+                        Add comments (optional), then choose to mark as Reviewed or send back for revision.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                      {reviewerActionDialog.wo && (
+                        <div className="bg-gray-50 border border-gray-200 rounded px-3 py-2 text-sm text-gray-700">
+                          <span className="font-medium">{reviewerActionDialog.wo.workOrderNo || `WO-${reviewerActionDialog.wo.id}`}</span>
+                          {reviewerActionDialog.wo.jobTitle && (
+                            <span className="ml-2 text-gray-500">— {reviewerActionDialog.wo.jobTitle}</span>
+                          )}
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        <Label htmlFor="reviewer-action-comments" className="text-sm">Reviewer Comments (optional)</Label>
+                        <Textarea
+                          id="reviewer-action-comments"
+                          rows={3}
+                          placeholder="Add any comments for the vessel team..."
+                          value={reviewerActionDialog.comments}
+                          onChange={(e) => setReviewerActionDialog(prev => ({ ...prev, comments: e.target.value }))}
+                          disabled={reviewerActionDialog.submitting}
+                          className="text-sm resize-none"
+                          data-testid="textarea-reviewer-action-comments"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setReviewerActionDialog({ open: false, wo: null, comments: '', submitting: false })}
+                        disabled={reviewerActionDialog.submitting}
+                        data-testid="button-reviewer-action-cancel"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        className="border-amber-400 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                        variant="outline"
+                        disabled={reviewerActionDialog.submitting}
+                        onClick={() => {
+                          if (!reviewerActionDialog.wo) return;
+                          setReviewerActionDialog(prev => ({ ...prev, submitting: true }));
+                          reviewerReopenMutation.mutate({ id: String(reviewerActionDialog.wo!.id), remarks: reviewerActionDialog.comments });
+                        }}
+                        data-testid="button-reviewer-action-reopen"
+                      >
+                        {reviewerActionDialog.submitting
+                          ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5 inline" />Processing...</>
+                          : <><RefreshCw className="h-4 w-4 mr-1.5 inline" />Reopen</>
+                        }
+                      </Button>
+                      <Button
+                        className="border-teal-500 bg-teal-50 text-teal-800 hover:bg-teal-100"
+                        variant="outline"
+                        disabled={reviewerActionDialog.submitting}
+                        onClick={() => {
+                          if (!reviewerActionDialog.wo) return;
+                          setReviewerActionDialog(prev => ({ ...prev, submitting: true }));
+                          reviewerApproveMutation.mutate({ id: String(reviewerActionDialog.wo!.id), comments: reviewerActionDialog.comments });
+                        }}
+                        data-testid="button-reviewer-action-reviewed"
+                      >
+                        {reviewerActionDialog.submitting
+                          ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5 inline" />Processing...</>
+                          : <><CheckCircle className="h-4 w-4 mr-1.5 inline" />Reviewed</>
+                        }
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
 
                 {opDetailSpare && (
                   <Dialog open={!!opDetailSpare} onOpenChange={(isOpen) => !isOpen && setOpDetailSpare(null)}>
@@ -2996,6 +3598,15 @@ const Dashboard = () => {
         {/* OVERVIEW TAB: Card-based Grid Layout */}
         {activeTab === 'overview' && (
           <div className="p-4 space-y-4">
+
+            {myVesselsEmpty && (
+              <div
+                className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+                data-testid="banner-no-assigned-vessels"
+              >
+                No vessels are assigned to you yet. Switch the Scope to "All Vessel" or contact your administrator to get vessels assigned.
+              </div>
+            )}
 
             {/* DASHBOARD GRID: 3 columns (25% / 50% / 25%), 4 explicit rows */}
             <div

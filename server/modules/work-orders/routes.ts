@@ -88,6 +88,18 @@ router.delete('/work-orders/:id', asyncHandler(woCtrl.deleteWorkOrder));
 
 // ── Superintendent Endpoints (Layer 5) ──
 
+// POST /work-orders/:id/reviewer-approve — Level 2 reviewer approves (Pending Office Review → Completed)
+router.post('/work-orders/:id/reviewer-approve',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.reviewerApprove)
+);
+
+// POST /work-orders/:id/reviewer-reopen — Level 2 reviewer sends back for rework
+router.post('/work-orders/:id/reviewer-reopen',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.reviewerReopen)
+);
+
 // POST /work-orders/:id/reject-completion — reject a Completed WO (Office/PMS Admin only)
 router.post('/work-orders/:id/reject-completion',
   requireRole(['Office', 'PMS Admin', 'Sail Admin']),
@@ -145,6 +157,26 @@ router.post('/work-orders/recalculate-statuses', asyncHandler(woCtrl.recalculate
 
 // POST /work-orders/check-postponements — check and revert postponed work orders
 router.post('/work-orders/check-postponements', asyncHandler(woCtrl.checkPostponements));
+
+// ── Postponement Approval Workflow (Plan B) ──
+
+// POST /work-orders/:id/postpone-request — ship submits initial postponement request
+router.post('/work-orders/:id/postpone-request', asyncHandler(woCtrl.submitPostponeRequest));
+
+// PUT /work-orders/:id/postpone-request — ship edits & resubmits a pending/rejected request
+router.put('/work-orders/:id/postpone-request', asyncHandler(woCtrl.editPostponeRequest));
+
+// POST /work-orders/:id/postpone-approve — office approves a postponement request
+router.post('/work-orders/:id/postpone-approve',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.approvePostponement)
+);
+
+// POST /work-orders/:id/postpone-reject — office rejects a postponement request
+router.post('/work-orders/:id/postpone-reject',
+  requireRole(['Office', 'PMS Admin', 'Sail Admin']),
+  asyncHandler(woCtrl.rejectPostponement)
+);
 
 // ── Work Order Executions ──
 

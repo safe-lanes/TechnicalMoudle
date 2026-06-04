@@ -1,0 +1,126 @@
+Following is my proposed work and I want you to Investigate and tell me in detail that what are the straight forward UI part then what is logic building part and finally what are the backend part.
+Create a separate plan for each first with simple UI changes then Backend and logic part Implementation.
+
+Postpone Work Order – Approval Workflow Enhancement
+Current Behavior
+Currently, when a vessel user selects a Postpone Date and Reason, the Work Order is immediately postponed.
+Required Behavior
+The postponement should follow an approval workflow and should not be automatically approved.
+The existing Postpone Work Order popup UI should remain the same, with only minor field rearrangements required to support the approval workflow.
+UI Changes
+•	Move Next Due Date above the approval remarks section.
+•	Move Postponement Duration above the approval remarks section.
+•	Postponement Duration should be auto-calculated based on the selected Postpone Date and the current Due Date.
+•	Move Approval Remarks to the bottom of the popup.
+•	Replace Authorized By with Approver.
+________________________________________
+1. Postpone Work Order Form Changes
+The Postpone Work Order form should contain:
+•	Postpone Date *
+•	Postpone Reason *
+•	Remarks (Optional)
+•	Next Due Date (Auto-calculated / Display Only)
+•	Postponement Duration (Auto-calculated)
+•	Approver *
+The vessel user must select an Approver before submitting the postponement request.
+________________________________________
+2. Vessel Submission Process
+When the vessel user submits a postponement request:
+•	The Work Order should not be automatically postponed.
+•	A postponement approval request should be created.
+•	The request should be routed to the selected Approver.
+•	The Work Order should be moved to the Postponed Work Order page/tab.
+However, the status should be:
+Awaiting Office Approval
+This indicates that the postponement has been requested but has not yet been approved.
+________________________________________
+3. Office Side – Operation Dashboard
+In the Operation Dashboard → Pending Approval tab:
+Display a new approval request type:
+Postponement Approval Request
+The All office users should be able to:
+•	Review the postponement request
+•	View the Postpone Date
+•	View the Postpone Reason
+•	View Vessel Remarks
+•	View Next Due Date
+•	View Postponement Duration
+•	Approve the request
+•	Reject the request
+•	Enter Approval/Rejection Remarks
+In the Office-side Operation Dashboard → Pending Approval tab, Work Orders that are awaiting approval from the Vessel HOD should not be displayed.
+The Layout and UI Should Not be changed. In action button they can approve or reject the Postponement WO Details.________________________________________
+4. Approval Process
+If Approved
+•	The postponement request is approved.
+•	The Work Order remains in the Postponed Work Order page.
+•	Update the status to:
+Postponement Approved
+•	The approved postponement date becomes effective.
+•	The revised schedule should be applied to the Work Order.
+If Rejected
+•	The postponement request is rejected.
+•	Update the status to:
+Postponement Rejected
+•	The Work Order should return to its appropriate Due/Overdue state based on the Work Order schedule.
+•	Rejection remarks should be visible to vessel users.
+________________________________________
+5. Postponed Work Order Page
+The following information should be permanently stored and displayed:
+•	Requested Postpone Date
+•	Postpone Reason
+•	Vessel Remarks
+•	Selected Approver
+•	Next Due Date
+•	Postponement Duration
+•	Approval Status
+•	Approval Date
+•	Approval/Rejection Remarks
+________________________________________
+6. Edit and Resubmit
+While the request status is:
+•	Awaiting Office Approval
+•	Postponement Rejected
+The vessel user should be allowed to:
+•	Edit the Postpone Date
+•	Edit the Postpone Reason
+•	Edit Remarks
+•	Change the Approver
+•	Resubmit the request
+Upon resubmission:
+•	The previous request history should be retained.
+•	A new approval request should be generated.
+•	All previous approval/rejection actions should remain available in the audit trail.
+________________________________________
+7. Status Flow
+Approved Flow
+Open
+→ Due / Overdue
+→ Postponement Request Submitted
+→ Awaiting Office Approval
+→ Postponement Approved
+→ Postponed Work Order
+Rejected Flow
+Open
+→ Due / Overdue
+→ Postponement Request Submitted
+→ Awaiting Office Approval
+→ Postponement Rejected
+→ Due / Overdue
+________________________________________
+8. Audit Trail
+All postponement actions should be recorded:
+•	Request Submitted
+•	Request Modified
+•	Request Resubmitted
+•	Approved
+•	Rejected
+Audit details should include:
+•	User Name
+•	Date & Time
+•	Postpone Date
+•	Postpone Reason
+•	Remarks
+•	Approver Name
+•	Approval/Rejection Remarks
+

@@ -189,6 +189,20 @@ export async function checkAndRevertPostponedWorkOrders(vesselId?: string) {
   return storage.checkAndRevertPostponedWorkOrders(vesselId);
 }
 
+export async function findPostponementsByWorkOrderId(workOrderId: string) {
+  return storage.getWorkOrderPostponementsByWorkOrderId(workOrderId);
+}
+
+export async function createPostponement(data: any) {
+  return storage.createWorkOrderPostponement(data);
+}
+
+export async function getMaxPostponementNumber(workOrderId: string): Promise<number> {
+  const rows = await storage.getWorkOrderPostponementsByWorkOrderId(workOrderId);
+  if (!rows || rows.length === 0) return 0;
+  return Math.max(...rows.map((r: any) => r.postponementNumber || 1));
+}
+
 // ── Audit Log ──
 
 export async function createAuditLog(data: any) {

@@ -158,7 +158,7 @@ export interface ReportActionTrigger {
 }
 
 const ReportsModule = () => {
-  const { vesselId, setVesselId } = useVessel();
+  const { vesselId, setVesselId, isMyVessels, assignedVesselIds } = useVessel();
   const { toast } = useToast();
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -170,7 +170,9 @@ const ReportsModule = () => {
   const [dragSourceId, setDragSourceId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [globalFilters, setGlobalFilters] = useState<FilterValues>({
-    vessels: vesselId ? [vesselId] : [],
+    // 'my' scope expands to the assigned mini-fleet's explicit vessel id list, which
+    // the report services already treat as a vesselIds allow-list.
+    vessels: isMyVessels ? assignedVesselIds : (vesselId ? [vesselId] : []),
     component: "",
     department: "",
     dateRange: { from: null, to: null },
@@ -178,13 +180,16 @@ const ReportsModule = () => {
   });
 
   useEffect(() => {
-    if (vesselId) {
-      setGlobalFilters(prev => {
-        if (prev.vessels.length === 1 && prev.vessels[0] === vesselId) return prev;
-        return { ...prev, vessels: [vesselId] };
-      });
-    }
-  }, [vesselId]);
+    if (!vesselId) return;
+    const scopeVessels = isMyVessels ? assignedVesselIds : [vesselId];
+    setGlobalFilters(prev => {
+      const same =
+        prev.vessels.length === scopeVessels.length &&
+        prev.vessels.every((v, i) => v === scopeVessels[i]);
+      if (same) return prev;
+      return { ...prev, vessels: scopeVessels };
+    });
+  }, [vesselId, isMyVessels, assignedVesselIds]);
 
   const { data: favoritesData } = useQuery<{ reportIds: string[] }>({
     queryKey: ['/technical/api/reports/favorites'],

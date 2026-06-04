@@ -7706,10 +7706,16 @@ export class PostgresStorage {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
     
-    // Find postponed work orders past their postponed date
+    // Find postponed work orders past their postponed date.
+    // "Awaiting Office Approval" WOs are intentionally excluded — they must not
+    // be auto-reverted until the office acts. Only "Postponed" (legacy) and
+    // "Postponement Approved" (Plan B) WOs are eligible.
     let query = db.select().from(workOrders)
       .where(and(
-        eq(workOrders.status, 'Postponed'),
+        or(
+          eq(workOrders.status, 'Postponed'),
+          eq(workOrders.status, 'Postponement Approved')
+        ),
         eq(workOrders.isActive, true)
       ));
     
@@ -9000,6 +9006,7 @@ export class PostgresStorage {
       sortDir?: 'asc' | 'desc';
       activeOnly?: boolean;
       componentId?: string;
+      vesselIds?: string[];
     }
   ): Promise<{ items: SpareWithInventory[]; total: number; page: number; pageSize: number }> {
     const db = await getDb();
@@ -9018,6 +9025,14 @@ export class PostgresStorage {
     ];
     if (vesselId !== 'all') {
       filters.push(sql`s.vessel_id = ${vesselId}`);
+    } else if (opts.vesselIds && opts.vesselIds.length > 0) {
+      // 'my' scope: restrict the all-vessel aggregate to the assigned mini-fleet.
+      // Bind each id as an explicit text-array parameter (matching the proven
+      // pattern elsewhere in this file). A raw `ANY(${jsArray})` does NOT bind a
+      // JS array as a Postgres text[] under node-postgres, so it matched nothing.
+      filters.push(
+        sql`s.vessel_id = ANY(ARRAY[${sql.join(opts.vesselIds.map((id) => sql`${id}`), sql`, `)}]::text[])`
+      );
     }
 
     if (opts.search && opts.search.trim()) {

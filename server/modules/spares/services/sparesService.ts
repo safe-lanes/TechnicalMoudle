@@ -458,8 +458,8 @@ export async function receiveToLocation(paramsRaw: any, bodyRaw: any) {
 
 // ── History ──
 
-export async function getSpareHistory(vesselId: string): Promise<SpareHistory[]> {
-  return repo.getSpareHistory(vesselId);
+export async function getSpareHistory(vesselId: string, vesselIds?: string[]): Promise<SpareHistory[]> {
+  return repo.getSpareHistory(vesselId, vesselIds);
 }
 
 // ── Low Stock ──

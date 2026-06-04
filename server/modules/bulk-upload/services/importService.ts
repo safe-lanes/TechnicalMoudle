@@ -2118,6 +2118,7 @@ export async function performImport(
         briefWorkDescription: row['Brief Work Description'] || null,  // Store in both fields for compatibility
         assignedTo: row['Assigned To'] || null,
         approver: row['Approver'] || null,
+        level2ReviewerRankId: row['Reviewer Rank'] ? String(row['Reviewer Rank']).trim() || null : null,
         jobPriority: row['Job Priority'] || null,
         // Schema expects text 'Yes'/'No', not boolean
         classRelated: row['Class Related'] ? (row['Class Related'].toString().toLowerCase() === 'yes' ? 'Yes' : 'No') : null,
@@ -2557,6 +2558,9 @@ export async function performImport(
       
       const fleetComponentsUuid = matchedComponent.fleetComponentsUuid;
       
+      const reviewerRankRaw = row['Reviewer Rank'] || null;
+      const level2ReviewerRankId = reviewerRankRaw ? String(reviewerRankRaw).trim() || null : null;
+
       const fleetJobData = {
         jobCode,
         fleetComponentsUuid,
@@ -2569,6 +2573,7 @@ export async function performImport(
         taskType,
         assignedTo,
         approver,
+        level2ReviewerRankId,
         jobPriority,
         classRelated,
         briefWorkDescription,

@@ -134,8 +134,8 @@ export async function cascadeUpdate(body: unknown) {
 // Running Hours Parents (from runningHoursRoutes.ts)
 // ══════════════════════════════════════════════════════════
 
-export async function listParents(vesselId: string, period: string = 'monthly', customFrom?: Date, customTo?: Date) {
-  const allComponents = await repo.getComponents(vesselId);
+export async function listParents(vesselId: string, period: string = 'monthly', customFrom?: Date, customTo?: Date, vesselIds?: string[]) {
+  const allComponents = await repo.getComponents(vesselId, vesselIds);
 
   const masterComponents = allComponents.filter(
     component => component.rhCounterType === 'MASTER' && component.isActive !== false
@@ -166,7 +166,9 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
 
   const parentsWithCounts = await Promise.all(
     masterComponents.map(async (component) => {
-      const allInheritedComponents = await repo.getInheritedComponents(component.cuuid, vesselId);
+      // Under 'all'/'my' aggregate, vesselId is 'all' — scope inherited lookup to the
+      // master's own vessel so the per-vessel isolation safeguard still resolves.
+      const allInheritedComponents = await repo.getInheritedComponents(component.cuuid, component.vesselId ?? vesselId);
       const inheritedComponents = allInheritedComponents.filter((c: any) => c.isActive !== false);
 
       const meterReplacedLastRh = parseFloat(component.meterReplacedLastRh || '0');
