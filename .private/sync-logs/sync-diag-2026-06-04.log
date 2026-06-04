@@ -65,3 +65,5 @@
 [2026-06-04T11:31:31.723Z] [SyncDiag] FIELD-LOGGER: work_order_postponements row=89bfbbe6-69a8-477b-a3cc-971b1a0a0529 — 16 fields changed, isInsert=true, vesselId=743ef9d1-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
 [2026-06-04T11:31:40.791Z] [SyncDiag] FIELD-LOGGER: work_order_postponements row=049ab995-add9-40c3-b1d3-1bde019d0f5b — 18 fields changed, isInsert=true, vesselId=743ef9d1-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
 [2026-06-04T11:31:57.114Z] [SyncDiag] FIELD-LOGGER: work_order_postponements row=17ba263d-5790-463f-a0b0-0681686032dd — 16 fields changed, isInsert=true, vesselId=743ef9d1-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-04T11:32:06.972Z] [SyncDiag] FIELD-LOGGER: work_order_postponements row=f7a7297e-3131-4b29-a317-336dc0da3e39 — 19 fields changed, isInsert=true, vesselId=743ef9d1-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
+[2026-06-04T11:33:27.808Z] [SyncDiag] FIELD-LOGGER: work_orders row=cb161ad2-3025-4ff3-a8c3-b1f07653621e — 1 fields changed, isInsert=false, vesselId=743ef9d1-841a-11ed-aa7c-7003bca91a86, instanceId=SHORE-PROD
