@@ -1992,7 +1992,7 @@ const Dashboard = () => {
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 w-7 p-0 text-teal-700 hover:bg-teal-50"
+                  className="h-7 w-7 p-0 text-[#1E5A8E] hover:bg-blue-50 hover:text-[#174a78]"
                   onClick={(e) => {
                     e.stopPropagation();
                     setReviewerActionDialog({ open: true, wo: wo as EnrichedWorkOrder, comments: '', submitting: false });
@@ -3457,78 +3457,115 @@ const Dashboard = () => {
                     if (!isOpen) setReviewerActionDialog({ open: false, wo: null, comments: '', submitting: false });
                   }}
                 >
-                  <DialogContent className="max-w-md" data-testid="dialog-reviewer-action">
-                    <DialogHeader>
+                  <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col" data-testid="dialog-reviewer-action">
+                    <DialogHeader className="flex-shrink-0">
                       <DialogTitle>Review Work Order</DialogTitle>
-                      <DialogDescription>
-                        Add comments (optional), then choose to mark as Reviewed or send back for revision.
-                      </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-3 py-2">
-                      {reviewerActionDialog.wo && (
-                        <div className="bg-gray-50 border border-gray-200 rounded px-3 py-2 text-sm text-gray-700">
-                          <span className="font-medium">{reviewerActionDialog.wo.workOrderNo || `WO-${reviewerActionDialog.wo.id}`}</span>
-                          {reviewerActionDialog.wo.jobTitle && (
-                            <span className="ml-2 text-gray-500">— {reviewerActionDialog.wo.jobTitle}</span>
-                          )}
+
+                    <div className="flex-1 overflow-y-auto px-1">
+                      <div className="space-y-3 py-4">
+                        {reviewerActionDialog.wo && (
+                          <>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <Label className="text-sm">Work Order ID</Label>
+                                <Input
+                                  value={reviewerActionDialog.wo.workOrderNo || `WO-${reviewerActionDialog.wo.id}`}
+                                  className="bg-gray-50 h-9"
+                                  readOnly
+                                  data-testid="input-reviewer-action-wo-id"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-sm">Component</Label>
+                                <Input
+                                  value={reviewerActionDialog.wo.component || '—'}
+                                  className="bg-gray-50 h-9"
+                                  readOnly
+                                  data-testid="input-reviewer-action-component"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-sm">Job Title</Label>
+                              <Input
+                                value={reviewerActionDialog.wo.jobTitle || '—'}
+                                className="bg-gray-50 h-9"
+                                readOnly
+                                data-testid="input-reviewer-action-job-title"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-sm">Due Date</Label>
+                              <Input
+                                value={reviewerActionDialog.wo.dueDate || reviewerActionDialog.wo.originalDueDate || '—'}
+                                className="bg-gray-50 h-9"
+                                readOnly
+                                data-testid="input-reviewer-action-due-date"
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        <div className="space-y-1">
+                          <Label htmlFor="reviewer-action-comments" className="text-sm">Reviewer Comments (optional)</Label>
+                          <Textarea
+                            id="reviewer-action-comments"
+                            rows={3}
+                            placeholder="Add any comments for the vessel team..."
+                            value={reviewerActionDialog.comments}
+                            onChange={(e) => setReviewerActionDialog(prev => ({ ...prev, comments: e.target.value }))}
+                            disabled={reviewerActionDialog.submitting}
+                            className="text-sm resize-none"
+                            data-testid="textarea-reviewer-action-comments"
+                          />
                         </div>
-                      )}
-                      <div className="space-y-1">
-                        <Label htmlFor="reviewer-action-comments" className="text-sm">Reviewer Comments (optional)</Label>
-                        <Textarea
-                          id="reviewer-action-comments"
-                          rows={3}
-                          placeholder="Add any comments for the vessel team..."
-                          value={reviewerActionDialog.comments}
-                          onChange={(e) => setReviewerActionDialog(prev => ({ ...prev, comments: e.target.value }))}
-                          disabled={reviewerActionDialog.submitting}
-                          className="text-sm resize-none"
-                          data-testid="textarea-reviewer-action-comments"
-                        />
+
+                        <div className="flex justify-end gap-3 pt-4 border-t">
+                          <Button
+                            variant="outline"
+                            onClick={() => setReviewerActionDialog({ open: false, wo: null, comments: '', submitting: false })}
+                            disabled={reviewerActionDialog.submitting}
+                            data-testid="button-reviewer-action-cancel"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
+                            disabled={reviewerActionDialog.submitting}
+                            onClick={() => {
+                              if (!reviewerActionDialog.wo) return;
+                              setReviewerActionDialog(prev => ({ ...prev, submitting: true }));
+                              reviewerReopenMutation.mutate({ id: String(reviewerActionDialog.wo!.id), remarks: reviewerActionDialog.comments });
+                            }}
+                            data-testid="button-reviewer-action-reopen"
+                          >
+                            {reviewerActionDialog.submitting
+                              ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />Processing...</>
+                              : <><XCircle className="h-4 w-4 mr-1.5" />Reopen</>
+                            }
+                          </Button>
+                          <Button
+                            className="bg-[#1E5A8E] hover:bg-[#174a78] text-white"
+                            disabled={reviewerActionDialog.submitting}
+                            onClick={() => {
+                              if (!reviewerActionDialog.wo) return;
+                              setReviewerActionDialog(prev => ({ ...prev, submitting: true }));
+                              reviewerApproveMutation.mutate({ id: String(reviewerActionDialog.wo!.id), comments: reviewerActionDialog.comments });
+                            }}
+                            data-testid="button-reviewer-action-reviewed"
+                          >
+                            {reviewerActionDialog.submitting
+                              ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />Processing...</>
+                              : <><CheckCircle className="h-4 w-4 mr-1.5" />Reviewed</>
+                            }
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                    <DialogFooter className="gap-2 sm:gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => setReviewerActionDialog({ open: false, wo: null, comments: '', submitting: false })}
-                        disabled={reviewerActionDialog.submitting}
-                        data-testid="button-reviewer-action-cancel"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        className="border-amber-400 bg-amber-50 text-amber-800 hover:bg-amber-100"
-                        variant="outline"
-                        disabled={reviewerActionDialog.submitting}
-                        onClick={() => {
-                          if (!reviewerActionDialog.wo) return;
-                          setReviewerActionDialog(prev => ({ ...prev, submitting: true }));
-                          reviewerReopenMutation.mutate({ id: String(reviewerActionDialog.wo!.id), remarks: reviewerActionDialog.comments });
-                        }}
-                        data-testid="button-reviewer-action-reopen"
-                      >
-                        {reviewerActionDialog.submitting
-                          ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5 inline" />Processing...</>
-                          : <><RefreshCw className="h-4 w-4 mr-1.5 inline" />Reopen</>
-                        }
-                      </Button>
-                      <Button
-                        className="border-teal-500 bg-teal-50 text-teal-800 hover:bg-teal-100"
-                        variant="outline"
-                        disabled={reviewerActionDialog.submitting}
-                        onClick={() => {
-                          if (!reviewerActionDialog.wo) return;
-                          setReviewerActionDialog(prev => ({ ...prev, submitting: true }));
-                          reviewerApproveMutation.mutate({ id: String(reviewerActionDialog.wo!.id), comments: reviewerActionDialog.comments });
-                        }}
-                        data-testid="button-reviewer-action-reviewed"
-                      >
-                        {reviewerActionDialog.submitting
-                          ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5 inline" />Processing...</>
-                          : <><CheckCircle className="h-4 w-4 mr-1.5 inline" />Reviewed</>
-                        }
-                      </Button>
-                    </DialogFooter>
                   </DialogContent>
                 </Dialog>
 
