@@ -253,6 +253,7 @@ export class WorkOrderStatusRecalculatorService {
           isExecution: wo.isExecution,
           status: wo.status,
           completionDateTime: wo.dateCompleted,
+          wasRejected: wo.wasRejected ?? false,
           maintenanceBasis: wo.maintenanceBasis || undefined,
           vesselGraceSettings,
           rhLeadTimeHours,

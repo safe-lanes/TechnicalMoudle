@@ -279,7 +279,7 @@ const JobsFormPage: React.FC = () => {
 
   const getChangedFields = (): string[] => {
     const changedFields: string[] = [];
-    const fieldsToCheck = ['woTitle', 'assignedTo', 'approver', 'level2ReviewerRankId', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive'];
+    const fieldsToCheck = ['woTitle', 'assignedTo', 'approver', 'level2ReviewerRankId', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'intervalRunningHour', 'maintenanceBasis', 'taskType', 'isActive', 'department', 'criticality'];
     
     for (const field of fieldsToCheck) {
       if (templateData[field as keyof typeof templateData] !== originalData[field]) {
@@ -436,6 +436,12 @@ const JobsFormPage: React.FC = () => {
       }
       if (templateData.taskType !== originalData.taskType) {
         updatePayload.maintenanceType = templateData.taskType;
+      }
+      if (templateData.department !== originalData.department) {
+        updatePayload.department = templateData.department || null;
+      }
+      if (templateData.criticality !== originalData.criticality) {
+        updatePayload.criticality = templateData.criticality || null;
       }
       
       if (Object.keys(updatePayload).length === 0) {
@@ -1215,8 +1221,8 @@ const JobsFormPage: React.FC = () => {
                     isModifyMode={isModifyMode}
                     isEditMode={isEditMode}
                     type="select"
-                    options={ensureRankInOptions(rankOptions, templateData.level2ReviewerRankId)}
-                    displayValue={getRankLabel(rankOptions, templateData.level2ReviewerRankId) || '— None —'}
+                    options={ensureRankInOptions([{ value: 'Office', label: 'Office' }], templateData.level2ReviewerRankId)}
+                    displayValue={getRankLabel([{ value: 'Office', label: 'Office' }], templateData.level2ReviewerRankId) || templateData.level2ReviewerRankId || '— None —'}
                     labelMarker="JF.A1.L2R.1"
                     valueMarker="JF.A1.L2R.2"
                   />
@@ -1298,8 +1304,31 @@ const JobsFormPage: React.FC = () => {
                       </div>
                     );
                   })()}
-                  <ReadOnlyField label="Department" value={templateData.department} labelMarker="JF.A1.27" valueMarker="JF.A1.28" />
-                  <ReadOnlyField label="Criticality" value={templateData.criticality} labelMarker="JF.A1.29" valueMarker="JF.A1.30" />
+                  <EditableField
+                    label="Department"
+                    field="department"
+                    value={templateData.department}
+                    originalValue={originalData.department}
+                    onChange={handleFieldChange}
+                    isModifyMode={isModifyMode}
+                    isEditMode={isEditMode}
+                    type="text"
+                    labelMarker="JF.A1.27"
+                    valueMarker="JF.A1.28"
+                  />
+                  <EditableField
+                    label="Criticality"
+                    field="criticality"
+                    value={templateData.criticality}
+                    originalValue={originalData.criticality}
+                    onChange={handleFieldChange}
+                    isModifyMode={isModifyMode}
+                    isEditMode={isEditMode}
+                    type="select"
+                    options={['Yes', 'No']}
+                    labelMarker="JF.A1.29"
+                    valueMarker="JF.A1.30"
+                  />
                   <EditableField 
                     label="Is Active" 
                     field="isActive"

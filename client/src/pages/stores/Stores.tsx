@@ -887,7 +887,8 @@ const Stores: React.FC = () => {
   }, [filteredItems, bulkSearchQuery]);
 
   const getStockColor = (stock: string) => {
-    if (stock === "Low") return "bg-yellow-100 text-yellow-800";
+    if (stock === "Low") return "bg-red-100 text-red-800";
+    if (stock === "At Min") return "bg-orange-100 text-orange-800";
     if (stock === "OK") return "bg-green-100 text-green-800";
     if (stock === "N/A") return "bg-gray-100 text-gray-800";
     return "";
@@ -1804,6 +1805,7 @@ const Stores: React.FC = () => {
         flex: 1.4,
         minWidth: 130,
         tooltipField: 'itemCode',
+        filter: 'agTextColumnFilter',
         headerComponent: () => (
           <span data-testid={getMarkerId(activeTab, '10')}>
             <span className="sr-only"><Marker id={getMarkerId(activeTab, '10')} /></span>
@@ -1826,6 +1828,7 @@ const Stores: React.FC = () => {
         flex: 1.6,
         minWidth: 160,
         tooltipField: 'itemName',
+        filter: 'agTextColumnFilter',
         headerComponent: () => (
           <span data-testid={getMarkerId(activeTab, '11')}>
             <span className="sr-only"><Marker id={getMarkerId(activeTab, '11')} /></span>
@@ -1848,6 +1851,7 @@ const Stores: React.FC = () => {
         flex: 1.4,
         minWidth: 130,
         tooltipField: 'storesCategory',
+        filter: 'agTextColumnFilter',
         headerComponent: () => (
           <span data-testid={getMarkerId(activeTab, '12')}>
             <span className="sr-only"><Marker id={getMarkerId(activeTab, '12')} /></span>
@@ -1869,6 +1873,7 @@ const Stores: React.FC = () => {
         headerName: 'UOM',
         flex: 0.6,
         minWidth: 70,
+        filter: 'agTextColumnFilter',
         headerComponent: () => (
           <span data-testid={getMarkerId(activeTab, '13')}>
             <span className="sr-only"><Marker id={getMarkerId(activeTab, '13')} /></span>UOM
@@ -1890,6 +1895,7 @@ const Stores: React.FC = () => {
         flex: 0.6,
         minWidth: 70,
         filter: 'agNumberColumnFilter',
+        cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
         headerComponent: () => (
           <span data-testid={getMarkerId(activeTab, '14')}>
             <span className="sr-only"><Marker id={getMarkerId(activeTab, '14')} /></span>ROB
@@ -1898,7 +1904,7 @@ const Stores: React.FC = () => {
         cellRenderer: (params: ICellRendererParams) => {
           const item = params.data as StoreItem;
           return (
-            <span className="text-gray-700" data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '24') : undefined}>
+            <span data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '24') : undefined}>
               {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '24')} />}
               {item.rob}
             </span>
@@ -1911,6 +1917,7 @@ const Stores: React.FC = () => {
         flex: 0.6,
         minWidth: 70,
         filter: 'agNumberColumnFilter',
+        cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
         headerComponent: () => (
           <span data-testid={getMarkerId(activeTab, '15')}>
             <span className="sr-only"><Marker id={getMarkerId(activeTab, '15')} /></span>Min
@@ -1919,7 +1926,7 @@ const Stores: React.FC = () => {
         cellRenderer: (params: ICellRendererParams) => {
           const item = params.data as StoreItem;
           return (
-            <span className="text-gray-700" data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '25') : undefined}>
+            <span data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '25') : undefined}>
               {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '25')} />}
               {item.min}
             </span>
@@ -1931,6 +1938,8 @@ const Stores: React.FC = () => {
         headerName: 'Stock',
         flex: 0.7,
         minWidth: 80,
+        filter: 'agTextColumnFilter',
+        cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
         headerComponent: () => (
           <span data-testid={getMarkerId(activeTab, '16')}>
             <span className="sr-only"><Marker id={getMarkerId(activeTab, '16')} /></span>Stock
@@ -1941,7 +1950,7 @@ const Stores: React.FC = () => {
           return (
             <span data-testid={params.node.rowIndex === 0 ? getMarkerId(activeTab, '26') : undefined}>
               {params.node.rowIndex === 0 && <Marker id={getMarkerId(activeTab, '26')} />}
-              <span className={`px-2 py-0.5 rounded text-xs font-medium inline-block ${getStockColor(item.stock)}`}>
+              <span className={`px-2 py-1 rounded text-xs ${getStockColor(item.stock)}`}>
                 {item.stock}
               </span>
             </span>
@@ -1987,6 +1996,7 @@ const Stores: React.FC = () => {
           headerName: 'Expiry',
           flex: 0.8,
           minWidth: 90,
+          filter: 'agTextColumnFilter',
           cellRenderer: (params: ICellRendererParams) => {
             const item = params.data as StoreItem;
             if (!item.expiryDate) return <span className="text-xs">-</span>;
@@ -2006,6 +2016,7 @@ const Stores: React.FC = () => {
           headerName: 'Batch #',
           flex: 0.8,
           minWidth: 90,
+          filter: 'agTextColumnFilter',
           cellRenderer: (params: ICellRendererParams) => {
             const item = params.data as StoreItem;
             return <span className="text-xs truncate">{item.batchNumber || '-'}</span>;
@@ -2016,6 +2027,7 @@ const Stores: React.FC = () => {
           headerName: 'Hazard',
           flex: 0.8,
           minWidth: 100,
+          filter: 'agTextColumnFilter',
           cellRenderer: (params: ICellRendererParams) => {
             const item = params.data as StoreItem;
             if (!item.hazardClassification || item.hazardClassification === 'None') return <span>-</span>;
@@ -2042,6 +2054,8 @@ const Stores: React.FC = () => {
         headerName: 'IHM',
         flex: 0.5,
         minWidth: 60,
+        sortable: false,
+        filter: false,
         headerComponent: () => (
           <span data-testid={getMarkerId(activeTab, '18')}>
             <span className="sr-only"><Marker id={getMarkerId(activeTab, '18')} /></span>IHM
@@ -2228,6 +2242,7 @@ const Stores: React.FC = () => {
         headerName: 'Item Code',
         flex: 1,
         minWidth: 110,
+        filter: 'agTextColumnFilter',
         headerComponent: () => <span data-testid="stores-loc-col-item-code">Item Code</span>,
         cellRenderer: (params: ICellRendererParams) => <span className="text-gray-900">{params.value}</span>,
       },
@@ -2237,6 +2252,7 @@ const Stores: React.FC = () => {
         flex: 1.6,
         minWidth: 180,
         tooltipField: 'itemName',
+        filter: 'agTextColumnFilter',
         headerComponent: () => <span data-testid="stores-loc-col-item-name">Item Name</span>,
         cellRenderer: (params: ICellRendererParams) => <span className="text-gray-700 truncate">{params.value}</span>,
       },
@@ -2245,6 +2261,7 @@ const Stores: React.FC = () => {
         headerName: 'Stores Category',
         flex: 1.2,
         minWidth: 140,
+        filter: 'agTextColumnFilter',
         headerComponent: () => <span data-testid="stores-loc-col-category">Stores Category</span>,
         cellRenderer: (params: ICellRendererParams) => <span className="text-gray-700 truncate">{params.value}</span>,
       },
@@ -2253,6 +2270,7 @@ const Stores: React.FC = () => {
         headerName: 'UOM',
         flex: 0.6,
         minWidth: 70,
+        filter: 'agTextColumnFilter',
         headerComponent: () => <span data-testid="stores-loc-col-uom">UOM</span>,
         cellRenderer: (params: ICellRendererParams) => <span className="text-gray-500">{params.value || '-'}</span>,
       },
@@ -2262,6 +2280,7 @@ const Stores: React.FC = () => {
         flex: 0.6,
         minWidth: 70,
         filter: 'agNumberColumnFilter',
+        cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
         headerComponent: () => <span data-testid="stores-loc-col-rob">ROB</span>,
       },
       {
@@ -2270,6 +2289,7 @@ const Stores: React.FC = () => {
         flex: 0.6,
         minWidth: 70,
         filter: 'agNumberColumnFilter',
+        cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
         headerComponent: () => <span data-testid="stores-loc-col-min">Min</span>,
       },
       {
@@ -2277,11 +2297,13 @@ const Stores: React.FC = () => {
         headerName: 'Stock',
         flex: 0.7,
         minWidth: 80,
+        filter: 'agTextColumnFilter',
+        cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
         headerComponent: () => <span data-testid="stores-loc-col-stock">Stock</span>,
         cellRenderer: (params: ICellRendererParams) => {
           const item = params.data as StoreItem;
           return (
-            <span className={`px-2 py-0.5 rounded text-xs font-medium inline-block ${getStockColor(item.stock)}`}>
+            <span className={`px-2 py-1 rounded text-xs ${getStockColor(item.stock)}`}>
               {item.stock}
             </span>
           );
@@ -2361,8 +2383,7 @@ const Stores: React.FC = () => {
         colId: 'locRob',
         flex: 0.8,
         minWidth: 90,
-        sortable: false,
-        filter: false,
+        filter: 'agNumberColumnFilter',
         headerComponent: () => <span data-testid="stores-loc-col-loc-rob">Loc ROB</span>,
         cellRenderer: (params: ICellRendererParams) => {
           const item = params.data as StoreItem & { _side: 'A' | 'B'; _locRob: number; _editKey: string };
@@ -2433,6 +2454,7 @@ const Stores: React.FC = () => {
       headerName: 'Date',
       flex: 1.2,
       minWidth: 130,
+      filter: 'agTextColumnFilter',
       headerComponent: () => (
         <span data-testid={getMarkerId(activeTab, '2.14')}>
           <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.14')} /></span>Date
@@ -2445,6 +2467,7 @@ const Stores: React.FC = () => {
       headerName: 'Event',
       flex: 0.8,
       minWidth: 100,
+      filter: 'agTextColumnFilter',
       headerComponent: () => (
         <span data-testid={getMarkerId(activeTab, '2.15')}>
           <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.15')} /></span>Event
@@ -2466,6 +2489,7 @@ const Stores: React.FC = () => {
       flex: 1.8,
       minWidth: 160,
       tooltipField: 'itemName',
+      filter: 'agTextColumnFilter',
       headerComponent: () => (
         <span data-testid={getMarkerId(activeTab, '2.16')}>
           <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.16')} /></span>Item Name
@@ -2478,6 +2502,7 @@ const Stores: React.FC = () => {
       headerName: 'Part Code',
       flex: 0.9,
       minWidth: 100,
+      filter: 'agTextColumnFilter',
       headerComponent: () => (
         <span data-testid={getMarkerId(activeTab, '2.17')}>
           <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.17')} /></span>Part Code
@@ -2490,6 +2515,7 @@ const Stores: React.FC = () => {
       headerName: 'UOM',
       flex: 0.6,
       minWidth: 70,
+      filter: 'agTextColumnFilter',
       headerComponent: () => (
         <span data-testid={getMarkerId(activeTab, '2.18')}>
           <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.18')} /></span>UOM
@@ -2503,6 +2529,7 @@ const Stores: React.FC = () => {
       flex: 0.8,
       minWidth: 90,
       filter: 'agNumberColumnFilter',
+      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
       headerComponent: () => (
         <span data-testid={getMarkerId(activeTab, '2.19')}>
           <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.19')} /></span>Qty Change
@@ -2511,7 +2538,7 @@ const Stores: React.FC = () => {
       cellRenderer: (params: ICellRendererParams) => {
         const item = params.data as StoresHistoryItem;
         return (
-          <span className={item.qtyChange > 0 ? 'text-green-600' : 'text-orange-600'}>
+          <span className={`font-semibold ${item.qtyChange < 0 ? 'text-red-600' : 'text-green-600'}`}>
             {item.qtyChange > 0 ? '+' : ''}{item.qtyChange}
           </span>
         );
@@ -2523,6 +2550,7 @@ const Stores: React.FC = () => {
       flex: 0.8,
       minWidth: 90,
       filter: 'agNumberColumnFilter',
+      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
       headerComponent: () => (
         <span data-testid={getMarkerId(activeTab, '2.20')}>
           <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.20')} /></span>ROB After
@@ -2535,6 +2563,7 @@ const Stores: React.FC = () => {
       headerName: 'Place',
       flex: 0.9,
       minWidth: 100,
+      filter: 'agTextColumnFilter',
       headerComponent: () => (
         <span data-testid={getMarkerId(activeTab, '2.21')}>
           <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.21')} /></span>Place
@@ -2547,6 +2576,7 @@ const Stores: React.FC = () => {
       headerName: 'User',
       flex: 0.9,
       minWidth: 100,
+      filter: 'agTextColumnFilter',
       headerComponent: () => (
         <span data-testid={getMarkerId(activeTab, '2.22')}>
           <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.22')} /></span>User
@@ -2559,8 +2589,7 @@ const Stores: React.FC = () => {
       colId: 'remarks',
       flex: 1.2,
       minWidth: 130,
-      sortable: false,
-      filter: false,
+      filter: 'agTextColumnFilter',
       headerComponent: () => (
         <span data-testid={getMarkerId(activeTab, '2.23')}>
           <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.23')} /></span>Remarks

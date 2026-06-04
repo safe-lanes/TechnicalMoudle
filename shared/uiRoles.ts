@@ -14,7 +14,7 @@ export const VISIBLE_UI_ROLES: UIRole[] = [
 export const UI_ROLE_LABELS: Record<UIRole, string> = {
   Sail_Admin: "Sail Admin",
   Client_Admin: "Client Admin",
-  Tech_Superintendent: "Technical Superintendent",
+  Tech_Superintendent: "Superintendent",
   Head_of_Dept: "Head of Dept",
   Vessel: "Vessel",
   External: "External",

@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet, BarChart3, AlertTriangle, CheckCircle2, Clock, ExternalLink, RefreshCw, ChevronDown } from "lucide-react";
+import { getWoStatusBadgeColor } from "@/components/wo/woCellRenderers";
 import RHTimelineViewer from "@/components/pms/RHTimelineViewer";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
@@ -3730,11 +3731,28 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <Marker id="WOF1" />
                   {isNewJobCreation ? 'Job Form' : (isUnplannedCreate || isExistingDraftUnplanned) ? 'Work Order Form — Unplanned' : 'Work Order Form'}
                 </h1>
-                {!isNewJobCreation && workOrderNo && (
-                  <span className="text-sm text-blue-600 font-medium" data-testid="WOF-wo-number">
-                    {workOrderNo}
-                  </span>
-                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {!isNewJobCreation && workOrderNo && (
+                    <span className="text-sm text-blue-600 font-medium" data-testid="WOF-wo-number">
+                      {workOrderNo}
+                    </span>
+                  )}
+                  {(() => {
+                    const isReturnedForCorrection =
+                      currentWorkOrderStatus === 'Reopened' &&
+                      (workOrderContext as any)?.workOrder?.wasRejected === true &&
+                      !!(workOrderContext as any)?.workOrder?.reviewerComments;
+                    if (!isReturnedForCorrection) return null;
+                    return (
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getWoStatusBadgeColor('returned for correction')}`}
+                        data-testid="badge-returned-for-correction"
+                      >
+                        Returned for Correction
+                      </span>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-3">

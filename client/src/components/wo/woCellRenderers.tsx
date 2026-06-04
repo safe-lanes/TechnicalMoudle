@@ -34,6 +34,8 @@ export const getWoStatusBadgeColor = (status: string): string => {
       return "bg-red-100 text-red-800";
     case "reopened":
       return "bg-amber-100 text-amber-800";
+    case "returned for correction":
+      return "bg-amber-600 text-white";
     case "draft":
       return "bg-gray-100 text-gray-800";
     default:
