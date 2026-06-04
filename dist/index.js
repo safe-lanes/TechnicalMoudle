@@ -12158,6 +12158,7 @@ function computeWorkOrderStatus(input) {
     isExecution,
     status,
     completionDateTime,
+    wasRejected,
     maintenanceBasis,
     vesselGraceSettings,
     rhLeadTimeHours,
@@ -12172,7 +12173,7 @@ function computeWorkOrderStatus(input) {
   if (isExecution) {
     if (status === "Pending Approval") return "Pending Approval";
     if (status === "Rejected") return "Rejected";
-    if (status === "Reopened") {
+    if (status === "Reopened" || wasRejected) {
     } else if (completionDateTime) {
       return "Completed";
     } else {
@@ -12186,7 +12187,7 @@ function computeWorkOrderStatus(input) {
   if (status === "Postponement Approved") return "Postponement Approved";
   if (status === "Postponement Rejected") return "Postponement Rejected";
   if (status === "Rejected") return "Rejected";
-  if (status !== "Reopened" && completionDateTime) {
+  if (status !== "Reopened" && !wasRejected && completionDateTime) {
     return "Completed";
   }
   if (maintenanceBasis === "Dual Frequency") {
@@ -19843,6 +19844,7 @@ var init_workOrderStatusRecalculator = __esm({
               isExecution: wo.isExecution,
               status: wo.status,
               completionDateTime: wo.dateCompleted,
+              wasRejected: wo.wasRejected ?? false,
               maintenanceBasis: wo.maintenanceBasis || void 0,
               vesselGraceSettings,
               rhLeadTimeHours,
@@ -22623,7 +22625,9 @@ async function resolveHodForDepartment(vesselId, department, storedApprover) {
     }
     return result;
   }
-  console.warn(`[HOD Resolution] No HOD found in org chart for department "${dept}" (vessel: ${vesselId || "none"}), using fallback`);
+  if (process.env.DEBUG_HOD === "true") {
+    console.warn(`[HOD Resolution] No HOD found in org chart for department "${dept}" (vessel: ${vesselId || "none"}), using fallback`);
+  }
   return buildFallback(dept, storedApprover);
 }
 function buildFallback(department, storedApprover) {
@@ -27908,10 +27912,16 @@ function getDisplayStatus(wo) {
     if (wo.status === "Pending Approval") return "Pending Approval";
     if (wo.status === "Pending Office Review") return "Awaiting Level 2 Review";
     if (wo.status === "Draft") return "Draft";
+    if (wo.status === "Reopened" && wo.wasRejected === true && !!wo.reviewerComments) {
+      return "Returned for Correction";
+    }
     return wo.status || "Active";
   }
   const es = getEffectiveStatus(wo);
   if (es === "Pending Office Review") return "Awaiting Level 2 Review";
+  if (es === "Reopened" && wo.wasRejected === true && !!wo.reviewerComments) {
+    return "Returned for Correction";
+  }
   return es;
 }
 function matchesTab(wo, activeTab) {
@@ -28396,6 +28406,7 @@ async function listWorkOrders(vesselId, vesselIds) {
       isExecution: wo.isExecution,
       status: wo.status,
       completionDateTime: wo.dateCompleted,
+      wasRejected: wo.wasRejected ?? false,
       maintenanceBasis: wo.maintenanceBasis || job?.maintenanceBasis || void 0,
       vesselGraceSettings,
       rhLeadTimeHours,
@@ -28592,6 +28603,7 @@ async function getWorkOrder(id) {
       isExecution: workOrder.isExecution,
       status: workOrder.status,
       completionDateTime: workOrder.dateCompleted,
+      wasRejected: workOrder.wasRejected ?? false,
       maintenanceBasis: workOrder.maintenanceBasis || job?.maintenanceBasis || void 0,
       vesselGraceSettings,
       rhLeadTimeHours,
@@ -31619,7 +31631,7 @@ async function reviewerReopen(workOrderId, reviewerComments, reviewedByUuid) {
     throw new ValidationError(`Work order is not pending office review (status: ${existingWO2.status})`);
   }
   const updateData = {
-    status: "Due",
+    status: "Reopened",
     approvalAction: "rejected",
     wasRejected: true,
     reviewerComments: reviewerComments || null,
@@ -31628,6 +31640,11 @@ async function reviewerReopen(workOrderId, reviewerComments, reviewedByUuid) {
     rejectionComments: reviewerComments || null
     // Intentionally preserve completionDateTime and dateCompleted so the vessel
     // form loads pre-populated and hasCompletionData evaluates true on resubmit.
+    // wasRejected=true (set above) is the permanent guard in computeWorkOrderStatus:
+    // it prevents the status engine from returning 'Completed' for this WO on any
+    // recalculation cycle, regardless of completionDateTime being present.
+    // status='Reopened' provides the initial guard for cycle 1; wasRejected covers
+    // all subsequent cycles after the recalculator transitions Reopened → Due.
   };
   await update5(workOrderId, updateData);
   try {
@@ -31649,7 +31666,7 @@ async function reviewerReopen(workOrderId, reviewerComments, reviewedByUuid) {
       newValue: null,
       payload: {
         workOrderNo: existingWO2.workOrderNo,
-        status: "Due",
+        status: "Reopened",
         reopenedAt: (/* @__PURE__ */ new Date()).toISOString(),
         reviewerComments: reviewerComments || null
       }
@@ -68567,7 +68584,7 @@ async function registerRoutes(app2) {
               if (oldFormatMatch) parentJobNo = oldFormatMatch[1];
             }
             if (parentJobNo && !parentJob) {
-              const allJobs = await storage.getJobsByVessel(woAny.vesselId);
+              const allJobs = await storage.getJobs(woAny.vesselId);
               parentJob = allJobs.find((j) => j.jobNo === parentJobNo) || null;
             }
           }
@@ -71825,6 +71842,11 @@ async function createDatabaseBackup() {
     const backupDir = path12.join(process.cwd(), "backup");
     if (!fs9.existsSync(backupDir)) {
       fs9.mkdirSync(backupDir, { recursive: true });
+    }
+    const recentBackupMs = fs9.readdirSync(backupDir).filter((f) => f.startsWith("backup_") && f.endsWith(".sql")).map((f) => fs9.statSync(path12.join(backupDir, f)).mtime.getTime());
+    if (recentBackupMs.length > 0 && Date.now() - Math.max(...recentBackupMs) < 24 * 60 * 60 * 1e3) {
+      console.log("\u23ED\uFE0F  Skipping startup backup \u2014 recent backup exists (<24h old)");
+      return null;
     }
     const timestamp4 = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
     const backupFile = path12.join(backupDir, `backup_${timestamp4}.sql`);
