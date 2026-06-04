@@ -46,7 +46,8 @@ function getRhLeadHours(job: Job, settings: PmsVesselSettings | null | undefined
  */
 
 export class JobDueScannerService {
-  private isRunning = false;
+  private isRunning = false;        // guards double-start() of the scheduler
+  private runInProgress = false;    // guards re-entrant ticks (a run still in progress)
   private intervalId: NodeJS.Timeout | null = null;
   private scanIntervalMs = 1 * 60 * 1000; // 1 minute
 
@@ -105,6 +106,21 @@ export class JobDueScannerService {
     dualJobsChecked: number;
     dualWOsGenerated: number;
   }> {
+    // Re-entrancy guard: if the previous scan is still running, skip this tick
+    // rather than stacking concurrent runs (which compounds heap + blocks the event loop).
+    if (this.runInProgress) {
+      console.log('[JobDueScanner] Previous scan still running — skipping this tick');
+      return {
+        calendarJobsChecked: 0,
+        calendarWOsGenerated: 0,
+        rhJobsChecked: 0,
+        rhWOsGenerated: 0,
+        dualJobsChecked: 0,
+        dualWOsGenerated: 0
+      };
+    }
+    this.runInProgress = true;
+
     console.log('[JobDueScanner] Starting job due scan...');
 
     const results = {
@@ -136,6 +152,8 @@ export class JobDueScannerService {
     } catch (error) {
       console.error('[JobDueScanner] Scan failed:', error);
       throw error;
+    } finally {
+      this.runInProgress = false;
     }
 
     return results;
