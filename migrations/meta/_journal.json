@@ -428,6 +428,20 @@
       "when": 1780315301625,
       "tag": "0060_cold_blindfold",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1780468412811,
+      "tag": "0061_real_madrox",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1780484810966,
+      "tag": "0062_rapid_goliath",
+      "breakpoints": true
     }
   ]
 }

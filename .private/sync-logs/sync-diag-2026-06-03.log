@@ -18,3 +18,5 @@
 [2026-06-03T07:00:47.674Z] [SyncDiag] FIELD-LOGGER: defects row=829b6171-535b-4763-b725-aa59f6ed9fb9 — 3 fields changed, isInsert=false, vesselId=7c08b51c-4345-4681-9d98-ec8ae142ac67, instanceId=SHORE-PROD
 [2026-06-03T07:00:54.942Z] [SyncDiag] FIELD-LOGGER: defects row=829b6171-535b-4763-b725-aa59f6ed9fb9 — 1 fields changed, isInsert=false, vesselId=7c08b51c-4345-4681-9d98-ec8ae142ac67, instanceId=SHORE-PROD
 [2026-06-03T07:01:19.978Z] [SyncDiag] FIELD-LOGGER: defects row=829b6171-535b-4763-b725-aa59f6ed9fb9 — 1 fields changed, isInsert=false, vesselId=7c08b51c-4345-4681-9d98-ec8ae142ac67, instanceId=SHORE-PROD
+[2026-06-03T11:31:23.639Z] [SyncDiag] FIELD-LOGGER: vessel_certificate_data row=a69cc606-6487-439c-9962-1dcfaa514dba — 7 fields changed, isInsert=true, vesselId=cd03135a-f38a-40de-b7d6-27ba85b633dc, instanceId=SHORE-PROD
+[2026-06-03T11:34:35.039Z] [SyncDiag] FIELD-LOGGER: defects row=27adb947-1846-4493-984a-17c050b2906f — 2 fields changed, isInsert=false, vesselId=13421138-e990-45d9-ab09-94f01faeebe2, instanceId=SHORE-PROD
