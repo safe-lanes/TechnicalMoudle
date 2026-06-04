@@ -2383,8 +2383,7 @@ const Stores: React.FC = () => {
         colId: 'locRob',
         flex: 0.8,
         minWidth: 90,
-        sortable: false,
-        filter: false,
+        filter: 'agNumberColumnFilter',
         headerComponent: () => <span data-testid="stores-loc-col-loc-rob">Loc ROB</span>,
         cellRenderer: (params: ICellRendererParams) => {
           const item = params.data as StoreItem & { _side: 'A' | 'B'; _locRob: number; _editKey: string };
@@ -2590,8 +2589,7 @@ const Stores: React.FC = () => {
       colId: 'remarks',
       flex: 1.2,
       minWidth: 130,
-      sortable: false,
-      filter: false,
+      filter: 'agTextColumnFilter',
       headerComponent: () => (
         <span data-testid={getMarkerId(activeTab, '2.23')}>
           <span className="sr-only"><Marker id={getMarkerId(activeTab, '2.23')} /></span>Remarks
