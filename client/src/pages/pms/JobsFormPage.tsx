@@ -1215,8 +1215,8 @@ const JobsFormPage: React.FC = () => {
                     isModifyMode={isModifyMode}
                     isEditMode={isEditMode}
                     type="select"
-                    options={ensureRankInOptions(rankOptions, templateData.level2ReviewerRankId)}
-                    displayValue={getRankLabel(rankOptions, templateData.level2ReviewerRankId) || '— None —'}
+                    options={ensureRankInOptions([{ value: 'Office', label: 'Office' }], templateData.level2ReviewerRankId)}
+                    displayValue={getRankLabel([{ value: 'Office', label: 'Office' }], templateData.level2ReviewerRankId) || templateData.level2ReviewerRankId || '— None —'}
                     labelMarker="JF.A1.L2R.1"
                     valueMarker="JF.A1.L2R.2"
                   />
