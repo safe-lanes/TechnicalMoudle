@@ -4,3 +4,4 @@ vite.config.ts.*
 *.tar.gz
 backup
 uploads
+package-lock

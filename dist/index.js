@@ -10810,6 +10810,7 @@ var init_autoSyncScheduler = __esm({
           });
         }, this.tickIntervalMs);
         this.isRunning = true;
+        console.log(`[AutoSync] Scheduler started \u2014 will run every ${Math.round(this.tickIntervalMs / 6e4)} minutes`);
       }
       /**
        * Resolve the startup tick cadence (ms). Precedence:
@@ -10821,11 +10822,13 @@ var init_autoSyncScheduler = __esm({
       async resolveIntervalMs(argMs) {
         try {
           const settings = await getAllSettings();
-          const minutes = parseInt(settings["sync_interval_minutes"] || "0", 10);
+          const raw = settings["sync_interval_minutes"];
+          const minutes = parseInt(raw || "0", 10);
           if (Number.isFinite(minutes) && minutes > 0) {
-            console.log(`[AutoSync] Using sync_interval_minutes=${minutes} from sync_settings`);
+            console.log(`[AutoSync] Using interval from DB: ${minutes} minutes`);
             return minutes * 60 * 1e3;
           }
+          console.log(`[AutoSync] DB sync_interval_minutes invalid ("${raw ?? "null"}") \u2014 falling back to default ${DEFAULT_INTERVAL_MINUTES} minutes`);
         } catch (err) {
           console.warn("[AutoSync] Could not read sync_interval_minutes at startup \u2014 falling back:", err?.message || err);
         }
@@ -11479,6 +11482,14 @@ async function updateSettingsHandler(req, res) {
     const { settings } = req.body;
     if (!settings || typeof settings !== "object") {
       return res.status(400).json({ error: "settings object is required" });
+    }
+    const SCHEDULER_ONLY_KEYS = ["auto_sync_enabled", "sync_interval_minutes"];
+    if (!await isShipInstance()) {
+      const stripped = SCHEDULER_ONLY_KEYS.filter((k) => k in settings);
+      if (stripped.length > 0) {
+        for (const k of stripped) delete settings[k];
+        console.log(`[Sync Settings] Ignoring scheduler-only keys on shore: ${stripped.join(", ")}`);
+      }
     }
     let newIntervalMinutes = null;
     if (settings.sync_interval_minutes !== void 0) {
@@ -29875,6 +29886,11 @@ async function submitPostponeRequest(id, body) {
     postponementApprovalDate: null,
     postponementApprovalRemarks: null
   });
+  try {
+    await logFieldChanges("work_orders", wo.wouuid, wo.vesselId || null, wo, updatedWO, body.userId || body.performedBy || "system");
+  } catch (err) {
+    console.error("[FieldLogger] WO postpone-request:", err);
+  }
   const prevMax = await getMaxPostponementNumber(wo.wouuid);
   await createPostponement({
     id: crypto.randomUUID(),
@@ -29916,6 +29932,11 @@ async function approvePostponement(id, body) {
     postponementApprovalDate: today,
     postponementApprovalRemarks: body.approvalRemarks || null
   });
+  try {
+    await logFieldChanges("work_orders", wo.wouuid, wo.vesselId || null, wo, updatedWO, body.approvedBy || body.userId || "system");
+  } catch (err) {
+    console.error("[FieldLogger] WO postpone-approve:", err);
+  }
   const existingRows = await findPostponementsByWorkOrderId(wo.wouuid);
   const prevMaxApprove = existingRows?.length ? existingRows.reduce(
     (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
@@ -29979,6 +30000,11 @@ async function rejectPostponement(id, body) {
     postponementApprovalDate: today,
     postponementApprovalRemarks: body.approvalRemarks || null
   });
+  try {
+    await logFieldChanges("work_orders", wo.wouuid, wo.vesselId || null, wo, updatedWO, body.approvedBy || body.userId || "system");
+  } catch (err) {
+    console.error("[FieldLogger] WO postpone-reject:", err);
+  }
   const rejectRows = await findPostponementsByWorkOrderId(wo.wouuid);
   const prevMaxReject = rejectRows?.length ? rejectRows.reduce(
     (a, b) => (b.postponementNumber || 1) > (a.postponementNumber || 1) ? b : a
