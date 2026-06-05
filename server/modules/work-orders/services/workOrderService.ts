@@ -2288,6 +2288,13 @@ export async function submitPostponeRequest(id: string, body: any) {
     postponementApprovalRemarks: null,
   });
 
+  // Sync field logging — log the work_orders UPDATE so the postpone request reaches
+  // the office (status → 'Awaiting Office Approval' + postpone columns). storage.updateWorkOrder
+  // does NOT field-log; the work_order_postponements INSERT below is logged in the storage layer.
+  try {
+    await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updatedWO, body.userId || body.performedBy || 'system');
+  } catch (err) { console.error('[FieldLogger] WO postpone-request:', err); }
+
   // Create a new postponement audit row
   const prevMax = await repo.getMaxPostponementNumber(wo.wouuid);
   await repo.createPostponement({
@@ -2346,6 +2353,11 @@ export async function approvePostponement(id: string, body: any) {
     postponementApprovalDate: today,
     postponementApprovalRemarks: body.approvalRemarks || null,
   });
+
+  // Sync field logging — log the work_orders UPDATE so the office's approval reaches the vessel.
+  try {
+    await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updatedWO, body.approvedBy || body.userId || 'system');
+  } catch (err) { console.error('[FieldLogger] WO postpone-approve:', err); }
 
   // Insert a new immutable decision audit row (approve)
   const existingRows = await repo.findPostponementsByWorkOrderId(wo.wouuid);
@@ -2428,6 +2440,11 @@ export async function rejectPostponement(id: string, body: any) {
     postponementApprovalDate: today,
     postponementApprovalRemarks: body.approvalRemarks || null,
   });
+
+  // Sync field logging — log the work_orders UPDATE so the office's rejection reaches the vessel.
+  try {
+    await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updatedWO, body.approvedBy || body.userId || 'system');
+  } catch (err) { console.error('[FieldLogger] WO postpone-reject:', err); }
 
   // Insert a new immutable decision audit row (reject)
   const rejectRows = await repo.findPostponementsByWorkOrderId(wo.wouuid);
