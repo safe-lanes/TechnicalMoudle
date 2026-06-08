@@ -74,7 +74,7 @@ export async function findByCodeAndVessel(
   vesselId: string
 ): Promise<Component | undefined> {
   const results = await storage.getComponents(vesselId);
-  return results.find(c => c.componentCode === componentCode);
+  return results.find(c => c.componentCode === componentCode && c.isActive !== false);
 }
 
 export async function update(id: string, data: Partial<Component>): Promise<Component> {
