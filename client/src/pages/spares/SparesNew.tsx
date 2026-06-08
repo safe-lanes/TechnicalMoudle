@@ -345,14 +345,14 @@ const Spares: React.FC = () => {
     }));
   };
   
-  const handleSaveLocation = async (spareId: number) => {
+  const handleSaveLocation = async (spareId: number): Promise<boolean> => {
     const locations = editingLocations[spareId];
     const original = originalLocationValues[spareId];
-    if (!locations) return;
+    if (!locations) return false;
 
     // Find the spare to check current names
     const spare = (Array.isArray(sparesData) ? sparesData : []).find((s: Spare) => s.id === spareId);
-    if (!spare) return;
+    if (!spare) return false;
     
     const newRobA = parseInt(locations.locationA) || 0;
     const newRobB = parseInt(locations.locationB) || 0;
@@ -361,6 +361,35 @@ const Spares: React.FC = () => {
     
     const deltaA = newRobA - origRobA;
     const deltaB = newRobB - origRobB;
+
+    // Validate: if ROB is changing, a real vessel location must be selected
+    const validLocationNames = new Set(allVesselLocations.map((l: any) => l.locationName));
+
+    if (deltaA !== 0) {
+      const nameA = locations.nameA ?? '';
+      const isPlaceholder = !nameA || nameA === 'Location A';
+      if (isPlaceholder || !validLocationNames.has(nameA)) {
+        toast({
+          title: "Location Required",
+          description: "Please select a valid Location A before updating ROB. If it does not exist, create a new location first.",
+          variant: "destructive"
+        });
+        return false;
+      }
+    }
+
+    if (deltaB !== 0) {
+      const nameB = locations.nameB ?? '';
+      const isPlaceholder = !nameB || nameB === 'Location B';
+      if (isPlaceholder || !validLocationNames.has(nameB)) {
+        toast({
+          title: "Location Required",
+          description: "Please select a valid Location B before updating ROB. If it does not exist, create a new location first.",
+          variant: "destructive"
+        });
+        return false;
+      }
+    }
     
     const errors: string[] = [];
     let successCount = 0;
@@ -456,6 +485,7 @@ const Spares: React.FC = () => {
       // All attempts failed
       toast({ title: "Error", description: errors.join('; '), variant: "destructive" });
     }
+    return true;
   };
 
   const [isSavingLocRob, setIsSavingLocRob] = useState(false);
@@ -6189,10 +6219,12 @@ const Spares: React.FC = () => {
                 <Button
                   className="bg-[#52baf3] hover:bg-[#3da8e0] text-white"
                   disabled={!canEditSpare}
-                  onClick={() => {
-                    handleSaveLocation(locationDialogSpare.id);
-                    setLocationDialogSpare(null);
-                    setOpenLocationDropdown(null);
+                  onClick={async () => {
+                    const saved = await handleSaveLocation(locationDialogSpare.id);
+                    if (saved) {
+                      setLocationDialogSpare(null);
+                      setOpenLocationDropdown(null);
+                    }
                   }}
                   data-testid="button-dialog-save"
                 >
