@@ -191,13 +191,18 @@ export async function findMaintenanceHistoryByVessel(vesselId: string) {
 
 export async function updateSortOrder(updates: { id: string; sortOrder: number }[]) {
   const { pool } = getPostgresClient();
+  let totalUpdated = 0;
   for (const update of updates) {
-    await pool.query(
-      `UPDATE components SET sort_order = $1, updated_at = NOW() WHERE id = $2`,
+    const result = await pool.query(
+      `UPDATE components SET sort_order = $1, updated_at = NOW() WHERE cuuid = $2`,
       [update.sortOrder, update.id]
     );
+    totalUpdated += result.rowCount ?? 0;
   }
-  return { success: true, updated: updates.length };
+  if (updates.length > 0 && totalUpdated === 0) {
+    throw new Error(`Sort order update matched 0 rows — component IDs may be invalid`);
+  }
+  return { success: true, updated: totalUpdated };
 }
 
 export async function updateHierarchyAndSortOrder(
@@ -211,7 +216,7 @@ export async function updateHierarchyAndSortOrder(
 
     for (const rp of reparents) {
       const componentResult = await client.query(
-        `SELECT component_code FROM components WHERE id = $1`,
+        `SELECT component_code FROM components WHERE cuuid = $1`,
         [rp.id]
       );
       if (componentResult.rows.length === 0) {
@@ -228,21 +233,24 @@ export async function updateHierarchyAndSortOrder(
         if (visited.has(checkParent)) break;
         visited.add(checkParent);
         const parentResult = await client.query(
-          `SELECT parent_id FROM components WHERE component_code = $1 AND vessel_id = (SELECT vessel_id FROM components WHERE id = $2)`,
+          `SELECT parent_id FROM components WHERE component_code = $1 AND vessel_id = (SELECT vessel_id FROM components WHERE cuuid = $2)`,
           [checkParent, rp.id]
         );
         checkParent = parentResult.rows[0]?.parent_id || null;
       }
 
-      await client.query(
-        `UPDATE components SET parent_id = $1, parent_component = $1, updated_at = NOW() WHERE id = $2`,
+      const reparentResult = await client.query(
+        `UPDATE components SET parent_id = $1, parent_component = $1, updated_at = NOW() WHERE cuuid = $2`,
         [rp.newParentCode, rp.id]
       );
+      if ((reparentResult.rowCount ?? 0) === 0) {
+        throw new Error(`Reparent update matched 0 rows for component cuuid: ${rp.id}`);
+      }
     }
 
     for (const update of sortUpdates) {
       await client.query(
-        `UPDATE components SET sort_order = $1, updated_at = NOW() WHERE id = $2`,
+        `UPDATE components SET sort_order = $1, updated_at = NOW() WHERE cuuid = $2`,
         [update.sortOrder, update.id]
       );
     }
