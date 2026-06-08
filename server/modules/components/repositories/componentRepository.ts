@@ -69,6 +69,14 @@ export async function create(data: InsertComponent): Promise<Component> {
   return storage.createComponent(data);
 }
 
+export async function findByCodeAndVessel(
+  componentCode: string,
+  vesselId: string
+): Promise<Component | undefined> {
+  const results = await storage.getComponents(vesselId);
+  return results.find(c => c.componentCode === componentCode);
+}
+
 export async function update(id: string, data: Partial<Component>): Promise<Component> {
   return storage.updateComponent(id, data);
 }

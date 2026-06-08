@@ -64,6 +64,9 @@ export async function create(req: Request, res: Response) {
     if (error instanceof ValidationError) {
       return res.status(400).json({ error: error.message });
     }
+    if (error.code === '23505' && (error.detail?.includes('component_code') || error.constraint?.includes('component_code'))) {
+      return res.status(400).json({ error: 'Component Code already exists for this vessel. Please use a unique code.' });
+    }
     throw error;
   }
 }
