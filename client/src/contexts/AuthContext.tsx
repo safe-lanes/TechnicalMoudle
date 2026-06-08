@@ -363,8 +363,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // userProfile (encrypted preferred, plain fallback), so re-read it here
     // rather than relying solely on the initial mount hydration.
     let loginMyVessels: MyVesselAssignment[] = [];
-    const encLoginProfile =
-      secureGetItem<Record<string, any>>("userProfile");
+    const encLoginProfile = secureGetItem<Record<string, any>>("userProfile");
     if (encLoginProfile) {
       loginMyVessels = normalizeMyVessels(encLoginProfile);
     } else {
