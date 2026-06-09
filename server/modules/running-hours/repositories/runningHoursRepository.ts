@@ -1,7 +1,7 @@
 import { storage } from '../../../storage';
 import { getDb } from '../../../db';
 import { runningHoursAudit } from '@shared/schema';
-import { desc, asc, eq, and, gte, lte, or, ilike, sql } from 'drizzle-orm';
+import { desc, asc, eq, and, gte, lte, or, ilike, sql, inArray } from 'drizzle-orm';
 import type { InsertRunningHoursAudit, RunningHoursAudit, Component } from '@shared/schema';
 
 // ── Component Queries ──
@@ -36,6 +36,109 @@ export async function getRunningHoursAtDate(componentId: string, targetDate: Dat
 
 export async function getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]> {
   return storage.getRunningHoursAudits(componentId, limit);
+}
+
+// ── Batched RH lookups (avoid per-component N+1 in listParents) ──
+
+export interface RHAtDate {
+  runningHours: number;
+  enteredAtUTC: Date;
+  isFallback: boolean;
+}
+
+// Mirrors storage.getRunningHoursAtDate (latest entry at/before target, else
+// earliest entry after target as fallback) but resolves ALL components in one
+// or two round-trips instead of one query per component. Keys are cuuids.
+export async function getRunningHoursAtDateBatch(
+  componentIds: string[],
+  targetDate: Date
+): Promise<Map<string, RHAtDate>> {
+  const result = new Map<string, RHAtDate>();
+  if (componentIds.length === 0) return result;
+  const db = await getDb();
+
+  // NOTE: use [0-9] not \d — inside a JS sql`` template literal, "\d" is cooked to
+  // "d", producing a regex that never matches ISO dates and crashes TO_TIMESTAMP on
+  // the DD-Mon-YYYY branch ("invalid value ... for Mon"). [0-9] survives intact.
+  const parsedDateExpr = sql`CASE 
+    WHEN ${runningHoursAudit.dateUpdatedLocal} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' 
+      THEN TO_TIMESTAMP(${runningHoursAudit.dateUpdatedLocal}, 'YYYY-MM-DD')
+    ELSE TO_TIMESTAMP(REPLACE(${runningHoursAudit.dateUpdatedLocal}, ' ', '-'), 'DD-Mon-YYYY-HH24:MI')
+  END`;
+
+  // Primary: latest entry at or before targetDate, one row per component.
+  const primary = await db
+    .selectDistinctOn([runningHoursAudit.componentId], {
+      componentId: runningHoursAudit.componentId,
+      runningHours: runningHoursAudit.cumulativeRH,
+      enteredAtUTC: runningHoursAudit.enteredAtUTC,
+    })
+    .from(runningHoursAudit)
+    .where(and(
+      inArray(runningHoursAudit.componentId, componentIds),
+      sql`${parsedDateExpr} <= ${targetDate}`
+    ))
+    .orderBy(runningHoursAudit.componentId, sql`${parsedDateExpr} DESC`);
+
+  for (const row of primary) {
+    result.set(row.componentId, {
+      runningHours: parseFloat(row.runningHours || '0'),
+      enteredAtUTC: row.enteredAtUTC,
+      isFallback: false,
+    });
+  }
+
+  // Fallback: earliest entry after targetDate, only for components with no primary hit.
+  const missing = componentIds.filter((id) => !result.has(id));
+  if (missing.length > 0) {
+    const fallback = await db
+      .selectDistinctOn([runningHoursAudit.componentId], {
+        componentId: runningHoursAudit.componentId,
+        runningHours: runningHoursAudit.cumulativeRH,
+        enteredAtUTC: runningHoursAudit.enteredAtUTC,
+      })
+      .from(runningHoursAudit)
+      .where(and(
+        inArray(runningHoursAudit.componentId, missing),
+        sql`${parsedDateExpr} > ${targetDate}`
+      ))
+      .orderBy(runningHoursAudit.componentId, sql`${parsedDateExpr} ASC`);
+
+    for (const row of fallback) {
+      result.set(row.componentId, {
+        runningHours: parseFloat(row.runningHours || '0'),
+        enteredAtUTC: row.enteredAtUTC,
+        isFallback: true,
+      });
+    }
+  }
+
+  return result;
+}
+
+// Latest audit userId per component (mirrors storage.getRunningHoursAudits(id, 1)
+// reading audits[0].userId) in a single round-trip. Keys are cuuids.
+export async function getLatestAuditUserBatch(
+  componentIds: string[]
+): Promise<Map<string, string | null>> {
+  const result = new Map<string, string | null>();
+  if (componentIds.length === 0) return result;
+  const db = await getDb();
+
+  const rows = await db
+    .selectDistinctOn([runningHoursAudit.componentId], {
+      componentId: runningHoursAudit.componentId,
+      userId: runningHoursAudit.userId,
+    })
+    .from(runningHoursAudit)
+    .where(inArray(runningHoursAudit.componentId, componentIds))
+    .orderBy(runningHoursAudit.componentId, desc(runningHoursAudit.enteredAtUTC));
+
+  for (const row of rows) {
+    result.set(row.componentId, row.userId || null);
+  }
+
+  return result;
 }
 
 export async function createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit> {

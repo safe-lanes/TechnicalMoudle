@@ -164,19 +164,39 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
   }
   const totalPeriodHours = periodDays * 24;
 
-  const parentsWithCounts = await Promise.all(
-    masterComponents.map(async (component) => {
+  // Inherited components are already loaded in `allComponents`; count them in-memory
+  // per master (mirrors storage.getInheritedComponents matching) instead of issuing
+  // one query per master. This removes the dominant N+1 fan-out.
+  const inheritedActive = allComponents.filter(
+    (c: any) => c.rhCounterType === 'INHERITED' && c.isActive !== false
+  );
+
+  // Batch the audit lookups across ALL masters in one/two round-trips each, instead
+  // of getRunningHoursAtDate + getRunningHoursAudits per master.
+  const masterIds = masterComponents.map((m) => m.cuuid);
+  const startEntries = await repo.getRunningHoursAtDateBatch(masterIds, periodStartDate);
+  const endEntries = periodEndDate ? await repo.getRunningHoursAtDateBatch(masterIds, periodEndDate) : null;
+  const lastUpdatedByMap = await repo.getLatestAuditUserBatch(masterIds);
+
+  const parentsWithCounts = masterComponents.map((component) => {
       // Under 'all'/'my' aggregate, vesselId is 'all' — scope inherited lookup to the
       // master's own vessel so the per-vessel isolation safeguard still resolves.
-      const allInheritedComponents = await repo.getInheritedComponents(component.cuuid, component.vesselId ?? vesselId);
-      const inheritedComponents = allInheritedComponents.filter((c: any) => c.isActive !== false);
+      const effectiveVesselId = component.vesselId ?? vesselId;
+      const inheritedCount = inheritedActive.filter((c: any) =>
+        c.vesselId === effectiveVesselId && (
+          c.rhMasterComponentId === component.id ||
+          c.rhMasterComponentId === component.componentCode ||
+          c.rhMasterComponentId === component.cuuid ||
+          c.rhCounterSource === component.componentCode
+        )
+      ).length;
 
       const meterReplacedLastRh = parseFloat(component.meterReplacedLastRh || '0');
-      const currentMeterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
+      const currentMeterRH = parseFloat(component.rhCurrentMaster || (component as any).currentCumulativeRH || '0');
       const totalCumulativeRH = meterReplacedLastRh + currentMeterRH;
 
-      const historicalEntry = await repo.getRunningHoursAtDate(component.cuuid, periodStartDate);
-      const endEntry = periodEndDate ? await repo.getRunningHoursAtDate(component.cuuid, periodEndDate) : null;
+      const historicalEntry = startEntries.get(component.cuuid) || null;
+      const endEntry = endEntries ? (endEntries.get(component.cuuid) || null) : null;
 
       let utilizationRate = 0;
       let periodRunningHours = 0;
@@ -221,8 +241,7 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
         ? Math.round((periodRunningHours / periodDays) * 10) / 10
         : 0;
 
-      const latestAudits = await repo.getRunningHoursAudits(component.cuuid, 1);
-      const lastUpdatedBy = latestAudits.length > 0 ? (latestAudits[0].userId || null) : null;
+      const lastUpdatedBy = lastUpdatedByMap.get(component.cuuid) ?? null;
 
       return {
         ...component,
@@ -232,7 +251,7 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
         currentMeterRH: currentMeterRH.toFixed(2),
         meterReplacedLastRh: meterReplacedLastRh > 0 ? meterReplacedLastRh.toFixed(2) : null,
         meterReplacedDate: component.meterReplacedDate || null,
-        inheritedCount: inheritedComponents.length,
+        inheritedCount,
         utilizationRate,
         periodRunningHours,
         lastUpdatedBy,
@@ -243,8 +262,7 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
         dataQualityWarning,
         averageDailyHours
       };
-    })
-  );
+  });
 
   parentsWithCounts.sort((a, b) => (a.componentCode || '').localeCompare(b.componentCode || ''));
 
