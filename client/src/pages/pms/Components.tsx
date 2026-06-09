@@ -1086,7 +1086,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   return (
     <>
       <div className="overflow-x-auto">
-        {(isSailAdmin || isExternal || isChangeMode || isChangeRequestMode) && isComponentActive !== false && (
+        {(isSailAdmin || isClientAdmin || isExternal || isChangeMode || isChangeRequestMode) && isComponentActive !== false && (
         <div className="flex justify-end mb-3">
           <Button
             onClick={handleAddWorkOrder}
