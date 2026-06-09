@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { calculateNextDueDate, normalizeDateToDDMMMYYYY, calculateMissedCycles, formatRelativeTime, formatRHWithSeparators } from "@shared/dateUtils";
 import {
   AlertDialog,
@@ -1380,6 +1380,39 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     fetchComponentActualRH();
   }, [(workOrderContext as any)?.component?.id]);
 
+  // Task #252: instant, client-side guard for RH-driven completions dated BEFORE the component's
+  // last running-hours update. Mirrors the authoritative server rule (validateRHEntry →
+  // INVALID_BACKDATED). To avoid false positives on legitimate backdating BETWEEN two existing
+  // historical entries, suppress when the server has resolved a real previous anchor on/before the
+  // completion date.
+  const rhBackdateError = useMemo<string | null>(() => {
+    if (!isRhDrivenCounter || !componentActualRHLastUpdated) return null;
+    const completionStr = executionData.completionDateTime
+      ? executionData.completionDateTime.split('T')[0]
+      : (executionData.dateOfCompletion || '');
+    if (!completionStr) return null;
+    const toUTCDay = (s: string) => {
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? NaN : Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    };
+    const completionMs = toUTCDay(completionStr);
+    const lastUpdatedMs = toUTCDay(componentActualRHLastUpdated);
+    if (isNaN(completionMs) || isNaN(lastUpdatedMs)) return null;
+    if (completionMs >= lastUpdatedMs) return null; // same-day or later is fine
+    // Backdated before the latest reading. Allow only if a real prior RH entry exists on/before the
+    // completion date (legitimate between-entries backdating, per the server timeline result).
+    const prev = rhValidation.previousEntry;
+    if (prev?.date) {
+      const prevMs = toUTCDay(prev.date);
+      if (!isNaN(prevMs) && prevMs <= completionMs) return null;
+    }
+    const fmt = (s: string) => {
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
+    };
+    return `Completion Date (${fmt(completionStr)}) is earlier than the component's last running-hours update (${fmt(componentActualRHLastUpdated)}). Running hours can only be recorded on or after the latest reading.`;
+  }, [isRhDrivenCounter, componentActualRHLastUpdated, executionData.completionDateTime, executionData.dateOfCompletion, rhValidation.previousEntry]);
+
   const handleExecutionChange = (field: string, value: string) => {
     setExecutionData(prev => {
       const newData = {
@@ -2591,6 +2624,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         // here is the server timeline result surfaced via rhValidation.status below.
       }
 
+      if (rhBackdateError && !isRejectedWO) {
+        hardErrors.push(rhBackdateError);
+      }
+
       if (rhValidation.status === 'invalid' && !isRejectedWO) {
         hardErrors.push(rhValidation.message || 'Running hours validation failed. Please correct the Current Reading value.');
       }
@@ -3221,6 +3258,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
       // Flat "exceeds component actual RH" ceiling removed (Task #245); timeline validation
       // (rhValidation.status below) is the sole RH gate for MASTER and INHERITED components.
+    }
+    if (rhBackdateError && !isRejectedWO) {
+      hardErrors.push(rhBackdateError);
     }
     if (rhValidation.status === 'invalid' && !isRejectedWO) {
       hardErrors.push(rhValidation.message || 'Running hours validation failed. Please correct the Current Reading value.');
@@ -5920,9 +5960,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </a>
                   </div>
                 )}
-                {rhValidation.status === 'invalid' && rhValidation.validationDetails?.validationStatus !== 'EXCEEDS_COMPONENT_RH' && (
+                {rhValidation.status === 'invalid' && rhValidation.validationDetails?.validationStatus !== 'EXCEEDS_COMPONENT_RH' && rhValidation.validationDetails?.validationStatus !== 'INVALID_BACKDATED' && (
                   <div className="text-xs text-red-600 flex items-center gap-1" data-testid="text-rh-invalid">
                     <X className="h-3 w-3" /> Invalid: {rhValidation.validRange ? (() => { const vr = rhValidation.validRange!; const prevR = executionData.previousReading ? Number(executionData.previousReading) : null; const displayMin = prevR !== null && !isNaN(prevR) && prevR < vr.min ? prevR : vr.min; const minStr = Number.isFinite(displayMin) ? displayMin.toLocaleString() : '0'; const maxStr = vr.max == null || !Number.isFinite(vr.max) ? '∞' : vr.max.toLocaleString(); return `Valid range: ${minStr} to ${maxStr} hours`; })() : rhValidation.message}
+                  </div>
+                )}
+                {(rhBackdateError || (rhValidation.status === 'invalid' && rhValidation.validationDetails?.validationStatus === 'INVALID_BACKDATED')) && (
+                  <div className="mt-2 p-3 bg-red-50 border border-red-300 rounded-md" data-testid="text-rh-backdated">
+                    <div className="flex items-center gap-1.5 text-sm font-semibold text-red-800 mb-1">
+                      <AlertTriangle className="h-4 w-4 text-red-600" /> Invalid Completion Date
+                    </div>
+                    <p className="text-xs text-red-700">
+                      {rhBackdateError || rhValidation.message}
+                    </p>
                   </div>
                 )}
                 {rhValidation.status === 'warning' && (

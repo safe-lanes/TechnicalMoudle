@@ -29,6 +29,15 @@ function getDaysBetweenCalendarDates(date1: Date, date2: Date): number {
   return Math.round((date2.getTime() - date1.getTime()) / msPerDay);
 }
 
+function formatDMY(dateStr: string): string {
+  if (!dateStr) return dateStr;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${day}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
+}
+
 export function validateRunningHoursIncrease(
   input: RHValidationInput
 ): RHValidationResult {
@@ -57,9 +66,26 @@ export function validateRunningHoursIncrease(
 
     daysSinceLastUpdate = getDaysBetweenCalendarDates(lastCalendarDate, newCalendarDate);
 
-    if (daysSinceLastUpdate <= 0) {
+    if (daysSinceLastUpdate < 0) {
+      // The new reading is dated BEFORE the component's last running-hours update. This is a
+      // backdated entry, NOT a same-day duplicate — recording running hours before the latest
+      // known reading corrupts the timeline. Reject with a clear, distinct message.
+      const canOverride = userRole === 'Sail Admin' && adminOverride === true;
+      return {
+        allowed: canOverride,
+        maxAllowedIncrease: 0,
+        requestedIncrease,
+        daysSinceLastUpdate,
+        lastUpdateDate: componentLastUpdated,
+        message: canOverride
+          ? 'Sail Admin override applied for backdated running-hours entry.'
+          : `Completion Date (${formatDMY(newUpdateDate)}) is earlier than the component's last running-hours update (${formatDMY(componentLastUpdated)}). Running hours can only be recorded on or after the latest reading.`,
+        requiresAdminOverride: !canOverride
+      };
+    }
+
+    if (daysSinceLastUpdate === 0) {
       sameDayUpdate = true;
-      daysSinceLastUpdate = 0;
     }
   } else {
     daysSinceLastUpdate = 1;

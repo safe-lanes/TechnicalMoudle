@@ -1380,6 +1380,26 @@ export async function updateWorkOrder(id: string, body: any) {
         // further below). It rides a master counter, so we NEVER advance the master here — only write
         // a read-only audit snapshot for history. Timeline validation is the sole governor (no flat
         // current-RH or exceeds-master ceiling).
+        // Task #252: this live PATCH approval path previously skipped timeline validation entirely, so a
+        // backdated completion (Completion Date before the component's RH baseline) could be persisted by
+        // bypassing the client check. Enforce the authoritative "no real RH entry on/before completion
+        // date" rule here too, gated narrowly to INVALID_BACKDATED so other timeline outcomes keep their
+        // existing (non-blocking on this path) behavior.
+        if (completionDateNorm) {
+          const { validateRHEntry } = await import('../../running-hours/services/rhTimelineValidationService');
+          const backdateCheck = await validateRHEntry(rhComp.cuuid, completionDateNorm, rhValue);
+          if (!backdateCheck.isValid && backdateCheck.validationStatus === 'INVALID_BACKDATED') {
+            throw new ValidationError(backdateCheck.errorMessage, {
+              code: 'INVALID_BACKDATED',
+              validRange: backdateCheck.validRange,
+              previousEntry: backdateCheck.previousEntry,
+              nextEntry: backdateCheck.nextEntry,
+              componentId: rhComp.cuuid,
+              componentCode: rhComp.componentCode || existingWO.componentCode,
+              rhCounterType: 'INHERITED'
+            });
+          }
+        }
         try {
           const prevRH = parseInt(rhComp.currentCumulativeRH || '0');
           await repo.createRunningHoursAudit({

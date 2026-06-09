@@ -26,11 +26,17 @@ export interface RHValidRange {
     source: string;
   } | null;
   recommendedAction: string;
+  // Set when the completion date is earlier than the component's RH baseline, i.e. there is no
+  // real RH entry dated on or before the completion date. Recording RH before the latest known
+  // reading corrupts the timeline, so this is reported as INVALID_BACKDATED by validateRHEntry.
+  backdatedBeforeBaseline?: boolean;
+  baselineDate?: string;
+  baselineRH?: number;
 }
 
 export interface RHValidationResult {
   isValid: boolean;
-  validationStatus: 'VALID' | 'INVALID_BACKWARD' | 'INVALID_FORWARD' | 'INVALID_DECREASE' | 'HIGH_UTILIZATION';
+  validationStatus: 'VALID' | 'INVALID_BACKWARD' | 'INVALID_FORWARD' | 'INVALID_DECREASE' | 'INVALID_BACKDATED' | 'HIGH_UTILIZATION';
   errorMessage: string;
   validRange: {
     min: number;
@@ -73,8 +79,21 @@ function parseDate(dateStr: string): Date {
 }
 
 function getDaysBetween(date1: Date, date2: Date): number {
+  // Signed (date2 - date1). Direction matters: a backward gap (date2 before date1) must NOT be
+  // read as a positive forward allowance. Call sites only pass correctly-ordered dates (previous
+  // <= target, target < next), so this is non-negative in practice; the backdated-before-baseline
+  // case is detected and rejected in getValidRange/validateRHEntry before any gap maths runs.
   const msPerDay = 24 * 60 * 60 * 1000;
-  return Math.abs(Math.round((date2.getTime() - date1.getTime()) / msPerDay));
+  return Math.round((date2.getTime() - date1.getTime()) / msPerDay);
+}
+
+function formatDMY(isoDate: string): string {
+  if (!isoDate) return isoDate;
+  const m = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return isoDate;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthIdx = parseInt(m[2], 10) - 1;
+  return `${m[3]}-${months[monthIdx] || m[2]}-${m[1]}`;
 }
 
 function normalizeAuditDate(audit: any): string {
@@ -142,17 +161,63 @@ export async function getValidRange(
     }
   }
 
+  let backdatedBeforeBaseline = false;
+  let baselineDate: string | undefined;
+  let baselineRH: number | undefined;
+
   if (!previousEntry) {
     const component = await repo.getComponent(machineryId);
     if (component) {
       const currentRH = parseFloat(component.currentCumulativeRH || '0');
-      const lastUpdated = component.lastUpdated || component.rhMasterUpdatedAt?.toISOString() || new Date().toISOString();
-      previousEntry = {
-        date: lastUpdated.split('T')[0],
-        runningHours: currentRH,
-        source: 'COMPONENT_STATE'
-      };
+      // Only treat the component's own state as a reference when it carries a REAL last-updated
+      // date. A fabricated "now" fallback (no lastUpdated/rhMasterUpdatedAt at all) means there is
+      // no RH baseline to compare against (brand-new component) — that must NOT be blocked.
+      const rawLastUpdated = component.lastUpdated
+        || (component.rhMasterUpdatedAt ? component.rhMasterUpdatedAt.toISOString() : null);
+      if (rawLastUpdated) {
+        const stateDateStr = rawLastUpdated.split('T')[0];
+        const stateDate = parseDate(stateDateStr);
+        if (stateDate.getTime() <= targetDate.getTime()) {
+          // Baseline is on/before the completion date → normal "previous" anchor.
+          previousEntry = {
+            date: stateDateStr,
+            runningHours: currentRH,
+            source: 'COMPONENT_STATE'
+          };
+        } else {
+          // The only known RH reference is dated AFTER the completion date. The completion predates
+          // the baseline: there is no real entry on/before it. Never label this future-dated state
+          // as the "previous" entry — flag it and treat it as a forward constraint instead.
+          backdatedBeforeBaseline = true;
+          baselineDate = stateDateStr;
+          baselineRH = currentRH;
+          if (!nextEntry || stateDate.getTime() < parseDate(nextEntry.date).getTime()) {
+            nextEntry = {
+              date: stateDateStr,
+              runningHours: currentRH,
+              source: 'COMPONENT_STATE'
+            };
+          }
+        }
+      }
     }
+  }
+
+  if (backdatedBeforeBaseline) {
+    return {
+      minRH: 0,
+      maxRH: nextEntry ? nextEntry.runningHours : 0,
+      previousEntry: null,
+      nextEntry: nextEntry ? {
+        date: nextEntry.date,
+        runningHours: nextEntry.runningHours,
+        source: nextEntry.source
+      } : null,
+      recommendedAction: 'MANUAL_ENTRY_REQUIRED',
+      backdatedBeforeBaseline: true,
+      baselineDate,
+      baselineRH
+    };
   }
 
   if (!previousEntry) {
@@ -201,6 +266,28 @@ export async function validateRHEntry(
 ): Promise<RHValidationResult> {
   const range = await getValidRange(machineryId, completionDate);
   const targetDate = parseDate(completionDate);
+
+  // Reject a completion that predates the component's RH baseline: there is no real RH entry dated
+  // on or before the completion date, so the entry cannot be anchored. (Legitimate backdating
+  // BETWEEN two existing historical entries is unaffected — that produces a real previousEntry and
+  // never sets this flag.)
+  if (range.backdatedBeforeBaseline) {
+    return {
+      isValid: false,
+      validationStatus: 'INVALID_BACKDATED',
+      errorMessage: `Completion Date ${formatDMY(completionDate)} is earlier than the component's last running-hours update (${formatDMY(range.baselineDate || '')}). There is no running-hours entry on or before this date, so running hours cannot be recorded here. Running hours can only be recorded on or after the latest reading.`,
+      validRange: { min: range.minRH, max: range.maxRH },
+      utilizationRate: 0,
+      requiresJustification: false,
+      anomalyFlags: ['BACKDATED_BEFORE_BASELINE'],
+      previousEntry: null,
+      nextEntry: range.nextEntry ? { date: range.nextEntry.date, runningHours: range.nextEntry.runningHours } : null,
+      daysBetweenPrevious: 0,
+      daysBetweenNext: 0,
+      maxPossibleIncrease: 0,
+      actualIncrease: 0
+    };
+  }
 
   const anomalyFlags: string[] = [];
   let daysBetweenPrevious = 0;
