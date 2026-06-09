@@ -16,12 +16,16 @@
  *               (default: 1 hour ago). Pass your DEPLOY timestamp here.
  *
  * READ-ONLY: this script never writes to the database.
+ *
+ * Note: env (DATABASE_URL, EXTERNAL_MASTER_DATA_URL_DEV) must be passed on the
+ * command line (this repo does not bundle dotenv).
  */
-import 'dotenv/config';
 import { getWorkOrdersWithComputedStatus } from '../server/modules/work-orders/services/workOrderService';
 import { getPool } from '../server/db';
+import { initStorage } from '../server/storage';
 
 async function main() {
+  await initStorage(); // the service layer uses a storage singleton initialized at startup
   const vesselId = process.argv[2] && process.argv[2] !== '-' ? process.argv[2] : undefined;
   const since = process.argv[3] || new Date(Date.now() - 3600_000).toISOString();
 
