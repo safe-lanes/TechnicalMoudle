@@ -186,7 +186,7 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
       if (!response.ok) throw new Error("Failed to fetch planner data");
       return response.json();
     },
-    enabled: !!vesselId && vesselId !== 'all' && vesselId !== 'my',
+    enabled: !!vesselId && vesselId !== 'all',
     staleTime: 30000,
   });
 
@@ -211,7 +211,7 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
       if (!response.ok) throw new Error("Failed to fetch planner data");
       return response.json();
     },
-    enabled: !!vesselId && vesselId !== 'all' && vesselId !== 'my' && selectedRank !== 'all',
+    enabled: !!vesselId && vesselId !== 'all' && selectedRank !== 'all',
     staleTime: 60000,
   });
 
@@ -803,7 +803,7 @@ export default function WorkOrderPlanner({ onBack, vesselId, vesselName }: WorkO
         </div>
       )}
 
-      {(vesselId === 'all' || vesselId === 'my') ? (
+      {vesselId === 'all' ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-12 text-center text-gray-500">
           Please select a specific vessel to use the Planner view
         </div>

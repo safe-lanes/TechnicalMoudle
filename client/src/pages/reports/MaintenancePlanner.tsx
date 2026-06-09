@@ -128,7 +128,6 @@ export default function MaintenancePlanner({ onBack, globalFilters }: Maintenanc
   const vesselId = globalVessels.length === 1
     ? globalVessels[0]
     : (globalVessels.length === 0 ? 'all' : contextVesselId);
-  const isAggregateScope = vesselId === 'all' || vesselId === 'my';
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { isSailAdmin, isClientAdmin } = useUIRole();
@@ -196,7 +195,7 @@ export default function MaintenancePlanner({ onBack, globalFilters }: Maintenanc
       if (!response.ok) throw new Error("Failed to fetch planner data");
       return response.json();
     },
-    enabled: !!vesselId && vesselId !== 'all' && vesselId !== 'my',
+    enabled: !!vesselId && vesselId !== 'all',
     staleTime: 60000,
   });
 
@@ -383,7 +382,7 @@ export default function MaintenancePlanner({ onBack, globalFilters }: Maintenanc
             <div>
               <h1 className="text-2xl font-bold text-gray-900" data-testid="G21.1"><Marker id="G21.1" />Maintenance Planner</h1>
               <p className="text-sm text-gray-500" data-testid="G21.2">
-                <Marker id="G21.2" />Planning view for {(vesselId === 'all' || vesselId === 'my') ? 'All Vessels' : (vessels.find(v => v.id === vesselId)?.name || vesselId)}
+                <Marker id="G21.2" />Planning view for {vesselId === 'all' ? 'All Vessels' : (vessels.find(v => v.id === vesselId)?.name || vesselId)}
               </p>
             </div>
           </div>
@@ -392,7 +391,7 @@ export default function MaintenancePlanner({ onBack, globalFilters }: Maintenanc
             {isClientAdmin && (
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-gray-600">Vessel:</span>
-                <Select value={(vesselId === 'all' || vesselId === 'my') ? '' : vesselId} onValueChange={setVesselId}>
+                <Select value={vesselId === 'all' ? '' : vesselId} onValueChange={setVesselId}>
                   <SelectTrigger className="w-[200px]" data-testid="select-vessel">
                     <SelectValue placeholder="Choose vessel" />
                   </SelectTrigger>
@@ -410,7 +409,7 @@ export default function MaintenancePlanner({ onBack, globalFilters }: Maintenanc
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              disabled={isFetching || isAggregateScope}
+              disabled={isFetching}
               data-testid="G21.5"
             >
               <Marker id="G21.5" />
@@ -421,7 +420,7 @@ export default function MaintenancePlanner({ onBack, globalFilters }: Maintenanc
               variant="outline"
               size="sm"
               onClick={() => exportMutation.mutate("excel")}
-              disabled={exportMutation.isPending || isAggregateScope}
+              disabled={exportMutation.isPending}
               data-testid="G21.6"
             >
               <Marker id="G21.6" />
