@@ -489,6 +489,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
   const [woDocuments, setWoDocuments] = useState<Array<{id: string, workOrderId: string, documentType: string, fileName: string, fileKey: string, fileType: string, fileSize: number, uploadedBy: string, uploadedAt: string}>>([]);
   const [previewDoc, setPreviewDoc] = useState<{id: string, fileName: string, fileType: string, fileSize?: number, fetchUrl?: string} | null>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<Array<{file: File, documentType: string}>>([]);
   const [currentReadingWarningAcknowledged, setCurrentReadingWarningAcknowledged] = useState(false);
 
   const [editingConsumedSparePart, setEditingConsumedSparePart] = useState<number | null>(null);
@@ -1836,10 +1837,65 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     return woDocuments.filter(d => d.documentType === documentType);
   };
 
+  const getEffectiveDocCount = (documentType: string) =>
+    getDocsByType(documentType).length +
+    pendingAttachments.filter(p => p.documentType === documentType).length;
+
   const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>, documentType: string) => {
-    if (isReadOnly || !workOrderId) return;
+    if (isReadOnly) return;
     const files = event.target.files;
     if (!files || files.length === 0) return;
+
+    const allowedTypes = documentType === 'other'
+      ? ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+      : ['application/pdf', 'image/jpeg', 'image/png'];
+    const allowedExtensions = documentType === 'other'
+      ? ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xlsx']
+      : ['.pdf', '.jpg', '.jpeg', '.png'];
+    const maxSizeBytes = 5 * 1024 * 1024;
+
+    // ── Pending mode: WO not saved yet — queue files locally ──────────────────
+    if (isUnplannedCreate && !workOrderId) {
+      const slotsAvailable = 5 - getEffectiveDocCount(documentType);
+      if (slotsAvailable <= 0) {
+        toast({ title: "Limit reached", description: "Maximum 5 documents per type.", variant: "destructive" });
+        event.target.value = '';
+        return;
+      }
+
+      const validFiles: File[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+        if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+          toast({ title: "Invalid file type", description: `${file.name}: Only allowed file types are accepted.`, variant: "destructive" });
+          continue;
+        }
+        if (file.size > maxSizeBytes) {
+          toast({ title: "File too large", description: `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Maximum is 5MB.`, variant: "destructive" });
+          continue;
+        }
+        validFiles.push(file);
+      }
+
+      const filesToQueue = validFiles.slice(0, slotsAvailable);
+      if (validFiles.length > slotsAvailable) {
+        toast({ title: "Partial queue", description: `Only ${slotsAvailable} slot(s) remaining. Queuing first ${slotsAvailable} of ${validFiles.length} files.`, variant: "destructive" });
+      }
+
+      if (filesToQueue.length > 0) {
+        setPendingAttachments(prev => [...prev, ...filesToQueue.map(file => ({ file, documentType }))]);
+        toast({
+          title: filesToQueue.length === 1 ? "File queued" : `${filesToQueue.length} files queued`,
+          description: "Files will be attached automatically when you save the draft.",
+        });
+      }
+      event.target.value = '';
+      return;
+    }
+
+    // ── Normal upload path: WO already exists ─────────────────────────────────
+    if (!workOrderId) return;
 
     const currentVesselId = vesselId || contextVesselId;
     if (!currentVesselId) {
@@ -1854,14 +1910,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       event.target.value = '';
       return;
     }
-
-    const allowedTypes = documentType === 'other'
-      ? ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
-      : ['application/pdf', 'image/jpeg', 'image/png'];
-    const allowedExtensions = documentType === 'other'
-      ? ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xlsx']
-      : ['.pdf', '.jpg', '.jpeg', '.png'];
-    const maxSizeBytes = 5 * 1024 * 1024;
 
     const validFiles: File[] = [];
     for (let i = 0; i < files.length; i++) {
@@ -2165,6 +2213,37 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </div>
           );
         })}
+      </div>
+    );
+  };
+
+  const renderPendingItems = (documentType: string) => {
+    const items = pendingAttachments
+      .map((item, globalIdx) => ({ ...item, globalIdx }))
+      .filter(item => item.documentType === documentType);
+    if (items.length === 0) return null;
+    return (
+      <div className="mt-1 flex items-center gap-1 flex-wrap" data-testid={`pending-items-${documentType}`}>
+        {items.map(({ file, globalIdx }) => (
+          <div
+            key={globalIdx}
+            className="flex items-center gap-1 p-1.5 rounded border border-dashed border-amber-300 bg-amber-50 text-amber-700"
+            title={`${file.name} — pending, will upload on Save Draft`}
+            data-testid={`pending-item-${documentType}-${globalIdx}`}
+          >
+            {getFileIcon(file.name)}
+            <span className="text-xs max-w-[90px] truncate">{file.name}</span>
+            <span className="text-[10px] text-amber-500 shrink-0">{formatFileSize(file.size)}</span>
+            <button
+              type="button"
+              className="ml-0.5 text-amber-500 hover:text-red-500 shrink-0"
+              onClick={() => setPendingAttachments(prev => prev.filter((_, i) => i !== globalIdx))}
+              data-testid={`button-remove-pending-${documentType}-${globalIdx}`}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        ))}
       </div>
     );
   };
@@ -2969,7 +3048,46 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         if (!newWoId) throw new Error('Failed to create work order — no ID returned.');
         queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
         queryClient.invalidateQueries({ queryKey: ['/technical/api/scoped-operation-data'] });
-        toast({ title: 'Draft Saved', description: 'Unplanned work order saved as draft. You can resume editing from the Unplanned tab.' });
+
+        // Upload any pending attachments now that we have a WO id
+        const currentVesselId = contextVesselId || '';
+        const failedFiles: string[] = [];
+        for (const { file, documentType } of pendingAttachments) {
+          try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('documentType', documentType);
+            formData.append('vesselId', currentVesselId);
+            const uploadRes = await fetch(`/technical/api/work-orders/${newWoId}/documents`, {
+              method: 'POST',
+              body: formData,
+            });
+            if (!uploadRes.ok) {
+              const errBody = await uploadRes.json().catch(() => ({}));
+              throw new Error(errBody.message || errBody.error || `Upload failed for ${file.name}`);
+            }
+          } catch (uploadErr: any) {
+            console.error('Pending attachment upload failed:', uploadErr);
+            failedFiles.push(file.name);
+          }
+        }
+        setPendingAttachments([]);
+
+        if (failedFiles.length === 0) {
+          const attachedCount = pendingAttachments.length;
+          toast({
+            title: 'Draft Saved',
+            description: attachedCount > 0
+              ? `Unplanned work order saved as draft with ${attachedCount} file(s) attached. You can resume editing from the Unplanned tab.`
+              : 'Unplanned work order saved as draft. You can resume editing from the Unplanned tab.',
+          });
+        } else {
+          toast({
+            title: 'Draft Saved (attachments partially failed)',
+            description: `Work order saved. ${pendingAttachments.length - failedFiles.length} file(s) attached. Failed: ${failedFiles.join(', ')}.`,
+            variant: 'destructive',
+          });
+        }
       }
       sessionStorage.setItem('workOrdersActiveTab', 'Unplanned');
       navigate('/pms/work-orders');
@@ -5091,7 +5209,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
-                    {!isReadOnly && !isPartBReadOnly && getDocsByType('riskAssessment').length < 5 && (
+                    {!isReadOnly && !isPartBReadOnly && getEffectiveDocCount('riskAssessment') < 5 && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -5111,9 +5229,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       onChange={(e) => handleFileSelected(e, 'riskAssessment')}
                       accept=".pdf,.jpg,.jpeg,.png"
                     />
-                    <span className="text-xs text-gray-400">{getDocsByType('riskAssessment').length}/5</span>
+                    <span className="text-xs text-gray-400">{getEffectiveDocCount('riskAssessment')}/5</span>
                   </div>
                   {renderDocIcons('riskAssessment', 'risk')}
+                  {renderPendingItems('riskAssessment')}
                 </div>
               </div>
 
@@ -5163,7 +5282,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
-                    {!isReadOnly && !isPartBReadOnly && getDocsByType('safetyChecklist').length < 5 && (
+                    {!isReadOnly && !isPartBReadOnly && getEffectiveDocCount('safetyChecklist') < 5 && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -5183,9 +5302,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       onChange={(e) => handleFileSelected(e, 'safetyChecklist')}
                       accept=".pdf,.jpg,.jpeg,.png"
                     />
-                    <span className="text-xs text-gray-400">{getDocsByType('safetyChecklist').length}/5</span>
+                    <span className="text-xs text-gray-400">{getEffectiveDocCount('safetyChecklist')}/5</span>
                   </div>
                   {renderDocIcons('safetyChecklist', 'safety')}
+                  {renderPendingItems('safetyChecklist')}
                 </div>
               </div>
 
@@ -5235,7 +5355,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
-                    {!isReadOnly && !isPartBReadOnly && getDocsByType('operationalForm').length < 5 && (
+                    {!isReadOnly && !isPartBReadOnly && getEffectiveDocCount('operationalForm') < 5 && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -5255,9 +5375,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       onChange={(e) => handleFileSelected(e, 'operationalForm')}
                       accept=".pdf,.jpg,.jpeg,.png"
                     />
-                    <span className="text-xs text-gray-400">{getDocsByType('operationalForm').length}/5</span>
+                    <span className="text-xs text-gray-400">{getEffectiveDocCount('operationalForm')}/5</span>
                   </div>
                   {renderDocIcons('operationalForm', 'operational')}
+                  {renderPendingItems('operationalForm')}
                 </div>
               </div>
             </div>
@@ -5569,7 +5690,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </div>
                   {/* Upload button column */}
                   <div className="flex flex-col items-center gap-1 pt-1">
-                    {!isReadOnly && !isPartBReadOnly && getDocsByType('other').length < 5 && (
+                    {!isReadOnly && !isPartBReadOnly && getEffectiveDocCount('other') < 5 && (
                       <Button
                         type="button"
                         variant="outline"
@@ -5591,10 +5712,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       onChange={(e) => handleFileSelected(e, 'other')}
                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"
                     />
-                    <span className="text-xs text-gray-400">{getDocsByType('other').length}/5</span>
+                    <span className="text-xs text-gray-400">{getEffectiveDocCount('other')}/5</span>
                   </div>
                 </div>
                 {renderDocIcons('other', 'other')}
+                {renderPendingItems('other')}
               </div>
 
               {/* Job Experience / Notes */}
