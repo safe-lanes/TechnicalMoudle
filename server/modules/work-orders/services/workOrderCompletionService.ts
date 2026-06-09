@@ -103,8 +103,10 @@ export async function completeWorkOrder(
     }
   }
 
-  // Enforce running hours requirement for RH-based maintenance
-  if (workOrder.maintenanceBasis === 'Running Hours' && !runningHours) {
+  // Enforce running hours requirement only for RH-driven completions (Task #245):
+  // NOT_RH_DRIVEN components treat running hours as not applicable — never required, never blocking.
+  const counterType = (component.rhCounterType || 'MASTER').toUpperCase();
+  if (workOrder.maintenanceBasis === 'Running Hours' && counterType !== 'NOT_RH_DRIVEN' && !runningHours) {
     throw new ValidationError('Running hours is required for RH-based maintenance work orders');
   }
 
@@ -119,7 +121,6 @@ export async function completeWorkOrder(
   let rhValidationDetails: any = null;
   let completionRHSource = 'MANUAL_ENTRY';
   let rhReadingApplied = false;
-  const counterType = (component.rhCounterType || 'MASTER').toUpperCase();
 
   if (runningHours && counterType !== 'NOT_RH_DRIVEN') {
     const newRH = parseInt(runningHours);

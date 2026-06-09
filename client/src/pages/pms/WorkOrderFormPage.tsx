@@ -903,6 +903,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   }>({ status: 'idle', message: '', validRange: null, utilizationRate: 0, previousEntry: null, nextEntry: null, validationDetails: null, componentActualRH: null });
   const [componentActualRHStatus, setComponentActualRHStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const [componentActualRHLastUpdated, setComponentActualRHLastUpdated] = useState<string | null>(null);
+  const [componentRhCounterType, setComponentRhCounterType] = useState<string>('');
+  // Task #245: RH-required/load gates fire ONLY for explicitly RH-driven counter types.
+  // Unknown ('') and NOT_RH_DRIVEN are treated as non-blocking so a slow/failed
+  // /running-hours/current call can never wrongly block a NOT_RH_DRIVEN work order.
+  const isRhDrivenCounter = componentRhCounterType === 'MASTER' || componentRhCounterType === 'INHERITED';
   const [rhJustificationModalOpen, setRhJustificationModalOpen] = useState(false);
   const [rhJustificationText, setRhJustificationText] = useState('');
   const [rhJustificationConfirmed, setRhJustificationConfirmed] = useState(false);
@@ -1137,6 +1142,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }));
       }
 
+      // Task #245: seed counter type from context so RH gates resolve before the RH API responds
+      if (context.component?.rhCounterType) {
+        setComponentRhCounterType(String(context.component.rhCounterType).toUpperCase());
+      }
+
       // Load work order number from context (for Part B display)
       if (context.workOrder?.workOrderNo || context.workOrder?.templateCode) {
         setWorkOrderNo(context.workOrder.workOrderNo || context.workOrder.templateCode);
@@ -1164,6 +1174,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       contextLoadedOnce.current = true;
     }
   }, [workOrderContext, isModifyMode, setOriginalSnapshot, vesselLocations]);
+
+  // Task #245: seed counter type for the new-job-creation flow (from the D3 full-component fetch)
+  useEffect(() => {
+    if (d3RhCounterType) setComponentRhCounterType(d3RhCounterType);
+  }, [d3RhCounterType]);
 
   // Initialize form for new job creation (Add Job flow)
   const componentNameFromUrl = urlParams.get('componentName') || '';
@@ -1287,6 +1302,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         body: JSON.stringify({ machineryId: componentId, completionDate: dateToUse, runningHours: Number(rhValue), previousReading: executionData.previousReading ? Number(executionData.previousReading) : undefined })
       });
       const result = await res.json();
+      if (result.rhCounterType) setComponentRhCounterType(String(result.rhCounterType).toUpperCase());
       if (result.isValid) {
         setRhValidation({
           status: result.requiresJustification ? 'warning' : 'valid',
@@ -1347,6 +1363,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const res = await fetch(`/technical/api/running-hours/current?machineryId=${encodeURIComponent(componentId)}`, { signal: controller.signal });
       clearTimeout(timeoutId);
       const result = await res.json();
+      if (result.rhCounterType) setComponentRhCounterType(String(result.rhCounterType).toUpperCase());
       if (result.currentRH !== undefined) {
         setRhValidation(prev => ({ ...prev, componentActualRH: result.currentRH }));
         setComponentActualRHStatus('loaded');
@@ -2563,7 +2580,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
 
-      if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours') {
+      if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter) {
         if (!draftIntent && componentActualRHStatus === 'loading') {
           hardErrors.push('Component running hours are still loading. Please wait for the value to load before saving.');
         } else if (!draftIntent && componentActualRHStatus === 'error') {
@@ -2595,7 +2612,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       if (!noOfPersonsStr) missingFields.push("No. of Persons");
       if (!executionData.totalTimeHours || isNaN(totalTimeVal)) missingFields.push("Total Time Taken");
       if (!workCarriedOutTrimmed) missingFields.push("Work Carried Out");
-      if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && !currentRHValue) {
+      if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter && !currentRHValue) {
         missingFields.push("Current Reading");
       }
 
@@ -2751,7 +2768,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
 
       if (hasCompletionData) {
-        if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && !currentRHValue) {
+        if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter && !currentRHValue) {
           toast({
             title: "Validation Error",
             description: "Running hours is required for RH-based maintenance when submitting for approval",
@@ -3196,7 +3213,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     // RH validation state checks (mirrors handleSave pipeline).
     // Unplanned WOs use maintenanceBasis='Calendar' so these are no-ops in practice,
     // but are included for full parity with the execution save path.
-    if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours') {
+    if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter) {
       if (componentActualRHStatus === 'loading') {
         hardErrors.push('Component running hours are still loading. Please wait for the value to load before saving.');
       } else if (componentActualRHStatus === 'error') {
@@ -5826,7 +5843,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.5"><Marker id="WOF.B3.5" />Current Reading{(workOrderContext as any)?.maintenanceBasis === 'Running Hours' && <span className="text-red-500"> *</span>}</Label>
+                <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.5"><Marker id="WOF.B3.5" />Current Reading{(workOrderContext as any)?.maintenanceBasis === 'Running Hours' && isRhDrivenCounter && <span className="text-red-500"> *</span>}</Label>
                 <div className="flex gap-2">
                   <Input
                     type="number"
@@ -6789,15 +6806,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           {/* Save/Submit Button at Bottom - Hidden for Pending Approval (unless rejected), Completed work orders, and embedded mode */}
           {!embedded && (currentWorkOrderStatus !== 'Pending Approval' || isRejectedWO) && currentWorkOrderStatus !== 'Completed' && (() => {
             const isRHBased = (workOrderContext as any)?.maintenanceBasis === 'Running Hours';
-            const currentRHVal = executionData.currentReading;
-            const capRH = rhValidation.componentActualRH;
-            const rhExceedsActual = isRHBased && currentRHVal && capRH !== null && Number(currentRHVal) > capRH;
-            const rhNotLoaded = isRHBased && componentActualRHStatus === 'loading';
-            const rhFetchFailed = isRHBased && componentActualRHStatus === 'error';
+            // Task #245: no flat current-RH ceiling. MASTER advances the counter, INHERITED is governed
+            // by timeline validation, and NOT_RH_DRIVEN never requires/blocks on running hours — so the
+            // RH-load gates only apply to RH-driven counter types.
+            const isRhRequired = isRHBased && isRhDrivenCounter;
+            const rhNotLoaded = isRhRequired && componentActualRHStatus === 'loading';
+            const rhFetchFailed = isRhRequired && componentActualRHStatus === 'error';
             const rhInvalid = rhValidation.status === 'invalid' && !isRejectedWO;
-            const isRHSaveBlocked = rhExceedsActual || rhNotLoaded || rhFetchFailed || rhInvalid;
-            const rhBlockReason = rhExceedsActual ? `Cannot save: Current Reading (${currentRHVal}) exceeds component's actual RH (${capRH})` :
-              rhNotLoaded ? 'Cannot save: Component running hours are still loading' :
+            const isRHSaveBlocked = rhNotLoaded || rhFetchFailed || rhInvalid;
+            const rhBlockReason = rhNotLoaded ? 'Cannot save: Component running hours are still loading' :
               rhFetchFailed ? 'Cannot save: Unable to verify component running hours' :
               rhInvalid ? 'Cannot save: Running hours validation failed' : '';
             const handleBottomSubmit = () => {
