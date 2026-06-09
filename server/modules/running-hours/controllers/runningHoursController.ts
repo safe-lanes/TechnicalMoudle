@@ -226,10 +226,12 @@ export async function validateRHEntry(req: Request, res: Response) {
 
     let componentActualRH: number | null = null;
     let rhCounterType = 'MASTER';
+    let hasRealRhBaseline = false;
     try {
       const currentRHData = await rhTimelineValidation.getCurrentRH(machineryId);
       componentActualRH = currentRHData.currentRH;
       rhCounterType = (currentRHData.rhCounterType || 'MASTER').toUpperCase();
+      hasRealRhBaseline = currentRHData.hasRealRhBaseline;
     } catch {}
 
     // Task #245: the flat "exceeds component actual RH" ceiling is fully retired. It is applied to
@@ -266,6 +268,7 @@ export async function validateRHEntry(req: Request, res: Response) {
       validRange: cappedValidRange,
       componentActualRH,
       rhCounterType,
+      hasRealRhBaseline,
       exceedsComponentRH
     });
   } catch (error: any) {

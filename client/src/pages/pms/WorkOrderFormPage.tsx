@@ -903,6 +903,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   }>({ status: 'idle', message: '', validRange: null, utilizationRate: 0, previousEntry: null, nextEntry: null, validationDetails: null, componentActualRH: null });
   const [componentActualRHStatus, setComponentActualRHStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const [componentActualRHLastUpdated, setComponentActualRHLastUpdated] = useState<string | null>(null);
+  // Task #252: whether `componentActualRHLastUpdated` is a REAL RH baseline (vs a fabricated
+  // updatedAt/now fallback from the server). The backdate guard must only fire when this is true so
+  // brand-new components with no real RH reference are never blocked.
+  const [componentActualRHHasBaseline, setComponentActualRHHasBaseline] = useState<boolean>(false);
   const [componentRhCounterType, setComponentRhCounterType] = useState<string>('');
   // Task #245: RH-required/load gates fire ONLY for explicitly RH-driven counter types.
   // Unknown ('') and NOT_RH_DRIVEN are treated as non-blocking so a slow/failed
@@ -1343,6 +1347,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         setRhValidation(prev => ({ ...prev, componentActualRH: result.currentRH }));
         setComponentActualRHStatus('loaded');
         setComponentActualRHLastUpdated(result.lastUpdated || null);
+        setComponentActualRHHasBaseline(!!result.hasRealRhBaseline);
         const fetchedDate = result.lastUpdated ? new Date(result.lastUpdated).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-') : 'N/A';
         toast({ title: "RH Fetched", description: `Running hours fetched: ${result.currentRH} hours as of ${fetchedDate}` });
         performRHValidation(String(result.currentRH));
@@ -1368,6 +1373,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         setRhValidation(prev => ({ ...prev, componentActualRH: result.currentRH }));
         setComponentActualRHStatus('loaded');
         setComponentActualRHLastUpdated(result.lastUpdated || null);
+        setComponentActualRHHasBaseline(!!result.hasRealRhBaseline);
       } else {
         setComponentActualRHStatus('error');
       }
@@ -1386,7 +1392,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // historical entries, suppress when the server has resolved a real previous anchor on/before the
   // completion date.
   const rhBackdateError = useMemo<string | null>(() => {
-    if (!isRhDrivenCounter || !componentActualRHLastUpdated) return null;
+    // Only guard when a REAL RH baseline exists. A fabricated updatedAt/now fallback (brand-new
+    // component with no RH reference) must never block — matches the authoritative server rule.
+    if (!isRhDrivenCounter || !componentActualRHHasBaseline || !componentActualRHLastUpdated) return null;
     const completionStr = executionData.completionDateTime
       ? executionData.completionDateTime.split('T')[0]
       : (executionData.dateOfCompletion || '');
@@ -1411,7 +1419,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       return isNaN(d.getTime()) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
     };
     return `Completion Date (${fmt(completionStr)}) is earlier than the component's last running-hours update (${fmt(componentActualRHLastUpdated)}). Running hours can only be recorded on or after the latest reading.`;
-  }, [isRhDrivenCounter, componentActualRHLastUpdated, executionData.completionDateTime, executionData.dateOfCompletion, rhValidation.previousEntry]);
+  }, [isRhDrivenCounter, componentActualRHHasBaseline, componentActualRHLastUpdated, executionData.completionDateTime, executionData.dateOfCompletion, rhValidation.previousEntry]);
 
   const handleExecutionChange = (field: string, value: string) => {
     setExecutionData(prev => {

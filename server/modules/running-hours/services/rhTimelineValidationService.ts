@@ -499,6 +499,7 @@ export async function getRHTimeline(
 export async function getCurrentRH(machineryId: string): Promise<{
   currentRH: number;
   lastUpdated: string;
+  hasRealRhBaseline: boolean;
   source: string;
   updatedBy: string;
   rhCounterType: string;
@@ -534,6 +535,12 @@ export async function getCurrentRH(machineryId: string): Promise<{
     rhLastUpdated = component.rhMasterUpdatedAt;
   }
   const currentRH = parseFloat(rhSource || '0');
+  // `hasRealRhBaseline` records whether `lastUpdated` is a genuine RH reference (a real master/
+  // inherited RH update date or the legacy `lastUpdated` field) BEFORE the `updatedAt`/`now`
+  // fabrication below. The client must only treat the completion date as "backdated before
+  // baseline" when this is true — a brand-new component with no real RH reference must never be
+  // blocked (matches the timeline validator, which also ignores the fabricated fallback).
+  const hasRealRhBaseline = !!(rhLastUpdated || component.lastUpdated);
   const lastUpdated = (rhLastUpdated ? (typeof rhLastUpdated === 'string' ? rhLastUpdated : rhLastUpdated.toISOString()) : null)
     || component.lastUpdated
     || component.updatedAt?.toISOString()
@@ -542,6 +549,7 @@ export async function getCurrentRH(machineryId: string): Promise<{
   return {
     currentRH,
     lastUpdated,
+    hasRealRhBaseline,
     source: 'RH_MODULE',
     updatedBy: component.rhMasterUpdatedBy || 'System',
     rhCounterType: (component.rhCounterType || 'MASTER').toUpperCase()
