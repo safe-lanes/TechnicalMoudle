@@ -172,11 +172,13 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
   );
 
   // Batch the audit lookups across ALL masters in one/two round-trips each, instead
-  // of getRunningHoursAtDate + getRunningHoursAudits per master.
-  const masterIds = masterComponents.map((m) => m.cuuid);
-  const startEntries = await repo.getRunningHoursAtDateBatch(masterIds, periodStartDate);
-  const endEntries = periodEndDate ? await repo.getRunningHoursAtDateBatch(masterIds, periodEndDate) : null;
-  const lastUpdatedByMap = await repo.getLatestAuditUserBatch(masterIds);
+  // of getRunningHoursAtDate + getRunningHoursAudits per master. Pass BOTH id and
+  // cuuid so legacy audit rows keyed by the non-cuuid id still resolve (mirrors the
+  // dual-identifier OR in storage.getRunningHoursAtDate). Results are keyed by cuuid.
+  const masterRefs = masterComponents.map((m) => ({ id: String(m.id), cuuid: m.cuuid }));
+  const startEntries = await repo.getRunningHoursAtDateBatch(masterRefs, periodStartDate);
+  const endEntries = periodEndDate ? await repo.getRunningHoursAtDateBatch(masterRefs, periodEndDate) : null;
+  const lastUpdatedByMap = await repo.getLatestAuditUserBatch(masterRefs);
 
   const parentsWithCounts = masterComponents.map((component) => {
       // Under 'all'/'my' aggregate, vesselId is 'all' — scope inherited lookup to the

@@ -46,16 +46,42 @@ export interface RHAtDate {
   isFallback: boolean;
 }
 
+// A master component identified by BOTH its primary id and its cuuid. Audit rows
+// may be keyed by either (legacy rows can use the non-cuuid id), mirroring the
+// dual-identifier lookup in storage.getRunningHoursAtDate
+// (component_id = resolvedId OR component_id = originalId).
+export interface MasterRef {
+  id: string;
+  cuuid: string;
+}
+
+// Build the union of distinct identifiers to query plus a reverse map from each
+// identifier back to the owning master cuuid (so results collapse onto cuuid).
+function buildIdentifierIndex(masters: MasterRef[]): {
+  identifiers: string[];
+  idToCuuid: Map<string, string>;
+} {
+  const idToCuuid = new Map<string, string>();
+  for (const m of masters) {
+    if (m.cuuid) idToCuuid.set(m.cuuid, m.cuuid);
+    if (m.id) idToCuuid.set(String(m.id), m.cuuid);
+  }
+  return { identifiers: Array.from(idToCuuid.keys()), idToCuuid };
+}
+
 // Mirrors storage.getRunningHoursAtDate (latest entry at/before target, else
 // earliest entry after target as fallback) but resolves ALL components in one
-// or two round-trips instead of one query per component. Keys are cuuids.
+// or two round-trips instead of one query per component. Accepts dual
+// identifiers per master and returns a Map keyed by master cuuid.
 export async function getRunningHoursAtDateBatch(
-  componentIds: string[],
+  masters: MasterRef[],
   targetDate: Date
 ): Promise<Map<string, RHAtDate>> {
   const result = new Map<string, RHAtDate>();
-  if (componentIds.length === 0) return result;
+  if (masters.length === 0) return result;
   const db = await getDb();
+  const { identifiers, idToCuuid } = buildIdentifierIndex(masters);
+  if (identifiers.length === 0) return result;
 
   // NOTE: use [0-9] not \d — inside a JS sql`` template literal, "\d" is cooked to
   // "d", producing a regex that never matches ISO dates and crashes TO_TIMESTAMP on
@@ -66,50 +92,69 @@ export async function getRunningHoursAtDateBatch(
     ELSE TO_TIMESTAMP(REPLACE(${runningHoursAudit.dateUpdatedLocal}, ' ', '-'), 'DD-Mon-YYYY-HH24:MI')
   END`;
 
-  // Primary: latest entry at or before targetDate, one row per component.
+  // Per-cuuid reducer: keep the row with the latest (primary) / earliest (fallback)
+  // parsed date, so audits split across legacy id + cuuid still collapse correctly.
+  const parsedTimes = new Map<string, number>();
+  const apply = (
+    cuuid: string,
+    runningHours: number,
+    enteredAtUTC: Date,
+    parsedMs: number,
+    isFallback: boolean,
+    preferLatest: boolean
+  ) => {
+    const existing = parsedTimes.get(cuuid);
+    if (existing === undefined || (preferLatest ? parsedMs > existing : parsedMs < existing)) {
+      parsedTimes.set(cuuid, parsedMs);
+      result.set(cuuid, { runningHours, enteredAtUTC, isFallback });
+    }
+  };
+
+  // Primary: latest entry at or before targetDate, one row per audit identifier.
   const primary = await db
     .selectDistinctOn([runningHoursAudit.componentId], {
       componentId: runningHoursAudit.componentId,
       runningHours: runningHoursAudit.cumulativeRH,
       enteredAtUTC: runningHoursAudit.enteredAtUTC,
+      parsedAt: sql<string>`${parsedDateExpr}`,
     })
     .from(runningHoursAudit)
     .where(and(
-      inArray(runningHoursAudit.componentId, componentIds),
+      inArray(runningHoursAudit.componentId, identifiers),
       sql`${parsedDateExpr} <= ${targetDate}`
     ))
     .orderBy(runningHoursAudit.componentId, sql`${parsedDateExpr} DESC`);
 
   for (const row of primary) {
-    result.set(row.componentId, {
-      runningHours: parseFloat(row.runningHours || '0'),
-      enteredAtUTC: row.enteredAtUTC,
-      isFallback: false,
-    });
+    const cuuid = idToCuuid.get(row.componentId);
+    if (!cuuid) continue;
+    apply(cuuid, parseFloat(row.runningHours || '0'), row.enteredAtUTC,
+      new Date(row.parsedAt).getTime(), false, true);
   }
 
-  // Fallback: earliest entry after targetDate, only for components with no primary hit.
-  const missing = componentIds.filter((id) => !result.has(id));
+  // Fallback: earliest entry after targetDate, only for masters with no primary hit.
+  const missing = masters.filter((m) => !result.has(m.cuuid));
   if (missing.length > 0) {
+    const { identifiers: missingIds } = buildIdentifierIndex(missing);
     const fallback = await db
       .selectDistinctOn([runningHoursAudit.componentId], {
         componentId: runningHoursAudit.componentId,
         runningHours: runningHoursAudit.cumulativeRH,
         enteredAtUTC: runningHoursAudit.enteredAtUTC,
+        parsedAt: sql<string>`${parsedDateExpr}`,
       })
       .from(runningHoursAudit)
       .where(and(
-        inArray(runningHoursAudit.componentId, missing),
+        inArray(runningHoursAudit.componentId, missingIds),
         sql`${parsedDateExpr} > ${targetDate}`
       ))
       .orderBy(runningHoursAudit.componentId, sql`${parsedDateExpr} ASC`);
 
     for (const row of fallback) {
-      result.set(row.componentId, {
-        runningHours: parseFloat(row.runningHours || '0'),
-        enteredAtUTC: row.enteredAtUTC,
-        isFallback: true,
-      });
+      const cuuid = idToCuuid.get(row.componentId);
+      if (!cuuid) continue;
+      apply(cuuid, parseFloat(row.runningHours || '0'), row.enteredAtUTC,
+        new Date(row.parsedAt).getTime(), true, false);
     }
   }
 
@@ -117,25 +162,39 @@ export async function getRunningHoursAtDateBatch(
 }
 
 // Latest audit userId per component (mirrors storage.getRunningHoursAudits(id, 1)
-// reading audits[0].userId) in a single round-trip. Keys are cuuids.
+// reading audits[0].userId) in a single round-trip. Accepts dual identifiers per
+// master and returns a Map keyed by master cuuid.
 export async function getLatestAuditUserBatch(
-  componentIds: string[]
+  masters: MasterRef[]
 ): Promise<Map<string, string | null>> {
   const result = new Map<string, string | null>();
-  if (componentIds.length === 0) return result;
+  if (masters.length === 0) return result;
   const db = await getDb();
+  const { identifiers, idToCuuid } = buildIdentifierIndex(masters);
+  if (identifiers.length === 0) return result;
 
   const rows = await db
     .selectDistinctOn([runningHoursAudit.componentId], {
       componentId: runningHoursAudit.componentId,
       userId: runningHoursAudit.userId,
+      enteredAtUTC: runningHoursAudit.enteredAtUTC,
     })
     .from(runningHoursAudit)
-    .where(inArray(runningHoursAudit.componentId, componentIds))
+    .where(inArray(runningHoursAudit.componentId, identifiers))
     .orderBy(runningHoursAudit.componentId, desc(runningHoursAudit.enteredAtUTC));
 
+  // Collapse onto master cuuid, keeping the most recent audit when rows are split
+  // across legacy id + cuuid.
+  const latestTimes = new Map<string, number>();
   for (const row of rows) {
-    result.set(row.componentId, row.userId || null);
+    const cuuid = idToCuuid.get(row.componentId);
+    if (!cuuid) continue;
+    const t = row.enteredAtUTC ? new Date(row.enteredAtUTC).getTime() : 0;
+    const existing = latestTimes.get(cuuid);
+    if (existing === undefined || t >= existing) {
+      latestTimes.set(cuuid, t);
+      result.set(cuuid, row.userId || null);
+    }
   }
 
   return result;
