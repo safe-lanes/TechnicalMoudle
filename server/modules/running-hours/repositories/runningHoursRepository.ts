@@ -1,6 +1,6 @@
 import { storage } from '../../../storage';
 import { getDb } from '../../../db';
-import { runningHoursAudit } from '@shared/schema';
+import { runningHoursAudit, componentMaintenanceHistory } from '@shared/schema';
 import { desc, asc, eq, and, gte, lte, or, ilike, sql, inArray } from 'drizzle-orm';
 import type { InsertRunningHoursAudit, RunningHoursAudit, Component } from '@shared/schema';
 
@@ -197,6 +197,39 @@ export async function getLatestAuditUserBatch(
     }
   }
 
+  return result;
+}
+
+// Latest APPROVED completion date per master component, from
+// component_maintenance_history. component_maintenance_history.component_id is
+// always a cuuid (FK → components.cuuid), so no dual-identifier resolution is
+// needed here. dateCompleted is text ISO (YYYY-MM-DD), so lexicographic DESC =
+// most recent. Returns a Map keyed by master cuuid → ISO date string.
+export async function getLatestCompletedDateBatch(
+  masters: MasterRef[]
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  if (masters.length === 0) return result;
+  const db = await getDb();
+  const cuuids = Array.from(new Set(masters.map((m) => m.cuuid).filter(Boolean)));
+  if (cuuids.length === 0) return result;
+
+  const rows = await db
+    .selectDistinctOn([componentMaintenanceHistory.componentId], {
+      componentId: componentMaintenanceHistory.componentId,
+      dateCompleted: componentMaintenanceHistory.dateCompleted,
+    })
+    .from(componentMaintenanceHistory)
+    .where(and(
+      inArray(componentMaintenanceHistory.componentId, cuuids),
+      eq(componentMaintenanceHistory.status, 'Approved'),
+      sql`coalesce(${componentMaintenanceHistory.isDeleted}, false) = false`
+    ))
+    .orderBy(componentMaintenanceHistory.componentId, desc(componentMaintenanceHistory.dateCompleted));
+
+  for (const row of rows) {
+    if (row.dateCompleted) result.set(row.componentId, row.dateCompleted);
+  }
   return result;
 }
 

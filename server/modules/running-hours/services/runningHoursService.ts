@@ -179,6 +179,9 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
   const startEntries = await repo.getRunningHoursAtDateBatch(masterRefs, periodStartDate);
   const endEntries = periodEndDate ? await repo.getRunningHoursAtDateBatch(masterRefs, periodEndDate) : null;
   const lastUpdatedByMap = await repo.getLatestAuditUserBatch(masterRefs);
+  // Latest approved completion date per master (component_maintenance_history).
+  // Used to drive the Overview "Last Updated" column for MASTER rows.
+  const lastCompletedMap = await repo.getLatestCompletedDateBatch(masterRefs);
 
   const parentsWithCounts = masterComponents.map((component) => {
       // Under 'all'/'my' aggregate, vesselId is 'all' — scope inherited lookup to the
@@ -244,11 +247,17 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
         : 0;
 
       const lastUpdatedBy = lastUpdatedByMap.get(component.cuuid) ?? null;
+      // Only MASTER components surface the last completed date (the Overview grid
+      // is MASTER-only, but branch explicitly to enforce the intent). ISO string.
+      const lastCompletedDate = component.rhCounterType === 'MASTER'
+        ? (lastCompletedMap.get(component.cuuid) ?? null)
+        : null;
 
       return {
         ...component,
         sfiCode: component.componentCode || '',
         latestUpdate: component.lastUpdated || component.rhMasterUpdatedAt || component.updatedAt || new Date().toISOString(),
+        lastCompletedDate,
         currentCumulativeRH: totalCumulativeRH.toFixed(2),
         currentMeterRH: currentMeterRH.toFixed(2),
         meterReplacedLastRh: meterReplacedLastRh > 0 ? meterReplacedLastRh.toFixed(2) : null,
