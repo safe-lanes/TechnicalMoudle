@@ -537,6 +537,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [currentWorkOrderStatus, setCurrentWorkOrderStatus] = useState<string>('');
   const [rejectionComments, setRejectionComments] = useState('');
   const [isProcessingApproval, setIsProcessingApproval] = useState(false);
+  // Task #240: when a MASTER component's completion reading exceeds the per-day RH rate cap,
+  // the server returns RH_OVERRIDE_REQUIRED. A Sail Admin (canOverride) can re-approve with the
+  // override flag; anyone else just sees the reason.
+  const [rhOverridePrompt, setRhOverridePrompt] = useState<{ message: string; canOverride: boolean } | null>(null);
   const [skippedCyclesJustification, setSkippedCyclesJustification] = useState('');
   const [ceApprovalRemarks, setCeApprovalRemarks] = useState('');
 
@@ -3471,7 +3475,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   // Approver actions
-  const handleApprove = async () => {
+  const handleApprove = async (adminOverride = false) => {
     if (embedded) return;
     if (!workOrderId) return;
 
@@ -3494,6 +3498,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         payload.dateCompleted = actualCompletionDate;
       }
 
+      // Task #240: re-approve with the Sail Admin override for a MASTER component whose completion
+      // reading exceeded the per-day RH rate cap.
+      if (adminOverride) {
+        payload.adminOverride = true;
+      }
+
       const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
         method: 'PATCH',
         headers: {
@@ -3505,6 +3515,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const result = await response.json();
 
       if (!response.ok) {
+        // Task #240: MASTER component over the per-day RH rate cap — surface the Sail Admin override
+        // affordance instead of a dead-end error toast.
+        if (result.code === 'RH_OVERRIDE_REQUIRED' && !adminOverride) {
+          setRhOverridePrompt({
+            message: result.error || 'The running-hours increase for this completion exceeds the allowed daily rate.',
+            canOverride: !!result.canOverride
+          });
+          return;
+        }
         throw new Error(result.error || 'Failed to approve work order');
       }
 
@@ -6616,7 +6635,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </Button>
                   ) : (
                     <Button
-                      onClick={handleApprove}
+                      onClick={() => handleApprove()}
                       disabled={approveDisabled}
                       className={`font-semibold px-8 py-2.5 h-auto text-sm rounded-full shadow-md min-w-[120px] ${approveDisabled && !isProcessingApproval ? 'bg-gray-400 cursor-not-allowed text-white' : 'bg-[#28a745] hover:bg-[#218838] text-white'}`}
                       title={approvalMissedCycles >= 1 && !justificationValid ? 'Please provide justification for skipped cycles before approving' : !ceRemarksValid ? `Please enter at least ${ceRemarksMinLength} characters in ${hodShort} Approval Remarks` : undefined}
@@ -6940,6 +6959,32 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         isOpen={isWorkInstructionsOpen}
         onClose={() => setIsWorkInstructionsOpen(false)}
       />
+
+      {/* Task #240: RH rate-cap override prompt (MASTER component over the per-day cap) */}
+      <AlertDialog open={!!rhOverridePrompt} onOpenChange={(open) => { if (!open) setRhOverridePrompt(null); }}>
+        <AlertDialogContent data-testid="dialog-rh-override">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Running Hours Increase Exceeds Daily Limit</AlertDialogTitle>
+            <AlertDialogDescription>
+              {rhOverridePrompt?.message}
+              {rhOverridePrompt?.canOverride
+                ? ' As a Sail Admin you can override the daily-rate limit and approve this completion. The master component running hours will be advanced and cascaded to its inherited children.'
+                : ' Only a Sail Admin can override this limit. Please verify the reading, or ask a Sail Admin to approve.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-rh-override-cancel">Cancel</AlertDialogCancel>
+            {rhOverridePrompt?.canOverride && (
+              <AlertDialogAction
+                onClick={() => { setRhOverridePrompt(null); handleApprove(true); }}
+                data-testid="button-rh-override-approve"
+              >
+                Override &amp; Approve
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Safety Requirement Modal */}
       <AlertDialog open={isSafetyModalOpen} onOpenChange={setIsSafetyModalOpen}>

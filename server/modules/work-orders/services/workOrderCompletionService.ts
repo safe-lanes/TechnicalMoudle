@@ -21,10 +21,23 @@ export async function completeWorkOrder(
     workDone?: string;
     sparesUsed?: any;
     remarks?: string;
+    userRole?: string;
+    adminOverride?: boolean;
+    userId?: string;
+    userUuid?: string;
     [key: string]: any;
   }
 ) {
-  const { runningHours, dateOfCompletion, approverUserId, ...executionData } = body;
+  const {
+    runningHours,
+    dateOfCompletion,
+    approverUserId,
+    userRole,
+    adminOverride,
+    userId: bodyUserId,
+    userUuid: bodyUserUuid,
+    ...executionData
+  } = body;
 
   // Get work order and component context
   const workOrder = await repo.findById(workOrderId);
@@ -95,18 +108,29 @@ export async function completeWorkOrder(
     throw new ValidationError('Running hours is required for RH-based maintenance work orders');
   }
 
-  // === Layer 7: RH Validation & Isolation ===
-  // Work orders NEVER write back to the RH Module. They only store snapshots.
+  // === Layer 7: RH Reading Sync (Task #240) — branch by rhCounterType ===
+  //  MASTER        → the completion reading is the source of truth: route it through
+  //                  updateMasterRH() so the per-day rate cap + Sail Admin override apply and the
+  //                  new value cascades to INHERITED children. The old flat "cannot exceed current
+  //                  RH" ceiling is intentionally NOT applied (the cap now lives in updateMasterRH).
+  //  INHERITED     → record this component's OWN maintenance cycle (last-done / next-due on the jobs
+  //                  row, written further below). Never move the master counter.
+  //  NOT_RH_DRIVEN → calendar/condition based: never write any RH value, skip RH validation entirely.
   let rhValidationDetails: any = null;
   let completionRHSource = 'MANUAL_ENTRY';
+  let rhReadingApplied = false;
+  const counterType = (component.rhCounterType || 'MASTER').toUpperCase();
 
-  if (runningHours) {
+  if (runningHours && counterType !== 'NOT_RH_DRIVEN') {
     const newRH = parseInt(runningHours);
     const completionDateForValidation = dateOfCompletion || new Date().toISOString().split('T')[0];
     const componentVesselId = workOrder.vesselId || component.vesselId || 'V001';
     const previousRH = parseInt(component.currentCumulativeRH || '0');
+    // Double-sync guard: if this WO's reading was already applied once, do not re-apply it on
+    // re-save / replay (would double-advance the master counter).
+    const alreadySynced = !!(workOrder as any).rhSyncedAt;
 
-    // Validate against parent (sub-component RH must never exceed parent RH)
+    // Validate against parent (sub-component RH must never exceed parent RH) — applies to both types
     if (component.parentId) {
       const parentComponent = await repo.findComponent(component.parentId as string);
       if (parentComponent) {
@@ -117,92 +141,110 @@ export async function completeWorkOrder(
       }
     }
 
-    const rhSource = component.rhCounterType === 'INHERITED'
-      ? (component.rhCurrentInheritedCached || component.currentCumulativeRH)
-      : (component.rhCurrentMaster || component.currentCumulativeRH);
-    const componentActualRH = rhSource !== null && rhSource !== undefined
-      ? parseInt(rhSource)
-      : null;
-    if (componentActualRH !== null && !isNaN(componentActualRH) && newRH > componentActualRH) {
-      throw new ValidationError(
-        `Current Reading (${newRH} hours) exceeds component's actual running hours (${componentActualRH} hours). ` +
-        `You cannot complete maintenance at a running hour that the component has not reached yet. ` +
-        `Please update the component's running hours in the Running Hours module first, then return to complete this work order. ` +
-        `Or enter a Current Reading value ≤ ${componentActualRH} hours.`,
-        {
-          code: 'INVALID_RUNNING_HOURS',
-          enteredValue: newRH,
-          componentActualRH,
-          maxAllowed: componentActualRH,
-          componentId: component.cuuid || component.id,
-          componentCode: component.componentCode || workOrder.componentCode,
-          componentName: component.description || component.componentCode || workOrder.componentCode,
-          rhCounterType: component.rhCounterType || 'MASTER'
-        }
-      );
-    }
-
-    // Use timeline-based validation (forward + backward checks, 24 hrs/day max)
-    const validation = await validateRHEntry(component.cuuid, completionDateForValidation, newRH);
-
-    if (!validation.isValid) {
-      throw new ValidationError(validation.errorMessage, {
-        code: validation.validationStatus,
-        validRange: validation.validRange,
-        previousEntry: validation.previousEntry,
-        nextEntry: validation.nextEntry,
-        utilizationRate: validation.utilizationRate,
-        daysBetweenPrevious: validation.daysBetweenPrevious,
-        daysBetweenNext: validation.daysBetweenNext,
-        maxPossibleIncrease: validation.maxPossibleIncrease,
-        actualIncrease: validation.actualIncrease
-      });
-    }
-
-    // If high utilization, require justification
-    if (validation.requiresJustification && !body.rhJustification) {
-      throw new ValidationError(
-        `High machinery utilization detected (${validation.utilizationRate.toFixed(1)} hrs/day). Justification is required.`,
-        {
-          code: 'HIGH_UTILIZATION',
-          validRange: validation.validRange,
-          utilizationRate: validation.utilizationRate,
-          requiresJustification: true
-        }
-      );
-    }
-
-    rhValidationDetails = {
-      isValid: validation.isValid,
-      validationDate: new Date().toISOString(),
-      validRange: validation.validRange,
-      utilizationRate: validation.utilizationRate,
-      requiresJustification: validation.requiresJustification,
-      validationErrors: validation.anomalyFlags
-    };
-
-    // Determine RH source
     if (body.completionRHSource) {
       completionRHSource = body.completionRHSource;
     }
 
-    // ISOLATION: Do NOT call repo.setComponentRunningHours() — work orders never modify RH Module
+    if (counterType === 'MASTER') {
+      // MASTER: advance the master counter and cascade to INHERITED children via updateMasterRH().
+      // updateMasterRH owns the 25 hrs/day cap + canAdminOverride(role) check, so we do NOT run the
+      // inline ceiling or validateRHEntry here (they would re-reject a reading the cap just accepted).
+      if (alreadySynced) {
+        console.log(`ℹ️ [RH Sync] WO ${workOrder.workOrderNo} already synced (rh_synced_at set) — skipping MASTER cascade (double-sync guard)`);
+      } else {
+        const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
+        try {
+          await updateMasterRH(component.cuuid, {
+            newRHValue: newRH,
+            updateSource: 'MANUAL',
+            userId: bodyUserId || executionData.performedBy || 'system',
+            userUuid: bodyUserUuid,
+            userRole: userRole || 'Ship',
+            adminOverride: adminOverride || false,
+            comments: `RH update via work order completion ${workOrder.workOrderNo} (${workOrder.templateCode || ''})`,
+            dateUpdated: completionDateForValidation
+          });
+          rhReadingApplied = true;
+          console.log(`✅ [RH Sync] MASTER component ${component.componentCode || component.cuuid} advanced to ${newRH} via WO ${workOrder.workOrderNo} (cascaded to INHERITED children)`);
+        } catch (masterErr: any) {
+          // Surface the per-day cap / override-required error so the UI can offer a Sail Admin override.
+          if (masterErr instanceof ValidationError) {
+            const det: any = masterErr.details || {};
+            throw new ValidationError(masterErr.message, {
+              code: 'RH_OVERRIDE_REQUIRED',
+              ...det,
+              requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+              canOverride: det.validation?.canOverride ?? false,
+              componentId: component.cuuid,
+              componentCode: component.componentCode || workOrder.componentCode,
+              rhCounterType: 'MASTER'
+            });
+          }
+          throw masterErr;
+        }
+      }
+    } else {
+      // INHERITED: validate the component's own timeline (forward/backward, 25 hrs/day) for its audit
+      // history, but drop the flat ceiling that over-blocked legitimate entries. The job's last-done /
+      // next-due RH cycle is written to the jobs row further below; the master counter is untouched.
+      const validation = await validateRHEntry(component.cuuid, completionDateForValidation, newRH);
 
-    // Record audit trail entry for historical tracking (read-only snapshot, source = 'workorder')
-    await repo.createRunningHoursAudit({
-      componentId: component.cuuid,
-      vesselId: componentVesselId,
-      previousRH: previousRH.toString(),
-      newRH: newRH.toString(),
-      cumulativeRH: newRH.toString(),
-      dateUpdatedLocal: completionDateForValidation,
-      dateUpdatedTZ: 'UTC',
-      enteredAtUTC: new Date(),
-      userId: executionData.performedBy || 'System',
-      source: 'workorder',
-      notes: `RH snapshot via work order completion: ${workOrder.templateCode} (ISOLATED - does not modify RH Module)`,
-      meterReplaced: false
-    });
+      if (!validation.isValid) {
+        throw new ValidationError(validation.errorMessage, {
+          code: validation.validationStatus,
+          validRange: validation.validRange,
+          previousEntry: validation.previousEntry,
+          nextEntry: validation.nextEntry,
+          utilizationRate: validation.utilizationRate,
+          daysBetweenPrevious: validation.daysBetweenPrevious,
+          daysBetweenNext: validation.daysBetweenNext,
+          maxPossibleIncrease: validation.maxPossibleIncrease,
+          actualIncrease: validation.actualIncrease
+        });
+      }
+
+      // If high utilization, require justification
+      if (validation.requiresJustification && !body.rhJustification) {
+        throw new ValidationError(
+          `High machinery utilization detected (${validation.utilizationRate.toFixed(1)} hrs/day). Justification is required.`,
+          {
+            code: 'HIGH_UTILIZATION',
+            validRange: validation.validRange,
+            utilizationRate: validation.utilizationRate,
+            requiresJustification: true
+          }
+        );
+      }
+
+      rhValidationDetails = {
+        isValid: validation.isValid,
+        validationDate: new Date().toISOString(),
+        validRange: validation.validRange,
+        utilizationRate: validation.utilizationRate,
+        requiresJustification: validation.requiresJustification,
+        validationErrors: validation.anomalyFlags
+      };
+
+      // Record audit-trail snapshot (INHERITED rides a master counter — this does NOT modify the
+      // RH Module master value). Guarded so a replay does not duplicate the snapshot.
+      if (!alreadySynced) {
+        await repo.createRunningHoursAudit({
+          componentId: component.cuuid,
+          vesselId: componentVesselId,
+          previousRH: previousRH.toString(),
+          newRH: newRH.toString(),
+          cumulativeRH: newRH.toString(),
+          dateUpdatedLocal: completionDateForValidation,
+          dateUpdatedTZ: 'UTC',
+          enteredAtUTC: new Date(),
+          userId: executionData.performedBy || 'System',
+          source: 'workorder',
+          notes: `RH snapshot via work order completion: ${workOrder.templateCode} (INHERITED — records own cycle, does not modify master)`,
+          meterReplaced: false
+        });
+      }
+      rhReadingApplied = true;
+    }
   }
 
   let missedCycles: number;
@@ -285,7 +327,10 @@ export async function completeWorkOrder(
     completionRHValidationDetails: rhValidationDetails || undefined,
     rhJustification: body.rhJustification || undefined,
     rhJustificationProvidedBy: body.rhJustification ? (executionData.performedBy || 'System') : undefined,
-    rhJustificationDate: body.rhJustification ? new Date() : undefined
+    rhJustificationDate: body.rhJustification ? new Date() : undefined,
+    // Double-sync guard: stamp when a completion reading was applied this run (MASTER cascade or
+    // INHERITED cycle). Leaves an existing stamp intact on replay.
+    rhSyncedAt: rhReadingApplied ? new Date() : undefined
   });
 
   // Sync field logging — log completion UPDATE

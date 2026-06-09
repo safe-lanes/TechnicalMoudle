@@ -1241,6 +1241,11 @@ export const workOrders = pgTable("work_orders", {
   rhJustificationProvidedBy: text("rh_justification_provided_by"),
   rhJustificationDate: timestamp("rh_justification_date"),
 
+  // === Task #240: RH Reading Sync double-sync guard ===
+  // Stamped when a completion running-hours reading has been applied (MASTER cascade
+  // or INHERITED cycle write). Prevents re-applying the same reading on re-save/replay.
+  rhSyncedAt: timestamp("rh_synced_at"),
+
   // === Postponement Approval Fields (Plan B) ===
   postponeRequestedDate: text("postpone_requested_date"), // Ship's requested new due date (populated on postpone-request submit)
   postponeApprover: text("postpone_approver"), // Static "Office" value stored at request time

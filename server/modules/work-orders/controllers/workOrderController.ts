@@ -123,6 +123,7 @@ export async function createWorkOrder(req: Request, res: Response) {
 export async function updateWorkOrder(req: Request, res: Response) {
   try {
     const actor = resolveActorIdentity(req);
+    const authReq = req as AuthenticatedRequest;
     const body = { ...req.body };
     if (actor) {
       // Prefer caller-supplied userId, but fall back to the authenticated user
@@ -130,6 +131,12 @@ export async function updateWorkOrder(req: Request, res: Response) {
       if (!body.userId || body.userId === 'system') body.userId = actor;
       if (!body.performedBy || body.performedBy === 'system') body.performedBy = actor;
     }
+    // Authorize the running-hours cap override from the session role (Task #240). The role is taken
+    // ONLY from the authenticated session and overwrites any client-supplied value — a caller must
+    // not be able to spoof "Sail Admin" via the request body. adminOverride (the intent) still comes
+    // from the body, but the server-side role is what decides whether the override is honored.
+    body.userRole = authReq.user?.role;
+    body.userUuid = authReq.user?.userUuid ?? body.userUuid;
     const workOrder = await woService.updateWorkOrder(req.params.id, body);
     res.json(workOrder);
   } catch (error: any) {
@@ -224,7 +231,16 @@ export async function reopenCompletion(req: Request, res: Response) {
 
 export async function completeWorkOrder(req: Request, res: Response) {
   try {
-    const result = await woCompletionService.completeWorkOrder(req.params.id, req.body);
+    const authReq = req as AuthenticatedRequest;
+    // Authorize the running-hours cap override server-side from the session role ONLY — never trust a
+    // client-sent role (a caller must not be able to spoof "Sail Admin" via the body). adminOverride
+    // (the intent) still comes from the body; the server-side role decides whether it is honored.
+    const result = await woCompletionService.completeWorkOrder(req.params.id, {
+      ...req.body,
+      userRole: authReq.user?.role,
+      userId: req.body.userId ?? authReq.user?.username,
+      userUuid: req.body.userUuid ?? authReq.user?.userUuid,
+    });
     res.json(result);
   } catch (error: any) {
     console.error('Work order completion error:', error);

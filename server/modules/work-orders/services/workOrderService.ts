@@ -1339,6 +1339,102 @@ export async function updateWorkOrder(id: string, body: any) {
     );
   }
 
+  // === Task #240: MASTER RH Reading Sync (live completion path) ===
+  // The web UI completes a WO via this PATCH approval transition (not POST /complete), so the
+  // counter-type branch must live here too. For MASTER components the completion reading is the
+  // source of truth: route it through updateMasterRH() so the per-day rate cap + Sail Admin
+  // override apply and the value cascades to INHERITED children.
+  //   - Placed AFTER all approval gates (justification / tier / L2) and BEFORE the commit so the
+  //     override-required error surfaces while the WO is still Pending (no half-completed state),
+  //     and so blocked / intercepted WOs never advance the master counter.
+  //   - INHERITED keeps the existing RH_EXCEEDS_MASTER guard above + its own jobs-row cycle write
+  //     below; NOT_RH_DRIVEN never reaches this branch. Neither moves the master counter.
+  //   - Double-sync guarded by existing rh_synced_at; the stamp persists in the same commit.
+  if (
+    isApprovalTransition &&
+    !interceptedForL2Review &&
+    updateData.status === 'Completed' &&
+    !(existingWO as any).rhSyncedAt
+  ) {
+    const rhRaw = existingWO.runningHours || updateData.runningHours;
+    if (rhRaw) {
+      let rhComp = await repo.findComponent(existingWO.component);
+      if (!rhComp && existingWO.componentCode && existingWO.vesselId) {
+        rhComp = await repo.findComponentByCode(existingWO.componentCode, existingWO.vesselId);
+      }
+      const rhCounterType = (rhComp?.rhCounterType || 'MASTER').toUpperCase();
+      const rhValue = parseInt(rhRaw);
+      const normRhDate = (d?: string | null): string | undefined => {
+        if (!d) return undefined;
+        if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.split('T')[0];
+        const m = d.match(/^(\d{2})[-\/](\d{2})[-\/](\d{4})/);
+        if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+        const p = new Date(d);
+        return !isNaN(p.getTime()) ? p.toISOString().split('T')[0] : undefined;
+      };
+      const completionDateNorm = normRhDate(existingWO.completionDateTime || existingWO.dateCompleted || updateData.completionDateTime);
+
+      if (rhComp && rhCounterType === 'MASTER' && !isNaN(rhValue)) {
+        // MASTER: completion reading is source of truth — advance master counter + cascade.
+        const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
+        try {
+          await updateMasterRH(rhComp.cuuid, {
+            newRHValue: rhValue,
+            updateSource: 'MANUAL',
+            userId: body.userId || existingWO.performedBy || 'system',
+            userUuid: body.userUuid,
+            userRole: body.userRole || 'Ship',
+            adminOverride: body.adminOverride || false,
+            comments: `RH update via work order completion ${existingWO.workOrderNo}`,
+            dateUpdated: completionDateNorm
+          });
+          updateData.rhSyncedAt = new Date();
+          console.log(`✅ [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} advanced to ${rhValue} via WO ${existingWO.workOrderNo} (cascaded to INHERITED children)`);
+        } catch (masterErr: any) {
+          // Surface the per-day cap / override-required error so the UI can offer a Sail Admin override.
+          if (masterErr instanceof ValidationError) {
+            const det: any = masterErr.details || {};
+            throw new ValidationError(masterErr.message, {
+              code: 'RH_OVERRIDE_REQUIRED',
+              ...det,
+              requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+              canOverride: det.validation?.canOverride ?? false,
+              componentId: rhComp.cuuid,
+              componentCode: rhComp.componentCode || existingWO.componentCode,
+              rhCounterType: 'MASTER'
+            });
+          }
+          throw masterErr;
+        }
+      } else if (rhComp && rhCounterType === 'INHERITED' && !isNaN(rhValue)) {
+        // INHERITED: records its OWN maintenance cycle (the jobs-row last-done/next-due write happens
+        // further below). It rides a master counter, so we NEVER advance the master here — only write
+        // a read-only audit snapshot for history. The exceeds-master guard already ran above.
+        try {
+          const prevRH = parseInt(rhComp.currentCumulativeRH || '0');
+          await repo.createRunningHoursAudit({
+            componentId: rhComp.cuuid,
+            vesselId: existingWO.vesselId || rhComp.vesselId || 'V001',
+            previousRH: (isNaN(prevRH) ? 0 : prevRH).toString(),
+            newRH: rhValue.toString(),
+            cumulativeRH: rhValue.toString(),
+            dateUpdatedLocal: completionDateNorm || new Date().toISOString().split('T')[0],
+            dateUpdatedTZ: 'UTC',
+            enteredAtUTC: new Date(),
+            userId: body.userId || existingWO.performedBy || 'System',
+            source: 'workorder',
+            notes: `RH snapshot via work order completion ${existingWO.workOrderNo} (INHERITED — records own cycle, does not modify master)`,
+            meterReplaced: false
+          });
+        } catch (auditErr) {
+          console.error('[RH Sync] Failed to write INHERITED audit snapshot:', auditErr);
+        }
+        updateData.rhSyncedAt = new Date();
+      }
+      // NOT_RH_DRIVEN: never write any RH value — fall through with no RH sync.
+    }
+  }
+
   const workOrder = await repo.update(id, updateData);
 
   // Sync field logging — log UPDATE (existingWO already fetched at top of function)
