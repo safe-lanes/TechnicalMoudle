@@ -225,16 +225,24 @@ export async function validateRHEntry(req: Request, res: Response) {
     const result = await rhTimelineValidation.validateRHEntry(machineryId, completionDate, Number(runningHours));
 
     let componentActualRH: number | null = null;
+    let rhCounterType = 'MASTER';
     try {
       const currentRHData = await rhTimelineValidation.getCurrentRH(machineryId);
       componentActualRH = currentRHData.currentRH;
+      rhCounterType = (currentRHData.rhCounterType || 'MASTER').toUpperCase();
     } catch {}
 
     const enteredRH = Number(runningHours);
-    let exceedsComponentRH = false;
-    if (componentActualRH !== null && !isNaN(componentActualRH) && enteredRH > componentActualRH) {
-      exceedsComponentRH = true;
-    }
+
+    // The flat "exceeds component actual RH" ceiling is a legacy gate that over-blocks RH-driven
+    // completions (it pins the max at the component's *current* reading). It must NOT apply to
+    // MASTER (the completion reading is the source of truth and advances the counter) or to
+    // INHERITED (governed solely by timeline validation — see workOrderCompletionService). Those
+    // are the only RH-driven counter types, so the flat ceiling is effectively retired here and
+    // timeline validation (already computed in `result`) is the sole governor.
+    const isRhDriven = rhCounterType === 'MASTER' || rhCounterType === 'INHERITED';
+    const exceedsComponentRH =
+      !isRhDriven && componentActualRH !== null && !isNaN(componentActualRH) && enteredRH > componentActualRH;
 
     const prevReading = previousReading !== undefined && previousReading !== null ? Number(previousReading) : null;
 
@@ -243,7 +251,9 @@ export async function validateRHEntry(req: Request, res: Response) {
       adjustedMin = prevReading;
     }
 
-    const adjustedMax = result.validRange && componentActualRH !== null && componentActualRH > 0
+    // For RH-driven types do NOT cap the displayed max at the current reading — show the true
+    // timeline range. The legacy current-RH cap only applies on the (now unused) non-RH path.
+    const adjustedMax = !isRhDriven && result.validRange && componentActualRH !== null && componentActualRH > 0
       ? Math.min(result.validRange.max, componentActualRH)
       : (result.validRange ? result.validRange.max : Infinity);
 
@@ -252,7 +262,7 @@ export async function validateRHEntry(req: Request, res: Response) {
       : result.validRange;
 
     let adjustedResult = { ...result };
-    if (!result.isValid && prevReading !== null && !isNaN(prevReading) && componentActualRH !== null) {
+    if (!isRhDriven && !result.isValid && prevReading !== null && !isNaN(prevReading) && componentActualRH !== null) {
       if (enteredRH >= prevReading && enteredRH <= componentActualRH) {
         adjustedResult = {
           ...result,
@@ -269,6 +279,7 @@ export async function validateRHEntry(req: Request, res: Response) {
       ...adjustedResult,
       validRange: cappedValidRange,
       componentActualRH,
+      rhCounterType,
       exceedsComponentRH,
       ...(exceedsComponentRH && adjustedResult.isValid ? {
         isValid: false,

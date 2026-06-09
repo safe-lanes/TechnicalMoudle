@@ -1195,42 +1195,11 @@ export async function updateWorkOrder(id: string, body: any) {
 
   console.log('📝 Cleaned update data keys:', Object.keys(updateData));
 
-  // VALIDATION: For INHERITED components, check that RH doesn't exceed master component RH
-  if (updateData.approvalAction === 'approved' && updateData.status === 'Completed') {
-    const runningHours = existingWO.runningHours || updateData.runningHours;
-    if (runningHours) {
-      let componentForValidation = await repo.findComponent(existingWO.component);
-      if (!componentForValidation && existingWO.componentCode && existingWO.vesselId) {
-        componentForValidation = await repo.findComponentByCode(existingWO.componentCode, existingWO.vesselId);
-      }
-
-      if (componentForValidation) {
-        const counterType = (componentForValidation.rhCounterType || '').toUpperCase();
-        if (counterType === 'INHERITED') {
-          let rhMasterComponent: any = null;
-          if (componentForValidation.rhMasterComponentId) {
-            rhMasterComponent = await repo.findComponent(componentForValidation.rhMasterComponentId);
-          }
-          if (!rhMasterComponent && componentForValidation.rhCounterSource && existingWO.vesselId) {
-            rhMasterComponent = await repo.findComponentByCode(componentForValidation.rhCounterSource, existingWO.vesselId);
-          }
-
-          if (rhMasterComponent) {
-            const enteredRH = parseFloat(runningHours);
-            const masterRH = parseFloat(rhMasterComponent.currentCumulativeRH || rhMasterComponent.rhCurrentMaster || '0');
-
-            if (!isNaN(enteredRH) && !isNaN(masterRH) && enteredRH > masterRH) {
-              console.error(`❌ RH validation failed: Entered RH (${enteredRH}) exceeds master component ${rhMasterComponent.componentCode} RH (${masterRH})`);
-              throw new ValidationError(
-                `Running hours (${enteredRH}) cannot exceed master component "${rhMasterComponent.name}" (${rhMasterComponent.componentCode}) running hours of ${masterRH}. Please update the master component's running hours first.`,
-                { code: 'RH_EXCEEDS_MASTER' }
-              );
-            }
-          }
-        }
-      }
-    }
-  }
+  // INHERITED RH no longer has a flat "cannot exceed master" ceiling. Per the Task #240 design,
+  // an INHERITED component records its OWN maintenance cycle and is governed solely by timeline
+  // validation (forward/backward ordering + 25 hrs/day utilization), mirroring the INHERITED
+  // branch in workOrderCompletionService. The legacy RH_EXCEEDS_MASTER guard was removed here so
+  // the two completion paths behave identically.
 
   const isApprovalTransition = (updateData.approvalAction === 'approved' && updateData.status === 'Completed') ||
     (updateData.status === 'Completed' && existingWO.status === 'Pending Approval');
@@ -1409,7 +1378,8 @@ export async function updateWorkOrder(id: string, body: any) {
       } else if (rhComp && rhCounterType === 'INHERITED' && !isNaN(rhValue)) {
         // INHERITED: records its OWN maintenance cycle (the jobs-row last-done/next-due write happens
         // further below). It rides a master counter, so we NEVER advance the master here — only write
-        // a read-only audit snapshot for history. The exceeds-master guard already ran above.
+        // a read-only audit snapshot for history. Timeline validation is the sole governor (no flat
+        // current-RH or exceeds-master ceiling).
         try {
           const prevRH = parseInt(rhComp.currentCumulativeRH || '0');
           await repo.createRunningHoursAudit({

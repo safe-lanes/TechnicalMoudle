@@ -414,6 +414,7 @@ export async function getCurrentRH(machineryId: string): Promise<{
   lastUpdated: string;
   source: string;
   updatedBy: string;
+  rhCounterType: string;
 }> {
   const component = await repo.getComponent(machineryId);
   if (!component) {
@@ -455,6 +456,7 @@ export async function getCurrentRH(machineryId: string): Promise<{
     currentRH,
     lastUpdated,
     source: 'RH_MODULE',
-    updatedBy: component.rhMasterUpdatedBy || 'System'
+    updatedBy: component.rhMasterUpdatedBy || 'System',
+    rhCounterType: (component.rhCounterType || 'MASTER').toUpperCase()
   };
 }

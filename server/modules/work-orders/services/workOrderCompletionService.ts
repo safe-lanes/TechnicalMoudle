@@ -130,16 +130,9 @@ export async function completeWorkOrder(
     // re-save / replay (would double-advance the master counter).
     const alreadySynced = !!(workOrder as any).rhSyncedAt;
 
-    // Validate against parent (sub-component RH must never exceed parent RH) — applies to both types
-    if (component.parentId) {
-      const parentComponent = await repo.findComponent(component.parentId as string);
-      if (parentComponent) {
-        const parentRH = parseInt(parentComponent.currentCumulativeRH);
-        if (newRH > parentRH) {
-          throw new ValidationError(`Sub-component running hours (${newRH}) cannot exceed parent component's running hours (${parentRH})`);
-        }
-      }
-    }
+    // Task #245: the flat parent/master-exceedance ceiling is intentionally NOT applied here.
+    // MASTER readings are governed by updateMasterRH (per-day cap + Sail-Admin override) and
+    // INHERITED readings are governed solely by validateRHEntry timeline validation below.
 
     if (body.completionRHSource) {
       completionRHSource = body.completionRHSource;

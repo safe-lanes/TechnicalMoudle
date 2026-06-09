@@ -2569,13 +2569,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         } else if (!draftIntent && componentActualRHStatus === 'error') {
           hardErrors.push('Unable to verify component running hours. Please refresh the page or retry loading the component RH before saving.');
         }
-        if (currentRHValue) {
-          const enteredRH = Number(currentRHValue);
-          const capRH = rhValidation.componentActualRH ?? (executionData.previousReading ? Number(executionData.previousReading) : null);
-          if (capRH !== null && !isNaN(enteredRH) && !isNaN(capRH) && enteredRH > capRH) {
-            hardErrors.push(`Running hours entered (${enteredRH}) exceeds the component's actual running hours (${capRH}). You cannot complete maintenance at a running hour that the component has not reached yet. Please update the component's running hours in the Running Hours module first, or enter a value ≤ ${capRH} hours.`);
-          }
-        }
+        // The flat "exceeds component actual RH" ceiling was removed (Task #245). MASTER readings
+        // advance the counter and INHERITED is governed by timeline validation, so the only RH gate
+        // here is the server timeline result surfaced via rhValidation.status below.
       }
 
       if (rhValidation.status === 'invalid' && !isRejectedWO) {
@@ -2777,18 +2773,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             return;
           }
 
-          const counterType = (component.rhCounterType || '').toUpperCase();
-          if (counterType === 'INHERITED' && rhMasterComponent) {
-            const masterRH = parseFloat(rhMasterComponent.currentCumulativeRH);
-            if (!isNaN(masterRH) && newRunningHours > masterRH) {
-              toast({
-                title: "Running Hours Exceeds Master",
-                description: `Running hours (${newRunningHours}) cannot exceed master component "${rhMasterComponent.name}" (${rhMasterComponent.componentCode}) running hours of ${masterRH}. Please update the master component's running hours in the Running Hours module first.`,
-                variant: "destructive",
-              });
-              return;
-            }
-          }
+          // INHERITED components no longer have a flat "cannot exceed master" ceiling (Task #245).
+          // They record their own maintenance cycle and are governed solely by server-side timeline
+          // validation (forward/backward + utilization), matching the merged completion service.
 
           // Layer 7: Use server-side timeline validation (skip blocking for rejected WOs — they need to resubmit)
           if (rhValidation.status === 'invalid' && !isRejectedWO) {
@@ -3215,13 +3202,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       } else if (componentActualRHStatus === 'error') {
         hardErrors.push('Unable to verify component running hours. Please refresh the page or retry loading the component RH before saving.');
       }
-      if (currentRHValue) {
-        const enteredRH = Number(currentRHValue);
-        const capRH = rhValidation.componentActualRH ?? (executionData.previousReading ? Number(executionData.previousReading) : null);
-        if (capRH !== null && !isNaN(enteredRH) && !isNaN(capRH) && enteredRH > capRH) {
-          hardErrors.push(`Running hours entered (${enteredRH}) exceeds the component's actual running hours (${capRH}). Please update the component's running hours in the Running Hours module first, or enter a value ≤ ${capRH} hours.`);
-        }
-      }
+      // Flat "exceeds component actual RH" ceiling removed (Task #245); timeline validation
+      // (rhValidation.status below) is the sole RH gate for MASTER and INHERITED components.
     }
     if (rhValidation.status === 'invalid' && !isRejectedWO) {
       hardErrors.push(rhValidation.message || 'Running hours validation failed. Please correct the Current Reading value.');
@@ -5831,16 +5813,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     </Button>
                   )}
                 </div>
-                {componentActualRHStatus === 'loaded' && rhValidation.componentActualRH !== null && executionData.currentReading && Number(executionData.currentReading) > rhValidation.componentActualRH && (
-                  <div className="text-xs text-red-600" data-testid="text-rh-cap-hint">
-                    Maximum allowed: {rhValidation.componentActualRH.toLocaleString()} hours
-                    {componentActualRHLastUpdated && (
-                      <span className="ml-1 text-gray-500">
-                        (updated {new Date(componentActualRHLastUpdated).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })})
-                      </span>
-                    )}
-                  </div>
-                )}
                 {componentActualRHStatus === 'error' && (
                   <div className="text-xs text-red-600" data-testid="text-rh-fetch-error">
                     Unable to fetch component RH. Please retry or refresh the page.
@@ -5888,7 +5860,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {/* RH Valid Range Helper */}
                 {rhValidation.validRange && (
                   <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded" data-testid="text-rh-valid-range">
-                    Valid range: {(() => { const prevR = executionData.previousReading ? Number(executionData.previousReading) : null; const displayMin = prevR !== null && !isNaN(prevR) && prevR < rhValidation.validRange.min ? prevR : rhValidation.validRange.min; return displayMin.toLocaleString(); })()} to {rhValidation.componentActualRH !== null && rhValidation.componentActualRH > 0 ? rhValidation.componentActualRH.toLocaleString() : (rhValidation.validRange.max === Infinity ? '∞' : rhValidation.validRange.max.toLocaleString())} hours
+                    Valid range: {(() => { const prevR = executionData.previousReading ? Number(executionData.previousReading) : null; const displayMin = prevR !== null && !isNaN(prevR) && prevR < rhValidation.validRange.min ? prevR : rhValidation.validRange.min; return displayMin.toLocaleString(); })()} to {rhValidation.validRange.max === Infinity ? '∞' : rhValidation.validRange.max.toLocaleString()} hours
                     {rhValidation.previousEntry && (
                       <span className="ml-1 text-blue-500">
                         | Last: {rhValidation.previousEntry.runningHours.toFixed(0)} hrs on {new Date(rhValidation.previousEntry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
