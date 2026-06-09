@@ -91,6 +91,42 @@ export async function getWorkOrder(req: Request, res: Response) {
   res.json(result);
 }
 
+// POST /work-orders/generate-now — office on-demand generation sweep for ONE vessel.
+// Reuses the exact generation logic of the (ship-side) daily scanner, but runs
+// only when a user clicks it. This is the office's replacement for the removed
+// every-minute shore auto-scan: manual, user-triggered, scoped to the selected
+// vessel (for setup/QA). The single-WO manual-create path is unchanged.
+export async function generateNow(req: Request, res: Response) {
+  const vesselId = ((req.body && req.body.vesselId) ?? req.query.vesselId) as string | undefined;
+  if (!vesselId || typeof vesselId !== 'string' || vesselId === 'all') {
+    throw new ValidationError('A specific vesselId is required to generate work orders.');
+  }
+
+  // Dynamic import mirrors routes.ts and avoids a static cycle with the scanner.
+  const { jobDueScanner } = await import('../../../services/jobDueScanner');
+  const result = await jobDueScanner.runScan(vesselId);
+
+  if (result.skipped) {
+    return res.status(409).json({
+      success: false,
+      message: 'A work-order generation run is already in progress. Please try again in a moment.',
+    });
+  }
+
+  const generated = result.calendarWOsGenerated + result.rhWOsGenerated + result.dualWOsGenerated;
+  const checked = result.calendarJobsChecked + result.rhJobsChecked + result.dualJobsChecked;
+  res.json({
+    success: true,
+    vesselId,
+    generated,
+    checked,
+    breakdown: result,
+    message: generated > 0
+      ? `Generated ${generated} work order(s) from ${checked} due job(s).`
+      : `No work orders were due. Checked ${checked} job(s).`,
+  });
+}
+
 export async function getWorkOrderContext(req: Request, res: Response) {
   const result = await woContextService.getWorkOrderContext(req.params.id);
   res.json(result);

@@ -96,32 +96,40 @@ export class JobDueScannerService {
   }
 
   /**
-   * Run a full scan of all jobs and generate work orders as needed
+   * Run a full scan of jobs and generate work orders as needed.
+   * @param scopeVesselId optional — when provided, only this vessel's jobs/WOs
+   *   are scanned. Used by the office on-demand "Generate Now" action. When
+   *   omitted, scans every vessel in this DB (the daily ship-side schedule;
+   *   a ship DB holds only its own vessel anyway).
+   * @returns the counts, plus `skipped: true` if a run was already in progress.
    */
-  async runScan(): Promise<{
+  async runScan(scopeVesselId?: string): Promise<{
     calendarJobsChecked: number;
     calendarWOsGenerated: number;
     rhJobsChecked: number;
     rhWOsGenerated: number;
     dualJobsChecked: number;
     dualWOsGenerated: number;
+    skipped?: boolean;
   }> {
     // Re-entrancy guard: if the previous scan is still running, skip this tick
     // rather than stacking concurrent runs (which compounds heap + blocks the event loop).
     if (this.runInProgress) {
-      console.log('[JobDueScanner] Previous scan still running — skipping this tick');
+      console.log('[JobDueScanner] Previous scan still running — skipping this run');
       return {
         calendarJobsChecked: 0,
         calendarWOsGenerated: 0,
         rhJobsChecked: 0,
         rhWOsGenerated: 0,
         dualJobsChecked: 0,
-        dualWOsGenerated: 0
+        dualWOsGenerated: 0,
+        skipped: true
       };
     }
     this.runInProgress = true;
 
-    console.log('[JobDueScanner] Starting job due scan...');
+    const scopeLabel = scopeVesselId ? `vessel ${scopeVesselId}` : 'all vessels';
+    console.log(`[JobDueScanner] Starting job due scan (${scopeLabel})...`);
 
     const results = {
       calendarJobsChecked: 0,
@@ -134,21 +142,21 @@ export class JobDueScannerService {
 
     try {
       // Process Calendar-based jobs using existing method
-      const calendarResults = await workOrderService.autoGenerateWorkOrdersFromJobs();
+      const calendarResults = await workOrderService.autoGenerateWorkOrdersFromJobs(scopeVesselId);
       results.calendarJobsChecked = calendarResults.checked;
       results.calendarWOsGenerated = calendarResults.generated;
 
       // Process Running Hours-based jobs
-      const rhResults = await this.processRunningHoursJobs();
+      const rhResults = await this.processRunningHoursJobs(scopeVesselId);
       results.rhJobsChecked = rhResults.checked;
       results.rhWOsGenerated = rhResults.generated;
 
       // Process Dual Frequency jobs (whichever-first: Calendar OR RH)
-      const dualResults = await this.processDualFrequencyJobs();
+      const dualResults = await this.processDualFrequencyJobs(scopeVesselId);
       results.dualJobsChecked = dualResults.checked;
       results.dualWOsGenerated = dualResults.generated;
 
-      console.log(`[JobDueScanner] Scan complete: Calendar (${results.calendarWOsGenerated}/${results.calendarJobsChecked} WOs), RH (${results.rhWOsGenerated}/${results.rhJobsChecked} WOs), Dual (${results.dualWOsGenerated}/${results.dualJobsChecked} WOs)`);
+      console.log(`[JobDueScanner] Scan complete (${scopeLabel}): Calendar (${results.calendarWOsGenerated}/${results.calendarJobsChecked} WOs), RH (${results.rhWOsGenerated}/${results.rhJobsChecked} WOs), Dual (${results.dualWOsGenerated}/${results.dualJobsChecked} WOs)`);
     } catch (error) {
       console.error('[JobDueScanner] Scan failed:', error);
       throw error;
@@ -180,7 +188,7 @@ export class JobDueScannerService {
    * - RH_effective_current >= RH_generate
    * - AND no DUE/OVERDUE/PENDING APPROVAL/POSTPONED WO exists for same job + same RH_due cycle
    */
-  private async processRunningHoursJobs(): Promise<{ checked: number; generated: number }> {
+  private async processRunningHoursJobs(scopeVesselId?: string): Promise<{ checked: number; generated: number }> {
     const skipReasons = {
       noComponentId: 0,
       componentNotFound: 0,
@@ -192,17 +200,17 @@ export class JobDueScannerService {
       cycleExists: 0,
     };
 
-    // Get only active RH-based jobs
-    const allJobs = await storage.getJobs();
+    // Get only active RH-based jobs (vessel-scoped when an on-demand scope is given)
+    const allJobs = await storage.getJobs(scopeVesselId);
     const rhJobs = allJobs.filter(job => 
       job.maintenanceBasis === 'Running Hours' && 
       job.isActive !== false && // Job must be active
       job.intervalRunningHour && job.intervalRunningHour > 0 // Must have valid frequency
     );
 
-    // Get all work orders to check for duplicates
-    // Note: We fetch all WOs but use vessel-scoped keys for proper cross-vessel handling
-    const allWorkOrders = await storage.getWorkOrders();
+    // Get work orders to check for duplicates (scoped to the same vessel when on-demand).
+    // Cross-vessel uniqueness is preserved via vessel-scoped keys regardless.
+    const allWorkOrders = await storage.getWorkOrders(scopeVesselId);
     
     // JOB-LEVEL LOCK: Build sets of jobs that already have an active WO
     // Rule: "one active WO per job at a time" - prevents ANY duplicate regardless of cycle
@@ -231,6 +239,10 @@ export class JobDueScannerService {
       }
       return componentCache.get(componentId);
     };
+
+    // Prefetch ALL job→component links for the candidate RH jobs in ONE query
+    // (kills the per-job getLinkedComponentsForJob N+1 → lower heap/CPU).
+    const rhLinksMap = await storage.getLinkedComponentsForJobs(rhJobs.map(j => j.juuid));
 
     let generated = 0;
 
@@ -285,8 +297,9 @@ export class JobDueScannerService {
         continue;
       }
       
-      // Get ALL linked components for this job (with RH tracking data)
-      const linkedComponents = await storage.getLinkedComponentsForJob(job.juuid);
+      // Get ALL linked components for this job from the prefetched batch map
+      // (copy so the per-job fallback push below never mutates the shared array).
+      const linkedComponents = [...(rhLinksMap.get(job.juuid) ?? [])];
 
       // If no linked components found, fall back to job's primary component
       if (linkedComponents.length === 0 && job.componentId) {
@@ -435,7 +448,7 @@ export class JobDueScannerService {
    * - job.isActive = true
    * - job.intervalRunningHour > 0 AND job.nextDueDate set
    */
-  private async processDualFrequencyJobs(): Promise<{ checked: number; generated: number }> {
+  private async processDualFrequencyJobs(scopeVesselId?: string): Promise<{ checked: number; generated: number }> {
     const skipReasons = {
       noComponentId: 0,
       componentNotFound: 0,
@@ -448,8 +461,8 @@ export class JobDueScannerService {
       missingRHData: 0,
     };
 
-    // Get only active Dual Frequency jobs
-    const allJobs = await storage.getJobs();
+    // Get only active Dual Frequency jobs (vessel-scoped when an on-demand scope is given)
+    const allJobs = await storage.getJobs(scopeVesselId);
     const dualJobs = allJobs.filter(job =>
       job.maintenanceBasis === 'Dual Frequency' &&
       job.isActive !== false &&
@@ -461,7 +474,7 @@ export class JobDueScannerService {
       return { checked: 0, generated: 0 };
     }
 
-    const allWorkOrders = await storage.getWorkOrders();
+    const allWorkOrders = await storage.getWorkOrders(scopeVesselId);
 
     // JOB-LEVEL LOCK: one active WO per job
     const activeWOSets = buildJobsWithActiveWOSet(allWorkOrders);
@@ -481,6 +494,10 @@ export class JobDueScannerService {
       }
       return componentCache.get(componentId);
     };
+
+    // Prefetch ALL job→component links for the candidate Dual jobs in ONE query
+    // (kills the per-job getLinkedComponentsForJob N+1 → lower heap/CPU).
+    const dualLinksMap = await storage.getLinkedComponentsForJobs(dualJobs.map(j => j.juuid));
 
     let generated = 0;
     const today = new Date();
@@ -549,8 +566,9 @@ export class JobDueScannerService {
         continue;
       }
 
-      // Get linked components
-      const linkedComponents = await storage.getLinkedComponentsForJob(job.juuid);
+      // Get linked components from the prefetched batch map
+      // (copy so the per-job fallback push below never mutates the shared array).
+      const linkedComponents = [...(dualLinksMap.get(job.juuid) ?? [])];
       if (linkedComponents.length === 0 && job.componentId) {
         linkedComponents.push({
           componentId: job.componentId,
