@@ -97,20 +97,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Ship/shore role drives scheduler placement. Vessel-maintenance scanners
-  // (WO generation + status recalculation) are SHIP-ONLY: maintenance happens
-  // on the vessel, and the office receives WOs via sync. On the shore they are
-  // NOT started — WO status is computed on read, and the office generates WOs
-  // via the on-demand "Generate Now" action. This removes the every-minute
-  // full-table scan ×N-tenants on the shore and the 'system' status writes that
-  // were the documented source of false sync conflicts.
+  // Ship/shore role drives scheduler placement. WO GENERATION (jobDueScanner) is
+  // SHIP-ONLY and runs daily: maintenance happens on the vessel and the office
+  // receives WOs via sync; the office generates on demand via "Generate Now".
+  // WO STATUS is computed on read everywhere (computeWorkOrderStatus) — no
+  // scheduler persists the derived band. This removes the shore's every-minute
+  // full-table scan AND the 'system' status writes that were the documented
+  // source of false sync conflicts.
   const { isShipInstance } = await import("./modules/sync/syncRole");
   const isShip = await isShipInstance();
 
   // Daily cadence (configurable). Calendar legs move at day granularity and RH
   // legs change only on running-hours entry, so a daily sweep is sufficient.
   const JOB_DUE_SCAN_INTERVAL_MS = parseInt(process.env.JOB_DUE_SCAN_INTERVAL_MS || '', 10) || 24 * 60 * 60 * 1000;
-  const WO_STATUS_RECALC_INTERVAL_MS = parseInt(process.env.WO_STATUS_RECALC_INTERVAL_MS || '', 10) || 24 * 60 * 60 * 1000;
 
   // Start Job Due Scanner - scans jobs and auto-generates work orders when due
   const { jobDueScanner } = await import("./services/jobDueScanner");
@@ -121,14 +120,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('[JobDueScanner] Shore instance — auto scan NOT started (office uses on-demand "Generate Now")');
   }
 
-  // Start Work Order Status Recalculator - recalculates and persists work order statuses
-  const { workOrderStatusRecalculator } = await import("./services/workOrderStatusRecalculator");
-  if (isShip) {
-    workOrderStatusRecalculator.start(WO_STATUS_RECALC_INTERVAL_MS);
-    console.log(`[StatusRecalculator] Ship instance — scheduler started (interval: ${WO_STATUS_RECALC_INTERVAL_MS / 3600000}h)`);
-  } else {
-    console.log('[StatusRecalculator] Shore instance — recalculator NOT started (status computed on read)');
-  }
+  // NOTE: the former every-minute Work Order Status Recalculator has been REMOVED
+  // (ship and shore). WO status is now computed on read via computeWorkOrderStatus,
+  // and the readers that filtered the persisted band (overdue-alert query,
+  // equipment report) were retargeted to the computed band.
 
   // Start PMS Alert Engine - evaluates alert policies and creates alert events
   const { pmsAlertEngine } = await import("./modules/alerts/services/pmsAlertEngine");
@@ -560,15 +555,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   console.log(`📅 Scheduled hourly check for expired postponed work orders`);
 
   // Cleanup on server shutdown
-  // Stop EVERY scheduler on shutdown. Previously jobDueScanner /
-  // workOrderStatusRecalculator / pmsAlertEngine were omitted here, so a
-  // PM2 restart could leave an orphaned scanner interval running against the
-  // DB while a fresh process started another — compounding CPU/heap.
+  // Stop EVERY scheduler on shutdown. Previously jobDueScanner / pmsAlertEngine
+  // were omitted here, so a PM2 restart could leave an orphaned scanner interval
+  // running against the DB while a fresh process started another — compounding
+  // CPU/heap. (The status recalculator scheduler has been removed entirely.)
   const stopAllSchedulers = () => {
     console.log('Cleaning up scheduled tasks...');
     clearInterval(postponementCheckInterval);
     jobDueScanner.stop();
-    workOrderStatusRecalculator.stop();
     pmsAlertEngine.stop();
     syncPruningScheduler.stop();
     syncHealthScheduler.stop();

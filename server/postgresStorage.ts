@@ -4925,15 +4925,6 @@ export class PostgresStorage {
     return new Set(rows.map(r => r.dedupeKey));
   }
 
-  async getOverdueWorkOrders(): Promise<any[]> {
-    const db = await getDb();
-    return await db.select().from(workOrders)
-      .where(and(
-        eq(workOrders.status, 'Overdue'),
-        eq(workOrders.dataScope, 'vessel')
-      ));
-  }
-
   async getWorkOrdersWithMissedCycles(): Promise<any[]> {
     const db = await getDb();
     return await db.select().from(workOrders)

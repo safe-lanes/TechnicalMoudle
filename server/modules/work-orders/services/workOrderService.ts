@@ -465,6 +465,23 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[]) {
   return sortedWorkOrders;
 }
 
+/**
+ * Same as listWorkOrders, but returns each row with `status` overwritten by the
+ * computed lifecycle band (computedStatus). For readers that historically
+ * filtered the persisted `status` column for the DERIVED band (Overdue / Due /
+ * Active): now that no scheduler persists that band (it is computed on read),
+ * those readers get a correct value with no downstream changes. Authored /
+ * workflow statuses (Completed, Pending Approval, Postponed, Rejected, …) are
+ * preserved because computeWorkOrderStatus passes them through unchanged.
+ */
+// CONTRACT: every overdue/due (derived-band) read MUST go through this helper —
+// never a raw `WHERE status = 'Overdue'/'Due'`. Status is computed on read; the
+// persisted column is not maintained for the derived band.
+export async function getWorkOrdersWithComputedStatus(vesselId?: string, vesselIds?: string[]) {
+  const enriched = await listWorkOrders(vesselId, vesselIds);
+  return enriched.map((wo: any) => ({ ...wo, status: wo.computedStatus ?? wo.status }));
+}
+
 export interface ListWorkOrdersPagedParams extends WorkOrderFilterParams {
   page: number;
   pageSize: number;
