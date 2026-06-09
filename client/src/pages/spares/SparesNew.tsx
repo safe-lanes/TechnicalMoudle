@@ -4759,7 +4759,6 @@ const Spares: React.FC = () => {
                     <SelectContent>
                       <SelectItem value="Yes">Yes</SelectItem>
                       <SelectItem value="No">No</SelectItem>
-                      <SelectItem value="Critical">Critical</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -5316,7 +5315,6 @@ const Spares: React.FC = () => {
                     <SelectContent>
                       <SelectItem value="Yes">Yes</SelectItem>
                       <SelectItem value="No">No</SelectItem>
-                      <SelectItem value="Critical">Critical</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
