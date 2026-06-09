@@ -523,36 +523,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   })();
 
-  // Check and revert expired postponed work orders on startup
-  (async () => {
-    try {
-      const result = await storage.checkAndRevertPostponedWorkOrders();
-      if (result.revertedCount > 0) {
-        console.log(`✅ Reverted ${result.revertedCount} expired postponed work orders to Due status`);
-        result.revertedWorkOrders.forEach(wo => {
-          console.log(`   - WO ${wo.workOrderNo} (${wo.jobTitle})`);
-        });
-      } else {
-        console.log('✅ No expired postponed work orders to revert');
-      }
-    } catch (err) {
-      console.error('⚠️ Error checking postponed work orders on startup:', err);
-    }
-  })();
-
-  // Set up hourly check for expired postponed work orders
-  const POSTPONEMENT_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-  const postponementCheckInterval = setInterval(async () => {
-    try {
-      const result = await storage.checkAndRevertPostponedWorkOrders();
-      if (result.revertedCount > 0) {
-        console.log(`[Scheduled] Reverted ${result.revertedCount} expired postponed work orders`);
-      }
-    } catch (err) {
-      console.error('[Scheduled] Error checking postponed work orders:', err);
-    }
-  }, POSTPONEMENT_CHECK_INTERVAL_MS);
-  console.log(`📅 Scheduled hourly check for expired postponed work orders`);
+  // ── Postponement auto-revert: INTENTIONALLY DISABLED — DO NOT RE-ENABLE ──
+  // Domain decision (Jeevan, 2026-06): an expired postponement must NOT
+  // auto-revert. A postponed work order stays 'Postponed' until a user acts on
+  // it manually. The former startup + hourly storage.checkAndRevertPostponedWorkOrders()
+  // calls were already a no-op (the revert keys on a non-existent `postponedDate`
+  // field), and that no-op is the CORRECT behaviour. The scheduled calls are
+  // therefore removed rather than fixed: re-enabling them — or "fixing" the
+  // postponedDate/postponement_end_date mismatch — would make WOs auto-revert,
+  // which is wrong. storage.checkAndRevertPostponedWorkOrders() remains available
+  // for an explicit manual/admin action but is no longer invoked on a timer.
 
   // Cleanup on server shutdown
   // Stop EVERY scheduler on shutdown. Previously jobDueScanner / pmsAlertEngine
@@ -561,7 +541,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CPU/heap. (The status recalculator scheduler has been removed entirely.)
   const stopAllSchedulers = () => {
     console.log('Cleaning up scheduled tasks...');
-    clearInterval(postponementCheckInterval);
     jobDueScanner.stop();
     pmsAlertEngine.stop();
     syncPruningScheduler.stop();
