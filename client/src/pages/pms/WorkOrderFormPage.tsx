@@ -31,7 +31,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet, BarChart3, AlertTriangle, CheckCircle2, Clock, ExternalLink, RefreshCw, ChevronDown } from "lucide-react";
+import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Copy, Loader2, Paperclip, Image as ImageIcon, FileSpreadsheet, BarChart3, AlertTriangle, CheckCircle2, Clock, ExternalLink, RefreshCw, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { getWoStatusBadgeColor } from "@/components/wo/woCellRenderers";
 import RHTimelineViewer from "@/components/pms/RHTimelineViewer";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
@@ -347,6 +349,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     enabled: isUnplannedCreate && !!contextVesselId,
   });
   const filteredUnplannedComponents = unplannedComponents.filter(c => c.isActive && !c.isParent);
+  const [componentPopoverOpen, setComponentPopoverOpen] = useState(false);
+  const [componentSearch, setComponentSearch] = useState('');
 
   const handleUnplannedComponentSelect = (componentId: string) => {
     setUnplannedComponentId(componentId);
@@ -3910,19 +3914,62 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.5"><Marker id="WOF.A1.5" />Component Name</Label>
                   {isUnplannedCreate ? (
-                    <Select
-                      value={unplannedComponentId}
-                      onValueChange={handleUnplannedComponentSelect}
-                    >
-                      <SelectTrigger className="text-sm" data-testid="WOF.A1.6">
-                        <SelectValue placeholder="Select component" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {filteredUnplannedComponents.map(c => (
-                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={componentPopoverOpen} onOpenChange={setComponentPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={componentPopoverOpen}
+                          className="w-full justify-between text-sm font-normal h-9 px-3"
+                          data-testid="WOF.A1.6"
+                        >
+                          <span className="truncate">
+                            {unplannedComponentId
+                              ? filteredUnplannedComponents.find(c => c.id === unplannedComponentId)?.name ?? 'Select component'
+                              : 'Select component'}
+                          </span>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                        <Command shouldFilter={false}>
+                          <CommandInput
+                            placeholder="Search by name or code..."
+                            value={componentSearch}
+                            onValueChange={setComponentSearch}
+                          />
+                          <CommandList>
+                            <CommandEmpty>No components found.</CommandEmpty>
+                            <CommandGroup>
+                              {filteredUnplannedComponents
+                                .filter(c => {
+                                  const q = componentSearch.toLowerCase();
+                                  return !q || c.name.toLowerCase().includes(q) || c.componentCode.toLowerCase().includes(q);
+                                })
+                                .map(c => (
+                                  <CommandItem
+                                    key={c.id}
+                                    value={c.id}
+                                    onSelect={() => {
+                                      handleUnplannedComponentSelect(c.id);
+                                      setComponentSearch('');
+                                      setComponentPopoverOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 shrink-0 ${unplannedComponentId === c.id ? 'opacity-100' : 'opacity-0'}`}
+                                    />
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="truncate">{c.name}</span>
+                                      <span className="text-xs text-muted-foreground">{c.componentCode}</span>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   ) : (
                     <Input
                       value={templateData.componentName || templateData.component}
