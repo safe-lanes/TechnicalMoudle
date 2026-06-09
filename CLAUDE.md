@@ -55,6 +55,15 @@ npx tsx scripts/some-script.ts  # (needs `import 'dotenv/config'` at top)
 - Frontend uses `@tanstack/react-query` with `apiRequest()` from `client/src/lib/queryClient.ts`
 - ag-grid used for data tables — `invalidateQueries` after mutations causes re-render issues
 
+## Work Order Status & Scheduler Architecture (feature/scheduler-redesign — read before touching WO status/schedulers)
+- **WO status is COMPUTED ON READ** (`computeWorkOrderStatus`, `shared/workOrders/status.ts`). The derived band (Active / Due / Due (Grace P) / Overdue) is **NEVER persisted**. Authored/workflow statuses (Completed, Pending Approval, Postponed, Rejected, …) ARE persisted and are passed through by `computeWorkOrderStatus`.
+- **CONTRACT:** every overdue/due (derived-band) read MUST go through `getWorkOrdersWithComputedStatus(vesselId?, vesselIds?)` in `server/modules/work-orders/services/workOrderService.ts`. **NEVER** write a raw `WHERE status='Overdue'/'Due'` — it returns stale results. (Consumers already retargeted: pmsAlertEngine UC1, equipmentReportService, operationsReportService.)
+- **The status recalculator scheduler is REMOVED** (ship + shore). `workOrderStatusRecalculator.runRecalculation()` is compute-only (no DB write, no `'system'` field-log) — writing `'system'` status was the documented false-sync-conflict source. `forceRecalculation()` callers still compile; their `statusesUpdated` is drift telemetry only.
+- **`jobDueScanner` (WO generation) is SHIP-ONLY**, gated by `isShipInstance()`, runs DAILY (configurable `JOB_DUE_SCAN_INTERVAL_MS`, default 24h). Shore runs NO automatic scanners. Use the batch `storage.getLinkedComponentsForJobs(jobIds[])` — never per-job `getLinkedComponentsForJob` in a loop (N+1).
+- **Office generates WOs on demand:** `POST /work-orders/generate-now` (vessel-scoped, 409 if a run is in progress) + the shore-only "Generate Now" button. `jobDueScanner.runScan(scopeVesselId?)` is the reusable sweep.
+- **Postponement auto-revert is INTENTIONALLY DISABLED** (domain decision, Jeevan): expired postponements stay 'Postponed' until manual action. Do NOT re-enable the removed startup/hourly `checkAndRevertPostponedWorkOrders()` calls, and do NOT "fix" the `postponedDate`/`postponement_end_date` mismatch — fixing it would (wrongly) start auto-reverting.
+- All schedulers must be stopped in `stopAllSchedulers()` (routes.ts) on SIGTERM/SIGINT — a missed one orphans on PM2 restart. PM2 runs in FORK mode (single instance), not cluster.
+
 ## Fleet Mapping Call Chain (4 layers — all must be updated together)
 - Frontend (`FleetVesselMapping.tsx`) → Service (`fleetAdminService.ts`) → Repository (`fleetAdminRepository.ts`) → Storage (`postgresStorage.ts`)
 - Repository is a thin pass-through wrapper — easy to miss when adding new params (e.g. jobId, spareId)
