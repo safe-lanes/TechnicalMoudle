@@ -248,7 +248,12 @@ export async function validateRHEntry(req: Request, res: Response) {
     }
 
     // Never cap the displayed max at the current reading — show the true timeline range.
-    const adjustedMax = result.validRange ? result.validRange.max : Infinity;
+    // An unbounded upper limit is represented internally as Infinity, which JSON.stringify
+    // silently converts to null. Emit an explicit null sentinel so the client has a stable
+    // contract for "no upper bound" instead of relying on that implicit coercion.
+    const adjustedMax = result.validRange && Number.isFinite(result.validRange.max)
+      ? result.validRange.max
+      : null;
 
     const cappedValidRange = result.validRange
       ? { ...result.validRange, min: adjustedMin, max: adjustedMax }

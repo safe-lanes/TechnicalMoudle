@@ -894,7 +894,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [rhValidation, setRhValidation] = useState<{
     status: 'idle' | 'loading' | 'valid' | 'invalid' | 'warning';
     message: string;
-    validRange: { min: number; max: number } | null;
+    validRange: { min: number; max: number | null } | null;
     utilizationRate: number;
     previousEntry: { date: string; runningHours: number } | null;
     nextEntry: { date: string; runningHours: number } | null;
@@ -5877,7 +5877,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {/* RH Valid Range Helper */}
                 {rhValidation.validRange && (
                   <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded" data-testid="text-rh-valid-range">
-                    Valid range: {(() => { const prevR = executionData.previousReading ? Number(executionData.previousReading) : null; const displayMin = prevR !== null && !isNaN(prevR) && prevR < rhValidation.validRange.min ? prevR : rhValidation.validRange.min; return displayMin.toLocaleString(); })()} to {rhValidation.validRange.max === Infinity ? '∞' : rhValidation.validRange.max.toLocaleString()} hours
+                    Valid range: {(() => { const vr = rhValidation.validRange!; const prevR = executionData.previousReading ? Number(executionData.previousReading) : null; const displayMin = prevR !== null && !isNaN(prevR) && prevR < vr.min ? prevR : vr.min; const minStr = Number.isFinite(displayMin) ? displayMin.toLocaleString() : '0'; const maxStr = vr.max == null || !Number.isFinite(vr.max) ? '∞' : vr.max.toLocaleString(); return `${minStr} to ${maxStr}`; })()} hours
                     {rhValidation.previousEntry && (
                       <span className="ml-1 text-blue-500">
                         | Last: {rhValidation.previousEntry.runningHours.toFixed(0)} hrs on {new Date(rhValidation.previousEntry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -5922,7 +5922,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 )}
                 {rhValidation.status === 'invalid' && rhValidation.validationDetails?.validationStatus !== 'EXCEEDS_COMPONENT_RH' && (
                   <div className="text-xs text-red-600 flex items-center gap-1" data-testid="text-rh-invalid">
-                    <X className="h-3 w-3" /> Invalid: {rhValidation.validRange ? (() => { const prevR = executionData.previousReading ? Number(executionData.previousReading) : null; const displayMin = prevR !== null && !isNaN(prevR) && prevR < rhValidation.validRange!.min ? prevR : rhValidation.validRange!.min; return `Valid range: ${displayMin.toLocaleString()} to ${rhValidation.validRange!.max === Infinity ? '∞' : rhValidation.validRange!.max.toLocaleString()} hours`; })() : rhValidation.message}
+                    <X className="h-3 w-3" /> Invalid: {rhValidation.validRange ? (() => { const vr = rhValidation.validRange!; const prevR = executionData.previousReading ? Number(executionData.previousReading) : null; const displayMin = prevR !== null && !isNaN(prevR) && prevR < vr.min ? prevR : vr.min; const minStr = Number.isFinite(displayMin) ? displayMin.toLocaleString() : '0'; const maxStr = vr.max == null || !Number.isFinite(vr.max) ? '∞' : vr.max.toLocaleString(); return `Valid range: ${minStr} to ${maxStr} hours`; })() : rhValidation.message}
                   </div>
                 )}
                 {rhValidation.status === 'warning' && (
@@ -7406,7 +7406,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
               {rhErrorDetails.validRange && (
                 <div className="bg-blue-50 p-3 rounded-lg text-blue-800">
-                  Valid RH Range: <strong>{rhErrorDetails.validRange.min?.toFixed(0)} to {rhErrorDetails.validRange.max === Infinity ? '∞' : rhErrorDetails.validRange.max?.toFixed(0)} hours</strong>
+                  Valid RH Range: <strong>{rhErrorDetails.validRange.min?.toFixed(0)} to {rhErrorDetails.validRange.max == null || !Number.isFinite(rhErrorDetails.validRange.max) ? '∞' : rhErrorDetails.validRange.max.toFixed(0)} hours</strong>
                 </div>
               )}
               <p className="text-gray-500 text-xs">
