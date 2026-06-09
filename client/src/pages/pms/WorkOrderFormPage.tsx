@@ -130,6 +130,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const [activeStep, setActiveStep] = useState('part-a');
   const [openDocPopup, setOpenDocPopup] = useState<string | null>(null);
+  const [openPendingPopup, setOpenPendingPopup] = useState<string | null>(null);
 
   // Scroll tracking for navigation with IntersectionObserver (only if Part B exists)
   useEffect(() => {
@@ -189,18 +190,21 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     };
   }, [resolvedMode]);
 
-  // Close attachment popup when clicking outside
+  // Close attachment popups when clicking outside
   useEffect(() => {
-    if (!openDocPopup) return;
+    if (!openDocPopup && !openPendingPopup) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as Element;
       if (!target.closest('[data-doc-popup]') && !target.closest('[data-doc-icon]')) {
         setOpenDocPopup(null);
       }
+      if (!target.closest('[data-pending-popup]') && !target.closest('[data-pending-icon]')) {
+        setOpenPendingPopup(null);
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [openDocPopup]);
+  }, [openDocPopup, openPendingPopup]);
 
   // Use job context endpoint for template mode (viewing job template), 
   // work order context endpoint otherwise
@@ -2224,26 +2228,47 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (items.length === 0) return null;
     return (
       <div className="mt-1 flex items-center gap-1 flex-wrap" data-testid={`pending-items-${documentType}`}>
-        {items.map(({ file, globalIdx }) => (
-          <div
-            key={globalIdx}
-            className="flex items-center gap-1 p-1.5 rounded border border-dashed border-amber-300 bg-amber-50 text-amber-700"
-            title={`${file.name} — pending, will upload on Save Draft`}
-            data-testid={`pending-item-${documentType}-${globalIdx}`}
-          >
-            {getFileIcon(file.name)}
-            <span className="text-xs max-w-[90px] truncate">{file.name}</span>
-            <span className="text-[10px] text-amber-500 shrink-0">{formatFileSize(file.size)}</span>
-            <button
-              type="button"
-              className="ml-0.5 text-amber-500 hover:text-red-500 shrink-0"
-              onClick={() => setPendingAttachments(prev => prev.filter((_, i) => i !== globalIdx))}
-              data-testid={`button-remove-pending-${documentType}-${globalIdx}`}
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        ))}
+        {items.map(({ file, globalIdx }) => {
+          const popupKey = `${documentType}-${globalIdx}`;
+          const isOpen = openPendingPopup === popupKey;
+          return (
+            <div key={globalIdx} className="relative" data-testid={`pending-item-${documentType}-${globalIdx}`}>
+              <div
+                data-pending-icon={popupKey}
+                className="p-1.5 rounded border border-gray-200 bg-gray-50 text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 cursor-pointer transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenPendingPopup(isOpen ? null : popupKey);
+                }}
+              >
+                {getFileIcon(file.name)}
+              </div>
+              {isOpen && (
+                <div
+                  data-pending-popup={popupKey}
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 flex flex-col items-start bg-white rounded-lg shadow-lg border border-gray-200 p-2 z-50 min-w-[180px]"
+                >
+                  <span className="text-xs text-gray-700 font-medium truncate max-w-[170px] mb-1" title={file.name}>{file.name}</span>
+                  <span className="text-[10px] text-gray-400 mb-2">{formatFileSize(file.size)}</span>
+                  <div className="flex items-center gap-1 w-full">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs text-red-500 hover:text-red-700 hover:border-red-300 w-full"
+                      onClick={() => {
+                        setOpenPendingPopup(null);
+                        setPendingAttachments(prev => prev.filter((_, i) => i !== globalIdx));
+                      }}
+                      data-testid={`button-remove-pending-${documentType}-${globalIdx}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   };
