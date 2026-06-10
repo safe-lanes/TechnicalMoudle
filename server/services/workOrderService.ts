@@ -6,6 +6,7 @@ import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 import { shouldGenerateWorkOrder } from "@shared/dateUtils";
 import { generatePlannedWorkOrderNumber, generateUnplannedWorkOrderNumber } from "../utils/workOrderNumbering";
 import { jobService } from "./jobService";
+import { logFieldChanges } from "../modules/sync";
 import { 
   isBlockingStatus, 
   isCompletedStatus,
@@ -241,7 +242,25 @@ export class WorkOrderService {
       workOrderData.templateCode = workOrderData.workOrderNo;
     }
 
-    return storage.createWorkOrder(workOrderData);
+    const createdWO = await storage.createWorkOrder(workOrderData);
+
+    // Sync field logging — log the INSERT so ship→shore sync picks up
+    // auto-generated work orders. Mirrors the modular service
+    // (modules/work-orders/services/workOrderService.ts:889-891). Without this,
+    // scanner/Generate-Now WOs were created with NO sync_field_log entry and were
+    // therefore invisible to the gather step (getUnsyncedFieldLogs) — so a WO
+    // generated on the ship never reached the office.
+    //
+    // NOTE: this is a NEW-ROW INSERT log (fresh wouuid; applied on the far side
+    // via INSERT ... ON CONFLICT DO NOTHING). It is NOT a 'system' status UPDATE
+    // on an existing WO, so it does NOT reintroduce the false sync-conflict the
+    // scheduler redesign removed. "Zero 'system' status writes" continues to mean
+    // zero 'system' status UPDATEs on existing rows — INSERT logs are expected.
+    try {
+      await logFieldChanges('work_orders', createdWO.wouuid, createdWO.vesselId || null, null, createdWO, 'system');
+    } catch (err) { console.error('[FieldLogger] WO create (legacy):', err); }
+
+    return createdWO;
   }
 
   /**
