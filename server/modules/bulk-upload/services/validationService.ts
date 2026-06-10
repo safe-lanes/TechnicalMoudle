@@ -704,16 +704,9 @@ export async function validateData(type: string, data: any[], mode: string, vess
         }
       }
 
-      // Validate Fleet Equipment Code if provided
+      // Fleet Equipment Code - accept as-is, no master data lookup
       if (row['Fleet Equipment Code']) {
-        const fleetCode = String(row['Fleet Equipment Code']).trim();
-        normalized['Fleet Equipment Code'] = fleetCode;
-        
-        // Validate that Fleet Equipment Code exists in master data
-        const masterEntry = await storage.getMasterDataByFleetCode(fleetCode);
-        if (!masterEntry) {
-          warnings.push(`Row ${rowNum}: Fleet Equipment Code '${fleetCode}' not found in master data. Code will be accepted but not linked.`);
-        }
+        normalized['Fleet Equipment Code'] = String(row['Fleet Equipment Code']).trim();
       }
       
       // Copy text fields directly - new template fields
