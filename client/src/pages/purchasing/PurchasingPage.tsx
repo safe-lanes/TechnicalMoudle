@@ -60,9 +60,15 @@ export default function PurchasingPage() {
     }
   }, [userRole]);
 
+  // Wait until auth has hydrated before calling SSO. currentUser is null on the
+  // first render(s) (AuthContext loads/decrypts the profile asynchronously), so
+  // firing immediately would POST initiate with role:"" → a spurious 403
+  // ROLE_NOT_MAPPED. Once currentUser is present, userRole is the real role and
+  // initiate (dep: userRole) runs with it. The loading spinner shows until then.
   useEffect(() => {
+    if (!currentUser) return;
     initiate();
-  }, [initiate]);
+  }, [currentUser, initiate]);
 
   if (loading) {
     return (
