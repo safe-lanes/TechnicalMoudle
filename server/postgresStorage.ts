@@ -1448,9 +1448,18 @@ export class PostgresStorage {
     userId: string;
     userUuid?: string;
     comments?: string;
+    dateUpdated?: string;
   }): Promise<{ masterUpdated: Component; inheritedUpdated: number }> {
     const db = await getDb();
     const now = new Date();
+    // Reading date: the date the running hours were actually observed (WO completion date or the
+    // RH Section "Date Updated"). It governs the stored reading date and the component's
+    // last-updated stamps so the RH timeline reflects when hours were read — NOT when the row was
+    // written. Falls back to "now" when omitted or unparseable. enteredAtUTC stays "now" (it is
+    // the audit trail of when the row was entered, not the reading date).
+    const parsedReadingDate = params.dateUpdated ? new Date(params.dateUpdated) : null;
+    const readingDate = parsedReadingDate && !isNaN(parsedReadingDate.getTime()) ? parsedReadingDate : now;
+    const readingDateLocal = readingDate.toISOString().split('T')[0];
     
     // Verify component exists and is a MASTER
     const component = await this.getComponent(params.componentId);
@@ -1483,10 +1492,10 @@ export class PostgresStorage {
         .set({
           rhCurrentMaster: params.newRHValue.toString(),
           currentCumulativeRH: params.newRHValue.toString(),
-          rhMasterUpdatedAt: now,
+          rhMasterUpdatedAt: readingDate,
           rhMasterUpdatedBy: params.userId,
           rhMasterUpdateSource: params.updateSource,
-          lastUpdated: now.toISOString(),
+          lastUpdated: readingDate.toISOString(),
           updatedAt: now,
         })
         .where(eq(components.cuuid, component.cuuid))
@@ -1507,7 +1516,7 @@ export class PostgresStorage {
         previousRH: previousMasterRH.toFixed(2),
         newRH: params.newRHValue.toFixed(2),
         cumulativeRH: params.newRHValue.toFixed(2),
-        dateUpdatedLocal: now.toISOString().split('T')[0],
+        dateUpdatedLocal: readingDateLocal,
         dateUpdatedTZ: 'UTC',
         enteredAtUTC: now,
         userId: params.userId,

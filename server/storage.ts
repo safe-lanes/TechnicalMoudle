@@ -317,6 +317,10 @@ export interface IStorage {
     userId: string;
     userUuid?: string;
     comments?: string;
+    // Reading date (the date the running hours were observed), e.g. a WO completion date or
+    // the "Date Updated" picked in the RH Section. Used for the stored reading date and the
+    // component's last-updated stamps. Falls back to "now" when omitted/unparseable.
+    dateUpdated?: string;
   }): Promise<{ 
     masterUpdated: Component;
     inheritedUpdated: number;

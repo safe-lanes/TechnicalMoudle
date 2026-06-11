@@ -285,6 +285,7 @@ export async function updateMasterRunningHours(params: {
   userId: string;
   userUuid?: string;
   comments?: string;
+  dateUpdated?: string;
 }): Promise<{
   masterUpdated: Component;
   inheritedUpdated: number;

@@ -663,7 +663,10 @@ export async function updateMasterRH(componentId: string, body: unknown) {
     updateSource,
     userId,
     userUuid,
-    comments
+    comments,
+    // Persist the reading date (WO completion date / RH Section "Date Updated") so the stored
+    // reading and the component's last-updated reflect when the hours were observed, not "now".
+    dateUpdated
   });
 
   // TRIGGER 1 HOOK: After MASTER RH is updated, scan for RH-based WO generation
