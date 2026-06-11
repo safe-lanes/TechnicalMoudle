@@ -1799,6 +1799,34 @@ export async function updateWorkOrder(id: string, body: any) {
     }
   }
 
+  // ========== EVENT-DRIVEN NEXT-CYCLE GENERATION ON APPROVAL (Issue 03) ==========
+  // Domain-confirmed (Jeevan): the next WO must appear immediately once the
+  // completion is approved, provided it falls within the generate window. The
+  // job-tracking update above has just rolled lastDone/nextDue, so a
+  // vessel-scoped scan now creates the next cycle without waiting for the daily
+  // ship scan (mirrors the RH-entry hook in runningHoursService).
+  // SHIP-ONLY: the L2-reviewer flow approves OFFICE-side — an ungated hook
+  // there would generate the same cycle on both instances with different
+  // wouuids (duplicate WOs across sync). Office-approved WOs get their next
+  // cycle at the ship's next daily scan after the approval syncs down.
+  // Fire-and-forget: a scan failure must never fail or slow the approval; the
+  // scanner's job-level/cycle guards prevent same-instance duplicates, and the
+  // daily scan remains the backstop if a concurrent run skips this one.
+  if (updateData.approvalAction === 'approved' && updateData.status === 'Completed' && workOrder.vesselId) {
+    try {
+      const { isShipInstance } = await import('../../sync/syncRole');
+      if (await isShipInstance()) {
+        const { jobDueScanner } = await import('../../../services/jobDueScanner');
+        console.log(`[NextCycleHook] Completion approved for WO ${workOrder.workOrderNo || id} — triggering vessel-scoped generation scan (${workOrder.vesselId})`);
+        jobDueScanner.runScan(workOrder.vesselId).catch((err: any) => {
+          console.error('[NextCycleHook] post-approval generation scan failed (non-blocking):', err?.message || err);
+        });
+      }
+    } catch (hookErr: any) {
+      console.error('[NextCycleHook] could not start post-approval generation scan (non-blocking):', hookErr?.message || hookErr);
+    }
+  }
+
   // ========== SPARE CONSUMPTION ON APPROVAL ==========
   if (updateData.approvalAction === 'approved' && updateData.status === 'Completed') {
     const freshWO = await repo.findById(id);
