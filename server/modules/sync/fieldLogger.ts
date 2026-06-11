@@ -98,12 +98,17 @@ export async function initFieldLoggerInstanceId(): Promise<string> {
   const envId = (process.env.SYNC_INSTANCE_ID || '').trim();
   const resolved = dbIdTrimmed || envId;
 
-  if (!resolved) {
+  // Reject placeholder VALUES, not just absence: 'UNKNOWN' was the old silent
+  // default and 'SHIP-VESSELNAME' is the unedited .env template literal — both
+  // produce logs that either never sync or collide across ships.
+  const PLACEHOLDER_INSTANCE_IDS = new Set(['UNKNOWN', 'SHIP-VESSELNAME']);
+  if (!resolved || PLACEHOLDER_INSTANCE_IDS.has(resolved.toUpperCase())) {
     throw new Error(
-      'Sync instance id is NOT configured. Set sync_settings.instance_id in the DB ' +
-      '(preferred — one row per ship/shore instance) or the SYNC_INSTANCE_ID env var. ' +
-      'Field logging refuses to stamp rows with a placeholder: logs written as ' +
-      "'UNKNOWN' are invisible to the sync gather and would silently never sync."
+      `Sync instance id is ${resolved ? `a placeholder ('${resolved}')` : 'NOT configured'}. ` +
+      'Set sync_settings.instance_id in the DB (preferred — one row per ship/shore instance) ' +
+      'or the SYNC_INSTANCE_ID env var to a real identity (e.g. SHIP-WAHKWONG-V003). ' +
+      "Field logging refuses placeholders: logs stamped 'UNKNOWN' are invisible to the sync " +
+      'gather and an unedited template id collides across ships.'
     );
   }
 

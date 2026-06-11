@@ -24,10 +24,33 @@ notepad .env
 
 Edit these values:
 - `DATABASE_URL` — your PostgreSQL connection string (e.g., `postgres://postgres:yourpassword@localhost:5432/pms_ship`)
-- `SYNC_INSTANCE_ID` — unique name for this ship (e.g., `SHIP-WAHKWONG-V003`)
+- `SYNC_INSTANCE_ID` — see step 3 (mandatory)
 - `SYNC_SHORE_URL` — shore server URL (e.g., `https://pms.safelanes.com/technical/api`)
 
-### 3. Start the server
+### 3. Assign the ship identity (MANDATORY)
+
+Every ship needs a unique sync identity in the form `SHIP-<CODE>` (letters,
+digits, dashes — e.g. `SHIP-WAHKWONG-V003`). **The server refuses to start
+without one**, and placeholder values (`UNKNOWN`, the unedited
+`SHIP-VESSELNAME` template) are rejected at boot.
+
+Identity is stored in TWO places:
+- **Database `sync_settings.instance_id` — the SOURCE OF TRUTH** (the
+  field-logger and sync engine both read the DB value first)
+- `.env` `SYNC_INSTANCE_ID` — the **fallback** (used until the DB row is set,
+  e.g. on the very first boot before migrations have created `sync_settings`)
+
+You do not normally set this by hand: **`start.bat` / `install-service.bat`
+prompt for the id on first run**, validate it, write the `.env` line, and
+write the database row (when `psql` is available). To set the DB row manually:
+```
+psql "<DATABASE_URL>" -c "UPDATE sync_settings SET setting_value='SHIP-YOURCODE' WHERE setting_key='instance_id'"
+```
+If two ships ever share the same id (e.g. a cloned image), the shore logs an
+`INSTANCE-ID COLLISION` warning on every sync from them — give each ship a
+unique id.
+
+### 4. Start the server
 
 ```
 start.bat
@@ -39,7 +62,7 @@ First start will:
 - Create 110+ tables automatically
 - Start the PMS server on port 5000
 
-### 4. Import vessel data
+### 5. Import vessel data
 
 1. Open browser: http://localhost:5000
 2. Log in with the Offline Admin credentials
@@ -47,7 +70,7 @@ First start will:
 4. Click **Import Bundle** and upload the provisioning JSON file from shore
 5. Click **Verify** to confirm all data imported correctly
 
-### 5. First sync
+### 6. First sync
 
 1. Go to **Admin → Sync Dashboard**
 2. Click **Sync Now**

@@ -116,6 +116,35 @@ export async function receivePushData(
     );
   }
 
+  // ── Instance-id collision guard ──
+  // Two DIFFERENT vessels presenting the SAME instance id is almost always an
+  // unedited .env template (e.g. both ships left 'SHIP-VESSELNAME') or a cloned
+  // image. Their field logs and metadata would interleave under one identity.
+  // Loud warning so the shore operator catches it immediately.
+  try {
+    const senderInstance = (batch as any).initiatedByInstance || (batch as any).initiated_by_instance;
+    if (senderInstance) {
+      const collisionPool = await getPool();
+      const collision = await collisionPool.query(
+        `SELECT DISTINCT vessel_id FROM sync_batches
+         WHERE initiated_by_instance = $1 AND vessel_id IS NOT NULL AND vessel_id <> $2
+         LIMIT 5`,
+        [senderInstance, vesselId]
+      );
+      if (collision.rows.length > 0) {
+        const others = collision.rows.map((r: any) => r.vessel_id).join(', ');
+        console.warn(
+          `[Sync Push] ⚠️ INSTANCE-ID COLLISION: instance '${senderInstance}' is now syncing vessel '${vesselId}' ` +
+          `but has previously synced different vessel(s): ${others}. Two ships are likely sharing one identity ` +
+          `(unedited .env template / cloned image). Give each ship a unique SHIP-<code> id.`
+        );
+        syncDiag(`INSTANCE-ID COLLISION: ${senderInstance} vessel=${vesselId} previously=${others}`);
+      }
+    }
+  } catch (collErr: any) {
+    syncDiag(`instance-id collision check failed (non-fatal): ${collErr.message}`);
+  }
+
   let totalReceived = 0;
   const oneWaySummary: Array<{ tableName: string; inserted: number; updated: number; errors: number }> = [];
 

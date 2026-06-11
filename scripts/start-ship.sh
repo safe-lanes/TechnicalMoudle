@@ -42,9 +42,49 @@ if [ -z "$DATABASE_URL" ]; then
     exit 1
 fi
 
-if [ -z "$SYNC_INSTANCE_ID" ]; then
-    echo "WARNING: SYNC_INSTANCE_ID not set in .env. Defaulting to UNKNOWN."
-    export SYNC_INSTANCE_ID=UNKNOWN
+# ── Ship identity (MANDATORY) ─────────────────────────────────
+# The server refuses to boot without a valid instance id, and field logs
+# stamped with a placeholder are invisible to sync. NEVER default.
+# DB sync_settings.instance_id is the source of truth; .env is fallback.
+is_valid_instance_id() {
+    [[ "$1" =~ ^SHIP-[A-Za-z0-9-]+$ ]] || return 1
+    local upper; upper=$(echo "$1" | tr '[:lower:]' '[:upper:]')
+    [ "$upper" != "UNKNOWN" ] && [ "$upper" != "SHIP-VESSELNAME" ]
+}
+if ! is_valid_instance_id "${SYNC_INSTANCE_ID:-}"; then
+    echo ""
+    echo "========================================================"
+    echo " SHIP IDENTITY REQUIRED (first-run setup)"
+    echo "========================================================"
+    echo "This ship has no valid sync instance id yet."
+    echo "Format: SHIP-CODE  (letters/digits/dashes, e.g. SHIP-WAHKWONG-V003)"
+    echo ""
+    read -r -p "Enter this ship's instance id: " SYNC_INSTANCE_ID
+    if ! is_valid_instance_id "${SYNC_INSTANCE_ID:-}"; then
+        echo ""
+        echo "FATAL: INVALID OR MISSING SHIP INSTANCE ID"
+        echo "The id must match SHIP-<code> (letters/digits/dashes) and must not"
+        echo "be a placeholder (UNKNOWN / SHIP-VESSELNAME)."
+        echo "Fix: edit .env and set SYNC_INSTANCE_ID=SHIP-YOURCODE (or set"
+        echo "sync_settings.instance_id in the database), then rerun."
+        echo "The server will NOT start without a valid identity."
+        exit 1
+    fi
+    export SYNC_INSTANCE_ID
+    # Persist to .env (appended line wins — the loader takes the last value)
+    echo "SYNC_INSTANCE_ID=$SYNC_INSTANCE_ID" >> .env
+    echo "Saved SYNC_INSTANCE_ID=$SYNC_INSTANCE_ID to .env"
+    # Best-effort: also write the DB row (source of truth). Fresh DBs may not
+    # have sync_settings yet (created by first-boot migrations) — that is OK.
+    if command -v psql >/dev/null 2>&1; then
+        if psql "$DATABASE_URL" -c "UPDATE sync_settings SET setting_value='$SYNC_INSTANCE_ID' WHERE setting_key='instance_id'" >/dev/null 2>&1; then
+            echo "DB row sync_settings.instance_id updated."
+        else
+            echo "NOTE: could not write DB row yet (fresh DB?) — .env value will be used."
+        fi
+    else
+        echo "NOTE: psql not found — DB row not written; .env value will be used."
+    fi
 fi
 
 # Check node_modules
