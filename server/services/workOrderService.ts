@@ -253,12 +253,18 @@ export class WorkOrderService {
     // generated on the ship never reached the office.
     //
     // NOTE: this is a NEW-ROW INSERT log (fresh wouuid; applied on the far side
-    // via INSERT ... ON CONFLICT DO NOTHING). It is NOT a 'system' status UPDATE
-    // on an existing WO, so it does NOT reintroduce the false sync-conflict the
-    // scheduler redesign removed. "Zero 'system' status writes" continues to mean
-    // zero 'system' status UPDATEs on existing rows — INSERT logs are expected.
+    // via INSERT ... ON CONFLICT DO NOTHING). It is NOT a status UPDATE on an
+    // existing WO, so it does NOT reintroduce the false sync-conflict the
+    // scheduler redesign removed.
+    // Actor resolution mirrors the MODULAR create (body.userId || performedBy ||
+    // fallback) so generated-WO log groups are byte-identical in shape to the
+    // manually-created WOs that sync correctly. The fallback is
+    // 'auto-generation' — deliberately NOT 'system': (a) any deployed receive
+    // path that special-cases 'system' work_orders logs can never drop these,
+    // and (b) "zero 'system' writes" telemetry stays unambiguous.
     try {
-      await logFieldChanges('work_orders', createdWO.wouuid, createdWO.vesselId || null, null, createdWO, 'system');
+      const actor = (workOrderData as any).userId || (workOrderData as any).performedBy || 'auto-generation';
+      await logFieldChanges('work_orders', createdWO.wouuid, createdWO.vesselId || null, null, createdWO, actor);
     } catch (err) { console.error('[FieldLogger] WO create (legacy):', err); }
 
     return createdWO;
