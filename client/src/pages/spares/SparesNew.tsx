@@ -26,7 +26,7 @@ interface ComponentNode {
   [key: string]: any;
 }
 import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -458,8 +458,8 @@ const Spares: React.FC = () => {
     }
     
     // Always invalidate cache to reflect any partial changes
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+    invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+    invalidateByUrlPrefix('/technical/api/spares/history');
     
     const hadInventoryChanges = deltaA !== 0 || deltaB !== 0;
     const hadNameChanges = nameAChanged || nameBChanged;
@@ -581,8 +581,8 @@ const Spares: React.FC = () => {
     }
 
     queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${selectedLocationId}`] });
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+    invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+    invalidateByUrlPrefix('/technical/api/spares/history');
   };
 
   const handleChangeSpareLocation = async (spare: any, newLocationId: number, newLocationName: string) => {
@@ -763,8 +763,8 @@ const Spares: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${newLocationId}`] });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/locations-with-stock/${vesselId}`] });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+      invalidateByUrlPrefix('/technical/api/spares/history');
       queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/${vesselId}`] });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || 'Failed to change location', variant: "destructive" });
@@ -858,8 +858,8 @@ const Spares: React.FC = () => {
     },
     onSettled: async (data, error, variables) => {
       // Wait for queries to refetch before clearing pending state
-      await queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-      await queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      await invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+      await invalidateByUrlPrefix('/technical/api/spares/history');
       
       // Clear pending adjustment and loading state
       setPendingAdjustments(prev => {
@@ -1546,8 +1546,8 @@ const Spares: React.FC = () => {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+      invalidateByUrlPrefix('/technical/api/spares/history');
       if (data.warning) {
         toast({ title: "Partial Consumption", description: data.warning.message, variant: "default" });
       } else {
@@ -1584,8 +1584,8 @@ const Spares: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+      invalidateByUrlPrefix('/technical/api/spares/history');
       toast({ title: "Success", description: "Spare received successfully" });
       setIsReceiveModalOpen(false);
       setReceiveForm({ qtyA: "", qtyB: "", date: "", supplier: "", remarks: "" });
@@ -1606,8 +1606,8 @@ const Spares: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+      invalidateByUrlPrefix('/technical/api/spares/history');
       toast({ title: "Success", description: "Spare ROB adjusted successfully" });
       setIsAdjustModalOpen(false);
       setAdjustForm({ location: "A", newRob: "", date: format(new Date(), 'yyyy-MM-dd'), place: "", remarks: "" });
@@ -1627,7 +1627,7 @@ const Spares: React.FC = () => {
       return apiRequest('POST', `/technical/api/spares/${vesselId}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
+      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
       toast({ title: "Success", description: "Spare created successfully" });
       setIsAddSpareModalOpen(false);
       setAddSpareForm({
@@ -1673,7 +1673,7 @@ const Spares: React.FC = () => {
       return apiRequest('PATCH', `/technical/api/spares/${vesselId}/${selectedSpare.id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
+      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
       toast({ title: "Success", description: "Spare updated successfully" });
       setIsEditModalOpen(false);
       setSelectedSpare(null);
@@ -1784,7 +1784,7 @@ const Spares: React.FC = () => {
         });
       });
       
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      invalidateByUrlPrefix('/technical/api/spares/history');
       
       // Count successes, failures, and skipped
       const succeeded = results.filter((r: any) => r.success).length;
@@ -1829,8 +1829,8 @@ const Spares: React.FC = () => {
       return results;
     },
     onSuccess: (results) => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+      invalidateByUrlPrefix('/technical/api/spares/history');
       const successCount = results.filter(r => r.success).length;
       const failCount = results.filter(r => !r.success).length;
       setShowDeactivateDialog(false);
@@ -1855,8 +1855,8 @@ const Spares: React.FC = () => {
       return apiRequest('PATCH', `/technical/api/spares/${vesselId}/${spareId}`, { isActive: true });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+      invalidateByUrlPrefix('/technical/api/spares/history');
       toast({ title: "Success", description: "Spare reactivated successfully" });
     },
     onError: (error: any) => {
@@ -2445,8 +2445,8 @@ const Spares: React.FC = () => {
     }
     
     // Always invalidate cache to reflect any partial changes
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+    invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+    invalidateByUrlPrefix('/technical/api/spares/history');
     
     if (errors.length === 0 && attemptCount > 0) {
       if (warnings.length > 0) {
@@ -2554,8 +2554,8 @@ const Spares: React.FC = () => {
     }
     
     // Always invalidate cache to reflect any partial changes
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+    invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+    invalidateByUrlPrefix('/technical/api/spares/history');
     
     if (errors.length === 0 && attemptCount > 0) {
       if (warnings.length > 0) {

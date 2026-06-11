@@ -7,7 +7,7 @@ import WorkOrderPlanner from "./WorkOrderPlanner";
 import { useLocation } from "wouter";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -312,7 +312,7 @@ const WorkOrders: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       toast({ title: "Success", description: "Work order created successfully" });
     },
     onError: (error: any) => {
@@ -327,7 +327,7 @@ const WorkOrders: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       toast({ title: "Success", description: "Work order updated successfully" });
     },
     onError: (error: any) => {
@@ -342,7 +342,7 @@ const WorkOrders: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       toast({ title: "Success", description: "Work order deleted successfully" });
     },
     onError: (error: any) => {
@@ -889,7 +889,7 @@ const WorkOrders: React.FC = () => {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       toast({ title: 'Postponement Approved', description: 'Work order due date has been updated.' });
       setPostponeApprovalDialogOpen(false);
       setPostponeApprovalWorkOrder(null);
@@ -907,7 +907,7 @@ const WorkOrders: React.FC = () => {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       toast({ title: 'Postponement Rejected', description: 'Work order has been reverted to Due/Overdue.' });
       setPostponeApprovalDialogOpen(false);
       setPostponeApprovalWorkOrder(null);
@@ -987,7 +987,7 @@ const WorkOrders: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       toast({ title: "Postponement Submitted", description: "Your postponement request has been sent to the office for approval." });
       setPostponeDialogOpen(false);
     },
@@ -1657,7 +1657,7 @@ const WorkOrders: React.FC = () => {
           setOverdueReasonWorkOrder(null);
         }}
         onSaved={() => {
-          queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+          invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
         }}
       />
 

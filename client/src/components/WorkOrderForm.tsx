@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from "@shared/dateUtils";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, invalidateByUrlPrefix } from "@/lib/queryClient";
 import { useVessel } from "@/contexts/VesselContext";
 import {
   Dialog,
@@ -372,6 +372,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/transactions'] });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/spares-by-component/${componentCode}`] });
+      invalidateByUrlPrefix(['/technical/api/inventory/spares-with-inventory', '/technical/api/spares/history']);
     },
     onError: (error: any) => {
       console.error('Consumption transaction failed:', error);

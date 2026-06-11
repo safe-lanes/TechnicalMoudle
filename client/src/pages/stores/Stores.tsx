@@ -21,7 +21,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Search, Edit2, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, PlusCircle, MinusCircle, Download, AlertCircle, CheckCircle, HelpCircle, MapPin, ChevronDown, ChevronsUpDown, Plus, Check, RotateCcw, Info, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import * as XLSX from "xlsx";
 import { FEATURES } from "@/config/features";
 import { useVessels } from "@/hooks/useVessels";
@@ -312,7 +312,7 @@ const Stores: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [fieldKey]: newLocName }),
       });
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      invalidateByUrlPrefix('/technical/api/stores');
       toast({ title: "Location Updated", description: `Location changed to "${newLocName}"` });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || 'Failed to update location', variant: "destructive" });
@@ -374,7 +374,7 @@ const Stores: React.FC = () => {
           body: JSON.stringify({ [fieldKey]: newVal }),
         });
       }
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      invalidateByUrlPrefix('/technical/api/stores');
       setEditingLocRobValues({});
       toast({ title: "Saved", description: `Location ROB values saved successfully.` });
     } catch (error) {
@@ -591,7 +591,7 @@ const Stores: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: [`/technical/api/vessel-location-names/${vesselId}`] });
       }
       
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      invalidateByUrlPrefix('/technical/api/stores');
       queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
       
       // Calculate delta for toast message
@@ -1386,7 +1386,7 @@ const Stores: React.FC = () => {
       await apiRequest('POST', `/technical/api/stores/${vesselId}/create`, payload);
       
       // Invalidate queries to refetch updated data (both inventory and history since ledger entry may be created)
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      invalidateByUrlPrefix('/technical/api/stores');
       queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
       
       setIsAddStoreModalOpen(false);
@@ -1448,7 +1448,7 @@ const Stores: React.FC = () => {
       // Call API to persist changes
       await apiRequest('PATCH', `/technical/api/stores/${vesselId}/${editingItem.id}`, updatePayload);
       
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      invalidateByUrlPrefix('/technical/api/stores');
       queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
       
       // Update local state optimistically
@@ -1573,7 +1573,7 @@ const Stores: React.FC = () => {
         purchaseOrderRef: receiveForm.supplierPO || undefined
       });
       
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      invalidateByUrlPrefix('/technical/api/stores');
       queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
       setIsReceiveModalOpen(false);
       const locationName = receiveForm.location === "A" ? locationNames.locationA : locationNames.locationB;
@@ -1636,7 +1636,7 @@ const Stores: React.FC = () => {
         }]
       });
       
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      invalidateByUrlPrefix('/technical/api/stores');
       queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
       setIsConsumeModalOpen(false);
       const locationName = consumeForm.location === "A" ? locationNames.locationA : locationNames.locationB;
@@ -1732,7 +1732,7 @@ const Stores: React.FC = () => {
         failedIds.add(storeId);
       }
     }
-    queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+    invalidateByUrlPrefix('/technical/api/stores');
     queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
     setIsDeletingSelected(false);
     if (failCount === 0) {
@@ -2107,7 +2107,7 @@ const Stores: React.FC = () => {
                     onClick={async () => {
                       try {
                         await apiRequest('PUT', `/technical/api/stores/item/${item.id}`, { isActive: true });
-                        queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+                        invalidateByUrlPrefix('/technical/api/stores');
                         toast({ title: "Success", description: "Item restored" });
                       } catch (error) {
                         toast({ title: "Error", description: "Failed to restore item", variant: "destructive" });
@@ -2404,7 +2404,7 @@ const Stores: React.FC = () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ [fieldKey]: newVal }),
                   }).then(() => {
-                    queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+                    invalidateByUrlPrefix('/technical/api/stores');
                   });
                 }
                 setEditingLocRobValues(prev => { const n = { ...prev }; delete n[item._editKey]; return n; });
