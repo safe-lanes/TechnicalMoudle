@@ -15,11 +15,13 @@
 # Must pass env vars explicitly (dotenv not loaded before config imports)
 DATABASE_URL="postgres://postgres:admin123@localhost:5432/pms" \
 EXTERNAL_MASTER_DATA_URL_DEV=http://localhost:9999 \
+SYNC_INSTANCE_ID=SHORE-DEV \
 NODE_ENV=development npx tsx server/index.ts
 ```
 - Server binds to port **5000** (not the PORT in .env)
 - `cross-env` removed from package.json — use bash env prefix syntax
 - `EXTERNAL_MASTER_DATA_URL_DEV` is mandatory (can be dummy URL for local dev)
+- **`SYNC_INSTANCE_ID` (or DB `sync_settings.instance_id`) is mandatory** — startup exits(1) without it. DB value wins over env (the field-logger and sync engine both resolve DB-first; placeholder ids are never stamped on field logs). Use `SHIP-<code>` for ship behavior, anything else = shore.
 
 ## Quick DB Queries (without server)
 ```bash
