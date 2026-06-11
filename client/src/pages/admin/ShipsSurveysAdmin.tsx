@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/command";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import { useVessels } from "@/hooks/useVessels";
 
 interface LabelConfig {
@@ -325,8 +325,7 @@ export default function ShipsSurveysAdmin() {
       setDeletedMasterIds([]);
       setMasterValidationError("");
       setInvalidSurveyIds(new Set());
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-survey-applicability', selectedVesselIds] });
+      invalidateByUrlPrefix(['/technical/api/admin/ship-surveys-master', '/technical/api/admin/vessel-survey-applicability']);
     },
     onError: (error: any) => {
       toast({
@@ -562,7 +561,7 @@ export default function ShipsSurveysAdmin() {
       setDeletedDraftIds([]);
     }
     
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-surveys-master'] });
+    invalidateByUrlPrefix('/technical/api/admin/ship-surveys-master');
     setDeletedMasterIds([]);
     
     setViewModes(prev => ({ ...prev, [activeTab]: "view" }));
@@ -996,7 +995,7 @@ export default function ShipsSurveysAdmin() {
               vesselName: vessel.vesselName,
             });
             setInitializedVesselIds(prev => new Set(Array.from(prev).concat(vessel.vesselId)));
-            queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-survey-applicability', selectedVesselIds] });
+            invalidateByUrlPrefix('/technical/api/admin/vessel-survey-applicability');
           } catch (err) {
             console.error('Failed to initialize vessel survey applicability:', err);
           }
@@ -1063,7 +1062,7 @@ export default function ShipsSurveysAdmin() {
       });
       
       // Refresh the data
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-survey-applicability', selectedVesselIds] });
+      invalidateByUrlPrefix('/technical/api/admin/vessel-survey-applicability');
     } catch (err) {
       console.error('Failed to update applicability:', err);
       toast({

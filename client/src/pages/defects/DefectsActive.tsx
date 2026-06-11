@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { invalidateByUrlPrefix } from "@/lib/queryClient";
 import { getComputedStatus, isActiveComputedStatus, isResolvedComputedStatus } from "@/lib/defectStatusUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -156,7 +156,7 @@ export default function DefectsActive() {
       return response.json();
     },
     onSuccess: (data, defectId) => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
+      invalidateByUrlPrefix('/technical/api/defects');
       
       // Show success toast with action to view in Resolved tab
       toast({

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -575,8 +575,7 @@ export default function DefectsLogWithTabs() {
       await apiRequest('DELETE', `/technical/api/defects/${defectId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['defects'] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
+      invalidateByUrlPrefix(['defects', '/technical/api/defects']);
       toast({
         title: "Success",
         description: "Defect has been deleted successfully."
@@ -608,8 +607,7 @@ export default function DefectsLogWithTabs() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['defects'] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
+      invalidateByUrlPrefix(['defects', '/technical/api/defects']);
     },
     onError: (error: Error) => {
       toast({
@@ -997,8 +995,7 @@ export default function DefectsLogWithTabs() {
           open={linkModal.open}
           onClose={() => {
             setLinkModal({ open: false, defectId: null, linkedDefects: [] });
-            queryClient.invalidateQueries({ queryKey: ['defects'] });
-            queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
+            invalidateByUrlPrefix(['defects', '/technical/api/defects']);
           }}
           defectId={linkModal.defectId}
           currentLinkedDefects={linkModal.linkedDefects}
@@ -1009,8 +1006,7 @@ export default function DefectsLogWithTabs() {
         open={newDefectModalOpen}
         onClose={() => {
           setNewDefectModalOpen(false);
-          queryClient.invalidateQueries({ queryKey: ['defects'] });
-          queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
+          invalidateByUrlPrefix(['defects', '/technical/api/defects']);
         }}
         mode="new"
       />
@@ -1031,8 +1027,7 @@ export default function DefectsLogWithTabs() {
           open={editModal.open}
           onClose={() => {
             setEditModal({ open: false, defectId: null });
-            queryClient.invalidateQueries({ queryKey: ['defects'] });
-            queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
+            invalidateByUrlPrefix(['defects', '/technical/api/defects']);
           }}
           defectId={editModal.defectId}
           mode="edit"
