@@ -4,6 +4,7 @@ import {
   type VesselGraceSettings,
   type CompanyStandardGraceConfig,
 } from './status';
+import { parseWorkOrderDate } from './dateParse';
 
 /**
  * Four-bucket point-in-time status used by the 6-Month Maintenance Trend chart.
@@ -42,55 +43,11 @@ export interface PITPostponement {
   createdAt?: string | Date | null;
 }
 
+// Format-tolerant parsing now lives in the SHARED parser (dateParse.ts) — this
+// file's earlier local implementation was the template for it. Kept as a thin
+// alias so the call sites below stay unchanged.
 function toDate(value: string | Date | null | undefined): Date | null {
-  if (!value) return null;
-  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
-  // Try strict format normalization first so DD-MM-YYYY / DD-MMM-YYYY don't
-  // get mis-parsed by Date's locale-dependent constructor.
-  const normalized = normalizeDueDateString(value);
-  if (normalized) {
-    const m = normalized.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
-    if (m) {
-      const dd = parseInt(m[1], 10);
-      const mIdx = MONTH_SHORT.findIndex((s) => s.toLowerCase() === m[2].toLowerCase());
-      const yyyy = parseInt(m[3], 10);
-      if (mIdx >= 0) return new Date(Date.UTC(yyyy, mIdx, dd));
-    }
-  }
-  const d = new Date(value);
-  return isNaN(d.getTime()) ? null : d;
-}
-
-const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-/**
- * Normalize an arbitrary date string into DD-MMM-YYYY, which is the format
- * understood by computeWorkOrderStatus. Accepts ISO (YYYY-MM-DD), DD-MMM-YYYY,
- * DD-MM-YYYY, and full ISO datetime strings.
- */
-function normalizeDueDateString(value: string | null | undefined): string | null {
-  if (!value) return null;
-  // Already DD-MMM-YYYY?
-  if (/^\d{1,2}-[A-Za-z]{3}-\d{4}$/.test(value)) return value;
-  // ISO date or datetime
-  if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
-    const d = new Date(value);
-    if (isNaN(d.getTime())) return null;
-    return `${String(d.getUTCDate()).padStart(2, '0')}-${MONTH_SHORT[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
-  }
-  // DD-MM-YYYY (numeric)
-  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(value)) {
-    const [dd, mm, yyyy] = value.split('-').map((p) => parseInt(p, 10));
-    if (mm >= 1 && mm <= 12) {
-      return `${String(dd).padStart(2, '0')}-${MONTH_SHORT[mm - 1]}-${yyyy}`;
-    }
-  }
-  // Last-resort: try to parse via Date and reformat
-  const d = new Date(value);
-  if (!isNaN(d.getTime())) {
-    return `${String(d.getUTCDate()).padStart(2, '0')}-${MONTH_SHORT[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
-  }
-  return null;
+  return parseWorkOrderDate(value);
 }
 
 function parseNumber(value: string | number | null | undefined): number | null {
@@ -185,7 +142,9 @@ export function computePointInTimeStatus(input: ComputePITStatusInput): PointInT
   //    on the WO row reflects today, not refDate, and would otherwise short-
   //    circuit the calculation.
   const computed = computeWorkOrderStatus({
-    dueDate: normalizeDueDateString(effectiveDueDate),
+    // No pre-normalization needed: computeWorkOrderStatus now parses all
+    // stored formats via the shared parser (dateParse.ts).
+    dueDate: effectiveDueDate,
     dueRH: parseNumber(wo.nextDueReading),
     currentRH: parseNumber(wo.currentReading),
     isExecution: wo.isExecution ?? false,

@@ -13,6 +13,7 @@ import {
   findBlockingWOForJob
 } from "../utils/workOrderStatus";
 import type { InsertWorkOrder, Job, PmsVesselSettings, Component } from "@shared/schema";
+import { parseWorkOrderDate } from "@shared/workOrders/dateParse";
 
 /**
  * Determine if a job is "critical" based on its jobPriority
@@ -523,8 +524,13 @@ export class JobDueScannerService {
         continue;
       }
 
-      // Calendar leg values
-      const dueDate = new Date(job.nextDueDate!);
+      // Calendar leg values — SHARED parser (dateParse.ts contract): raw
+      // new Date() invalidated/swapped DD-MM-YYYY dates. Unparseable → skip.
+      const dueDate = parseWorkOrderDate(job.nextDueDate);
+      if (!dueDate) {
+        skipReasons.missingCalendarData++;
+        continue;
+      }
       dueDate.setHours(0, 0, 0, 0);
       const generateDate = new Date(dueDate);
       generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
@@ -850,7 +856,7 @@ export class JobDueScannerService {
       dueRH = dualRhDueValue;
 
       // Calendar values
-      const dualDueDate = job.nextDueDate ? new Date(job.nextDueDate) : new Date();
+      const dualDueDate = parseWorkOrderDate(job.nextDueDate) ?? new Date(); // shared parser (dateParse.ts contract)
       dualDueDate.setHours(0, 0, 0, 0);
       const dualDueDateStr = dualDueDate.toISOString().split('T')[0];
       const dualGenerateDate = new Date(dualDueDate);
@@ -958,7 +964,7 @@ export class JobDueScannerService {
       console.log(`   RH_due=${rhDueValue}, RH_generate=${rhGenerate}, RH_current=${currentRH}`);
     } else {
       // Calendar Job: compute cycle values
-      const dueDate = job.nextDueDate ? new Date(job.nextDueDate) : new Date();
+      const dueDate = parseWorkOrderDate(job.nextDueDate) ?? new Date(); // shared parser (dateParse.ts contract)
       dueDate.setHours(0, 0, 0, 0);
       const dueDateStr = dueDate.toISOString().split('T')[0];
       

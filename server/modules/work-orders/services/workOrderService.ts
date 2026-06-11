@@ -2,6 +2,7 @@ import * as repo from '../repositories/workOrderRepository';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 import { ensureArray } from '../../shared/jsonHelpers';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
+import { parseWorkOrderDate } from '@shared/workOrders/dateParse';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { computeSpareConsumptionDelta, ConsumedSpareEntry } from '../utils/spareConsumptionDelta';
 import { calculateMissedCycles, calculateMissedCyclesRH } from '@shared/dateUtils';
@@ -114,11 +115,13 @@ async function buildRankLabelMap(): Promise<Map<string, string>> {
 }
 
 function calculateBackdatingDaysForApproval(completionDate: string | null | undefined, submittedDate: string | null | undefined): number {
-  if (!completionDate) return 0;
-  const comp = new Date(completionDate);
-  if (isNaN(comp.getTime())) return 0;
-  const reference = submittedDate ? new Date(submittedDate) : new Date();
-  if (isNaN(reference.getTime())) return 0;
+  // Dates parse via the SHARED format-complete parser (dateParse.ts contract):
+  // stored date strings are mixed-format, and raw new Date() mis-parses
+  // DD-MM-YYYY (month/day swap or Invalid → silently 0 days).
+  const comp = parseWorkOrderDate(completionDate);
+  if (!comp) return 0;
+  const reference = submittedDate ? parseWorkOrderDate(submittedDate) : new Date();
+  if (!reference) return 0;
   const diffMs = reference.getTime() - comp.getTime();
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }
@@ -129,10 +132,14 @@ export function calculateApprovalTier(
   missedCycles: number,
   backdatingDays: number = 0
 ) {
+  // SHARED parser (dateParse.ts contract): raw new Date() made DD-MM-YYYY due
+  // dates Invalid (daysLate NaN) or month/day-swapped (daysLate 0) → WOs that
+  // were months late computed tier 'standard' and never created the
+  // superintendent notification (the Issue-02 "inconsistent" mechanism).
   let daysLate = 0;
-  if (dueDate && completionDate) {
-    const due = new Date(dueDate);
-    const comp = new Date(completionDate);
+  const due = parseWorkOrderDate(dueDate);
+  const comp = parseWorkOrderDate(completionDate);
+  if (due && comp) {
     const diffMs = comp.getTime() - due.getTime();
     daysLate = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
   }
@@ -456,7 +463,8 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[]) {
     }
 
     if (a.dueDate && b.dueDate) {
-      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      // shared parser (dateParse.ts contract); unparseable sorts as epoch 0
+      return (parseWorkOrderDate(a.dueDate)?.getTime() ?? 0) - (parseWorkOrderDate(b.dueDate)?.getTime() ?? 0);
     }
 
     return 0;
@@ -918,8 +926,8 @@ export async function updateWorkOrder(id: string, body: any) {
       const storedStatus = existingWO.status || 'Completed';
       const dueDate = existingWO.dueDate;
       if (dueDate) {
-        const parsedDue = new Date(dueDate);
-        if (!isNaN(parsedDue.getTime()) && parsedDue < new Date()) {
+        const parsedDue = parseWorkOrderDate(dueDate); // shared parser (dateParse.ts contract)
+        if (parsedDue && parsedDue < new Date()) {
           console.warn(
             `⚠️ Data inconsistency: WO ${existingWO.workOrderNo} has stored status "${storedStatus}" ` +
             `but due date ${dueDate} is in the past. This WO may have appeared as Overdue in the UI.`
@@ -1373,9 +1381,9 @@ export async function updateWorkOrder(id: string, body: any) {
       const newDueDate = workOrder.postponementEndDate || workOrder.dueDate || null;
       let durationDays: number | null = null;
       if (originalDueDate && newDueDate) {
-        const orig = new Date(originalDueDate);
-        const next = new Date(newDueDate);
-        if (!isNaN(orig.getTime()) && !isNaN(next.getTime())) {
+        const orig = parseWorkOrderDate(originalDueDate); // shared parser (dateParse.ts contract)
+        const next = parseWorkOrderDate(newDueDate);
+        if (orig && next) {
           durationDays = Math.ceil((next.getTime() - orig.getTime()) / (1000 * 60 * 60 * 24));
         }
       }

@@ -7,6 +7,7 @@ import { shouldGenerateWorkOrder } from "@shared/dateUtils";
 import { generatePlannedWorkOrderNumber, generateUnplannedWorkOrderNumber } from "../utils/workOrderNumbering";
 import { jobService } from "./jobService";
 import { logFieldChanges } from "../modules/sync";
+import { parseWorkOrderDate } from "@shared/workOrders/dateParse";
 import { 
   isBlockingStatus, 
   isCompletedStatus,
@@ -444,10 +445,18 @@ export class WorkOrderService {
     
     for (const job of calendarJobs) {
       // Calculate DUE_DATE and GENERATE_DATE
-      // DUE_DATE is stored in job.nextDueDate
-      const dueDate = new Date(job.nextDueDate!);
+      // DUE_DATE is stored in job.nextDueDate — parsed via the SHARED
+      // format-complete parser (dateParse.ts contract). Previously a raw
+      // new Date() here turned DD-MM-YYYY dates into Invalid Date, and the
+      // .toISOString() below then THREW — killing calendar generation for the
+      // ENTIRE vessel on every scan. Unparseable dates now skip the job only.
+      const dueDate = parseWorkOrderDate(job.nextDueDate);
+      if (!dueDate) {
+        console.warn(`⚠️ [Calendar WO Gen] Job ${job.jobNo} has unparseable nextDueDate "${job.nextDueDate}" — skipping (fix the job's due date)`);
+        continue;
+      }
       dueDate.setHours(0, 0, 0, 0);
-      
+
       // GENERATE_DATE = DUE_DATE - FIXED 30 days (business rule: generation is fixed, not vessel-driven)
       const generateDate = new Date(dueDate);
       generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);
