@@ -563,6 +563,15 @@ export async function applyFieldLogInserts(
       if (!rowData['created_at']) rowData['created_at'] = new Date();
       if (!rowData['updated_at']) rowData['updated_at'] = new Date();
 
+      // Defense-in-depth (pairs with full-row-creation logging): work_orders.id is a LOCAL text PK
+      // with no DB default, and it is intentionally NOT carried across instances (every child table
+      // FKs to wouuid, never to id). If an incoming INSERT lacks `id`, assign a fresh local id keyed
+      // on wouuid so the row is NEVER dropped for a missing local id ("null value in column id").
+      // Idempotent: same wouuid -> same synthesized id, and ON CONFLICT (wouuid) dedups re-applies.
+      if (tableName === 'work_orders' && (rowData['id'] === undefined || rowData['id'] === null)) {
+        rowData['id'] = `WO-SYNC-${rowUuid}`;
+      }
+
       // Build INSERT statement
       const columns: string[] = [];
       const placeholders: string[] = [];
