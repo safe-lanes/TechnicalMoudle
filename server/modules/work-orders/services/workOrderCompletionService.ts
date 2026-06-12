@@ -6,6 +6,7 @@ import { detectAndLogAnomalies } from './anomalyDetectionService';
 import { invalidateComplianceCache } from './complianceAnomalyService';
 import { validateRHEntry } from '../../running-hours/services/rhTimelineValidationService';
 import { logFieldChanges } from '../../sync';
+import { isShipInstance } from '../../sync/syncRole';
 
 // ── Complete Work Order ──
 
@@ -122,7 +123,14 @@ export async function completeWorkOrder(
   let completionRHSource = 'MANUAL_ENTRY';
   let rhReadingApplied = false;
 
-  if (runningHours && counterType !== 'NOT_RH_DRIVEN') {
+  // SHIP-ONLY RH sync (Jeevan): the master RH counter advances on the ship/HOD approval, NEVER
+  // office-side; INHERITED snapshots likewise originate on the ship and reach shore via sync.
+  // NOTE: gated at this OUTER block — NOT the inner `if (counterType === 'MASTER')` at line ~142 —
+  // because that block's bare `else` is the INHERITED branch, so gating there would mis-route a
+  // shore MASTER reading into INHERITED validation/audit. This outer block has no else (closes
+  // cleanly), so a shore instance simply skips RH sync and continues. updateMasterRH still runs on
+  // the ship, so the shore mirrors via running_hours_audit sync (propagation untouched).
+  if (runningHours && counterType !== 'NOT_RH_DRIVEN' && await isShipInstance()) {
     const newRH = parseInt(runningHours);
     const completionDateForValidation = dateOfCompletion || new Date().toISOString().split('T')[0];
     const componentVesselId = workOrder.vesselId || component.vesselId || 'V001';

@@ -1344,11 +1344,18 @@ export async function updateWorkOrder(id: string, body: any) {
   //   - INHERITED keeps the existing RH_EXCEEDS_MASTER guard above + its own jobs-row cycle write
   //     below; NOT_RH_DRIVEN never reaches this branch. Neither moves the master counter.
   //   - Double-sync guarded by existing rh_synced_at; the stamp persists in the same commit.
+  //   - SHIP-ONLY (Jeevan): the master RH counter advances on the ship/HOD approval, NEVER
+  //     office-side. The office L2 review completes via reviewerApprove() (which does not advance
+  //     the counter); this PATCH approval path must not advance it on a shore instance either.
+  //     updateMasterRH still runs on the ship, so the shore mirrors the value via the
+  //     running_hours_audit sync + derived-RH-update (propagation untouched).
+  const { isShipInstance: isShipInstanceForRH } = await import('../../sync/syncRole');
   if (
     isApprovalTransition &&
     !interceptedForL2Review &&
     updateData.status === 'Completed' &&
-    !(existingWO as any).rhSyncedAt
+    !(existingWO as any).rhSyncedAt &&
+    await isShipInstanceForRH()
   ) {
     const rhRaw = existingWO.runningHours || updateData.runningHours;
     if (rhRaw) {
