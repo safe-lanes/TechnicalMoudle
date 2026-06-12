@@ -18,7 +18,13 @@ import { ShipskartRoleNotMappedError } from '../services/shipskartSsoService';
  * If the user's role has no Shipskart mapping, returns 403 ROLE_NOT_MAPPED.
  */
 export async function initiateHandler(req: AuthenticatedRequest, res: Response) {
-  const userRole = req.user?.role ?? '';
+  // The backend has no real auth yet — mockAuthMiddleware hardcodes
+  // req.user.role to 'Sail Admin', which is unmapped. The frontend therefore
+  // sends the real logged-in role in the body (same pattern as the alerts
+  // ?role= calls). Prefer a valid non-empty body.role; otherwise fall back to
+  // req.user.role so existing behavior is preserved.
+  const bodyRole = typeof req.body?.role === 'string' ? req.body.role.trim() : '';
+  const userRole = bodyRole || req.user?.role || '';
   try {
     const result = await shipskartSsoService.initiateSso(userRole);
     res.json({
@@ -49,7 +55,10 @@ export async function initiateHandler(req: AuthenticatedRequest, res: Response) 
  * Unmapped roles are a no-op inside the service.
  */
 export async function logoutHandler(req: AuthenticatedRequest, res: Response) {
-  const userRole = req.user?.role ?? '';
+  // Mirror initiate: prefer the real role the client sends so the correct
+  // Shipskart session is evicted; fall back to req.user.role.
+  const bodyRole = typeof req.body?.role === 'string' ? req.body.role.trim() : '';
+  const userRole = bodyRole || req.user?.role || '';
   try {
     const result = await shipskartSsoService.logoutSso(userRole);
     res.json({ success: true, message: result?.message });

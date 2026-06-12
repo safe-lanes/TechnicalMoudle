@@ -12,6 +12,17 @@ import {
   type ConditionalStyle,
 } from '../../../lib/excelReportStyles';
 
+// Compute-on-read seam. WO status is no longer persisted, so report band logic
+// (Overdue / Due / Active counts) must use the COMPUTED lifecycle band. This
+// returns the same work-order row set as repo.getWorkOrders (both delegate to
+// storage.getWorkOrders) but with `status` set to the computed band; authored
+// statuses (Completed, etc.) are preserved. Used in place of repo.getWorkOrders
+// for every band-reading report in this file.
+async function getWorkOrdersComputed(vesselId?: string, vesselIds?: string[]) {
+  const { getWorkOrdersWithComputedStatus } = await import('../../work-orders/services/workOrderService');
+  return getWorkOrdersWithComputedStatus(vesselId, vesselIds);
+}
+
 function filterByComponent<T extends Record<string, any>>(items: T[], componentFilter?: string): T[] {
   if (!componentFilter) return items;
   const q = componentFilter.toLowerCase();
@@ -57,7 +68,7 @@ export async function getCriticalEquipmentStatus(vesselId: string, startDateStr?
     c.isActive !== false && (c.critical === true || c.classItem === true)
   );
 
-  const allWorkOrders = await repo.getWorkOrders(vesselId, vesselIds);
+  const allWorkOrders = await getWorkOrdersComputed(vesselId, vesselIds);
 
   const parseDate = (dateStr: string | null | undefined): Date | null => {
     if (!dateStr) return null;
@@ -330,7 +341,7 @@ export async function getUnplannedBreakdownJobs(
   // Get all work orders for the vessel
   const allVesselsForLookup = await repo.getVessels();
   const vesselMap = new Map(allVesselsForLookup.map(v => [v.id, v.name || v.id]));
-  const allWorkOrders = await repo.getWorkOrders(vesselId, vesselIds);
+  const allWorkOrders = await getWorkOrdersComputed(vesselId, vesselIds);
 
   // Parse date helper
   const parseDate = (dateStr: string | null | undefined): Date | null => {
@@ -456,7 +467,7 @@ export async function exportUnplannedBreakdownJobsExcel(
   endDate: string,
   componentFilter?: string,
 ): Promise<{ buffer: Buffer; filename: string }> {
-  const allWorkOrdersRaw = await repo.getWorkOrders(vesselId);
+  const allWorkOrdersRaw = await getWorkOrdersComputed(vesselId);
   const allWorkOrders = componentFilter
     ? allWorkOrdersRaw.filter(wo => {
         const compName = ((wo as Record<string, any>).componentName || (wo as Record<string, any>).component || "").toLowerCase();
@@ -930,11 +941,11 @@ export async function getLsaFfaMaintenanceSchedule(
   let allWorkOrders: any[] = [];
   if (vesselId === 'all') {
     for (const v of scopedVessels) {
-      const wos = await repo.getWorkOrders(v.id);
+      const wos = await getWorkOrdersComputed(v.id);
       allWorkOrders = allWorkOrders.concat(wos);
     }
   } else {
-    allWorkOrders = await repo.getWorkOrders(vesselId);
+    allWorkOrders = await getWorkOrdersComputed(vesselId);
   }
 
   const today = new Date();
@@ -1173,11 +1184,11 @@ export async function getCriticalEquipmentSchedule(
   let allWorkOrders: any[] = [];
   if (vesselId === 'all') {
     for (const v of scopedVessels) {
-      const wos = await repo.getWorkOrders(v.id);
+      const wos = await getWorkOrdersComputed(v.id);
       allWorkOrders = allWorkOrders.concat(wos);
     }
   } else {
-    allWorkOrders = await repo.getWorkOrders(vesselId);
+    allWorkOrders = await getWorkOrdersComputed(vesselId);
   }
 
   const vesselMap = new Map(allVessels.map(v => [v.id, v.name || v.id]));
@@ -1542,7 +1553,7 @@ export async function getClassItemsJobsStatus(
   for (const v of scopedVessels) {
     allComponents = allComponents.concat(await repo.getComponents(v.id));
     allJobs = allJobs.concat(await repo.getJobs(v.id));
-    allWorkOrders = allWorkOrders.concat(await repo.getWorkOrders(v.id));
+    allWorkOrders = allWorkOrders.concat(await getWorkOrdersComputed(v.id));
   }
 
   const isClassRelated = (val: any) => val === true || val === 'Yes' || val === 'true';

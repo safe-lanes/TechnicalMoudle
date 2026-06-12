@@ -928,6 +928,7 @@ export interface IStorage {
   createJobComponentLink(link: InsertJobComponentLink): Promise<JobComponentLink>;
   deleteJobComponentLink(jobId: string, componentId: string): Promise<void>;
   getLinkedComponentsForJob(jobId: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string; lastDoneRH?: string | null; nextDueRH?: string | null }>>;
+  getLinkedComponentsForJobs(jobIds: string[]): Promise<Map<string, Array<{ componentId: string; componentCode: string; componentName: string; lastDoneRH?: string | null; nextDueRH?: string | null }>>>;
   getLinkedJobsForComponent(componentId: string): Promise<Array<{ jobId: string; jobNo: string; jobTitle: string }>>;
   // Get maintenance history for a specific job-component pair
   getMaintenanceHistoryByJobAndComponent(jobId: string, componentCode: string): Promise<any[]>;

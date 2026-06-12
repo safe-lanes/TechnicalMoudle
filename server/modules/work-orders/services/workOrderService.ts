@@ -2,6 +2,7 @@ import * as repo from '../repositories/workOrderRepository';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 import { ensureArray } from '../../shared/jsonHelpers';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
+import { parseWorkOrderDate } from '@shared/workOrders/dateParse';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { computeSpareConsumptionDelta, ConsumedSpareEntry } from '../utils/spareConsumptionDelta';
 import { calculateMissedCycles, calculateMissedCyclesRH } from '@shared/dateUtils';
@@ -114,11 +115,13 @@ async function buildRankLabelMap(): Promise<Map<string, string>> {
 }
 
 function calculateBackdatingDaysForApproval(completionDate: string | null | undefined, submittedDate: string | null | undefined): number {
-  if (!completionDate) return 0;
-  const comp = new Date(completionDate);
-  if (isNaN(comp.getTime())) return 0;
-  const reference = submittedDate ? new Date(submittedDate) : new Date();
-  if (isNaN(reference.getTime())) return 0;
+  // Dates parse via the SHARED format-complete parser (dateParse.ts contract):
+  // stored date strings are mixed-format, and raw new Date() mis-parses
+  // DD-MM-YYYY (month/day swap or Invalid → silently 0 days).
+  const comp = parseWorkOrderDate(completionDate);
+  if (!comp) return 0;
+  const reference = submittedDate ? parseWorkOrderDate(submittedDate) : new Date();
+  if (!reference) return 0;
   const diffMs = reference.getTime() - comp.getTime();
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }
@@ -129,10 +132,14 @@ export function calculateApprovalTier(
   missedCycles: number,
   backdatingDays: number = 0
 ) {
+  // SHARED parser (dateParse.ts contract): raw new Date() made DD-MM-YYYY due
+  // dates Invalid (daysLate NaN) or month/day-swapped (daysLate 0) → WOs that
+  // were months late computed tier 'standard' and never created the
+  // superintendent notification (the Issue-02 "inconsistent" mechanism).
   let daysLate = 0;
-  if (dueDate && completionDate) {
-    const due = new Date(dueDate);
-    const comp = new Date(completionDate);
+  const due = parseWorkOrderDate(dueDate);
+  const comp = parseWorkOrderDate(completionDate);
+  if (due && comp) {
     const diffMs = comp.getTime() - due.getTime();
     daysLate = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
   }
@@ -456,13 +463,31 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[]) {
     }
 
     if (a.dueDate && b.dueDate) {
-      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      // shared parser (dateParse.ts contract); unparseable sorts as epoch 0
+      return (parseWorkOrderDate(a.dueDate)?.getTime() ?? 0) - (parseWorkOrderDate(b.dueDate)?.getTime() ?? 0);
     }
 
     return 0;
   });
 
   return sortedWorkOrders;
+}
+
+/**
+ * Same as listWorkOrders, but returns each row with `status` overwritten by the
+ * computed lifecycle band (computedStatus). For readers that historically
+ * filtered the persisted `status` column for the DERIVED band (Overdue / Due /
+ * Active): now that no scheduler persists that band (it is computed on read),
+ * those readers get a correct value with no downstream changes. Authored /
+ * workflow statuses (Completed, Pending Approval, Postponed, Rejected, …) are
+ * preserved because computeWorkOrderStatus passes them through unchanged.
+ */
+// CONTRACT: every overdue/due (derived-band) read MUST go through this helper —
+// never a raw `WHERE status = 'Overdue'/'Due'`. Status is computed on read; the
+// persisted column is not maintained for the derived band.
+export async function getWorkOrdersWithComputedStatus(vesselId?: string, vesselIds?: string[]) {
+  const enriched = await listWorkOrders(vesselId, vesselIds);
+  return enriched.map((wo: any) => ({ ...wo, status: wo.computedStatus ?? wo.status }));
 }
 
 export interface ListWorkOrdersPagedParams extends WorkOrderFilterParams {
@@ -901,8 +926,8 @@ export async function updateWorkOrder(id: string, body: any) {
       const storedStatus = existingWO.status || 'Completed';
       const dueDate = existingWO.dueDate;
       if (dueDate) {
-        const parsedDue = new Date(dueDate);
-        if (!isNaN(parsedDue.getTime()) && parsedDue < new Date()) {
+        const parsedDue = parseWorkOrderDate(dueDate); // shared parser (dateParse.ts contract)
+        if (parsedDue && parsedDue < new Date()) {
           console.warn(
             `⚠️ Data inconsistency: WO ${existingWO.workOrderNo} has stored status "${storedStatus}" ` +
             `but due date ${dueDate} is in the past. This WO may have appeared as Overdue in the UI.`
@@ -1442,9 +1467,9 @@ export async function updateWorkOrder(id: string, body: any) {
       const newDueDate = workOrder.postponementEndDate || workOrder.dueDate || null;
       let durationDays: number | null = null;
       if (originalDueDate && newDueDate) {
-        const orig = new Date(originalDueDate);
-        const next = new Date(newDueDate);
-        if (!isNaN(orig.getTime()) && !isNaN(next.getTime())) {
+        const orig = parseWorkOrderDate(originalDueDate); // shared parser (dateParse.ts contract)
+        const next = parseWorkOrderDate(newDueDate);
+        if (orig && next) {
           durationDays = Math.ceil((next.getTime() - orig.getTime()) / (1000 * 60 * 60 * 24));
         }
       }
@@ -1865,6 +1890,34 @@ export async function updateWorkOrder(id: string, body: any) {
       } else {
         console.warn(`⚠️ Could not find component for work order ${freshWorkOrder.id}`);
       }
+    }
+  }
+
+  // ========== EVENT-DRIVEN NEXT-CYCLE GENERATION ON APPROVAL (Issue 03) ==========
+  // Domain-confirmed (Jeevan): the next WO must appear immediately once the
+  // completion is approved, provided it falls within the generate window. The
+  // job-tracking update above has just rolled lastDone/nextDue, so a
+  // vessel-scoped scan now creates the next cycle without waiting for the daily
+  // ship scan (mirrors the RH-entry hook in runningHoursService).
+  // SHIP-ONLY: the L2-reviewer flow approves OFFICE-side — an ungated hook
+  // there would generate the same cycle on both instances with different
+  // wouuids (duplicate WOs across sync). Office-approved WOs get their next
+  // cycle at the ship's next daily scan after the approval syncs down.
+  // Fire-and-forget: a scan failure must never fail or slow the approval; the
+  // scanner's job-level/cycle guards prevent same-instance duplicates, and the
+  // daily scan remains the backstop if a concurrent run skips this one.
+  if (updateData.approvalAction === 'approved' && updateData.status === 'Completed' && workOrder.vesselId) {
+    try {
+      const { isShipInstance } = await import('../../sync/syncRole');
+      if (await isShipInstance()) {
+        const { jobDueScanner } = await import('../../../services/jobDueScanner');
+        console.log(`[NextCycleHook] Completion approved for WO ${workOrder.workOrderNo || id} — triggering vessel-scoped generation scan (${workOrder.vesselId})`);
+        jobDueScanner.runScan(workOrder.vesselId).catch((err: any) => {
+          console.error('[NextCycleHook] post-approval generation scan failed (non-blocking):', err?.message || err);
+        });
+      }
+    } catch (hookErr: any) {
+      console.error('[NextCycleHook] could not start post-approval generation scan (non-blocking):', hookErr?.message || hookErr);
     }
   }
 

@@ -68,9 +68,66 @@ function serializeFieldValue(value: any): string | null {
   return String(value);
 }
 
-// Get instance ID from environment — each ship/shore server has a unique identity
-function getInstanceId(): string {
-  return process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
+// ── Sync instance identity (stamped on every field log) ──
+//
+// PRECEDENCE:
+//   1. DB `sync_settings.instance_id` — the SAME primary source the sync
+//      engine uses (syncRole.getEffectiveInstanceId). Identity is data-driven:
+//      provisioning a new ship is a single DB row, not a per-machine env step.
+//   2. env SYNC_INSTANCE_ID — fallback only.
+//   3. Neither set → THROW. We NEVER stamp logs with 'UNKNOWN' or any
+//      placeholder: the gather query filters `WHERE instance_id = <engine id>`,
+//      so placeholder-stamped rows are invisible and silently never sync.
+//
+// Resolved ONCE and cached — the logger runs on every write, so no per-log DB
+// query. server/index.ts calls initFieldLoggerInstanceId() at startup (before
+// any scheduler or request can write); the lazy fallback below covers scripts.
+let cachedInstanceId: string | null = null;
+
+export async function initFieldLoggerInstanceId(): Promise<string> {
+  if (cachedInstanceId) return cachedInstanceId;
+
+  let dbId: string | null = null;
+  try {
+    const { getSetting } = await import('./repository');
+    dbId = await getSetting('instance_id');
+  } catch {
+    // DB not available — fall through to env
+  }
+  const dbIdTrimmed = (dbId || '').trim();
+  const envId = (process.env.SYNC_INSTANCE_ID || '').trim();
+  const resolved = dbIdTrimmed || envId;
+
+  // Reject placeholder VALUES, not just absence: 'UNKNOWN' was the old silent
+  // default and 'SHIP-VESSELNAME' is the unedited .env template literal — both
+  // produce logs that either never sync or collide across ships.
+  const PLACEHOLDER_INSTANCE_IDS = new Set(['UNKNOWN', 'SHIP-VESSELNAME']);
+  if (!resolved || PLACEHOLDER_INSTANCE_IDS.has(resolved.toUpperCase())) {
+    throw new Error(
+      `Sync instance id is ${resolved ? `a placeholder ('${resolved}')` : 'NOT configured'}. ` +
+      'Set sync_settings.instance_id in the DB (preferred — one row per ship/shore instance) ' +
+      'or the SYNC_INSTANCE_ID env var to a real identity (e.g. SHIP-WAHKWONG-V003). ' +
+      "Field logging refuses placeholders: logs stamped 'UNKNOWN' are invisible to the sync " +
+      'gather and an unedited template id collides across ships.'
+    );
+  }
+
+  if (dbIdTrimmed && envId && dbIdTrimmed !== envId) {
+    console.warn(
+      `[FieldLogger] WARNING: DB sync_settings.instance_id ('${dbIdTrimmed}') and env ` +
+      `SYNC_INSTANCE_ID ('${envId}') disagree — the DB value wins (same precedence as the ` +
+      `sync engine). Align them to avoid confusion.`
+    );
+  }
+
+  cachedInstanceId = resolved;
+  console.log(`[FieldLogger] Instance id resolved: '${resolved}' (source: ${dbIdTrimmed ? 'DB sync_settings.instance_id' : 'env SYNC_INSTANCE_ID'})`);
+  return resolved;
+}
+
+/** Cached resolve — never returns a placeholder; throws if unresolvable. */
+async function getInstanceId(): Promise<string> {
+  return cachedInstanceId ?? initFieldLoggerInstanceId();
 }
 
 /**
@@ -104,7 +161,7 @@ export async function logFieldChanges(
   }
 
   const db = txConn || await getDb();
-  const instanceId = getInstanceId();
+  const instanceId = await getInstanceId();
   const changedAt = new Date();
   let logCount = 0;
   const skipFields = await getEffectiveSkipFields(tableName);
@@ -226,7 +283,7 @@ export async function logFieldChangesBatch(
   if (entries.length === 0) return 0;
 
   const db = txOrDb || await getDb();
-  const instanceId = getInstanceId();
+  const instanceId = await getInstanceId();
   const changedAt = new Date();
 
   // Resolve userId context once — same logic as logFieldChanges

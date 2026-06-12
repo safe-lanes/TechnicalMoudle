@@ -1,5 +1,6 @@
 import { storage } from '../../../storage';
 import { invalidateComplianceCache } from './complianceAnomalyService';
+import { parseWorkOrderDate } from '@shared/workOrders/dateParse';
 import type { WorkOrder, InsertWorkOrderAnomaly } from '@shared/schema';
 
 interface CompletionData {
@@ -12,21 +13,22 @@ interface CompletionData {
 type AnomalyType = 'BACKDATING' | 'MISSED_CYCLES' | 'SUSPICIOUS_PATTERN' | 'MULTIPLE_ANOMALIES';
 type Severity = 'HIGH' | 'MEDIUM' | 'LOW';
 
+// Dates parse via the SHARED format-complete parser (dateParse.ts contract) —
+// raw new Date() mis-parsed DD-MM-YYYY dates (month/day swap or Invalid →
+// daysLate silently 0 → anomalies/notifications skipped).
 function calculateDaysLate(dueDate: string | null | undefined, completionDate: string | null | undefined): number {
-  if (!dueDate || !completionDate) return 0;
-  const due = new Date(dueDate);
-  const comp = new Date(completionDate);
-  if (isNaN(due.getTime()) || isNaN(comp.getTime())) return 0;
+  const due = parseWorkOrderDate(dueDate);
+  const comp = parseWorkOrderDate(completionDate);
+  if (!due || !comp) return 0;
   const diffMs = comp.getTime() - due.getTime();
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }
 
 function calculateBackdatingDays(completionDate: string | null | undefined, submittedDate?: string | null): number {
-  if (!completionDate) return 0;
-  const comp = new Date(completionDate);
-  if (isNaN(comp.getTime())) return 0;
-  const reference = submittedDate ? new Date(submittedDate) : new Date();
-  if (isNaN(reference.getTime())) return 0;
+  const comp = parseWorkOrderDate(completionDate);
+  if (!comp) return 0;
+  const reference = submittedDate ? parseWorkOrderDate(submittedDate) : new Date();
+  if (!reference) return 0;
   const diffMs = reference.getTime() - comp.getTime();
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }

@@ -63,10 +63,6 @@ export async function getExistingAlertDedupeKeys() {
   return storage.getExistingAlertDedupeKeys();
 }
 
-export async function getOverdueWorkOrders() {
-  return storage.getOverdueWorkOrders();
-}
-
 export async function getWorkOrdersWithMissedCycles() {
   return storage.getWorkOrdersWithMissedCycles();
 }

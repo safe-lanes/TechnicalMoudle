@@ -233,8 +233,24 @@ export async function importProvisioningBundle(
   let rowsImported = 0;
   const errors: string[] = [];
 
+  // ── Identity gate: refuse to provision a ship without a REAL instance id ──
+  // Resolve via the same DB-first resolver the field-logger and sync engine
+  // use (sync_settings.instance_id → env SYNC_INSTANCE_ID; throws on missing
+  // or placeholder values like 'UNKNOWN'/'SHIP-VESSELNAME'). Previously this
+  // import stamped sync_metadata.instance_id = env || 'UNKNOWN' permanently —
+  // a provisioned-but-identityless ship whose syncs could never be attributed.
+  let resolvedInstanceId: string;
+  try {
+    const { initFieldLoggerInstanceId } = await import('./fieldLogger');
+    resolvedInstanceId = await initFieldLoggerInstanceId();
+  } catch (idErr: any) {
+    throw new Error(
+      `Provisioning import REFUSED — no valid sync instance id: ${idErr?.message || idErr}`
+    );
+  }
+
   console.log(
-    `[Provisioning] Importing bundle for vessel ${bundle.manifest.vesselId}`
+    `[Provisioning] Importing bundle for vessel ${bundle.manifest.vesselId} (instance: ${resolvedInstanceId})`
   );
   console.log(
     `[Provisioning] Bundle contains ${bundle.manifest.totalRows} rows across ${bundle.manifest.tables.length} tables`
@@ -523,9 +539,10 @@ export async function importProvisioningBundle(
     }
   }
 
-  // Set up sync_metadata for this ship instance
+  // Set up sync_metadata for this ship instance — uses the validated identity
+  // resolved at the top of this function (never raw env, never 'UNKNOWN').
   try {
-    const instanceId = process.env.SYNC_INSTANCE_ID || 'UNKNOWN';
+    const instanceId = resolvedInstanceId;
     await syncRepo.upsertInstanceMetadata({
       instanceId,
       vesselId: bundle.manifest.vesselId,

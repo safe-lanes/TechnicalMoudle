@@ -4937,15 +4937,6 @@ export class PostgresStorage {
     return new Set(rows.map(r => r.dedupeKey));
   }
 
-  async getOverdueWorkOrders(): Promise<any[]> {
-    const db = await getDb();
-    return await db.select().from(workOrders)
-      .where(and(
-        eq(workOrders.status, 'Overdue'),
-        eq(workOrders.dataScope, 'vessel')
-      ));
-  }
-
   async getWorkOrdersWithMissedCycles(): Promise<any[]> {
     const db = await getDb();
     return await db.select().from(workOrders)
@@ -8288,6 +8279,43 @@ export class PostgresStorage {
       lastDoneRH: l.lastDoneRH,
       nextDueRH: l.nextDueRH,
     }));
+  }
+
+  /**
+   * Batch variant of getLinkedComponentsForJob — fetches links for MANY jobs in
+   * a single query and returns them grouped by jobId. Used by the job-due
+   * scanner to KILL the per-job N+1 (previously one query per RH/Dual job).
+   * Jobs with no links are simply absent from the returned map.
+   */
+  async getLinkedComponentsForJobs(jobIds: string[]): Promise<Map<string, Array<{ componentId: string; componentCode: string; componentName: string; lastDoneRH?: string | null; nextDueRH?: string | null }>>> {
+    const result = new Map<string, Array<{ componentId: string; componentCode: string; componentName: string; lastDoneRH?: string | null; nextDueRH?: string | null }>>();
+    if (!jobIds || jobIds.length === 0) return result;
+
+    const db = await getDb();
+    const links = await db.select({
+      jobId: jobComponentLinks.jobId,
+      componentId: jobComponentLinks.componentId,
+      componentCode: components.componentCode,
+      componentName: components.name,
+      lastDoneRH: jobComponentLinks.lastDoneRH,
+      nextDueRH: jobComponentLinks.nextDueRH,
+    })
+    .from(jobComponentLinks)
+    .innerJoin(components, eq(jobComponentLinks.componentId, components.cuuid))
+    .where(inArray(jobComponentLinks.jobId, jobIds));
+
+    for (const l of links) {
+      const arr = result.get(l.jobId) ?? [];
+      arr.push({
+        componentId: l.componentId,
+        componentCode: l.componentCode || '',
+        componentName: l.componentName || '',
+        lastDoneRH: l.lastDoneRH,
+        nextDueRH: l.nextDueRH,
+      });
+      result.set(l.jobId, arr);
+    }
+    return result;
   }
 
   async getLinkedJobsForComponent(componentId: string): Promise<Array<{ jobId: string; jobNo: string; jobTitle: string }>> {

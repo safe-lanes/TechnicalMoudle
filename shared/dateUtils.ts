@@ -1,4 +1,5 @@
 import { format, parse, add, isValid, differenceInCalendarDays, differenceInMonths, differenceInYears } from 'date-fns';
+import { parseWorkOrderDate } from './workOrders/dateParse';
 
 /**
  * Normalize various date formats to DD-MMM-YYYY format
@@ -216,8 +217,12 @@ export function shouldGenerateWorkOrder(
   }
 
   try {
-    const parsedDueDate = parse(nextDueDate, 'dd-MMM-yyyy', new Date());
-    
+    // SHARED parser (workOrders/dateParse.ts contract): the previous
+    // single-format parse('dd-MMM-yyyy') silently returned Invalid for ISO and
+    // DD-MM-YYYY due dates → those jobs NEVER generated a work order.
+    const parsedDueDate = parseWorkOrderDate(nextDueDate);
+    if (!parsedDueDate) return false;
+
     // Normalize current date to midnight for comparison
     const normalizedCurrent = new Date(currentDate);
     normalizedCurrent.setHours(0, 0, 0, 0);

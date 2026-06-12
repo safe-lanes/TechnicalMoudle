@@ -1,5 +1,6 @@
 import * as jobRepo from '../../jobs/repositories/jobRepository';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
+import { parseWorkOrderDate } from '@shared/workOrders/dateParse';
 import { calculateCompanyStandardGraceEnd, buildCompanyGraceConfig, type CompanyStandardGraceConfig } from '@shared/workOrders/status';
 import { ValidationError } from '../../shared/errors';
 import { getDb } from '../../../db';
@@ -163,17 +164,21 @@ export async function getWorkOrderPlannerData(filters: WorkOrderPlannerFilters) 
     if (isCalendarJob) {
       let nextDueDate: Date | null = null;
 
+      // SHARED parser (dateParse.ts contract): raw new Date() invalidated or
+      // month/day-swapped DD-MM-YYYY job dates → wrong/missing planner rows.
       if (job.nextDueDate) {
-        nextDueDate = new Date(job.nextDueDate);
+        nextDueDate = parseWorkOrderDate(job.nextDueDate);
       } else if (job.lastDoneDate && job.frequencyValue && job.frequencyUnit) {
-        const lastDone = new Date(job.lastDoneDate);
+        const lastDone = parseWorkOrderDate(job.lastDoneDate);
         const freqVal = parseInt(job.frequencyValue) || 0;
-        nextDueDate = new Date(lastDone);
-        switch (job.frequencyUnit) {
-          case 'Days': nextDueDate.setDate(nextDueDate.getDate() + freqVal); break;
-          case 'Weeks': nextDueDate.setDate(nextDueDate.getDate() + freqVal * 7); break;
-          case 'Months': nextDueDate.setMonth(nextDueDate.getMonth() + freqVal); break;
-          case 'Years': nextDueDate.setFullYear(nextDueDate.getFullYear() + freqVal); break;
+        nextDueDate = lastDone ? new Date(lastDone) : null;
+        if (nextDueDate) {
+          switch (job.frequencyUnit) {
+            case 'Days': nextDueDate.setDate(nextDueDate.getDate() + freqVal); break;
+            case 'Weeks': nextDueDate.setDate(nextDueDate.getDate() + freqVal * 7); break;
+            case 'Months': nextDueDate.setMonth(nextDueDate.getMonth() + freqVal); break;
+            case 'Years': nextDueDate.setFullYear(nextDueDate.getFullYear() + freqVal); break;
+          }
         }
       }
 

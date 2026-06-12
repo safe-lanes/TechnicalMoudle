@@ -55,6 +55,66 @@ for /f "usebackq tokens=1,* delims==" %%a in (".env") do (
     )
 )
 
+REM ── Ship identity (MANDATORY provisioning step) ────────────────
+REM A ship cannot be brought up without a real identity. The server refuses
+REM to boot on a missing/placeholder id, and field logs stamped with a
+REM placeholder are invisible to sync or collide across ships.
+REM DB sync_settings.instance_id is the source of truth; .env is fallback.
+if "%SYNC_INSTANCE_ID%"=="" goto :svc_prompt_id
+if /I "%SYNC_INSTANCE_ID%"=="UNKNOWN" goto :svc_prompt_id
+if /I "%SYNC_INSTANCE_ID%"=="SHIP-VESSELNAME" goto :svc_prompt_id
+goto :svc_id_ok
+
+:svc_prompt_id
+echo.
+echo ========================================================
+echo  SHIP IDENTITY REQUIRED (provisioning)
+echo ========================================================
+echo This installation has no valid sync instance id yet.
+echo Format: SHIP-CODE  (letters/digits/dashes, e.g. SHIP-WAHKWONG-V003)
+echo.
+set "SYNC_INSTANCE_ID="
+set /p SYNC_INSTANCE_ID="Enter this ship's instance id: "
+if "%SYNC_INSTANCE_ID%"=="" goto :svc_id_fail
+if /I "%SYNC_INSTANCE_ID%"=="UNKNOWN" goto :svc_id_fail
+if /I "%SYNC_INSTANCE_ID%"=="SHIP-VESSELNAME" goto :svc_id_fail
+if /I not "%SYNC_INSTANCE_ID:~0,5%"=="SHIP-" goto :svc_id_fail
+if not "%SYNC_INSTANCE_ID%"=="%SYNC_INSTANCE_ID: =%" goto :svc_id_fail
+REM Persist to .env (appended line wins — the loader takes the last value)
+echo SYNC_INSTANCE_ID=%SYNC_INSTANCE_ID%>>.env
+echo Saved SYNC_INSTANCE_ID=%SYNC_INSTANCE_ID% to .env
+
+:svc_id_ok
+REM Write/refresh the DB row (source of truth) — best-effort: the value in
+REM .env keeps the boot working if psql is unavailable or the DB is fresh.
+where psql >nul 2>&1
+if %ERRORLEVEL% EQU 0 (
+    psql "%DATABASE_URL%" -c "UPDATE sync_settings SET setting_value='%SYNC_INSTANCE_ID%' WHERE setting_key='instance_id'" >nul 2>&1
+    if %ERRORLEVEL% EQU 0 (
+        echo DB row sync_settings.instance_id = %SYNC_INSTANCE_ID% ^(source of truth^).
+    ) else (
+        echo NOTE: could not write DB row ^(fresh DB?^) - .env value will be used.
+        echo       Set it later: UPDATE sync_settings SET setting_value='%SYNC_INSTANCE_ID%' WHERE setting_key='instance_id';
+    )
+) else (
+    echo NOTE: psql not found - DB row not written; .env value will be used.
+    echo       Set it later: UPDATE sync_settings SET setting_value='%SYNC_INSTANCE_ID%' WHERE setting_key='instance_id';
+)
+goto :svc_continue
+
+:svc_id_fail
+echo.
+echo ========================================================
+echo  FATAL: INVALID OR MISSING SHIP INSTANCE ID
+echo ========================================================
+echo The id must start with SHIP- and must not be a placeholder
+echo ^(UNKNOWN / SHIP-VESSELNAME^) or contain spaces.
+echo Installation REFUSED - a ship cannot be provisioned without identity.
+echo Rerun this installer and provide a valid id.
+pause
+exit /b 1
+
+:svc_continue
 REM Stop existing instance if running
 pm2 delete SAIL-PMS >nul 2>&1
 

@@ -1,41 +1,15 @@
-import { parseDDMMYYYY } from '@shared/utils/dateCalculations';
 import { WORK_ORDER_THRESHOLDS } from './constants';
-
-const MONTH_NAMES: { [key: string]: number } = {
-  'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-  'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
-};
+import { parseWorkOrderDate } from './dateParse';
 
 /**
- * Parse date in DD-MMM-YYYY format (e.g., "15-Jan-2024")
- */
-function parseDDMMMYYYY(dateStr: string | null | undefined): Date | null {
-  if (!dateStr) return null;
-  
-  const parts = dateStr.split('-');
-  if (parts.length !== 3) return null;
-  
-  const day = parseInt(parts[0], 10);
-  const month = MONTH_NAMES[parts[1]];
-  const year = parseInt(parts[2], 10);
-  
-  if (isNaN(day) || month === undefined || isNaN(year)) return null;
-  
-  return new Date(Date.UTC(year, month, day));
-}
-
-/**
- * Parse date - handles both DD-MMM-YYYY (15-Jan-2024) and DD-MM-YYYY (15-01-2024) formats
+ * Parse a WO/job date string via the SHARED format-complete parser
+ * (DD-MMM-YYYY, ISO date/datetime, DD-MM-YYYY, DD/MM/YYYY → UTC midnight for
+ * date-only; null when unparseable). The previous local parser turned ISO
+ * dates into garbage (Date.UTC(10, 0, 2026) ≈ 1915) which made compute-on-read
+ * report false Overdue for ISO-dated work orders.
  */
 function parseDate(dateStr: string | null | undefined): Date | null {
-  if (!dateStr) return null;
-  
-  // Try DD-MMM-YYYY first (more common in this app)
-  const dmmyResult = parseDDMMMYYYY(dateStr);
-  if (dmmyResult) return dmmyResult;
-  
-  // Fall back to DD-MM-YYYY
-  return parseDDMMYYYY(dateStr);
+  return parseWorkOrderDate(dateStr);
 }
 
 /**

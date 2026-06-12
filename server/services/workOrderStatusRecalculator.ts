@@ -6,15 +6,19 @@ import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 
 /**
  * Work Order Status Recalculator Service
- * 
- * Runs every minute to recalculate and persist work order statuses.
- * When grace period settings change, work order statuses are updated automatically.
- * 
- * Key business rules:
- * - Only recalculates statuses for non-terminal work orders
- * - Terminal statuses (Completed, Rejected) are NOT recalculated
+ *
+ * COMPUTE-ON-READ MODEL: WO status is a pure derived value computed at read time
+ * (computeWorkOrderStatus). This service NO LONGER persists status — its periodic
+ * scheduler has been removed, and runRecalculation() now computes drift counts
+ * for telemetry only (no DB write, no field-log). The remaining forceRecalculation()
+ * callers (e.g. on vessel-settings change) are therefore effectively no-ops, kept
+ * only for call-site compatibility; settings changes are reflected automatically
+ * on the next read.
+ *
+ * Key business rules (for the compute path):
+ * - Terminal statuses (Completed, Rejected) are not re-derived
  * - Uses vessel-specific grace period settings
- * - For RH-based work orders, fetches current component RH
+ * - For RH-based work orders, uses current component RH
  */
 
 export class WorkOrderStatusRecalculatorService {
@@ -261,11 +265,12 @@ export class WorkOrderStatusRecalculatorService {
           companyGraceConfig
         });
 
-        // Only update if status has changed
+        // COMPUTE-ON-READ: status is no longer persisted. We still count drift
+        // (computed vs the last-stored value) for telemetry, but DO NOT write.
+        // Persisting the derived band on a timer was both redundant (readers now
+        // compute it) and the documented source of false sync conflicts (the
+        // 'system'-authored status write out-ranked real vessel edits under LWW).
         if (computedStatus !== wo.status) {
-          const updated = await storage.updateWorkOrder(wo.wouuid, { status: computedStatus });
-          // Sync field logging — workOrderStatusRecalculator
-          try { await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updated, 'system'); } catch (e) { console.error('[FieldLogger] WO status recalc:', e); }
           results.statusesUpdated++;
         }
       }

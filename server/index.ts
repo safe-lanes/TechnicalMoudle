@@ -51,7 +51,36 @@ app.use((req, res, next) => {
   
   // Run database migrations (adds new columns, tables, updates data format)
   await initializeDatabase();
-  
+
+  // Resolve the sync instance identity BEFORE anything can write (schedulers
+  // and startup tasks inside registerRoutes field-log their writes). The
+  // field-logger resolves DB-first (sync_settings.instance_id) with env
+  // SYNC_INSTANCE_ID as fallback and REFUSES placeholders — logs stamped
+  // 'UNKNOWN' are invisible to the sync gather and silently never sync.
+  try {
+    const { initFieldLoggerInstanceId } = await import('./modules/sync/fieldLogger');
+    const { getEffectiveInstanceId } = await import('./modules/sync/syncRole');
+    const loggerId = await initFieldLoggerInstanceId();
+    const engineId = await getEffectiveInstanceId();
+    if (engineId !== loggerId) {
+      console.warn(
+        `[Startup] ⚠️ WARNING: field-logger instance id ('${loggerId}') != sync-engine instance id ('${engineId}'). ` +
+        `Field logs written under one id are INVISIBLE to a gather running under the other — nothing will sync. ` +
+        `Align sync_settings.instance_id and SYNC_INSTANCE_ID.`
+      );
+    } else {
+      console.log(`[Startup] Sync instance identity OK: '${loggerId}' (field-logger and sync engine agree)`);
+    }
+  } catch (err: any) {
+    console.error('═══════════════════════════════════════════════════════════════');
+    console.error('FATAL: SYNC INSTANCE ID NOT CONFIGURED — SERVER WILL NOT START');
+    console.error(String(err?.message || err));
+    console.error('Fix: INSERT/UPDATE sync_settings.instance_id (preferred), or set');
+    console.error('the SYNC_INSTANCE_ID env var, then restart.');
+    console.error('═══════════════════════════════════════════════════════════════');
+    process.exit(1);
+  }
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

@@ -97,16 +97,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Ship/shore role drives scheduler placement. WO GENERATION (jobDueScanner) is
+  // SHIP-ONLY and runs daily: maintenance happens on the vessel and the office
+  // receives WOs via sync; the office generates on demand via "Generate Now".
+  // WO STATUS is computed on read everywhere (computeWorkOrderStatus) — no
+  // scheduler persists the derived band. This removes the shore's every-minute
+  // full-table scan AND the 'system' status writes that were the documented
+  // source of false sync conflicts.
+  const { isShipInstance } = await import("./modules/sync/syncRole");
+  const isShip = await isShipInstance();
+
+  // Daily cadence (configurable). Calendar legs move at day granularity and RH
+  // legs change only on running-hours entry, so a daily sweep is sufficient.
+  const JOB_DUE_SCAN_INTERVAL_MS = parseInt(process.env.JOB_DUE_SCAN_INTERVAL_MS || '', 10) || 24 * 60 * 60 * 1000;
+
   // Start Job Due Scanner - scans jobs and auto-generates work orders when due
   const { jobDueScanner } = await import("./services/jobDueScanner");
-  jobDueScanner.start(1 * 60 * 1000); // Run every 1 minute
-  console.log('[JobDueScanner] Scheduler started - will auto-generate work orders for due jobs');
+  if (isShip) {
+    jobDueScanner.start(JOB_DUE_SCAN_INTERVAL_MS);
+    console.log(`[JobDueScanner] Ship instance — scheduler started (interval: ${JOB_DUE_SCAN_INTERVAL_MS / 3600000}h)`);
+  } else {
+    console.log('[JobDueScanner] Shore instance — auto scan NOT started (office uses on-demand "Generate Now")');
+  }
 
-  // Start Work Order Status Recalculator - recalculates and persists work order statuses
-  // Runs every minute so grace period setting changes are reflected automatically
-  const { workOrderStatusRecalculator } = await import("./services/workOrderStatusRecalculator");
-  workOrderStatusRecalculator.start(1 * 60 * 1000); // Run every 1 minute
-  console.log('[StatusRecalculator] Scheduler started - will recalculate work order statuses based on current settings');
+  // NOTE: the former every-minute Work Order Status Recalculator has been REMOVED
+  // (ship and shore). WO status is now computed on read via computeWorkOrderStatus,
+  // and the readers that filtered the persisted band (overdue-alert query,
+  // equipment report) were retargeted to the computed band.
 
   // Start PMS Alert Engine - evaluates alert policies and creates alert events
   const { pmsAlertEngine } = await import("./modules/alerts/services/pmsAlertEngine");
@@ -125,9 +142,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Start Auto-Sync Scheduler - autonomous ship-shore sync (GAP 1 + GAP 4)
   // Ship-only: sync is always ship-initiated. Shore is the responder.
-  const { isShipInstance } = await import("./modules/sync/syncRole");
   const { syncAutoScheduler } = await import("./modules/sync/autoSyncScheduler");
-  if (await isShipInstance()) {
+  if (isShip) {
     await syncAutoScheduler.start(6 * 60 * 60 * 1000); // Initial cadence; runtime value comes from sync_interval_minutes setting in sync_settings table.
     console.log('[AutoSync] Ship instance — scheduler started (autonomous sync with catch-up and connectivity logging)');
   } else {
@@ -507,52 +523,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   })();
 
-  // Check and revert expired postponed work orders on startup
-  (async () => {
-    try {
-      const result = await storage.checkAndRevertPostponedWorkOrders();
-      if (result.revertedCount > 0) {
-        console.log(`✅ Reverted ${result.revertedCount} expired postponed work orders to Due status`);
-        result.revertedWorkOrders.forEach(wo => {
-          console.log(`   - WO ${wo.workOrderNo} (${wo.jobTitle})`);
-        });
-      } else {
-        console.log('✅ No expired postponed work orders to revert');
-      }
-    } catch (err) {
-      console.error('⚠️ Error checking postponed work orders on startup:', err);
-    }
-  })();
-
-  // Set up hourly check for expired postponed work orders
-  const POSTPONEMENT_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-  const postponementCheckInterval = setInterval(async () => {
-    try {
-      const result = await storage.checkAndRevertPostponedWorkOrders();
-      if (result.revertedCount > 0) {
-        console.log(`[Scheduled] Reverted ${result.revertedCount} expired postponed work orders`);
-      }
-    } catch (err) {
-      console.error('[Scheduled] Error checking postponed work orders:', err);
-    }
-  }, POSTPONEMENT_CHECK_INTERVAL_MS);
-  console.log(`📅 Scheduled hourly check for expired postponed work orders`);
+  // ── Postponement auto-revert: INTENTIONALLY DISABLED — DO NOT RE-ENABLE ──
+  // Domain decision (Jeevan, 2026-06): an expired postponement must NOT
+  // auto-revert. A postponed work order stays 'Postponed' until a user acts on
+  // it manually. The former startup + hourly storage.checkAndRevertPostponedWorkOrders()
+  // calls were already a no-op (the revert keys on a non-existent `postponedDate`
+  // field), and that no-op is the CORRECT behaviour. The scheduled calls are
+  // therefore removed rather than fixed: re-enabling them — or "fixing" the
+  // postponedDate/postponement_end_date mismatch — would make WOs auto-revert,
+  // which is wrong. storage.checkAndRevertPostponedWorkOrders() remains available
+  // for an explicit manual/admin action but is no longer invoked on a timer.
 
   // Cleanup on server shutdown
-  process.on('SIGTERM', () => {
+  // Stop EVERY scheduler on shutdown. Previously jobDueScanner / pmsAlertEngine
+  // were omitted here, so a PM2 restart could leave an orphaned scanner interval
+  // running against the DB while a fresh process started another — compounding
+  // CPU/heap. (The status recalculator scheduler has been removed entirely.)
+  const stopAllSchedulers = () => {
     console.log('Cleaning up scheduled tasks...');
-    clearInterval(postponementCheckInterval);
+    jobDueScanner.stop();
+    pmsAlertEngine.stop();
     syncPruningScheduler.stop();
     syncHealthScheduler.stop();
     syncAutoScheduler.stop();
-  });
-  process.on('SIGINT', () => {
-    console.log('Cleaning up scheduled tasks...');
-    clearInterval(postponementCheckInterval);
-    syncPruningScheduler.stop();
-    syncHealthScheduler.stop();
-    syncAutoScheduler.stop();
-  });
+  };
+  process.on('SIGTERM', stopAllSchedulers);
+  process.on('SIGINT', stopAllSchedulers);
 
   return httpServer;
 }

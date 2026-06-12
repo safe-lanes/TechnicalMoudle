@@ -674,7 +674,10 @@ export async function updateMasterRH(componentId: string, body: unknown) {
   try {
     if (component.vesselId) {
       const { jobDueScanner } = await import('../../../services/jobDueScanner');
-      const scanResult = await jobDueScanner.runScan();
+      // Scope the event-driven generation to the affected vessel only (master RH
+      // + its inherited cascades are all within this vessel). Avoids a fleet-wide
+      // scan on every RH entry — far lower heap/CPU than the previous unscoped call.
+      const scanResult = await jobDueScanner.runScan(component.vesselId);
       woGenerationResult = {
         rhJobsChecked: scanResult.rhJobsChecked,
         rhWOsGenerated: scanResult.rhWOsGenerated

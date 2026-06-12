@@ -1,4 +1,13 @@
 import { storage } from '../../../storage';
+import { parseWorkOrderDate } from '@shared/workOrders/dateParse';
+
+// Shared parser (dateParse.ts contract): wo.dueDate / completion strings are
+// MIXED-format; raw new Date() swapped or invalidated DD-MM-YYYY values
+// (skewing daysLate stats, and an Invalid completion date would THROW at the
+// toISOString() date-key below, killing the whole compliance computation).
+function woDate(value: any): Date | null {
+  return parseWorkOrderDate(value);
+}
 
 interface CycleSkipBreakdown {
   rank: string;
@@ -150,10 +159,8 @@ function calculateCycleSkipRate(completedWOs: any[]) {
 
 function calculateBackdatingFrequency(completedWOs: any[], thirtyDaysAgo: Date) {
   const recentWOs = completedWOs.filter(wo => {
-    const completed = wo.dateCompleted || wo.completionDateTime;
-    if (!completed) return false;
-    const completedDate = new Date(completed);
-    return completedDate >= thirtyDaysAgo;
+    const completedDate = woDate(wo.dateCompleted || wo.completionDateTime);
+    return completedDate !== null && completedDate >= thirtyDaysAgo;
   });
 
   const backdated: BackdatedEntry[] = [];
@@ -163,8 +170,9 @@ function calculateBackdatingFrequency(completedWOs: any[], thirtyDaysAgo: Date) 
     const submittedDateStr = wo.submittedDate || wo.updatedAt;
     if (!completionDateStr || !submittedDateStr) continue;
 
-    const completionDate = new Date(completionDateStr);
-    const submittedDate = new Date(submittedDateStr);
+    const completionDate = woDate(completionDateStr);
+    const submittedDate = woDate(submittedDateStr);
+    if (!completionDate || !submittedDate) continue;
     const daysDiff = Math.floor((submittedDate.getTime() - completionDate.getTime()) / (1000 * 60 * 60 * 24));
 
     if (daysDiff > 7) {
@@ -199,8 +207,8 @@ function calculateBulkCompletions(completedWOs: any[], ninetyDaysAgo: Date) {
     const completedStr = wo.dateCompleted || wo.completionDateTime;
     if (!completedStr) continue;
 
-    const completedDate = new Date(completedStr);
-    if (completedDate < ninetyDaysAgo) continue;
+    const completedDate = woDate(completedStr);
+    if (!completedDate || completedDate < ninetyDaysAgo) continue;
 
     const dateKey = completedDate.toISOString().split('T')[0];
     if (!byDate[dateKey]) {
@@ -209,8 +217,8 @@ function calculateBulkCompletions(completedWOs: any[], ninetyDaysAgo: Date) {
     byDate[dateKey].wos.push(wo);
 
     if (wo.dueDate) {
-      const dueDate = new Date(wo.dueDate);
-      if (completedDate > dueDate) {
+      const dueDate = woDate(wo.dueDate);
+      if (dueDate && completedDate > dueDate) {
         byDate[dateKey].overdueCount++;
       }
     }
@@ -268,9 +276,11 @@ function calculateScheduleDrift(completedWOs: any[], ninetyDaysAgo: Date) {
   let onTimeCount = 0;
 
   for (const wo of recentWOs) {
-    const completedDate = new Date(wo.dateCompleted || wo.completionDateTime);
-    const dueDate = new Date(wo.dueDate);
-    const daysLate = Math.max(0, Math.floor((completedDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
+    const completedDate = woDate(wo.dateCompleted || wo.completionDateTime);
+    const dueDate = woDate(wo.dueDate);
+    const daysLate = (completedDate && dueDate)
+      ? Math.max(0, Math.floor((completedDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)))
+      : 0;
     daysLateValues.push(daysLate);
 
     if (daysLate === 0) {
@@ -290,19 +300,21 @@ function calculateScheduleDrift(completedWOs: any[], ninetyDaysAgo: Date) {
   const medianDaysLate = median(daysLateValues);
 
   const midpoint = new Date(ninetyDaysAgo.getTime() + 45 * 24 * 60 * 60 * 1000);
-  const firstHalf = recentWOs.filter(wo => new Date(wo.dateCompleted || wo.completionDateTime) < midpoint);
-  const secondHalf = recentWOs.filter(wo => new Date(wo.dateCompleted || wo.completionDateTime) >= midpoint);
+  const firstHalf = recentWOs.filter(wo => { const d = woDate(wo.dateCompleted || wo.completionDateTime); return d !== null && d < midpoint; });
+  const secondHalf = recentWOs.filter(wo => { const d = woDate(wo.dateCompleted || wo.completionDateTime); return d !== null && d >= midpoint; });
 
   const avgFirst = firstHalf.length > 0
     ? firstHalf.reduce((s, wo) => {
-        const dl = Math.max(0, Math.floor((new Date(wo.dateCompleted || wo.completionDateTime).getTime() - new Date(wo.dueDate).getTime()) / (1000 * 60 * 60 * 24)));
+        const c = woDate(wo.dateCompleted || wo.completionDateTime); const due = woDate(wo.dueDate);
+        const dl = (c && due) ? Math.max(0, Math.floor((c.getTime() - due.getTime()) / (1000 * 60 * 60 * 24))) : 0;
         return s + dl;
       }, 0) / firstHalf.length
     : 0;
 
   const avgSecond = secondHalf.length > 0
     ? secondHalf.reduce((s, wo) => {
-        const dl = Math.max(0, Math.floor((new Date(wo.dateCompleted || wo.completionDateTime).getTime() - new Date(wo.dueDate).getTime()) / (1000 * 60 * 60 * 24)));
+        const c = woDate(wo.dateCompleted || wo.completionDateTime); const due = woDate(wo.dueDate);
+        const dl = (c && due) ? Math.max(0, Math.floor((c.getTime() - due.getTime()) / (1000 * 60 * 60 * 24))) : 0;
         return s + dl;
       }, 0) / secondHalf.length
     : 0;

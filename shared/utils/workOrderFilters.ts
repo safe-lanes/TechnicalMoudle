@@ -6,6 +6,8 @@
 // (`client/src/pages/pms/WorkOrders.tsx`, used for export building) import these
 // pure functions so the two sides can never drift.
 
+import { parseWorkOrderDate } from "../workOrders/dateParse";
+
 export type WorkOrderSortField =
   | "component" | "workOrderNo" | "jobTitle" | "assignedTo" | "dueDate"
   | "status" | "dateCompleted" | "plannedDate" | "postponeUntil"
@@ -180,8 +182,10 @@ export function matchesPeriod(wo: FilterableWorkOrder, periodFilter: WorkOrderPe
     const periodHours = periodDays * 24;
     if (rhRemaining > periodHours) return false;
   } else {
-    const woDueDate = wo.dueDate ? new Date(wo.dueDate) : null;
-    if (!woDueDate || isNaN(woDueDate.getTime())) {
+    // SHARED parser (dateParse.ts contract) — raw new Date() month/day-swapped
+    // DD-MM-YYYY due dates, putting WOs in the wrong period bucket.
+    const woDueDate = parseWorkOrderDate(wo.dueDate);
+    if (!woDueDate) {
       return false;
     }
     if (periodFilter.mode === 'year-only' && periodFilter.year) {

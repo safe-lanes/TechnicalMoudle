@@ -90,7 +90,12 @@ export class PmsAlertEngine {
       const overduePolicy = policyMap.get('critical_job_overdue');
       if (overduePolicy) {
         try {
-          const overdueWOs = await alertsRepo.getOverdueWorkOrders();
+          // Status is computed on read (no persisted 'Overdue' band to query).
+          // Source from the enriched work-order list, which sets `status` to the
+          // computed band, then keep the overdue vessel-scoped rows.
+          const { getWorkOrdersWithComputedStatus } = await import('../../work-orders/services/workOrderService');
+          const allComputed = await getWorkOrdersWithComputedStatus();
+          const overdueWOs = allComputed.filter((wo: any) => wo.status === 'Overdue' && wo.dataScope === 'vessel');
           const alerts = evaluateOverdueJobs(overdueWOs, overduePolicy, existingDedupeKeys);
           for (const alert of alerts) {
             await this.createAlertEvent(overduePolicy, alert);
