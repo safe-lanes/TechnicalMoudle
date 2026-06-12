@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Loader2, AlertTriangle, Lock } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 /**
  * Purchasing — embeds the Shipskart platform via ticket-based SSO.
@@ -13,10 +14,17 @@ import { Loader2, AlertTriangle, Lock } from "lucide-react";
  * iframeUrl every time this page mounts.
  */
 export default function PurchasingPage() {
+  const { currentUser } = useAuth();
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [roleBlocked, setRoleBlocked] = useState(false);
+
+  // The logged-in role (already decrypted by AuthContext) drives which Shipskart
+  // account Purchasing opens. The backend has no real auth, so we pass it here —
+  // the same pattern the alerts endpoint uses (?role=). Backend falls back to
+  // req.user.role if this is absent.
+  const userRole = currentUser?.role ?? "";
 
   const initiate = useCallback(async () => {
     setLoading(true);
@@ -28,6 +36,8 @@ export default function PurchasingPage() {
       const res = await fetch("/technical/api/shipskart/sso/initiate", {
         method: "POST",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: userRole }),
       });
       const data = await res.json().catch(() => null);
 
@@ -48,11 +58,17 @@ export default function PurchasingPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userRole]);
 
+  // Wait until auth has hydrated before calling SSO. currentUser is null on the
+  // first render(s) (AuthContext loads/decrypts the profile asynchronously), so
+  // firing immediately would POST initiate with role:"" → a spurious 403
+  // ROLE_NOT_MAPPED. Once currentUser is present, userRole is the real role and
+  // initiate (dep: userRole) runs with it. The loading spinner shows until then.
   useEffect(() => {
+    if (!currentUser) return;
     initiate();
-  }, [initiate]);
+  }, [currentUser, initiate]);
 
   if (loading) {
     return (

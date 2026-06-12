@@ -91,6 +91,42 @@ export async function getWorkOrder(req: Request, res: Response) {
   res.json(result);
 }
 
+// POST /work-orders/generate-now — office on-demand generation sweep for ONE vessel.
+// Reuses the exact generation logic of the (ship-side) daily scanner, but runs
+// only when a user clicks it. This is the office's replacement for the removed
+// every-minute shore auto-scan: manual, user-triggered, scoped to the selected
+// vessel (for setup/QA). The single-WO manual-create path is unchanged.
+export async function generateNow(req: Request, res: Response) {
+  const vesselId = ((req.body && req.body.vesselId) ?? req.query.vesselId) as string | undefined;
+  if (!vesselId || typeof vesselId !== 'string' || vesselId === 'all') {
+    throw new ValidationError('A specific vesselId is required to generate work orders.');
+  }
+
+  // Dynamic import mirrors routes.ts and avoids a static cycle with the scanner.
+  const { jobDueScanner } = await import('../../../services/jobDueScanner');
+  const result = await jobDueScanner.runScan(vesselId);
+
+  if (result.skipped) {
+    return res.status(409).json({
+      success: false,
+      message: 'A work-order generation run is already in progress. Please try again in a moment.',
+    });
+  }
+
+  const generated = result.calendarWOsGenerated + result.rhWOsGenerated + result.dualWOsGenerated;
+  const checked = result.calendarJobsChecked + result.rhJobsChecked + result.dualJobsChecked;
+  res.json({
+    success: true,
+    vesselId,
+    generated,
+    checked,
+    breakdown: result,
+    message: generated > 0
+      ? `Generated ${generated} work order(s) from ${checked} due job(s).`
+      : `No work orders were due. Checked ${checked} job(s).`,
+  });
+}
+
 export async function getWorkOrderContext(req: Request, res: Response) {
   const result = await woContextService.getWorkOrderContext(req.params.id);
   res.json(result);
@@ -123,6 +159,7 @@ export async function createWorkOrder(req: Request, res: Response) {
 export async function updateWorkOrder(req: Request, res: Response) {
   try {
     const actor = resolveActorIdentity(req);
+    const authReq = req as AuthenticatedRequest;
     const body = { ...req.body };
     if (actor) {
       // Prefer caller-supplied userId, but fall back to the authenticated user
@@ -130,6 +167,12 @@ export async function updateWorkOrder(req: Request, res: Response) {
       if (!body.userId || body.userId === 'system') body.userId = actor;
       if (!body.performedBy || body.performedBy === 'system') body.performedBy = actor;
     }
+    // Authorize the running-hours cap override from the session role (Task #240). The role is taken
+    // ONLY from the authenticated session and overwrites any client-supplied value — a caller must
+    // not be able to spoof "Sail Admin" via the request body. adminOverride (the intent) still comes
+    // from the body, but the server-side role is what decides whether the override is honored.
+    body.userRole = authReq.user?.role;
+    body.userUuid = authReq.user?.userUuid ?? body.userUuid;
     const workOrder = await woService.updateWorkOrder(req.params.id, body);
     res.json(workOrder);
   } catch (error: any) {
@@ -224,7 +267,16 @@ export async function reopenCompletion(req: Request, res: Response) {
 
 export async function completeWorkOrder(req: Request, res: Response) {
   try {
-    const result = await woCompletionService.completeWorkOrder(req.params.id, req.body);
+    const authReq = req as AuthenticatedRequest;
+    // Authorize the running-hours cap override server-side from the session role ONLY — never trust a
+    // client-sent role (a caller must not be able to spoof "Sail Admin" via the body). adminOverride
+    // (the intent) still comes from the body; the server-side role decides whether it is honored.
+    const result = await woCompletionService.completeWorkOrder(req.params.id, {
+      ...req.body,
+      userRole: authReq.user?.role,
+      userId: req.body.userId ?? authReq.user?.username,
+      userUuid: req.body.userUuid ?? authReq.user?.userUuid,
+    });
     res.json(result);
   } catch (error: any) {
     console.error('Work order completion error:', error);

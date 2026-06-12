@@ -14,7 +14,13 @@ let db: ReturnType<typeof drizzle> | undefined;
 if (process.env.DATABASE_URL) {
   // Only initialize if DATABASE_URL is available
   // This allows the module to be imported without crashing if DATABASE_URL is not yet resolved
-  pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  // Keep pool sizing in lockstep with server/postgresClient.ts (the runtime pool).
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: Number(process.env.DB_POOL_MAX) || 25,
+    connectionTimeoutMillis: Number(process.env.DB_CONNECT_TIMEOUT_MS) || 10000,
+    idleTimeoutMillis: 30000,
+  });
   db = drizzle(pool, { schema });
 }
 

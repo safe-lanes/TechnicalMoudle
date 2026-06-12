@@ -363,8 +363,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // userProfile (encrypted preferred, plain fallback), so re-read it here
     // rather than relying solely on the initial mount hydration.
     let loginMyVessels: MyVesselAssignment[] = [];
-    const encLoginProfile =
-      secureGetItem<Record<string, any>>("userProfile");
+    const encLoginProfile = secureGetItem<Record<string, any>>("userProfile");
     if (encLoginProfile) {
       loginMyVessels = normalizeMyVessels(encLoginProfile);
     } else {
@@ -384,13 +383,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const logout = () => {
+    // Capture the role before we clear local state below, so Shipskart evicts
+    // the session for the SAME account Purchasing opened (backend maps role→account).
+    const roleForLogout = currentUser?.role ?? "";
     // Best-effort Shipskart SSO logout (Purchasing module). Per the
     // integration guide we notify Shipskart BEFORE clearing the local
     // session, but it must NEVER block local logout — fire-and-forget,
     // errors are logged only. The backend endpoint is idempotent.
     void (async () => {
       try {
-        await apiRequest("POST", "/technical/api/shipskart/sso/logout");
+        await apiRequest("POST", "/technical/api/shipskart/sso/logout", { role: roleForLogout });
       } catch (err) {
         console.error("[Shipskart] logout call failed (non-blocking):", err);
       }

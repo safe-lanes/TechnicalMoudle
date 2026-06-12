@@ -64,6 +64,9 @@ export async function create(req: Request, res: Response) {
     if (error instanceof ValidationError) {
       return res.status(400).json({ error: error.message });
     }
+    if (error.code === '23505' && (error.detail?.includes('component_code') || error.constraint?.includes('component_code'))) {
+      return res.status(400).json({ error: 'Component Code already exists for this vessel. Please use a unique code.' });
+    }
     throw error;
   }
 }
@@ -83,6 +86,9 @@ export async function update(req: Request, res: Response) {
     }
     if (error.message?.includes('not found')) {
       return res.status(404).json({ error: error.message });
+    }
+    if (error.code === '23505' && (error.detail?.includes('component_code') || error.constraint?.includes('component_code'))) {
+      return res.status(400).json({ error: 'Component Code already exists for this vessel. Please use a unique code.' });
     }
     res.status(500).json({ error: 'Failed to update component' });
   }

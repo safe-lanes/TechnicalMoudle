@@ -10,6 +10,14 @@ import {
   type ColumnDef
 } from '../../../lib/excelReportStyles';
 
+// Compute-on-read seam: WO status is no longer persisted, so the 'Overdue' band
+// must be computed. Same row set as repo.getWorkOrders (both call
+// storage.getWorkOrders) but with `status` = computed lifecycle band.
+async function getWorkOrdersComputed(vesselId?: string, vesselIds?: string[]) {
+  const { getWorkOrdersWithComputedStatus } = await import('../../work-orders/services/workOrderService');
+  return getWorkOrdersWithComputedStatus(vesselId, vesselIds);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // SHARED HELPERS
 // ═══════════════════════════════════════════════════════════════
@@ -64,7 +72,7 @@ export async function getCrewWorkloadDistribution(
   const vessel = allVessels.find(v => v.id === vesselId);
   const vesselName = vessel?.name || String(vesselId);
 
-  const workOrders = await repo.getWorkOrders(String(vesselId));
+  const workOrders = await getWorkOrdersComputed(String(vesselId));
   const components = await repo.getComponents(String(vesselId));
   const componentsMap = new Map(components.map(c => [c.cuuid, c]));
 
@@ -256,7 +264,7 @@ export async function exportCrewWorkloadDistributionExcel(
   const vessel = allVessels.find(v => v.id === vesselId);
   const vesselName = vessel?.name || vesselId;
 
-  const workOrders = await repo.getWorkOrders(vesselId);
+  const workOrders = await getWorkOrdersComputed(vesselId);
   const components = await repo.getComponents(vesselId);
   const componentsMap = new Map(components.map(c => [c.cuuid, c]));
 

@@ -751,10 +751,10 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
   });
   console.log(`📊 Including all ${sortedComponents.length} components (all levels) in jobs template`);
   
-  // Create main "jobs" sheet with 26-column structure (includes Part A fields)
+  // Create main "jobs" sheet with 27-column structure (includes Part A fields)
   const jobsSheet = workbook.addWorksheet('Vessel_Job');
   
-  // Add headers matching the 26-column specification (21 original + 5 Part A fields)
+  // Add headers matching the 27-column specification (22 original + 5 Part A fields)
   // NOTE: "Interval Running Hours" column restored for Dual Frequency support
   jobsSheet.columns = [
     { header: 'Job Code', key: 'jobCode', width: 18 },
@@ -773,6 +773,7 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Job Priority', key: 'jobPriority', width: 15 },
     { header: 'Class Related', key: 'classRelated', width: 15 },
     { header: 'Last Done Date', key: 'lastDoneDate', width: 15 },
+    { header: 'Last Done Hour', key: 'lastDoneHour', width: 18 },
     { header: 'Brief Work Description', key: 'briefWorkDescription', width: 50 },
     { header: 'Department', key: 'department', width: 20 },
     { header: 'Criticality', key: 'criticality', width: 15 },
@@ -806,6 +807,7 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       jobPriority: '',
       classRelated: '',
       lastDoneDate: '',
+      lastDoneHour: '',
       briefWorkDescription: '',
       department: '',
       criticality: '',
@@ -847,7 +849,7 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
   
   listValues.forEach(row => listsSheet.addRow(row));
   
-  // Add data validations to jobs sheet (26-column layout, with Interval Running Hours restored)
+  // Add data validations to jobs sheet (27-column layout, with Interval Running Hours restored)
   // Column G (Maintenance Basis) - row 2 onwards (Calendar, Running Hours, Dual Frequency)
   jobsSheet.getColumn(7).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
@@ -905,8 +907,8 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     }
   });
 
-  // Column R (Department) - shifted +1 from col 17
-  jobsSheet.getColumn(18).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  // Column S (Department) - shifted +2 from original col 17 (was col 18, now col 19)
+  jobsSheet.getColumn(19).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -916,18 +918,7 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     }
   });
 
-  // Column S (Criticality) - shifted +1 from col 18 - Yes/No
-  jobsSheet.getColumn(19).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
-    if (rowNumber > 1) {
-      cell.dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: ['=Lists!$F$2:$F$3']
-      };
-    }
-  });
-
-  // Column T (Is Active) - shifted +1 from col 19 - Yes/No
+  // Column T (Criticality) - shifted +2 from original col 18 (was col 19, now col 20) - Yes/No
   jobsSheet.getColumn(20).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
@@ -937,8 +928,20 @@ export async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       };
     }
   });
+
+  // Column U (Is Active) - shifted +2 from original col 19 (was col 20, now col 21) - Yes/No
+  jobsSheet.getColumn(21).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+    if (rowNumber > 1) {
+      cell.dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['=Lists!$F$2:$F$3']
+      };
+    }
+  });
   
-  addVersionInfoToSheet(jobsSheet);
+  // Version info at col AB (28) — col AA (27) is now occupied by "Other Safety Requirements"
+  addVersionInfoToSheet(jobsSheet, 28);
   
   // Write to buffer and return
   const buffer = await workbook.xlsx.writeBuffer();

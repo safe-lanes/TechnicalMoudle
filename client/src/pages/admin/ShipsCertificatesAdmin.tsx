@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/command";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import { useVessels } from "@/hooks/useVessels";
 
 // Interface for label configuration (used by Company Group, Master Category, Master Group)
@@ -370,8 +370,7 @@ export default function ShipsCertificatesAdmin() {
       setMasterData([]);
       setCompanyOnlyCerts([]);
       setVesselOnlyCerts([]);
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-certificates-master'] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/vessel-certificate-applicability'] });
+      invalidateByUrlPrefix(['/technical/api/admin/ship-certificates-master', '/technical/api/admin/vessel-certificate-applicability']);
     },
     onError: (error: any) => {
       toast({

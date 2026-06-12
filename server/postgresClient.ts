@@ -37,8 +37,17 @@ export async function resolvePostgres(): Promise<{ db: ReturnType<typeof drizzle
   }
 
   try {
-    // Create connection pool (only once) using native pg driver
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    // Create connection pool (only once) using native pg driver.
+    // Explicit max (node-postgres defaults to only 10) so concurrent read bursts
+    // (e.g. the Running Hours overview) don't starve, and a finite acquire timeout
+    // so a saturated pool fails fast instead of hanging forever (default is 0 = wait
+    // indefinitely). Tunable via DB_POOL_MAX / DB_CONNECT_TIMEOUT_MS.
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: Number(process.env.DB_POOL_MAX) || 25,
+      connectionTimeoutMillis: Number(process.env.DB_CONNECT_TIMEOUT_MS) || 10000,
+      idleTimeoutMillis: 30000,
+    });
     const db = drizzle(pool, { schema });
 
     // Lightweight connection test - verify database is accessible

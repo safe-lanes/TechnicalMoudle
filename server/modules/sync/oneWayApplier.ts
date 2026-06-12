@@ -445,16 +445,13 @@ export async function applyFieldLogInserts(
   const groupKeys = Array.from(groups.keys());
   for (const groupKey of groupKeys) {
     const logs = groups.get(groupKey)!;
-    const isInsertGroup = logs.every((l: FieldLogEntry) => l.oldValue === null);
-    const hasAnyInsertLogs = logs.some((l: FieldLogEntry) => l.oldValue === null);
+    // Loose == null (null OR undefined): the wire is JSON so null should survive,
+    // but be defensive against any mapping/storage variant that turns a null
+    // oldValue into undefined — strict ===null silently reclassified INSERT
+    // groups as UPDATE-shaped, and UPDATEs against a missing row vanish.
+    const isInsertGroup = logs.every((l: FieldLogEntry) => l.oldValue == null);
+    const hasAnyInsertLogs = logs.some((l: FieldLogEntry) => l.oldValue == null);
 
-    if (!isInsertGroup && !hasAnyInsertLogs) {
-      // Pure UPDATE group (no INSERT-origin logs) — pass to per-field UPDATE
-      updateLogs.push(...logs);
-      continue;
-    }
-
-    // Has INSERT-origin logs (either pure or mixed group) — check if row needs creation
     const tableName = logs[0].tableName;
     const rowUuid = logs[0].rowUuid;
 
@@ -466,6 +463,32 @@ export async function applyFieldLogInserts(
     }
 
     const identityCol = config.identityColumn || 'id';
+
+    if (!isInsertGroup && !hasAnyInsertLogs) {
+      // UPDATE-shaped group (no INSERT-origin logs). Previously passed straight
+      // to the per-field UPDATE path — which did NOTHING when the row didn't
+      // exist on the receiver (UPDATE matched 0 rows, errors=0). That silent
+      // drop is how generated WOs vanished (Issue 01). Now: if the receiver row
+      // EXISTS → per-field UPDATE as before; if it's MISSING → loud warning and
+      // a recovery INSERT built from the logs' newValues (savepoint-guarded
+      // below; on failure it falls back to passthrough, which the UPDATE-MISS
+      // counter in receivePushData now also surfaces).
+      try {
+        const exist = await pool.query(`SELECT 1 FROM "${tableName}" WHERE "${identityCol}" = $1 LIMIT 1`, [rowUuid]);
+        if (exist.rows.length > 0) {
+          updateLogs.push(...logs);
+          continue;
+        }
+        const msg = `${tableName}.${rowUuid}: UPDATE-shaped group (${logs.length} logs) for a row that does NOT exist on receiver — attempting recovery INSERT from newValues`;
+        console.warn(`[FieldLogInsert] ${msg}`);
+        syncDiag(`FIELD-LOG-INSERT RECOVERY: ${msg}`);
+        // fall through to the INSERT build below
+      } catch (existErr: any) {
+        errors.push(`${tableName}.${rowUuid}: exist-check failed (${existErr.message})`);
+        updateLogs.push(...logs);
+        continue;
+      }
+    }
 
     // Hoist meta + rowData so they're accessible in the catch block for conflict resolution
     let meta: Awaited<ReturnType<typeof getColumnMeta>> | null = null;

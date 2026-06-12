@@ -10,7 +10,7 @@ import { Search, X, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import WOAgGridTable from "@/components/WOAgGridTable";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 
@@ -179,7 +179,7 @@ export default function BulkUpdateStores() {
       return results;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      invalidateByUrlPrefix('/technical/api/stores');
       toast({ title: "Success", description: "Bulk update completed successfully" });
       setLocation("/stores");
     },
@@ -249,7 +249,7 @@ export default function BulkUpdateStores() {
       return results;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      invalidateByUrlPrefix('/technical/api/stores');
       toast({ title: "Success", description: "Chemical fields updated successfully" });
     },
     onError: (error: any) => {

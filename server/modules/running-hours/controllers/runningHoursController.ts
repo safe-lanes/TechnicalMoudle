@@ -225,16 +225,22 @@ export async function validateRHEntry(req: Request, res: Response) {
     const result = await rhTimelineValidation.validateRHEntry(machineryId, completionDate, Number(runningHours));
 
     let componentActualRH: number | null = null;
+    let rhCounterType = 'MASTER';
+    let hasRealRhBaseline = false;
     try {
       const currentRHData = await rhTimelineValidation.getCurrentRH(machineryId);
       componentActualRH = currentRHData.currentRH;
+      rhCounterType = (currentRHData.rhCounterType || 'MASTER').toUpperCase();
+      hasRealRhBaseline = currentRHData.hasRealRhBaseline;
     } catch {}
 
-    const enteredRH = Number(runningHours);
-    let exceedsComponentRH = false;
-    if (componentActualRH !== null && !isNaN(componentActualRH) && enteredRH > componentActualRH) {
-      exceedsComponentRH = true;
-    }
+    // Task #245: the flat "exceeds component actual RH" ceiling is fully retired. It is applied to
+    // NO counter type. MASTER (the completion reading is the source of truth and advances the
+    // counter) and INHERITED (governed solely by timeline validation — see workOrderCompletionService)
+    // are the RH-driven types; NOT_RH_DRIVEN treats running hours as not applicable. Timeline
+    // validation (already computed in `result`) is the sole governor for RH-driven components.
+    const isNotRhDriven = rhCounterType === 'NOT_RH_DRIVEN';
+    const exceedsComponentRH = false;
 
     const prevReading = previousReading !== undefined && previousReading !== null ? Number(previousReading) : null;
 
@@ -243,38 +249,27 @@ export async function validateRHEntry(req: Request, res: Response) {
       adjustedMin = prevReading;
     }
 
-    const adjustedMax = result.validRange && componentActualRH !== null && componentActualRH > 0
-      ? Math.min(result.validRange.max, componentActualRH)
-      : (result.validRange ? result.validRange.max : Infinity);
+    // Never cap the displayed max at the current reading — show the true timeline range.
+    // An unbounded upper limit is represented internally as Infinity, which JSON.stringify
+    // silently converts to null. Emit an explicit null sentinel so the client has a stable
+    // contract for "no upper bound" instead of relying on that implicit coercion.
+    const adjustedMax = result.validRange && Number.isFinite(result.validRange.max)
+      ? result.validRange.max
+      : null;
 
     const cappedValidRange = result.validRange
       ? { ...result.validRange, min: adjustedMin, max: adjustedMax }
       : result.validRange;
 
-    let adjustedResult = { ...result };
-    if (!result.isValid && prevReading !== null && !isNaN(prevReading) && componentActualRH !== null) {
-      if (enteredRH >= prevReading && enteredRH <= componentActualRH) {
-        adjustedResult = {
-          ...result,
-          isValid: true,
-          validationStatus: 'VALID' as const,
-          errorMessage: '',
-          requiresJustification: false,
-          anomalyFlags: []
-        };
-      }
-    }
-
     res.json({
-      ...adjustedResult,
+      ...result,
+      // NOT_RH_DRIVEN: running hours are not applicable — never block the entry.
+      ...(isNotRhDriven ? { isValid: true, validationStatus: 'NOT_APPLICABLE', errorMessage: '', requiresJustification: false } : {}),
       validRange: cappedValidRange,
       componentActualRH,
-      exceedsComponentRH,
-      ...(exceedsComponentRH && adjustedResult.isValid ? {
-        isValid: false,
-        validationStatus: 'EXCEEDS_COMPONENT_RH',
-        errorMessage: `Running hours entered (${enteredRH}) exceeds the component's actual running hours (${componentActualRH}). Please update the component's running hours first in the Running Hours module.`
-      } : {})
+      rhCounterType,
+      hasRealRhBaseline,
+      exceedsComponentRH
     });
   } catch (error: any) {
     console.error('Error validating RH entry:', error);

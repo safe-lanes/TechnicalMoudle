@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FiltersToggle } from '@/components/filters/VesselFilter';
 import { VesselFleetGroupFilter, VesselFleetGroupFilterValue, VesselFleetGroupFilterResult, createDefaultFilterValue } from '@/components/filters/VesselFleetGroupFilter';
 import { useUIRole } from "@/contexts/UIRoleContext";
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, queryClient, invalidateByUrlPrefix } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { FileAttachmentDialog, FileAttachment } from '@/components/FileAttachmentDialog';
 import { pdfReportGenerator } from '@/lib/pdfReportGenerator';
@@ -401,7 +401,7 @@ export default function CertificatesPage() {
         clearTimeout(certInvalidateTimer.current);
       }
       certInvalidateTimer.current = setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['/technical/api/certificates'] });
+        invalidateByUrlPrefix('/technical/api/certificates');
         certInvalidateTimer.current = null;
       }, 5000);
     },
@@ -411,7 +411,7 @@ export default function CertificatesPage() {
         description: error.message || 'Failed to update certificate',
         variant: 'destructive',
       });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/certificates'] });
+      invalidateByUrlPrefix('/technical/api/certificates');
     },
   });
 

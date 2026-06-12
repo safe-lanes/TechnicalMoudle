@@ -56,6 +56,35 @@ export const STALE_TIMES = {
   STATIC: 30 * 60 * 1000,     // 30 minutes for rarely changing data
 } as const;
 
+/**
+ * Invalidate every cached query whose first queryKey element is a string that
+ * matches one of the given URL prefixes (exact, or followed by `/` or `?`).
+ *
+ * The shared fetcher (getQueryFn) loads data using ONLY queryKey[0], so the full
+ * request URL — including `?itemType=...&vesselIds=...&scope=...` and pagination —
+ * is stored as that first element. TanStack Query compares key elements by exact
+ * deep-equality, so a plain `invalidateQueries({ queryKey: ['/x/123'] })` will NOT
+ * match a list stored under `['/x/123?itemType=ROB']` or under a different scope
+ * segment (e.g. `all` vs `my` vs a vessel id). Matching on the URL prefix instead
+ * refreshes every variant of a list regardless of its query-string parameters or
+ * vessel scope.
+ *
+ * Convention for new mutations: invalidate the list's base URL via this helper
+ * rather than reconstructing the exact full-URL key by hand.
+ */
+export function invalidateByUrlPrefix(prefixes: string | string[]) {
+  const list = Array.isArray(prefixes) ? prefixes : [prefixes];
+  return queryClient.invalidateQueries({
+    predicate: (query) => {
+      const key0 = query.queryKey?.[0];
+      if (typeof key0 !== "string") return false;
+      return list.some(
+        (p) => key0 === p || key0.startsWith(`${p}/`) || key0.startsWith(`${p}?`),
+      );
+    },
+  });
+}
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

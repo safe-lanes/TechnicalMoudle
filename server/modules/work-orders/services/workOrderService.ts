@@ -2,6 +2,7 @@ import * as repo from '../repositories/workOrderRepository';
 import { NotFoundError, ValidationError } from '../../shared/errors';
 import { ensureArray } from '../../shared/jsonHelpers';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
+import { parseWorkOrderDate } from '@shared/workOrders/dateParse';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
 import { computeSpareConsumptionDelta, ConsumedSpareEntry } from '../utils/spareConsumptionDelta';
 import { calculateMissedCycles, calculateMissedCyclesRH } from '@shared/dateUtils';
@@ -114,11 +115,13 @@ async function buildRankLabelMap(): Promise<Map<string, string>> {
 }
 
 function calculateBackdatingDaysForApproval(completionDate: string | null | undefined, submittedDate: string | null | undefined): number {
-  if (!completionDate) return 0;
-  const comp = new Date(completionDate);
-  if (isNaN(comp.getTime())) return 0;
-  const reference = submittedDate ? new Date(submittedDate) : new Date();
-  if (isNaN(reference.getTime())) return 0;
+  // Dates parse via the SHARED format-complete parser (dateParse.ts contract):
+  // stored date strings are mixed-format, and raw new Date() mis-parses
+  // DD-MM-YYYY (month/day swap or Invalid → silently 0 days).
+  const comp = parseWorkOrderDate(completionDate);
+  if (!comp) return 0;
+  const reference = submittedDate ? parseWorkOrderDate(submittedDate) : new Date();
+  if (!reference) return 0;
   const diffMs = reference.getTime() - comp.getTime();
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }
@@ -129,10 +132,14 @@ export function calculateApprovalTier(
   missedCycles: number,
   backdatingDays: number = 0
 ) {
+  // SHARED parser (dateParse.ts contract): raw new Date() made DD-MM-YYYY due
+  // dates Invalid (daysLate NaN) or month/day-swapped (daysLate 0) → WOs that
+  // were months late computed tier 'standard' and never created the
+  // superintendent notification (the Issue-02 "inconsistent" mechanism).
   let daysLate = 0;
-  if (dueDate && completionDate) {
-    const due = new Date(dueDate);
-    const comp = new Date(completionDate);
+  const due = parseWorkOrderDate(dueDate);
+  const comp = parseWorkOrderDate(completionDate);
+  if (due && comp) {
     const diffMs = comp.getTime() - due.getTime();
     daysLate = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
   }
@@ -456,13 +463,31 @@ export async function listWorkOrders(vesselId?: string, vesselIds?: string[]) {
     }
 
     if (a.dueDate && b.dueDate) {
-      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      // shared parser (dateParse.ts contract); unparseable sorts as epoch 0
+      return (parseWorkOrderDate(a.dueDate)?.getTime() ?? 0) - (parseWorkOrderDate(b.dueDate)?.getTime() ?? 0);
     }
 
     return 0;
   });
 
   return sortedWorkOrders;
+}
+
+/**
+ * Same as listWorkOrders, but returns each row with `status` overwritten by the
+ * computed lifecycle band (computedStatus). For readers that historically
+ * filtered the persisted `status` column for the DERIVED band (Overdue / Due /
+ * Active): now that no scheduler persists that band (it is computed on read),
+ * those readers get a correct value with no downstream changes. Authored /
+ * workflow statuses (Completed, Pending Approval, Postponed, Rejected, …) are
+ * preserved because computeWorkOrderStatus passes them through unchanged.
+ */
+// CONTRACT: every overdue/due (derived-band) read MUST go through this helper —
+// never a raw `WHERE status = 'Overdue'/'Due'`. Status is computed on read; the
+// persisted column is not maintained for the derived band.
+export async function getWorkOrdersWithComputedStatus(vesselId?: string, vesselIds?: string[]) {
+  const enriched = await listWorkOrders(vesselId, vesselIds);
+  return enriched.map((wo: any) => ({ ...wo, status: wo.computedStatus ?? wo.status }));
 }
 
 export interface ListWorkOrdersPagedParams extends WorkOrderFilterParams {
@@ -901,8 +926,8 @@ export async function updateWorkOrder(id: string, body: any) {
       const storedStatus = existingWO.status || 'Completed';
       const dueDate = existingWO.dueDate;
       if (dueDate) {
-        const parsedDue = new Date(dueDate);
-        if (!isNaN(parsedDue.getTime()) && parsedDue < new Date()) {
+        const parsedDue = parseWorkOrderDate(dueDate); // shared parser (dateParse.ts contract)
+        if (parsedDue && parsedDue < new Date()) {
           console.warn(
             `⚠️ Data inconsistency: WO ${existingWO.workOrderNo} has stored status "${storedStatus}" ` +
             `but due date ${dueDate} is in the past. This WO may have appeared as Overdue in the UI.`
@@ -1195,42 +1220,11 @@ export async function updateWorkOrder(id: string, body: any) {
 
   console.log('📝 Cleaned update data keys:', Object.keys(updateData));
 
-  // VALIDATION: For INHERITED components, check that RH doesn't exceed master component RH
-  if (updateData.approvalAction === 'approved' && updateData.status === 'Completed') {
-    const runningHours = existingWO.runningHours || updateData.runningHours;
-    if (runningHours) {
-      let componentForValidation = await repo.findComponent(existingWO.component);
-      if (!componentForValidation && existingWO.componentCode && existingWO.vesselId) {
-        componentForValidation = await repo.findComponentByCode(existingWO.componentCode, existingWO.vesselId);
-      }
-
-      if (componentForValidation) {
-        const counterType = (componentForValidation.rhCounterType || '').toUpperCase();
-        if (counterType === 'INHERITED') {
-          let rhMasterComponent: any = null;
-          if (componentForValidation.rhMasterComponentId) {
-            rhMasterComponent = await repo.findComponent(componentForValidation.rhMasterComponentId);
-          }
-          if (!rhMasterComponent && componentForValidation.rhCounterSource && existingWO.vesselId) {
-            rhMasterComponent = await repo.findComponentByCode(componentForValidation.rhCounterSource, existingWO.vesselId);
-          }
-
-          if (rhMasterComponent) {
-            const enteredRH = parseFloat(runningHours);
-            const masterRH = parseFloat(rhMasterComponent.currentCumulativeRH || rhMasterComponent.rhCurrentMaster || '0');
-
-            if (!isNaN(enteredRH) && !isNaN(masterRH) && enteredRH > masterRH) {
-              console.error(`❌ RH validation failed: Entered RH (${enteredRH}) exceeds master component ${rhMasterComponent.componentCode} RH (${masterRH})`);
-              throw new ValidationError(
-                `Running hours (${enteredRH}) cannot exceed master component "${rhMasterComponent.name}" (${rhMasterComponent.componentCode}) running hours of ${masterRH}. Please update the master component's running hours first.`,
-                { code: 'RH_EXCEEDS_MASTER' }
-              );
-            }
-          }
-        }
-      }
-    }
-  }
+  // INHERITED RH no longer has a flat "cannot exceed master" ceiling. Per the Task #240 design,
+  // an INHERITED component records its OWN maintenance cycle and is governed solely by timeline
+  // validation (forward/backward ordering + 25 hrs/day utilization), mirroring the INHERITED
+  // branch in workOrderCompletionService. The legacy RH_EXCEEDS_MASTER guard was removed here so
+  // the two completion paths behave identically.
 
   const isApprovalTransition = (updateData.approvalAction === 'approved' && updateData.status === 'Completed') ||
     (updateData.status === 'Completed' && existingWO.status === 'Pending Approval');
@@ -1339,6 +1333,130 @@ export async function updateWorkOrder(id: string, body: any) {
     );
   }
 
+  // === Task #240: MASTER RH Reading Sync (live completion path) ===
+  // The web UI completes a WO via this PATCH approval transition (not POST /complete), so the
+  // counter-type branch must live here too. For MASTER components the completion reading is the
+  // source of truth: route it through updateMasterRH() so the per-day rate cap + Sail Admin
+  // override apply and the value cascades to INHERITED children.
+  //   - Placed AFTER all approval gates (justification / tier / L2) and BEFORE the commit so the
+  //     override-required error surfaces while the WO is still Pending (no half-completed state),
+  //     and so blocked / intercepted WOs never advance the master counter.
+  //   - INHERITED keeps the existing RH_EXCEEDS_MASTER guard above + its own jobs-row cycle write
+  //     below; NOT_RH_DRIVEN never reaches this branch. Neither moves the master counter.
+  //   - Double-sync guarded by existing rh_synced_at; the stamp persists in the same commit.
+  //   - SHIP-ONLY (Jeevan): the master RH counter advances on the ship/HOD approval, NEVER
+  //     office-side. The office L2 review completes via reviewerApprove() (which does not advance
+  //     the counter); this PATCH approval path must not advance it on a shore instance either.
+  //     updateMasterRH still runs on the ship, so the shore mirrors the value via the
+  //     running_hours_audit sync + derived-RH-update (propagation untouched).
+  const { isShipInstance: isShipInstanceForRH } = await import('../../sync/syncRole');
+  if (
+    isApprovalTransition &&
+    !interceptedForL2Review &&
+    updateData.status === 'Completed' &&
+    !(existingWO as any).rhSyncedAt &&
+    await isShipInstanceForRH()
+  ) {
+    const rhRaw = existingWO.runningHours || updateData.runningHours;
+    if (rhRaw) {
+      let rhComp = await repo.findComponent(existingWO.component);
+      if (!rhComp && existingWO.componentCode && existingWO.vesselId) {
+        rhComp = await repo.findComponentByCode(existingWO.componentCode, existingWO.vesselId);
+      }
+      const rhCounterType = (rhComp?.rhCounterType || 'MASTER').toUpperCase();
+      const rhValue = parseInt(rhRaw);
+      const normRhDate = (d?: string | null): string | undefined => {
+        if (!d) return undefined;
+        if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.split('T')[0];
+        const m = d.match(/^(\d{2})[-\/](\d{2})[-\/](\d{4})/);
+        if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+        const p = new Date(d);
+        return !isNaN(p.getTime()) ? p.toISOString().split('T')[0] : undefined;
+      };
+      const completionDateNorm = normRhDate(existingWO.completionDateTime || existingWO.dateCompleted || updateData.completionDateTime);
+
+      if (rhComp && rhCounterType === 'MASTER' && !isNaN(rhValue)) {
+        // MASTER: completion reading is source of truth — advance master counter + cascade.
+        const { updateMasterRH } = await import('../../running-hours/services/runningHoursService');
+        try {
+          await updateMasterRH(rhComp.cuuid, {
+            newRHValue: rhValue,
+            updateSource: 'MANUAL',
+            userId: body.userId || existingWO.performedBy || 'system',
+            userUuid: body.userUuid,
+            userRole: body.userRole || 'Ship',
+            adminOverride: body.adminOverride || false,
+            comments: `RH update via work order completion ${existingWO.workOrderNo}`,
+            dateUpdated: completionDateNorm
+          });
+          updateData.rhSyncedAt = new Date();
+          console.log(`✅ [RH Sync] MASTER component ${rhComp.componentCode || rhComp.cuuid} advanced to ${rhValue} via WO ${existingWO.workOrderNo} (cascaded to INHERITED children)`);
+        } catch (masterErr: any) {
+          // Surface the per-day cap / override-required error so the UI can offer a Sail Admin override.
+          if (masterErr instanceof ValidationError) {
+            const det: any = masterErr.details || {};
+            throw new ValidationError(masterErr.message, {
+              code: 'RH_OVERRIDE_REQUIRED',
+              ...det,
+              requiresAdminOverride: det.validation?.requiresAdminOverride ?? true,
+              canOverride: det.validation?.canOverride ?? false,
+              componentId: rhComp.cuuid,
+              componentCode: rhComp.componentCode || existingWO.componentCode,
+              rhCounterType: 'MASTER'
+            });
+          }
+          throw masterErr;
+        }
+      } else if (rhComp && rhCounterType === 'INHERITED' && !isNaN(rhValue)) {
+        // INHERITED: records its OWN maintenance cycle (the jobs-row last-done/next-due write happens
+        // further below). It rides a master counter, so we NEVER advance the master here — only write
+        // a read-only audit snapshot for history. Timeline validation is the sole governor (no flat
+        // current-RH or exceeds-master ceiling).
+        // Task #252: this live PATCH approval path previously skipped timeline validation entirely, so a
+        // backdated completion (Completion Date before the component's RH baseline) could be persisted by
+        // bypassing the client check. Enforce the authoritative "no real RH entry on/before completion
+        // date" rule here too, gated narrowly to INVALID_BACKDATED so other timeline outcomes keep their
+        // existing (non-blocking on this path) behavior.
+        if (completionDateNorm) {
+          const { validateRHEntry } = await import('../../running-hours/services/rhTimelineValidationService');
+          const backdateCheck = await validateRHEntry(rhComp.cuuid, completionDateNorm, rhValue);
+          if (!backdateCheck.isValid && backdateCheck.validationStatus === 'INVALID_BACKDATED') {
+            throw new ValidationError(backdateCheck.errorMessage, {
+              code: 'INVALID_BACKDATED',
+              validRange: backdateCheck.validRange,
+              previousEntry: backdateCheck.previousEntry,
+              nextEntry: backdateCheck.nextEntry,
+              componentId: rhComp.cuuid,
+              componentCode: rhComp.componentCode || existingWO.componentCode,
+              rhCounterType: 'INHERITED'
+            });
+          }
+        }
+        try {
+          const prevRH = parseInt(rhComp.currentCumulativeRH || '0');
+          await repo.createRunningHoursAudit({
+            componentId: rhComp.cuuid,
+            vesselId: existingWO.vesselId || rhComp.vesselId || 'V001',
+            previousRH: (isNaN(prevRH) ? 0 : prevRH).toString(),
+            newRH: rhValue.toString(),
+            cumulativeRH: rhValue.toString(),
+            dateUpdatedLocal: completionDateNorm || new Date().toISOString().split('T')[0],
+            dateUpdatedTZ: 'UTC',
+            enteredAtUTC: new Date(),
+            userId: body.userId || existingWO.performedBy || 'System',
+            source: 'workorder',
+            notes: `RH snapshot via work order completion ${existingWO.workOrderNo} (INHERITED — records own cycle, does not modify master)`,
+            meterReplaced: false
+          });
+        } catch (auditErr) {
+          console.error('[RH Sync] Failed to write INHERITED audit snapshot:', auditErr);
+        }
+        updateData.rhSyncedAt = new Date();
+      }
+      // NOT_RH_DRIVEN: never write any RH value — fall through with no RH sync.
+    }
+  }
+
   const workOrder = await repo.update(id, updateData);
 
   // Sync field logging — log UPDATE (existingWO already fetched at top of function)
@@ -1356,9 +1474,9 @@ export async function updateWorkOrder(id: string, body: any) {
       const newDueDate = workOrder.postponementEndDate || workOrder.dueDate || null;
       let durationDays: number | null = null;
       if (originalDueDate && newDueDate) {
-        const orig = new Date(originalDueDate);
-        const next = new Date(newDueDate);
-        if (!isNaN(orig.getTime()) && !isNaN(next.getTime())) {
+        const orig = parseWorkOrderDate(originalDueDate); // shared parser (dateParse.ts contract)
+        const next = parseWorkOrderDate(newDueDate);
+        if (orig && next) {
           durationDays = Math.ceil((next.getTime() - orig.getTime()) / (1000 * 60 * 60 * 24));
         }
       }
@@ -1779,6 +1897,34 @@ export async function updateWorkOrder(id: string, body: any) {
       } else {
         console.warn(`⚠️ Could not find component for work order ${freshWorkOrder.id}`);
       }
+    }
+  }
+
+  // ========== EVENT-DRIVEN NEXT-CYCLE GENERATION ON APPROVAL (Issue 03) ==========
+  // Domain-confirmed (Jeevan): the next WO must appear immediately once the
+  // completion is approved, provided it falls within the generate window. The
+  // job-tracking update above has just rolled lastDone/nextDue, so a
+  // vessel-scoped scan now creates the next cycle without waiting for the daily
+  // ship scan (mirrors the RH-entry hook in runningHoursService).
+  // SHIP-ONLY: the L2-reviewer flow approves OFFICE-side — an ungated hook
+  // there would generate the same cycle on both instances with different
+  // wouuids (duplicate WOs across sync). Office-approved WOs get their next
+  // cycle at the ship's next daily scan after the approval syncs down.
+  // Fire-and-forget: a scan failure must never fail or slow the approval; the
+  // scanner's job-level/cycle guards prevent same-instance duplicates, and the
+  // daily scan remains the backstop if a concurrent run skips this one.
+  if (updateData.approvalAction === 'approved' && updateData.status === 'Completed' && workOrder.vesselId) {
+    try {
+      const { isShipInstance } = await import('../../sync/syncRole');
+      if (await isShipInstance()) {
+        const { jobDueScanner } = await import('../../../services/jobDueScanner');
+        console.log(`[NextCycleHook] Completion approved for WO ${workOrder.workOrderNo || id} — triggering vessel-scoped generation scan (${workOrder.vesselId})`);
+        jobDueScanner.runScan(workOrder.vesselId).catch((err: any) => {
+          console.error('[NextCycleHook] post-approval generation scan failed (non-blocking):', err?.message || err);
+        });
+      }
+    } catch (hookErr: any) {
+      console.error('[NextCycleHook] could not start post-approval generation scan (non-blocking):', hookErr?.message || hookErr);
     }
   }
 

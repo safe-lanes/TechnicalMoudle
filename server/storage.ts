@@ -317,6 +317,10 @@ export interface IStorage {
     userId: string;
     userUuid?: string;
     comments?: string;
+    // Reading date (the date the running hours were observed), e.g. a WO completion date or
+    // the "Date Updated" picked in the RH Section. Used for the stored reading date and the
+    // component's last-updated stamps. Falls back to "now" when omitted/unparseable.
+    dateUpdated?: string;
   }): Promise<{ 
     masterUpdated: Component;
     inheritedUpdated: number;
@@ -924,6 +928,7 @@ export interface IStorage {
   createJobComponentLink(link: InsertJobComponentLink): Promise<JobComponentLink>;
   deleteJobComponentLink(jobId: string, componentId: string): Promise<void>;
   getLinkedComponentsForJob(jobId: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string; lastDoneRH?: string | null; nextDueRH?: string | null }>>;
+  getLinkedComponentsForJobs(jobIds: string[]): Promise<Map<string, Array<{ componentId: string; componentCode: string; componentName: string; lastDoneRH?: string | null; nextDueRH?: string | null }>>>;
   getLinkedJobsForComponent(componentId: string): Promise<Array<{ jobId: string; jobNo: string; jobTitle: string }>>;
   // Get maintenance history for a specific job-component pair
   getMaintenanceHistoryByJobAndComponent(jobId: string, componentCode: string): Promise<any[]>;

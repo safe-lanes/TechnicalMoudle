@@ -6,6 +6,8 @@ import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 import { shouldGenerateWorkOrder } from "@shared/dateUtils";
 import { generatePlannedWorkOrderNumber, generateUnplannedWorkOrderNumber } from "../utils/workOrderNumbering";
 import { jobService } from "./jobService";
+import { logFieldChanges } from "../modules/sync";
+import { parseWorkOrderDate } from "@shared/workOrders/dateParse";
 import { 
   isBlockingStatus, 
   isCompletedStatus,
@@ -241,7 +243,31 @@ export class WorkOrderService {
       workOrderData.templateCode = workOrderData.workOrderNo;
     }
 
-    return storage.createWorkOrder(workOrderData);
+    const createdWO = await storage.createWorkOrder(workOrderData);
+
+    // Sync field logging — log the INSERT so ship→shore sync picks up
+    // auto-generated work orders. Mirrors the modular service
+    // (modules/work-orders/services/workOrderService.ts:889-891). Without this,
+    // scanner/Generate-Now WOs were created with NO sync_field_log entry and were
+    // therefore invisible to the gather step (getUnsyncedFieldLogs) — so a WO
+    // generated on the ship never reached the office.
+    //
+    // NOTE: this is a NEW-ROW INSERT log (fresh wouuid; applied on the far side
+    // via INSERT ... ON CONFLICT DO NOTHING). It is NOT a status UPDATE on an
+    // existing WO, so it does NOT reintroduce the false sync-conflict the
+    // scheduler redesign removed.
+    // Actor resolution mirrors the MODULAR create (body.userId || performedBy ||
+    // fallback) so generated-WO log groups are byte-identical in shape to the
+    // manually-created WOs that sync correctly. The fallback is
+    // 'auto-generation' — deliberately NOT 'system': (a) any deployed receive
+    // path that special-cases 'system' work_orders logs can never drop these,
+    // and (b) "zero 'system' writes" telemetry stays unambiguous.
+    try {
+      const actor = (workOrderData as any).userId || (workOrderData as any).performedBy || 'auto-generation';
+      await logFieldChanges('work_orders', createdWO.wouuid, createdWO.vesselId || null, null, createdWO, actor);
+    } catch (err) { console.error('[FieldLogger] WO create (legacy):', err); }
+
+    return createdWO;
   }
 
   /**
@@ -425,10 +451,18 @@ export class WorkOrderService {
     
     for (const job of calendarJobs) {
       // Calculate DUE_DATE and GENERATE_DATE
-      // DUE_DATE is stored in job.nextDueDate
-      const dueDate = new Date(job.nextDueDate!);
+      // DUE_DATE is stored in job.nextDueDate — parsed via the SHARED
+      // format-complete parser (dateParse.ts contract). Previously a raw
+      // new Date() here turned DD-MM-YYYY dates into Invalid Date, and the
+      // .toISOString() below then THREW — killing calendar generation for the
+      // ENTIRE vessel on every scan. Unparseable dates now skip the job only.
+      const dueDate = parseWorkOrderDate(job.nextDueDate);
+      if (!dueDate) {
+        console.warn(`⚠️ [Calendar WO Gen] Job ${job.jobNo} has unparseable nextDueDate "${job.nextDueDate}" — skipping (fix the job's due date)`);
+        continue;
+      }
       dueDate.setHours(0, 0, 0, 0);
-      
+
       // GENERATE_DATE = DUE_DATE - FIXED 30 days (business rule: generation is fixed, not vessel-driven)
       const generateDate = new Date(dueDate);
       generateDate.setDate(generateDate.getDate() - WORK_ORDER_THRESHOLDS.CALENDAR_GENERATION_ADVANCE_DAYS);

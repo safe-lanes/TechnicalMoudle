@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar, ChevronDown } from "lucide-react";
+import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Lock, Download, FileText, Loader2, Calendar, ChevronDown, Zap } from "lucide-react";
 import WOAgGridTable from "@/components/WOAgGridTable";
 import { getWoStatusBadgeColor } from "@/components/wo/woCellRenderers";
 import type { ColDef, RowClickedEvent } from 'ag-grid-community';
@@ -7,7 +7,7 @@ import WorkOrderPlanner from "./WorkOrderPlanner";
 import { useLocation } from "wouter";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +42,7 @@ import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils
 import { Marker } from "@/components/Marker";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSyncInstanceInfo } from "@/hooks/useSyncInstanceInfo";
 import * as XLSX from "xlsx";
 import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import { format } from "date-fns";
@@ -209,6 +210,9 @@ const WorkOrders: React.FC = () => {
   const vesselScopeKey = isMyVessels ? `my:${assignedVesselIds.join(',')}` : vesselId;
   const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept } = useUIRole();
   const { isOfficeUser } = useAuth();
+  // Office (shore) replacement for the removed every-minute auto-scan: on shore,
+  // WO generation is on-demand. The ship generates on its daily schedule.
+  const { isShore } = useSyncInstanceInfo();
   const { data: vessels = [] } = useVessels();
   
   // Debounce the search box so each keystroke doesn't fire a server round-trip
@@ -312,7 +316,7 @@ const WorkOrders: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       toast({ title: "Success", description: "Work order created successfully" });
     },
     onError: (error: any) => {
@@ -327,7 +331,7 @@ const WorkOrders: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       toast({ title: "Success", description: "Work order updated successfully" });
     },
     onError: (error: any) => {
@@ -342,11 +346,30 @@ const WorkOrders: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       toast({ title: "Success", description: "Work order deleted successfully" });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to delete work order" });
+    }
+  });
+
+  // Office on-demand "Generate Now" — runs the generation sweep for the selected
+  // vessel (replaces the removed every-minute shore auto-scan; for setup/QA).
+  const generateNowMutation = useMutation({
+    mutationFn: async (targetVesselId: string) => {
+      const response = await apiRequest('POST', '/technical/api/work-orders/generate-now', { vesselId: targetVesselId });
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      toast({
+        title: result?.generated > 0 ? "Work orders generated" : "No work orders due",
+        description: result?.message || "Generation complete.",
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Generation failed", description: error.message || "Failed to generate work orders" });
     }
   });
 
@@ -889,7 +912,7 @@ const WorkOrders: React.FC = () => {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       toast({ title: 'Postponement Approved', description: 'Work order due date has been updated.' });
       setPostponeApprovalDialogOpen(false);
       setPostponeApprovalWorkOrder(null);
@@ -907,7 +930,7 @@ const WorkOrders: React.FC = () => {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       toast({ title: 'Postponement Rejected', description: 'Work order has been reverted to Due/Overdue.' });
       setPostponeApprovalDialogOpen(false);
       setPostponeApprovalWorkOrder(null);
@@ -987,7 +1010,7 @@ const WorkOrders: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       toast({ title: "Postponement Submitted", description: "Your postponement request has been sent to the office for approval." });
       setPostponeDialogOpen(false);
     },
@@ -1302,9 +1325,23 @@ const WorkOrders: React.FC = () => {
             <Calendar className="h-4 w-4" />
             Planner
           </Button>
+          {isShore && (isSailAdmin || isClientAdmin || isHeadOfDept) && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
+            onClick={() => { if (vesselId && vesselId !== 'all' && vesselId !== 'my') generateNowMutation.mutate(vesselId); }}
+            disabled={generateNowMutation.isPending || !vesselId || vesselId === 'all' || vesselId === 'my'}
+            title={(!vesselId || vesselId === 'all' || vesselId === 'my') ? 'Select a specific vessel to generate work orders' : 'Generate due work orders for this vessel now'}
+            data-testid="button-generate-now"
+          >
+            {generateNowMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+            Generate Now
+          </Button>
+          )}
           {(isSailAdmin || isClientAdmin || isHeadOfDept || isVessel) && (
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
             onClick={() => setExportDialogOpen(true)}
@@ -1657,7 +1694,7 @@ const WorkOrders: React.FC = () => {
           setOverdueReasonWorkOrder(null);
         }}
         onSaved={() => {
-          queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', vesselId] });
+          invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
         }}
       />
 

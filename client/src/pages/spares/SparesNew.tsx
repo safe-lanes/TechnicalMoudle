@@ -26,7 +26,7 @@ interface ComponentNode {
   [key: string]: any;
 }
 import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -249,6 +249,8 @@ const Spares: React.FC = () => {
     critical: "No",
     isActive: true,
     rob: "",
+    robLocationA: "",
+    robLocationB: "",
     min: "",
     location: "",
     location2: "",
@@ -277,6 +279,8 @@ const Spares: React.FC = () => {
     componentName: "",
     // Stock & Location
     rob: "",
+    robLocationA: "",
+    robLocationB: "",
     min: "",
     location: "",
     location2: "",
@@ -345,14 +349,14 @@ const Spares: React.FC = () => {
     }));
   };
   
-  const handleSaveLocation = async (spareId: number) => {
+  const handleSaveLocation = async (spareId: number): Promise<boolean> => {
     const locations = editingLocations[spareId];
     const original = originalLocationValues[spareId];
-    if (!locations) return;
+    if (!locations) return false;
 
     // Find the spare to check current names
     const spare = (Array.isArray(sparesData) ? sparesData : []).find((s: Spare) => s.id === spareId);
-    if (!spare) return;
+    if (!spare) return false;
     
     const newRobA = parseInt(locations.locationA) || 0;
     const newRobB = parseInt(locations.locationB) || 0;
@@ -361,6 +365,35 @@ const Spares: React.FC = () => {
     
     const deltaA = newRobA - origRobA;
     const deltaB = newRobB - origRobB;
+
+    // Validate: if ROB is changing, a real vessel location must be selected
+    const validLocationNames = new Set(allVesselLocations.map((l: any) => l.locationName));
+
+    if (deltaA !== 0) {
+      const nameA = locations.nameA ?? '';
+      const isPlaceholder = !nameA || nameA === 'Location A';
+      if (isPlaceholder || !validLocationNames.has(nameA)) {
+        toast({
+          title: "Location Required",
+          description: "Please select a valid Location A before updating ROB. If it does not exist, create a new location first.",
+          variant: "destructive"
+        });
+        return false;
+      }
+    }
+
+    if (deltaB !== 0) {
+      const nameB = locations.nameB ?? '';
+      const isPlaceholder = !nameB || nameB === 'Location B';
+      if (isPlaceholder || !validLocationNames.has(nameB)) {
+        toast({
+          title: "Location Required",
+          description: "Please select a valid Location B before updating ROB. If it does not exist, create a new location first.",
+          variant: "destructive"
+        });
+        return false;
+      }
+    }
     
     const errors: string[] = [];
     let successCount = 0;
@@ -425,8 +458,8 @@ const Spares: React.FC = () => {
     }
     
     // Always invalidate cache to reflect any partial changes
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+    invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+    invalidateByUrlPrefix('/technical/api/spares/history');
     
     const hadInventoryChanges = deltaA !== 0 || deltaB !== 0;
     const hadNameChanges = nameAChanged || nameBChanged;
@@ -456,6 +489,7 @@ const Spares: React.FC = () => {
       // All attempts failed
       toast({ title: "Error", description: errors.join('; '), variant: "destructive" });
     }
+    return true;
   };
 
   const [isSavingLocRob, setIsSavingLocRob] = useState(false);
@@ -547,8 +581,8 @@ const Spares: React.FC = () => {
     }
 
     queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${selectedLocationId}`] });
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+    invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+    invalidateByUrlPrefix('/technical/api/spares/history');
   };
 
   const handleChangeSpareLocation = async (spare: any, newLocationId: number, newLocationName: string) => {
@@ -729,8 +763,8 @@ const Spares: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/full-by-location/${vesselId}/${newLocationId}`] });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/locations-with-stock/${vesselId}`] });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+      invalidateByUrlPrefix('/technical/api/spares/history');
       queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/${vesselId}`] });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || 'Failed to change location', variant: "destructive" });
@@ -824,8 +858,8 @@ const Spares: React.FC = () => {
     },
     onSettled: async (data, error, variables) => {
       // Wait for queries to refetch before clearing pending state
-      await queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-      await queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      await invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+      await invalidateByUrlPrefix('/technical/api/spares/history');
       
       // Clear pending adjustment and loading state
       setPendingAdjustments(prev => {
@@ -882,6 +916,8 @@ const Spares: React.FC = () => {
       componentName: spare.componentName || "",
       // Stock & Location
       rob: spare.rob?.toString() || "0",
+      robLocationA: spare.robLocationA?.toString() ?? "0",
+      robLocationB: spare.robLocationB?.toString() ?? "0",
       min: spare.min?.toString() || "0",
       location: spare.location || "",
       location2: spare.location2 || "",
@@ -1510,8 +1546,8 @@ const Spares: React.FC = () => {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+      invalidateByUrlPrefix('/technical/api/spares/history');
       if (data.warning) {
         toast({ title: "Partial Consumption", description: data.warning.message, variant: "default" });
       } else {
@@ -1548,8 +1584,8 @@ const Spares: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+      invalidateByUrlPrefix('/technical/api/spares/history');
       toast({ title: "Success", description: "Spare received successfully" });
       setIsReceiveModalOpen(false);
       setReceiveForm({ qtyA: "", qtyB: "", date: "", supplier: "", remarks: "" });
@@ -1570,8 +1606,8 @@ const Spares: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+      invalidateByUrlPrefix('/technical/api/spares/history');
       toast({ title: "Success", description: "Spare ROB adjusted successfully" });
       setIsAdjustModalOpen(false);
       setAdjustForm({ location: "A", newRob: "", date: format(new Date(), 'yyyy-MM-dd'), place: "", remarks: "" });
@@ -1591,7 +1627,7 @@ const Spares: React.FC = () => {
       return apiRequest('POST', `/technical/api/spares/${vesselId}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
+      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
       toast({ title: "Success", description: "Spare created successfully" });
       setIsAddSpareModalOpen(false);
       setAddSpareForm({
@@ -1603,6 +1639,8 @@ const Spares: React.FC = () => {
         critical: "No",
         isActive: true,
         rob: "",
+        robLocationA: "",
+        robLocationB: "",
         min: "",
         location: "",
         location2: "",
@@ -1635,7 +1673,7 @@ const Spares: React.FC = () => {
       return apiRequest('PATCH', `/technical/api/spares/${vesselId}/${selectedSpare.id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
+      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
       toast({ title: "Success", description: "Spare updated successfully" });
       setIsEditModalOpen(false);
       setSelectedSpare(null);
@@ -1657,13 +1695,32 @@ const Spares: React.FC = () => {
       toast({ title: "Invalid Maker", description: "Selected maker is not in the Maker List. Please select a valid maker.", variant: "destructive" });
       return;
     }
-    
+
+    const robA = parseInt(editSpareForm.robLocationA) || 0;
+    const robB = parseInt(editSpareForm.robLocationB) || 0;
+    if (robA < 0 || robB < 0) {
+      toast({ title: "Validation Error", description: "ROB values cannot be negative. Please enter 0 or a positive number.", variant: "destructive" });
+      return;
+    }
+
+    const validEditLocationNames = new Set(allVesselLocations.map((l: any) => l.locationName));
+    if (robA > 0 && (!editSpareForm.location || !validEditLocationNames.has(editSpareForm.location))) {
+      toast({ title: "Location Required", description: "Please select a valid Location A before entering ROB.", variant: "destructive" });
+      return;
+    }
+    if (robB > 0 && (!editSpareForm.location2 || !validEditLocationNames.has(editSpareForm.location2))) {
+      toast({ title: "Location Required", description: "Please select a valid Location B before entering ROB.", variant: "destructive" });
+      return;
+    }
+
     const updateData = {
       partCode: editSpareForm.partCode,
       partName: editSpareForm.partName,
       partNumber: editSpareForm.partNumber || null,
       uom: editSpareForm.uom || null,
-      rob: parseInt(editSpareForm.rob) || 0,
+      rob: robA + robB,
+      robLocationA: robA,
+      robLocationB: robB,
       min: parseInt(editSpareForm.min) || 0,
       location: editSpareForm.location || null,
       location2: editSpareForm.location2 || null,
@@ -1727,7 +1784,7 @@ const Spares: React.FC = () => {
         });
       });
       
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      invalidateByUrlPrefix('/technical/api/spares/history');
       
       // Count successes, failures, and skipped
       const succeeded = results.filter((r: any) => r.success).length;
@@ -1772,8 +1829,8 @@ const Spares: React.FC = () => {
       return results;
     },
     onSuccess: (results) => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+      invalidateByUrlPrefix('/technical/api/spares/history');
       const successCount = results.filter(r => r.success).length;
       const failCount = results.filter(r => !r.success).length;
       setShowDeactivateDialog(false);
@@ -1798,8 +1855,8 @@ const Spares: React.FC = () => {
       return apiRequest('PATCH', `/technical/api/spares/${vesselId}/${spareId}`, { isActive: true });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+      invalidateByUrlPrefix('/technical/api/spares/history');
       toast({ title: "Success", description: "Spare reactivated successfully" });
     },
     onError: (error: any) => {
@@ -2388,8 +2445,8 @@ const Spares: React.FC = () => {
     }
     
     // Always invalidate cache to reflect any partial changes
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+    invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+    invalidateByUrlPrefix('/technical/api/spares/history');
     
     if (errors.length === 0 && attemptCount > 0) {
       if (warnings.length > 0) {
@@ -2497,8 +2554,8 @@ const Spares: React.FC = () => {
     }
     
     // Always invalidate cache to reflect any partial changes
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
-    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+    invalidateByUrlPrefix('/technical/api/inventory/spares-with-inventory');
+    invalidateByUrlPrefix('/technical/api/spares/history');
     
     if (errors.length === 0 && attemptCount > 0) {
       if (warnings.length > 0) {
@@ -2574,8 +2631,24 @@ const Spares: React.FC = () => {
       toast({ title: "Invalid Maker", description: "Selected maker is not in the Maker List. Please select a valid maker.", variant: "destructive" });
       return;
     }
-    
-    const rob = parseInt(addSpareForm.rob) || 0;
+
+    const robA = parseInt(addSpareForm.robLocationA) || 0;
+    const robB = parseInt(addSpareForm.robLocationB) || 0;
+    if (robA < 0 || robB < 0) {
+      toast({ title: "Validation Error", description: "ROB values cannot be negative. Please enter 0 or a positive number.", variant: "destructive" });
+      return;
+    }
+
+    const validAddLocationNames = new Set(allVesselLocations.map((l: any) => l.locationName));
+    if (robA > 0 && (!addSpareForm.location || !validAddLocationNames.has(addSpareForm.location))) {
+      toast({ title: "Location Required", description: "Please select a valid Location A before entering ROB.", variant: "destructive" });
+      return;
+    }
+    if (robB > 0 && (!addSpareForm.location2 || !validAddLocationNames.has(addSpareForm.location2))) {
+      toast({ title: "Location Required", description: "Please select a valid Location B before entering ROB.", variant: "destructive" });
+      return;
+    }
+
     const min = parseInt(addSpareForm.min) || 0;
     
     // Find the component for getting the name
@@ -2603,7 +2676,9 @@ const Spares: React.FC = () => {
       fleetEquipmentCode: component?.fleetEquipmentCode || undefined,
       critical: addSpareForm.critical,
       isActive: addSpareForm.isActive,
-      rob,
+      rob: robA + robB,
+      robLocationA: robA,
+      robLocationB: robB,
       min,
       location: addSpareForm.location || undefined,
       location2: addSpareForm.location2 || undefined,
@@ -4443,18 +4518,6 @@ const Spares: React.FC = () => {
               <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Stock & Location</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="add-rob">ROB (Total)</Label>
-                  <Input
-                    id="add-rob"
-                    type="number"
-                    min="0"
-                    value={addSpareForm.rob}
-                    onChange={(e) => setAddSpareForm({...addSpareForm, rob: e.target.value})}
-                    placeholder="0"
-                    data-testid="input-add-rob"
-                  />
-                </div>
-                <div>
                   <Label htmlFor="add-min">Minimum Stock</Label>
                   <Input
                     id="add-min"
@@ -4466,185 +4529,223 @@ const Spares: React.FC = () => {
                     data-testid="input-add-min"
                   />
                 </div>
-                <div>
-                  <Label>Location A</Label>
-                  <Popover open={addLocAPopoverOpen} onOpenChange={setAddLocAPopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={addLocAPopoverOpen}
-                        className="w-full justify-between font-normal"
-                        data-testid="input-add-location-a"
-                      >
-                        {addSpareForm.location || "Select location..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[280px] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search locations..." value={addLocSearchA} onValueChange={setAddLocSearchA} />
-                        <CommandList className="max-h-none">
-                          <CommandEmpty>No locations found.</CommandEmpty>
-                          <div className="max-h-[144px] overflow-y-auto">
-                            <CommandGroup heading="Locations">
-                              <CommandItem
-                                value="none"
-                                onSelect={() => {
-                                  setAddSpareForm({...addSpareForm, location: ''});
-                                  setAddLocAPopoverOpen(false);
-                                  setAddLocSearchA('');
-                                }}
-                              >
-                                <span className="text-muted-foreground">None</span>
-                                {!addSpareForm.location && (
-                                  <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
-                                )}
-                              </CommandItem>
-                              {allVesselLocations.map((loc: any) => (
+                <div className="bg-white border border-gray-200 rounded-md p-2 flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-600">Total ROB</span>
+                  <span className="text-base font-bold text-gray-800" data-testid="text-add-total-rob">
+                    {(parseInt(addSpareForm.robLocationA) || 0) + (parseInt(addSpareForm.robLocationB) || 0)}
+                  </span>
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs font-semibold text-blue-600 mb-1 block">Location A</Label>
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <Popover open={addLocAPopoverOpen} onOpenChange={setAddLocAPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={addLocAPopoverOpen}
+                            className="w-full justify-between font-normal"
+                            data-testid="input-add-location-a"
+                          >
+                            {addSpareForm.location || "Select location..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[280px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search locations..." value={addLocSearchA} onValueChange={setAddLocSearchA} />
+                            <CommandList className="max-h-none">
+                              <CommandEmpty>No locations found.</CommandEmpty>
+                              <div className="max-h-[144px] overflow-y-auto">
+                                <CommandGroup heading="Locations">
+                                  <CommandItem
+                                    value="none"
+                                    onSelect={() => {
+                                      setAddSpareForm({...addSpareForm, location: ''});
+                                      setAddLocAPopoverOpen(false);
+                                      setAddLocSearchA('');
+                                    }}
+                                  >
+                                    <span className="text-muted-foreground">None</span>
+                                    {!addSpareForm.location && (
+                                      <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
+                                    )}
+                                  </CommandItem>
+                                  {allVesselLocations.map((loc: any) => (
+                                    <CommandItem
+                                      key={loc.id}
+                                      value={loc.locationName}
+                                      onSelect={() => {
+                                        setAddSpareForm({...addSpareForm, location: loc.locationName});
+                                        setAddLocAPopoverOpen(false);
+                                        setAddLocSearchA('');
+                                      }}
+                                    >
+                                      <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                      <span className="truncate flex-1">{loc.locationName}</span>
+                                      {addSpareForm.location === loc.locationName && (
+                                        <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
+                                      )}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </div>
+                              <CommandGroup className="border-t" forceMount>
                                 <CommandItem
-                                  key={loc.id}
-                                  value={loc.locationName}
-                                  onSelect={() => {
-                                    setAddSpareForm({...addSpareForm, location: loc.locationName});
+                                  onSelect={async () => {
+                                    const name = addLocSearchA.trim();
+                                    if (!name) return;
+                                    try {
+                                      const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ locationName: name, createdBy: 'System' }),
+                                      });
+                                      if (res.ok) {
+                                        queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
+                                        setAddSpareForm({...addSpareForm, location: name});
+                                        toast({ title: "Location Created", description: `"${name}" created.` });
+                                      } else {
+                                        toast({ title: "Failed to create location", description: "Please try again.", variant: "destructive" });
+                                      }
+                                    } catch {
+                                      toast({ title: "Failed to create location", description: "Network error. Please try again.", variant: "destructive" });
+                                    }
                                     setAddLocAPopoverOpen(false);
                                     setAddLocSearchA('');
                                   }}
+                                  data-testid="button-add-create-location-a"
+                                  forceMount
                                 >
-                                  <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                  <span className="truncate flex-1">{loc.locationName}</span>
-                                  {addSpareForm.location === loc.locationName && (
-                                    <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
-                                  )}
+                                  <Plus className="mr-2 h-4 w-4 text-green-600" />
+                                  <span className="text-green-600 font-medium">Create New Location</span>
                                 </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </div>
-                          <CommandGroup className="border-t" forceMount>
-                            <CommandItem
-                              onSelect={async () => {
-                                const name = addLocSearchA.trim();
-                                if (!name) return;
-                                try {
-                                  const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ locationName: name, createdBy: 'System' }),
-                                  });
-                                  if (res.ok) {
-                                    queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
-                                    setAddSpareForm({...addSpareForm, location: name});
-                                    toast({ title: "Location Created", description: `"${name}" created.` });
-                                  } else {
-                                    toast({ title: "Failed to create location", description: "Please try again.", variant: "destructive" });
-                                  }
-                                } catch {
-                                  toast({ title: "Failed to create location", description: "Network error. Please try again.", variant: "destructive" });
-                                }
-                                setAddLocAPopoverOpen(false);
-                                setAddLocSearchA('');
-                              }}
-                              data-testid="button-add-create-location-a"
-                              forceMount
-                            >
-                              <Plus className="mr-2 h-4 w-4 text-green-600" />
-                              <span className="text-green-600 font-medium">Create New Location</span>
-                            </CommandItem>
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="w-28 flex-shrink-0">
+                      <Label className="text-xs text-muted-foreground block mb-1">ROB at Loc A</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={addSpareForm.robLocationA}
+                        onChange={(e) => setAddSpareForm({...addSpareForm, robLocationA: e.target.value})}
+                        placeholder="0"
+                        className="h-9 text-sm"
+                        data-testid="input-add-rob-location-a"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <Label>Location B</Label>
-                  <Popover open={addLocBPopoverOpen} onOpenChange={setAddLocBPopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={addLocBPopoverOpen}
-                        className="w-full justify-between font-normal"
-                        data-testid="input-add-location-b"
-                      >
-                        {addSpareForm.location2 || "Select location..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[280px] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search locations..." value={addLocSearchB} onValueChange={setAddLocSearchB} />
-                        <CommandList className="max-h-none">
-                          <CommandEmpty>No locations found.</CommandEmpty>
-                          <div className="max-h-[144px] overflow-y-auto">
-                            <CommandGroup heading="Locations">
-                              <CommandItem
-                                value="none"
-                                onSelect={() => {
-                                  setAddSpareForm({...addSpareForm, location2: ''});
-                                  setAddLocBPopoverOpen(false);
-                                  setAddLocSearchB('');
-                                }}
-                              >
-                                <span className="text-muted-foreground">None</span>
-                                {!addSpareForm.location2 && (
-                                  <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
-                                )}
-                              </CommandItem>
-                              {allVesselLocations.map((loc: any) => (
+                <div className="col-span-2">
+                  <Label className="text-xs font-semibold text-blue-600 mb-1 block">Location B</Label>
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <Popover open={addLocBPopoverOpen} onOpenChange={setAddLocBPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={addLocBPopoverOpen}
+                            className="w-full justify-between font-normal"
+                            data-testid="input-add-location-b"
+                          >
+                            {addSpareForm.location2 || "Select location..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[280px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search locations..." value={addLocSearchB} onValueChange={setAddLocSearchB} />
+                            <CommandList className="max-h-none">
+                              <CommandEmpty>No locations found.</CommandEmpty>
+                              <div className="max-h-[144px] overflow-y-auto">
+                                <CommandGroup heading="Locations">
+                                  <CommandItem
+                                    value="none"
+                                    onSelect={() => {
+                                      setAddSpareForm({...addSpareForm, location2: ''});
+                                      setAddLocBPopoverOpen(false);
+                                      setAddLocSearchB('');
+                                    }}
+                                  >
+                                    <span className="text-muted-foreground">None</span>
+                                    {!addSpareForm.location2 && (
+                                      <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
+                                    )}
+                                  </CommandItem>
+                                  {allVesselLocations.map((loc: any) => (
+                                    <CommandItem
+                                      key={loc.id}
+                                      value={loc.locationName}
+                                      onSelect={() => {
+                                        setAddSpareForm({...addSpareForm, location2: loc.locationName});
+                                        setAddLocBPopoverOpen(false);
+                                        setAddLocSearchB('');
+                                      }}
+                                    >
+                                      <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                      <span className="truncate flex-1">{loc.locationName}</span>
+                                      {addSpareForm.location2 === loc.locationName && (
+                                        <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
+                                      )}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </div>
+                              <CommandGroup className="border-t" forceMount>
                                 <CommandItem
-                                  key={loc.id}
-                                  value={loc.locationName}
-                                  onSelect={() => {
-                                    setAddSpareForm({...addSpareForm, location2: loc.locationName});
+                                  onSelect={async () => {
+                                    const name = addLocSearchB.trim();
+                                    if (!name) return;
+                                    try {
+                                      const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ locationName: name, createdBy: 'System' }),
+                                      });
+                                      if (res.ok) {
+                                        queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
+                                        setAddSpareForm({...addSpareForm, location2: name});
+                                        toast({ title: "Location Created", description: `"${name}" created.` });
+                                      } else {
+                                        toast({ title: "Failed to create location", description: "Please try again.", variant: "destructive" });
+                                      }
+                                    } catch {
+                                      toast({ title: "Failed to create location", description: "Network error. Please try again.", variant: "destructive" });
+                                    }
                                     setAddLocBPopoverOpen(false);
                                     setAddLocSearchB('');
                                   }}
+                                  data-testid="button-add-create-location-b"
+                                  forceMount
                                 >
-                                  <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                  <span className="truncate flex-1">{loc.locationName}</span>
-                                  {addSpareForm.location2 === loc.locationName && (
-                                    <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
-                                  )}
+                                  <Plus className="mr-2 h-4 w-4 text-green-600" />
+                                  <span className="text-green-600 font-medium">Create New Location</span>
                                 </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </div>
-                          <CommandGroup className="border-t" forceMount>
-                            <CommandItem
-                              onSelect={async () => {
-                                const name = addLocSearchB.trim();
-                                if (!name) return;
-                                try {
-                                  const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ locationName: name, createdBy: 'System' }),
-                                  });
-                                  if (res.ok) {
-                                    queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
-                                    setAddSpareForm({...addSpareForm, location2: name});
-                                    toast({ title: "Location Created", description: `"${name}" created.` });
-                                  } else {
-                                    toast({ title: "Failed to create location", description: "Please try again.", variant: "destructive" });
-                                  }
-                                } catch {
-                                  toast({ title: "Failed to create location", description: "Network error. Please try again.", variant: "destructive" });
-                                }
-                                setAddLocBPopoverOpen(false);
-                                setAddLocSearchB('');
-                              }}
-                              data-testid="button-add-create-location-b"
-                              forceMount
-                            >
-                              <Plus className="mr-2 h-4 w-4 text-green-600" />
-                              <span className="text-green-600 font-medium">Create New Location</span>
-                            </CommandItem>
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="w-28 flex-shrink-0">
+                      <Label className="text-xs text-muted-foreground block mb-1">ROB at Loc B</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={addSpareForm.robLocationB}
+                        onChange={(e) => setAddSpareForm({...addSpareForm, robLocationB: e.target.value})}
+                        placeholder="0"
+                        className="h-9 text-sm"
+                        data-testid="input-add-rob-location-b"
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="add-critical">Criticality</Label>
@@ -4658,7 +4759,6 @@ const Spares: React.FC = () => {
                     <SelectContent>
                       <SelectItem value="Yes">Yes</SelectItem>
                       <SelectItem value="No">No</SelectItem>
-                      <SelectItem value="Critical">Critical</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -4974,18 +5074,6 @@ const Spares: React.FC = () => {
               <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Stock & Location</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="edit-rob">ROB (Total)</Label>
-                  <Input
-                    id="edit-rob"
-                    type="number"
-                    min="0"
-                    value={editSpareForm.rob}
-                    onChange={(e) => setEditSpareForm({...editSpareForm, rob: e.target.value})}
-                    placeholder="0"
-                    data-testid="input-edit-rob"
-                  />
-                </div>
-                <div>
                   <Label htmlFor="edit-min">Minimum Stock</Label>
                   <Input
                     id="edit-min"
@@ -4997,185 +5085,223 @@ const Spares: React.FC = () => {
                     data-testid="input-edit-min"
                   />
                 </div>
-                <div>
-                  <Label>Location A</Label>
-                  <Popover open={editLocAPopoverOpen} onOpenChange={setEditLocAPopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={editLocAPopoverOpen}
-                        className="w-full justify-between font-normal"
-                        data-testid="input-edit-location-a"
-                      >
-                        {editSpareForm.location || "Select location..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[280px] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search locations..." value={editLocSearchA} onValueChange={setEditLocSearchA} />
-                        <CommandList className="max-h-none">
-                          <CommandEmpty>No locations found.</CommandEmpty>
-                          <div className="max-h-[144px] overflow-y-auto">
-                            <CommandGroup heading="Locations">
-                              <CommandItem
-                                value="none"
-                                onSelect={() => {
-                                  setEditSpareForm({...editSpareForm, location: ''});
-                                  setEditLocAPopoverOpen(false);
-                                  setEditLocSearchA('');
-                                }}
-                              >
-                                <span className="text-muted-foreground">None</span>
-                                {!editSpareForm.location && (
-                                  <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
-                                )}
-                              </CommandItem>
-                              {allVesselLocations.map((loc: any) => (
+                <div className="bg-white border border-gray-200 rounded-md p-2 flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-600">Total ROB</span>
+                  <span className="text-base font-bold text-gray-800" data-testid="text-edit-total-rob">
+                    {(parseInt(editSpareForm.robLocationA) || 0) + (parseInt(editSpareForm.robLocationB) || 0)}
+                  </span>
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs font-semibold text-blue-600 mb-1 block">Location A</Label>
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <Popover open={editLocAPopoverOpen} onOpenChange={setEditLocAPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={editLocAPopoverOpen}
+                            className="w-full justify-between font-normal"
+                            data-testid="input-edit-location-a"
+                          >
+                            {editSpareForm.location || "Select location..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[280px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search locations..." value={editLocSearchA} onValueChange={setEditLocSearchA} />
+                            <CommandList className="max-h-none">
+                              <CommandEmpty>No locations found.</CommandEmpty>
+                              <div className="max-h-[144px] overflow-y-auto">
+                                <CommandGroup heading="Locations">
+                                  <CommandItem
+                                    value="none"
+                                    onSelect={() => {
+                                      setEditSpareForm({...editSpareForm, location: ''});
+                                      setEditLocAPopoverOpen(false);
+                                      setEditLocSearchA('');
+                                    }}
+                                  >
+                                    <span className="text-muted-foreground">None</span>
+                                    {!editSpareForm.location && (
+                                      <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
+                                    )}
+                                  </CommandItem>
+                                  {allVesselLocations.map((loc: any) => (
+                                    <CommandItem
+                                      key={loc.id}
+                                      value={loc.locationName}
+                                      onSelect={() => {
+                                        setEditSpareForm({...editSpareForm, location: loc.locationName});
+                                        setEditLocAPopoverOpen(false);
+                                        setEditLocSearchA('');
+                                      }}
+                                    >
+                                      <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                      <span className="truncate flex-1">{loc.locationName}</span>
+                                      {editSpareForm.location === loc.locationName && (
+                                        <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
+                                      )}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </div>
+                              <CommandGroup className="border-t" forceMount>
                                 <CommandItem
-                                  key={loc.id}
-                                  value={loc.locationName}
-                                  onSelect={() => {
-                                    setEditSpareForm({...editSpareForm, location: loc.locationName});
+                                  onSelect={async () => {
+                                    const name = editLocSearchA.trim();
+                                    if (!name) return;
+                                    try {
+                                      const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ locationName: name, createdBy: 'System' }),
+                                      });
+                                      if (res.ok) {
+                                        queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
+                                        setEditSpareForm({...editSpareForm, location: name});
+                                        toast({ title: "Location Created", description: `"${name}" created.` });
+                                      } else {
+                                        toast({ title: "Failed to create location", description: "Please try again.", variant: "destructive" });
+                                      }
+                                    } catch {
+                                      toast({ title: "Failed to create location", description: "Network error. Please try again.", variant: "destructive" });
+                                    }
                                     setEditLocAPopoverOpen(false);
                                     setEditLocSearchA('');
                                   }}
+                                  data-testid="button-edit-create-location-a"
+                                  forceMount
                                 >
-                                  <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                  <span className="truncate flex-1">{loc.locationName}</span>
-                                  {editSpareForm.location === loc.locationName && (
-                                    <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
-                                  )}
+                                  <Plus className="mr-2 h-4 w-4 text-green-600" />
+                                  <span className="text-green-600 font-medium">Create New Location</span>
                                 </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </div>
-                          <CommandGroup className="border-t" forceMount>
-                            <CommandItem
-                              onSelect={async () => {
-                                const name = editLocSearchA.trim();
-                                if (!name) return;
-                                try {
-                                  const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ locationName: name, createdBy: 'System' }),
-                                  });
-                                  if (res.ok) {
-                                    queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
-                                    setEditSpareForm({...editSpareForm, location: name});
-                                    toast({ title: "Location Created", description: `"${name}" created.` });
-                                  } else {
-                                    toast({ title: "Failed to create location", description: "Please try again.", variant: "destructive" });
-                                  }
-                                } catch {
-                                  toast({ title: "Failed to create location", description: "Network error. Please try again.", variant: "destructive" });
-                                }
-                                setEditLocAPopoverOpen(false);
-                                setEditLocSearchA('');
-                              }}
-                              data-testid="button-edit-create-location-a"
-                              forceMount
-                            >
-                              <Plus className="mr-2 h-4 w-4 text-green-600" />
-                              <span className="text-green-600 font-medium">Create New Location</span>
-                            </CommandItem>
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="w-28 flex-shrink-0">
+                      <Label className="text-xs text-muted-foreground block mb-1">ROB at Loc A</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={editSpareForm.robLocationA}
+                        onChange={(e) => setEditSpareForm({...editSpareForm, robLocationA: e.target.value})}
+                        placeholder="0"
+                        className="h-9 text-sm"
+                        data-testid="input-edit-rob-location-a"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <Label>Location B</Label>
-                  <Popover open={editLocBPopoverOpen} onOpenChange={setEditLocBPopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={editLocBPopoverOpen}
-                        className="w-full justify-between font-normal"
-                        data-testid="input-edit-location-b"
-                      >
-                        {editSpareForm.location2 || "Select location..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[280px] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search locations..." value={editLocSearchB} onValueChange={setEditLocSearchB} />
-                        <CommandList className="max-h-none">
-                          <CommandEmpty>No locations found.</CommandEmpty>
-                          <div className="max-h-[144px] overflow-y-auto">
-                            <CommandGroup heading="Locations">
-                              <CommandItem
-                                value="none"
-                                onSelect={() => {
-                                  setEditSpareForm({...editSpareForm, location2: ''});
-                                  setEditLocBPopoverOpen(false);
-                                  setEditLocSearchB('');
-                                }}
-                              >
-                                <span className="text-muted-foreground">None</span>
-                                {!editSpareForm.location2 && (
-                                  <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
-                                )}
-                              </CommandItem>
-                              {allVesselLocations.map((loc: any) => (
+                <div className="col-span-2">
+                  <Label className="text-xs font-semibold text-blue-600 mb-1 block">Location B</Label>
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <Popover open={editLocBPopoverOpen} onOpenChange={setEditLocBPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={editLocBPopoverOpen}
+                            className="w-full justify-between font-normal"
+                            data-testid="input-edit-location-b"
+                          >
+                            {editSpareForm.location2 || "Select location..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[280px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search locations..." value={editLocSearchB} onValueChange={setEditLocSearchB} />
+                            <CommandList className="max-h-none">
+                              <CommandEmpty>No locations found.</CommandEmpty>
+                              <div className="max-h-[144px] overflow-y-auto">
+                                <CommandGroup heading="Locations">
+                                  <CommandItem
+                                    value="none"
+                                    onSelect={() => {
+                                      setEditSpareForm({...editSpareForm, location2: ''});
+                                      setEditLocBPopoverOpen(false);
+                                      setEditLocSearchB('');
+                                    }}
+                                  >
+                                    <span className="text-muted-foreground">None</span>
+                                    {!editSpareForm.location2 && (
+                                      <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
+                                    )}
+                                  </CommandItem>
+                                  {allVesselLocations.map((loc: any) => (
+                                    <CommandItem
+                                      key={loc.id}
+                                      value={loc.locationName}
+                                      onSelect={() => {
+                                        setEditSpareForm({...editSpareForm, location2: loc.locationName});
+                                        setEditLocBPopoverOpen(false);
+                                        setEditLocSearchB('');
+                                      }}
+                                    >
+                                      <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                      <span className="truncate flex-1">{loc.locationName}</span>
+                                      {editSpareForm.location2 === loc.locationName && (
+                                        <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
+                                      )}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </div>
+                              <CommandGroup className="border-t" forceMount>
                                 <CommandItem
-                                  key={loc.id}
-                                  value={loc.locationName}
-                                  onSelect={() => {
-                                    setEditSpareForm({...editSpareForm, location2: loc.locationName});
+                                  onSelect={async () => {
+                                    const name = editLocSearchB.trim();
+                                    if (!name) return;
+                                    try {
+                                      const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ locationName: name, createdBy: 'System' }),
+                                      });
+                                      if (res.ok) {
+                                        queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
+                                        setEditSpareForm({...editSpareForm, location2: name});
+                                        toast({ title: "Location Created", description: `"${name}" created.` });
+                                      } else {
+                                        toast({ title: "Failed to create location", description: "Please try again.", variant: "destructive" });
+                                      }
+                                    } catch {
+                                      toast({ title: "Failed to create location", description: "Network error. Please try again.", variant: "destructive" });
+                                    }
                                     setEditLocBPopoverOpen(false);
                                     setEditLocSearchB('');
                                   }}
+                                  data-testid="button-edit-create-location-b"
+                                  forceMount
                                 >
-                                  <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                  <span className="truncate flex-1">{loc.locationName}</span>
-                                  {editSpareForm.location2 === loc.locationName && (
-                                    <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
-                                  )}
+                                  <Plus className="mr-2 h-4 w-4 text-green-600" />
+                                  <span className="text-green-600 font-medium">Create New Location</span>
                                 </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </div>
-                          <CommandGroup className="border-t" forceMount>
-                            <CommandItem
-                              onSelect={async () => {
-                                const name = editLocSearchB.trim();
-                                if (!name) return;
-                                try {
-                                  const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ locationName: name, createdBy: 'System' }),
-                                  });
-                                  if (res.ok) {
-                                    queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
-                                    setEditSpareForm({...editSpareForm, location2: name});
-                                    toast({ title: "Location Created", description: `"${name}" created.` });
-                                  } else {
-                                    toast({ title: "Failed to create location", description: "Please try again.", variant: "destructive" });
-                                  }
-                                } catch {
-                                  toast({ title: "Failed to create location", description: "Network error. Please try again.", variant: "destructive" });
-                                }
-                                setEditLocBPopoverOpen(false);
-                                setEditLocSearchB('');
-                              }}
-                              data-testid="button-edit-create-location-b"
-                              forceMount
-                            >
-                              <Plus className="mr-2 h-4 w-4 text-green-600" />
-                              <span className="text-green-600 font-medium">Create New Location</span>
-                            </CommandItem>
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="w-28 flex-shrink-0">
+                      <Label className="text-xs text-muted-foreground block mb-1">ROB at Loc B</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={editSpareForm.robLocationB}
+                        onChange={(e) => setEditSpareForm({...editSpareForm, robLocationB: e.target.value})}
+                        placeholder="0"
+                        className="h-9 text-sm"
+                        data-testid="input-edit-rob-location-b"
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="edit-critical">Criticality</Label>
@@ -5189,7 +5315,6 @@ const Spares: React.FC = () => {
                     <SelectContent>
                       <SelectItem value="Yes">Yes</SelectItem>
                       <SelectItem value="No">No</SelectItem>
-                      <SelectItem value="Critical">Critical</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -6189,10 +6314,12 @@ const Spares: React.FC = () => {
                 <Button
                   className="bg-[#52baf3] hover:bg-[#3da8e0] text-white"
                   disabled={!canEditSpare}
-                  onClick={() => {
-                    handleSaveLocation(locationDialogSpare.id);
-                    setLocationDialogSpare(null);
-                    setOpenLocationDropdown(null);
+                  onClick={async () => {
+                    const saved = await handleSaveLocation(locationDialogSpare.id);
+                    if (saved) {
+                      setLocationDialogSpare(null);
+                      setOpenLocationDropdown(null);
+                    }
                   }}
                   data-testid="button-dialog-save"
                 >

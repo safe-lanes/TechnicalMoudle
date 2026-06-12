@@ -1,0 +1,76 @@
+✅ Work Order Form – B3 Running Hours (Improved Requirement)
+1. Current Requirement
+
+When a Work Order is created for an RH-based job, Current Reading entry is mandatory.
+
+Currently:
+
+Current Reading is auto-fetched from the Running Hour Tab
+Manual entry is not supported
+2. Proposed Enhancement
+2.1 Manual Current Reading Option
+Provide an option to manually enter Current Running Hours in the Work Order Form
+This manually entered value should:
+Update the Running Hour module after approval
+Reflect as the latest Current Reading
+2.2 Smart Suggestion Logic (Auto Assistance)
+
+When user starts entering RH value:
+
+System should fetch:
+Last updated RH value
+Last updated date (from RH module)
+
+Then system should:
+
+Compare:
+Last RH reading vs Current entered RH
+Last updated date vs Today’s date
+
+Suggest expected RH increase based on time difference:
+
+Estimated RH = Last RH + (Daily average / time gap)
+
+Show suggestion like:
+
+“Last RH: 1250 on 10-Jan-2026. Expected range today: 1260–1285”
+
+2.3 Post Approval Sync Logic
+
+After Work Order is:
+
+Approved → Completed
+
+Then system should:
+
+Push Current Reading into Running Hour Module
+Update:
+Latest RH value
+Last Updated Date
+3. System Impact Rules (IMPORTANT)
+Must Ensure:
+Existing RH fetch logic remains unchanged
+Existing Work Order flow is not broken
+Manual entry works as an optional override, not replacement
+4. Risk Analysis
+4.1 Data Integrity Risk
+Manual RH updates may conflict with auto-fetched RH values
+Risk of incorrect machinery usage tracking
+4.2 Duplicate Update Risk
+Same Work Order may re-update RH multiple times if not controlled
+4.3 Sync Issue Risk
+Delay between Work Order completion and RH module update may cause mismatch
+4.4 Calculation Risk (Suggestion Logic)
+Incorrect estimation if:
+Vessel idle time is not considered
+Machine not running continuously
+4.5 Dependency Risk
+Running Hour module must support:
+External update API or controlled write access
+5. Recommended Safe Implementation Approach
+Keep auto-fetch as default
+Add manual entry as optional override (role-controlled)
+Log both:
+Auto fetched value
+Manual override value (if used)
+Maintain audit trail for compliance

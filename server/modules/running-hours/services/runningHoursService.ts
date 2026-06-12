@@ -164,19 +164,44 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
   }
   const totalPeriodHours = periodDays * 24;
 
-  const parentsWithCounts = await Promise.all(
-    masterComponents.map(async (component) => {
+  // Inherited components are already loaded in `allComponents`; count them in-memory
+  // per master (mirrors storage.getInheritedComponents matching) instead of issuing
+  // one query per master. This removes the dominant N+1 fan-out.
+  const inheritedActive = allComponents.filter(
+    (c: any) => c.rhCounterType === 'INHERITED' && c.isActive !== false
+  );
+
+  // Batch the audit lookups across ALL masters in one/two round-trips each, instead
+  // of getRunningHoursAtDate + getRunningHoursAudits per master. Pass BOTH id and
+  // cuuid so legacy audit rows keyed by the non-cuuid id still resolve (mirrors the
+  // dual-identifier OR in storage.getRunningHoursAtDate). Results are keyed by cuuid.
+  const masterRefs = masterComponents.map((m) => ({ id: String(m.id), cuuid: m.cuuid }));
+  const startEntries = await repo.getRunningHoursAtDateBatch(masterRefs, periodStartDate);
+  const endEntries = periodEndDate ? await repo.getRunningHoursAtDateBatch(masterRefs, periodEndDate) : null;
+  const lastUpdatedByMap = await repo.getLatestAuditUserBatch(masterRefs);
+  // Latest approved completion date per master (component_maintenance_history).
+  // Used to drive the Overview "Last Updated" column for MASTER rows.
+  const lastCompletedMap = await repo.getLatestCompletedDateBatch(masterRefs);
+
+  const parentsWithCounts = masterComponents.map((component) => {
       // Under 'all'/'my' aggregate, vesselId is 'all' — scope inherited lookup to the
       // master's own vessel so the per-vessel isolation safeguard still resolves.
-      const allInheritedComponents = await repo.getInheritedComponents(component.cuuid, component.vesselId ?? vesselId);
-      const inheritedComponents = allInheritedComponents.filter((c: any) => c.isActive !== false);
+      const effectiveVesselId = component.vesselId ?? vesselId;
+      const inheritedCount = inheritedActive.filter((c: any) =>
+        c.vesselId === effectiveVesselId && (
+          c.rhMasterComponentId === component.id ||
+          c.rhMasterComponentId === component.componentCode ||
+          c.rhMasterComponentId === component.cuuid ||
+          c.rhCounterSource === component.componentCode
+        )
+      ).length;
 
       const meterReplacedLastRh = parseFloat(component.meterReplacedLastRh || '0');
-      const currentMeterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
+      const currentMeterRH = parseFloat(component.rhCurrentMaster || (component as any).currentCumulativeRH || '0');
       const totalCumulativeRH = meterReplacedLastRh + currentMeterRH;
 
-      const historicalEntry = await repo.getRunningHoursAtDate(component.cuuid, periodStartDate);
-      const endEntry = periodEndDate ? await repo.getRunningHoursAtDate(component.cuuid, periodEndDate) : null;
+      const historicalEntry = startEntries.get(component.cuuid) || null;
+      const endEntry = endEntries ? (endEntries.get(component.cuuid) || null) : null;
 
       let utilizationRate = 0;
       let periodRunningHours = 0;
@@ -221,18 +246,23 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
         ? Math.round((periodRunningHours / periodDays) * 10) / 10
         : 0;
 
-      const latestAudits = await repo.getRunningHoursAudits(component.cuuid, 1);
-      const lastUpdatedBy = latestAudits.length > 0 ? (latestAudits[0].userId || null) : null;
+      const lastUpdatedBy = lastUpdatedByMap.get(component.cuuid) ?? null;
+      // Only MASTER components surface the last completed date (the Overview grid
+      // is MASTER-only, but branch explicitly to enforce the intent). ISO string.
+      const lastCompletedDate = component.rhCounterType === 'MASTER'
+        ? (lastCompletedMap.get(component.cuuid) ?? null)
+        : null;
 
       return {
         ...component,
         sfiCode: component.componentCode || '',
         latestUpdate: component.lastUpdated || component.rhMasterUpdatedAt || component.updatedAt || new Date().toISOString(),
+        lastCompletedDate,
         currentCumulativeRH: totalCumulativeRH.toFixed(2),
         currentMeterRH: currentMeterRH.toFixed(2),
         meterReplacedLastRh: meterReplacedLastRh > 0 ? meterReplacedLastRh.toFixed(2) : null,
         meterReplacedDate: component.meterReplacedDate || null,
-        inheritedCount: inheritedComponents.length,
+        inheritedCount,
         utilizationRate,
         periodRunningHours,
         lastUpdatedBy,
@@ -243,8 +273,7 @@ export async function listParents(vesselId: string, period: string = 'monthly', 
         dataQualityWarning,
         averageDailyHours
       };
-    })
-  );
+  });
 
   parentsWithCounts.sort((a, b) => (a.componentCode || '').localeCompare(b.componentCode || ''));
 
@@ -634,7 +663,10 @@ export async function updateMasterRH(componentId: string, body: unknown) {
     updateSource,
     userId,
     userUuid,
-    comments
+    comments,
+    // Persist the reading date (WO completion date / RH Section "Date Updated") so the stored
+    // reading and the component's last-updated reflect when the hours were observed, not "now".
+    dateUpdated
   });
 
   // TRIGGER 1 HOOK: After MASTER RH is updated, scan for RH-based WO generation
@@ -642,7 +674,10 @@ export async function updateMasterRH(componentId: string, body: unknown) {
   try {
     if (component.vesselId) {
       const { jobDueScanner } = await import('../../../services/jobDueScanner');
-      const scanResult = await jobDueScanner.runScan();
+      // Scope the event-driven generation to the affected vessel only (master RH
+      // + its inherited cascades are all within this vessel). Avoids a fleet-wide
+      // scan on every RH entry — far lower heap/CPU than the previous unscoped call.
+      const scanResult = await jobDueScanner.runScan(component.vesselId);
       woGenerationResult = {
         rhJobsChecked: scanResult.rhJobsChecked,
         rhWOsGenerated: scanResult.rhWOsGenerated

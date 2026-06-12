@@ -1448,9 +1448,18 @@ export class PostgresStorage {
     userId: string;
     userUuid?: string;
     comments?: string;
+    dateUpdated?: string;
   }): Promise<{ masterUpdated: Component; inheritedUpdated: number }> {
     const db = await getDb();
     const now = new Date();
+    // Reading date: the date the running hours were actually observed (WO completion date or the
+    // RH Section "Date Updated"). It governs the stored reading date and the component's
+    // last-updated stamps so the RH timeline reflects when hours were read — NOT when the row was
+    // written. Falls back to "now" when omitted or unparseable. enteredAtUTC stays "now" (it is
+    // the audit trail of when the row was entered, not the reading date).
+    const parsedReadingDate = params.dateUpdated ? new Date(params.dateUpdated) : null;
+    const readingDate = parsedReadingDate && !isNaN(parsedReadingDate.getTime()) ? parsedReadingDate : now;
+    const readingDateLocal = readingDate.toISOString().split('T')[0];
     
     // Verify component exists and is a MASTER
     const component = await this.getComponent(params.componentId);
@@ -1483,10 +1492,10 @@ export class PostgresStorage {
         .set({
           rhCurrentMaster: params.newRHValue.toString(),
           currentCumulativeRH: params.newRHValue.toString(),
-          rhMasterUpdatedAt: now,
+          rhMasterUpdatedAt: readingDate,
           rhMasterUpdatedBy: params.userId,
           rhMasterUpdateSource: params.updateSource,
-          lastUpdated: now.toISOString(),
+          lastUpdated: readingDate.toISOString(),
           updatedAt: now,
         })
         .where(eq(components.cuuid, component.cuuid))
@@ -1507,7 +1516,7 @@ export class PostgresStorage {
         previousRH: previousMasterRH.toFixed(2),
         newRH: params.newRHValue.toFixed(2),
         cumulativeRH: params.newRHValue.toFixed(2),
-        dateUpdatedLocal: now.toISOString().split('T')[0],
+        dateUpdatedLocal: readingDateLocal,
         dateUpdatedTZ: 'UTC',
         enteredAtUTC: now,
         userId: params.userId,
@@ -1985,8 +1994,11 @@ export class PostgresStorage {
     const comp = await this.getComponent(componentId);
     const resolvedId = comp ? comp.cuuid : componentId;
 
+    // NOTE: use [0-9] not \d — inside a JS sql`` template literal, "\d" is cooked to
+    // "d", producing a regex that never matches ISO dates and crashes TO_TIMESTAMP on
+    // the DD-Mon-YYYY branch ("invalid value ... for Mon"). [0-9] survives intact.
     const parsedDateExpr = sql`CASE 
-      WHEN ${runningHoursAudit.dateUpdatedLocal} ~ '^\d{4}-\d{2}-\d{2}' 
+      WHEN ${runningHoursAudit.dateUpdatedLocal} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' 
         THEN TO_TIMESTAMP(${runningHoursAudit.dateUpdatedLocal}, 'YYYY-MM-DD')
       ELSE TO_TIMESTAMP(REPLACE(${runningHoursAudit.dateUpdatedLocal}, ' ', '-'), 'DD-Mon-YYYY-HH24:MI')
     END`;
@@ -4923,15 +4935,6 @@ export class PostgresStorage {
     const rows = await db.select({ dedupeKey: alertEvents.dedupeKey })
       .from(alertEvents);
     return new Set(rows.map(r => r.dedupeKey));
-  }
-
-  async getOverdueWorkOrders(): Promise<any[]> {
-    const db = await getDb();
-    return await db.select().from(workOrders)
-      .where(and(
-        eq(workOrders.status, 'Overdue'),
-        eq(workOrders.dataScope, 'vessel')
-      ));
   }
 
   async getWorkOrdersWithMissedCycles(): Promise<any[]> {
@@ -8276,6 +8279,43 @@ export class PostgresStorage {
       lastDoneRH: l.lastDoneRH,
       nextDueRH: l.nextDueRH,
     }));
+  }
+
+  /**
+   * Batch variant of getLinkedComponentsForJob — fetches links for MANY jobs in
+   * a single query and returns them grouped by jobId. Used by the job-due
+   * scanner to KILL the per-job N+1 (previously one query per RH/Dual job).
+   * Jobs with no links are simply absent from the returned map.
+   */
+  async getLinkedComponentsForJobs(jobIds: string[]): Promise<Map<string, Array<{ componentId: string; componentCode: string; componentName: string; lastDoneRH?: string | null; nextDueRH?: string | null }>>> {
+    const result = new Map<string, Array<{ componentId: string; componentCode: string; componentName: string; lastDoneRH?: string | null; nextDueRH?: string | null }>>();
+    if (!jobIds || jobIds.length === 0) return result;
+
+    const db = await getDb();
+    const links = await db.select({
+      jobId: jobComponentLinks.jobId,
+      componentId: jobComponentLinks.componentId,
+      componentCode: components.componentCode,
+      componentName: components.name,
+      lastDoneRH: jobComponentLinks.lastDoneRH,
+      nextDueRH: jobComponentLinks.nextDueRH,
+    })
+    .from(jobComponentLinks)
+    .innerJoin(components, eq(jobComponentLinks.componentId, components.cuuid))
+    .where(inArray(jobComponentLinks.jobId, jobIds));
+
+    for (const l of links) {
+      const arr = result.get(l.jobId) ?? [];
+      arr.push({
+        componentId: l.componentId,
+        componentCode: l.componentCode || '',
+        componentName: l.componentName || '',
+        lastDoneRH: l.lastDoneRH,
+        nextDueRH: l.nextDueRH,
+      });
+      result.set(l.jobId, arr);
+    }
+    return result;
   }
 
   async getLinkedJobsForComponent(componentId: string): Promise<Array<{ jobId: string; jobNo: string; jobTitle: string }>> {

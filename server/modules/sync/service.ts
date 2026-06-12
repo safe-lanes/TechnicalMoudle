@@ -116,6 +116,35 @@ export async function receivePushData(
     );
   }
 
+  // ── Instance-id collision guard ──
+  // Two DIFFERENT vessels presenting the SAME instance id is almost always an
+  // unedited .env template (e.g. both ships left 'SHIP-VESSELNAME') or a cloned
+  // image. Their field logs and metadata would interleave under one identity.
+  // Loud warning so the shore operator catches it immediately.
+  try {
+    const senderInstance = (batch as any).initiatedByInstance || (batch as any).initiated_by_instance;
+    if (senderInstance) {
+      const collisionPool = await getPool();
+      const collision = await collisionPool.query(
+        `SELECT DISTINCT vessel_id FROM sync_batches
+         WHERE initiated_by_instance = $1 AND vessel_id IS NOT NULL AND vessel_id <> $2
+         LIMIT 5`,
+        [senderInstance, vesselId]
+      );
+      if (collision.rows.length > 0) {
+        const others = collision.rows.map((r: any) => r.vessel_id).join(', ');
+        console.warn(
+          `[Sync Push] ⚠️ INSTANCE-ID COLLISION: instance '${senderInstance}' is now syncing vessel '${vesselId}' ` +
+          `but has previously synced different vessel(s): ${others}. Two ships are likely sharing one identity ` +
+          `(unedited .env template / cloned image). Give each ship a unique SHIP-<code> id.`
+        );
+        syncDiag(`INSTANCE-ID COLLISION: ${senderInstance} vessel=${vesselId} previously=${others}`);
+      }
+    }
+  } catch (collErr: any) {
+    syncDiag(`instance-id collision check failed (non-fatal): ${collErr.message}`);
+  }
+
   let totalReceived = 0;
   const oneWaySummary: Array<{ tableName: string; inserted: number; updated: number; errors: number }> = [];
 
@@ -147,6 +176,7 @@ export async function receivePushData(
   let fieldLogsStored = 0;
   let fieldLogsApplied = 0;
   let fieldLogApplyErrors = 0;
+  let fieldLogRowMissing = 0; // UPDATEs that matched 0 rows (row absent on receiver) — must never be silent
   if (payload.fieldLogs && payload.fieldLogs.length > 0) {
     // Validate business rules before accepting
     const acceptedLogs: typeof payload.fieldLogs = [];
@@ -404,11 +434,15 @@ export async function receivePushData(
               [valueToApply, log.rowUuid, logChangedAt]
             );
 
-            // Defence-in-depth: if UPDATE matched 0 rows, the row doesn't exist.
-            // This happens when applyFieldLogInserts misclassifies a mixed INSERT+UPDATE
-            // group (all logs routed to UPDATE path but row was never created).
-            // Log it so we can detect the pattern in syncDiag.
+            // Defence-in-depth: if UPDATE matched 0 rows, the row doesn't exist
+            // on the receiver and the incoming change just VANISHED. This was
+            // previously syncDiag-only (errors=0) — which masked Issue 01
+            // (generated WOs reached the shore but were never inserted, and the
+            // per-field UPDATEs against the missing row dropped silently). Now
+            // it is loud and COUNTED so the batch result can never look clean.
             if (updateResult.rowCount === 0) {
+              fieldLogRowMissing++;
+              console.warn(`[Sync Push] UPDATE skipped — row missing on receiver: ${log.tableName}.${fieldNameSnake} row=${log.rowUuid} (change dropped; see FIELD-LOG-INSERT RECOVERY)`);
               syncDiag(`UPDATE-MISS: ${log.tableName}.${fieldNameSnake} row=${log.rowUuid} — row not found, UPDATE had no effect`);
             }
 
@@ -665,18 +699,23 @@ export async function receivePushData(
     recordsReceived: (batch.recordsReceived ?? 0) + totalReceived,
   });
 
-  syncDiag(`RECEIVE-PUSH DONE: stored=${fieldLogsStored}, applied=${fieldLogsApplied}, errors=${fieldLogApplyErrors}, oneWayTables=${oneWaySummary.length}`);
+  syncDiag(`RECEIVE-PUSH DONE: stored=${fieldLogsStored}, applied=${fieldLogsApplied}, errors=${fieldLogApplyErrors}, rowMissing=${fieldLogRowMissing}, oneWayTables=${oneWaySummary.length}`);
   console.log(
     `[Sync Push] Batch ${batchUuid}: ${fieldLogsStored} field logs stored, ` +
     `${fieldLogsApplied} applied, ${fieldLogApplyErrors} apply errors, ` +
+    `${fieldLogRowMissing} row-missing skips, ` +
     `${oneWaySummary.length} one-way tables`
   );
+  if (fieldLogRowMissing > 0) {
+    console.warn(`[Sync Push] WARNING: ${fieldLogRowMissing} field change(s) targeted rows that do not exist on this instance — data was NOT applied (stored≫applied gap). Investigate FIELD-LOG-INSERT RECOVERY / UPDATE-MISS lines above.`);
+  }
 
   return {
     received: totalReceived,
     fieldLogsStored,
     fieldLogsApplied,
     fieldLogApplyErrors,
+    fieldLogRowMissing,
     oneWaySummary,
   };
 }

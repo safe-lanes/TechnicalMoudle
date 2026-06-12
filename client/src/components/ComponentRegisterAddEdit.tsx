@@ -25,7 +25,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import { useVessels } from "@/hooks/useVessels";
 import { useDepartmentOptions, useMasterListOptions } from "@/hooks/useDepartments";
 import type { ComponentDocument } from "@shared/schema";
@@ -161,7 +161,7 @@ export default function ComponentRegisterAddEdit({
     },
     onSuccess: (data: any) => {
       toast({ title: data.message || "Job deactivated successfully" });
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/jobs?vesselId=${vesselId}`] });
+      invalidateByUrlPrefix('/technical/api/jobs');
       setShowJobDeactivateDialog(false);
       setJobToDeactivate(null);
     },

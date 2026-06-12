@@ -102,6 +102,16 @@ export async function create(data: any): Promise<Component> {
 
   await validateMaker(data.maker, data.makerCode);
 
+  // Duplicate component code check
+  if (data.componentCode && data.vesselId) {
+    const existing = await repo.findByCodeAndVessel(data.componentCode, data.vesselId);
+    if (existing) {
+      throw new ValidationError(
+        `Component Code '${data.componentCode}' already exists for this vessel. Please use a unique code.`
+      );
+    }
+  }
+
   // RH field validation (B7.B rules)
   const effectiveRhType = data.rhCounterType || 'NOT_RH_DRIVEN';
 
@@ -187,6 +197,19 @@ export async function update(id: string, data: any, userId: string): Promise<Com
 
   if (data.maker !== undefined || data.makerCode !== undefined) {
     await validateMaker(data.maker, data.makerCode);
+  }
+
+  // Duplicate component code check (only when code is actually changing)
+  if (data.componentCode && data.componentCode !== existingComponent.componentCode) {
+    const vesselId = existingComponent.vesselId ?? data.vesselId;
+    if (vesselId) {
+      const duplicate = await repo.findByCodeAndVessel(data.componentCode, vesselId);
+      if (duplicate) {
+        throw new ValidationError(
+          `Component Code '${data.componentCode}' already exists for this vessel. Please use a unique code.`
+        );
+      }
+    }
   }
 
   // RH field validation (B7.B rules)

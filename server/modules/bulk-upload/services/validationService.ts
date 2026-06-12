@@ -388,6 +388,24 @@ export async function validateData(type: string, data: any[], mode: string, vess
               normalized['Parent Component Code'] = parentCode;
             }
           }
+
+          // Validation: Component Code and Parent Component Code must not be identical
+          const resolvedParent = normalized['Parent Component Code'];
+          if (resolvedParent) {
+            const resolvedParentUpper = String(resolvedParent).toUpperCase();
+
+            if (codeUpperCase === resolvedParentUpper) {
+              errors.push(`Row ${rowNum}: Component Code and Parent Component Code are both '${codeStr}'. A component cannot be its own parent.`);
+            } else {
+              // Validation: Parent Component Code must exist in the uploaded file OR in the vessel's database
+              const parentInFile = componentCodeOccurrences.has(resolvedParentUpper);
+              const parentInDb = existingDbComponentCodes.has(resolvedParentUpper);
+              if (!parentInFile && !parentInDb) {
+                errors.push(`Row ${rowNum}: Parent Component Code '${resolvedParent}' does not exist in the uploaded file or in the vessel's component register. Cannot create a component without a valid parent.`);
+              }
+            }
+          }
+
           // NOTE: __meta is set at the END of the component validation block
           // to ensure it survives all field copy operations
           
@@ -686,16 +704,9 @@ export async function validateData(type: string, data: any[], mode: string, vess
         }
       }
 
-      // Validate Fleet Equipment Code if provided
+      // Fleet Equipment Code - accept as-is, no master data lookup
       if (row['Fleet Equipment Code']) {
-        const fleetCode = String(row['Fleet Equipment Code']).trim();
-        normalized['Fleet Equipment Code'] = fleetCode;
-        
-        // Validate that Fleet Equipment Code exists in master data
-        const masterEntry = await storage.getMasterDataByFleetCode(fleetCode);
-        if (!masterEntry) {
-          warnings.push(`Row ${rowNum}: Fleet Equipment Code '${fleetCode}' not found in master data. Code will be accepted but not linked.`);
-        }
+        normalized['Fleet Equipment Code'] = String(row['Fleet Equipment Code']).trim();
       }
       
       // Copy text fields directly - new template fields
