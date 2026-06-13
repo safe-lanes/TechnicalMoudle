@@ -5,3 +5,5 @@ vite.config.ts.*
 backup
 uploads
 package-lock
+.env
+ecosystem.config.cjs
