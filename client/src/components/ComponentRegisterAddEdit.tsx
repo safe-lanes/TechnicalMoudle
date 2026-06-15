@@ -901,7 +901,7 @@ export default function ComponentRegisterAddEdit({
         installationDate: componentData.installationDate || null,
         commissionedDate: componentData.commissionedDate || null,
         rating: componentData.rating || null,
-        eqptSystemDept: componentData.eqptSystemDept || null,
+        eqptSystemDept: (!componentData.eqptSystemDept || componentData.eqptSystemDept.toUpperCase() === 'NULL') ? null : componentData.eqptSystemDept,
         notes: componentData.notes || null,
         runningHours: componentData.runningHours ? parseFloat(componentData.runningHours) : null,
         vesselId: vesselId || "V001",
