@@ -208,7 +208,7 @@ import {
   type AdmRoleMenuAccess,
 } from '@shared/schema';
 import { logFieldChanges, logSoftDelete, FileSyncProcessor } from './modules/sync';
-import { getAuditActor } from './middleware/requestContext';
+import { getAuditActor, getRequestContext } from './middleware/requestContext';
 
 /**
  * PostgreSQL Storage Implementation
@@ -6268,16 +6268,18 @@ export class PostgresStorage {
   async createAuditLog(data: InsertAuditLog): Promise<AuditLog> {
     const db = await getDb();
 
-    // Audit Phase 0 — identity threading. Stamp the real request actor and FREEZE the
-    // human-readable identity into payload so it survives crew changes (never resolved live).
-    // - userId: keep the caller's explicit id when meaningful; fill placeholders from the
-    //   request actor's canonical id (userUuid). audit_log.userId semantics = "who acted".
-    // - payload: merge actorLabel/type/email/role unless the caller already set them.
-    const actor = getAuditActor();
+    // Audit identity (Phase 0). The request-context actor is AUTHORITATIVE for audit_log.user_id
+    // (= "who acted"), regardless of any name/rank a controller injected into data.userId for its
+    // own operational use. The frozen human identity is also stored in payload (survives crew
+    // changes, never resolved live). With NO request context (machine/cron) the explicit token is
+    // preserved (e.g. 'auto-generation'), falling back to 'system'.
+    const inRequest = getRequestContext() !== undefined;
+    const actor = getAuditActor(); // ctx.actor when in a request, else SYSTEM_ACTOR
     const PLACEHOLDER_AUDIT_USER_IDS = new Set(['system', 'admin', 'System', '']);
     const callerUserId = data.userId == null ? '' : String(data.userId);
-    const resolvedUserId =
-      callerUserId && !PLACEHOLDER_AUDIT_USER_IDS.has(callerUserId) ? callerUserId : actor.actorId;
+    const resolvedUserId = inRequest
+      ? actor.actorId
+      : (callerUserId && !PLACEHOLDER_AUDIT_USER_IDS.has(callerUserId) ? callerUserId : actor.actorId);
 
     const basePayload =
       data.payload && typeof data.payload === 'object' && !Array.isArray(data.payload)
