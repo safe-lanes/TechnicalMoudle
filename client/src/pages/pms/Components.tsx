@@ -2315,7 +2315,7 @@ const Components: React.FC = () => {
   const { isChangeMode, changeRequestTitle, changeRequestCategory, setOriginalSnapshot, collectDiff, getDiffs, reset } = useChangeMode();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const { vesselId, setVesselId } = useVessel();
+  const { vesselId, setVesselId, pickerVessels, myVesselsEmpty } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept, isExternal } = useUIRole();
   const { canCreate: canCreatePerm, canEdit: canEditPerm, canDelete: canDeletePerm } = usePermissions();
@@ -3562,11 +3562,17 @@ const Components: React.FC = () => {
                 <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>
               <SelectContent>
-                {vessels.map(vessel => (
-                  <SelectItem key={vessel.id} value={vessel.id}>
-                    {vessel.name}
-                  </SelectItem>
-                ))}
+                {myVesselsEmpty ? (
+                  <div className="px-2 py-1.5 text-sm text-gray-500" data-testid="select-no-assigned-vessels">
+                    No assigned vessels
+                  </div>
+                ) : (
+                  pickerVessels.map(vessel => (
+                    <SelectItem key={vessel.id} value={vessel.id}>
+                      {vessel.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
