@@ -480,7 +480,7 @@ export default function ComponentRegisterAddEdit({
         // Row 5
         commissionedDate: comp.commissionedDate || "",
         rating: comp.rating || "",
-        eqptSystemDept: comp.eqptSystemDept || comp.deptCategory || comp.department || "",
+        eqptSystemDept: comp.eqptSystemDept || comp.deptCategory || comp.department || "NULL",
         // Row 6
         runningHours: comp.runningHours?.toString() || comp.currentCumulativeRH?.toString() || "",
         isActive: comp.isActive === false ? "No" : "Yes",
@@ -901,7 +901,7 @@ export default function ComponentRegisterAddEdit({
         installationDate: componentData.installationDate || null,
         commissionedDate: componentData.commissionedDate || null,
         rating: componentData.rating || null,
-        eqptSystemDept: (!componentData.eqptSystemDept || componentData.eqptSystemDept.toUpperCase() === 'NULL') ? null : componentData.eqptSystemDept,
+        eqptSystemDept: componentData.eqptSystemDept || null,
         notes: componentData.notes || null,
         runningHours: componentData.runningHours ? parseFloat(componentData.runningHours) : null,
         vesselId: vesselId || "V001",
@@ -1015,7 +1015,7 @@ export default function ComponentRegisterAddEdit({
       // Row 5
       commissionedDate: comp.commissionedDate || "",
       rating: comp.rating || "",
-      eqptSystemDept: comp.eqptSystemDept || comp.deptCategory || comp.department || "",
+      eqptSystemDept: comp.eqptSystemDept || comp.deptCategory || comp.department || "NULL",
       // Row 6
       runningHours: comp.runningHours?.toString() || comp.currentCumulativeRH?.toString() || "",
       isActive: comp.isActive === false ? "No" : "Yes",
