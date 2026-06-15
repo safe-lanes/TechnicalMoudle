@@ -904,6 +904,7 @@ export default function ComponentRegisterAddEdit({
         eqptSystemDept: componentData.eqptSystemDept || null,
         notes: componentData.notes || null,
         runningHours: componentData.runningHours ? parseFloat(componentData.runningHours) : null,
+        lastUpdated: componentData.lastUpdated || null,
         vesselId: vesselId || "V001",
         isActive: componentData.isActive === "Yes",
         vesselCode: componentData.vesselCode || null,
