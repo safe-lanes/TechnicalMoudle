@@ -10,7 +10,7 @@ import type { UIRole } from "@shared/uiRoles";
 import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { secureGetItem } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
-import { setActiveRank } from "@/lib/activeRank";
+import { setActiveRank, setActiveIdentity, type ActiveIdentity } from "@/lib/activeRank";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
 function resolveProfileName(profile: Record<string, any>): {
@@ -150,6 +150,21 @@ function invalidateRankScopedQueries() {
       );
     },
   });
+}
+
+/**
+ * Audit Phase 0 — map the authenticated user to the audit-relevant identity that the fetch
+ * interceptor forwards to PMS (x-user-* headers). Returns null when there is no user (logout).
+ */
+function toActiveIdentity(user: PublicUser | null | undefined): ActiveIdentity | null {
+  if (!user) return null;
+  return {
+    userId: user.userUuid ?? null,
+    name: user.fullName ?? user.username ?? null,
+    email: user.email ?? null,
+    userType: user.userType ?? null,
+    role: user.role ?? null,
+  };
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
@@ -292,6 +307,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setMyVessels(resolvedMyVessels);
     setUserType(resolvedUserType);
     const hydratedRankChanged = setActiveRank(resolvedUser?.rank_name ?? null);
+    // Audit Phase 0 — forward the authenticated identity to PMS on every API call.
+    setActiveIdentity(toActiveIdentity(resolvedUser));
     if (hydratedRankChanged) {
       invalidateRankScopedQueries();
     }
@@ -377,6 +394,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setMyVessels(loginMyVessels);
 
     const rankChanged = setActiveRank(sanitizedUser.rank_name ?? null);
+    // Audit Phase 0 — forward the authenticated identity to PMS on every API call.
+    setActiveIdentity(toActiveIdentity(sanitizedUser));
     if (rankChanged) {
       invalidateRankScopedQueries();
     }
@@ -402,6 +421,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUserType(null);
     setMyVessels([]);
     const rankChanged = setActiveRank(null);
+    // Audit Phase 0 — clear the forwarded identity on logout.
+    setActiveIdentity(null);
     if (rankChanged) {
       invalidateRankScopedQueries();
     }
