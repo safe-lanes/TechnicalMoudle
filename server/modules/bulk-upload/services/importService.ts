@@ -19,7 +19,7 @@ import { createRecordSnapshot } from './undoService';
 import { saveImportHistory } from '../../../services/fileBasedImportHistory';
 import { applyAssignmentSync } from '../../work-orders/services/workOrderService';
 import * as woRepo from '../../work-orders/repositories/workOrderRepository';
-import { logFieldChangesBatch } from '../../sync';
+import { logFieldChangesBatch, logFieldChanges } from '../../sync';
 
 
 export interface SpareInventoryResult {
@@ -1333,6 +1333,13 @@ export async function performImport(
           if (!existingWorkOrder) {
             const newWorkOrder = await createWorkOrderFromRow(row, templateCode, vesselId);
             workOrdersByTemplateCode.set(templateCode, newWorkOrder);
+            // Field-log the full-row CREATE so a bulk-imported WO syncs (the 'updated' branch logs
+            // via logFieldChangesBatch; CREATE previously logged nothing). Direct logFieldChanges —
+            // the batch is UPDATE-only. `id` omitted: receiver assigns its own, keyed on wouuid.
+            try {
+              const { id: _localId, ...woForLog } = newWorkOrder as any;
+              await logFieldChanges('work_orders', newWorkOrder.wouuid, newWorkOrder.vesselId || null, null, woForLog, 'auto-generation');
+            } catch (logErr) { console.error('[BulkImport] WO create field-log:', logErr); }
             result.created++;
             result.rowResults.push({ rowNumber: _woRowNum, primaryIdentifier: templateCode, action: 'created' });
             woSequenceMap.set(componentYearKey, sequence + 1);
@@ -1377,6 +1384,13 @@ export async function performImport(
           } else {
             const newWorkOrder = await createWorkOrderFromRow(row, templateCode, vesselId);
             workOrdersByTemplateCode.set(templateCode, newWorkOrder);
+            // Field-log the full-row CREATE so a bulk-imported WO syncs (the 'updated' branch logs
+            // via logFieldChangesBatch; CREATE previously logged nothing). Direct logFieldChanges —
+            // the batch is UPDATE-only. `id` omitted: receiver assigns its own, keyed on wouuid.
+            try {
+              const { id: _localId, ...woForLog } = newWorkOrder as any;
+              await logFieldChanges('work_orders', newWorkOrder.wouuid, newWorkOrder.vesselId || null, null, woForLog, 'auto-generation');
+            } catch (logErr) { console.error('[BulkImport] WO create field-log:', logErr); }
             result.created++;
             result.rowResults.push({ rowNumber: _woRowNum, primaryIdentifier: templateCode, action: 'created' });
             woSequenceMap.set(componentYearKey, sequence + 1);
@@ -1561,6 +1575,12 @@ export async function performImport(
           }
           savedWO = await storage.createWorkOrder(woPayload);
           woByNumber.set(woNumber, savedWO);
+          // Field-log the full-row CREATE so this bulk-imported WO syncs (direct logFieldChanges;
+          // batch is UPDATE-only). `id` omitted — receiver assigns its own, keyed on wouuid.
+          try {
+            const { id: _localId, ...woForLog } = savedWO as any;
+            await logFieldChanges('work_orders', savedWO.wouuid, savedWO.vesselId || null, null, woForLog, 'auto-generation');
+          } catch (logErr) { console.error('[BulkImport] WO create field-log:', logErr); }
           result.created++;
           result.rowResults.push({ rowNumber: _rowNum, primaryIdentifier: woNumber, action: 'created' });
         } else {

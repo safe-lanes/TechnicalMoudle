@@ -730,7 +730,6 @@ export interface IStorage {
   
   // On-Demand Work Order Generation (Rule #4)
   // activeComponentCode: optional override for multi-linked jobs to bind WO to specific component context
-  generateOnDemandWorkOrder(jobId: string, reason: 'Planning' | 'Breakdown' | 'Other', activeComponentCode?: string): Promise<WorkOrder>;
   
   // Postponed WO Reappearance (Rule #5)
   checkAndRevertPostponedWorkOrders(vesselId?: string): Promise<{

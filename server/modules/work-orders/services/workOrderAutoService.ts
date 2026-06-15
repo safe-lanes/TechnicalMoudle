@@ -113,6 +113,14 @@ export async function autoGenerate(vesselId: string) {
 
         await applyAssignmentSync(workOrderData);
         const createdWO = await repo.create(workOrderData);
+        // Field-log the full-row creation so this WO syncs ship<->shore (mirrors the legacy
+        // createWorkOrder fix 909310771). `id` is intentionally omitted from the log — it is a
+        // local PK; the receiver assigns its own, keyed on wouuid (see applyFieldLogInserts).
+        try {
+          const { logFieldChanges } = await import('../../sync');
+          const { id: _localId, ...woForLog } = createdWO as any;
+          await logFieldChanges('work_orders', createdWO.wouuid, createdWO.vesselId || null, null, woForLog, 'auto-generation');
+        } catch (logErr) { console.error('[FieldLogger] autoGenerate WO insert:', logErr); }
         results.generated++;
         results.workOrders.push(createdWO);
 
@@ -186,6 +194,14 @@ export async function autoGenerate(vesselId: string) {
 
         await applyAssignmentSync(workOrderData);
         const createdWO = await repo.create(workOrderData);
+        // Field-log the full-row creation so this WO syncs ship<->shore (mirrors the legacy
+        // createWorkOrder fix 909310771). `id` is intentionally omitted from the log — it is a
+        // local PK; the receiver assigns its own, keyed on wouuid (see applyFieldLogInserts).
+        try {
+          const { logFieldChanges } = await import('../../sync');
+          const { id: _localId, ...woForLog } = createdWO as any;
+          await logFieldChanges('work_orders', createdWO.wouuid, createdWO.vesselId || null, null, woForLog, 'auto-generation');
+        } catch (logErr) { console.error('[FieldLogger] autoGenerate WO insert:', logErr); }
         results.generated++;
         results.workOrders.push(createdWO);
 

@@ -234,7 +234,19 @@ export async function receivePushData(
         fieldLogsApplied += insertResult.insertedRows;
         fieldLogApplyErrors += insertResult.errors.length;
         if (insertResult.errors.length > 0) {
+          // VISIBLE ALERT: a dropped INSERT means an incoming row could NOT be applied and is now
+          // MISSING on this instance (the historical silent-drop that orphaned WOs / notifications).
+          // Surface it unmistakably — both in the server log and the sync diag — and it is already
+          // counted in fieldLogApplyErrors, which flows to the RECEIVE-PUSH DONE summary so a non-zero
+          // 'errors' count is never invisible. (Follow-up: also raise a Conflict-Review UI entry.)
           insertResult.errors.forEach(e => console.error(`[Sync Push] INSERT error: ${e}`));
+          console.error(
+            `[Sync Push] ⚠️ DROPPED-ROW ALERT: ${insertResult.errors.length} incoming INSERT(s) could ` +
+            `NOT be applied and are MISSING on this instance (batch=${batchUuid}). Rows: ${insertResult.errors.join(' | ')}`
+          );
+          syncDiag(
+            `RECEIVE-PUSH ⚠️ DROPPED-ROW ALERT: ${insertResult.errors.length} insert(s) dropped, batch=${batchUuid} — ${insertResult.errors.join(' | ')}`
+          );
         }
 
         // ── Detect whether cert/survey data tables were touched in this batch ──
