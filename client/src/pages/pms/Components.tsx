@@ -861,7 +861,12 @@ const JobRow: React.FC<{
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate work order');
+        if (errorData.blockingWorkOrder) {
+          const err: any = new Error('PLANNED_WO_EXISTS');
+          err.isPlannedWOBlock = true;
+          throw err;
+        }
+        throw new Error(errorData.message || errorData.error || 'Failed to generate work order');
       }
       
       return response.json();
@@ -879,11 +884,19 @@ const JobRow: React.FC<{
       setShowReasonDialog(false);
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to generate work order",
-        variant: "destructive"
-      });
+      if (error.isPlannedWOBlock) {
+        toast({
+          title: "A planned Work Order already exists for this maintenance job.",
+          description: "Please complete the existing planned Work Order from the WO section before proceeding.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to generate work order",
+          variant: "destructive"
+        });
+      }
       setShowReasonDialog(false);
     }
   });
@@ -2302,7 +2315,7 @@ const Components: React.FC = () => {
   const { isChangeMode, changeRequestTitle, changeRequestCategory, setOriginalSnapshot, collectDiff, getDiffs, reset } = useChangeMode();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const { vesselId, setVesselId } = useVessel();
+  const { vesselId, setVesselId, pickerVessels, myVesselsEmpty } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isVessel, isHeadOfDept, isExternal } = useUIRole();
   const { canCreate: canCreatePerm, canEdit: canEditPerm, canDelete: canDeletePerm } = usePermissions();
@@ -3283,6 +3296,8 @@ const Components: React.FC = () => {
     });
   };
 
+  const isClassItem = selectedComponent?.classItem === true || selectedComponent?.classItem === "Yes";
+
   const formSections = [
     { id: "A", title: "Component Information", marker: "B7.A" },
     { id: "B", title: "Running Hours & Condition Monitoring", marker: "B7.B" },
@@ -3290,7 +3305,7 @@ const Components: React.FC = () => {
     { id: "D", title: "Maintenance History", marker: "B7.D" },
     { id: "E", title: "Spares", marker: "B7.E.1" },
     { id: "F", title: "Drawings & Manuals", marker: "B7.F" },
-    { id: "G", title: "Classification & Regulatory Data", marker: "B7.G" },
+    ...(isClassItem ? [{ id: "G", title: "Classification & Regulatory Data", marker: "B7.G" }] : []),
     { id: "H", title: "Requisitions", marker: "B7.H" }
   ];
 
@@ -3547,11 +3562,17 @@ const Components: React.FC = () => {
                 <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>
               <SelectContent>
-                {vessels.map(vessel => (
-                  <SelectItem key={vessel.id} value={vessel.id}>
-                    {vessel.name}
-                  </SelectItem>
-                ))}
+                {myVesselsEmpty ? (
+                  <div className="px-2 py-1.5 text-sm text-gray-500" data-testid="select-no-assigned-vessels">
+                    No assigned vessels
+                  </div>
+                ) : (
+                  pickerVessels.map(vessel => (
+                    <SelectItem key={vessel.id} value={vessel.id}>
+                      {vessel.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
