@@ -165,6 +165,7 @@ export const runningHoursAudit = pgTable("running_hours_audit", {
   dateUpdatedTZ: text("date_updated_tz").notNull(), // e.g., Asia/Kolkata
   enteredAtUTC: timestamp("entered_at_utc").notNull(),
   userId: text("user_id").notNull(),
+  actorLabel: text("actor_label"), // Audit Phase 0: frozen human actor (Office: name, Ship: rank) at write time
   source: text("source").notNull(), // 'single' | 'bulk' | 'cascade' | 'inherited_cascade'
   notes: text("notes"),
   meterReplaced: boolean("meter_replaced").notNull().default(false),
@@ -4068,6 +4069,7 @@ export const syncFieldLog = pgTable("sync_field_log", {
   vesselId: text("vessel_id"),
   changedAt: timestamp("changed_at").defaultNow().notNull(),
   changedByUserId: text("changed_by_user_id"),
+  changedByDisplay: text("changed_by_display"), // Audit Phase 0: frozen human actor (Office: name, Ship: rank) at write time
   instanceId: text("instance_id").notNull(),
   syncBatchId: text("sync_batch_id"),
   isSynced: boolean("is_synced").default(false).notNull(),
