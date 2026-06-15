@@ -170,9 +170,9 @@ export async function logFieldChanges(
   // This avoids modifying 65+ callers that hardcode 'system' — the middleware captures the
   // real authenticated user automatically for any call originating from an HTTP request.
   const PLACEHOLDER_USER_IDS = new Set(['system', 'admin', 'System', '']);
+  const ctx = getRequestContext();
   let resolvedUserId = userId;
   if (!resolvedUserId || PLACEHOLDER_USER_IDS.has(resolvedUserId)) {
-    const ctx = getRequestContext();
     if (ctx?.userId) {
       resolvedUserId = ctx.userId;
     } else if (!resolvedUserId) {
@@ -182,6 +182,13 @@ export async function logFieldChanges(
     // If resolvedUserId is still a placeholder (e.g. 'system') but no request context found,
     // keep the original value — this happens for cron jobs, sync engine, startup tasks.
   }
+
+  // Audit Phase 0 — frozen human-readable actor (sync_field_log.changed_by_display).
+  // Keep the label consistent with the resolved id source: when the id came from the request
+  // actor use its frozen label (Office name / Ship rank); for explicit machine tokens
+  // ('auto-generation', 'system', cron/sync writers) the token IS the label.
+  const resolvedDisplay =
+    ctx?.actor && ctx.userId === resolvedUserId ? ctx.actor.actorLabel : (resolvedUserId || 'system');
 
   if (oldRow === null && newRow !== null) {
     // === INSERT — log all non-skip fields with old=null ===
@@ -199,6 +206,7 @@ export async function logFieldChanges(
           vesselId,
           changedAt,
           changedByUserId: resolvedUserId,
+          changedByDisplay: resolvedDisplay,
           instanceId,
           isSynced: false,
         });
@@ -233,6 +241,7 @@ export async function logFieldChanges(
           vesselId,
           changedAt,
           changedByUserId: resolvedUserId,
+          changedByDisplay: resolvedDisplay,
           instanceId,
           isSynced: false,
         });
@@ -300,6 +309,7 @@ export async function logFieldChangesBatch(
     vesselId: string | null;
     changedAt: Date;
     changedByUserId: string;
+    changedByDisplay: string;
     instanceId: string;
     isSynced: boolean;
   }> = [];
@@ -326,6 +336,9 @@ export async function logFieldChangesBatch(
         resolvedUserId = 'system';
       }
     }
+    // Audit Phase 0 — frozen display label, consistent with the resolved id source.
+    const resolvedDisplay =
+      ctx?.actor && ctx.userId === resolvedUserId ? ctx.actor.actorLabel : (resolvedUserId || 'system');
 
     // Compute changed fields (UPDATE mode — both oldRow and newRow present)
     const allKeys = Array.from(new Set([...Object.keys(entry.oldRow), ...Object.keys(entry.newRow)]));
@@ -347,6 +360,7 @@ export async function logFieldChangesBatch(
         vesselId: entry.vesselId,
         changedAt,
         changedByUserId: resolvedUserId,
+        changedByDisplay: resolvedDisplay,
         instanceId,
         isSynced: false,
       });

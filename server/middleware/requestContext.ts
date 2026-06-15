@@ -18,12 +18,15 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Request, Response, NextFunction } from 'express';
+import { resolveAuditActor, SYSTEM_ACTOR, type AuditActor } from './auditActor';
 
 export interface RequestContext {
-  /** users.id as string — the canonical user identifier for sync_field_log */
+  /** Canonical actor id (userUuid for real users) — stamped on sync_field_log.changed_by_user_id */
   userId: string;
-  /** Display name for logging/diagnostics */
+  /** Frozen human-readable actor label (Office: name, Ship: rank) — for logging + display columns */
   fullName: string;
+  /** Full frozen actor for audit writers (field logger, RH audit, createAuditLog). */
+  actor: AuditActor;
 }
 
 const asyncLocalStorage = new AsyncLocalStorage<RequestContext>();
@@ -38,15 +41,25 @@ export function requestContextMiddleware(req: Request, _res: Response, next: Nex
   const user = (req as any).user;
 
   if (user && user.id != null) {
+    const actor = resolveAuditActor(user);
     const ctx: RequestContext = {
-      userId: String(user.id),
-      fullName: user.fullName || user.username || `User ${user.id}`,
+      userId: actor.actorId,
+      fullName: actor.actorLabel,
+      actor,
     };
     asyncLocalStorage.run(ctx, () => next());
   } else {
     // No authenticated user (shouldn't happen behind auth middleware, but safe fallback)
     next();
   }
+}
+
+/**
+ * Get the frozen audit actor for the current request.
+ * Returns SYSTEM_ACTOR when called outside a request (cron jobs, startup, background writes).
+ */
+export function getAuditActor(): AuditActor {
+  return asyncLocalStorage.getStore()?.actor ?? SYSTEM_ACTOR;
 }
 
 /**

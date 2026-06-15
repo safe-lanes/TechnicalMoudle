@@ -208,6 +208,7 @@ import {
   type AdmRoleMenuAccess,
 } from '@shared/schema';
 import { logFieldChanges, logSoftDelete, FileSyncProcessor } from './modules/sync';
+import { getAuditActor } from './middleware/requestContext';
 
 /**
  * PostgreSQL Storage Implementation
@@ -1520,6 +1521,7 @@ export class PostgresStorage {
         dateUpdatedTZ: 'UTC',
         enteredAtUTC: now,
         userId: params.userId,
+        actorLabel: getAuditActor().actorLabel, // Audit Phase 0: frozen human actor at write time
         updatedByUuid: params.userUuid || null,
         source: params.updateSource.toLowerCase(),
         notes: params.comments || null,
@@ -1920,7 +1922,9 @@ export class PostgresStorage {
 
   async createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit> {
     const db = await getDb();
-    const result = await db.insert(runningHoursAudit).values(audit).returning();
+    // Audit Phase 0: freeze the human actor label unless the caller already supplied one.
+    const auditWithActor = { ...audit, actorLabel: audit.actorLabel ?? getAuditActor().actorLabel };
+    const result = await db.insert(runningHoursAudit).values(auditWithActor).returning();
     // Sync field logging — INSERT
     try { await logFieldChanges('running_hours_audit', result[0].rhauuid, (result[0] as any).vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] rha create:', e); }
     return result[0];
@@ -6263,8 +6267,34 @@ export class PostgresStorage {
 
   async createAuditLog(data: InsertAuditLog): Promise<AuditLog> {
     const db = await getDb();
+
+    // Audit Phase 0 — identity threading. Stamp the real request actor and FREEZE the
+    // human-readable identity into payload so it survives crew changes (never resolved live).
+    // - userId: keep the caller's explicit id when meaningful; fill placeholders from the
+    //   request actor's canonical id (userUuid). audit_log.userId semantics = "who acted".
+    // - payload: merge actorLabel/type/email/role unless the caller already set them.
+    const actor = getAuditActor();
+    const PLACEHOLDER_AUDIT_USER_IDS = new Set(['system', 'admin', 'System', '']);
+    const callerUserId = data.userId == null ? '' : String(data.userId);
+    const resolvedUserId =
+      callerUserId && !PLACEHOLDER_AUDIT_USER_IDS.has(callerUserId) ? callerUserId : actor.actorId;
+
+    const basePayload =
+      data.payload && typeof data.payload === 'object' && !Array.isArray(data.payload)
+        ? (data.payload as Record<string, any>)
+        : data.payload != null
+        ? { value: data.payload }
+        : {};
+    const frozenPayload: Record<string, any> = {
+      ...basePayload,
+      actorLabel: basePayload.actorLabel ?? actor.actorLabel,
+      actorType: basePayload.actorType ?? actor.actorType,
+      actorEmail: basePayload.actorEmail ?? actor.actorEmail,
+      actorRole: basePayload.actorRole ?? actor.actorRole,
+    };
+
     const result = await db.insert(auditLog).values({
-      userId: data.userId,
+      userId: resolvedUserId,
       vesselCode: data.vesselCode ?? null,
       componentCode: data.componentCode ?? null,
       entityType: data.entityType,
@@ -6274,7 +6304,7 @@ export class PostgresStorage {
       oldValue: data.oldValue ?? null,
       newValue: data.newValue ?? null,
       source: data.source,
-      payload: data.payload ?? null,
+      payload: frozenPayload,
     }).returning();
     return result[0];
   }
@@ -6992,6 +7022,7 @@ export class PostgresStorage {
         dateUpdatedTZ: 'UTC',
         enteredAtUTC: now,
         userId: userId || 'system',
+        actorLabel: getAuditActor().actorLabel, // Audit Phase 0: frozen human actor at write time
         updatedByUuid: userUuid || null,
         source: 'cascade',
         notes: meterReplaced
@@ -7077,6 +7108,7 @@ export class PostgresStorage {
             dateUpdatedTZ: 'UTC',
             enteredAtUTC: now,
             userId: userId || 'system',
+            actorLabel: getAuditActor().actorLabel, // Audit Phase 0: frozen human actor at write time
             updatedByUuid: userUuid || null,
             source: 'inherited_cascade',
             comments: `Inherited delta ${inheritedDelta} from MASTER ${parentResult[0]?.componentCode || parentResult[0]?.name}`,
@@ -7124,6 +7156,7 @@ export class PostgresStorage {
           dateUpdatedTZ: 'UTC',
           enteredAtUTC: now,
           userId: userId || 'system',
+          actorLabel: getAuditActor().actorLabel, // Audit Phase 0: frozen human actor at write time
           updatedByUuid: userUuid || null,
           source: 'cascade',
           comments: comments,
