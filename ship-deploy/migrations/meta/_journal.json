@@ -1,0 +1,447 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1768562738288,
+      "tag": "0000_overrated_natasha_romanoff",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1769493198235,
+      "tag": "0001_auto_2026-01-27T05-53-16",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769589252974,
+      "tag": "0002_auto_2026-01-28T08-34-11",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1769598084685,
+      "tag": "0003_auto_2026-01-28T11-01-23",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1769598984255,
+      "tag": "0004_auto_2026-01-28T11-16-23",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1769599816477,
+      "tag": "0005_auto_2026-01-28T11-30-15",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1769689791896,
+      "tag": "0006_auto_2026-01-29T12-29-50",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1770115247757,
+      "tag": "0007_auto_2026-02-03T10-40-46",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1770273632806,
+      "tag": "0008_open_scarlet_witch",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1770274551462,
+      "tag": "0009_auto_2026-02-05T06-55-50",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1770285618407,
+      "tag": "0010_auto_2026-02-05T10-00-16",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1770288369889,
+      "tag": "0011_auto_2026-02-05T10-46-06",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1770378455947,
+      "tag": "0012_auto_2026-02-06T11-47-34",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1770612338223,
+      "tag": "0013_drop_fleet_equipment_master",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1770613948883,
+      "tag": "0014_steady_lockheed",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1770629010654,
+      "tag": "0015_auto_2026-02-09T09-23-26",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1770642565037,
+      "tag": "0016_auto_2026-02-09T13-09-23",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1770699265441,
+      "tag": "0017_faulty_doctor_doom",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1770700400172,
+      "tag": "0018_auto_2026-02-10T05-13-16",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1770890955798,
+      "tag": "0019_auto_2026-02-12T10-09-11",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1771783059816,
+      "tag": "0020_auto_2026-02-22T17-57-32",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1771813641708,
+      "tag": "0021_auto_2026-02-23T02-26-57",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1771815974519,
+      "tag": "0022_auto_2026-02-23T03-06-06",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1771816548487,
+      "tag": "0023_auto_2026-02-23T03-15-42",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1771816981342,
+      "tag": "0024_auto_2026-02-23T03-22-54",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1771819504710,
+      "tag": "0025_auto_2026-02-23T04-04-54",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1772448122285,
+      "tag": "0026_medical_turbo",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1772518330521,
+      "tag": "0027_auto_2026-03-03T06-12-08",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1772775119641,
+      "tag": "0028_giant_stature",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1775041144663,
+      "tag": "0029_faulty_whizzer",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1775042019071,
+      "tag": "0030_auto_2026-04-01T11-13-37",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1775045733350,
+      "tag": "0031_auto_2026-04-01T12-15-30",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1775049222494,
+      "tag": "0032_auto_2026-04-01T13-13-41",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1775058737732,
+      "tag": "0033_auto_2026-04-01T15-52-15",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1775105461033,
+      "tag": "0034_auto_2026-04-02T04-50-59",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1775130684658,
+      "tag": "0035_auto_2026-04-02T11-51-23",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1775131460035,
+      "tag": "0036_auto_2026-04-02T12-04-18",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1775131620152,
+      "tag": "0037_auto_2026-04-02T12-06-58",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1775146102605,
+      "tag": "0038_auto_2026-04-02T16-08-21",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1775453164958,
+      "tag": "0039_auto_2026-04-06T05-26-03",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1775453176346,
+      "tag": "0040_add_postponement_remarks",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1775459786468,
+      "tag": "0041_auto_2026-04-06T07-16-24",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1775542207850,
+      "tag": "0042_auto_2026-04-07T06-10-04",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1775566797421,
+      "tag": "0043_auto_2026-04-07T12-59-55",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1775570930059,
+      "tag": "0044_auto_2026-04-07T14-08-44",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1775823700659,
+      "tag": "0045_auto_2026-04-10T12-21-39",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1776080625345,
+      "tag": "0046_fine_mandroid",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1776082051041,
+      "tag": "0047_lowly_maginty",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1776151768701,
+      "tag": "0048_dark_harpoon",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1776765502217,
+      "tag": "0049_simple_whirlwind",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1776765884317,
+      "tag": "0050_jazzy_doctor_spectrum",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1776771470589,
+      "tag": "0051_eager_ravenous",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1776772153627,
+      "tag": "0052_bright_slayback",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1776826569339,
+      "tag": "0053_open_vulcan",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1776828811968,
+      "tag": "0054_careless_wendell_rand",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1776935993251,
+      "tag": "0055_remarkable_unicorn",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1777009596522,
+      "tag": "0056_flashy_chameleon",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1777119877173,
+      "tag": "0057_open_vampiro",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1780305351291,
+      "tag": "0058_useful_hiroim",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1780306356360,
+      "tag": "0059_redundant_ben_urich",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1780315301625,
+      "tag": "0060_cold_blindfold",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1780468412811,
+      "tag": "0061_real_madrox",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1780484810966,
+      "tag": "0062_rapid_goliath",
+      "breakpoints": true
+    }
+  ]
+}

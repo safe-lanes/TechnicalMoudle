@@ -1,0 +1,1 @@
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_fleet_comp_vessel_component') THEN ALTER TABLE "fleet_component_mapping" ADD CONSTRAINT "unique_fleet_comp_vessel_component" UNIQUE("fleet_equipment_code","vessel_code","component_code"); END IF; END $$;
