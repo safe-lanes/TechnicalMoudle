@@ -1769,7 +1769,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                 </div>
 
                 {/* G. Classification & Regulatory Data */}
-                <div>
+                {(componentData.classItem === "Yes" || componentData.classItem === true) && <div>
                   <Collapsible open={!collapsedSections.G} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, G: !open }))}>
                     <CollapsibleTrigger className="w-full">
                       <div className="flex items-center gap-2 mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
@@ -1870,7 +1870,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       </DeletableField>
                     </div>
                   )}
-                </div>
+                </div>}
 
                 {/* H. Requisitions */}
                 <div>

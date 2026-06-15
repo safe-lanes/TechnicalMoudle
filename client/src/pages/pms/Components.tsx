@@ -3296,6 +3296,8 @@ const Components: React.FC = () => {
     });
   };
 
+  const isClassItem = selectedComponent?.classItem === true || selectedComponent?.classItem === "Yes";
+
   const formSections = [
     { id: "A", title: "Component Information", marker: "B7.A" },
     { id: "B", title: "Running Hours & Condition Monitoring", marker: "B7.B" },
@@ -3303,7 +3305,7 @@ const Components: React.FC = () => {
     { id: "D", title: "Maintenance History", marker: "B7.D" },
     { id: "E", title: "Spares", marker: "B7.E.1" },
     { id: "F", title: "Drawings & Manuals", marker: "B7.F" },
-    { id: "G", title: "Classification & Regulatory Data", marker: "B7.G" },
+    ...(isClassItem ? [{ id: "G", title: "Classification & Regulatory Data", marker: "B7.G" }] : []),
     { id: "H", title: "Requisitions", marker: "B7.H" }
   ];
 

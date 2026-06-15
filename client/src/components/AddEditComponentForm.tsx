@@ -743,7 +743,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     { id: "D", title: "Maintenance History" },
     { id: "E", title: "Spares" },
     { id: "F", title: "Drawings & Manuals" },
-    { id: "G", title: "Classification & Regulatory Data" },
+    ...(componentData.classItem === "Yes" ? [{ id: "G", title: "Classification & Regulatory Data" }] : []),
     { id: "H", title: "Requisitions" }
   ];
 
