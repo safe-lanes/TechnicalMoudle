@@ -7,6 +7,49 @@ import { db } from '../../../db';
 
 const ALLOWED_DEPARTMENTS = ['Engine', 'Deck', 'Electrical', 'Galley', 'LSA', 'FFA'];
 
+// Audit Phase 1 — equipment/component register audit (entity_type='component').
+// Register fields whose changes we record as old→new. Excludes RH counter fields
+// (that is the running_hours_audit stream) and bookkeeping columns.
+const AUDIT_TRACKED_FIELDS = [
+  'name', 'componentCode', 'critical', 'isActive', 'parentId', 'parentComponent',
+  'componentCategory', 'category', 'eqptSystemDept', 'maker', 'makerCode', 'location',
+] as const;
+
+/** Build an old→new diff over the tracked register fields. Returns {} when nothing tracked changed. */
+function buildComponentChangedFields(oldRow: any, newRow: any): Record<string, { old: any; new: any }> {
+  const changed: Record<string, { old: any; new: any }> = {};
+  for (const f of AUDIT_TRACKED_FIELDS) {
+    if (newRow == null || !(f in newRow)) continue;
+    const oldVal = oldRow?.[f] ?? null;
+    const newVal = newRow[f] ?? null;
+    if (oldVal !== newVal) changed[f] = { old: oldVal, new: newVal };
+  }
+  return changed;
+}
+
+/** Best-effort register audit — never blocks or fails the mutation. Actor is frozen by Phase 0 createAuditLog. */
+async function auditComponent(params: {
+  actionType: string;
+  component: any;
+  source?: string;
+  payload?: Record<string, any>;
+}): Promise<void> {
+  try {
+    const c = params.component || {};
+    await repo.createAuditLog({
+      entityType: 'component',
+      entityId: c.cuuid || c.id || null,
+      actionType: params.actionType,
+      source: params.source || 'web_ui',
+      vesselCode: c.vesselId ?? null,
+      componentCode: c.componentCode ?? null,
+      payload: params.payload ?? {},
+    });
+  } catch (auditErr) {
+    console.error(`[Audit] component ${params.actionType} log failed:`, auditErr);
+  }
+}
+
 async function getActiveComponentCategories(): Promise<string[]> {
   const items = await db.select({ listValue: masterLists.listValue })
     .from(masterLists)
@@ -148,6 +191,20 @@ export async function create(data: any): Promise<Component> {
     parentId: component.parentId,
     vesselId: component.vesselId
   });
+  // Audit Phase 1 — register create.
+  await auditComponent({
+    actionType: 'create',
+    component,
+    payload: {
+      componentCode: component.componentCode,
+      name: component.name,
+      critical: component.critical,
+      parentId: component.parentId,
+      eqptSystemDept: (component as any).eqptSystemDept,
+      componentCategory: (component as any).componentCategory ?? (component as any).category,
+      isActive: component.isActive,
+    },
+  });
   return component;
 }
 
@@ -287,6 +344,20 @@ export async function update(id: string, data: any, userId: string): Promise<Com
   }
 
   console.log(`✅ Updated component:`, component.componentCode, '| vesselId:', component.vesselId, '| parentId:', component.parentId);
+
+  // Audit Phase 1 — register edit. isActive transition → activate/deactivate; otherwise → update.
+  const changedFields = buildComponentChangedFields(existingComponent, component);
+  if (Object.keys(changedFields).length > 0) {
+    const isActiveChange = changedFields.isActive;
+    const actionType = isActiveChange
+      ? (isActiveChange.new === true ? 'activate' : 'deactivate')
+      : 'update';
+    await auditComponent({
+      actionType,
+      component,
+      payload: { componentCode: component.componentCode, changedFields },
+    });
+  }
   return component;
 }
 
@@ -314,5 +385,15 @@ export async function remove(id: string): Promise<void> {
 }
 
 export async function inactivate(id: string, vesselId: string, userId: string) {
-  return repo.inactivate(id, vesselId, userId);
+  const result = await repo.inactivate(id, vesselId, userId);
+  // Audit Phase 1 — deactivate (the user-facing "Delete" in the register). Only on success.
+  if ((result as any)?.success) {
+    const comp = await repo.findById(id).catch(() => undefined);
+    await auditComponent({
+      actionType: 'deactivate',
+      component: comp ?? { cuuid: id, vesselId },
+      payload: { componentCode: (comp as any)?.componentCode, isActive: { old: true, new: false } },
+    });
+  }
+  return result;
 }

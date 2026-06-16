@@ -1464,22 +1464,40 @@ export async function undoImport(req: Request, res: Response) {
 
         // Apply undo operation
         if (log.entityType === 'component') {
+          // Audit Phase 1 — bulk undo of component register changes (source='bulk_import').
+          const cs: any = currentState || {};
+          const auditUndo = async (actionType: string, payload: Record<string, any>) => {
+            try {
+              await storage.createAuditLog({
+                entityType: 'component',
+                entityId: log.entityId,
+                actionType,
+                source: 'bulk_import',
+                vesselCode: cs.vesselId ?? null,
+                componentCode: cs.componentCode ?? null,
+                payload: { via: 'undo', historyId, ...payload },
+              });
+            } catch (auditErr) { console.error('[Audit] bulk undo component log failed:', auditErr); }
+          };
           if (log.operation === 'created') {
             // Delete created component (archive it)
             await storage.archiveComponent(log.entityId);
             result.deleted++;
             console.log(`  ✓ Archived component ${log.entityId}`);
+            await auditUndo('deactivate', { isActive: { old: true, new: false }, undoOf: 'created' });
           } else if (log.operation === 'updated') {
             // Restore previous state
             const previousData = log.previousData as any;
             await storage.updateComponent(log.entityId, previousData);
             result.restored++;
             console.log(`  ✓ Restored component ${log.entityId}`);
+            await auditUndo('update', { undoOf: 'updated', restoredTo: log.previousData ?? null });
           } else if (log.operation === 'archived') {
             // Restore isActive:true
             await storage.updateComponent(log.entityId, { isActive: true });
             result.unarchived++;
             console.log(`  ✓ Unarchived component ${log.entityId}`);
+            await auditUndo('activate', { isActive: { old: false, new: true }, undoOf: 'archived' });
           }
         } else if (log.entityType === 'job') {
           if (log.operation === 'created') {
@@ -1566,6 +1584,26 @@ export async function undoImport(req: Request, res: Response) {
       console.log(`   - Deleted: ${result.deleted}`);
       console.log(`   - Restored: ${result.restored}`);
       console.log(`   - Unarchived: ${result.unarchived}`);
+
+      // Audit Phase 1 — one batch-summary row per undo event (action_type='bulk_undo').
+      try {
+        await storage.createAuditLog({
+          entityType: 'component',
+          entityId: historyId,
+          actionType: 'bulk_undo',
+          source: 'bulk_import',
+          vesselCode: null,
+          componentCode: null,
+          payload: {
+            historyId,
+            deleted: result.deleted,
+            restored: result.restored,
+            unarchived: result.unarchived,
+          },
+        });
+      } catch (auditErr) {
+        console.error('[Audit] bulk_undo summary log failed:', auditErr);
+      }
       
       res.json({
         message: 'Import successfully undone',

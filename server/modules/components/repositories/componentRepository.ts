@@ -85,6 +85,13 @@ export async function remove(id: string): Promise<void> {
   return storage.deleteComponent(id);
 }
 
+// Audit Phase 1 — thin passthrough so the service can record register-change audits
+// through the repository layer (mirrors the work-orders repo.createAuditLog pattern).
+// createAuditLog freezes the Phase 0 request-context actor internally.
+export async function createAuditLog(data: any): Promise<any> {
+  return storage.createAuditLog(data);
+}
+
 export async function inactivate(id: string, vesselId: string, userId: string) {
   return storage.inactivateComponent(id, vesselId, userId);
 }
@@ -219,18 +226,22 @@ export async function updateHierarchyAndSortOrder(
 ) {
   const { pool } = getPostgresClient();
   const client = await pool.connect();
+  // Audit Phase 1 — collect reparent moves to record AFTER commit (best-effort, never blocks the move).
+  const reparentAudits: Array<{ cuuid: string; componentCode: string; vesselId: string | null; oldParent: string | null; newParent: string }> = [];
   try {
     await client.query('BEGIN');
 
     for (const rp of reparents) {
       const componentResult = await client.query(
-        `SELECT component_code FROM components WHERE cuuid = $1`,
+        `SELECT component_code, parent_id, vessel_id FROM components WHERE cuuid = $1`,
         [rp.id]
       );
       if (componentResult.rows.length === 0) {
         throw new Error(`Component not found: ${rp.id}`);
       }
       const movingCode = componentResult.rows[0].component_code;
+      const oldParent = componentResult.rows[0].parent_id ?? null;
+      const movingVesselId = componentResult.rows[0].vessel_id ?? null;
 
       let checkParent = rp.newParentCode;
       const visited = new Set<string>();
@@ -254,6 +265,7 @@ export async function updateHierarchyAndSortOrder(
       if ((reparentResult.rowCount ?? 0) === 0) {
         throw new Error(`Reparent update matched 0 rows for component cuuid: ${rp.id}`);
       }
+      reparentAudits.push({ cuuid: rp.id, componentCode: movingCode, vesselId: movingVesselId, oldParent, newParent: rp.newParentCode });
     }
 
     for (const update of sortUpdates) {
@@ -264,6 +276,24 @@ export async function updateHierarchyAndSortOrder(
     }
 
     await client.query('COMMIT');
+
+    // Audit Phase 1 — record reparent moves after the move is committed (best-effort).
+    for (const a of reparentAudits) {
+      try {
+        await storage.createAuditLog({
+          entityType: 'component',
+          entityId: a.cuuid,
+          actionType: 'reparent',
+          source: 'web_ui',
+          vesselCode: a.vesselId,
+          componentCode: a.componentCode,
+          payload: { componentCode: a.componentCode, parentId: { old: a.oldParent, new: a.newParent } },
+        });
+      } catch (auditErr) {
+        console.error('[Audit] component reparent log failed:', auditErr);
+      }
+    }
+
     return { success: true, updated: sortUpdates.length, reparented: reparents.length };
   } catch (error) {
     await client.query('ROLLBACK');
