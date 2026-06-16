@@ -149,10 +149,13 @@ export default function ApprovalWorkflow() {
     return ids;
   }, [isSearching, normalizedQuery, activeModuleId]);
 
-  const isLeafVisible = (modId: string, fnName: string) => {
+  const isLeafVisible = (modId: string, subTitle: string, fnName: string) => {
     if (!isSearching) return true;
     if (modId !== activeModuleId) return false;
-    return fnName.toLowerCase().includes(normalizedQuery);
+    return (
+      fnName.toLowerCase().includes(normalizedQuery) ||
+      subTitle.toLowerCase().includes(normalizedQuery)
+    );
   };
 
   const isModuleExpanded = (id: string) => {
@@ -393,7 +396,7 @@ export default function ApprovalWorkflow() {
                             {subExpanded && (
                               <div>
                                 {sub.functions
-                                  .filter((fn) => isLeafVisible(mod.id, fn.name))
+                                  .filter((fn) => isLeafVisible(mod.id, sub.title, fn.name))
                                   .map((fn) => {
                                     const isSelected =
                                       selected?.functionId === fn.id &&
