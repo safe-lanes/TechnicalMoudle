@@ -1,8 +1,6 @@
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -11,7 +9,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 function computeInitials(
@@ -35,19 +32,12 @@ function computeInitials(
 }
 
 export function UserMenu() {
-  const { currentUser, domain, logout } = useAuth();
+  const { currentUser, domain } = useAuth();
 
   const fullName = currentUser?.fullName || currentUser?.username || "User";
   const role = currentUser?.role || "—";
   const domainName = domain || "—";
   const initials = computeInitials(currentUser?.fullName, currentUser?.username);
-
-  const handleLogout = () => {
-    // Client-side session teardown, then a full-page reload to "/" so the
-    // React Query cache, all contexts, and any host state reset cleanly.
-    logout();
-    window.location.assign("/");
-  };
 
   return (
     <DropdownMenu>
@@ -96,15 +86,6 @@ export function UserMenu() {
             {domainName}
           </span>
         </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="cursor-pointer text-red-600 focus:text-red-600"
-          onClick={handleLogout}
-          data-testid="menu-item-logout"
-        >
-          <LogOut className="h-4 w-4" />
-          <span>Logout</span>
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
