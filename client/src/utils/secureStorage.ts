@@ -6,6 +6,7 @@ export const LOCAL_STORAGE_KEYS = [
   "userType",
   "credentials",
   "Role_Access_Data",
+  "domain",
 ] as const;
 
 export type LocalStorageKey = (typeof LOCAL_STORAGE_KEYS)[number];

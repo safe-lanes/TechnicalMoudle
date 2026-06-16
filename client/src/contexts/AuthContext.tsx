@@ -44,6 +44,32 @@ function resolveProfileName(profile: Record<string, any>): {
   return { fullName, username, userUuid };
 }
 
+/**
+ * Read the standalone `domain` key from localStorage. It is stored separately
+ * from `userProfile` (NOT a field on it). Encrypted value is preferred; falls
+ * back to a plain string the same encrypted-first / plain-fallback way the rest
+ * of the auth hydration reads stored values. Returns null when absent/blank.
+ */
+function resolveDomain(): string | null {
+  const encrypted = secureGetItem<unknown>("domain");
+  if (typeof encrypted === "string" && encrypted.trim()) {
+    return encrypted.trim();
+  }
+  const plain = localStorage.getItem("domain");
+  if (plain) {
+    const trimmed = plain.trim();
+    if (trimmed) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (typeof parsed === "string" && parsed.trim()) return parsed.trim();
+      } catch {
+        return trimmed;
+      }
+    }
+  }
+  return null;
+}
+
 const DEFAULT_USER: PublicUser = {
   id: 1,
   username: "munawer.modak",
@@ -120,6 +146,9 @@ function normalizeMyVessels(
 interface AuthContextType {
   currentUser: PublicUser | null;
   myVessels: MyVesselAssignment[];
+  /** Organization/tenant code from the standalone encrypted `domain`
+   * localStorage key (NOT a field on userProfile). Null when absent. */
+  domain: string | null;
   isAuthenticated: boolean;
   hasRole: (role: UserRole | UserRole[]) => boolean;
   isShipUser: boolean;
@@ -155,6 +184,7 @@ function invalidateRankScopedQueries() {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<PublicUser | null>(null);
   const [myVessels, setMyVessels] = useState<MyVesselAssignment[]>([]);
+  const [domain, setDomain] = useState<string | null>(null);
   const [userType, setUserType] = useState<UIRole | null>(null);
 
   useEffect(() => {
@@ -290,6 +320,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setCurrentUser(resolvedUser);
     setMyVessels(resolvedMyVessels);
+    setDomain(resolveDomain());
     setUserType(resolvedUserType);
     const hydratedRankChanged = setActiveRank(resolvedUser?.rank_name ?? null);
     if (hydratedRankChanged) {
@@ -375,6 +406,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     }
     setMyVessels(loginMyVessels);
+    setDomain(resolveDomain());
 
     const rankChanged = setActiveRank(sanitizedUser.rank_name ?? null);
     if (rankChanged) {
@@ -409,6 +441,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setCurrentUser(null);
     setUserType(null);
     setMyVessels([]);
+    setDomain(null);
     const rankChanged = setActiveRank(null);
     if (rankChanged) {
       invalidateRankScopedQueries();
@@ -418,6 +451,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const value: AuthContextType = {
     currentUser,
     myVessels,
+    domain,
     isAuthenticated: !!currentUser,
     hasRole,
     isShipUser,

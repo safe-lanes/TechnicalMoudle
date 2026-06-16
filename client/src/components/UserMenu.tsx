@@ -35,10 +35,11 @@ function computeInitials(
 }
 
 export function UserMenu() {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, domain, logout } = useAuth();
 
   const fullName = currentUser?.fullName || currentUser?.username || "User";
   const role = currentUser?.role || "—";
+  const domainName = domain || "—";
   const initials = computeInitials(currentUser?.fullName, currentUser?.username);
 
   const handleLogout = () => {
@@ -86,9 +87,15 @@ export function UserMenu() {
             {role}
           </span>
         </div>
-        {/* TODO: add a "Domain Name : <tenant>" line here once a tenant slug is
-            exposed to the client. The app has no tenant value today — do not
-            invent one. */}
+        <div className="px-2 py-1.5 text-sm">
+          <span className="text-gray-500">Domain Name : </span>
+          <span
+            className="font-semibold text-gray-900"
+            data-testid="text-user-domain"
+          >
+            {domainName}
+          </span>
+        </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="cursor-pointer text-red-600 focus:text-red-600"
