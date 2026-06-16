@@ -4,10 +4,8 @@ import {
   Clock,
   Package,
   Store,
-  Biohazard,
   Settings2,
   AlertTriangle,
-  LifeBuoy,
   Shield,
   ChevronRight,
   ChevronDown,
@@ -18,8 +16,10 @@ import {
   Workflow,
   Bug,
   Search,
+  CheckCircle2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ApprovalFunctionNode {
   id: string;
@@ -37,6 +37,7 @@ interface ModuleNode {
   id: string;
   title: string;
   icon: React.ElementType;
+  twoLevel?: boolean;
   subModules: SubModuleNode[];
 }
 
@@ -47,109 +48,75 @@ const APPROVAL_MODULES: ModuleNode[] = [
     icon: Workflow,
     subModules: [
       {
-        id: "pms-maintenance",
-        title: "Maintenance & Work Orders",
-        icon: ClipboardList,
-        functions: [
-          { id: "wo-cancellation", name: "Work Order Cancellation" },
-          { id: "wo-postpone", name: "Postpone Work Order" },
-        ],
+        id: "pms-components",
+        title: "Components",
+        icon: Settings2,
+        functions: [{ id: "pms-components-cr", name: "Change Request" }],
       },
       {
-        id: "pms-running-hours",
-        title: "Running Hours & Condition",
-        icon: Clock,
-        functions: [
-          { id: "rh-threshold-approval", name: "Running Hours Threshold Approval" },
-          { id: "rh-reset-approval", name: "Running Hours Reset Approval" },
-        ],
+        id: "pms-jobs",
+        title: "Jobs",
+        icon: ClipboardList,
+        functions: [{ id: "pms-jobs-cr", name: "Change Request" }],
       },
       {
         id: "pms-spares",
-        title: "Inventory - Spares",
+        title: "Spares",
         icon: Package,
-        functions: [
-          { id: "spares-rob-adjustment", name: "ROB Adjustment Approval" },
-          { id: "spares-min-level-change", name: "Minimum Level Change Approval" },
-        ],
+        functions: [{ id: "pms-spares-cr", name: "Change Request" }],
       },
       {
         id: "pms-stores",
-        title: "Inventory - Stores/Lubes/Chemicals",
+        title: "Stores",
         icon: Store,
-        functions: [
-          { id: "stores-rob-adjustment", name: "ROB Adjustment Approval" },
-          { id: "stores-write-off", name: "Write-Off Approval" },
-        ],
+        functions: [{ id: "pms-stores-cr", name: "Change Request" }],
       },
       {
-        id: "pms-ihm",
-        title: "IHM (Inventory of Hazardous Materials)",
-        icon: Biohazard,
-        functions: [
-          { id: "ihm-item-addition", name: "IHM Item Addition Approval" },
-        ],
-      },
-      {
-        id: "pms-modify-pms",
-        title: "Modify PMS",
-        icon: Settings2,
-        functions: [
-          { id: "modify-pms-component", name: "Component Change Approval" },
-          { id: "modify-pms-job", name: "Job Change Approval" },
-        ],
-      },
-      {
-        id: "pms-critical-equipment",
-        title: "Critical Equipment",
-        icon: AlertTriangle,
-        functions: [
-          { id: "critical-flag-change", name: "Critical Flag Change Approval" },
-        ],
-      },
-      {
-        id: "pms-lsa-ffa",
-        title: "LSA/FFA Equipment",
-        icon: LifeBuoy,
-        functions: [
-          { id: "lsa-ffa-survey-extension", name: "Survey Extension Approval" },
-        ],
-      },
-      {
-        id: "pms-class-items",
-        title: "Class Items",
-        icon: Shield,
-        functions: [
-          { id: "class-item-postponement", name: "Class Item Postponement" },
-        ],
+        id: "pms-work-order",
+        title: "Work Order",
+        icon: Clock,
+        functions: [{ id: "pms-wo-postponement", name: "WO Postponement" }],
       },
     ],
   },
   {
-    id: "defect-reporting",
-    title: "Defect Reporting",
+    id: "defects",
+    title: "Defects",
     icon: Bug,
+    twoLevel: true,
     subModules: [
       {
-        id: "defect-lifecycle",
-        title: "Defect Lifecycle",
+        id: "defects-extension",
+        title: "Extension",
         icon: AlertTriangle,
-        functions: [
-          { id: "defect-closure", name: "Defect Closure Approval" },
-          { id: "defect-deferral", name: "Defect Deferral Approval" },
-        ],
+        functions: [{ id: "defects-extension", name: "Extension" }],
       },
       {
-        id: "defect-classification",
-        title: "Defect Classification",
+        id: "defects-closure",
+        title: "Closure",
         icon: Shield,
-        functions: [
-          { id: "defect-severity-change", name: "Severity Change Approval" },
-        ],
+        functions: [{ id: "defects-closure", name: "Closure" }],
+      },
+      {
+        id: "defects-verification",
+        title: "Verification",
+        icon: CheckCircle2,
+        functions: [{ id: "defects-verification", name: "Verification" }],
       },
     ],
   },
 ];
+
+const CONFIG_ROWS: Record<string, string[]> = {
+  "pms-components-cr":    ["Critical Equipment", "Normal Equipment"],
+  "pms-jobs-cr":          ["Critical Jobs", "Critical Equipment Jobs", "Normal Jobs"],
+  "pms-spares-cr":        ["Critical Spares", "Normal Spares"],
+  "pms-stores-cr":        ["Store Items"],
+  "pms-wo-postponement":  ["Critical WO", "Normal WO", "Critical Equipment WO"],
+  "defects-extension":    ["Critical Equipment Related", "COC Related", "Normal Defects"],
+  "defects-closure":      ["Critical Equipment Related", "COC Related", "Normal Defects"],
+  "defects-verification": ["Critical Equipment Related", "COC Related", "Normal Defects"],
+};
 
 interface SelectedLeaf {
   moduleId: string;
@@ -158,16 +125,13 @@ interface SelectedLeaf {
 }
 
 export default function ApprovalWorkflow() {
-  const [expandedModules, setExpandedModules] = useState<Set<string>>(
-    new Set(["pms"])
-  );
-  const [expandedSubModules, setExpandedSubModules] = useState<Set<string>>(
-    new Set()
-  );
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set(["pms"]));
+  const [expandedSubModules, setExpandedSubModules] = useState<Set<string>>(new Set());
   const [activeModuleId, setActiveModuleId] = useState<string>("pms");
   const [selected, setSelected] = useState<SelectedLeaf | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isEditMode, setIsEditMode] = useState(false);
+  const [checkboxState, setCheckboxState] = useState<Record<string, { level1: boolean; level2: boolean }>>({});
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const isSearching = normalizedQuery.length > 0;
@@ -178,9 +142,9 @@ export default function ApprovalWorkflow() {
     if (!activeMod) return new Set<string>();
     const ids = new Set<string>();
     for (const sub of activeMod.subModules) {
-      if (sub.functions.some((fn) => fn.name.toLowerCase().includes(normalizedQuery))) {
-        ids.add(sub.id);
-      }
+      const matchesSub = sub.title.toLowerCase().includes(normalizedQuery);
+      const matchesFn = sub.functions.some((fn) => fn.name.toLowerCase().includes(normalizedQuery));
+      if (matchesSub || matchesFn) ids.add(sub.id);
     }
     return ids;
   }, [isSearching, normalizedQuery, activeModuleId]);
@@ -195,6 +159,7 @@ export default function ApprovalWorkflow() {
     if (isSearching) return id === activeModuleId;
     return expandedModules.has(id);
   };
+
   const isSubModuleExpanded = (id: string) => {
     if (isSearching) return matchedSubModuleIds?.has(id) ?? false;
     return expandedSubModules.has(id);
@@ -233,9 +198,7 @@ export default function ApprovalWorkflow() {
 
   const expandAll = () => {
     setExpandedModules(new Set(APPROVAL_MODULES.map((m) => m.id)));
-    setExpandedSubModules(
-      new Set(APPROVAL_MODULES.flatMap((m) => m.subModules.map((s) => s.id)))
-    );
+    setExpandedSubModules(new Set(APPROVAL_MODULES.flatMap((m) => m.subModules.map((s) => s.id))));
   };
 
   const collapseAll = () => {
@@ -252,8 +215,25 @@ export default function ApprovalWorkflow() {
     return { module: mod, subModule: sub, fn };
   }, [selected]);
 
+  const toggleCheckbox = (leafId: string, rowLabel: string, level: "level1" | "level2") => {
+    const key = `${leafId}:${rowLabel}`;
+    setCheckboxState((prev) => ({
+      ...prev,
+      [key]: {
+        level1: prev[key]?.level1 ?? false,
+        level2: prev[key]?.level2 ?? false,
+        [level]: !(prev[key]?.[level] ?? false),
+      },
+    }));
+  };
+
+  const getCheckbox = (leafId: string, rowLabel: string, level: "level1" | "level2"): boolean => {
+    return checkboxState[`${leafId}:${rowLabel}`]?.[level] ?? false;
+  };
+
   return (
     <div className="flex flex-col" style={{ height: "calc(100vh - 120px)" }}>
+      {/* Title + Search */}
       <div className="flex-shrink-0 mb-4">
         <div className="flex items-center justify-between mb-3">
           <h1
@@ -263,7 +243,6 @@ export default function ApprovalWorkflow() {
             Approval Workflow
           </h1>
         </div>
-
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
@@ -277,13 +256,15 @@ export default function ApprovalWorkflow() {
       </div>
 
       <div className="flex flex-1 gap-0 overflow-hidden rounded-lg shadow-sm">
+        {/* ── LEFT PANEL ── */}
         <div
           className="flex-shrink-0 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-col rounded-l-lg"
           style={{ width: "320px" }}
           data-testid="approval-tree-panel"
         >
+          {/* Panel header */}
           <div className="flex-shrink-0 bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm flex items-center justify-between gap-2 rounded-tl-lg">
-            <div className="flex items-center gap-2">APPROVAL WORKFLOW</div>
+            <span>APPROVAL WORKFLOW</span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setIsEditMode((v) => !v)}
@@ -314,6 +295,7 @@ export default function ApprovalWorkflow() {
             </div>
           </div>
 
+          {/* Tree */}
           <div className="flex-1 overflow-y-auto">
             {isSearching && (matchedSubModuleIds?.size ?? 0) === 0 && (
               <div
@@ -323,16 +305,16 @@ export default function ApprovalWorkflow() {
                 No matching approval functions in this module.
               </div>
             )}
+
             {APPROVAL_MODULES.map((mod) => {
               if (isSearching && mod.id !== activeModuleId) return null;
               const ModIcon = mod.icon;
               const modExpanded = isModuleExpanded(mod.id);
-              const subModuleCount = mod.subModules.length;
+              const isTwoLevel = mod.twoLevel === true;
+
               return (
-                <div
-                  key={mod.id}
-                  data-testid={`tree-module-${mod.id}`}
-                >
+                <div key={mod.id} data-testid={`tree-module-${mod.id}`}>
+                  {/* Module row */}
                   <div
                     className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-semibold transition-colors border-b border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${
                       activeModuleId === mod.id
@@ -350,7 +332,7 @@ export default function ApprovalWorkflow() {
                     <ModIcon className="h-4 w-4 flex-shrink-0 text-[#52baf3]" />
                     <span className="truncate flex-1">{mod.title}</span>
                     <span className="text-[11px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 rounded-full px-1.5 py-0.5 min-w-[20px] text-center flex-shrink-0">
-                      {subModuleCount}
+                      {mod.subModules.length}
                     </span>
                   </div>
 
@@ -359,6 +341,35 @@ export default function ApprovalWorkflow() {
                       {mod.subModules.map((sub) => {
                         if (isSearching && !matchedSubModuleIds?.has(sub.id)) return null;
                         const SubIcon = sub.icon;
+
+                        /* ── TWO-LEVEL (Defects): sub rendered directly as a leaf ── */
+                        if (isTwoLevel) {
+                          const fn = sub.functions[0];
+                          if (!fn) return null;
+                          const isSelected =
+                            selected?.functionId === fn.id &&
+                            selected?.moduleId === mod.id;
+                          return (
+                            <button
+                              key={sub.id}
+                              className={`w-full flex items-center gap-2 pl-8 pr-3 py-2 text-left text-[13px] transition-colors border-b border-gray-100/70 dark:border-gray-800/70 ${
+                                isSelected
+                                  ? "bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 font-medium border-l-2 border-l-blue-500"
+                                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200"
+                              }`}
+                              onClick={() => {
+                                setActiveModuleId(mod.id);
+                                setSelected({ moduleId: mod.id, subModuleId: sub.id, functionId: fn.id });
+                              }}
+                              data-testid={`button-function-${fn.id}`}
+                            >
+                              <SubIcon className="h-3.5 w-3.5 flex-shrink-0 text-[#52baf3]" />
+                              <span className="truncate">{sub.title}</span>
+                            </button>
+                          );
+                        }
+
+                        /* ── THREE-LEVEL (PMS): sub-module row + leaf children ── */
                         const subExpanded = isSubModuleExpanded(sub.id);
                         return (
                           <div key={sub.id} data-testid={`tree-submodule-${sub.id}`}>
@@ -384,33 +395,33 @@ export default function ApprovalWorkflow() {
                                 {sub.functions
                                   .filter((fn) => isLeafVisible(mod.id, fn.name))
                                   .map((fn) => {
-                                  const isSelected =
-                                    selected?.functionId === fn.id &&
-                                    selected?.subModuleId === sub.id &&
-                                    selected?.moduleId === mod.id;
-                                  return (
-                                    <button
-                                      key={fn.id}
-                                      className={`w-full flex items-center gap-2 pl-14 pr-3 py-2 text-left text-[13px] transition-colors border-b border-gray-50 dark:border-gray-800/50 ${
-                                        isSelected
-                                          ? "bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 font-medium border-l-2 border-l-blue-500"
-                                          : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200"
-                                      }`}
-                                      onClick={() => {
-                                        setActiveModuleId(mod.id);
-                                        setSelected({
-                                          moduleId: mod.id,
-                                          subModuleId: sub.id,
-                                          functionId: fn.id,
-                                        });
-                                      }}
-                                      data-testid={`button-function-${fn.id}`}
-                                    >
-                                      <FileText className="h-3.5 w-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
-                                      <span className="truncate">{fn.name}</span>
-                                    </button>
-                                  );
-                                })}
+                                    const isSelected =
+                                      selected?.functionId === fn.id &&
+                                      selected?.subModuleId === sub.id &&
+                                      selected?.moduleId === mod.id;
+                                    return (
+                                      <button
+                                        key={fn.id}
+                                        className={`w-full flex items-center gap-2 pl-14 pr-3 py-2 text-left text-[13px] transition-colors border-b border-gray-50 dark:border-gray-800/50 ${
+                                          isSelected
+                                            ? "bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 font-medium border-l-2 border-l-blue-500"
+                                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200"
+                                        }`}
+                                        onClick={() => {
+                                          setActiveModuleId(mod.id);
+                                          setSelected({
+                                            moduleId: mod.id,
+                                            subModuleId: sub.id,
+                                            functionId: fn.id,
+                                          });
+                                        }}
+                                        data-testid={`button-function-${fn.id}`}
+                                      >
+                                        <FileText className="h-3.5 w-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
+                                        <span className="truncate">{fn.name}</span>
+                                      </button>
+                                    );
+                                  })}
                               </div>
                             )}
                           </div>
@@ -424,12 +435,14 @@ export default function ApprovalWorkflow() {
           </div>
         </div>
 
+        {/* ── RIGHT PANEL ── */}
         <div
           className="flex-1 overflow-y-auto bg-white dark:bg-background border border-l-0 border-gray-200 dark:border-gray-700 rounded-r-lg"
           data-testid="approval-viewer-panel"
         >
           {selectedDetails ? (
             <div className="h-full flex flex-col">
+              {/* Header */}
               <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex-shrink-0">
                 <h2
                   className="text-lg font-semibold text-gray-900 dark:text-foreground"
@@ -444,10 +457,76 @@ export default function ApprovalWorkflow() {
                   {selectedDetails.subModule.title}
                 </p>
               </div>
+
+              {/* Checkbox grid */}
               <div
-                className="flex-1 overflow-y-auto"
+                className="flex-1 overflow-y-auto p-5"
                 data-testid="container-approval-function-body"
-              />
+              >
+                {(() => {
+                  const rows = CONFIG_ROWS[selectedDetails.fn.id];
+                  if (!rows || rows.length === 0) {
+                    return (
+                      <p className="text-sm text-gray-400" data-testid="text-no-config">
+                        No configuration available.
+                      </p>
+                    );
+                  }
+                  const leafId = selectedDetails.fn.id;
+                  return (
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide border-b border-r border-gray-200 dark:border-gray-700 w-[60%]">
+                            Variables
+                          </th>
+                          <th className="text-center px-4 py-3 text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide border-b border-r border-gray-200 dark:border-gray-700 w-[20%]">
+                            Level 1
+                          </th>
+                          <th className="text-center px-4 py-3 text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide border-b border-gray-200 dark:border-gray-700 w-[20%]">
+                            Level 2
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((rowLabel, idx) => (
+                          <tr
+                            key={rowLabel}
+                            className={`border border-gray-200 dark:border-gray-700 ${
+                              idx % 2 === 0
+                                ? "bg-white dark:bg-background"
+                                : "bg-gray-50/60 dark:bg-gray-900/20"
+                            }`}
+                            data-testid={`row-config-${leafId}-${idx}`}
+                          >
+                            <td className="px-4 py-3 text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700">
+                              {rowLabel}
+                            </td>
+                            <td className="px-4 py-3 text-center border-r border-gray-200 dark:border-gray-700">
+                              <div className="flex justify-center">
+                                <Checkbox
+                                  checked={getCheckbox(leafId, rowLabel, "level1")}
+                                  onCheckedChange={() => toggleCheckbox(leafId, rowLabel, "level1")}
+                                  data-testid={`checkbox-level1-${leafId}-${idx}`}
+                                />
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <div className="flex justify-center">
+                                <Checkbox
+                                  checked={getCheckbox(leafId, rowLabel, "level2")}
+                                  onCheckedChange={() => toggleCheckbox(leafId, rowLabel, "level2")}
+                                  data-testid={`checkbox-level2-${leafId}-${idx}`}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()}
+              </div>
             </div>
           ) : (
             <div className="flex items-center justify-center h-full bg-gray-50/30 dark:bg-gray-900/20">
