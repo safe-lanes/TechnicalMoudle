@@ -4464,30 +4464,32 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 )}
 
                 {/* Conditional Next Due field based on Maintenance Basis */}
-                {!isUnplannedCreate && (templateData.maintenanceBasis === 'Running Hours' ? (
-                  <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.26"><Marker id="WOF.A1.26" />Next Due RH</Label>
-                    <Input
-                      type="text"
-                      value={templateData.nextDueReading ? `${templateData.nextDueReading} Hours` : '-'}
-                      className="text-sm bg-gray-50"
-                      disabled={true}
-                      data-testid="WOF.A1.27"
-                    />
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.26"><Marker id="WOF.A1.26" />Next Due Date</Label>
-                    <Input
-                      type="date"
-                      value={templateData.nextDueDate}
-                      onChange={(e) => handleTemplateChange('nextDueDate', e.target.value)}
-                      className="text-sm"
-                      disabled={isPartAReadOnly}
-                      data-testid="WOF.A1.27"
-                    />
-                  </div>
-                ))}
+                {!isUnplannedCreate && (
+                  (templateData.maintenanceBasis === 'Running Hours' || (templateData.maintenanceBasis === 'Dual Frequency' && isNewJobCreation)) ? (
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.26"><Marker id="WOF.A1.26" />{isNewJobCreation ? 'Next Due Hour' : 'Next Due RH'}</Label>
+                      <Input
+                        type="text"
+                        value={templateData.nextDueReading ? `${templateData.nextDueReading} Hours` : '-'}
+                        className="text-sm bg-gray-50"
+                        disabled={true}
+                        data-testid="WOF.A1.27"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.26"><Marker id="WOF.A1.26" />Next Due Date</Label>
+                      <Input
+                        type="date"
+                        value={templateData.nextDueDate}
+                        onChange={(e) => handleTemplateChange('nextDueDate', e.target.value)}
+                        className="text-sm"
+                        disabled={isPartAReadOnly}
+                        data-testid="WOF.A1.27"
+                      />
+                    </div>
+                  )
+                )}
 
                 {!isUnplannedCreate && (templateData.maintenanceBasis === 'Running Hours' || templateData.maintenanceBasis === 'Dual Frequency') && (
                   <div className="space-y-2">
