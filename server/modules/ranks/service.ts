@@ -1,7 +1,26 @@
 import * as repo from './repository';
 import { getPostgresClient } from '../../postgresClient';
+import { storage } from '../../storage';
 import { admAvailableRanks, admVesselOrgChart, masterLists, type AdmVesselOrgChart } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
+
+// Audit Phase 2 — rank-catalog audit (entity_type='rank'). Subject = the RANK. Actor (who)
+// is frozen by createAuditLog (Phase 0). Best-effort — never blocks/fails the rank save.
+async function auditRank(actionType: string, rank: any, payload: Record<string, any>): Promise<void> {
+  try {
+    await storage.createAuditLog({
+      entityType: 'rank',
+      entityId: rank?.rankId ?? null,
+      actionType,
+      source: 'web_ui',
+      vesselCode: null,
+      componentCode: null,
+      payload: { subject: { rankId: rank?.rankId ?? null, rankName: rank?.name ?? null }, ...payload },
+    });
+  } catch (auditErr: any) {
+    console.error(`[Audit] rank ${actionType} log failed:`, auditErr?.message);
+  }
+}
 
 export async function getAllRanks() {
   const ranks = await repo.getAllRanks();
@@ -31,7 +50,10 @@ export async function saveRanks(ranks: any[]) {
     throw err;
   }
 
-  return postgres.db.transaction(async (tx) => {
+  // Audit Phase 2 — collect per-rank create/update outcomes inside the tx, emit AFTER commit.
+  const rankAudits: Array<{ action: string; rank: any; before: any; after: any }> = [];
+
+  const txResult = await postgres.db.transaction(async (tx) => {
     let inserted = 0;
     let updated = 0;
 
@@ -57,14 +79,22 @@ export async function saveRanks(ranks: any[]) {
           .set({ ...data, updatedAt: new Date() })
           .where(eq(admAvailableRanks.rankId, rank.rankId));
         updated++;
+        rankAudits.push({ action: 'rank_update', rank, before: existing[0], after: data });
       } else {
         await tx.insert(admAvailableRanks).values(data);
         inserted++;
+        rankAudits.push({ action: 'rank_create', rank, before: null, after: data });
       }
     }
 
     return { success: true, message: `Saved ${ranks.length} ranks`, inserted, updated };
   });
+
+  for (const a of rankAudits) {
+    await auditRank(a.action, a.rank, a.action === 'rank_update' ? { before: a.before, after: a.after } : { after: a.after });
+  }
+
+  return txResult;
 }
 
 export async function updateRank(rankId: string, data: any) {
@@ -85,7 +115,10 @@ export async function updateRank(rankId: string, data: any) {
     viewMode: data.viewMode !== undefined ? (data.viewMode || null) : existing.viewMode,
     isDeleted: false,
   });
-  return { success: true, rank: result?.[0] || null };
+  const updatedRank = result?.[0] || null;
+  // Audit Phase 2 — rank update (before = prior row, after = updated row).
+  await auditRank('rank_update', updatedRank ?? existing, { before: existing, after: updatedRank });
+  return { success: true, rank: updatedRank };
 }
 
 export async function deleteRank(rankId: string) {
@@ -101,6 +134,8 @@ export async function deleteRank(rankId: string) {
     throw err;
   }
   await repo.softDeleteRank(rankId);
+  // Audit Phase 2 — rank delete (soft). before = the deleted rank row.
+  await auditRank('rank_delete', rank, { before: rank });
   return { success: true, message: `Rank ${rankId} deleted` };
 }
 
