@@ -739,6 +739,8 @@ export interface IStorage {
   
   // Audit Log
   createAuditLog(data: any): Promise<any>;
+  getAuditLogs(filters?: any): Promise<any[]>;
+  countAuditLogs(filters?: any): Promise<number>;
   getAuditLogsByEntity(entityType: string, entityId: string): Promise<any[]>;
 
   // PMS Vessel Settings - Lead Time & Grace Period Configuration

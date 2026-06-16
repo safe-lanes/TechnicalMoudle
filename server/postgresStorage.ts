@@ -6311,44 +6311,75 @@ export class PostgresStorage {
     return result[0];
   }
 
+  // Audit viewer (Phase 3) — shared filter builder. Read-only; additive filters (userId, source,
+  // entityTypes[]) added for the audit trail viewer. NEVER mutates audit rows.
+  private buildAuditLogConditions(filters?: {
+    vesselCode?: string;
+    componentCode?: string;
+    entityType?: string;
+    entityTypes?: string[];
+    entityId?: string;
+    actionType?: string;
+    userId?: string;
+    source?: string;
+    actor?: string;
+    entityCode?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): any[] {
+    const conditions: any[] = [];
+    if (!filters) return conditions;
+    if (filters.vesselCode) conditions.push(eq(auditLog.vesselCode, filters.vesselCode));
+    if (filters.componentCode) conditions.push(eq(auditLog.componentCode, filters.componentCode));
+    if (filters.entityType) conditions.push(eq(auditLog.entityType, filters.entityType));
+    if (filters.entityTypes && filters.entityTypes.length > 0) conditions.push(inArray(auditLog.entityType, filters.entityTypes));
+    if (filters.entityId) conditions.push(eq(auditLog.entityId, filters.entityId));
+    if (filters.actionType) conditions.push(eq(auditLog.actionType, filters.actionType));
+    if (filters.userId) conditions.push(eq(auditLog.userId, filters.userId));
+    if (filters.source) conditions.push(eq(auditLog.source, filters.source));
+    // Actor free-text: match the frozen label (payload.actorLabel) OR the canonical id.
+    if (filters.actor) {
+      const a = `%${filters.actor}%`;
+      conditions.push(sql`(${auditLog.userId} ILIKE ${a} OR ${auditLog.payload}->>'actorLabel' ILIKE ${a})`);
+    }
+    // Entity/equipment code free-text: component code, entity id, or WO number from payload.
+    if (filters.entityCode) {
+      const c = `%${filters.entityCode}%`;
+      conditions.push(sql`(${auditLog.componentCode} ILIKE ${c} OR ${auditLog.entityId} ILIKE ${c} OR ${auditLog.payload}->>'workOrderNo' ILIKE ${c} OR ${auditLog.payload}->>'componentCode' ILIKE ${c})`);
+    }
+    if (filters.startDate) conditions.push(gte(auditLog.timestamp, filters.startDate));
+    if (filters.endDate) conditions.push(lte(auditLog.timestamp, filters.endDate));
+    return conditions;
+  }
+
+  async countAuditLogs(filters?: Parameters<PostgresStorage['buildAuditLogConditions']>[0]): Promise<number> {
+    const db = await getDb();
+    const conditions = this.buildAuditLogConditions(filters);
+    let q = db.select({ n: sql<number>`count(*)::int` }).from(auditLog) as any;
+    if (conditions.length > 0) q = q.where(and(...conditions));
+    const r = await q;
+    return Number(r[0]?.n ?? 0);
+  }
+
   async getAuditLogs(filters?: {
     vesselCode?: string;
     componentCode?: string;
     entityType?: string;
+    entityTypes?: string[];
     entityId?: string;
     actionType?: string;
+    userId?: string;
+    source?: string;
+    actor?: string;
+    entityCode?: string;
     startDate?: Date;
     endDate?: Date;
     limit?: number;
     offset?: number;
   }): Promise<AuditLog[]> {
     const db = await getDb();
-    let conditions: any[] = [];
-    
-    if (filters) {
-      if (filters.vesselCode) {
-        conditions.push(eq(auditLog.vesselCode, filters.vesselCode));
-      }
-      if (filters.componentCode) {
-        conditions.push(eq(auditLog.componentCode, filters.componentCode));
-      }
-      if (filters.entityType) {
-        conditions.push(eq(auditLog.entityType, filters.entityType));
-      }
-      if (filters.entityId) {
-        conditions.push(eq(auditLog.entityId, filters.entityId));
-      }
-      if (filters.actionType) {
-        conditions.push(eq(auditLog.actionType, filters.actionType));
-      }
-      if (filters.startDate) {
-        conditions.push(gte(auditLog.timestamp, filters.startDate));
-      }
-      if (filters.endDate) {
-        conditions.push(lte(auditLog.timestamp, filters.endDate));
-      }
-    }
-    
+    const conditions = this.buildAuditLogConditions(filters);
+
     let query = db.select().from(auditLog);
     
     if (conditions.length > 0) {

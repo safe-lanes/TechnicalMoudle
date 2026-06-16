@@ -32,6 +32,7 @@ import DataMasters from "./admin/DataMasters";
 import ShipsCertificatesAdmin from "./admin/ShipsCertificatesAdmin";
 import ShipsSurveysAdmin from "./admin/ShipsSurveysAdmin";
 import AccessControl from "./admin/AccessControl";
+import AuditTrail from "./admin/AuditTrail";
 import RanksAdmin from "./admin/RanksAdmin";
 import AddEditFleetComponent from "./admin/AddEditFleetComponent";
 import SyncDashboard from "./admin/SyncDashboard";
@@ -233,6 +234,16 @@ export const TechnicalModule = () => {
             <ShipsSurveysAdmin />
           ) : selectedSubModule === "admin" && selectedMenuItem === "ranks" ? (
             <RanksAdmin />
+          ) : selectedSubModule === "admin" && selectedMenuItem === "audit-trail" && isSailAdmin ? (
+            <AuditTrail />
+          ) : selectedSubModule === "admin" && selectedMenuItem === "audit-trail" && !isSailAdmin ? (
+            <div className="flex items-center justify-center h-full min-h-[400px]" data-testid="access-denied-audit-trail">
+              <div className="text-center">
+                <ShieldX className="h-16 w-16 text-red-400 mx-auto mb-4" />
+                <h2 className="text-2xl font-semibold text-gray-600 mb-2">Access Denied</h2>
+                <p className="text-gray-500 mb-4">The Audit Trail is restricted to Sail Admin only.</p>
+              </div>
+            </div>
           ) : selectedSubModule === "admin" && selectedMenuItem === "access-control" && isSailAdmin ? (
             <AccessControl />
           ) : selectedSubModule === "admin" && selectedMenuItem === "access-control" && !isSailAdmin ? (

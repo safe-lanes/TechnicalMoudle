@@ -90,6 +90,7 @@ const menuConfigs: Record<string, MenuItem[]> = {
     { id: "ships-surveys", label: "Ship's Surveys", icon: ClipboardCheck },
     { id: "ranks", label: "Ranks", icon: UserCog },
     { id: "access-control", label: "Access Control", icon: ShieldCheck },
+    { id: "audit-trail", label: "Audit Trail", icon: History },
     { id: "sync-dashboard", label: "Sync Dashboard", icon: Cloud },
     { id: "sync-conflicts", label: "Conflict Review", icon: GitPullRequest },
     { id: "sync-provisioning", label: "Ship Provisioning", icon: HardDrive },
@@ -144,6 +145,7 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
   }
   const menuItems = allMenuItems.filter((item) => {
     if (item.id === "access-control") return isSailAdmin;
+    if (item.id === "audit-trail") return isSailAdmin;
     return canViewSidebarItem(subModule, item.id);
   });
 
