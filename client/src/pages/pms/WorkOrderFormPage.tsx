@@ -1200,6 +1200,21 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   }, [(templateData as any).lastDoneRH, templateData.intervalRunningHour, templateData.maintenanceBasis, isNewJobCreation]);
 
+  // Auto-calculate Next Due Date from Last Completed On + frequency (Calendar Add Job mode only)
+  useEffect(() => {
+    if (!isNewJobCreation) return;
+    if (templateData.maintenanceBasis !== 'Calendar') return;
+    const lastDone = (templateData as any).lastCompletedOn || '';
+    const freqVal = templateData.frequencyValue || '';
+    const freqUnit = templateData.frequencyUnit || '';
+    if (lastDone && freqVal && freqUnit) {
+      const calculated = calculateNextDueDate(lastDone, freqVal, freqUnit);
+      setTemplateData(prev => ({ ...prev, nextDueDate: calculated || '' }));
+    } else {
+      setTemplateData(prev => ({ ...prev, nextDueDate: '' }));
+    }
+  }, [(templateData as any).lastCompletedOn, templateData.frequencyValue, templateData.frequencyUnit, templateData.maintenanceBasis, isNewJobCreation]);
+
   // Initialize form for new job creation (Add Job flow)
   const componentNameFromUrl = urlParams.get('componentName') || '';
   useEffect(() => {
@@ -4483,8 +4498,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         type="date"
                         value={templateData.nextDueDate}
                         onChange={(e) => handleTemplateChange('nextDueDate', e.target.value)}
-                        className="text-sm"
-                        disabled={isPartAReadOnly}
+                        className={`text-sm ${isNewJobCreation && templateData.maintenanceBasis === 'Calendar' ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
+                        disabled={isPartAReadOnly || (isNewJobCreation && templateData.maintenanceBasis === 'Calendar')}
                         data-testid="WOF.A1.27"
                       />
                     </div>
