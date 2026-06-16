@@ -4411,7 +4411,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <SelectItem value="Low">Low</SelectItem>
                       <SelectItem value="Medium">Medium</SelectItem>
                       <SelectItem value="High">High</SelectItem>
-                      <SelectItem value="Critical">Critical</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
