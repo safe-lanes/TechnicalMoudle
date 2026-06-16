@@ -62,3 +62,33 @@ export function secureGetItem<T>(key: string): T | null {
     return null;
   }
 }
+
+// Non-encrypted auth-adjacent keys that must also be wiped on logout. Kept
+// explicit (not encrypted, so not part of LOCAL_STORAGE_KEYS) so the full
+// logout wipe set stays visible in one place.
+export const EXTRA_AUTH_LOCAL_STORAGE_KEYS = [
+  "selectedVesselId",
+  "selected_module",
+] as const;
+
+const FORM_VERSIONS_PREFIX = "form-versions-";
+
+/**
+ * Wipe every authentication-related entry from localStorage. Clears the five
+ * encrypted keys (`LOCAL_STORAGE_KEYS`), the extra auth keys, and any
+ * `form-versions-*` cache entry. Used by logout so a reload cannot silently
+ * re-hydrate the previous user.
+ */
+export function secureClear(): void {
+  for (const key of LOCAL_STORAGE_KEYS) {
+    localStorage.removeItem(key);
+  }
+  for (const key of EXTRA_AUTH_LOCAL_STORAGE_KEYS) {
+    localStorage.removeItem(key);
+  }
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith(FORM_VERSIONS_PREFIX)) {
+      localStorage.removeItem(key);
+    }
+  }
+}

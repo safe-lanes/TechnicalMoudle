@@ -8,7 +8,7 @@ import {
 import type { PublicUser, UserRole } from "@shared/schema";
 import type { UIRole } from "@shared/uiRoles";
 import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
-import { secureGetItem } from "@/utils/secureStorage";
+import { secureGetItem, secureClear } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
 import { setActiveRank } from "@/lib/activeRank";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -397,6 +397,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.error("[Shipskart] logout call failed (non-blocking):", err);
       }
     })();
+
+    // TODO(server-auth): when this app's backend gains real session/token
+    // auth (it currently runs mock auth), also call its server logout endpoint
+    // here to invalidate the server session. Today logout is client-side only.
+
+    // Wipe all auth-related localStorage so a reload cannot re-hydrate the
+    // previous user (otherwise AuthContext's mount effect re-authenticates).
+    secureClear();
 
     setCurrentUser(null);
     setUserType(null);
