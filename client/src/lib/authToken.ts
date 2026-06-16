@@ -1,6 +1,25 @@
 import CryptoJS from "crypto-js";
+import { isReplit } from "./env";
 
 const TOKEN_STORAGE_KEY = "credentials";
+
+let redirectedToLogin = false;
+
+/**
+ * Handle a token-resolution failure. Outside Replit (production / local) a
+ * missing or invalid session means the user is not logged in, so we send the
+ * browser to the parent app's existing `/login` page (a hard navigation — it is
+ * NOT an in-app route). On Replit we keep the dev mock-auth convenience and
+ * simply return `null` so the PMS renders normally. Always returns `null` so
+ * callers omit the `Authorization` header.
+ */
+function onTokenFailure(): null {
+  if (!isReplit() && typeof window !== "undefined" && !redirectedToLogin) {
+    redirectedToLogin = true;
+    window.location.assign("/login");
+  }
+  return null;
+}
 
 const TOKEN_FIELD_CANDIDATES = [
   "token",
@@ -92,21 +111,25 @@ function normalizeToken(value: unknown): string | null {
 export function getAccessToken(): string | null {
   try {
     if (typeof sessionStorage === "undefined") {
-      return null;
+      return onTokenFailure();
     }
     const raw = sessionStorage.getItem(TOKEN_STORAGE_KEY);
     if (!raw || !raw.trim()) {
-      return null;
+      return onTokenFailure();
     }
 
     const bytes = CryptoJS.AES.decrypt(raw, STORAGE_SECRET);
     const decryptedText = bytes.toString(CryptoJS.enc.Utf8);
     if (!decryptedText) {
-      return null;
+      return onTokenFailure();
     }
 
-    return normalizeToken(decodeDecrypted(decryptedText));
+    const token = normalizeToken(decodeDecrypted(decryptedText));
+    if (!token) {
+      return onTokenFailure();
+    }
+    return token;
   } catch {
-    return null;
+    return onTokenFailure();
   }
 }
