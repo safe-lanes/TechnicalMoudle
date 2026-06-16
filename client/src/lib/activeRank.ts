@@ -1,9 +1,11 @@
+import { getAccessToken } from "./authToken";
+
 let activeRank: string | null = null;
 const listeners = new Set<(rank: string | null) => void>();
 
 const API_PREFIX = "/technical/api";
 
-function isApiUrl(url: string): boolean {
+export function isApiUrl(url: string): boolean {
   if (!url) return false;
   if (url.startsWith(API_PREFIX) || url.startsWith("/" + API_PREFIX.replace(/^\//, ""))) {
     return true;
@@ -52,7 +54,8 @@ export function installRankFetchInterceptor(): void {
 
   window.fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const rank = getActiveRank();
-    if (!rank) {
+    const token = getAccessToken();
+    if (!rank && !token) {
       return originalFetch(input, init);
     }
 
@@ -76,15 +79,21 @@ export function installRankFetchInterceptor(): void {
           merged.set(key, value);
         });
       }
-      if (!merged.has("x-rank")) {
+      if (rank && !merged.has("x-rank")) {
         merged.set("x-rank", rank);
+      }
+      if (token && !merged.has("authorization")) {
+        merged.set("Authorization", `Bearer ${token}`);
       }
       return originalFetch(input, { ...init, headers: merged });
     }
 
     const headers = new Headers(init?.headers);
-    if (!headers.has("x-rank")) {
+    if (rank && !headers.has("x-rank")) {
       headers.set("x-rank", rank);
+    }
+    if (token && !headers.has("authorization")) {
+      headers.set("Authorization", `Bearer ${token}`);
     }
     return originalFetch(input, { ...init, headers });
   };

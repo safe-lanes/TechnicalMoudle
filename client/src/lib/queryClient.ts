@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { installRankFetchInterceptor } from "./activeRank";
+import { installRankFetchInterceptor, isApiUrl } from "./activeRank";
+import { getAccessToken } from "./authToken";
 
 installRankFetchInterceptor();
 
@@ -15,9 +16,16 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const token = getAccessToken();
+  const headers: Record<string, string> = {};
+  if (data) headers["Content-Type"] = "application/json";
+  // Only attach the bearer token to our own same-origin API — never leak it
+  // to cross-origin / non-API URLs.
+  if (token && isApiUrl(url)) headers["Authorization"] = `Bearer ${token}`;
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -32,7 +40,11 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
+    const url = queryKey[0] as string;
+    const token = getAccessToken();
+    const res = await fetch(url, {
+      headers:
+        token && isApiUrl(url) ? { Authorization: `Bearer ${token}` } : {},
       credentials: "include",
     });
 
