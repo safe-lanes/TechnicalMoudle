@@ -32,6 +32,8 @@ import { RejectionHistorySection } from '@/components/wo/RejectionHistorySection
 import { useVessel } from '@/contexts/VesselContext';
 import { useUIRole } from '@/contexts/UIRoleContext';
 import { useVessels } from '@/hooks/useVessels';
+import { useAuth } from '@/contexts/AuthContext';
+import { useLocalApprovers } from '@/hooks/useExternalMasterData';
 import {
   Select,
   SelectContent,
@@ -112,6 +114,8 @@ export function ModifyPMS() {
   const { vesselId, setVesselId, applyVesselScope, pickerVessels, myVesselsEmpty } = useVessel();
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
   const { data: vessels = [] } = useVessels();
+  const { currentUser } = useAuth();
+  const { data: localApprovers = [] } = useLocalApprovers();
 
   const periodDateRange = useMemo(() => periodFilter ? periodFilterToDateRange(periodFilter) : null, [periodFilter]);
 
@@ -149,6 +153,28 @@ export function ModifyPMS() {
       return matchesSearch && matchesStatus;
     });
   }, [requests, searchQuery, statusFilter]);
+
+  // Approval steps for the currently viewed request (gating logic)
+  const { data: approvalSteps = [] } = useQuery({
+    queryKey: ['/technical/api/change-requests', viewingRequest?.id, 'approval-steps'],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/change-requests/${viewingRequest!.id}/approval-steps`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!viewingRequest && viewingRequest.status === 'submitted',
+  });
+
+  // Derive whether the current user is the active approver for the pending step
+  const currentUserId = currentUser?.username || (currentUser as any)?.userId || null;
+  const userApproverLevels: string[] = localApprovers
+    .filter((a: any) => a.userId === currentUserId && a.isActive === 1 && !a.isDeleted)
+    .map((a: any) => a.approverLevel as string);
+  const activeStep = approvalSteps.find((s: any) => s.status === 'Pending');
+  const userIsApproverForActiveStep = !!activeStep && userApproverLevels.includes(activeStep.approvalLevel);
+  // Legacy CRs with no steps: fall back to role-based guard
+  const noStepsYet = viewingRequest?.status === 'submitted' && approvalSteps.length === 0;
+  const userCanAct = noStepsYet ? (!isVessel && !isHeadOfDept) : userIsApproverForActiveStep;
 
   // Approve mutation
   const approveMutation = useMutation({
@@ -623,7 +649,7 @@ export function ModifyPMS() {
             </Button>
           )}
           
-          {viewingRequest && viewingRequest.status === 'submitted' && !isVessel && !isHeadOfDept && (
+          {viewingRequest && viewingRequest.status === 'submitted' && userCanAct && (
             <>
               <Button
                 variant="outline"
