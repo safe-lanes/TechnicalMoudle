@@ -19,6 +19,7 @@ router.post('/change-requests', asyncHandler(crCtrl.createChangeRequest));
 
 // ── Status, Comments, Attachments, Approve, Reject (sub-resource routes before /:id) ──
 router.patch('/change-requests/:id/status', asyncHandler(crCtrl.updateStatus));
+router.get('/change-requests/:id/approval-steps', asyncHandler(crCtrl.getApprovalSteps));
 router.get('/change-requests/:id/comments', asyncHandler(crCtrl.getComments));
 router.post('/change-requests/:id/comments', asyncHandler(crCtrl.createComment));
 router.get('/change-requests/:id/attachments', asyncHandler(crCtrl.getAttachments));

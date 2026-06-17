@@ -1,13 +1,14 @@
 import { storage } from '../../../storage';
 import type {
   ChangeRequest, InsertChangeRequest,
+  ChangeRequestApproval, InsertChangeRequestApproval,
   ChangeRequestComment, InsertChangeRequestComment,
   ChangeRequestAttachment, InsertChangeRequestAttachment
 } from '@shared/schema';
 
 // ── Core Change Requests ──
 
-export async function getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string }): Promise<ChangeRequest[]> {
+export async function getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string; pendingForApprover?: string }): Promise<ChangeRequest[]> {
   return storage.getChangeRequests(filters);
 }
 
@@ -47,6 +48,26 @@ export async function returnChangeRequest(id: number, reviewerId: string, commen
 
 export async function submitChangeRequest(id: number, userId: string): Promise<ChangeRequest> {
   return storage.submitChangeRequest(id, userId);
+}
+
+// ── Approval Steps ──
+
+export async function getChangeRequestApprovalSteps(changeRequestId: number): Promise<ChangeRequestApproval[]> {
+  return storage.getChangeRequestApprovalSteps(changeRequestId);
+}
+
+export async function createChangeRequestApprovalStep(step: InsertChangeRequestApproval): Promise<ChangeRequestApproval> {
+  return storage.createChangeRequestApprovalStep(step);
+}
+
+export async function updateChangeRequestApprovalStep(id: number, data: Partial<ChangeRequestApproval>): Promise<ChangeRequestApproval> {
+  return storage.updateChangeRequestApprovalStep(id, data);
+}
+
+// ── Approval Workflow Config ──
+
+export async function getApprovalWorkflowConfig() {
+  return storage.getApprovalWorkflowConfig();
 }
 
 // ── Comments ──

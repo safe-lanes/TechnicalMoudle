@@ -820,6 +820,11 @@ export const changeRequest = pgTable("change_request", {
   updatedByUuid: text("updated_by_uuid"),
   isDeleted: boolean("is_deleted").default(false),
   sortOrder: integer("sort_order"),
+  approvalWorkflowSnapshot: json("approval_workflow_snapshot").$type<{
+    level1Enabled: boolean;
+    level2Enabled: boolean;
+    equipmentClassification: 'normal' | 'critical' | 'unknown';
+  }>(),
 }, (table) => ({
   vesselCategoryIdx: index("idx_vessel_category").on(table.vesselId, table.category),
   statusIdx: index("idx_change_request_status").on(table.status),
@@ -834,6 +839,34 @@ export const insertChangeRequestSchema = createInsertSchema(changeRequest).omit(
 
 export type InsertChangeRequest = z.infer<typeof insertChangeRequestSchema>;
 export type ChangeRequest = typeof changeRequest.$inferSelect;
+
+// Change Request Approval — intermediary table for multi-level approval workflow
+export const changeRequestApproval = pgTable("change_request_approval", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  crauuid: text("crauuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  changeRequestId: integer("change_request_id").notNull().references(() => changeRequest.id),
+  changeRequestUuid: text("change_request_uuid").notNull(),
+  approvalLevel: text("approval_level").notNull(),
+  status: text("status").notNull().default("Pending"),
+  actionByUserId: text("action_by_user_id"),
+  actionAt: timestamp("action_at", { withTimezone: true }),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: updatedAtColumn(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+});
+
+export const insertChangeRequestApprovalSchema = createInsertSchema(changeRequestApproval).omit({
+  id: true,
+  crauuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertChangeRequestApproval = z.infer<typeof insertChangeRequestApprovalSchema>;
+export type ChangeRequestApproval = typeof changeRequestApproval.$inferSelect;
 
 // Change Request Attachments
 export const changeRequestAttachment = pgTable("change_request_attachment", {

@@ -27,7 +27,8 @@ export async function getChangeRequests(req: Request, res: Response) {
     category: req.query.category as string,
     requestedBy: req.query.requestedBy as string,
     periodFrom: req.query.periodFrom as string | undefined,
-    periodTo: req.query.periodTo as string | undefined
+    periodTo: req.query.periodTo as string | undefined,
+    pendingForApprover: req.query.pendingForApprover as string | undefined,
   };
   const requests = await crService.getChangeRequests(query);
   res.json(requests);
@@ -54,6 +55,14 @@ export async function updateStatus(req: Request, res: Response) {
   const id = parseInt(req.params.id);
   const updated = await crService.updateStatus(id, req.body);
   res.json(updated);
+}
+
+// ── GET /change-requests/:id/approval-steps ──
+
+export async function getApprovalSteps(req: Request, res: Response) {
+  const changeRequestId = parseInt(req.params.id);
+  const steps = await crService.getApprovalSteps(changeRequestId);
+  res.json(steps);
 }
 
 // ── GET /change-requests/:id/comments ──

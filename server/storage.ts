@@ -29,6 +29,8 @@ import {
   changeRequest,
   type ChangeRequest,
   type InsertChangeRequest,
+  type ChangeRequestApproval,
+  type InsertChangeRequestApproval,
   changeRequestAttachment,
   type ChangeRequestAttachment,
   type InsertChangeRequestAttachment,
@@ -419,7 +421,7 @@ export interface IStorage {
   createStoresLedgerEntryForImport(values: InsertStoresLedger): Promise<void>;
   
   // Change Request methods
-  getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string }): Promise<ChangeRequest[]>;
+  getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string; pendingForApprover?: string }): Promise<ChangeRequest[]>;
   getChangeRequest(id: number): Promise<ChangeRequest | undefined>;
   createChangeRequest(request: InsertChangeRequest): Promise<ChangeRequest>;
   updateChangeRequest(id: number, data: Partial<ChangeRequest>): Promise<ChangeRequest>;
@@ -431,6 +433,10 @@ export interface IStorage {
   rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest>;
   returnChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest>;
   applyApprovedChanges(changeRequest: ChangeRequest): Promise<{ appliedFieldCount: number }>;
+  // Change Request Approval Steps
+  getChangeRequestApprovalSteps(changeRequestId: number): Promise<ChangeRequestApproval[]>;
+  createChangeRequestApprovalStep(step: InsertChangeRequestApproval): Promise<ChangeRequestApproval>;
+  updateChangeRequestApprovalStep(id: number, data: Partial<ChangeRequestApproval>): Promise<ChangeRequestApproval>;
   
   // Change Request Attachments
   getChangeRequestAttachments(changeRequestId: number): Promise<ChangeRequestAttachment[]>;

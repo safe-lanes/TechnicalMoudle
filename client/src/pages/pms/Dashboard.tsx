@@ -1722,7 +1722,7 @@ const Dashboard = () => {
     const effectiveChangeRequests = changeRequestsData;
     const openChangeRequestsList = effectiveChangeRequests.filter(cr => {
       const s = cr.status?.toLowerCase();
-      return s !== 'approved' && s !== 'rejected';
+      return s === 'submitted';
     });
     const openChangeRequests = openChangeRequestsList.length;
 
