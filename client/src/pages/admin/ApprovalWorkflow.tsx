@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   ClipboardList,
   Clock,
@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   Loader2,
   Save,
+  X,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -139,6 +140,7 @@ export default function ApprovalWorkflow() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isEditMode, setIsEditMode] = useState(false);
   const [checkboxState, setCheckboxState] = useState<Record<string, { level1: boolean; level2: boolean }>>({});
+  const savedCheckboxStateRef = useRef<Record<string, { level1: boolean; level2: boolean }>>({});
 
   // Load config from server on mount
   const { data: configData } = useQuery<{ success: boolean; data: Array<{
@@ -195,6 +197,8 @@ export default function ApprovalWorkflow() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/approval-workflow-config'] });
+      savedCheckboxStateRef.current = structuredClone(checkboxState);
+      setIsEditMode(false);
       toast({ title: 'Saved', description: 'Approval workflow configuration saved.' });
     },
     onError: () => {
@@ -339,16 +343,6 @@ export default function ApprovalWorkflow() {
           <div className="flex-shrink-0 bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm flex items-center justify-between gap-2 rounded-tl-lg">
             <span>APPROVAL WORKFLOW</span>
             <div className="flex items-center gap-1">
-              <button
-                onClick={() => setIsEditMode((v) => !v)}
-                className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors ${
-                  isEditMode ? "bg-white/20" : ""
-                }`}
-                data-testid="button-edit-approval-workflow"
-              >
-                <Pencil className="h-3 w-3" />
-                Edit
-              </button>
               <button
                 onClick={expandAll}
                 className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-white/20 transition-colors"
@@ -531,21 +525,49 @@ export default function ApprovalWorkflow() {
                     {selectedDetails.subModule.title}
                   </p>
                 </div>
-                {isEditMode && (
+                {!isEditMode ? (
                   <Button
-                    onClick={() => saveMutation.mutate()}
-                    disabled={saveMutation.isPending}
+                    variant="outline"
                     size="sm"
                     className="flex-shrink-0"
-                    data-testid="button-save-approval-config"
+                    onClick={() => {
+                      savedCheckboxStateRef.current = structuredClone(checkboxState);
+                      setIsEditMode(true);
+                    }}
+                    data-testid="button-edit-approval-config"
                   >
-                    {saveMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-1" />
-                    )}
-                    Save
+                    <Pencil className="h-4 w-4 mr-1" />
+                    Edit
                   </Button>
+                ) : (
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setCheckboxState(structuredClone(savedCheckboxStateRef.current));
+                        setIsEditMode(false);
+                      }}
+                      disabled={saveMutation.isPending}
+                      data-testid="button-cancel-approval-config"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => saveMutation.mutate()}
+                      disabled={saveMutation.isPending}
+                      data-testid="button-save-approval-config"
+                    >
+                      {saveMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-1" />
+                      )}
+                      Save
+                    </Button>
+                  </div>
                 )}
               </div>
 
