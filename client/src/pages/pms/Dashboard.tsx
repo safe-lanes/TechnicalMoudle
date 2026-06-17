@@ -816,7 +816,8 @@ const Dashboard = () => {
   const crActiveStep = opCrApprovalSteps.find((s: any) => s.status === 'Pending');
   const crUserIsApproverForActiveStep = !!crActiveStep && crUserApproverLevels.includes(crActiveStep.approvalLevel);
   const crNoStepsYet = opDetailChangeRequest?.status?.toLowerCase() === 'submitted' && opCrApprovalSteps.length === 0;
-  const crUserCanAct = crNoStepsYet ? (!isVessel && !isHeadOfDept) : crUserIsApproverForActiveStep;
+  const noApproversConfigured = !localApprovers.some((a: any) => a.isActive === 1 && !a.isDeleted);
+  const crUserCanAct = (crNoStepsYet || noApproversConfigured) ? (!isVessel && !isHeadOfDept) : crUserIsApproverForActiveStep;
 
   const { data: superintendentSummary } = useQuery<{ pendingCount: number; acknowledgedThisMonthCount: number }>({
     queryKey: ['/technical/api/superintendent/notifications/summary', effectiveVesselId],

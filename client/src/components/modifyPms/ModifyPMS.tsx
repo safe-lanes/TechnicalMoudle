@@ -172,9 +172,10 @@ export function ModifyPMS() {
     .map((a: any) => a.approverLevel as string);
   const activeStep = approvalSteps.find((s: any) => s.status === 'Pending');
   const userIsApproverForActiveStep = !!activeStep && userApproverLevels.includes(activeStep.approvalLevel);
-  // Legacy CRs with no steps: fall back to role-based guard
+  // Legacy CRs with no steps, or no approvers configured at all: fall back to role-based guard
   const noStepsYet = viewingRequest?.status === 'submitted' && approvalSteps.length === 0;
-  const userCanAct = noStepsYet ? (!isVessel && !isHeadOfDept) : userIsApproverForActiveStep;
+  const noApproversConfigured = !localApprovers.some((a: any) => a.isActive === 1 && !a.isDeleted);
+  const userCanAct = (noStepsYet || noApproversConfigured) ? (!isVessel && !isHeadOfDept) : userIsApproverForActiveStep;
 
   // Approve mutation
   const approveMutation = useMutation({

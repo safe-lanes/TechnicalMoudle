@@ -228,14 +228,15 @@ export default function ModifyPMS() {
   // True when the active step is at an earlier level than the user's level (e.g., L1 pending, user is L2)
   const awaitingPriorLevel = !!activeStep && !userIsApproverForActiveStep
     && userApproverLevels.length > 0;
-  // Legacy CRs with no steps yet: fall back to role-based guard
+  // Legacy CRs with no steps yet, or no approvers configured at all: fall back to role-based guard
   const noStepsYet = viewingRequest?.status === 'submitted' && approvalSteps.length === 0;
+  const noApproversConfigured = !localApprovers.some((a: any) => a.isActive === 1 && !a.isDeleted);
 
   const currentUserCanAct = !!viewingRequest
     && viewingRequest.status === 'submitted'
     && !isVessel
     && !isHeadOfDept
-    && (noStepsYet || userIsApproverForActiveStep);
+    && (noStepsYet || noApproversConfigured || userIsApproverForActiveStep);
 
   // Create mutation
   const createMutation = useMutation({
