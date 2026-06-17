@@ -4285,5 +4285,33 @@ export const insertSyncSettingsSchema = createInsertSchema(syncSettings).omit({
 export type InsertSyncSettings = z.infer<typeof insertSyncSettingsSchema>;
 export type SyncSettings = typeof syncSettings.$inferSelect;
 
+// ====== MOC APPROVERS TABLE ======
+export const mocApprovers = pgTable("moc_approvers", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  mauuid: text("mauuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  name: text("name"),
+  userId: text("user_id"),
+  approverLevel: text("approver_level"),
+  emailId: text("email_id"),
+  isActive: integer("is_active").default(1),
+  modulename: text("modulename"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+});
+
+export const insertMocApproverSchema = createInsertSchema(mocApprovers).omit({
+  id: true,
+  mauuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMocApprover = z.infer<typeof insertMocApproverSchema>;
+export type MocApprover = typeof mocApprovers.$inferSelect;
+
 // ====== NOON REPORT MODULE SCHEMA — remove this line to disable ======
 export * from './schema-noon-report';

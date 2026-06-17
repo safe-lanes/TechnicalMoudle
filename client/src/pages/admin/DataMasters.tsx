@@ -26,6 +26,7 @@ import {
   useExternalAppraisalTypes,
   useExternalUsers,
   useExternalApprovers,
+  useLocalApprovers,
   getDomain,
 } from "@/hooks/useExternalMasterData";
 
@@ -440,7 +441,20 @@ export default function DataMasters() {
   const crewPoolsQuery = useExternalCrewPools({ enabled: selectedMaster === "crewPool" });
   const appraisalTypesQuery = useExternalAppraisalTypes({ enabled: selectedMaster === "appraisalType" });
   const usersQuery = useExternalUsers({ enabled: selectedMaster === "users" });
-  const approversQuery = useExternalApprovers({ enabled: selectedMaster === "approvers" });
+  // Approvers tab: local-primary, external fallback — same pattern as Vessel Master
+  const localApproversQuery = useLocalApprovers({ enabled: selectedMaster === "approvers" });
+  const localApproversResolved = !localApproversQuery.isLoading;
+  const localApproversHasData = (localApproversQuery.data?.length ?? 0) > 0;
+  const externalApproversEnabled =
+    selectedMaster === "approvers" && localApproversResolved && !localApproversHasData;
+  const externalApproversQuery = useExternalApprovers({ enabled: externalApproversEnabled });
+  const approversQuery = {
+    data: localApproversHasData ? localApproversQuery.data : externalApproversQuery.data,
+    isLoading:
+      localApproversQuery.isLoading ||
+      (externalApproversEnabled && externalApproversQuery.isLoading),
+    error: localApproversHasData ? localApproversQuery.error : externalApproversQuery.error,
+  };
 
   const queryMap: Record<string, { data: any[]; isLoading: boolean; error: Error | null }> = {
     nationality: { data: nationalitiesQuery.data || [], isLoading: nationalitiesQuery.isLoading, error: nationalitiesQuery.error },

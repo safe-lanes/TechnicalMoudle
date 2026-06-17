@@ -41,6 +41,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mount modular architecture router (modules extracted from routes.ts go here)
   app.use('/technical/api', moduleRouter);
 
+  app.get('/technical/api/admin/local-approvers', async (req, res) => {
+    try {
+      const rows = await storage.getLocalApprovers();
+      return res.json(rows);
+    } catch (error: any) {
+      console.error('[LocalApprovers] Failed to fetch:', error.message);
+      return res.status(500).json({ error: 'Failed to fetch local approvers' });
+    }
+  });
+
   app.get('/technical/api/admin/approvers', async (req, res) => {
     const domain = req.query.domain as string;
     if (!domain || domain.trim().length === 0) {

@@ -296,6 +296,25 @@ export const useExternalUsers = (options?: UseExternalDataOptions) => {
   });
 };
 
+export const useLocalApprovers = (options?: UseExternalDataOptions) => {
+  return useQuery({
+    queryKey: ['/technical/api/admin/local-approvers'],
+    queryFn: async () => {
+      const response = await fetch('/technical/api/admin/local-approvers', {
+        method: 'GET',
+        headers: { 'accept': 'application/json' },
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error(`Failed to fetch local approvers: ${response.status}`);
+      const data = await response.json();
+      return (data || []).map((a: any) => ({ ...a, isActiveLabel: a.isActive === 1 ? 'Active' : 'Inactive' }));
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 2,
+    enabled: options?.enabled ?? true,
+  });
+};
+
 export const useExternalApprovers = (options?: UseExternalDataOptions) => {
   return useQuery({
     queryKey: ['/technical/api/admin/approvers'],

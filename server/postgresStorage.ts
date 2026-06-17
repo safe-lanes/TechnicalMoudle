@@ -208,6 +208,7 @@ import {
   type AdmRoleMenuAccess,
   approvalWorkflowConfig,
   type ApprovalWorkflowConfig,
+  mocApprovers,
 } from '@shared/schema';
 import { logFieldChanges, logSoftDelete, FileSyncProcessor } from './modules/sync';
 import { getAuditActor, getRequestContext } from './middleware/requestContext';
@@ -9374,6 +9375,13 @@ export class PostgresStorage {
       .from(approvalWorkflowConfig)
       .where(eq(approvalWorkflowConfig.isDeleted, false))
       .orderBy(approvalWorkflowConfig.functionId, approvalWorkflowConfig.variableName);
+  }
+
+  async getLocalApprovers(): Promise<any[]> {
+    const db = await getDb();
+    return db.select()
+      .from(mocApprovers)
+      .where(eq(mocApprovers.isDeleted, false));
   }
 
   async upsertApprovalWorkflowConfig(

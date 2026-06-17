@@ -1027,6 +1027,9 @@ export interface IStorage {
     }>,
     updatedByUuid?: string
   ): Promise<ApprovalWorkflowConfig[]>;
+
+  // MOC Approvers (local table)
+  getLocalApprovers(): Promise<any[]>;
 }
 
 // Helper function to normalize and validate immediateCause structure
