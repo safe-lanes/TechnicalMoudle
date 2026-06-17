@@ -51,35 +51,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/technical/api/admin/approvers', async (req, res) => {
-    const domain = req.query.domain as string;
-    if (!domain || domain.trim().length === 0) {
-      return res.status(400).json({ error: 'Missing required "domain" query parameter.' });
-    }
-    try {
-      const { getExternalMasterDataBaseUrl } = await import('./config/externalApi');
-      const baseUrl = getExternalMasterDataBaseUrl();
-      const url = `${baseUrl}/mocapprovers?domain=${encodeURIComponent(domain)}`;
-      const apiResponse = await fetch(url, {
-        method: 'GET',
-        headers: { 'accept': '*/*' },
-      });
-      if (!apiResponse.ok) {
-        return res.status(apiResponse.status).json({ error: `External API returned ${apiResponse.status}` });
-      }
-      const data = await apiResponse.json();
-      const approvers = Array.isArray(data) ? data : (data.mocapprovers || []);
-      return res.json({ mocapprovers: approvers });
-    } catch (error: any) {
-      console.error('[ExternalProxy] Failed to fetch approvers:', error.message);
-      return res.status(502).json({ error: 'Failed to fetch from external API' });
-    }
-  });
-
   const ALLOWED_EXTERNAL_ENDPOINTS = [
     'nationalities', 'vessels', 'vesseltypes', 'licenses',
     'additionalgroups', 'ports', 'languages', 'fleetgroups',
-    'countries', 'manningagents', 'crewpools', 'appraisaltypes', 'users'
+    'countries', 'manningagents', 'crewpools', 'appraisaltypes', 'users',
+    'mocapprovers',
   ];
 
   app.get('/technical/api/external/master-data/:endpoint', async (req, res) => {
