@@ -49,7 +49,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { getExternalMasterDataBaseUrl } = await import('./config/externalApi');
       const baseUrl = getExternalMasterDataBaseUrl();
-      const url = `${baseUrl}?domain=${encodeURIComponent(domain)}`;
+      const url = `${baseUrl}/mocapprovers?domain=${encodeURIComponent(domain)}`;
       const apiResponse = await fetch(url, {
         method: 'GET',
         headers: { 'accept': '*/*' },
@@ -58,7 +58,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(apiResponse.status).json({ error: `External API returned ${apiResponse.status}` });
       }
       const data = await apiResponse.json();
-      return res.json({ mocapprovers: data.mocapprovers || [] });
+      const approvers = Array.isArray(data) ? data : (data.mocapprovers || []);
+      return res.json({ mocapprovers: approvers });
     } catch (error: any) {
       console.error('[ExternalProxy] Failed to fetch approvers:', error.message);
       return res.status(502).json({ error: 'Failed to fetch from external API' });
