@@ -17,6 +17,7 @@ import {
   jobComponentLinks as jobComponentLinksTable,
   workOrders as workOrdersTable,
   components as componentsTable,
+  mocApprovers,
 } from '@shared/schema';
 
 // ── GET/POST /admin/job-due-scan ──
@@ -333,6 +334,7 @@ export async function syncMasters(req: Request, res: Response) {
     ports: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
     users: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
     fleetGroups: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
+    approvers: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
   };
 
   const fetchExternal = async (endpoint: string, key: string) => {
@@ -573,6 +575,58 @@ export async function syncMasters(req: Request, res: Response) {
       });
       stats.fleetGroups.updated++;
     } catch (e: any) { stats.fleetGroups.errors.push(`FleetGroup ${fg.fleet_group_id}: ${e.message}`); }
+  }
+
+  // 7. Sync Approvers (moc_approvers)
+  console.log('📦 Syncing Approvers...');
+  let fetchedApprovers: any[] = [];
+  try {
+    fetchedApprovers = await fetchExternal('mocapprovers', 'mocapprovers');
+  } catch (e: any) {
+    console.error(`[syncMasters] Failed to fetch approvers: ${e.message}`);
+    stats.approvers.errors.push(`Fetch failed: ${e.message}`);
+  }
+  // Filter to Technical module only (matches useLocalApprovers read filter)
+  const technicalApprovers = fetchedApprovers.filter(
+    (a: any) => (a.modulename || a.moduleName || '') === 'Technical'
+  );
+  if (technicalApprovers.length > 0) {
+    // Soft-delete all previously synced Technical approvers so stale records don't linger
+    try {
+      await db.update(mocApprovers)
+        .set({ isDeleted: true, updatedAt: now })
+        .where(and(eq(mocApprovers.isSync, true), eq(mocApprovers.isDeleted, false)));
+    } catch (e: any) {
+      console.error(`[syncMasters] Failed to soft-delete stale approvers: ${e.message}`);
+    }
+    for (const a of technicalApprovers) {
+      try {
+        const userId = getFieldValue(a, ['userId', 'user_id', 'uid']);
+        if (!userId) { stats.approvers.skipped++; continue; }
+        const name = getFieldValue(a, ['name', 'fullname', 'fullName', 'userName']) || null;
+        const approverLevel = getFieldValue(a, ['approverLevel', 'approver_level', 'level']) || null;
+        const emailId = getFieldValue(a, ['emailId', 'email_id', 'email']) || null;
+        const modulename = getFieldValue(a, ['modulename', 'moduleName']) || 'Technical';
+        const isActiveRaw = a.isActive ?? a.is_active;
+        const isActive = isActiveRaw === 1 || isActiveRaw === true ? 1 : 0;
+        await db.insert(mocApprovers).values({
+          name,
+          userId,
+          approverLevel,
+          emailId,
+          isActive,
+          modulename,
+          isSync: true,
+          isDeleted: false,
+          updatedAt: now,
+        });
+        stats.approvers.inserted++;
+      } catch (e: any) {
+        stats.approvers.errors.push(`Approver ${a.userId || a.user_id}: ${e.message}`);
+      }
+    }
+  } else {
+    console.log('[syncMasters] No Technical approvers returned from external API — skipping soft-delete');
   }
 
   console.log('✅ Master data sync completed:', stats);

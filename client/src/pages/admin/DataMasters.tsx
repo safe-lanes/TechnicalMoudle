@@ -397,7 +397,10 @@ export default function DataMasters() {
         (stats.additionalGroups?.updated || 0) + (stats.additionalGroups?.inserted || 0) +
         (stats.ports?.updated || 0) + (stats.ports?.inserted || 0) +
         (stats.users?.updated || 0) + (stats.users?.inserted || 0) +
-        (stats.fleetGroups?.updated || 0) + (stats.fleetGroups?.inserted || 0);
+        (stats.fleetGroups?.updated || 0) + (stats.fleetGroups?.inserted || 0) +
+        (stats.approvers?.updated || 0) + (stats.approvers?.inserted || 0);
+      
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/local-approvers'] });
       
       toast({
         title: "Master data sync completed successfully",
