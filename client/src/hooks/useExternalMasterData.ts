@@ -317,15 +317,16 @@ export const useLocalApprovers = (options?: UseExternalDataOptions) => {
 
 export const useExternalApprovers = (options?: UseExternalDataOptions) => {
   return useQuery({
-    queryKey: ['/technical/api/external/master-data/mocapprovers'],
+    queryKey: ['/technical/api/admin/approvers'],
     queryFn: async () => {
+      const domain = getDomain();
       const response = await fetch(
-        buildProxyUrl('mocapprovers', getDomain()),
+        `/technical/api/admin/approvers?domain=${encodeURIComponent(domain)}`,
         { method: 'GET', headers: { 'accept': '*/*' }, credentials: 'include' }
       );
       if (!response.ok) throw new Error(`Failed to fetch approvers: ${response.status}`);
       const data = await response.json();
-      const all: any[] = Array.isArray(data) ? data : (data.mocapprovers || []);
+      const all: any[] = data.mocapprovers || [];
       return all
         .filter((a) => a.modulename === 'Technical')
         .map((a) => ({ ...a, isActiveLabel: a.isActive === 1 ? 'Active' : 'Inactive' }));
