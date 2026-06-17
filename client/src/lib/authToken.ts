@@ -14,7 +14,12 @@ let redirectedToLogin = false;
  * callers omit the `Authorization` header.
  */
 function onTokenFailure(): null {
-  if (!isReplit() && typeof window !== "undefined" && !redirectedToLogin) {
+  if (
+    !isReplit() &&
+    typeof window !== "undefined" &&
+    !redirectedToLogin &&
+    window.location.pathname !== "/login"
+  ) {
     redirectedToLogin = true;
     window.location.assign("/login");
   }
