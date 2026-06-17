@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   ClipboardList,
   Clock,
@@ -17,9 +17,15 @@ import {
   Bug,
   Search,
   CheckCircle2,
+  Loader2,
+  Save,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface ApprovalFunctionNode {
   id: string;
@@ -125,6 +131,7 @@ interface SelectedLeaf {
 }
 
 export default function ApprovalWorkflow() {
+  const { toast } = useToast();
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set(["pms"]));
   const [expandedSubModules, setExpandedSubModules] = useState<Set<string>>(new Set());
   const [activeModuleId, setActiveModuleId] = useState<string>("pms");
@@ -132,6 +139,68 @@ export default function ApprovalWorkflow() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isEditMode, setIsEditMode] = useState(false);
   const [checkboxState, setCheckboxState] = useState<Record<string, { level1: boolean; level2: boolean }>>({});
+
+  // Load config from server on mount
+  const { data: configData } = useQuery<{ success: boolean; data: Array<{
+    functionId: string;
+    variableName: string;
+    level1Enabled: boolean;
+    level2Enabled: boolean;
+  }> }>({
+    queryKey: ['/technical/api/admin/approval-workflow-config'],
+  });
+
+  // Seed checkboxState from server data when it arrives
+  useEffect(() => {
+    if (!configData?.data) return;
+    const stateMap: Record<string, { level1: boolean; level2: boolean }> = {};
+    for (const row of configData.data) {
+      stateMap[`${row.functionId}:${row.variableName}`] = {
+        level1: row.level1Enabled,
+        level2: row.level2Enabled,
+      };
+    }
+    setCheckboxState(stateMap);
+  }, [configData]);
+
+  // Save mutation — sends all 20 rows in one batch PUT
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const rows: Array<{
+        moduleId: string;
+        subModuleId: string;
+        functionId: string;
+        variableName: string;
+        level1Enabled: boolean;
+        level2Enabled: boolean;
+      }> = [];
+      for (const mod of APPROVAL_MODULES) {
+        for (const sub of mod.subModules) {
+          for (const fn of sub.functions) {
+            for (const variableName of (CONFIG_ROWS[fn.id] || [])) {
+              const key = `${fn.id}:${variableName}`;
+              rows.push({
+                moduleId: mod.id,
+                subModuleId: sub.id,
+                functionId: fn.id,
+                variableName,
+                level1Enabled: checkboxState[key]?.level1 ?? false,
+                level2Enabled: checkboxState[key]?.level2 ?? false,
+              });
+            }
+          }
+        }
+      }
+      return apiRequest('PUT', '/technical/api/admin/approval-workflow-config', { rows });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/approval-workflow-config'] });
+      toast({ title: 'Saved', description: 'Approval workflow configuration saved.' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to save configuration.', variant: 'destructive' });
+    },
+  });
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const isSearching = normalizedQuery.length > 0;
@@ -219,6 +288,7 @@ export default function ApprovalWorkflow() {
   }, [selected]);
 
   const toggleCheckbox = (leafId: string, rowLabel: string, level: "level1" | "level2") => {
+    if (!isEditMode) return;
     const key = `${leafId}:${rowLabel}`;
     setCheckboxState((prev) => ({
       ...prev,
@@ -446,19 +516,37 @@ export default function ApprovalWorkflow() {
           {selectedDetails ? (
             <div className="h-full flex flex-col">
               {/* Header */}
-              <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex-shrink-0">
-                <h2
-                  className="text-lg font-semibold text-gray-900 dark:text-foreground"
-                  data-testid="text-selected-function-name"
-                >
-                  {selectedDetails.fn.name}
-                </h2>
-                <p
-                  className="text-xs text-gray-500 dark:text-muted-foreground mt-0.5"
-                  data-testid="text-selected-submodule-name"
-                >
-                  {selectedDetails.subModule.title}
-                </p>
+              <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex-shrink-0 flex items-start justify-between gap-4">
+                <div>
+                  <h2
+                    className="text-lg font-semibold text-gray-900 dark:text-foreground"
+                    data-testid="text-selected-function-name"
+                  >
+                    {selectedDetails.fn.name}
+                  </h2>
+                  <p
+                    className="text-xs text-gray-500 dark:text-muted-foreground mt-0.5"
+                    data-testid="text-selected-submodule-name"
+                  >
+                    {selectedDetails.subModule.title}
+                  </p>
+                </div>
+                {isEditMode && (
+                  <Button
+                    onClick={() => saveMutation.mutate()}
+                    disabled={saveMutation.isPending}
+                    size="sm"
+                    className="flex-shrink-0"
+                    data-testid="button-save-approval-config"
+                  >
+                    {saveMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-1" />
+                    )}
+                    Save
+                  </Button>
+                )}
               </div>
 
               {/* Checkbox grid */}
@@ -510,6 +598,7 @@ export default function ApprovalWorkflow() {
                                 <Checkbox
                                   checked={getCheckbox(leafId, rowLabel, "level1")}
                                   onCheckedChange={() => toggleCheckbox(leafId, rowLabel, "level1")}
+                                  disabled={!isEditMode}
                                   data-testid={`checkbox-level1-${leafId}-${idx}`}
                                 />
                               </div>
@@ -519,6 +608,7 @@ export default function ApprovalWorkflow() {
                                 <Checkbox
                                   checked={getCheckbox(leafId, rowLabel, "level2")}
                                   onCheckedChange={() => toggleCheckbox(leafId, rowLabel, "level2")}
+                                  disabled={!isEditMode}
                                   data-testid={`checkbox-level2-${leafId}-${idx}`}
                                 />
                               </div>

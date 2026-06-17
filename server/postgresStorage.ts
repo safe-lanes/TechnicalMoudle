@@ -206,6 +206,8 @@ import {
   type AdmnRoleMaster,
   type AdmMenumasterAc,
   type AdmRoleMenuAccess,
+  approvalWorkflowConfig,
+  type ApprovalWorkflowConfig,
 } from '@shared/schema';
 import { logFieldChanges, logSoftDelete, FileSyncProcessor } from './modules/sync';
 import { getAuditActor, getRequestContext } from './middleware/requestContext';
@@ -9364,6 +9366,54 @@ export class PostgresStorage {
       }
     });
     return { count: permissions.length };
+  }
+
+  async getApprovalWorkflowConfig(): Promise<ApprovalWorkflowConfig[]> {
+    const db = await getDb();
+    return db.select()
+      .from(approvalWorkflowConfig)
+      .where(eq(approvalWorkflowConfig.isDeleted, false))
+      .orderBy(approvalWorkflowConfig.functionId, approvalWorkflowConfig.variableName);
+  }
+
+  async upsertApprovalWorkflowConfig(
+    rows: Array<{
+      moduleId: string;
+      subModuleId: string;
+      functionId: string;
+      variableName: string;
+      level1Enabled: boolean;
+      level2Enabled: boolean;
+    }>,
+    updatedByUuid?: string
+  ): Promise<ApprovalWorkflowConfig[]> {
+    const db = await getDb();
+    const results: ApprovalWorkflowConfig[] = [];
+    for (const row of rows) {
+      const [updated] = await db
+        .insert(approvalWorkflowConfig)
+        .values({
+          moduleId: row.moduleId,
+          subModuleId: row.subModuleId,
+          functionId: row.functionId,
+          variableName: row.variableName,
+          level1Enabled: row.level1Enabled,
+          level2Enabled: row.level2Enabled,
+          updatedByUuid,
+        })
+        .onConflictDoUpdate({
+          target: [approvalWorkflowConfig.functionId, approvalWorkflowConfig.variableName],
+          set: {
+            level1Enabled: sql`EXCLUDED.level1_enabled`,
+            level2Enabled: sql`EXCLUDED.level2_enabled`,
+            updatedByUuid: sql`EXCLUDED.updated_by_uuid`,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      results.push(updated);
+    }
+    return results;
   }
 }
 

@@ -186,6 +186,7 @@ import {
   type AdmnRoleMaster,
   type AdmMenumasterAc,
   type AdmRoleMenuAccess,
+  type ApprovalWorkflowConfig,
 } from "@shared/schema";
 
 export function sortObjectKeys(obj: any): any {
@@ -1012,6 +1013,20 @@ export interface IStorage {
     canEdit: boolean;
     canDelete: boolean;
   }>): Promise<{ count: number }>;
+
+  // Approval Workflow Config methods
+  getApprovalWorkflowConfig(): Promise<ApprovalWorkflowConfig[]>;
+  upsertApprovalWorkflowConfig(
+    rows: Array<{
+      moduleId: string;
+      subModuleId: string;
+      functionId: string;
+      variableName: string;
+      level1Enabled: boolean;
+      level2Enabled: boolean;
+    }>,
+    updatedByUuid?: string
+  ): Promise<ApprovalWorkflowConfig[]>;
 }
 
 // Helper function to normalize and validate immediateCause structure

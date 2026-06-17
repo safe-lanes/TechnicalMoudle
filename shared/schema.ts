@@ -3851,6 +3851,35 @@ export const insertAdmRoleMenuAccessSchema = createInsertSchema(admRoleMenuAcces
 export type InsertAdmRoleMenuAccess = z.infer<typeof insertAdmRoleMenuAccessSchema>;
 export type AdmRoleMenuAccess = typeof admRoleMenuAccess.$inferSelect;
 
+// ====== APPROVAL WORKFLOW CONFIG TABLE ======
+export const approvalWorkflowConfig = pgTable("approval_workflow_config", {
+  id: serial("id").primaryKey(),
+  awcuuid: text("awcuuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  moduleId: text("module_id").notNull(),
+  subModuleId: text("sub_module_id").notNull(),
+  functionId: text("function_id").notNull(),
+  variableName: text("variable_name").notNull(),
+  level1Enabled: boolean("level1_enabled").notNull().default(false),
+  level2Enabled: boolean("level2_enabled").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => new Date()),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+}, (table) => [
+  unique().on(table.functionId, table.variableName),
+]);
+
+export const insertApprovalWorkflowConfigSchema = createInsertSchema(approvalWorkflowConfig).omit({
+  id: true,
+  awcuuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertApprovalWorkflowConfig = z.infer<typeof insertApprovalWorkflowConfigSchema>;
+export type ApprovalWorkflowConfig = typeof approvalWorkflowConfig.$inferSelect;
+
 // ====== PLANNER DATES TABLE ======
 export const plannerDates = pgTable("planner_dates", {
   id: serial("id").primaryKey(),

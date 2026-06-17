@@ -271,6 +271,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
+  // ── Approval Workflow Config ──
+  app.get('/technical/api/admin/approval-workflow-config', async (_req, res) => {
+    try {
+      const rows = await storage.getApprovalWorkflowConfig();
+      res.json({ success: true, data: rows });
+    } catch (err) {
+      console.error('[ApprovalWorkflowConfig] GET error:', err);
+      res.status(500).json({ success: false, error: 'Failed to fetch approval workflow config' });
+    }
+  });
+
+  app.put('/technical/api/admin/approval-workflow-config', async (req, res) => {
+    try {
+      const { rows } = req.body;
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ success: false, error: 'rows array required' });
+      }
+      const updated = await storage.upsertApprovalWorkflowConfig(rows);
+      res.json({ success: true, data: updated });
+    } catch (err) {
+      console.error('[ApprovalWorkflowConfig] PUT error:', err);
+      res.status(500).json({ success: false, error: 'Failed to save approval workflow config' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Recalculate recurring defects on startup (don't await - let it run in background)
