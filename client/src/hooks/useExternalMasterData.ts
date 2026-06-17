@@ -298,10 +298,11 @@ export const useExternalUsers = (options?: UseExternalDataOptions) => {
 
 export const useExternalApprovers = (options?: UseExternalDataOptions) => {
   return useQuery({
-    queryKey: ['/technical/api/external/approvers'],
+    queryKey: ['/technical/api/admin/approvers'],
     queryFn: async () => {
+      const domain = getDomain();
       const response = await fetch(
-        buildProxyUrl('approvers', getDomain()),
+        `/technical/api/admin/approvers?domain=${encodeURIComponent(domain)}`,
         { method: 'GET', headers: { 'accept': '*/*' }, credentials: 'include' }
       );
       if (!response.ok) throw new Error(`Failed to fetch approvers: ${response.status}`);

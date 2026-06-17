@@ -43,7 +43,7 @@ export const APP_ENV = resolveAppEnv();
 
 let _cachedBaseUrl: string | null = null;
 
-function getExternalMasterDataBaseUrl(): string {
+export function getExternalMasterDataBaseUrl(): string {
   if (_cachedBaseUrl !== null) return _cachedBaseUrl;
 
   const devUrl = process.env.EXTERNAL_MASTER_DATA_URL_DEV;
