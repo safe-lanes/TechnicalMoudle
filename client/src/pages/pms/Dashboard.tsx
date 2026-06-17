@@ -811,7 +811,10 @@ const Dashboard = () => {
 
   // Levels for which the current user is an active, non-deleted approver
   const crUserApproverLevels: string[] = localApprovers
-    .filter((a: any) => a.userId === currentUserIdForApprover && a.isActive === 1 && !a.isDeleted)
+    .filter((a: any) =>
+      ((currentUser?.email && a.emailId === currentUser.email) || a.userId === currentUserIdForApprover) &&
+      a.isActive === 1 && !a.isDeleted
+    )
     .map((a: any) => a.approverLevel as string);
   const crActiveStep = opCrApprovalSteps.find((s: any) => s.status === 'Pending');
   const crUserIsApproverForActiveStep = !!crActiveStep && crUserApproverLevels.includes(crActiveStep.approvalLevel);
@@ -1759,8 +1762,10 @@ const Dashboard = () => {
     // If user IS an approver: use pendingApproverCRs even when zero — that is the correct count.
     // If user is NOT an approver: show all submitted CRs for the vessel.
     const currentUserIdKpi = currentUser?.username || (currentUser as any)?.userId || null;
-    const userIsApprover = currentUserIdKpi !== null && localApprovers.some(
-      (a: any) => a.userId === currentUserIdKpi && a.isActive === 1 && !a.isDeleted
+    const userIsApprover = localApprovers.some(
+      (a: any) =>
+        ((currentUser?.email && a.emailId === currentUser.email) || (currentUserIdKpi !== null && a.userId === currentUserIdKpi)) &&
+        a.isActive === 1 && !a.isDeleted
     );
     const openChangeRequestsList = userIsApprover
       ? pendingApproverCRs

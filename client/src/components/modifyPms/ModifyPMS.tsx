@@ -168,7 +168,10 @@ export function ModifyPMS() {
   // Derive whether the current user is the active approver for the pending step
   const currentUserId = currentUser?.username || (currentUser as any)?.userId || null;
   const userApproverLevels: string[] = localApprovers
-    .filter((a: any) => a.userId === currentUserId && a.isActive === 1 && !a.isDeleted)
+    .filter((a: any) =>
+      ((currentUser?.email && a.emailId === currentUser.email) || a.userId === currentUserId) &&
+      a.isActive === 1 && !a.isDeleted
+    )
     .map((a: any) => a.approverLevel as string);
   const activeStep = approvalSteps.find((s: any) => s.status === 'Pending');
   const userIsApproverForActiveStep = !!activeStep && userApproverLevels.includes(activeStep.approvalLevel);
