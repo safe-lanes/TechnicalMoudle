@@ -580,18 +580,18 @@ export async function syncMasters(req: Request, res: Response) {
   // 7. Sync Approvers (moc_approvers)
   console.log('📦 Syncing Approvers...');
   let fetchedApprovers: any[] = [];
+  let approverFetchSucceeded = false;
   try {
     fetchedApprovers = await fetchExternal('mocapprovers', 'mocapprovers');
+    approverFetchSucceeded = true;
   } catch (e: any) {
     console.error(`[syncMasters] Failed to fetch approvers: ${e.message}`);
     stats.approvers.errors.push(`Fetch failed: ${e.message}`);
   }
-  // Filter to Technical module only (matches useLocalApprovers read filter)
-  const technicalApprovers = fetchedApprovers.filter(
-    (a: any) => (a.modulename || a.moduleName || '') === 'Technical'
-  );
-  if (technicalApprovers.length > 0) {
-    // Soft-delete all previously synced Technical approvers so stale records don't linger
+  if (approverFetchSucceeded) {
+    // Soft-delete all previously synced Technical approvers so stale records don't linger.
+    // This runs even when the API returns zero records — an empty result is still a valid
+    // response and should clear out any stale synced data.
     try {
       await db.update(mocApprovers)
         .set({ isDeleted: true, updatedAt: now })
@@ -599,6 +599,10 @@ export async function syncMasters(req: Request, res: Response) {
     } catch (e: any) {
       console.error(`[syncMasters] Failed to soft-delete stale approvers: ${e.message}`);
     }
+    // Filter to Technical module only (matches useLocalApprovers read filter)
+    const technicalApprovers = fetchedApprovers.filter(
+      (a: any) => (a.modulename || a.moduleName || '') === 'Technical'
+    );
     for (const a of technicalApprovers) {
       try {
         const userId = getFieldValue(a, ['userId', 'user_id', 'uid']);
@@ -625,8 +629,6 @@ export async function syncMasters(req: Request, res: Response) {
         stats.approvers.errors.push(`Approver ${a.userId || a.user_id}: ${e.message}`);
       }
     }
-  } else {
-    console.log('[syncMasters] No Technical approvers returned from external API — skipping soft-delete');
   }
 
   console.log('✅ Master data sync completed:', stats);
