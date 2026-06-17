@@ -3427,8 +3427,8 @@ const Components: React.FC = () => {
 
       if (response.ok) {
         toast({
-          title: "Change request created",
-          description: "Your change request has been created as a draft. Navigate to Modify PMS to complete it.",
+          title: "Change request submitted",
+          description: "Your change request has been submitted for approval. Navigate to Modify PMS to track its status.",
         });
         // Navigate back to Modify PMS
         setLocation('/pms/modify-pms');

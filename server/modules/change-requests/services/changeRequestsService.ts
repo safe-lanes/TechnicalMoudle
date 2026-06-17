@@ -171,15 +171,23 @@ export async function createChangeRequest(body: any) {
     }
   }
 
+  const submitAfterCreate = validatedData.status === 'submitted';
+
   const requestData = {
     ...validatedData,
     vesselId: validatedData.vesselId,
     targetId: resolvedTargetId,
-    status: validatedData.status || 'draft' as const,
+    status: 'draft' as const,
     requestedByUserId: validatedData.requestedByUserId || 'system'
   };
 
-  return crRepo.createChangeRequest(requestData);
+  const created = await crRepo.createChangeRequest(requestData);
+
+  if (submitAfterCreate) {
+    return submitChangeRequestWorkflow(created.id, validatedData.requestedByUserId || 'system');
+  }
+
+  return created;
 }
 
 // ── Status Updates ──
