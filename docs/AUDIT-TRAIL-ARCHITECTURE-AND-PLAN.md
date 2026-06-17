@@ -1,7 +1,7 @@
 # Audit Trail — Architecture & Plan
 
-**Status:** Phases 0–3 built & server-side verified on isolated branch `feature/audit-identity-phase0` (NOT merged). Phase 4 (retention) pending.
-**Last updated:** 2026-06-16
+**Status:** Phases 0–4 built & server-side verified on isolated branch `feature/audit-identity-phase0` (NOT merged). All planned phases complete; only manual physical purge + legal-hold left as deliberate future scope.
+**Last updated:** 2026-06-17
 **Owner branch:** `feature/audit-identity-phase0` (off `replit_dev` @ `02c1081dd`; merged personally after integrated-SAILERP verification).
 **Push state:** Phase 0 (incl. this doc's first version) pushed to origin; Phases 1/2/3 committed locally, **not yet pushed**.
 **Related:** ABS sample audit-trail report (investigation source), `CLAUDE.md` (sync-layer rules), memory `project_audit_trail_plan` + `project_audit_identity_phase0_build`.
@@ -115,6 +115,25 @@ Admin **"Audit Trail"** screen (shore, Sail-Admin), `requirePMSAdmin`, **strictl
 
 ---
 
+## 6b. Phase 4 — Configurable retention + disposition lifecycle
+
+**Model:** the configured period is a **minimum keep-time, not an auto-delete timer**. Business/audit records are **never auto-deleted**. Disposal is a **human, logged, reversible soft-dispose** (`disposed_at`/`disposed_by_uuid`, row kept). No physical deletion of business records anywhere — manual physical purge is deliberately **out of scope** (design left open for it; the `disposed_at` flag is the future purge eligibility list). Legal-hold left as a future concept (not built).
+
+**Migration 123 (additive, idempotent):** `retention_settings` (category, value, unit, enabled, is_protected, min_value/min_unit) seeded with the committed §6 defaults; + nullable `disposed_at`/`disposed_by_uuid` on `audit_log`, `component_maintenance_history`, `work_order_postponements`.
+
+| Category | Default | Protected / floor | Disposition flow | Targets |
+|---|---|---|---|---|
+| Maintenance Records | 5 years | ✓ / 5y | yes | `audit_log[work_order]` + `component_maintenance_history` |
+| Approval Records | 5 years | ✓ / 5y | yes | `work_order_postponements` |
+| Audit Logs | 2 years | ✓ / 2y | yes | `audit_log[component + general]` |
+| User Access Logs | 12 months | ✓ / 12m | yes | `audit_log[role_permission, rank, retention_setting, retention_disposition]` |
+| Running Hours History | forever | ✓ / — | none (never disposed) | `running_hours_audit` |
+| Sync Logs | 12 months | ✗ (editable) | **auto-prune only** | `sync_field_log`+`batches`+`file_queue`+`conflicts` |
+
+**Behaviour:** `server/modules/retention/` (guard `requirePMSAdmin`): eligibility = count past minimum AND `disposed_at IS NULL`; `updateSetting` enforces a **hard floor** (protected categories reject below committed min, 400); `dispose` soft-marks **only past-minimum rows**; `retain`/`revert` log/restore — all audited (`entity_type` `retention_setting`/`retention_disposition`, frozen actor). `pruningService` reads the `sync_logs` setting (12mo → 365d via month factor 30.44, never shorter than the prior 90/90/180/365) and is the **only** auto-delete path; business categories have no auto-delete. The viewer adds `disposed_at IS NULL` (disposed rows leave active views) and maps the new entity types into Permissions/Access. Frontend `RetentionSettings.tsx` (Admin, Sail-Admin): floor-enforced period edit, eligibility banner, Retain/Dispose/Revert with a **double-confirm** dialog (Cancel default + type-to-confirm "DISPOSE", states marked-not-erased).
+
+---
+
 ## 7. Commit list (branch `feature/audit-identity-phase0`)
 
 | Commit | Phase |
@@ -127,8 +146,10 @@ Admin **"Audit Trail"** screen (shore, Sail-Admin), `requirePMSAdmin`, **strictl
 | `f7ba28619` | P1 component register audit |
 | `3fb4e3dca` | P2 user-access audit |
 | `bc2eafc7b` | P3 unified viewer + Excel |
+| `0c8aa21ce` | docs update (P1–3) |
+| `6b6095cbf` | P4 configurable retention + disposition |
 
-Migrations: **121** (`sync_field_log.changed_by_display`), **122** (`running_hours_audit.actor_label`) — additive, nullable, idempotent. tsc held **366** throughout.
+Migrations: **121** (`sync_field_log.changed_by_display`), **122** (`running_hours_audit.actor_label`), **123** (`retention_settings` + `disposed_at`/`disposed_by_uuid`) — additive, nullable, idempotent. tsc held **366** throughout.
 
 ---
 
@@ -160,7 +181,8 @@ Migrations: **121** (`sync_field_log.changed_by_display`), **122** (`running_hou
 ---
 
 ## 10. Pending / deferred
-- **Phase 4 — Retention:** retention/pruning policy for the audit streams (not built).
+- **Manual physical purge (future):** a separate, manual, double-confirmed admin action that erases **only already-disposed** rows — never automatic, never on a timer. The `disposed_at` flag is the eligibility list; not built.
+- **Legal hold (future concept):** keep the design open; not built.
 - **Phase 3.1 (deferred):** `sync_field_log` union in the viewer if ABS later wants field-level WO-edit granularity.
 - **Approval-audit phase:** org-chart (`saveOrgChart`/`updateOrgChartEntry`/`deleteOrgChartEntry`) + approval routing.
 - **DB-view union:** documented fallback for the viewer only if merge-pagination performance ever demands it.
