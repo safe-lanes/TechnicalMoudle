@@ -38,7 +38,33 @@ export interface PruneResult {
 }
 
 async function getRetentionConfig(): Promise<PruneConfig> {
-  // Try DB settings first, then env vars, then defaults
+  // Audit Phase 4 — the 'sync_logs' retention setting (UI-managed, default 12 months / 365 days)
+  // drives the auto-prune of ALL FOUR sync-scratch tables. Sync-scratch is the ONLY thing that
+  // auto-deletes; business/audit categories are never pruned here. If the setting is missing/
+  // disabled, fall back to the legacy sync_settings/env/defaults (never shorter than before).
+  let syncDays: number | null = null;
+  try {
+    const pool = await getPool();
+    if (pool) {
+      const r = await pool.query(`SELECT retention_value, retention_unit, enabled FROM retention_settings WHERE category = 'sync_logs' LIMIT 1`);
+      const row = r.rows[0];
+      if (row && row.enabled && row.retention_unit !== 'forever') {
+        const v = Number(row.retention_value);
+        // Average month length so 12 months === 365 days (never shorter than the prior 365d batch threshold).
+        syncDays = row.retention_unit === 'days' ? v : row.retention_unit === 'months' ? Math.round(v * 30.44) : v * 365;
+      } else if (row && (!row.enabled || row.retention_unit === 'forever')) {
+        syncDays = Number.MAX_SAFE_INTEGER; // disabled / forever → effectively never prune
+      }
+    }
+  } catch {
+    // retention_settings not ready — fall through to legacy behavior
+  }
+
+  if (syncDays !== null) {
+    return { fieldLogDays: syncDays, batchDays: syncDays, fileQueueDays: syncDays, conflictDays: syncDays };
+  }
+
+  // Legacy fallback (pre-Phase-4): per-table sync_settings → env → defaults.
   let dbFieldLogDays: string | null = null;
   let dbBatchDays: string | null = null;
   try {
@@ -48,7 +74,6 @@ async function getRetentionConfig(): Promise<PruneConfig> {
   } catch {
     // DB not ready — use env/defaults
   }
-
   return {
     fieldLogDays: parseInt(dbFieldLogDays || process.env.SYNC_PRUNE_FIELD_LOG_DAYS || '90', 10),
     batchDays: parseInt(dbBatchDays || process.env.SYNC_PRUNE_BATCH_DAYS || '365', 10),

@@ -6328,6 +6328,8 @@ export class PostgresStorage {
     endDate?: Date;
   }): any[] {
     const conditions: any[] = [];
+    // Audit Phase 4 — soft-disposed rows leave active views (the audit viewer + its counts).
+    conditions.push(isNull(auditLog.disposedAt));
     if (!filters) return conditions;
     if (filters.vesselCode) conditions.push(eq(auditLog.vesselCode, filters.vesselCode));
     if (filters.componentCode) conditions.push(eq(auditLog.componentCode, filters.componentCode));

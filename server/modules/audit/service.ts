@@ -51,7 +51,7 @@ export interface AuditViewRow {
 const AUDIT_LOG_ENTITY_TYPES_FOR: Record<Exclude<LogType, 'all' | 'running_hours' | 'postponements'>, string[]> = {
   work_orders: ['work_order'],
   components: ['component'],
-  permissions: ['role_permission', 'rank'],
+  permissions: ['role_permission', 'rank', 'retention_setting', 'retention_disposition'],
 };
 
 function humanize(s: string | null | undefined): string {
@@ -76,6 +76,8 @@ function mapAuditLogRow(r: any): AuditViewRow {
   else if (et === 'component') { entityType = 'Component'; logType = 'components'; entityRef = p.componentCode || r.componentCode || r.component_code || entityRef; }
   else if (et === 'role_permission') { entityType = 'Permission (Role)'; logType = 'permissions'; entityRef = p.subject?.roleName || entityRef; }
   else if (et === 'rank') { entityType = 'Rank'; logType = 'permissions'; entityRef = p.subject?.rankName || entityRef; }
+  else if (et === 'retention_setting') { entityType = 'Retention Setting'; logType = 'permissions'; entityRef = p.subject?.label || entityRef; }
+  else if (et === 'retention_disposition') { entityType = 'Disposition'; logType = 'permissions'; entityRef = p.subject?.label || entityRef; }
   else { entityType = humanize(et); }
 
   // before → new / changes
@@ -208,7 +210,7 @@ async function fetchRunningHours(f: AuditFilters, take: number): Promise<{ rows:
 
 async function fetchPostponements(f: AuditFilters, take: number): Promise<{ rows: AuditViewRow[]; total: number }> {
   const pool = await getPool();
-  const conds: string[] = ['(p.is_deleted IS DISTINCT FROM true)'];
+  const conds: string[] = ['(p.is_deleted IS DISTINCT FROM true)', 'p.disposed_at IS NULL'];
   const vals: any[] = [];
   if (f.startDate) { vals.push(f.startDate.toISOString()); conds.push(`p.created_at >= $${vals.length}`); }
   if (f.endDate) { vals.push(f.endDate.toISOString()); conds.push(`p.created_at <= $${vals.length}`); }
