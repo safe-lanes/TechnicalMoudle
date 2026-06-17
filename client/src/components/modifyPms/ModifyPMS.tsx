@@ -169,7 +169,7 @@ export function ModifyPMS() {
   const currentUserId = currentUser?.username || (currentUser as any)?.userId || null;
   const userApproverLevels: string[] = localApprovers
     .filter((a: any) =>
-      ((currentUser?.email && a.emailId === currentUser.email) || a.userId === currentUserId) &&
+      (a.name?.trim().toLowerCase() === currentUser?.username?.trim().toLowerCase() || a.userId === currentUserId) &&
       a.isActive === 1 && !a.isDeleted
     )
     .map((a: any) => a.approverLevel as string);

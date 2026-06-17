@@ -809,10 +809,13 @@ const Dashboard = () => {
     enabled: !!opDetailChangeRequest && opDetailChangeRequest.status?.toLowerCase() === 'submitted',
   });
 
-  // Levels for which the current user is an active, non-deleted approver
+  // Levels for which the current user is an active, non-deleted approver.
+  // Match by name (moc_approvers.name) against currentUser.username — the only
+  // cross-system identifier that is reliably the same in both the auth profile
+  // and the Crew Master approvers data. userId fallback for legacy records.
   const crUserApproverLevels: string[] = localApprovers
     .filter((a: any) =>
-      ((currentUser?.email && a.emailId === currentUser.email) || a.userId === currentUserIdForApprover) &&
+      (a.name?.trim().toLowerCase() === currentUser?.username?.trim().toLowerCase() || a.userId === currentUserIdForApprover) &&
       a.isActive === 1 && !a.isDeleted
     )
     .map((a: any) => a.approverLevel as string);
@@ -1757,19 +1760,17 @@ const Dashboard = () => {
       return severity !== 'green';
     }).length : 0;
 
-    // For the KPI: if the current user is a known active approver, scope to their pending items.
-    // We check by userId (username) presence in localApprovers (fetched outside useMemo).
-    // If user IS an approver: use pendingApproverCRs even when zero — that is the correct count.
-    // If user is NOT an approver: show all submitted CRs for the vessel.
+    // All submitted CRs are always visible to every user — the approval workflow only
+    // controls who can click Approve/Reject, not who can see the requests.
+    // userIsApprover is still computed (used for KPI pending-approval WO scoping above)
+    // but no longer gates the CR list or KPI count.
     const currentUserIdKpi = currentUser?.username || (currentUser as any)?.userId || null;
     const userIsApprover = localApprovers.some(
       (a: any) =>
-        ((currentUser?.email && a.emailId === currentUser.email) || (currentUserIdKpi !== null && a.userId === currentUserIdKpi)) &&
+        (a.name?.trim().toLowerCase() === currentUser?.username?.trim().toLowerCase() || (currentUserIdKpi !== null && a.userId === currentUserIdKpi)) &&
         a.isActive === 1 && !a.isDeleted
     );
-    const openChangeRequestsList = userIsApprover
-      ? pendingApproverCRs
-      : changeRequestsData.filter(cr => cr.status?.toLowerCase() === 'submitted');
+    const openChangeRequestsList = changeRequestsData.filter(cr => cr.status?.toLowerCase() === 'submitted');
     const openChangeRequests = openChangeRequestsList.length;
 
     return {
