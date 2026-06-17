@@ -25,6 +25,7 @@ import {
   useExternalCrewPools,
   useExternalAppraisalTypes,
   useExternalUsers,
+  useExternalApprovers,
   getDomain,
 } from "@/hooks/useExternalMasterData";
 
@@ -141,6 +142,18 @@ const masterTypes: MasterType[] = [
       { header: "Sort Order", fields: ["sortOrder"] },
     ],
     isEditable: true,
+  },
+  {
+    id: "approvers",
+    name: "Approvers",
+    idFields: ["auid", "id"],
+    columns: [
+      { header: "Name", fields: ["name"] },
+      { header: "User ID", fields: ["userId"] },
+      { header: "Approver Level", fields: ["approverLevel"] },
+      { header: "Email", fields: ["emailId"] },
+      { header: "Status", fields: ["isActiveLabel"] },
+    ],
   },
    // {
   //   id: "licenseDce",
@@ -427,6 +440,7 @@ export default function DataMasters() {
   const crewPoolsQuery = useExternalCrewPools({ enabled: selectedMaster === "crewPool" });
   const appraisalTypesQuery = useExternalAppraisalTypes({ enabled: selectedMaster === "appraisalType" });
   const usersQuery = useExternalUsers({ enabled: selectedMaster === "users" });
+  const approversQuery = useExternalApprovers({ enabled: selectedMaster === "approvers" });
 
   const queryMap: Record<string, { data: any[]; isLoading: boolean; error: Error | null }> = {
     nationality: { data: nationalitiesQuery.data || [], isLoading: nationalitiesQuery.isLoading, error: nationalitiesQuery.error },
@@ -445,6 +459,7 @@ export default function DataMasters() {
     equipmentCategory: { data: equipmentCategoriesQuery.data || [], isLoading: equipmentCategoriesQuery.isLoading, error: equipmentCategoriesQuery.error },
     defectCategory: { data: defectCategoriesQuery.data || [], isLoading: defectCategoriesQuery.isLoading, error: defectCategoriesQuery.error },
     defectType: { data: defectTypesQuery.data || [], isLoading: defectTypesQuery.isLoading, error: defectTypesQuery.error },
+    approvers: { data: approversQuery.data || [], isLoading: approversQuery.isLoading, error: approversQuery.error },
   };
 
   const currentMaster = masterTypes.find(m => m.id === selectedMaster);

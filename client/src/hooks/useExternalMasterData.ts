@@ -295,3 +295,24 @@ export const useExternalUsers = (options?: UseExternalDataOptions) => {
     enabled: options?.enabled ?? true,
   });
 };
+
+export const useExternalApprovers = (options?: UseExternalDataOptions) => {
+  return useQuery({
+    queryKey: ['/technical/api/external/approvers'],
+    queryFn: async () => {
+      const response = await fetch(
+        buildProxyUrl('approvers', getDomain()),
+        { method: 'GET', headers: { 'accept': '*/*' }, credentials: 'include' }
+      );
+      if (!response.ok) throw new Error(`Failed to fetch approvers: ${response.status}`);
+      const data = await response.json();
+      const all: any[] = data.mocapprovers || [];
+      return all
+        .filter((a) => a.modulename === 'Technical')
+        .map((a) => ({ ...a, isActiveLabel: a.isActive === 1 ? 'Active' : 'Inactive' }));
+    },
+    staleTime: 30 * 60 * 1000,
+    retry: 2,
+    enabled: options?.enabled ?? true,
+  });
+};

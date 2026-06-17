@@ -44,7 +44,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const ALLOWED_EXTERNAL_ENDPOINTS = [
     'nationalities', 'vessels', 'vesseltypes', 'licenses',
     'additionalgroups', 'ports', 'languages', 'fleetgroups',
-    'countries', 'manningagents', 'crewpools', 'appraisaltypes', 'users'
+    'countries', 'manningagents', 'crewpools', 'appraisaltypes', 'users', 'approvers'
   ];
 
   app.get('/technical/api/external/master-data/:endpoint', async (req, res) => {
