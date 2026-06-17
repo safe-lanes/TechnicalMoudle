@@ -1,0 +1,258 @@
+Approval Workflow – Complete Functional Analysis
+Objective
+
+Analyze the Approval Workflow functionality for PMS and Defect modules and understand how requests should be routed, approved, rejected, and synchronized between Office and Vessel environments.
+
+This document is intended for functional analysis only and should be used as the basis for design validation before development.
+
+Approval Workflow Configuration
+
+The Approval Workflow screen allows administrators to configure approval levels for various PMS and Defect transactions.
+
+Each transaction type can be configured with:
+
+Level 1 Approval
+Level 2 Approval
+Level 1 + Level 2 Approval
+
+The approval path shall be determined dynamically based on the configuration selected for each transaction category.
+
+Applicable Modules
+PMS
+Components → Change Request
+Critical Equipment
+Normal Equipment
+Jobs → Change Request
+Critical Jobs
+Critical Equipment Jobs
+Normal Jobs
+Spares → Change Request
+Critical Spares
+Normal Spares
+Stores → Change Request
+Store Items
+Work Order → Postponement
+Critical Work Orders
+Critical Equipment Work Orders
+Normal Work Orders
+Defects
+Extension
+Critical Equipment Related
+COC Related
+Normal Defects
+Closure
+Critical Equipment Related
+COC Related
+Normal Defects
+Verification
+Critical Equipment Related
+COC Related
+Normal Defects
+Approval Routing Logic
+Scenario 1 – Only Level 1 Configured
+
+When only Level 1 is selected:
+
+Request shall be routed to the Level 1 Approver.
+After approval, the request shall be processed.
+Approved changes shall be synchronized to the Vessel.
+Workflow
+
+Vessel User → Request Submission → Level 1 Approval → Synchronization to Vessel
+
+Scenario 2 – Only Level 2 Configured
+
+When only Level 2 is selected:
+
+Request shall be routed directly to the Level 2 Approver.
+Level 1 shall be bypassed.
+After approval, the request shall be processed.
+Approved changes shall be synchronized to the Vessel.
+Workflow
+
+Vessel User → Request Submission → Level 2 Approval → Synchronization to Vessel
+
+Scenario 3 – Both Level 1 and Level 2 Configured
+
+When both approval levels are selected:
+
+Request shall first be routed to Level 1.
+After Level 1 approval, request shall move to Level 2.
+After Level 2 approval, the request shall be processed.
+Approved changes shall be synchronized to the Vessel.
+Workflow
+
+Vessel User → Request Submission → Level 1 Approval → Level 2 Approval → Synchronization to Vessel
+
+Approval Designation Mapping
+
+Level 1 and Level 2 are not fixed users.
+
+Approvers are determined based on the designation, role, rank, or user mapping configured within the system.
+
+When a request is raised:
+
+System identifies the request category.
+System checks the Approval Workflow configuration.
+System identifies the corresponding Level 1 and/or Level 2 approvers.
+System routes the request accordingly.
+Sail Admin Override Behavior
+
+Please note that Sail Admin users shall have visibility of all approval requests irrespective of the configured approval workflow.
+
+Sail Admin users should be able to:
+
+View all pending requests.
+View all approved requests.
+View all rejected requests.
+View all synchronized requests.
+Monitor requests across all modules.
+
+Sail Admin access shall not be restricted by Level 1 or Level 2 designation mappings.
+
+All Sail Admin actions must be captured in the audit trail.
+
+Change Request Rejection Handling
+Level 1 Rejection
+
+If a Change Request is rejected at Level 1:
+
+Workflow shall terminate immediately.
+Request status shall become Rejected.
+Request shall not move to Level 2.
+Requested changes shall not be applied.
+Rejected status shall be synchronized to the Vessel.
+Vessel user shall be able to view rejection remarks.
+Workflow
+
+Vessel User → Change Request → Level 1 Rejection → Rejected Status → Synchronization to Vessel
+
+Level 2 Rejection
+
+If a Change Request is rejected at Level 2:
+
+Level 1 approval shall remain recorded.
+Workflow shall terminate.
+Request status shall become Rejected.
+Requested changes shall not be applied.
+Rejected status shall be synchronized to the Vessel.
+Vessel user shall be able to view rejection remarks.
+Workflow
+
+Vessel User → Change Request → Level 1 Approval → Level 2 Rejection → Rejected Status → Synchronization to Vessel
+
+Work Order Postponement Rejection Handling
+Level 1 Rejection
+
+If a postponement request is rejected at Level 1:
+
+Workflow shall terminate.
+Request status shall become Rejected.
+Work Order shall not be postponed.
+Work Order shall return to its original section.
+Rejected status shall be synchronized to the Vessel.
+Workflow
+
+Vessel User → WO Postponement Request → Level 1 Rejection → WO Returned to Original Status → Synchronization to Vessel
+
+Level 2 Rejection
+
+If a postponement request is rejected at Level 2:
+
+Level 1 approval shall remain recorded.
+Workflow shall terminate.
+Request status shall become Rejected.
+Work Order shall not be postponed.
+Work Order shall return to its original section.
+Rejected status shall be synchronized to the Vessel.
+Workflow
+
+Vessel User → WO Postponement Request → Level 1 Approval → Level 2 Rejection → WO Returned to Original Status → Synchronization to Vessel
+
+Work Order Status Restoration
+
+When a postponement request is rejected:
+
+The Work Order shall be moved back to its original location based on its status before the postponement request was raised.
+
+Possible sections:
+
+Scheduled
+Due
+Overdue
+
+The system shall restore the Work Order to the appropriate section automatically.
+
+Synchronization Rules
+
+Synchronization shall occur only after:
+
+All configured approval levels have approved the request.
+
+Synchronization shall not occur when:
+
+Request is Pending Approval.
+Request is Rejected.
+Request is Partially Approved.
+
+For rejected requests:
+
+Rejected status shall be synchronized to the Vessel.
+No requested changes shall be applied.
+Audit Trail Requirements
+
+The system should capture:
+
+Request ID
+Request Type
+Request Category
+Vessel
+Requested By
+Approval Level
+Approver Name
+Approval/Rejection Action
+Remarks
+Date and Time
+Synchronization Status
+
+All approval activities must be fully traceable.
+
+Validation Analysis
+
+The following scenarios should be analyzed before implementation:
+
+Missing Level 1 Approver
+Level 1 enabled but no approver configured.
+Missing Level 2 Approver
+Level 2 enabled but no approver configured.
+Inactive Approver
+Configured approver is inactive.
+Multiple Approvers
+Multiple users assigned to same designation.
+Approval Mapping Changes
+Approver mapping modified while requests are pending.
+Synchronization Failure
+Approval completed but synchronization fails.
+Duplicate Requests
+Multiple requests raised for same record before approval completion.
+Expected Outcome
+
+The Approval Workflow module should provide a configurable approval mechanism that supports:
+
+Single-level approvals.
+Two-level approvals.
+Dynamic approver assignment.
+Change Request approvals.
+Work Order Postponement approvals.
+Defect approval processes.
+Rejection handling.
+Vessel synchronization.
+Complete audit traceability.
+Sail Admin monitoring and oversight capabilities.
+
+The analysis should be reviewed and finalized before proceeding with development.
+
+
+
+
+Level 1 and Level 2 approver details will shared later we will link with other table
