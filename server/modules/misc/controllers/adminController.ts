@@ -3,7 +3,7 @@ import { storage } from '../../../storage';
 import { getDb } from '../../../db';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
-import { buildExternalMasterDataUrl } from '../../../config/externalApi';
+import { buildExternalMasterDataUrl, getCrewMasterDataBaseUrl } from '../../../config/externalApi';
 import { logFieldChanges } from '../../sync';
 import { sql, eq, and } from 'drizzle-orm';
 import {
@@ -578,12 +578,25 @@ export async function syncMasters(req: Request, res: Response) {
   }
 
   // 7. Sync Approvers (moc_approvers)
+  // NOTE: mocapprovers lives on the Crew Master service (getCrewMasterDataBaseUrl),
+  // NOT on the PMS master data service (buildExternalMasterDataUrl). Using the wrong
+  // base URL is why fetchExternal('mocapprovers') always returned [].
   console.log('📦 Syncing Approvers...');
   let fetchedApprovers: any[] = [];
   let approverFetchSucceeded = false;
   try {
-    fetchedApprovers = await fetchExternal('mocapprovers', 'mocapprovers');
+    const crewBaseUrl = getCrewMasterDataBaseUrl().replace(/\/+$/, '');
+    const approversUrl = `${crewBaseUrl}/mocapprovers?domain=${encodeURIComponent(domain)}`;
+    console.log(`[fetchExternal] Fetching mocapprovers from crew master: ${approversUrl}`);
+    const approversResponse = await fetch(approversUrl, { method: 'GET', headers: { accept: '*/*' } });
+    if (!approversResponse.ok) {
+      throw new Error(`Failed to fetch mocapprovers: ${approversResponse.status}`);
+    }
+    const approversData = await approversResponse.json();
+    // API may return a bare array or { mocapprovers: [...] }
+    fetchedApprovers = Array.isArray(approversData) ? approversData : (approversData.mocapprovers || []);
     approverFetchSucceeded = true;
+    console.log(`[fetchExternal] mocapprovers returned ${fetchedApprovers.length} records`);
   } catch (e: any) {
     console.error(`[syncMasters] Failed to fetch approvers: ${e.message}`);
     stats.approvers.errors.push(`Fetch failed: ${e.message}`);
