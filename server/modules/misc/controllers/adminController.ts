@@ -621,6 +621,7 @@ export async function syncMasters(req: Request, res: Response) {
         const userId = getFieldValue(a, ['userId', 'user_id', 'uid']);
         if (!userId) { stats.approvers.skipped++; continue; }
         const name = getFieldValue(a, ['name', 'fullname', 'fullName', 'userName']) || null;
+        const userUuid = getFieldValue(a, ['userUuid', 'user_uuid', 'uuid']) || null;
         const approverLevel = getFieldValue(a, ['approverLevel', 'approver_level', 'level']) || null;
         const emailId = getFieldValue(a, ['emailId', 'email_id', 'email']) || null;
         const modulename = getFieldValue(a, ['modulename', 'moduleName']) || 'Technical';
@@ -629,6 +630,7 @@ export async function syncMasters(req: Request, res: Response) {
         await db.insert(mocApprovers).values({
           name,
           userId,
+          userUuid,
           approverLevel,
           emailId,
           isActive,

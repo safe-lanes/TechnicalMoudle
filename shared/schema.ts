@@ -4324,6 +4324,7 @@ export const mocApprovers = pgTable("moc_approvers", {
   mauuid: text("mauuid").notNull().unique().default(sql`gen_random_uuid()::text`),
   name: text("name"),
   userId: text("user_id"),
+  userUuid: text("user_uuid"),
   approverLevel: text("approver_level"),
   emailId: text("email_id"),
   isActive: integer("is_active").default(1),

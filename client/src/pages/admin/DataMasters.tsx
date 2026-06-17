@@ -151,6 +151,7 @@ const masterTypes: MasterType[] = [
     columns: [
       { header: "Name", fields: ["name"] },
       { header: "User ID", fields: ["userId"] },
+      { header: "User UUID", fields: ["userUuid"] },
       { header: "Approver Level", fields: ["approverLevel"] },
       { header: "Email", fields: ["emailId"] },
       { header: "Status", fields: ["isActiveLabel"] },
