@@ -9381,7 +9381,7 @@ export class PostgresStorage {
     const db = await getDb();
     return db.select()
       .from(mocApprovers)
-      .where(eq(mocApprovers.isDeleted, false));
+      .where(and(eq(mocApprovers.isDeleted, false), eq(mocApprovers.modulename, 'Technical')));
   }
 
   async upsertApprovalWorkflowConfig(
