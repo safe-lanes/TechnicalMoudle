@@ -5338,12 +5338,38 @@ export class PostgresStorage {
   // ── Internal: finalise a fully-approved CR (apply changes + mark approved) ──
 
   private async finaliseApprovedCR(id: number, existing: ChangeRequest, reviewerId: string, comment: string): Promise<ChangeRequest> {
+    return this.finaliseApprovedCRWithStep(id, existing, null, reviewerId, comment, new Date());
+  }
+
+  // ── Internal: atomically mark the final approval step AND finalise the CR ──
+  // stepId: if provided, marks that step as Approved inside the same transaction.
+
+  private async finaliseApprovedCRWithStep(
+    id: number,
+    existing: ChangeRequest,
+    stepId: number | null,
+    reviewerId: string,
+    comment: string,
+    now: Date
+  ): Promise<ChangeRequest> {
     const db = await getDb();
-    const now = new Date();
     const newRevisionNumber = (existing.revisionNumber || 0) + 1;
 
     try {
       const result = await db.transaction(async (tx) => {
+        // Mark the final approval step as Approved inside the same transaction
+        if (stepId !== null) {
+          await tx.update(changeRequestApproval)
+            .set({
+              status: 'Approved',
+              actionByUserId: reviewerId,
+              actionAt: now,
+              remarks: comment,
+              updatedAt: now
+            })
+            .where(eq(changeRequestApproval.id, stepId));
+        }
+
         const appliedChangesResult = await this.applyApprovedChangesInTx(tx, existing);
 
         const revisionHistoryEntry = {
@@ -5408,24 +5434,25 @@ export class PostgresStorage {
       throw new Error(`Not authorised to approve at ${activeStep.approvalLevel}`);
     }
 
-    // Mark the active step as Approved
-    await this.updateChangeRequestApprovalStep(activeStep.id, {
-      status: 'Approved',
-      actionByUserId: reviewerId,
-      actionAt: now,
-      remarks: comment
-    });
-
-    // Check if any further steps are still Pending
+    // Check if any further steps are still Pending (excluding the active step)
     const remainingSteps = steps.filter(s => s.id !== activeStep.id && s.status === 'Pending');
+
     if (remainingSteps.length > 0) {
+      // More steps remain — mark the active step approved non-atomically is fine here;
+      // CR stays in 'submitted' state awaiting the next level.
+      await this.updateChangeRequestApprovalStep(activeStep.id, {
+        status: 'Approved',
+        actionByUserId: reviewerId,
+        actionAt: now,
+        remarks: comment
+      });
       console.log(`[CR_WORKFLOW] CR ${id} — ${activeStep.approvalLevel} approved; awaiting ${remainingSteps.length} more level(s)`);
       return (await this.getChangeRequest(id))!;
     }
 
-    // All steps approved — apply changes and finalise
+    // All steps approved — mark the final step AND finalise atomically in one transaction.
     console.log(`[CR_WORKFLOW] CR ${id} — all approval levels satisfied, finalising`);
-    return this.finaliseApprovedCR(id, existing, reviewerId, comment);
+    return this.finaliseApprovedCRWithStep(id, existing, activeStep.id, reviewerId, comment, now);
   }
 
   /**

@@ -52,6 +52,7 @@ import {
 } from "@/components/wo/woCellRenderers";
 import { RejectionHistoryBadge } from "@/components/wo/RejectionHistoryBadge";
 import { useVessels } from "@/hooks/useVessels";
+import { useLocalApprovers } from "@/hooks/useExternalMasterData";
 import { PeriodFilter, type PeriodFilterValue, periodFilterToDateRange, getPeriodLabel } from "@/components/filters/PeriodFilter";
 import { SemiCircleGauge } from "@/components/SemiCircleGauge";
 import { ComplianceAnomalyPanel } from "./ComplianceAnomalyPanel";
@@ -576,6 +577,7 @@ const Dashboard = () => {
 
   const { currentUser, myVessels } = useAuth();
   const userRankName = currentUser?.rank_name ?? '';
+  const { data: localApprovers = [] } = useLocalApprovers();
 
   // Task #224: "My Vessel" scope = the set of vessels assigned to the logged-in
   // user (from AuthContext.myVessels). The 'my' sentinel in mgmtVesselId means
@@ -1731,11 +1733,17 @@ const Dashboard = () => {
       return severity !== 'green';
     }).length : 0;
 
-    // For the KPI: prefer the approver-scoped list when available (non-empty means user is an approver)
-    const effectiveChangeRequests = pendingApproverCRs.length > 0
+    // For the KPI: if the current user is a known active approver, scope to their pending items.
+    // We check by userId (username) presence in localApprovers (fetched outside useMemo).
+    // If user IS an approver: use pendingApproverCRs even when zero — that is the correct count.
+    // If user is NOT an approver: show all submitted CRs for the vessel.
+    const currentUserIdKpi = currentUser?.username || (currentUser as any)?.userId || null;
+    const userIsApprover = currentUserIdKpi !== null && localApprovers.some(
+      (a: any) => a.userId === currentUserIdKpi && a.isActive === 1 && !a.isDeleted
+    );
+    const openChangeRequestsList = userIsApprover
       ? pendingApproverCRs
       : changeRequestsData.filter(cr => cr.status?.toLowerCase() === 'submitted');
-    const openChangeRequestsList = effectiveChangeRequests;
     const openChangeRequests = openChangeRequestsList.length;
 
     return {
@@ -1757,7 +1765,7 @@ const Dashboard = () => {
       openChangeRequests,
       openChangeRequestsList,
     };
-  }, [operationWOs, sparesData, changeRequestsData, pendingApproverCRs, complianceAnomalies, isHeadOfDept]);
+  }, [operationWOs, sparesData, changeRequestsData, pendingApproverCRs, localApprovers, currentUser, complianceAnomalies, isHeadOfDept]);
 
   const operationTableData = useMemo(() => {
     switch (selectedOpCard) {

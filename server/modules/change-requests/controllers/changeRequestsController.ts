@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import type { AuthenticatedRequest } from '../../../middleware/auth';
 import * as crService from '../services/changeRequestsService';
 
 // ── GET /change-requests/field-definitions/:targetType ──
@@ -101,7 +102,14 @@ export async function createAttachment(req: Request, res: Response) {
 
 export async function approveChangeRequest(req: Request, res: Response) {
   const id = parseInt(req.params.id);
-  const updated = await crService.approveChangeRequest(id, req.body);
+  // Derive reviewer identity from the authenticated session, NOT the request body.
+  // req.user is populated by the auth middleware (mock or real).
+  const authReq = req as AuthenticatedRequest;
+  const serverReviewerId = authReq.user?.username || authReq.user?.userUuid || 'system';
+  const updated = await crService.approveChangeRequest(id, {
+    comment: req.body.comment,
+    reviewerId: serverReviewerId,
+  });
   res.json(updated);
 }
 
@@ -109,7 +117,12 @@ export async function approveChangeRequest(req: Request, res: Response) {
 
 export async function rejectChangeRequest(req: Request, res: Response) {
   const id = parseInt(req.params.id);
-  const updated = await crService.rejectChangeRequest(id, req.body);
+  const authReq = req as AuthenticatedRequest;
+  const serverReviewerId = authReq.user?.username || authReq.user?.userUuid || 'system';
+  const updated = await crService.rejectChangeRequest(id, {
+    comment: req.body.comment,
+    reviewerId: serverReviewerId,
+  });
   res.json(updated);
 }
 
