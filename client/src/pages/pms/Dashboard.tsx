@@ -784,6 +784,18 @@ const Dashboard = () => {
     enabled: !!effectiveVesselId,
   });
 
+  // Approver-scoped CR query: only CRs where the current user is the pending approver
+  const currentUserIdForApprover = currentUser?.username || (currentUser as any)?.userId || null;
+  const { data: pendingApproverCRs = [] } = useQuery<ChangeRequest[]>({
+    queryKey: ['/technical/api/change-requests', 'pending-approver', currentUserIdForApprover],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/change-requests?pendingForApprover=${encodeURIComponent(currentUserIdForApprover!)}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!currentUserIdForApprover,
+  });
+
   const { data: superintendentSummary } = useQuery<{ pendingCount: number; acknowledgedThisMonthCount: number }>({
     queryKey: ['/technical/api/superintendent/notifications/summary', effectiveVesselId],
     queryFn: async () => {
@@ -1719,11 +1731,11 @@ const Dashboard = () => {
       return severity !== 'green';
     }).length : 0;
 
-    const effectiveChangeRequests = changeRequestsData;
-    const openChangeRequestsList = effectiveChangeRequests.filter(cr => {
-      const s = cr.status?.toLowerCase();
-      return s === 'submitted';
-    });
+    // For the KPI: prefer the approver-scoped list when available (non-empty means user is an approver)
+    const effectiveChangeRequests = pendingApproverCRs.length > 0
+      ? pendingApproverCRs
+      : changeRequestsData.filter(cr => cr.status?.toLowerCase() === 'submitted');
+    const openChangeRequestsList = effectiveChangeRequests;
     const openChangeRequests = openChangeRequestsList.length;
 
     return {
@@ -1745,7 +1757,7 @@ const Dashboard = () => {
       openChangeRequests,
       openChangeRequestsList,
     };
-  }, [operationWOs, sparesData, changeRequestsData, complianceAnomalies, isHeadOfDept]);
+  }, [operationWOs, sparesData, changeRequestsData, pendingApproverCRs, complianceAnomalies, isHeadOfDept]);
 
   const operationTableData = useMemo(() => {
     switch (selectedOpCard) {

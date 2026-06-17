@@ -211,6 +211,11 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
   const cr = await crRepo.getChangeRequest(id);
   if (!cr) throw new NotFoundError('Change request not found');
 
+  // Only allow submission from draft or returned status
+  if (cr.status !== 'draft' && cr.status !== 'returned') {
+    throw new ValidationError(`Cannot submit a change request with status '${cr.status}'. Only draft or returned CRs can be submitted.`);
+  }
+
   let equipmentClassification: 'normal' | 'critical' | 'unknown' = 'unknown';
 
   // Classify the target component (only components support classification)

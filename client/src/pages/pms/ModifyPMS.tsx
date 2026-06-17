@@ -58,6 +58,7 @@ import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLocalApprovers } from "@/hooks/useExternalMasterData";
 
 interface RevisionHistoryEntry {
   revisionNumber: number;
@@ -210,12 +211,31 @@ export default function ModifyPMS() {
     enabled: !!viewingRequest && viewingRequest.status === 'submitted',
   });
 
-  // Derive whether the current user is the active approver for the next pending step
-  const pendingStep = approvalSteps.find((s: any) => s.status === 'Pending');
+  // Fetch local approvers to determine if the current user can act on a step
+  const { data: localApprovers = [] } = useLocalApprovers();
+
+  // Derive level-aware action eligibility
+  const currentUserId = currentUser?.username || (currentUser as any)?.userId || null;
+  // Levels for which the current user is an active, non-deleted approver
+  const userApproverLevels: string[] = localApprovers
+    .filter((a: any) => a.userId === currentUserId && a.isActive === 1 && !a.isDeleted)
+    .map((a: any) => a.approverLevel as string);
+
+  // The first Pending step is the one that needs action right now
+  const activeStep = approvalSteps.find((s: any) => s.status === 'Pending');
+  // True when the active step matches one of the current user's approver levels
+  const userIsApproverForActiveStep = !!activeStep && userApproverLevels.includes(activeStep.approvalLevel);
+  // True when the active step is at an earlier level than the user's level (e.g., L1 pending, user is L2)
+  const awaitingPriorLevel = !!activeStep && !userIsApproverForActiveStep
+    && userApproverLevels.length > 0;
+  // Legacy CRs with no steps yet: fall back to role-based guard
+  const noStepsYet = viewingRequest?.status === 'submitted' && approvalSteps.length === 0;
+
   const currentUserCanAct = !!viewingRequest
     && viewingRequest.status === 'submitted'
     && !isVessel
-    && !isHeadOfDept;
+    && !isHeadOfDept
+    && (noStepsYet || userIsApproverForActiveStep);
 
   // Create mutation
   const createMutation = useMutation({
@@ -1189,9 +1209,12 @@ export default function ModifyPMS() {
                     );
                   })}
                 </div>
-                {pendingStep && (
-                  <p className="mt-1 text-xs text-blue-600">
-                    Awaiting {pendingStep.approvalLevel} approval
+                {activeStep && (
+                  <p className="mt-1 text-xs text-blue-600" data-testid="text-awaiting-level">
+                    Awaiting {activeStep.approvalLevel} approval
+                    {awaitingPriorLevel && (
+                      <span className="ml-1 text-amber-600">(complete prior level first)</span>
+                    )}
                   </p>
                 )}
               </div>
