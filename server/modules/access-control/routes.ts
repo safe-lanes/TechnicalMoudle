@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { storage } from '../../storage';
+import { requirePMSAdmin } from '../../middleware/auth';
 
 const router = Router();
 
@@ -44,7 +45,7 @@ router.get('/admin/access-control/:roleRuid', async (req: Request, res: Response
   }
 });
 
-router.put('/admin/access-control/:roleRuid', async (req: Request, res: Response) => {
+router.put('/admin/access-control/:roleRuid', requirePMSAdmin, async (req: Request, res: Response) => {
   try {
     const { roleRuid } = req.params;
     const { permissions } = req.body as {
