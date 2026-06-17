@@ -798,6 +798,26 @@ const Dashboard = () => {
     enabled: !!currentUserIdForApprover,
   });
 
+  // Approval steps for the CR currently open in the detail dialog (gate logic)
+  const { data: opCrApprovalSteps = [] } = useQuery({
+    queryKey: ['/technical/api/change-requests', opDetailChangeRequest?.id, 'approval-steps'],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/change-requests/${opDetailChangeRequest!.id}/approval-steps`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!opDetailChangeRequest && opDetailChangeRequest.status?.toLowerCase() === 'submitted',
+  });
+
+  // Levels for which the current user is an active, non-deleted approver
+  const crUserApproverLevels: string[] = localApprovers
+    .filter((a: any) => a.userId === currentUserIdForApprover && a.isActive === 1 && !a.isDeleted)
+    .map((a: any) => a.approverLevel as string);
+  const crActiveStep = opCrApprovalSteps.find((s: any) => s.status === 'Pending');
+  const crUserIsApproverForActiveStep = !!crActiveStep && crUserApproverLevels.includes(crActiveStep.approvalLevel);
+  const crNoStepsYet = opDetailChangeRequest?.status?.toLowerCase() === 'submitted' && opCrApprovalSteps.length === 0;
+  const crUserCanAct = crNoStepsYet ? (!isVessel && !isHeadOfDept) : crUserIsApproverForActiveStep;
+
   const { data: superintendentSummary } = useQuery<{ pendingCount: number; acknowledgedThisMonthCount: number }>({
     queryKey: ['/technical/api/superintendent/notifications/summary', effectiveVesselId],
     queryFn: async () => {
@@ -4597,7 +4617,7 @@ const Dashboard = () => {
                   <Eye className="h-4 w-4 mr-1" />
                   View Changes
                 </Button>
-                {opDetailChangeRequest.status?.toLowerCase() === 'submitted' && !isVessel && !isHeadOfDept && (
+                {opDetailChangeRequest.status?.toLowerCase() === 'submitted' && crUserCanAct && (
                   <>
                     <Button
                       variant="destructive"
