@@ -810,12 +810,11 @@ const Dashboard = () => {
   });
 
   // Levels for which the current user is an active, non-deleted approver.
-  // Match by name (moc_approvers.name) against currentUser.username — the only
-  // cross-system identifier that is reliably the same in both the auth profile
-  // and the Crew Master approvers data. userId fallback for legacy records.
+  // Match by userUuid (moc_approvers.user_uuid vs currentUser.userUuid) —
+  // the stable cross-system UUID identifier synced from Crew Master.
   const crUserApproverLevels: string[] = localApprovers
     .filter((a: any) =>
-      (a.name?.trim().toLowerCase() === currentUser?.username?.trim().toLowerCase() || a.userId === currentUserIdForApprover) &&
+      a.userUuid && currentUser?.userUuid && a.userUuid === currentUser.userUuid &&
       a.isActive === 1 && !a.isDeleted
     )
     .map((a: any) => a.approverLevel as string);
@@ -1764,10 +1763,9 @@ const Dashboard = () => {
     // controls who can click Approve/Reject, not who can see the requests.
     // userIsApprover is still computed (used for KPI pending-approval WO scoping above)
     // but no longer gates the CR list or KPI count.
-    const currentUserIdKpi = currentUser?.username || (currentUser as any)?.userId || null;
     const userIsApprover = localApprovers.some(
       (a: any) =>
-        (a.name?.trim().toLowerCase() === currentUser?.username?.trim().toLowerCase() || (currentUserIdKpi !== null && a.userId === currentUserIdKpi)) &&
+        a.userUuid && currentUser?.userUuid && a.userUuid === currentUser.userUuid &&
         a.isActive === 1 && !a.isDeleted
     );
     const openChangeRequestsList = changeRequestsData.filter(cr => cr.status?.toLowerCase() === 'submitted');

@@ -214,11 +214,14 @@ export default function ModifyPMS() {
   // Fetch local approvers to determine if the current user can act on a step
   const { data: localApprovers = [] } = useLocalApprovers();
 
-  // Derive level-aware action eligibility
-  const currentUserId = currentUser?.username || (currentUser as any)?.userId || null;
-  // Levels for which the current user is an active, non-deleted approver
+  // Levels for which the current user is an active, non-deleted approver.
+  // Match by userUuid (moc_approvers.user_uuid vs currentUser.userUuid) —
+  // the stable cross-system UUID identifier synced from Crew Master.
   const userApproverLevels: string[] = localApprovers
-    .filter((a: any) => a.userId === currentUserId && a.isActive === 1 && !a.isDeleted)
+    .filter((a: any) =>
+      a.userUuid && currentUser?.userUuid && a.userUuid === currentUser.userUuid &&
+      a.isActive === 1 && !a.isDeleted
+    )
     .map((a: any) => a.approverLevel as string);
 
   // The first Pending step is the one that needs action right now

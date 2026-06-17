@@ -165,11 +165,12 @@ export function ModifyPMS() {
     enabled: !!viewingRequest && viewingRequest.status === 'submitted',
   });
 
-  // Derive whether the current user is the active approver for the pending step
-  const currentUserId = currentUser?.username || (currentUser as any)?.userId || null;
+  // Derive whether the current user is the active approver for the pending step.
+  // Match by userUuid (moc_approvers.user_uuid vs currentUser.userUuid) —
+  // the stable cross-system UUID identifier synced from Crew Master.
   const userApproverLevels: string[] = localApprovers
     .filter((a: any) =>
-      (a.name?.trim().toLowerCase() === currentUser?.username?.trim().toLowerCase() || a.userId === currentUserId) &&
+      a.userUuid && currentUser?.userUuid && a.userUuid === currentUser.userUuid &&
       a.isActive === 1 && !a.isDeleted
     )
     .map((a: any) => a.approverLevel as string);
