@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface LocationItem {
   id: number;
@@ -23,6 +24,8 @@ interface LocationSearchDropdownProps {
   placeholder?: string;
   disabled?: boolean;
   allowClear?: boolean;
+  allowCreate?: boolean;
+  triggerClassName?: string;
   "data-testid"?: string;
 }
 
@@ -33,6 +36,8 @@ export function LocationSearchDropdown({
   placeholder = "Select location...",
   disabled = false,
   allowClear = false,
+  allowCreate = true,
+  triggerClassName,
   "data-testid": testId,
 }: LocationSearchDropdownProps) {
   const { toast } = useToast();
@@ -117,7 +122,7 @@ export function LocationSearchDropdown({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className="w-full justify-between font-normal h-10 px-3"
+          className={cn("w-full justify-between font-normal h-10 px-3", triggerClassName)}
           data-testid={testId}
         >
           <span className="truncate text-left flex-1">
@@ -166,6 +171,8 @@ export function LocationSearchDropdown({
               </>
             )}
           </CommandList>
+          {allowCreate && (
+          <>
           <CommandSeparator />
           <div className="p-1">
             {isCreating ? (
@@ -201,6 +208,8 @@ export function LocationSearchDropdown({
               </button>
             )}
           </div>
+          </>
+          )}
         </Command>
       </PopoverContent>
     </Popover>
