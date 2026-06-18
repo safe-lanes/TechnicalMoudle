@@ -103,7 +103,7 @@ export async function createAttachment(req: Request, res: Response) {
 export async function approveChangeRequest(req: Request, res: Response) {
   const id = parseInt(req.params.id);
   const authReq = req as AuthenticatedRequest;
-  const serverReviewerId = authReq.user?.username || authReq.user?.userUuid || 'system';
+  const serverReviewerId = authReq.user?.userUuid || authReq.user?.username || 'system';
   const userRole = authReq.user?.role || '';
   const updated = await crService.approveChangeRequest(id, {
     comment: req.body.comment,
@@ -118,7 +118,7 @@ export async function approveChangeRequest(req: Request, res: Response) {
 export async function rejectChangeRequest(req: Request, res: Response) {
   const id = parseInt(req.params.id);
   const authReq = req as AuthenticatedRequest;
-  const serverReviewerId = authReq.user?.username || authReq.user?.userUuid || 'system';
+  const serverReviewerId = authReq.user?.userUuid || authReq.user?.username || 'system';
   const userRole = authReq.user?.role || '';
   const updated = await crService.rejectChangeRequest(id, {
     comment: req.body.comment,
