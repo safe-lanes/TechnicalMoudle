@@ -187,6 +187,9 @@ Migrations: **121** (`sync_field_log.changed_by_display`), **122** (`running_hou
 - **Approval-audit phase:** org-chart (`saveOrgChart`/`updateOrgChartEntry`/`deleteOrgChartEntry`) + approval routing.
 - **DB-view union:** documented fallback for the viewer only if merge-pagination performance ever demands it.
 
+### Merge resolution (REQUIRED at the audit→replit_dev merge)
+- `client/src/lib/activeRank.ts` and `client/src/contexts/AuthContext.tsx` are modified on BOTH this branch and `replit_dev` → the merge **will conflict** on them. **Resolve by UNION (keep both sides), never accept-one-side** — full instructions in **`docs/AUDIT-MERGE-NOTES.md`**.
+
 ### Cleanup flags (separate — not actioned in this work)
 - `PUT /admin/access-control/:roleRuid` has **no `requireRole` guard** (anyone authenticated can rewrite a role's permissions) — recommend gating.
 - Two **orphaned hard-delete routes** (`DELETE /components/:id`, `DELETE /fleet/components/:id`) bypass the retain-and-deactivate model — recommend gating/removing.
