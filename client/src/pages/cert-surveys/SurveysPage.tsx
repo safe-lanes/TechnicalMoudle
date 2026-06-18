@@ -103,7 +103,7 @@ const ActionsCellRenderer = (params: ActionsCellRendererProps) => {
 };
 
 export default function SurveysPage() {
-  const { isClientAdmin, isSailAdmin } = useUIRole();
+  const { isClientAdmin, isSailAdmin, isTechSuperintendent } = useUIRole();
   const [showFilters, setShowFilters] = useState(true);
   const [filterValue, setFilterValue] = useState<VesselFleetGroupFilterValue>(createDefaultFilterValue());
   const [selectedVesselNames, setSelectedVesselNames] = useState<string[]>([]);
@@ -691,7 +691,7 @@ export default function SurveysPage() {
 
       {showFilters && (
         <div className="flex items-center gap-4 px-6 flex-shrink-0">
-          {(isClientAdmin || isSailAdmin) && (
+          {(isClientAdmin || isSailAdmin || isTechSuperintendent) && (
             <VesselFleetGroupFilter
               value={filterValue}
               onChange={handleFilterChange}

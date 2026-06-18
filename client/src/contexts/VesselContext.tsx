@@ -19,6 +19,16 @@ interface VesselContextType {
   vessels: Vessel[];
   /** The assigned mini-fleet ids that 'my' aggregates over (from AuthContext). */
   assignedVesselIds: string[];
+  /**
+   * Scope-aware option list for vessel `<Select>` pickers. When the global
+   * scope is 'my' this is narrowed to the assigned mini-fleet; otherwise it is
+   * the full vessel list. Use this ONLY to render picker options — keep using
+   * `vessels` for id→name lookups so labels resolve for any vessel.
+   */
+  pickerVessels: Vessel[];
+  /** True when scope is 'my' but the user has no assigned vessels — pickers
+   * should show an empty-state instead of an empty/unusable dropdown. */
+  myVesselsEmpty: boolean;
   isAllVessels: boolean;
   isMyVessels: boolean;
   /**
@@ -135,6 +145,17 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
   const isAllVessels = vesselId === 'all';
   const isMyVessels = vesselId === 'my';
 
+  // Scope-aware option list for vessel pickers. In 'my' scope, narrow the
+  // rendered options to the assigned mini-fleet (mirroring the Dashboard);
+  // fall back to a label-only stub if a fleet id is missing from the vessel
+  // list. Otherwise expose the full list unchanged.
+  const pickerVessels: Vessel[] = isMyVessels
+    ? assignedVesselIds.map(
+        id => vessels.find(v => v.id === id) || { id, name: id, code: id }
+      )
+    : vessels;
+  const myVesselsEmpty = isMyVessels && assignedVesselIds.length === 0;
+
   const applyVesselScope = (params: URLSearchParams) => {
     if (isMyVessels) {
       params.set('vesselId', 'all');
@@ -152,6 +173,8 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
         isLoading,
         vessels,
         assignedVesselIds,
+        pickerVessels,
+        myVesselsEmpty,
         isAllVessels,
         isMyVessels,
         applyVesselScope,

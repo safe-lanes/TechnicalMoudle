@@ -31,6 +31,13 @@ const alertTypeLabels: Record<string, string> = {
   low_critical_spares: 'Low Spares',
   critical_job_cycle_skipped: 'Cycle Skipped',
   sync_conflict_detected: 'Sync Conflict',
+  certificate_expiration: 'Certificate Expiring',
+  certificate_expired: 'Certificate Expired',
+  survey_due_soon: 'Survey Due Soon',
+  survey_window_closing: 'Survey Window Closing',
+  survey_overdue: 'Survey Overdue',
+  defect_overdue: 'Defect Overdue',
+  defect_coc: 'COC / Class Defect',
 };
 
 function getHighestPriority(events: AlertEvent[]): string {

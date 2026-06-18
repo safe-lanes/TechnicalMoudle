@@ -1,0 +1,63 @@
+#267 - Phase 1 — Frontend auth gate (simple)
+Goal
+Stop production from opening the PMS as Sail Admin on a direct URL. Gate the SPA in the frontend only. No backend / JWT / mock-auth changes this phase.
+
+The rule (one line)
+If APP_ENV === "replit" → keep the DEFAULT_USER auto-enter (dev convenience). Otherwise (production / local / anything ≠ replit) → the user is authenticated only if login data exists in localStorage; if localStorage is empty → redirect to the existing /login page.
+
+Environment detection (APP_ENV)
+The gate runs in the browser, but Vite only exposes VITE_-prefixed vars via import.meta.env; the existing unprefixed APP_ENV is not readable client-side.
+Do: add a separate VITE_APP_ENV=replit in the Replit workspace only (keep the existing APP_ENV=dev for server use). Production/local leave it unset ⇒ undefined ≠ "replit" ⇒ gated. No production env change required.
+(Alt, not preferred: one-line vite.config.ts define mapping process.env.APP_ENV, then set APP_ENV=replit on Replit — touches the otherwise-frozen Vite config.)
+Helper (add to client/src/utils/secureStorage.ts or a tiny client/src/lib/env.ts):
+export const isReplit = () => import.meta.env.VITE_APP_ENV === "replit";
+
+Changes (3 edits + 1 new file)
+1. Gate the DEFAULT_USER fallback — client/src/contexts/AuthContext.tsx
+The mount-effect fallback (~313–319) currently assigns DEFAULT_USER whenever no profile resolves from storage. Make it Replit-only:
+
+if (!resolvedUser && isReplit()) {
+  resolvedUser = DEFAULT_USER;
+  resolvedUserType = mapLoggedRoleToUIRole(DEFAULT_USER.userType, DEFAULT_USER.role);
+}
+
+In production with empty storage, resolvedUser stays null ⇒ currentUser null ⇒ isAuthenticated === false.
+Add an isHydrated boolean (set true at the end of the mount effect) and expose it on the context so the gate doesn't redirect before hydration finishes (avoids a flash / false redirect).
+2. New AuthGate — client/src/components/AuthGate.tsx
+Render it inside AuthProvider, wrapping the existing <Switch> in App.tsx.
+
+const { isAuthenticated, isHydrated } = useAuth();
+const authed = isReplit() || isAuthenticated;   // isAuthenticated = login data present in localStorage
+useEffect(() => {
+  if (isHydrated && !authed) window.location.assign("/login");
+}, [isHydrated, authed]);
+if (!isHydrated) return null;   // wait for hydration
+if (!authed) return null;       // redirecting to /login
+return <>{children}</>;
+
+/login already exists (portal/host-served, NOT an in-app route) ⇒ use a hard window.location.assign("/login"). Do not add a wouter route and do not create a Login page/component.
+3. Wire AuthGate into client/src/App.tsx
+Wrap the existing <Switch>…</Switch> with <AuthGate> … </AuthGate> (inside the existing provider tree so useAuth() is available).
+
+4. Logout redirects to /login — client/src/contexts/AuthContext.tsx (~417–449)
+logout() already fires the best-effort Shipskart SSO logout (fire-and-forget), calls secureClear(), and nulls state. Add at the end:
+
+window.location.assign("/login");
+
+After secureClear() localStorage is empty, so the next load is also gated to /login in production. On Replit, isReplit() is true so the app re-enters with DEFAULT_USER — matching "Replit uses default user".
+Explicitly NOT done
+No /login page or route created (already exists, portal-served).
+No backend, JWT, tenant, or mock-auth changes.
+No logout marker / sessionStorage scheme — production already behaves correctly because empty storage = unauthenticated there.
+Done looks like
+Production, direct URL, empty localStorage ⇒ redirected to /login; PMS does not render as Sail Admin.
+Production, valid login data in localStorage ⇒ app works exactly as today.
+Logout ⇒ storage cleared ⇒ lands on /login.
+Replit workspace (VITE_APP_ENV=replit) ⇒ still auto-enters as Sail Admin; preview / automated check passes.
+npx tsc --noEmit stays ≤ baseline (374).
+Relevant files
+client/src/contexts/AuthContext.tsx — gate DEFAULT_USER (~313), add isHydrated, logout redirect (~439)
+client/src/components/AuthGate.tsx — new gate component
+client/src/App.tsx — wrap <Switch> with <AuthGate>
+client/src/utils/secureStorage.ts — isReplit() helper (or lib/env.ts); existing secureClear / secureGetItem
+Env: set VITE_APP_ENV=replit in the Replit workspace only

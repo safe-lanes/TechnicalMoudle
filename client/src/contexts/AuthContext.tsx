@@ -8,7 +8,7 @@ import {
 import type { PublicUser, UserRole } from "@shared/schema";
 import type { UIRole } from "@shared/uiRoles";
 import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
-import { secureGetItem } from "@/utils/secureStorage";
+import { secureGetItem, secureClear } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
 import { setActiveRank, setActiveIdentity, type ActiveIdentity } from "@/lib/activeRank";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -42,6 +42,32 @@ function resolveProfileName(profile: Record<string, any>): {
     profile.userUuid ||
     null;
   return { fullName, username, userUuid };
+}
+
+/**
+ * Read the standalone `domain` key from localStorage. It is stored separately
+ * from `userProfile` (NOT a field on it). Encrypted value is preferred; falls
+ * back to a plain string the same encrypted-first / plain-fallback way the rest
+ * of the auth hydration reads stored values. Returns null when absent/blank.
+ */
+function resolveDomain(): string | null {
+  const encrypted = secureGetItem<unknown>("domain");
+  if (typeof encrypted === "string" && encrypted.trim()) {
+    return encrypted.trim();
+  }
+  const plain = localStorage.getItem("domain");
+  if (plain) {
+    const trimmed = plain.trim();
+    if (trimmed) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (typeof parsed === "string" && parsed.trim()) return parsed.trim();
+      } catch {
+        return trimmed;
+      }
+    }
+  }
+  return null;
 }
 
 const DEFAULT_USER: PublicUser = {
@@ -120,6 +146,9 @@ function normalizeMyVessels(
 interface AuthContextType {
   currentUser: PublicUser | null;
   myVessels: MyVesselAssignment[];
+  /** Organization/tenant code from the standalone encrypted `domain`
+   * localStorage key (NOT a field on userProfile). Null when absent. */
+  domain: string | null;
   isAuthenticated: boolean;
   hasRole: (role: UserRole | UserRole[]) => boolean;
   isShipUser: boolean;
@@ -170,6 +199,7 @@ function toActiveIdentity(user: PublicUser | null | undefined): ActiveIdentity |
 export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<PublicUser | null>(null);
   const [myVessels, setMyVessels] = useState<MyVesselAssignment[]>([]);
+  const [domain, setDomain] = useState<string | null>(null);
   const [userType, setUserType] = useState<UIRole | null>(null);
 
   useEffect(() => {
@@ -305,6 +335,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setCurrentUser(resolvedUser);
     setMyVessels(resolvedMyVessels);
+    setDomain(resolveDomain());
     setUserType(resolvedUserType);
     const hydratedRankChanged = setActiveRank(resolvedUser?.rank_name ?? null);
     // Audit Phase 0 — forward the authenticated identity to PMS on every API call.
@@ -392,6 +423,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     }
     setMyVessels(loginMyVessels);
+    setDomain(resolveDomain());
 
     const rankChanged = setActiveRank(sanitizedUser.rank_name ?? null);
     // Audit Phase 0 — forward the authenticated identity to PMS on every API call.
@@ -411,15 +443,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // errors are logged only. The backend endpoint is idempotent.
     void (async () => {
       try {
-        await apiRequest("POST", "/technical/api/shipskart/sso/logout", { role: roleForLogout });
+        await apiRequest("POST", "/technical/api/shipskart/sso/logout", {
+          role: roleForLogout,
+        });
       } catch (err) {
         console.error("[Shipskart] logout call failed (non-blocking):", err);
       }
     })();
 
+    // TODO(server-auth): when this app's backend gains real session/token
+    // auth (it currently runs mock auth), also call its server logout endpoint
+    // here to invalidate the server session. Today logout is client-side only.
+
+    // Wipe all auth-related localStorage so a reload cannot re-hydrate the
+    // previous user (otherwise AuthContext's mount effect re-authenticates).
+    secureClear();
+
     setCurrentUser(null);
     setUserType(null);
     setMyVessels([]);
+    setDomain(null);
     const rankChanged = setActiveRank(null);
     // Audit Phase 0 — clear the forwarded identity on logout.
     setActiveIdentity(null);
@@ -431,6 +474,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const value: AuthContextType = {
     currentUser,
     myVessels,
+    domain,
     isAuthenticated: !!currentUser,
     hasRole,
     isShipUser,

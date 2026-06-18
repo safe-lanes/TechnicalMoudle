@@ -132,6 +132,9 @@ export async function create(data: any): Promise<Component> {
     throw new ValidationError(`Missing mandatory fields: ${missing.join(', ')}`);
   }
 
+  if (data.eqptSystemDept && data.eqptSystemDept.toUpperCase() === 'NULL') {
+    data.eqptSystemDept = null;
+  }
   if (data.eqptSystemDept && !ALLOWED_DEPARTMENTS.includes(data.eqptSystemDept)) {
     throw new ValidationError(`Invalid Equipment / System Department. Allowed values are: ${ALLOWED_DEPARTMENTS.join(', ')}.`);
   }
@@ -241,6 +244,9 @@ export async function update(id: string, data: any, userId: string): Promise<Com
     throw new ValidationError(`Cannot set mandatory fields to empty: ${invalidPatch.join(', ')}`);
   }
 
+  if (data.eqptSystemDept && typeof data.eqptSystemDept === 'string' && data.eqptSystemDept.toUpperCase() === 'NULL') {
+    data.eqptSystemDept = null;
+  }
   if (data.eqptSystemDept !== undefined && data.eqptSystemDept !== null && data.eqptSystemDept !== '' && !ALLOWED_DEPARTMENTS.includes(data.eqptSystemDept)) {
     throw new ValidationError(`Invalid Equipment / System Department. Allowed values are: ${ALLOWED_DEPARTMENTS.join(', ')}.`);
   }

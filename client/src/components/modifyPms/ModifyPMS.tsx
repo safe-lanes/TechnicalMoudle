@@ -109,7 +109,7 @@ export function ModifyPMS() {
   const [viewingRequest, setViewingRequest] = useState<ChangeRequest | null>(null);
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const { vesselId, setVesselId, applyVesselScope } = useVessel();
+  const { vesselId, setVesselId, applyVesselScope, pickerVessels, myVesselsEmpty } = useVessel();
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
   const { data: vessels = [] } = useVessels();
 
@@ -272,11 +272,17 @@ export function ModifyPMS() {
                 <SelectValue placeholder="Choose vessel" />
               </SelectTrigger>
               <SelectContent>
-                {vessels.map(vessel => (
-                  <SelectItem key={vessel.id} value={vessel.id}>
-                    {vessel.name}
-                  </SelectItem>
-                ))}
+                {myVesselsEmpty ? (
+                  <div className="px-2 py-1.5 text-sm text-gray-500" data-testid="select-no-assigned-vessels">
+                    No assigned vessels
+                  </div>
+                ) : (
+                  pickerVessels.map(vessel => (
+                    <SelectItem key={vessel.id} value={vessel.id}>
+                      {vessel.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>

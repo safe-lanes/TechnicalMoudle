@@ -75,10 +75,46 @@ const alertTypeInfo: Record<string, { label: string; description: string; icon: 
     color: 'text-orange-600'
   },
   certificate_expiration: {
-    label: 'Certificate Expiration',
-    description: 'Alerts for upcoming certificate expirations',
+    label: 'Certificate Expiring',
+    description: 'Alerts when certificates approach their expiry date (90/30 days)',
     icon: Shield,
     color: 'text-purple-600'
+  },
+  certificate_expired: {
+    label: 'Certificate Expired',
+    description: 'Alerts when a certificate has passed its expiry date',
+    icon: Shield,
+    color: 'text-red-600'
+  },
+  survey_due_soon: {
+    label: 'Survey Due Soon',
+    description: 'Alerts when a survey approaches its due date',
+    icon: Shield,
+    color: 'text-blue-600'
+  },
+  survey_window_closing: {
+    label: 'Survey Window Closing',
+    description: 'Alerts when a survey window end date approaches',
+    icon: Shield,
+    color: 'text-orange-600'
+  },
+  survey_overdue: {
+    label: 'Survey Overdue',
+    description: 'Alerts when a survey has passed its due/window date',
+    icon: Shield,
+    color: 'text-red-600'
+  },
+  defect_overdue: {
+    label: 'Defect Overdue',
+    description: 'Alerts when an active defect passes its target close date',
+    icon: AlertCircle,
+    color: 'text-red-600'
+  },
+  defect_coc: {
+    label: 'COC / Class Defect',
+    description: 'Alerts when a Condition-of-Class / Class defect is raised',
+    icon: AlertCircle,
+    color: 'text-red-600'
   },
   system_backup: {
     label: 'System Backup',
