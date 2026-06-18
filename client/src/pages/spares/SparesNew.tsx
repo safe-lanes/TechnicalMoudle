@@ -990,7 +990,27 @@ const Spares: React.FC = () => {
         reason: `Modification request for spare part ${originalSpareData.partCode}`,
         targetType: 'spare',
         targetId: String(originalSpareData.id),
-        snapshotBeforeJson: originalSpareData,
+        snapshotBeforeJson: {
+          displayKey: originalSpareData.partCode,
+          displayName: originalSpareData.partName,
+          displayPath: originalSpareData.componentCode
+            ? `${originalSpareData.componentCode} — ${originalSpareData.componentName}`
+            : originalSpareData.componentName || '',
+          fields: {
+            partCode: originalSpareData.partCode,
+            partName: originalSpareData.partName,
+            uom: originalSpareData.uom,
+            min: originalSpareData.min,
+            critical: originalSpareData.critical,
+            location: originalSpareData.location,
+            maker: originalSpareData.maker,
+            makerCode: originalSpareData.makerCode,
+            drawingNumber: originalSpareData.drawingNumber,
+            specification: originalSpareData.specification,
+            remarks: originalSpareData.remarks,
+            note: originalSpareData.note,
+          }
+        },
         proposedChangesJson: changes,
         status: 'submitted',
         requestedByUserId: 'Current User'
