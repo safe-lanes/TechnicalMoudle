@@ -102,13 +102,13 @@ export async function createAttachment(req: Request, res: Response) {
 
 export async function approveChangeRequest(req: Request, res: Response) {
   const id = parseInt(req.params.id);
-  // Derive reviewer identity from the authenticated session, NOT the request body.
-  // req.user is populated by the auth middleware (mock or real).
   const authReq = req as AuthenticatedRequest;
   const serverReviewerId = authReq.user?.username || authReq.user?.userUuid || 'system';
+  const userRole = authReq.user?.role || '';
   const updated = await crService.approveChangeRequest(id, {
     comment: req.body.comment,
     reviewerId: serverReviewerId,
+    role: userRole,
   });
   res.json(updated);
 }
@@ -119,9 +119,11 @@ export async function rejectChangeRequest(req: Request, res: Response) {
   const id = parseInt(req.params.id);
   const authReq = req as AuthenticatedRequest;
   const serverReviewerId = authReq.user?.username || authReq.user?.userUuid || 'system';
+  const userRole = authReq.user?.role || '';
   const updated = await crService.rejectChangeRequest(id, {
     comment: req.body.comment,
     reviewerId: serverReviewerId,
+    role: userRole,
   });
   res.json(updated);
 }

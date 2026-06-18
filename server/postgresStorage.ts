@@ -5409,7 +5409,7 @@ export class PostgresStorage {
     }
   }
 
-  async approveChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+  async approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string): Promise<ChangeRequest> {
     const existing = await this.getChangeRequest(id);
     if (!existing) throw new Error('Change request not found');
 
@@ -5428,10 +5428,14 @@ export class PostgresStorage {
       throw new Error('No pending approval step found — this request may have already been fully approved');
     }
 
-    // Verify the reviewer is authorised at this level
-    const isAuthorised = await this.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
-    if (!isAuthorised) {
-      throw new Error(`Not authorised to approve at ${activeStep.approvalLevel}`);
+    // Sail Admin is always authorised to approve any level.
+    // Other roles are checked against moc_approvers configuration.
+    const isSailAdmin = role === 'Sail Admin';
+    if (!isSailAdmin) {
+      const isAuthorised = await this.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
+      if (!isAuthorised) {
+        throw new Error(`Not authorised to approve at ${activeStep.approvalLevel}`);
+      }
     }
 
     // Check if any further steps are still Pending (excluding the active step)
@@ -5849,7 +5853,7 @@ export class PostgresStorage {
     try { await logFieldChanges('stores_items', resolvedStuuid, beforeState.vesselId || null, beforeState, afterState, 'system'); } catch (e) { console.error('[FieldLogger] CR apply store:', e); }
   }
 
-  async rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+  async rejectChangeRequest(id: number, reviewerId: string, comment: string, role?: string): Promise<ChangeRequest> {
     const existing = await this.getChangeRequest(id);
     const now = new Date();
 
@@ -5863,10 +5867,14 @@ export class PostgresStorage {
         throw new Error('No pending approval step found');
       }
 
-      // Verify the reviewer is authorised at this level
-      const isAuthorised = await this.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
-      if (!isAuthorised) {
-        throw new Error(`Not authorised to reject at ${activeStep.approvalLevel}`);
+      // Sail Admin is always authorised to reject any level.
+      // Other roles are checked against moc_approvers configuration.
+      const isSailAdmin = role === 'Sail Admin';
+      if (!isSailAdmin) {
+        const isAuthorised = await this.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
+        if (!isAuthorised) {
+          throw new Error(`Not authorised to reject at ${activeStep.approvalLevel}`);
+        }
       }
 
       // Mark active step Rejected

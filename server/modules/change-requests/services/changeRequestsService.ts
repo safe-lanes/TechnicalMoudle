@@ -309,8 +309,8 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
 
 // ── Approve / Reject ──
 
-export async function approveChangeRequest(id: number, body: { comment: string; reviewerId?: string }) {
-  const { comment, reviewerId } = body;
+export async function approveChangeRequest(id: number, body: { comment: string; reviewerId?: string; role?: string }) {
+  const { comment, reviewerId, role } = body;
 
   if (!comment) {
     throw new ValidationError('Comment is required for approval');
@@ -324,20 +324,20 @@ export async function approveChangeRequest(id: number, body: { comment: string; 
     proposedChangesCount: Array.isArray(existing?.proposedChangesJson) ? existing.proposedChangesJson.length : 0
   });
 
-  const updated = await crRepo.approveChangeRequest(id, reviewerId || 'reviewer', comment);
+  const updated = await crRepo.approveChangeRequest(id, reviewerId || 'reviewer', comment, role);
   console.log(`[CR_SERVICE] Approval complete, status: ${updated.status}`);
   return updated;
 }
 
-export async function rejectChangeRequest(id: number, body: { comment: string; reviewerId?: string }) {
-  const { comment, reviewerId } = body;
+export async function rejectChangeRequest(id: number, body: { comment: string; reviewerId?: string; role?: string }) {
+  const { comment, reviewerId, role } = body;
 
   if (!comment) {
     throw new ValidationError('Comment is required for rejection');
   }
 
   console.log('Rejecting change request:', id, 'with comment:', comment);
-  const updated = await crRepo.rejectChangeRequest(id, reviewerId || 'reviewer', comment);
+  const updated = await crRepo.rejectChangeRequest(id, reviewerId || 'reviewer', comment, role);
   console.log('Successfully rejected request:', updated);
   return updated;
 }
