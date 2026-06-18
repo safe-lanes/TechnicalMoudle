@@ -1,0 +1,43 @@
+A. Counter behavior
+1. Renewed/reset child components (the big one).
+When an inherited component is physically renewed and its counter is reset to 0 (e.g., ME Valves replaced while Main Engine stays at 2500), and later any WO in the family updates RH — should the renewed child be forced back to the master's value (so all linked components are always identical, as in your examples), or should it keep its own independent count (preserving the renewal)?
+Why it matters: The system has a meter-replacement feature built specifically to let a child diverge. Your examples assume everyone is always in sync, so this only surfaces after a replacement. Pick one: "always identical" vs "preserve per-child count."
+Answer: When a Child Component is Replaced then The Counter can be set to zero, and When it was replaced and what is RH and Date should be noted. And it should be displayed in the Update Running Hours popup as Last Meter rested at similar to this some thing. Example if reset the ME valves and RH = 0 and If we update the Main Engine RH from 3000 – 3100 then Here this ME Valves RH = 100 and it shoyld show replacement history when it was replaced.
+2. Decrease attempts.
+If the RH entered on a WO is lower than the component's current RH (mis-entry, or a wrong reading), should the system reject it (RH can only go up or stay equal), or allow it under an override?
+Recommended: reject.
+Answer: Reject.
+B. Dates & history
+3. Last-updated date on all linked components.
+Confirm: when RH updates through a WO, every linked component's "Last Updated" should show the WO completion date (e.g., 15-02-2025 / 10-03-2025), not the system clock date. Correct?
+Answer: Yes.
+4. Per-component history.
+When a WO is completed on an inherited component (ME Valves), should the RH entry appear in ME Valves' own RH history, in Main Engine's history, or both?
+Why it matters: Today the propagation would log it under the master only. For audit clarity you may want it on the inherited component too.
+Answer: We can show only one entry and in remark from the Work order number.
+
+
+C. Validation rules
+5. Daily-rate limit & override for inherited WOs.
+Should RH entered on an inherited WO be subject to the same guardrails as the master today — i.e., the 25 hours/day maximum and a Sail-Admin override when exceeded — or should inherited WOs use looser validation?
+Why it matters: Routing inherited entries through the master makes them stricter; a normal ship user could be blocked on a large jump.
+Answer Use same validation as Applied for Master Component WO
+6. Backdated / out-of-order WOs across the family.
+Once all linked components share one timeline: if a backdated inherited WO conflicts with a reading another sibling already recorded at a later date, should it be rejected (with a clear message), or allowed?
+Example: ME Valves WO dated 01-03 entered after Main Engine was already updated to 2800 on 10-03.
+Answer: Provide Validation Error.
+D. Downstream effects
+7. Auto-generating WOs on siblings.
+After RH propagates, sibling components that are now past their next-due will auto-generate their own WOs. Is it acceptable that completing one WO can trigger new WOs across the whole family, or should that be suppressed/batched?
+For Each Job it will have its own Last Done dates, now only RH we are updating from the WO form, If the Last Done hour + Frequency = Matchs the Due Hour then WO should be generated.
+Each Job Should Store its Last Done hour independly.
+8. Broken or missing master link.
+If an inherited component has no valid master linked (config error), should WO completion be blocked with an error, or should it fall back to recording RH on that component only?
+Answer: Record on that component only.
+E. Scope confirmation
+9. Ship vs. shore.
+Confirm propagation should continue to happen ship-side only, with the office/shore copy receiving the values through normal sync (same as the master behaves today). Correct?
+Answer: yes.
+10. Components not on running hours.
+Calendar/condition-based components (NOT_RH_DRIVEN) are unaffected by this change — confirm they're out of scope.
+Answer: Yes.
