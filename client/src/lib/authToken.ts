@@ -104,37 +104,60 @@ function normalizeToken(value: unknown): string | null {
 }
 
 /**
- * Read the access token used for the `Authorization: Bearer` header.
- *
- * The token lives in `sessionStorage` under the `credentials` key as an
- * AES-encrypted (CryptoJS) blob keyed by `VITE_STORAGE_SECRET`. We decrypt it,
- * decode the (double-encoded) JSON, and return the JWT — either the decoded
- * string directly or a known token field from the decoded object. Returns
- * `null` when nothing usable is present or decryption fails, so callers simply
- * omit the header (keeps dev/Replit mock auth working).
+ * Decrypt and normalize the `credentials` blob from a single Web Storage area.
+ * Returns the JWT (decoded string directly or a known token field of the
+ * decoded object) or `null` when the key is absent, empty, or fails to
+ * decrypt/decode. Never triggers the login-redirect side effect — that is the
+ * caller's responsibility once ALL stores have been exhausted.
  */
-export function getAccessToken(): string | null {
+function readTokenFromStore(store: Storage): string | null {
   try {
-    if (typeof sessionStorage === "undefined") {
-      return onTokenFailure();
-    }
-    const raw = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+    const raw = store.getItem(TOKEN_STORAGE_KEY);
     if (!raw || !raw.trim()) {
-      return onTokenFailure();
+      return null;
     }
 
     const bytes = CryptoJS.AES.decrypt(raw, STORAGE_SECRET);
     const decryptedText = bytes.toString(CryptoJS.enc.Utf8);
     if (!decryptedText) {
-      return onTokenFailure();
+      return null;
     }
 
-    const token = normalizeToken(decodeDecrypted(decryptedText));
-    if (!token) {
-      return onTokenFailure();
-    }
-    return token;
+    return normalizeToken(decodeDecrypted(decryptedText));
   } catch {
-    return onTokenFailure();
+    // Decryption/parse error or storage access threw (e.g. privacy mode) —
+    // treat as "no token here" so the caller can try the next store.
+    return null;
   }
+}
+
+/**
+ * Read the access token used for the `Authorization: Bearer` header.
+ *
+ * The token is an AES-encrypted (CryptoJS) blob stored under the `credentials`
+ * key, keyed by `VITE_STORAGE_SECRET`. `sessionStorage` is the primary source
+ * and is checked first; if no usable token is found there we fall back to
+ * `localStorage` (the store the app's own `secureStorage` utility reads/writes),
+ * so a credential present only in `localStorage` still authenticates instead of
+ * causing a spurious logout. Each store is decrypted and decoded with the same
+ * pipeline. Only when BOTH stores yield nothing usable do we return `null` and
+ * (outside Replit) redirect to `/login` — so callers simply omit the header
+ * (keeps dev/Replit mock auth working).
+ */
+export function getAccessToken(): string | null {
+  if (typeof sessionStorage !== "undefined") {
+    const fromSession = readTokenFromStore(sessionStorage);
+    if (fromSession) {
+      return fromSession;
+    }
+  }
+
+  if (typeof localStorage !== "undefined") {
+    const fromLocal = readTokenFromStore(localStorage);
+    if (fromLocal) {
+      return fromLocal;
+    }
+  }
+
+  return onTokenFailure();
 }

@@ -22,6 +22,7 @@ interface LocationSearchDropdownProps {
   onChange: (locationName: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  allowClear?: boolean;
   "data-testid"?: string;
 }
 
@@ -31,6 +32,7 @@ export function LocationSearchDropdown({
   onChange,
   placeholder = "Select location...",
   disabled = false,
+  allowClear = false,
   "data-testid": testId,
 }: LocationSearchDropdownProps) {
   const { toast } = useToast();
@@ -136,6 +138,16 @@ export function LocationSearchDropdown({
               <>
                 <CommandEmpty>No locations found.</CommandEmpty>
                 <CommandGroup heading="Locations">
+                  {allowClear && (
+                    <CommandItem
+                      value="__none__"
+                      onSelect={() => handleSelect("")}
+                      data-testid={testId ? `${testId}-option-none` : undefined}
+                    >
+                      <span className="text-muted-foreground flex-1">None</span>
+                      {!value && <Check className="h-4 w-4 text-green-600 shrink-0" />}
+                    </CommandItem>
+                  )}
                   {locations.map((loc) => (
                     <CommandItem
                       key={loc.id}
