@@ -6083,7 +6083,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <th className="text-left py-2 font-medium text-gray-700 w-[25%]" data-testid="WOF.B4.5"><Marker id="WOF.B4.5" />Description</th>
                       <th className="text-left py-2 font-medium text-gray-700 w-[12%]" data-testid="WOF.B4.6"><Marker id="WOF.B4.6" />Qty Used</th>
                       <th className="text-left py-2 font-medium text-gray-700 w-[20%]" data-testid="WOF.B4.11"><Marker id="WOF.B4.11" />Location *</th>
-                      <th className="text-left py-2 font-medium text-gray-700 w-[25%]" data-testid="WOF.B4.7"><Marker id="WOF.B4.7" />Comments</th>
+                      <th className="text-left py-2 font-medium text-gray-700 w-[20%]" data-testid="WOF.B4.7"><Marker id="WOF.B4.7" />Comments</th>
+                      {!isReadOnly && (
+                        <th className="text-right py-2 font-medium text-gray-700 w-[5%]" data-testid="WOF.B4.12"><Marker id="WOF.B4.12" /><span className="sr-only">Actions</span></th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -6246,6 +6249,31 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                               data-testid={`input-consumed-comments-${sparePartCode || spare.partNo || index}`}
                             />
                           </td>
+                          {!isReadOnly && (
+                            <td className="py-3 text-right">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                disabled={isPartBReadOnly || consumedIndex < 0}
+                                onClick={() => {
+                                  setExecutionData(prev => ({
+                                    ...prev,
+                                    consumedSpareParts: prev.consumedSpareParts.filter(c =>
+                                      !((sparePartCode && c.partCode === sparePartCode) ||
+                                        (!sparePartCode && spare.partNo && c.partNo === spare.partNo))
+                                    )
+                                  }));
+                                }}
+                                title="Clear consumption"
+                                aria-label="Clear consumption"
+                                data-testid={`button-remove-consumed-${sparePartCode || spare.partNo || index}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -6459,6 +6487,23 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   />
                                 </td>
                               </>
+                            )}
+                            {!isReadOnly && (
+                              <td className="py-3 text-right">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  disabled={isPartBReadOnly}
+                                  onClick={() => handleDeleteConsumedSparePart(actualIndex)}
+                                  title="Remove spare part"
+                                  aria-label="Remove spare part"
+                                  data-testid={`button-remove-consumed-manual-${actualIndex}`}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </td>
                             )}
                           </tr>
                         );
