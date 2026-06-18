@@ -28544,6 +28544,9 @@ async function create2(data) {
   if (missing.length > 0) {
     throw new ValidationError(`Missing mandatory fields: ${missing.join(", ")}`);
   }
+  if (data.eqptSystemDept && data.eqptSystemDept.toUpperCase() === "NULL") {
+    data.eqptSystemDept = null;
+  }
   if (data.eqptSystemDept && !ALLOWED_DEPARTMENTS.includes(data.eqptSystemDept)) {
     throw new ValidationError(`Invalid Equipment / System Department. Allowed values are: ${ALLOWED_DEPARTMENTS.join(", ")}.`);
   }
@@ -28622,6 +28625,9 @@ async function update2(id, data, userId) {
   }).map((f) => f.label);
   if (invalidPatch.length > 0) {
     throw new ValidationError(`Cannot set mandatory fields to empty: ${invalidPatch.join(", ")}`);
+  }
+  if (data.eqptSystemDept && typeof data.eqptSystemDept === "string" && data.eqptSystemDept.toUpperCase() === "NULL") {
+    data.eqptSystemDept = null;
   }
   if (data.eqptSystemDept !== void 0 && data.eqptSystemDept !== null && data.eqptSystemDept !== "" && !ALLOWED_DEPARTMENTS.includes(data.eqptSystemDept)) {
     throw new ValidationError(`Invalid Equipment / System Department. Allowed values are: ${ALLOWED_DEPARTMENTS.join(", ")}.`);
