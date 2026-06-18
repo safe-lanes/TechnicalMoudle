@@ -4762,8 +4762,15 @@ export class PostgresStorage {
 
   async updateAlertPolicy(id: string, data: Partial<AlertPolicy>): Promise<AlertPolicy> {
     const db = await getDb();
+    const {
+      id: _ignoredId,
+      apuuid: _ignoredApuuid,
+      createdAt: _ignoredCreatedAt,
+      updatedAt: _ignoredUpdatedAt,
+      ...mutableData
+    } = data as Record<string, unknown>;
     const result = await db.update(alertPolicies)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...mutableData, updatedAt: new Date() })
       .where(eq(alertPolicies.apuuid, id))
       .returning();
     if (!result[0]) {
@@ -4897,15 +4904,22 @@ export class PostgresStorage {
   async createOrUpdateAlertConfig(config: InsertAlertConfig): Promise<AlertConfig> {
     const db = await getDb();
     const existing = await this.getAlertConfig(config.vesselId);
-    
+    const {
+      id: _ignoredId,
+      acuuid: _ignoredAcuuid,
+      createdAt: _ignoredCreatedAt,
+      updatedAt: _ignoredUpdatedAt,
+      ...mutableConfig
+    } = config as Record<string, unknown>;
+
     if (existing) {
       const result = await db.update(alertConfig)
-        .set({ ...config, updatedAt: new Date() })
+        .set({ ...mutableConfig, updatedAt: new Date() })
         .where(eq(alertConfig.id, existing.id))
         .returning();
       return result[0];
     } else {
-      const result = await db.insert(alertConfig).values(config).returning();
+      const result = await db.insert(alertConfig).values(mutableConfig as InsertAlertConfig).returning();
       return result[0];
     }
   }
