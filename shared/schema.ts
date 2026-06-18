@@ -823,7 +823,9 @@ export const changeRequest = pgTable("change_request", {
   approvalWorkflowSnapshot: json("approval_workflow_snapshot").$type<{
     level1Enabled: boolean;
     level2Enabled: boolean;
-    equipmentClassification: 'normal' | 'critical' | 'unknown';
+    equipmentClassification?: 'normal' | 'critical' | 'unknown';
+    spareClassification?: 'normal' | 'critical' | 'unknown';
+    storeClassification?: 'standard';
   }>(),
 }, (table) => ({
   vesselCategoryIdx: index("idx_vessel_category").on(table.vesselId, table.category),

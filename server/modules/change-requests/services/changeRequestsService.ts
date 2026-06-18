@@ -259,6 +259,16 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
       level1Enabled = config.level1Enabled;
       level2Enabled = config.level2Enabled;
     }
+  } else if (cr.targetType === 'store') {
+    // Stores have no classification split — one flat config row covers all store items
+    const allConfigs = await crRepo.getApprovalWorkflowConfig();
+    const config = allConfigs.find(
+      c => c.functionId === 'pms-stores-cr' && c.variableName === 'Store Items' && !c.isDeleted
+    );
+    if (config) {
+      level1Enabled = config.level1Enabled;
+      level2Enabled = config.level2Enabled;
+    }
   } else if (equipmentClassification !== 'unknown') {
     const allConfigs = await crRepo.getApprovalWorkflowConfig();
     const variableName = equipmentClassification === 'normal' ? 'Normal Equipment' : 'Critical Equipment';
@@ -271,9 +281,11 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
     }
   }
 
-  // Build snapshot — spare CRs store spareClassification; component CRs store equipmentClassification
+  // Build snapshot — each CR category records its classification key
   const snapshot = cr.targetType === 'spare'
     ? { level1Enabled, level2Enabled, spareClassification }
+    : cr.targetType === 'store'
+    ? { level1Enabled, level2Enabled, storeClassification: 'standard' as const }
     : { level1Enabled, level2Enabled, equipmentClassification };
 
   // Update CR to submitted with snapshot
@@ -302,7 +314,9 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
     });
   }
 
-  const classLabel = cr.targetType === 'spare' ? spareClassification : equipmentClassification;
+  const classLabel = cr.targetType === 'spare' ? spareClassification
+    : cr.targetType === 'store' ? 'standard'
+    : equipmentClassification;
   console.log(`[CR_WORKFLOW] CR ${id} (${cr.targetType}) submitted — classification: ${classLabel}, L1: ${level1Enabled}, L2: ${level2Enabled}`);
   return updated;
 }
