@@ -86,7 +86,7 @@ const DEFAULT_USER: PublicUser = {
   isActive: true,
   crewDesignation: "Marine Manager",
   rank_name: "Master",
-  userUuid: "00000000-0000-0000-0000-000000000001",
+  userUuid: "745f662d-3e14-4208-8c01-32e515cbedee",
   createdAt: new Date(),
   updatedAt: new Date(),
 };
