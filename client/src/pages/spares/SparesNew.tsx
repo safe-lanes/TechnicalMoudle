@@ -302,9 +302,6 @@ const Spares: React.FC = () => {
   
   const [originalLocationValues, setOriginalLocationValues] = useState<{[key: number]: {locationA: number, locationB: number, nameA: string, nameB: string}}>({});
   const [locationDialogSpare, setLocationDialogSpare] = useState<Spare | null>(null);
-  const [creatingLocationForSpare, setCreatingLocationForSpare] = useState<Spare | null>(null);
-  const [newLocationName, setNewLocationName] = useState('');
-  const [isCreatingLocation, setIsCreatingLocation] = useState(false);
   const [isChangingLocation, setIsChangingLocation] = useState(false);
   const [pendingLocationChange, setPendingLocationChange] = useState<{
     spare: any;
@@ -766,37 +763,6 @@ const Spares: React.FC = () => {
     }
   };
 
-  const handleCreateNewLocation = async () => {
-    if (!newLocationName.trim() || !vesselId || !creatingLocationForSpare) return;
-    setIsCreatingLocation(true);
-    try {
-      const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ locationName: newLocationName.trim(), createdBy: 'System' }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to create location');
-      }
-      const result = await res.json();
-      const newLoc = result.data;
-      toast({ title: "Location Created", description: `Location "${newLocationName.trim()}" created successfully.` });
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/stock/locations-with-stock/${vesselId}`] });
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
-
-      if (creatingLocationForSpare && newLoc?.id) {
-        await handleChangeSpareLocation(creatingLocationForSpare, newLoc.id, newLocationName.trim());
-      }
-
-      setCreatingLocationForSpare(null);
-      setNewLocationName('');
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message || 'Failed to create location', variant: "destructive" });
-    } finally {
-      setIsCreatingLocation(false);
-    }
-  };
 
   // Quick adjust mutation (for +/- buttons) with optimistic updates
   const adjustMutation = useMutation({
@@ -3238,57 +3204,20 @@ const Spares: React.FC = () => {
           const spare = params.data as LocationSpare;
           return (
             <div onClick={(e) => e.stopPropagation()} className="w-full">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button
-                    className={`flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left border border-gray-200 rounded-md px-2 py-1 ${isChangingLocation || !canEditSpare ? 'opacity-50 pointer-events-none' : ''}`}
-                    disabled={isChangingLocation || !canEditSpare}
-                    data-testid={`button-change-location-${spare.id}`}
-                  >
-                    <MapPin className="h-3 w-3 flex-shrink-0 text-gray-500" />
-                    <span className="truncate text-xs flex-1">{selectedLocName}</span>
-                    <ChevronsUpDown className="h-3 w-3 flex-shrink-0 text-gray-400" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-56 p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search locations..." data-testid={`input-search-location-${spare.id}`} />
-                    <CommandList className="max-h-none">
-                      <CommandEmpty>No locations found.</CommandEmpty>
-                      <div className="max-h-[144px] overflow-y-auto">
-                        <CommandGroup heading="Locations">
-                          {allVesselLocations.map((loc: VesselLocation) => (
-                            <CommandItem
-                              key={loc.id}
-                              value={loc.locationName}
-                              onSelect={() => {
-                                if (loc.id !== selectedLocationId) {
-                                  handleChangeSpareLocation(spare, loc.id, loc.locationName);
-                                }
-                              }}
-                              data-testid={`option-location-${loc.id}-${spare.id}`}
-                            >
-                              <MapPin className="h-3 w-3 mr-2 flex-shrink-0" />
-                              <span className="truncate">{loc.locationName}</span>
-                              {loc.id === selectedLocationId && <Check className="h-3 w-3 ml-auto text-blue-600" />}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </div>
-                      <CommandGroup className="border-t" forceMount>
-                        <CommandItem
-                          onSelect={() => setCreatingLocationForSpare(spare)}
-                          data-testid={`button-create-location-${spare.id}`}
-                          forceMount
-                        >
-                          <Plus className="h-3 w-3 mr-2 text-green-600" />
-                          <span className="text-green-600 font-medium">Create New Location</span>
-                        </CommandItem>
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <LocationSearchDropdown
+                vesselId={vesselId}
+                value={selectedLocName}
+                onChange={() => {}}
+                onSelectLocation={(loc) => {
+                  if (loc && loc.id !== selectedLocationId) {
+                    handleChangeSpareLocation(spare, loc.id, loc.locationName);
+                  }
+                }}
+                disabled={isChangingLocation || !canEditSpare}
+                allowCreate={canEditSpare}
+                triggerClassName="h-7 px-2 text-xs"
+                data-testid={`spare-location-${spare.id}`}
+              />
             </div>
           );
         },
@@ -3353,6 +3282,7 @@ const Spares: React.FC = () => {
   }, [
     allLocations,
     selectedLocationId,
+    vesselId,
     allVesselLocations,
     editingLocRob,
     isChangingLocation,
@@ -5580,64 +5510,6 @@ const Spares: React.FC = () => {
               {adjustSpareMutation.isPending ? "Saving..." : "Save Adjustment"}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create New Location Dialog */}
-      <Dialog 
-        open={creatingLocationForSpare !== null} 
-        onOpenChange={(open) => { 
-          if (!open) { 
-            setCreatingLocationForSpare(null); 
-            setNewLocationName(''); 
-          } 
-        }}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <div className="flex items-center gap-2">
-              <div className="bg-green-500 rounded-md p-1.5">
-                <Plus className="h-4 w-4 text-white" />
-              </div>
-              <DialogTitle className="text-base">Create New Location</DialogTitle>
-            </div>
-          </DialogHeader>
-          <div className="space-y-4">
-            {creatingLocationForSpare && (
-              <div className="text-xs text-gray-500">
-                Creating a new location for spare: <span className="font-medium text-gray-700">{creatingLocationForSpare.partCode}</span>
-              </div>
-            )}
-            <div>
-              <Label htmlFor="new-location-name" className="text-sm">Location Name</Label>
-              <Input
-                id="new-location-name"
-                value={newLocationName}
-                onChange={(e) => setNewLocationName(e.target.value)}
-                placeholder="Enter location name..."
-                className="mt-1"
-                data-testid="input-new-location-name"
-                onKeyDown={(e) => { if (e.key === 'Enter' && newLocationName.trim()) handleCreateNewLocation(); }}
-              />
-            </div>
-            <DialogFooter className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => { setCreatingLocationForSpare(null); setNewLocationName(''); }}
-                data-testid="button-cancel-create-location"
-              >
-                Cancel
-              </Button>
-              <Button
-                className="bg-green-600 hover:bg-green-700 text-white"
-                onClick={handleCreateNewLocation}
-                disabled={!newLocationName.trim() || isCreatingLocation}
-                data-testid="button-confirm-create-location"
-              >
-                {isCreatingLocation ? 'Creating...' : 'Create & Assign'}
-              </Button>
-            </DialogFooter>
-          </div>
         </DialogContent>
       </Dialog>
 
