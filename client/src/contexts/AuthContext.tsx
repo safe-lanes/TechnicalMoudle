@@ -75,7 +75,7 @@ const DEFAULT_USER: PublicUser = {
   username: "munawer.modak",
   fullName: "Munawer A. Modak",
   email: "ayush.agrawal@safe-lanes.com",
-  role: "Sail Admin",
+  role: "Super Admin",
   userType: "Office",
   vesselId: null,
   department: null,
@@ -424,7 +424,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // errors are logged only. The backend endpoint is idempotent.
     void (async () => {
       try {
-        await apiRequest("POST", "/technical/api/shipskart/sso/logout", { role: roleForLogout });
+        await apiRequest("POST", "/technical/api/shipskart/sso/logout", {
+          role: roleForLogout,
+        });
       } catch (err) {
         console.error("[Shipskart] logout call failed (non-blocking):", err);
       }
