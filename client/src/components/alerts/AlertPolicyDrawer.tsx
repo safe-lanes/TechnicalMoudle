@@ -47,7 +47,13 @@ const alertTypeLabels: Record<string, string> = {
   maintenance_due: 'Maintenance Due',
   critical_inventory: 'Critical Inventory',
   running_hours: 'Running Hours Threshold',
-  certificate_expiration: 'Certificate Expiration',
+  certificate_expiration: 'Certificate Expiring',
+  certificate_expired: 'Certificate Expired',
+  survey_due_soon: 'Survey Due Soon',
+  survey_window_closing: 'Survey Window Closing',
+  survey_overdue: 'Survey Overdue',
+  defect_overdue: 'Defect Overdue',
+  defect_coc: 'COC / Class Defect',
   system_backup: 'System Backup'
 };
 
@@ -264,7 +270,32 @@ export default function AlertPolicyDrawer({
             </div>
           </>
         );
-      
+
+      case 'survey_due_soon':
+      case 'survey_window_closing':
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="lead-days">Lead Days (alert before due/window close)</Label>
+            <Input
+              id="lead-days"
+              type="number"
+              value={thresholds.leadDays || 30}
+              onChange={(e) => setThresholds({ ...thresholds, leadDays: parseInt(e.target.value) })}
+            />
+          </div>
+        );
+
+      case 'certificate_expired':
+      case 'survey_overdue':
+      case 'defect_overdue':
+      case 'defect_coc':
+        return (
+          <p className="text-sm text-muted-foreground">
+            This alert has no configurable thresholds. It fires once per item as soon as the
+            condition is met.
+          </p>
+        );
+
       case 'system_backup':
         return (
           <>

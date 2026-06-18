@@ -1,0 +1,106 @@
+SAIL PMS — Notifications MVP: BUILD STEP 2 (Defect + Certificate/Survey alerts).
+Step 1 is approved. Same branch you used for Step 1 (off the dev head; tsc baseline 374, migration 121 free).
+Implement the 7 MVP alert types below with the THREE Step-1 corrections applied. Read-only evaluators,
+additive migration, do not touch UC1–3 or sync_conflict. Mirror server/modules/alerts/evaluators/overdueJobsEvaluator.ts.
+ 
+══════════ PRE-BUILD: confirm 2 data facts (run these, use results in B & C) ══════════
+- B: SELECT DISTINCT source, count(*) FROM defects GROUP BY source;   (find the Class/COC signal)
+     also: SELECT count(*) FROM defects WHERE is_coc = true;
+- C: SELECT DISTINCT status FROM defects;                              (confirm the done states)
+Report both before wiring defect_coc / defect_overdue, then proceed.
+ 
+══════════ CORRECTIONS (override the original prompt) ══════════
+A. CERT/SURVEY SOURCE = the LIVE tables, not the legacy ones:
+   - Certificates → certificateRepository.getAllVesselCertificateData()  (vessel_certificate_data;
+     fields: vessel_id, expiry_date, endorsement_date, masterId, is_deleted).
+   - Surveys     → surveyRepository.getAllVesselSurveyData()             (vessel_survey_data;
+     fields: vessel_id, due_date, first_range_date, second_range_date, survey_date, masterId, is_deleted).
+   - These getAll… methods DON'T filter — in JS filter is_deleted<>true (and applicability where relevant).
+   - vessel_*_data is keyed by masterId and has NO friendly name → resolve the display name from the master
+     tables (certificateRepository.getMasterCertificatesByIds / surveyRepository.getMasterSurveysByIds) for
+     the alert payload label. objectId = the vessel-data row id; vesselId = row.vesselId.
+   - DO NOT use storage.getCertificates()/getSurveys() (legacy 5-row certificates/surveys tables).
+ 
+B. DEFECT COC SIGNAL = defects.source (is_coc is all-false, category holds equipment groups):
+   - Condition: (is_coc = true OR lower(source) = '<confirmed class value>')  — use the value found in the
+     pre-build query (Replit proposed 'class'); confirm it. If NO class signal exists today, defect_coc
+     matches 0 — that is ACCEPTABLE: still seed the policy (disabled); it fires when a real class defect
+     appears. Do NOT fabricate a signal.
+ 
+C. DEFECT "DONE" SET (robust to casing/variants incl. 'Verified & Closed'):
+   - A defect is DONE when: lower(status) LIKE '%closed%' OR lower(status) LIKE '%cancel%'.
+   - "Active/open" = NOT done. (Catches Closed, Verified & Closed, Cancelled; leaves Open, Pending Spare
+     Parts, Under Repair active.) Confirm against the DISTINCT status query first.
+ 
+══════════ ENGINE WIRING (unchanged from Step 1) ══════════
+In pmsAlertEngine.ts runScan, add one block per new alert_type mirroring UC1's pattern:
+  const p = policyMap.get('<alert_type>');
+  if (p) { const alerts = evaluateX(rows, p, existingDedupeKeys);
+           for (const a of alerts){ await this.createAlertEvent(p, a); existingDedupeKeys.add(a.dedupeKey); }
+           results.<counter> = alerts.length; }
+Add each counter to the results object + the scan-complete log line. Engine runs on both instances
+(alert_events is NO_SYNC → per-instance bells, no double-notify). New evaluator files under
+server/modules/alerts/evaluators/, exported via evaluators/index.ts.
+ 
+EVALUATOR CONTRACT: (rows, policy, existingDedupeKeys:Set<string>); const t = JSON.parse(policy.thresholds||'{}');
+skip if existingDedupeKeys.has(dedupeKey); return { dedupeKey, alertType, priority, objectType, objectId,
+vesselId, payload }. DATES: never new Date() — use parseWorkOrderDate() (shared/workOrders/dateParse.ts) or
+normalizeDateToDDMMMYYYY() (shared/dateUtils.ts); daysDiff = Math.floor((parsed.getTime()-Date.now())/86400000);
+skip + warn on unparseable dates (no NaN alerts).
+ 
+══════════ THE 7 MVP EVALUATORS ══════════
+(objectType, friendly payload, vesselId set on every alert. priority lowercase.)
+1. certificate_expiration  (REUSE existing stub type/label/drawer branch) — source getAllVesselCertificateData()
+   d=daysDiff(expiry_date); for each tier T in t.leadDaysTiers(default [90,30]): if 0<=d<=T → emit,
+   priority = T<=t.highAtDays(30) ? 'high':'medium'; skip if d<0. dedupe `cert_expiring:<vcdId>:<T>`.
+2. certificate_expired — getAllVesselCertificateData(); daysDiff(expiry_date)<0 → emit; 'high';
+   dedupe `cert_expired:<vcdId>`.
+3. survey_due_soon — getAllVesselSurveyData() (filter is_deleted); 0<=daysDiff(due_date)<=t.leadDays(30) →
+   emit; 'medium'; dedupe `survey_due_soon:<vsdId>`.
+4. survey_window_closing — second_range_date present; 0<=daysDiff(second_range_date)<=t.leadDays(30) → emit;
+   'high'; dedupe `survey_window_closing:<vsdId>`.
+5. survey_overdue — daysDiff(second_range_date ?? due_date)<0 → emit; 'high'; dedupe `survey_overdue:<vsdId>`.
+6. defect_overdue — getDefects(); NOT done (rule C) AND target_close_date present AND daysDiff(target_close_date)<0
+   → emit; 'high'; dedupe `defect_overdue:<defectId>`.
+7. defect_coc — getDefects(); (rule B) AND NOT done (rule C) → emit; 'high'; dedupe `defect_coc:<defectId>`.
+ 
+PHASE 2 (NOT now): cert endorsement, survey window-opening/postponed (info), new-defect, defect-due-soon,
+extensions, defect-action-overdue, closure-pending-verification, recurring-defect.
+ 
+══════════ SEED MIGRATION 121 (alert_policies; additive, idempotent, all enabled=false) ══════════
+Columns: alert_type, enabled, priority(lowercase), email_enabled, in_app_enabled, thresholds(JSON-as-text),
+scope_filters(JSON), recipients(JSON), created_by, updated_by, apuuid('policy-<dashed>'). OMIT id (identity).
+Key idempotency on apuuid. recipients(all 7) = {"roles":["Ship","Office","PMS Admin","Sail Admin","Super Admin","Vessel Admin"]}.
+ 
+INSERT INTO alert_policies (alert_type,enabled,priority,email_enabled,in_app_enabled,thresholds,scope_filters,recipients,created_by,updated_by,apuuid)
+SELECT v.* FROM (VALUES
+('certificate_expiration',false,'medium',false,true,'{"leadDaysTiers":[90,30],"highAtDays":30}','{}','{"roles":["Ship","Office","PMS Admin","Sail Admin","Super Admin","Vessel Admin"]}','system','system','policy-certificate-expiration'),
+('certificate_expired',    false,'high',  false,true,'{}','{}','{"roles":["Ship","Office","PMS Admin","Sail Admin","Super Admin","Vessel Admin"]}','system','system','policy-certificate-expired'),
+('survey_due_soon',        false,'medium',false,true,'{"leadDays":30}','{}','{"roles":["Ship","Office","PMS Admin","Sail Admin","Super Admin","Vessel Admin"]}','system','system','policy-survey-due-soon'),
+('survey_window_closing',  false,'high',  false,true,'{"leadDays":30}','{}','{"roles":["Ship","Office","PMS Admin","Sail Admin","Super Admin","Vessel Admin"]}','system','system','policy-survey-window-closing'),
+('survey_overdue',         false,'high',  false,true,'{}','{}','{"roles":["Ship","Office","PMS Admin","Sail Admin","Super Admin","Vessel Admin"]}','system','system','policy-survey-overdue'),
+('defect_overdue',         false,'high',  false,true,'{}','{}','{"roles":["Ship","Office","PMS Admin","Sail Admin","Super Admin","Vessel Admin"]}','system','system','policy-defect-overdue'),
+('defect_coc',             false,'high',  false,true,'{}','{}','{"roles":["Ship","Office","PMS Admin","Sail Admin","Super Admin","Vessel Admin"]}','system','system','policy-defect-coc')
+) AS v(alert_type,enabled,priority,email_enabled,in_app_enabled,thresholds,scope_filters,recipients,created_by,updated_by,apuuid)
+WHERE NOT EXISTS (SELECT 1 FROM alert_policies a WHERE a.apuuid = v.apuuid);
+ 
+══════════ FRONTEND MAPS (add all 7; client/src/components/alerts/ + components/ + pages/admin/) ══════════
+Labels: certificate_expiration:'Certificate Expiring', certificate_expired:'Certificate Expired',
+survey_due_soon:'Survey Due Soon', survey_window_closing:'Survey Window Closing', survey_overdue:'Survey Overdue',
+defect_overdue:'Defect Overdue', defect_coc:'COC / Class Defect'.
+- client/src/components/NotificationBell.tsx (label map ~30)
+- client/src/components/alerts/AlertHistory.tsx (label map ~55 AND filter <SelectItem>s ~181)
+- client/src/pages/admin/Alerts.tsx (type-config map ~41: label+description+icon, mirror an existing entry)
+- client/src/components/alerts/AlertPolicyDrawer.tsx (label map ~47; reuse the existing 'certificate_expiration'
+  threshold branch for its tier editor; for survey lead-days a simple number input mirroring that pattern;
+  others need no threshold editor). Without these, the bell shows the raw key.
+ 
+══════════ GUARDRAILS + SELF-VERIFY ══════════
+- Additive idempotent migration 121; no schema changes to existing tables; UC1–3 + sync_conflict untouched;
+  counters/log extended not rewritten. alert_events never pruned — note as future retention, don't build it.
+- tsc must stay ≤ 374. Evaluators strictly read-only.
+- Self-verify (report results): each type fires exactly once with the correct milestone dedupe key;
+  cert tiers fire per tier (90 then 30); dates parse across DD MMM YYYY + ISO with no NaN alerts;
+  defect_overdue fires ONLY on active defects (no 'Verified & Closed'); defect_coc uses the confirmed signal;
+  cert/survey alerts read vessel_certificate_data/vessel_survey_data (live), not the legacy tables; disabled
+  policies emit nothing until enabled; UC1–3/sync alerts unaffected; tsc green.
