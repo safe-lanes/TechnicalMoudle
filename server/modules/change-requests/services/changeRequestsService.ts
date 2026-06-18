@@ -226,6 +226,7 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
 
   let equipmentClassification: 'normal' | 'critical' | 'unknown' = 'unknown';
   let spareClassification: 'normal' | 'critical' | 'unknown' = 'unknown';
+  let jobClassification: 'criticalEquipment' | 'critical' | 'normal' | 'unknown' = 'unknown';
 
   // Classify the target component
   if (cr.targetType === 'component' && cr.targetId) {
@@ -242,6 +243,28 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
     if (spare) {
       const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes';
       spareClassification = isCritical ? 'critical' : 'normal';
+    }
+  }
+
+  // Classify a job CR:
+  //   Priority 1 — Critical Equipment Jobs: job's component has critical = true
+  //   Priority 2 — Critical Jobs: job itself has criticality = 'Yes'
+  //   Default    — Normal Jobs
+  if (cr.targetType === 'job' && cr.targetId) {
+    const job = await crRepo.getJob(cr.targetId);
+    if (job) {
+      let isOnCriticalEquipment = false;
+      if (job.componentId) {
+        const comp = await crRepo.getComponent(job.componentId);
+        isOnCriticalEquipment = (comp as any)?.critical === true;
+      }
+      if (isOnCriticalEquipment) {
+        jobClassification = 'criticalEquipment';
+      } else if (job.criticality === 'Yes') {
+        jobClassification = 'critical';
+      } else {
+        jobClassification = 'normal';
+      }
     }
   }
 
@@ -269,6 +292,19 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
       level1Enabled = config.level1Enabled;
       level2Enabled = config.level2Enabled;
     }
+  } else if (cr.targetType === 'job' && jobClassification !== 'unknown') {
+    const allConfigs = await crRepo.getApprovalWorkflowConfig();
+    const variableName =
+      jobClassification === 'criticalEquipment' ? 'Critical Equipment Jobs'
+      : jobClassification === 'critical'        ? 'Critical Jobs'
+      :                                           'Normal Jobs';
+    const config = allConfigs.find(
+      c => c.functionId === 'pms-jobs-cr' && c.variableName === variableName && !c.isDeleted
+    );
+    if (config) {
+      level1Enabled = config.level1Enabled;
+      level2Enabled = config.level2Enabled;
+    }
   } else if (equipmentClassification !== 'unknown') {
     const allConfigs = await crRepo.getApprovalWorkflowConfig();
     const variableName = equipmentClassification === 'normal' ? 'Normal Equipment' : 'Critical Equipment';
@@ -286,6 +322,8 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
     ? { level1Enabled, level2Enabled, spareClassification }
     : cr.targetType === 'store'
     ? { level1Enabled, level2Enabled, storeClassification: 'standard' as const }
+    : cr.targetType === 'job'
+    ? { level1Enabled, level2Enabled, jobClassification: jobClassification as 'criticalEquipment' | 'critical' | 'normal' }
     : { level1Enabled, level2Enabled, equipmentClassification };
 
   // Update CR to submitted with snapshot
@@ -316,6 +354,7 @@ async function submitChangeRequestWorkflow(id: number, userId: string) {
 
   const classLabel = cr.targetType === 'spare' ? spareClassification
     : cr.targetType === 'store' ? 'standard'
+    : cr.targetType === 'job' ? jobClassification
     : equipmentClassification;
   console.log(`[CR_WORKFLOW] CR ${id} (${cr.targetType}) submitted — classification: ${classLabel}, L1: ${level1Enabled}, L2: ${level2Enabled}`);
   return updated;

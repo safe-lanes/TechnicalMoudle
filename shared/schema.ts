@@ -826,6 +826,7 @@ export const changeRequest = pgTable("change_request", {
     equipmentClassification?: 'normal' | 'critical' | 'unknown';
     spareClassification?: 'normal' | 'critical' | 'unknown';
     storeClassification?: 'standard';
+    jobClassification?: 'criticalEquipment' | 'critical' | 'normal';
   }>(),
 }, (table) => ({
   vesselCategoryIdx: index("idx_vessel_category").on(table.vesselId, table.category),
