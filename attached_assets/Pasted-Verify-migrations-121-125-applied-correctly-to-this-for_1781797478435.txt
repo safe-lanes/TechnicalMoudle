@@ -1,0 +1,38 @@
+Verify migrations 121–125 applied correctly to this fork's database after the latest pull. Read-only checks — report results, change nothing.
+The branch just pulled in five new migrations (121–125: audit identity columns, retention settings, performance indexes, and the alert policy seed). This database previously topped out at migration 120. Confirm all five applied cleanly and their structures actually exist — not just that the files are present.
+Run these and report the results:
+1. Confirm the migrations are recorded as applied:
+sqlSELECT id, applied_at FROM schema_migrations WHERE id LIKE '12%' ORDER BY id;
+Expect to see 121_add_sync_field_log_changed_by_display, 122_add_running_hours_audit_actor_label, 123_retention_settings_and_disposition, 124_audit_viewer_performance_indexes, 125_seed_defect_cert_survey_alert_policies — alongside the pre-existing 118/119/120 rows.
+2. Confirm the structures each migration creates actually exist:
+sql-- 121: identity column on sync_field_log
+SELECT column_name FROM information_schema.columns
+  WHERE table_name='sync_field_log' AND column_name='changed_by_display';
+
+-- 122: actor_label on running_hours_audit
+SELECT column_name FROM information_schema.columns
+  WHERE table_name='running_hours_audit' AND column_name='actor_label';
+
+-- 123: retention table + disposition columns
+SELECT to_regclass('retention_settings');
+SELECT count(*) FROM retention_settings;     -- expect 6 seeded categories
+SELECT column_name FROM information_schema.columns
+  WHERE table_name='audit_log' AND column_name IN ('disposed_at','disposed_by_uuid');
+
+-- 124: the performance indexes
+SELECT indexname FROM pg_indexes
+  WHERE indexname IN ('idx_rha_entered_at_utc','idx_postponement_created_at','idx_audit_timestamp_active');
+
+-- 125: the 7 alert policies, all disabled
+SELECT alert_type, enabled FROM alert_policies
+  WHERE alert_type IN ('certificate_expiration','certificate_expired','survey_due_soon',
+  'survey_window_closing','survey_overdue','defect_overdue','defect_coc')
+  ORDER BY alert_type;
+3. Report:
+
+Are all five migrations listed in schema_migrations? If any of 121–125 is MISSING, flag it — that means it didn't run (possibly skipped) and needs attention.
+Do all the structures exist (the columns, the retention_settings table with 6 rows, the 3 indexes, the 7 alert policies)?
+Critical: confirm all 7 alert policies have enabled = false. If any is true, flag it immediately — nothing should fire on deploy.
+Note any pre-existing 119/120 duplicate-numbering rows but don't treat those as a problem (they're known, pre-existing, already applied).
+
+Report the actual query output. Read-only — do not modify, do not re-run migrations, just verify.
