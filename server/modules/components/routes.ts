@@ -42,7 +42,9 @@ router.post('/components', asyncHandler(componentCtrl.create));
 // GET /components/:vesselId (line 25) which Express matched first.
 // Use GET /components/details/:id instead (line 28).
 router.patch('/components/:id', asyncHandler(componentCtrl.update));
-router.delete('/components/:id', asyncHandler(componentCtrl.remove));
+// DELETE /components/:id REMOVED (Audit Phase 4 cleanup): it hard-deleted a component row,
+// bypassing the retain-and-deactivate model. The register "delete" is deactivation
+// (POST /components/:id/inactivate below). The route was orphaned — no UI/offline caller.
 
 // POST /components/:id/inactivate — soft inactivate (preferred over delete)
 router.post('/components/:id/inactivate', asyncHandler(componentCtrl.inactivate));

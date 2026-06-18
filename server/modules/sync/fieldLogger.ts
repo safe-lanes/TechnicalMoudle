@@ -166,21 +166,28 @@ export async function logFieldChanges(
   let logCount = 0;
   const skipFields = await getEffectiveSkipFields(tableName);
 
-  // Resolve userId: prefer explicit parameter, fall back to AsyncLocalStorage request context.
-  // This avoids modifying 65+ callers that hardcode 'system' — the middleware captures the
-  // real authenticated user automatically for any call originating from an HTTP request.
-  const PLACEHOLDER_USER_IDS = new Set(['system', 'admin', 'System', '']);
-  let resolvedUserId = userId;
-  if (!resolvedUserId || PLACEHOLDER_USER_IDS.has(resolvedUserId)) {
-    const ctx = getRequestContext();
-    if (ctx?.userId) {
-      resolvedUserId = ctx.userId;
-    } else if (!resolvedUserId) {
+  // Audit identity (Phase 0). The request-context actor is AUTHORITATIVE for the audit-identity
+  // columns (changed_by_user_id / changed_by_display). Controllers inject a name/rank into the
+  // caller's `userId` for their own operational use (approver, performed_by, RH attribution, …) —
+  // but those operational columns are written elsewhere; here we record WHO made the request:
+  //   - request present  → actorId (canonical userUuid) + actorLabel (Office name / Ship rank),
+  //                         ignoring the injected `userId` param.
+  //   - no request       → machine/cron/sync write: preserve the explicit token
+  //                         ('auto-generation', 'system', …); the token is also its own label.
+  const ctx = getRequestContext();
+  let resolvedUserId: string;
+  let resolvedDisplay: string;
+  if (ctx?.actor) {
+    resolvedUserId = ctx.actor.actorId;
+    resolvedDisplay = ctx.actor.actorLabel;
+  } else {
+    if (!userId) {
       syncDiag(`WARNING: logFieldChanges called without userId and no request context for ${tableName}.${rowUuid} — using 'system' fallback`);
       resolvedUserId = 'system';
+    } else {
+      resolvedUserId = userId;
     }
-    // If resolvedUserId is still a placeholder (e.g. 'system') but no request context found,
-    // keep the original value — this happens for cron jobs, sync engine, startup tasks.
+    resolvedDisplay = resolvedUserId;
   }
 
   if (oldRow === null && newRow !== null) {
@@ -199,6 +206,7 @@ export async function logFieldChanges(
           vesselId,
           changedAt,
           changedByUserId: resolvedUserId,
+          changedByDisplay: resolvedDisplay,
           instanceId,
           isSynced: false,
         });
@@ -233,6 +241,7 @@ export async function logFieldChanges(
           vesselId,
           changedAt,
           changedByUserId: resolvedUserId,
+          changedByDisplay: resolvedDisplay,
           instanceId,
           isSynced: false,
         });
@@ -286,8 +295,8 @@ export async function logFieldChangesBatch(
   const instanceId = await getInstanceId();
   const changedAt = new Date();
 
-  // Resolve userId context once — same logic as logFieldChanges
-  const PLACEHOLDER_USER_IDS_BATCH = new Set(['system', 'admin', 'System', '']);
+  // Audit identity (Phase 0) — same precedence as logFieldChanges: the request-context actor is
+  // authoritative when present; otherwise the explicit per-entry token (machine/cron) is kept.
   const ctx = getRequestContext();
 
   // Accumulate all insert rows
@@ -300,6 +309,7 @@ export async function logFieldChangesBatch(
     vesselId: string | null;
     changedAt: Date;
     changedByUserId: string;
+    changedByDisplay: string;
     instanceId: string;
     isSynced: boolean;
   }> = [];
@@ -317,14 +327,14 @@ export async function logFieldChangesBatch(
     }
     const skipFields = skipFieldsByTable.get(entry.tableName)!;
 
-    // Resolve userId per entry — same fallback as logFieldChanges
-    let resolvedUserId = entry.userId;
-    if (!resolvedUserId || PLACEHOLDER_USER_IDS_BATCH.has(resolvedUserId)) {
-      if (ctx?.userId) {
-        resolvedUserId = ctx.userId;
-      } else if (!resolvedUserId) {
-        resolvedUserId = 'system';
-      }
+    let resolvedUserId: string;
+    let resolvedDisplay: string;
+    if (ctx?.actor) {
+      resolvedUserId = ctx.actor.actorId;
+      resolvedDisplay = ctx.actor.actorLabel;
+    } else {
+      resolvedUserId = entry.userId || 'system';
+      resolvedDisplay = resolvedUserId;
     }
 
     // Compute changed fields (UPDATE mode — both oldRow and newRow present)
@@ -347,6 +357,7 @@ export async function logFieldChangesBatch(
         vesselId: entry.vesselId,
         changedAt,
         changedByUserId: resolvedUserId,
+        changedByDisplay: resolvedDisplay,
         instanceId,
         isSynced: false,
       });

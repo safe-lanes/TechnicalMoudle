@@ -208,6 +208,7 @@ import {
   type AdmRoleMenuAccess,
 } from '@shared/schema';
 import { logFieldChanges, logSoftDelete, FileSyncProcessor } from './modules/sync';
+import { getAuditActor, getRequestContext } from './middleware/requestContext';
 
 /**
  * PostgreSQL Storage Implementation
@@ -1520,6 +1521,7 @@ export class PostgresStorage {
         dateUpdatedTZ: 'UTC',
         enteredAtUTC: now,
         userId: params.userId,
+        actorLabel: getAuditActor().actorLabel, // Audit Phase 0: frozen human actor at write time
         updatedByUuid: params.userUuid || null,
         source: params.updateSource.toLowerCase(),
         notes: params.comments || null,
@@ -1920,7 +1922,9 @@ export class PostgresStorage {
 
   async createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit> {
     const db = await getDb();
-    const result = await db.insert(runningHoursAudit).values(audit).returning();
+    // Audit Phase 0: freeze the human actor label unless the caller already supplied one.
+    const auditWithActor = { ...audit, actorLabel: audit.actorLabel ?? getAuditActor().actorLabel };
+    const result = await db.insert(runningHoursAudit).values(auditWithActor).returning();
     // Sync field logging — INSERT
     try { await logFieldChanges('running_hours_audit', result[0].rhauuid, (result[0] as any).vesselId || null, null, result[0], 'system'); } catch (e) { console.error('[FieldLogger] rha create:', e); }
     return result[0];
@@ -4762,8 +4766,15 @@ export class PostgresStorage {
 
   async updateAlertPolicy(id: string, data: Partial<AlertPolicy>): Promise<AlertPolicy> {
     const db = await getDb();
+    const {
+      id: _ignoredId,
+      apuuid: _ignoredApuuid,
+      createdAt: _ignoredCreatedAt,
+      updatedAt: _ignoredUpdatedAt,
+      ...mutableData
+    } = data as Record<string, unknown>;
     const result = await db.update(alertPolicies)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...mutableData, updatedAt: new Date() })
       .where(eq(alertPolicies.apuuid, id))
       .returning();
     if (!result[0]) {
@@ -4897,15 +4908,22 @@ export class PostgresStorage {
   async createOrUpdateAlertConfig(config: InsertAlertConfig): Promise<AlertConfig> {
     const db = await getDb();
     const existing = await this.getAlertConfig(config.vesselId);
-    
+    const {
+      id: _ignoredId,
+      acuuid: _ignoredAcuuid,
+      createdAt: _ignoredCreatedAt,
+      updatedAt: _ignoredUpdatedAt,
+      ...mutableConfig
+    } = config as Record<string, unknown>;
+
     if (existing) {
       const result = await db.update(alertConfig)
-        .set({ ...config, updatedAt: new Date() })
+        .set({ ...mutableConfig, updatedAt: new Date() })
         .where(eq(alertConfig.id, existing.id))
         .returning();
       return result[0];
     } else {
-      const result = await db.insert(alertConfig).values(config).returning();
+      const result = await db.insert(alertConfig).values(mutableConfig as InsertAlertConfig).returning();
       return result[0];
     }
   }
@@ -6263,8 +6281,36 @@ export class PostgresStorage {
 
   async createAuditLog(data: InsertAuditLog): Promise<AuditLog> {
     const db = await getDb();
+
+    // Audit identity (Phase 0). The request-context actor is AUTHORITATIVE for audit_log.user_id
+    // (= "who acted"), regardless of any name/rank a controller injected into data.userId for its
+    // own operational use. The frozen human identity is also stored in payload (survives crew
+    // changes, never resolved live). With NO request context (machine/cron) the explicit token is
+    // preserved (e.g. 'auto-generation'), falling back to 'system'.
+    const inRequest = getRequestContext() !== undefined;
+    const actor = getAuditActor(); // ctx.actor when in a request, else SYSTEM_ACTOR
+    const PLACEHOLDER_AUDIT_USER_IDS = new Set(['system', 'admin', 'System', '']);
+    const callerUserId = data.userId == null ? '' : String(data.userId);
+    const resolvedUserId = inRequest
+      ? actor.actorId
+      : (callerUserId && !PLACEHOLDER_AUDIT_USER_IDS.has(callerUserId) ? callerUserId : actor.actorId);
+
+    const basePayload =
+      data.payload && typeof data.payload === 'object' && !Array.isArray(data.payload)
+        ? (data.payload as Record<string, any>)
+        : data.payload != null
+        ? { value: data.payload }
+        : {};
+    const frozenPayload: Record<string, any> = {
+      ...basePayload,
+      actorLabel: basePayload.actorLabel ?? actor.actorLabel,
+      actorType: basePayload.actorType ?? actor.actorType,
+      actorEmail: basePayload.actorEmail ?? actor.actorEmail,
+      actorRole: basePayload.actorRole ?? actor.actorRole,
+    };
+
     const result = await db.insert(auditLog).values({
-      userId: data.userId,
+      userId: resolvedUserId,
       vesselCode: data.vesselCode ?? null,
       componentCode: data.componentCode ?? null,
       entityType: data.entityType,
@@ -6274,49 +6320,82 @@ export class PostgresStorage {
       oldValue: data.oldValue ?? null,
       newValue: data.newValue ?? null,
       source: data.source,
-      payload: data.payload ?? null,
+      payload: frozenPayload,
     }).returning();
     return result[0];
+  }
+
+  // Audit viewer (Phase 3) — shared filter builder. Read-only; additive filters (userId, source,
+  // entityTypes[]) added for the audit trail viewer. NEVER mutates audit rows.
+  private buildAuditLogConditions(filters?: {
+    vesselCode?: string;
+    componentCode?: string;
+    entityType?: string;
+    entityTypes?: string[];
+    entityId?: string;
+    actionType?: string;
+    userId?: string;
+    source?: string;
+    actor?: string;
+    entityCode?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): any[] {
+    const conditions: any[] = [];
+    // Audit Phase 4 — soft-disposed rows leave active views (the audit viewer + its counts).
+    conditions.push(isNull(auditLog.disposedAt));
+    if (!filters) return conditions;
+    if (filters.vesselCode) conditions.push(eq(auditLog.vesselCode, filters.vesselCode));
+    if (filters.componentCode) conditions.push(eq(auditLog.componentCode, filters.componentCode));
+    if (filters.entityType) conditions.push(eq(auditLog.entityType, filters.entityType));
+    if (filters.entityTypes && filters.entityTypes.length > 0) conditions.push(inArray(auditLog.entityType, filters.entityTypes));
+    if (filters.entityId) conditions.push(eq(auditLog.entityId, filters.entityId));
+    if (filters.actionType) conditions.push(eq(auditLog.actionType, filters.actionType));
+    if (filters.userId) conditions.push(eq(auditLog.userId, filters.userId));
+    if (filters.source) conditions.push(eq(auditLog.source, filters.source));
+    // Actor free-text: match the frozen label (payload.actorLabel) OR the canonical id.
+    if (filters.actor) {
+      const a = `%${filters.actor}%`;
+      conditions.push(sql`(${auditLog.userId} ILIKE ${a} OR ${auditLog.payload}->>'actorLabel' ILIKE ${a})`);
+    }
+    // Entity/equipment code free-text: component code, entity id, or WO number from payload.
+    if (filters.entityCode) {
+      const c = `%${filters.entityCode}%`;
+      conditions.push(sql`(${auditLog.componentCode} ILIKE ${c} OR ${auditLog.entityId} ILIKE ${c} OR ${auditLog.payload}->>'workOrderNo' ILIKE ${c} OR ${auditLog.payload}->>'componentCode' ILIKE ${c})`);
+    }
+    if (filters.startDate) conditions.push(gte(auditLog.timestamp, filters.startDate));
+    if (filters.endDate) conditions.push(lte(auditLog.timestamp, filters.endDate));
+    return conditions;
+  }
+
+  async countAuditLogs(filters?: Parameters<PostgresStorage['buildAuditLogConditions']>[0]): Promise<number> {
+    const db = await getDb();
+    const conditions = this.buildAuditLogConditions(filters);
+    let q = db.select({ n: sql<number>`count(*)::int` }).from(auditLog) as any;
+    if (conditions.length > 0) q = q.where(and(...conditions));
+    const r = await q;
+    return Number(r[0]?.n ?? 0);
   }
 
   async getAuditLogs(filters?: {
     vesselCode?: string;
     componentCode?: string;
     entityType?: string;
+    entityTypes?: string[];
     entityId?: string;
     actionType?: string;
+    userId?: string;
+    source?: string;
+    actor?: string;
+    entityCode?: string;
     startDate?: Date;
     endDate?: Date;
     limit?: number;
     offset?: number;
   }): Promise<AuditLog[]> {
     const db = await getDb();
-    let conditions: any[] = [];
-    
-    if (filters) {
-      if (filters.vesselCode) {
-        conditions.push(eq(auditLog.vesselCode, filters.vesselCode));
-      }
-      if (filters.componentCode) {
-        conditions.push(eq(auditLog.componentCode, filters.componentCode));
-      }
-      if (filters.entityType) {
-        conditions.push(eq(auditLog.entityType, filters.entityType));
-      }
-      if (filters.entityId) {
-        conditions.push(eq(auditLog.entityId, filters.entityId));
-      }
-      if (filters.actionType) {
-        conditions.push(eq(auditLog.actionType, filters.actionType));
-      }
-      if (filters.startDate) {
-        conditions.push(gte(auditLog.timestamp, filters.startDate));
-      }
-      if (filters.endDate) {
-        conditions.push(lte(auditLog.timestamp, filters.endDate));
-      }
-    }
-    
+    const conditions = this.buildAuditLogConditions(filters);
+
     let query = db.select().from(auditLog);
     
     if (conditions.length > 0) {
@@ -6992,6 +7071,7 @@ export class PostgresStorage {
         dateUpdatedTZ: 'UTC',
         enteredAtUTC: now,
         userId: userId || 'system',
+        actorLabel: getAuditActor().actorLabel, // Audit Phase 0: frozen human actor at write time
         updatedByUuid: userUuid || null,
         source: 'cascade',
         notes: meterReplaced
@@ -7077,6 +7157,7 @@ export class PostgresStorage {
             dateUpdatedTZ: 'UTC',
             enteredAtUTC: now,
             userId: userId || 'system',
+            actorLabel: getAuditActor().actorLabel, // Audit Phase 0: frozen human actor at write time
             updatedByUuid: userUuid || null,
             source: 'inherited_cascade',
             comments: `Inherited delta ${inheritedDelta} from MASTER ${parentResult[0]?.componentCode || parentResult[0]?.name}`,
@@ -7124,6 +7205,7 @@ export class PostgresStorage {
           dateUpdatedTZ: 'UTC',
           enteredAtUTC: now,
           userId: userId || 'system',
+          actorLabel: getAuditActor().actorLabel, // Audit Phase 0: frozen human actor at write time
           updatedByUuid: userUuid || null,
           source: 'cascade',
           comments: comments,

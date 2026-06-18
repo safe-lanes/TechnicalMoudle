@@ -21,7 +21,9 @@ router.get('/fleet/components', asyncHandler(fleetCtrl.getFleetScopedComponents)
 router.get('/fleet/components/:id', asyncHandler(fleetCtrl.getFleetScopedComponent));
 router.post('/fleet/components', asyncHandler(fleetCtrl.createFleetScopedComponent));
 router.patch('/fleet/components/:id', asyncHandler(fleetCtrl.updateFleetScopedComponent));
-router.delete('/fleet/components/:id', asyncHandler(fleetCtrl.deleteFleetScopedComponent));
+// DELETE /fleet/components/:id REMOVED (Audit Phase 4 cleanup): it hard-deleted a fleet-scoped
+// component row, bypassing retain-and-deactivate. The fleet-admin UI uses the soft-delete
+// endpoint (/fleet-admin/fleet-components/:id). This route was orphaned — no UI caller.
 
 // ── Fleet Jobs ──
 // IMPORTANT: export MUST come before :id to avoid catch-all

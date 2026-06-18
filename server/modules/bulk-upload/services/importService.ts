@@ -184,6 +184,43 @@ export async function trackChange(
   });
 }
 
+// Audit Phase 1 — bulk component register audit. Per-component rows tagged source='bulk_import'
+// so the audit UI can filter them out of the default per-component view but still surface them
+// when drilling into one component's history. Actor frozen by Phase 0 createAuditLog (the uploader).
+const BULK_AUDIT_TRACKED_FIELDS = [
+  'name', 'componentCode', 'critical', 'isActive', 'parentId', 'parentComponent',
+  'componentCategory', 'category', 'eqptSystemDept', 'maker', 'makerCode', 'location',
+];
+
+function buildBulkChangedFields(oldRow: any, newRow: any): Record<string, { old: any; new: any }> {
+  const changed: Record<string, { old: any; new: any }> = {};
+  for (const f of BULK_AUDIT_TRACKED_FIELDS) {
+    if (newRow == null || !(f in newRow)) continue;
+    const oldVal = oldRow?.[f] ?? null;
+    const newVal = newRow[f] ?? null;
+    if (oldVal !== newVal) changed[f] = { old: oldVal, new: newVal };
+  }
+  return changed;
+}
+
+/** Best-effort bulk component audit — never blocks/fails the import. */
+async function auditBulkComponent(actionType: string, component: any, payload: Record<string, any>): Promise<void> {
+  try {
+    const c = component || {};
+    await storage.createAuditLog({
+      entityType: 'component',
+      entityId: c.cuuid || c.id || null,
+      actionType,
+      source: 'bulk_import',
+      vesselCode: c.vesselId ?? null,
+      componentCode: c.componentCode ?? null,
+      payload,
+    });
+  } catch (auditErr) {
+    console.error(`[Audit] bulk component ${actionType} log failed:`, auditErr);
+  }
+}
+
 export interface RowResult {
   rowNumber: number;
   primaryIdentifier: string;
@@ -374,6 +411,14 @@ export async function performImport(
       if (importHistoryId) {
         await trackChange(importHistoryId, 'created', 'component', parentComponent.cuuid, null, parentComponent);
       }
+      await auditBulkComponent('create', parentComponent, {
+        componentCode: parentComponent.componentCode,
+        name: parentComponent.name,
+        critical: parentComponent.critical,
+        parentId: parentComponent.parentId,
+        isActive: parentComponent.isActive,
+        autoCreatedParent: true,
+      });
     }
     
     // Step 3: Sort components to ensure parents are created before children
@@ -436,6 +481,13 @@ export async function performImport(
             if (importHistoryId) {
               await trackChange(importHistoryId, 'created', 'component', newComponent.cuuid, null, newComponent);
             }
+            await auditBulkComponent('create', newComponent, {
+              componentCode: newComponent.componentCode,
+              name: newComponent.name,
+              critical: newComponent.critical,
+              parentId: newComponent.parentId,
+              isActive: newComponent.isActive,
+            });
           } else {
             result.skipped++;
             result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: 'skipped', error: 'Component already exists' });
@@ -451,6 +503,10 @@ export async function performImport(
             if (importHistoryId) {
               await trackChange(importHistoryId, 'updated', 'component', updatedComponent.cuuid, existingComponent, updatedComponent);
             }
+            await auditBulkComponent('update', updatedComponent, {
+              componentCode: updatedComponent.componentCode,
+              changedFields: buildBulkChangedFields(existingComponent, updatedComponent),
+            });
           } else {
             result.skipped++;
             result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: 'skipped', error: 'Component not found for update' });
@@ -467,6 +523,10 @@ export async function performImport(
             if (importHistoryId) {
               await trackChange(importHistoryId, 'updated', 'component', updatedComponent.cuuid, existingComponent, updatedComponent);
             }
+            await auditBulkComponent('update', updatedComponent, {
+              componentCode: updatedComponent.componentCode,
+              changedFields: buildBulkChangedFields(existingComponent, updatedComponent),
+            });
           } else {
             const newComponent = await createComponentFromRow(row, vesselId);
             existingComponentsMap.set(componentCode, newComponent);
@@ -476,6 +536,13 @@ export async function performImport(
             if (importHistoryId) {
               await trackChange(importHistoryId, 'created', 'component', newComponent.cuuid, null, newComponent);
             }
+            await auditBulkComponent('create', newComponent, {
+              componentCode: newComponent.componentCode,
+              name: newComponent.name,
+              critical: newComponent.critical,
+              parentId: newComponent.parentId,
+              isActive: newComponent.isActive,
+            });
           }
         }
       } catch (rowError: any) {
@@ -502,13 +569,41 @@ export async function performImport(
           if (importHistoryId) {
             await trackChange(importHistoryId, 'archived', 'component', component.cuuid, component, archivedComponent);
           }
-          
+          await auditBulkComponent('deactivate', archivedComponent ?? component, {
+            componentCode: component.componentCode,
+            isActive: { old: true, new: false },
+            via: 'archiveMissing',
+          });
+
           console.log(`📦 Archived component: ${component.componentCode}`);
         }
       }
     }
-    
+
     console.log(`✅ Component import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.archived} archived`);
+
+    // Audit Phase 1 — one batch-summary row per import event (action_type='bulk_import').
+    try {
+      await storage.createAuditLog({
+        entityType: 'component',
+        entityId: importHistoryId ?? 'bulk_import',
+        actionType: 'bulk_import',
+        source: 'bulk_import',
+        vesselCode: vesselId ?? null,
+        componentCode: null,
+        payload: {
+          importHistoryId: importHistoryId ?? null,
+          mode,
+          created: result.created,
+          updated: result.updated,
+          archived: result.archived,
+          skipped: result.skipped,
+          total: data.length,
+        },
+      });
+    } catch (auditErr) {
+      console.error('[Audit] bulk_import summary log failed:', auditErr);
+    }
   } else if (type === 'spares') {
     const sparesVesselId = vesselId || 'V001';
     console.log(`🚀 Starting spares import: ${data.length} rows, mode: ${mode}, vesselId: ${sparesVesselId}`);

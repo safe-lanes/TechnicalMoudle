@@ -14,6 +14,19 @@ import * as alertsRepo from '../repositories/alertsRepository';
 import { evaluateOverdueJobs } from '../evaluators/overdueJobsEvaluator';
 import { evaluateLowSpares } from '../evaluators/lowSparesEvaluator';
 import { evaluateSkippedCycles } from '../evaluators/skippedCyclesEvaluator';
+import {
+  evaluateCertificateExpiring,
+  evaluateCertificateExpired,
+} from '../evaluators/certificateEvaluators';
+import {
+  evaluateSurveyDueSoon,
+  evaluateSurveyWindowClosing,
+  evaluateSurveyOverdue,
+} from '../evaluators/surveyEvaluators';
+import {
+  evaluateDefectOverdue,
+  evaluateDefectCoc,
+} from '../evaluators/defectEvaluators';
 import type { AlertPolicy } from '@shared/schema';
 
 export class PmsAlertEngine {
@@ -62,6 +75,13 @@ export class PmsAlertEngine {
     overdueAlerts: number;
     lowSpareAlerts: number;
     skippedCycleAlerts: number;
+    certExpiringAlerts: number;
+    certExpiredAlerts: number;
+    surveyDueSoonAlerts: number;
+    surveyWindowClosingAlerts: number;
+    surveyOverdueAlerts: number;
+    defectOverdueAlerts: number;
+    defectCocAlerts: number;
     totalCreated: number;
   }> {
     console.log('[PmsAlertEngine] Starting alert evaluation scan...');
@@ -70,6 +90,13 @@ export class PmsAlertEngine {
       overdueAlerts: 0,
       lowSpareAlerts: 0,
       skippedCycleAlerts: 0,
+      certExpiringAlerts: 0,
+      certExpiredAlerts: 0,
+      surveyDueSoonAlerts: 0,
+      surveyWindowClosingAlerts: 0,
+      surveyOverdueAlerts: 0,
+      defectOverdueAlerts: 0,
+      defectCocAlerts: 0,
       totalCreated: 0,
     };
 
@@ -139,8 +166,133 @@ export class PmsAlertEngine {
         }
       }
 
-      results.totalCreated = results.overdueAlerts + results.lowSpareAlerts + results.skippedCycleAlerts;
-      console.log(`[PmsAlertEngine] Scan complete: UC1=${results.overdueAlerts}, UC2=${results.lowSpareAlerts}, UC3=${results.skippedCycleAlerts}, total=${results.totalCreated}`);
+      // 6. Certificate + Survey evaluators share LIVE cert/survey data and
+      //    master-name maps — load once, only if any of those policies enabled.
+      const certPolicy = policyMap.get('certificate_expiration');
+      const certExpiredPolicy = policyMap.get('certificate_expired');
+      if (certPolicy || certExpiredPolicy) {
+        try {
+          const certRepo = await import('../../cert-surveys/repositories/certificateRepository');
+          const certRows = (await certRepo.getAllVesselCertificateData()) || [];
+          const liveCertRows = certRows.filter((r: any) => r.isDeleted !== true);
+          const masterIds = Array.from(new Set(liveCertRows.map((r: any) => r.masterId).filter(Boolean))) as string[];
+          const masters = masterIds.length
+            ? await certRepo.getMasterCertificatesByIds(masterIds)
+            : [];
+          const nameByMasterId = new Map<string, string>();
+          for (const m of masters as any[]) nameByMasterId.set(m.masterId, m.certificateName);
+
+          if (certPolicy) {
+            const alerts = evaluateCertificateExpiring(liveCertRows as any, certPolicy, existingDedupeKeys, nameByMasterId);
+            for (const alert of alerts) {
+              await this.createAlertEvent(certPolicy, alert);
+              existingDedupeKeys.add(alert.dedupeKey);
+            }
+            results.certExpiringAlerts = alerts.length;
+          }
+          if (certExpiredPolicy) {
+            const alerts = evaluateCertificateExpired(liveCertRows as any, certExpiredPolicy, existingDedupeKeys, nameByMasterId);
+            for (const alert of alerts) {
+              await this.createAlertEvent(certExpiredPolicy, alert);
+              existingDedupeKeys.add(alert.dedupeKey);
+            }
+            results.certExpiredAlerts = alerts.length;
+          }
+        } catch (err) {
+          console.error('[PmsAlertEngine] Certificate evaluation failed:', err);
+        }
+      }
+
+      const surveyDueSoonPolicy = policyMap.get('survey_due_soon');
+      const surveyWindowPolicy = policyMap.get('survey_window_closing');
+      const surveyOverduePolicy = policyMap.get('survey_overdue');
+      if (surveyDueSoonPolicy || surveyWindowPolicy || surveyOverduePolicy) {
+        try {
+          const surveyRepo = await import('../../cert-surveys/repositories/surveyRepository');
+          const surveyRows = (await surveyRepo.getAllVesselSurveyData()) || [];
+          const liveSurveyRows = surveyRows.filter((r: any) => r.isDeleted !== true);
+          const masterIds = Array.from(new Set(liveSurveyRows.map((r: any) => r.masterId).filter(Boolean))) as string[];
+          const masters = masterIds.length
+            ? await surveyRepo.getMasterSurveysByIds(masterIds)
+            : [];
+          const nameByMasterId = new Map<string, string>();
+          for (const m of masters as any[]) nameByMasterId.set(m.masterId, m.surveyName);
+
+          if (surveyDueSoonPolicy) {
+            const alerts = evaluateSurveyDueSoon(liveSurveyRows as any, surveyDueSoonPolicy, existingDedupeKeys, nameByMasterId);
+            for (const alert of alerts) {
+              await this.createAlertEvent(surveyDueSoonPolicy, alert);
+              existingDedupeKeys.add(alert.dedupeKey);
+            }
+            results.surveyDueSoonAlerts = alerts.length;
+          }
+          if (surveyWindowPolicy) {
+            const alerts = evaluateSurveyWindowClosing(liveSurveyRows as any, surveyWindowPolicy, existingDedupeKeys, nameByMasterId);
+            for (const alert of alerts) {
+              await this.createAlertEvent(surveyWindowPolicy, alert);
+              existingDedupeKeys.add(alert.dedupeKey);
+            }
+            results.surveyWindowClosingAlerts = alerts.length;
+          }
+          if (surveyOverduePolicy) {
+            const alerts = evaluateSurveyOverdue(liveSurveyRows as any, surveyOverduePolicy, existingDedupeKeys, nameByMasterId);
+            for (const alert of alerts) {
+              await this.createAlertEvent(surveyOverduePolicy, alert);
+              existingDedupeKeys.add(alert.dedupeKey);
+            }
+            results.surveyOverdueAlerts = alerts.length;
+          }
+        } catch (err) {
+          console.error('[PmsAlertEngine] Survey evaluation failed:', err);
+        }
+      }
+
+      // 7. Defect evaluators share storage.getDefects() — load once if enabled.
+      const defectOverduePolicy = policyMap.get('defect_overdue');
+      const defectCocPolicy = policyMap.get('defect_coc');
+      if (defectOverduePolicy || defectCocPolicy) {
+        try {
+          const { storage } = await import('../../../storage');
+          const defects = (await storage.getDefects()) || [];
+
+          if (defectOverduePolicy) {
+            const alerts = evaluateDefectOverdue(defects as any, defectOverduePolicy, existingDedupeKeys);
+            for (const alert of alerts) {
+              await this.createAlertEvent(defectOverduePolicy, alert);
+              existingDedupeKeys.add(alert.dedupeKey);
+            }
+            results.defectOverdueAlerts = alerts.length;
+          }
+          if (defectCocPolicy) {
+            const alerts = evaluateDefectCoc(defects as any, defectCocPolicy, existingDedupeKeys);
+            for (const alert of alerts) {
+              await this.createAlertEvent(defectCocPolicy, alert);
+              existingDedupeKeys.add(alert.dedupeKey);
+            }
+            results.defectCocAlerts = alerts.length;
+          }
+        } catch (err) {
+          console.error('[PmsAlertEngine] Defect evaluation failed:', err);
+        }
+      }
+
+      results.totalCreated =
+        results.overdueAlerts +
+        results.lowSpareAlerts +
+        results.skippedCycleAlerts +
+        results.certExpiringAlerts +
+        results.certExpiredAlerts +
+        results.surveyDueSoonAlerts +
+        results.surveyWindowClosingAlerts +
+        results.surveyOverdueAlerts +
+        results.defectOverdueAlerts +
+        results.defectCocAlerts;
+      console.log(
+        `[PmsAlertEngine] Scan complete: UC1=${results.overdueAlerts}, UC2=${results.lowSpareAlerts}, UC3=${results.skippedCycleAlerts}, ` +
+        `certExpiring=${results.certExpiringAlerts}, certExpired=${results.certExpiredAlerts}, ` +
+        `surveyDueSoon=${results.surveyDueSoonAlerts}, surveyWindowClosing=${results.surveyWindowClosingAlerts}, surveyOverdue=${results.surveyOverdueAlerts}, ` +
+        `defectOverdue=${results.defectOverdueAlerts}, defectCoc=${results.defectCocAlerts}, total=${results.totalCreated}`
+      );
     } catch (error) {
       console.error('[PmsAlertEngine] Scan failed:', error);
     }

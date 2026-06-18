@@ -165,6 +165,7 @@ export const runningHoursAudit = pgTable("running_hours_audit", {
   dateUpdatedTZ: text("date_updated_tz").notNull(), // e.g., Asia/Kolkata
   enteredAtUTC: timestamp("entered_at_utc").notNull(),
   userId: text("user_id").notNull(),
+  actorLabel: text("actor_label"), // Audit Phase 0: frozen human actor (Office: name, Ship: rank) at write time
   source: text("source").notNull(), // 'single' | 'bulk' | 'cascade' | 'inherited_cascade'
   notes: text("notes"),
   meterReplaced: boolean("meter_replaced").notNull().default(false),
@@ -1949,6 +1950,8 @@ export const auditLog = pgTable("audit_log", {
   updatedByUuid: text("updated_by_uuid"),
   isDeleted: boolean("is_deleted").default(false),
   sortOrder: integer("sort_order"),
+  disposedAt: timestamp("disposed_at"), // Audit Phase 4: soft-dispose marker (reversible); NULL = active
+  disposedByUuid: text("disposed_by_uuid"),
 }, (table) => ({
   timestampIdx: index("idx_audit_timestamp").on(table.timestamp),
   userIdIdx: index("idx_audit_user_id").on(table.userId),
@@ -1965,6 +1968,26 @@ export const insertAuditLogSchema = createInsertSchema(auditLog).omit({
 
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLog.$inferSelect;
+
+// Retention Settings (Audit Phase 4) — UI-managed retention policy, one row per record category.
+// The configured period is a MINIMUM keep-time, not an auto-delete timer. is_protected categories
+// enforce a hard floor (min_value/min_unit) and NEVER auto-delete (disposal is a human, logged,
+// reversible soft-dispose). Only the non-protected sync_logs category actually auto-prunes.
+export const retentionSettings = pgTable("retention_settings", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  category: text("category").notNull().unique(),
+  label: text("label").notNull(),
+  retentionValue: integer("retention_value").notNull().default(0),
+  retentionUnit: text("retention_unit").notNull().default("years"), // days | months | years | forever
+  enabled: boolean("enabled").notNull().default(true),
+  isProtected: boolean("is_protected").notNull().default(true),
+  minValue: integer("min_value").notNull().default(0),
+  minUnit: text("min_unit").notNull().default("years"),
+  description: text("description"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedByUuid: text("updated_by_uuid"),
+});
+export type RetentionSetting = typeof retentionSettings.$inferSelect;
 
 // Component Documents Table - Drawings, manuals, and technical documents
 export const componentDocuments = pgTable("component_documents", {
@@ -2084,6 +2107,8 @@ export const componentMaintenanceHistory = pgTable("component_maintenance_histor
   updatedByUuid: text("updated_by_uuid"),
   isDeleted: boolean("is_deleted").default(false),
   sortOrder: integer("sort_order"),
+  disposedAt: timestamp("disposed_at"), // Audit Phase 4: soft-dispose marker (reversible); NULL = active
+  disposedByUuid: text("disposed_by_uuid"),
 }, (table) => ({
   componentIdIdx: index("idx_history_component_id").on(table.componentId),
   componentCodeIdx: index("idx_history_component_code").on(table.componentCode),
@@ -3488,6 +3513,8 @@ export const workOrderPostponements = pgTable("work_order_postponements", {
   updatedByUuid: text("updated_by_uuid"),
   isDeleted: boolean("is_deleted").default(false),
   sortOrder: integer("sort_order"),
+  disposedAt: timestamp("disposed_at"), // Audit Phase 4: soft-dispose marker (reversible); NULL = active
+  disposedByUuid: text("disposed_by_uuid"),
 }, (table) => ({
   workOrderIdx: index("idx_postponement_work_order").on(table.workOrderId),
   vesselIdx: index("idx_postponement_vessel").on(table.vesselId),
@@ -4068,6 +4095,7 @@ export const syncFieldLog = pgTable("sync_field_log", {
   vesselId: text("vessel_id"),
   changedAt: timestamp("changed_at").defaultNow().notNull(),
   changedByUserId: text("changed_by_user_id"),
+  changedByDisplay: text("changed_by_display"), // Audit Phase 0: frozen human actor (Office: name, Ship: rank) at write time
   instanceId: text("instance_id").notNull(),
   syncBatchId: text("sync_batch_id"),
   isSynced: boolean("is_synced").default(false).notNull(),

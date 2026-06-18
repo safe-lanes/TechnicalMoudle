@@ -121,6 +121,18 @@ export async function autoGenerate(vesselId: string) {
           const { id: _localId, ...woForLog } = createdWO as any;
           await logFieldChanges('work_orders', createdWO.wouuid, createdWO.vesselId || null, null, woForLog, 'auto-generation');
         } catch (logErr) { console.error('[FieldLogger] autoGenerate WO insert:', logErr); }
+        // Audit Phase 3 — clean business audit row for system-generated WO creation.
+        try {
+          await repo.createAuditLog({
+            entityType: 'work_order',
+            entityId: createdWO.wouuid,
+            actionType: 'create',
+            source: 'auto-generation',
+            vesselCode: createdWO.vesselId || null,
+            componentCode: (createdWO as any).componentCode || null,
+            payload: { workOrderNo: createdWO.workOrderNo, status: createdWO.status, generated: true },
+          });
+        } catch (auditErr) { console.error('[Audit] autoGenerate WO create log failed:', auditErr); }
         results.generated++;
         results.workOrders.push(createdWO);
 
@@ -202,6 +214,18 @@ export async function autoGenerate(vesselId: string) {
           const { id: _localId, ...woForLog } = createdWO as any;
           await logFieldChanges('work_orders', createdWO.wouuid, createdWO.vesselId || null, null, woForLog, 'auto-generation');
         } catch (logErr) { console.error('[FieldLogger] autoGenerate WO insert:', logErr); }
+        // Audit Phase 3 — clean business audit row for system-generated WO creation.
+        try {
+          await repo.createAuditLog({
+            entityType: 'work_order',
+            entityId: createdWO.wouuid,
+            actionType: 'create',
+            source: 'auto-generation',
+            vesselCode: createdWO.vesselId || null,
+            componentCode: (createdWO as any).componentCode || null,
+            payload: { workOrderNo: createdWO.workOrderNo, status: createdWO.status, generated: true },
+          });
+        } catch (auditErr) { console.error('[Audit] autoGenerate WO create log failed:', auditErr); }
         results.generated++;
         results.workOrders.push(createdWO);
 

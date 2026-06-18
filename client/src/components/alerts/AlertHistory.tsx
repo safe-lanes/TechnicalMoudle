@@ -55,7 +55,13 @@ const alertTypeLabels: Record<string, string> = {
   maintenance_due: 'Maintenance Due',
   critical_inventory: 'Critical Inventory',
   running_hours: 'Running Hours',
-  certificate_expiration: 'Certificate Expiry',
+  certificate_expiration: 'Certificate Expiring',
+  certificate_expired: 'Certificate Expired',
+  survey_due_soon: 'Survey Due Soon',
+  survey_window_closing: 'Survey Window Closing',
+  survey_overdue: 'Survey Overdue',
+  defect_overdue: 'Defect Overdue',
+  defect_coc: 'COC / Class Defect',
   system_backup: 'System Backup'
 };
 
@@ -181,7 +187,13 @@ export default function AlertHistory() {
                   <SelectItem value="maintenance_due">Maintenance Due</SelectItem>
                   <SelectItem value="critical_inventory">Critical Inventory</SelectItem>
                   <SelectItem value="running_hours">Running Hours</SelectItem>
-                  <SelectItem value="certificate_expiration">Certificate Expiry</SelectItem>
+                  <SelectItem value="certificate_expiration">Certificate Expiring</SelectItem>
+                  <SelectItem value="certificate_expired">Certificate Expired</SelectItem>
+                  <SelectItem value="survey_due_soon">Survey Due Soon</SelectItem>
+                  <SelectItem value="survey_window_closing">Survey Window Closing</SelectItem>
+                  <SelectItem value="survey_overdue">Survey Overdue</SelectItem>
+                  <SelectItem value="defect_overdue">Defect Overdue</SelectItem>
+                  <SelectItem value="defect_coc">COC / Class Defect</SelectItem>
                   <SelectItem value="system_backup">System Backup</SelectItem>
                 </SelectContent>
               </Select>

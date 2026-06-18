@@ -19,10 +19,13 @@ export async function updatePolicy(id: string, data: any) {
   return alertsRepo.updateAlertPolicy(id, data);
 }
 
-export async function batchUpdatePolicies(policies: Array<{ id: string; [key: string]: any }>) {
+export async function batchUpdatePolicies(policies: Array<{ apuuid?: string; [key: string]: any }>) {
   const results = [];
   for (const update of policies) {
-    const policy = await alertsRepo.updateAlertPolicy(update.id, update);
+    if (!update.apuuid) {
+      throw new Error('Alert policy is missing apuuid; cannot update');
+    }
+    const policy = await alertsRepo.updateAlertPolicy(update.apuuid, update);
     results.push(policy);
   }
   return results;

@@ -1,0 +1,11 @@
+-- Migration 121: Audit identity (Phase 0) — frozen actor display on field logs
+-- Adds changed_by_display to sync_field_log so every field-level audit row stores the
+-- human-readable actor (Office: person name, Ship: rank) captured AT WRITE TIME — it must
+-- survive crew changes and never be resolved live from the user table.
+-- changed_by_user_id keeps the canonical id (userUuid for real users; 'system'/'auto-generation'
+-- for machine writes); changed_by_display is the report-facing label.
+--
+-- Additive only: nullable, no default. Existing rows keep NULL (legacy rows show the id).
+-- Idempotent (ADD COLUMN IF NOT EXISTS) — re-run is a clean no-op. Does NOT touch sync
+-- infrastructure or categories (sync_field_log is NO_SYNC / local).
+ALTER TABLE sync_field_log ADD COLUMN IF NOT EXISTS changed_by_display TEXT;

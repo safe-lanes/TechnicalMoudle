@@ -72,6 +72,23 @@ export async function initMockAuthRankId() {
   );
 }
 
+/**
+ * Read a forwarded request header (SAILERP integration: see client/src/lib/activeRank.ts).
+ * Values are URI-encoded on the client; decode defensively and treat blanks as absent.
+ */
+function readForwardedHeader(req: AuthenticatedRequest, name: string): string | undefined {
+  const raw = req.headers[name];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  try {
+    const decoded = decodeURIComponent(value).trim();
+    return decoded || undefined;
+  } catch {
+    // Malformed percent-encoding — fall back to the raw trimmed value.
+    return value.trim();
+  }
+}
+
 export const mockAuthMiddleware = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   const headerRankRaw = req.headers["x-rank"];
   const headerRank = Array.isArray(headerRankRaw) ? headerRankRaw[0] : headerRankRaw;
@@ -85,22 +102,34 @@ export const mockAuthMiddleware = (req: AuthenticatedRequest, res: Response, nex
     (bodyRank && bodyRank.trim()) ||
     DEFAULT_MOCK_RANK_NAME;
 
+  // Audit Phase 0 — identity threading. In integrated SAILERP the client forwards the
+  // authenticated identity via x-user-* headers. Prefer those over the mock for IDENTITY
+  // fields only. RBAC is unchanged: req.user.role STAYS on the mock; the real role is stashed
+  // separately on `forwardedRole` for audit attribution only.
+  const fwdId = readForwardedHeader(req, "x-user-id");
+  const fwdName = readForwardedHeader(req, "x-user-name");
+  const fwdEmail = readForwardedHeader(req, "x-user-email");
+  const fwdType = readForwardedHeader(req, "x-user-type");
+  const fwdRole = readForwardedHeader(req, "x-user-role");
+
   req.user = {
     id: 1,
     username: "sail_admin",
-    fullName: "Sail Administrator",
+    fullName: fwdName || "Sail Administrator",
     firstname: "Sail",
     lastname: "Administrator",
-    email: "admin@seafarer.com",
-    role: "Sail Admin",
+    email: fwdEmail || "admin@seafarer.com",
+    role: "Sail Admin", // RBAC mock — unchanged in Phase 0 (frontend reads the real role independently)
     vesselId: null,
     isActive: true,
-    userUuid: "00000000-0000-0000-0000-000000000001",
+    userUuid: fwdId || "00000000-0000-0000-0000-000000000001",
     crewDesignation: "Marine Manager",
     rank_name: resolvedRank,
-    userType: "Office",
+    userType: fwdType || "Office",
     createdAt: new Date(),
     updatedAt: new Date(),
   };
+  // Real role forwarded for audit attribution only (never consulted by requireRole/RBAC).
+  if (fwdRole) (req.user as any).forwardedRole = fwdRole;
   next();
 };

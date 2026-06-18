@@ -898,6 +898,24 @@ export async function createWorkOrder(body: any) {
     await logFieldChanges('work_orders', workOrder.wouuid, workOrder.vesselId || null, null, workOrder, body.userId || body.performedBy || 'system');
   } catch (err) { console.error('[FieldLogger] WO create:', err); }
 
+  // Audit Phase 3 — clean business audit row for WO creation (manual). Actor frozen by createAuditLog.
+  try {
+    await repo.createAuditLog({
+      entityType: 'work_order',
+      entityId: workOrder.wouuid,
+      actionType: 'create',
+      source: 'web_ui',
+      vesselCode: workOrder.vesselId || null,
+      componentCode: workOrder.componentCode || null,
+      payload: {
+        workOrderNo: workOrder.workOrderNo,
+        status: workOrder.status,
+        jobTitle: (workOrder as any).jobTitle ?? null,
+        component: (workOrder as any).component ?? null,
+      },
+    });
+  } catch (auditErr) { console.error('[Audit] WO create log failed:', auditErr); }
+
   return workOrder;
 }
 

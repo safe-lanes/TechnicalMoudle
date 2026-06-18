@@ -352,8 +352,11 @@ export async function receivePushData(
                     );
                     const rejectedUserId = rejectedUserQuery.rows[0]?.changed_by_user_id;
 
-                    // Only notify real users, not 'system'
-                    if (rejectedUserId && rejectedUserId !== 'system') {
+                    // Only notify real users, not machine actors. Auto-generated writers stamp
+                    // 'auto-generation' (and startup/cron stamp 'system') — neither is a real
+                    // recipient, so both must be excluded or we'd queue a notification nobody owns.
+                    const MACHINE_ACTORS = new Set(['system', 'auto-generation']);
+                    if (rejectedUserId && !MACHINE_ACTORS.has(rejectedUserId)) {
                       const fieldLabel = getFieldDisplayName(log.fieldName);
                       const event = await alertsRepo.createAlertEvent({
                         alertType: 'sync_conflict_detected',
