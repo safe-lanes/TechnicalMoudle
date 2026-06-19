@@ -2436,35 +2436,44 @@ export async function rejectCompletedWorkOrder(
 // ── Classify a WO for the postponement approval workflow ─────────────────────
 
 async function classifyWoForPostponement(wo: any): Promise<{
-  variableName: 'Critical Equipment WO' | 'Critical WO' | 'Normal WO';
+  classification: 'criticalEquipment' | 'critical' | 'normal';
   level1Enabled: boolean;
   level2Enabled: boolean;
 }> {
-  let variableName: 'Critical Equipment WO' | 'Critical WO' | 'Normal WO' = 'Normal WO';
+  // WOs with no linked job always fall into normal — no config lookup needed
+  if (!wo.jobId) {
+    return { classification: 'normal', level1Enabled: false, level2Enabled: false };
+  }
 
-  if (wo.jobId) {
-    const job = await repo.findJob(wo.jobId);
-    if (job) {
-      let isOnCriticalEquipment = false;
-      if ((job as any).componentId) {
-        const comp = await repo.findComponent((job as any).componentId);
-        isOnCriticalEquipment = (comp as any)?.critical === true;
-      }
-      if (isOnCriticalEquipment) {
-        variableName = 'Critical Equipment WO';
-      } else if ((job as any).criticality === 'Yes') {
-        variableName = 'Critical WO';
-      }
+  let classification: 'criticalEquipment' | 'critical' | 'normal' = 'normal';
+
+  const job = await repo.findJob(wo.jobId);
+  if (job) {
+    let isOnCriticalEquipment = false;
+    if ((job as any).componentId) {
+      const comp = await repo.findComponent((job as any).componentId);
+      isOnCriticalEquipment = (comp as any)?.critical === true;
+    }
+    if (isOnCriticalEquipment) {
+      classification = 'criticalEquipment';
+    } else if ((job as any).criticality === 'Yes') {
+      classification = 'critical';
     }
   }
 
+  const variableNameMap: Record<'criticalEquipment' | 'critical' | 'normal', string> = {
+    criticalEquipment: 'Critical Equipment WO',
+    critical: 'Critical WO',
+    normal: 'Normal WO',
+  };
+
   const allConfigs = await storage.getApprovalWorkflowConfig();
   const config = allConfigs.find(
-    (c: any) => c.functionId === 'pms-wo-postponement' && c.variableName === variableName && !c.isDeleted
+    (c: any) => c.functionId === 'pms-wo-postponement' && c.variableName === variableNameMap[classification] && !c.isDeleted
   );
 
   return {
-    variableName,
+    classification,
     level1Enabled: config?.level1Enabled ?? false,
     level2Enabled: config?.level2Enabled ?? false,
   };
@@ -2499,7 +2508,7 @@ export async function submitPostponeRequest(id: string, body: any) {
   // Classify the WO and build the approval workflow snapshot
   const classification = await classifyWoForPostponement(wo);
   const approvalWorkflowSnapshot = {
-    woClassification: classification.variableName,
+    woClassification: classification.classification,
     level1Enabled: classification.level1Enabled,
     level2Enabled: classification.level2Enabled,
   };
