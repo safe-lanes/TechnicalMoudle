@@ -5,7 +5,6 @@ import {
   getComponentCategory,
   getEffectiveComponentCategories,
   getSubGroupCode,
-  getSubGroupName,
   stripSFISuffix,
   getParentSFICode,
   validateSFICode,
@@ -243,6 +242,13 @@ export async function validateData(type: string, data: any[], mode: string, vess
   // Also fetch existing component codes from database for validation
   const componentCodeOccurrences = new Map<string, number[]>(); // Key: uppercase code, Value: row numbers
   const existingDbComponentCodes = new Set<string>(); // Uppercase codes from database
+
+  // Track duplicate Component Names (case-insensitive, trimmed, per vessel)
+  // Also fetch existing component names from database for validation
+  const componentNameOccurrences = new Map<string, number[]>(); // Key: uppercase trimmed name, Value: row numbers
+  // Key: uppercase trimmed name, Value: set of uppercase Component Codes already using that name in the vessel.
+  // The code set lets update/upsert rows keep their own existing name while still rejecting a name owned by a different component.
+  const existingDbComponentNames = new Map<string, Set<string>>();
   
   // Track duplicate Fleet Equipment Codes (case-insensitive)
   // Also fetch existing fleet equipment codes from database for validation
@@ -385,8 +391,19 @@ export async function validateData(type: string, data: any[], mode: string, vess
             if (comp.componentCode) {
               existingDbComponentCodes.add(comp.componentCode.toUpperCase());
             }
+            if (comp.name) {
+              const nameKey = String(comp.name).trim().toUpperCase();
+              if (nameKey) {
+                if (!existingDbComponentNames.has(nameKey)) {
+                  existingDbComponentNames.set(nameKey, new Set<string>());
+                }
+                if (comp.componentCode) {
+                  existingDbComponentNames.get(nameKey)!.add(String(comp.componentCode).trim().toUpperCase());
+                }
+              }
+            }
           });
-          console.log(`📋 Loaded ${existingDbComponentCodes.size} existing component codes for vessel '${vesselId}'`);
+          console.log(`📋 Loaded ${existingDbComponentCodes.size} existing component codes and ${existingDbComponentNames.size} existing component names for vessel '${vesselId}'`);
         } catch (err) {
           console.error(`Failed to fetch existing components for vessel ${vesselId}:`, err);
         }
@@ -415,6 +432,17 @@ export async function validateData(type: string, data: any[], mode: string, vess
             componentCodeOccurrences.set(code, []);
           }
           componentCodeOccurrences.get(code)!.push(index + 2); // Row number (Excel is 1-indexed + header)
+        }
+        // Track Component Name occurrences (case-insensitive, trimmed) for in-file duplicate detection
+        const componentName = row['Component Name'];
+        if (componentName !== undefined && componentName !== null) {
+          const name = String(componentName).trim().toUpperCase();
+          if (name !== '') {
+            if (!componentNameOccurrences.has(name)) {
+              componentNameOccurrences.set(name, []);
+            }
+            componentNameOccurrences.get(name)!.push(index + 2); // Row number (Excel is 1-indexed + header)
+          }
         }
       });
     }
@@ -535,32 +563,46 @@ export async function validateData(type: string, data: any[], mode: string, vess
         }
       }
       
-      // Component Name - required, but auto-generate for parent nodes if missing
-      if (!row['Component Name'] || String(row['Component Name']).trim() === '') {
-        // Auto-generate name for parent nodes (codes without detailed hierarchy)
-        const sfiCode = normalized['Component Code'];
-        if (sfiCode) {
-          const firstDigit = parseInt(sfiCode.charAt(0));
-          
-          // Try to generate a sensible name based on the code structure
-          if (sfiCode.length === 1) {
-            // Single digit: use main group category
-            const category = getComponentCategory(firstDigit);
-            normalized['Component Name'] = category ? category.replace(/^\d+\s+/, '') : `SFI ${sfiCode}`;
-            warnings.push(`Row ${rowNum}: Component Name auto-generated from SFI code: "${normalized['Component Name']}"`);
-          } else if (sfiCode.length === 2) {
-            // Two digits: use sub group name
-            normalized['Component Name'] = getSubGroupName(sfiCode);
-            warnings.push(`Row ${rowNum}: Component Name auto-generated from SFI code: "${normalized['Component Name']}"`);
-          } else {
-            // More complex codes should have names - this is likely an error
-            errors.push(`Row ${rowNum}: Component Name is required for detailed component codes`);
-          }
-        } else {
-          errors.push(`Row ${rowNum}: Component Name is required`);
-        }
+      // Component Name validation:
+      // 1. Mandatory — blank (or whitespace-only) is a blocking error; no auto-generation.
+      // 2. Allowed characters: letters, numbers, spaces, period, comma, hyphen, round brackets.
+      // 3. Unique within the import file (case-insensitive, trimmed).
+      // 4. Trimmed before validation; trimmed value is what gets imported.
+      // 5. Unique within the selected vessel (case-insensitive, trimmed).
+      const componentNameTrimmed = row['Component Name'] === undefined || row['Component Name'] === null
+        ? ''
+        : String(row['Component Name']).trim();
+      if (componentNameTrimmed === '') {
+        errors.push(`Row ${rowNum}: Component Name is required and cannot be blank`);
+      } else if (!/^[A-Za-z0-9 .,()\-]+$/.test(componentNameTrimmed)) {
+        errors.push(`Row ${rowNum}: Component Name contains invalid characters. Only letters, numbers, spaces, periods (.), commas (,), hyphens (-), and brackets () are allowed.`);
       } else {
-        normalized['Component Name'] = String(row['Component Name']).trim();
+        normalized['Component Name'] = componentNameTrimmed;
+        const nameUpperCase = componentNameTrimmed.toUpperCase();
+
+        // Duplicate within the uploaded file (case-insensitive). Flag only non-first occurrences.
+        const nameOccurrences = componentNameOccurrences.get(nameUpperCase);
+        if (nameOccurrences && nameOccurrences.length > 1) {
+          const firstOccurrence = nameOccurrences[0];
+          if (rowNum !== firstOccurrence) {
+            errors.push(`Row ${rowNum}: Duplicate Component Name '${componentNameTrimmed}' - this name already appears in row ${firstOccurrence}. Each Component Name must be unique within the import file.`);
+          }
+        }
+
+        // Duplicate against existing components for the vessel (case-insensitive).
+        // In 'add' mode any pre-existing name is a conflict. In 'update'/'upsert' mode a row
+        // may legitimately keep its own existing name, so only flag a name that belongs to a
+        // DIFFERENT component (matched by Component Code).
+        const codesWithName = existingDbComponentNames.get(nameUpperCase);
+        if (codesWithName) {
+          const ownCode = normalized['Component Code']
+            ? String(normalized['Component Code']).trim().toUpperCase()
+            : null;
+          const belongsOnlyToThisRow = ownCode !== null && codesWithName.size === 1 && codesWithName.has(ownCode);
+          if (mode === 'add' || !belongsOnlyToThisRow) {
+            errors.push(`Row ${rowNum}: Component Name '${componentNameTrimmed}' already exists in vessel '${vesselId}'. Component Name must be unique within the vessel.`);
+          }
+        }
       }
 
       // Validate Yes/No fields - Support both template format and legacy format
