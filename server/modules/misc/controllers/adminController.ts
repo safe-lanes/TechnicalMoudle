@@ -3,7 +3,7 @@ import { storage } from '../../../storage';
 import { getDb } from '../../../db';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
-import { buildExternalMasterDataUrl, getCrewMasterDataBaseUrl } from '../../../config/externalApi';
+import { buildExternalMasterDataUrl, getExternalMasterDataBaseUrl } from '../../../config/externalApi';
 import { logFieldChanges } from '../../sync';
 import { sql, eq, and } from 'drizzle-orm';
 import {
@@ -578,15 +578,12 @@ export async function syncMasters(req: Request, res: Response) {
   }
 
   // 7. Sync Approvers (moc_approvers)
-  // NOTE: mocapprovers lives on the Crew Master service (getCrewMasterDataBaseUrl),
-  // NOT on the PMS master data service (buildExternalMasterDataUrl). Using the wrong
-  // base URL is why fetchExternal('mocapprovers') always returned [].
   console.log('📦 Syncing Approvers...');
   let fetchedApprovers: any[] = [];
   let approverFetchSucceeded = false;
   try {
-    const crewBaseUrl = getCrewMasterDataBaseUrl().replace(/\/+$/, '');
-    const approversUrl = `${crewBaseUrl}/mocapprovers?domain=${encodeURIComponent(domain)}`;
+    const masterBaseUrl = getExternalMasterDataBaseUrl().replace(/\/+$/, '');
+    const approversUrl = `${masterBaseUrl}/mocapprovers?domain=${encodeURIComponent(domain)}`;
     console.log(`[fetchExternal] Fetching mocapprovers from crew master: ${approversUrl}`);
     const approversResponse = await fetch(approversUrl, { method: 'GET', headers: { accept: '*/*' } });
     if (!approversResponse.ok) {
