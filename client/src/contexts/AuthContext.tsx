@@ -10,7 +10,11 @@ import type { UIRole } from "@shared/uiRoles";
 import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { secureGetItem, secureClear } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
-import { setActiveRank, setActiveIdentity, type ActiveIdentity } from "@/lib/activeRank";
+import {
+  setActiveRank,
+  setActiveIdentity,
+  type ActiveIdentity,
+} from "@/lib/activeRank";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
 function resolveProfileName(profile: Record<string, any>): {
@@ -185,7 +189,9 @@ function invalidateRankScopedQueries() {
  * Audit Phase 0 — map the authenticated user to the audit-relevant identity that the fetch
  * interceptor forwards to PMS (x-user-* headers). Returns null when there is no user (logout).
  */
-function toActiveIdentity(user: PublicUser | null | undefined): ActiveIdentity | null {
+function toActiveIdentity(
+  user: PublicUser | null | undefined,
+): ActiveIdentity | null {
   if (!user) return null;
   return {
     userId: user.userUuid ?? null,
