@@ -99,12 +99,17 @@ export async function getTargetEntity(targetType: string, targetId: string) {
 
 // ── Change Request CRUD ──
 
-export async function getChangeRequests(query: { vesselId?: string; status?: string; category?: string; requestedBy?: string; periodFrom?: string; periodTo?: string }) {
-  const { vesselId, status, category, requestedBy, periodFrom, periodTo } = query;
+export async function getChangeRequests(query: { vesselId?: string; status?: string; category?: string; requestedBy?: string; periodFrom?: string; periodTo?: string; pendingForApprover?: string }) {
+  const { vesselId, status, category, requestedBy, periodFrom, periodTo, pendingForApprover } = query;
 
-  const filters: { vesselId?: string } = {};
+  const filters: { vesselId?: string; pendingForApprover?: string } = {};
   if (vesselId) {
     filters.vesselId = vesselId;
+  }
+  if (pendingForApprover) {
+    filters.pendingForApprover = pendingForApprover;
+    // When filtering by approver, return directly — storage handles the filter
+    return crRepo.getChangeRequests(filters);
   }
 
   let requests = await crRepo.getChangeRequests(filters);
@@ -166,15 +171,23 @@ export async function createChangeRequest(body: any) {
     }
   }
 
+  const submitAfterCreate = validatedData.status === 'submitted';
+
   const requestData = {
     ...validatedData,
     vesselId: validatedData.vesselId,
     targetId: resolvedTargetId,
-    status: validatedData.status || 'draft' as const,
+    status: 'draft' as const,
     requestedByUserId: validatedData.requestedByUserId || 'system'
   };
 
-  return crRepo.createChangeRequest(requestData);
+  const created = await crRepo.createChangeRequest(requestData);
+
+  if (submitAfterCreate) {
+    return submitChangeRequestWorkflow(created.id, validatedData.requestedByUserId || 'system');
+  }
+
+  return created;
 }
 
 // ── Status Updates ──
@@ -186,6 +199,11 @@ export async function updateStatus(id: number, body: { status: string; reviewedB
     throw new ValidationError('Invalid status');
   }
 
+  // When transitioning to 'submitted', run the level-aware workflow setup
+  if (status === 'submitted') {
+    return submitChangeRequestWorkflow(id, reviewedByUserId || 'system');
+  }
+
   return crRepo.updateChangeRequest(id, {
     status: status as any,
     reviewedByUserId,
@@ -193,10 +211,159 @@ export async function updateStatus(id: number, body: { status: string; reviewedB
   });
 }
 
+// ── Submit Workflow ──
+// Classifies the target component, reads the approval workflow config,
+// snapshots it on the CR, and creates the required approval step rows.
+
+async function submitChangeRequestWorkflow(id: number, userId: string) {
+  const cr = await crRepo.getChangeRequest(id);
+  if (!cr) throw new NotFoundError('Change request not found');
+
+  // Only allow submission from draft or returned status
+  if (cr.status !== 'draft' && cr.status !== 'returned') {
+    throw new ValidationError(`Cannot submit a change request with status '${cr.status}'. Only draft or returned CRs can be submitted.`);
+  }
+
+  let equipmentClassification: 'normal' | 'critical' | 'unknown' = 'unknown';
+  let spareClassification: 'normal' | 'critical' | 'unknown' = 'unknown';
+  let jobClassification: 'criticalEquipment' | 'critical' | 'normal' | 'unknown' = 'unknown';
+
+  // Classify the target component
+  if (cr.targetType === 'component' && cr.targetId) {
+    const component = await crRepo.getComponent(cr.targetId);
+    if (component) {
+      const isCritical = (component as any).critical === true || (component as any).classItem === true;
+      equipmentClassification = isCritical ? 'critical' : 'normal';
+    }
+  }
+
+  // Classify the target spare using its own critical TEXT field
+  if (cr.targetType === 'spare' && cr.targetId) {
+    const spare = await crRepo.getSpare(cr.targetId);
+    if (spare) {
+      const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes';
+      spareClassification = isCritical ? 'critical' : 'normal';
+    }
+  }
+
+  // Classify a job CR:
+  //   Priority 1 — Critical Equipment Jobs: job's component has critical = true
+  //   Priority 2 — Critical Jobs: job itself has criticality = 'Yes'
+  //   Default    — Normal Jobs
+  if (cr.targetType === 'job' && cr.targetId) {
+    const job = await crRepo.getJob(cr.targetId);
+    if (job) {
+      let isOnCriticalEquipment = false;
+      if (job.componentId) {
+        const comp = await crRepo.getComponent(job.componentId);
+        isOnCriticalEquipment = (comp as any)?.critical === true;
+      }
+      if (isOnCriticalEquipment) {
+        jobClassification = 'criticalEquipment';
+      } else if (job.criticality === 'Yes') {
+        jobClassification = 'critical';
+      } else {
+        jobClassification = 'normal';
+      }
+    }
+  }
+
+  // Look up the approval workflow config for this CR category
+  let level1Enabled = false;
+  let level2Enabled = false;
+
+  if (cr.targetType === 'spare' && spareClassification !== 'unknown') {
+    const allConfigs = await crRepo.getApprovalWorkflowConfig();
+    const variableName = spareClassification === 'critical' ? 'Critical Spares' : 'Normal Spares';
+    const config = allConfigs.find(
+      c => c.functionId === 'pms-spares-cr' && c.variableName === variableName && !c.isDeleted
+    );
+    if (config) {
+      level1Enabled = config.level1Enabled;
+      level2Enabled = config.level2Enabled;
+    }
+  } else if (cr.targetType === 'store') {
+    // Stores have no classification split — one flat config row covers all store items
+    const allConfigs = await crRepo.getApprovalWorkflowConfig();
+    const config = allConfigs.find(
+      c => c.functionId === 'pms-stores-cr' && c.variableName === 'Store Items' && !c.isDeleted
+    );
+    if (config) {
+      level1Enabled = config.level1Enabled;
+      level2Enabled = config.level2Enabled;
+    }
+  } else if (cr.targetType === 'job' && jobClassification !== 'unknown') {
+    const allConfigs = await crRepo.getApprovalWorkflowConfig();
+    const variableName =
+      jobClassification === 'criticalEquipment' ? 'Critical Equipment Jobs'
+      : jobClassification === 'critical'        ? 'Critical Jobs'
+      :                                           'Normal Jobs';
+    const config = allConfigs.find(
+      c => c.functionId === 'pms-jobs-cr' && c.variableName === variableName && !c.isDeleted
+    );
+    if (config) {
+      level1Enabled = config.level1Enabled;
+      level2Enabled = config.level2Enabled;
+    }
+  } else if (equipmentClassification !== 'unknown') {
+    const allConfigs = await crRepo.getApprovalWorkflowConfig();
+    const variableName = equipmentClassification === 'normal' ? 'Normal Equipment' : 'Critical Equipment';
+    const config = allConfigs.find(
+      c => c.functionId === 'pms-components-cr' && c.variableName === variableName && !c.isDeleted
+    );
+    if (config) {
+      level1Enabled = config.level1Enabled;
+      level2Enabled = config.level2Enabled;
+    }
+  }
+
+  // Build snapshot — each CR category records its classification key
+  const snapshot = cr.targetType === 'spare'
+    ? { level1Enabled, level2Enabled, spareClassification }
+    : cr.targetType === 'store'
+    ? { level1Enabled, level2Enabled, storeClassification: 'standard' as const }
+    : cr.targetType === 'job'
+    ? { level1Enabled, level2Enabled, jobClassification: jobClassification as 'criticalEquipment' | 'critical' | 'normal' }
+    : { level1Enabled, level2Enabled, equipmentClassification };
+
+  // Update CR to submitted with snapshot
+  const updated = await crRepo.updateChangeRequest(id, {
+    status: 'submitted',
+    submittedAt: new Date(),
+    requestedByUserId: userId,
+    approvalWorkflowSnapshot: snapshot
+  } as any);
+
+  // Create approval step rows
+  if (level1Enabled) {
+    await crRepo.createChangeRequestApprovalStep({
+      changeRequestId: id,
+      changeRequestUuid: cr.cruuid,
+      approvalLevel: 'Level 1',
+      status: 'Pending',
+    });
+  }
+  if (level2Enabled) {
+    await crRepo.createChangeRequestApprovalStep({
+      changeRequestId: id,
+      changeRequestUuid: cr.cruuid,
+      approvalLevel: 'Level 2',
+      status: 'Pending',
+    });
+  }
+
+  const classLabel = cr.targetType === 'spare' ? spareClassification
+    : cr.targetType === 'store' ? 'standard'
+    : cr.targetType === 'job' ? jobClassification
+    : equipmentClassification;
+  console.log(`[CR_WORKFLOW] CR ${id} (${cr.targetType}) submitted — classification: ${classLabel}, L1: ${level1Enabled}, L2: ${level2Enabled}`);
+  return updated;
+}
+
 // ── Approve / Reject ──
 
-export async function approveChangeRequest(id: number, body: { comment: string; reviewerId?: string }) {
-  const { comment, reviewerId } = body;
+export async function approveChangeRequest(id: number, body: { comment: string; reviewerId?: string; role?: string }) {
+  const { comment, reviewerId, role } = body;
 
   if (!comment) {
     throw new ValidationError('Comment is required for approval');
@@ -210,22 +377,30 @@ export async function approveChangeRequest(id: number, body: { comment: string; 
     proposedChangesCount: Array.isArray(existing?.proposedChangesJson) ? existing.proposedChangesJson.length : 0
   });
 
-  const updated = await crRepo.approveChangeRequest(id, reviewerId || 'reviewer', comment);
+  const updated = await crRepo.approveChangeRequest(id, reviewerId || 'reviewer', comment, role);
   console.log(`[CR_SERVICE] Approval complete, status: ${updated.status}`);
   return updated;
 }
 
-export async function rejectChangeRequest(id: number, body: { comment: string; reviewerId?: string }) {
-  const { comment, reviewerId } = body;
+export async function rejectChangeRequest(id: number, body: { comment: string; reviewerId?: string; role?: string }) {
+  const { comment, reviewerId, role } = body;
 
   if (!comment) {
     throw new ValidationError('Comment is required for rejection');
   }
 
   console.log('Rejecting change request:', id, 'with comment:', comment);
-  const updated = await crRepo.rejectChangeRequest(id, reviewerId || 'reviewer', comment);
+  const updated = await crRepo.rejectChangeRequest(id, reviewerId || 'reviewer', comment, role);
   console.log('Successfully rejected request:', updated);
   return updated;
+}
+
+// ── Approval Steps ──
+
+export async function getApprovalSteps(changeRequestId: number) {
+  const cr = await crRepo.getChangeRequest(changeRequestId);
+  if (!cr) throw new NotFoundError('Change request not found');
+  return crRepo.getChangeRequestApprovalSteps(changeRequestId);
 }
 
 // ── Rejection History ──

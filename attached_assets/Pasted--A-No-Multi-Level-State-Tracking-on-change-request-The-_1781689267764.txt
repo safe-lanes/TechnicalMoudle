@@ -1,0 +1,61 @@
+### A. No Multi-Level State Tracking on change_request
+
+The change_request table has a single status field (draft | submitted | returned | approved | rejected) and a single reviewedByUserId. There is no way to track:
+
+* Which level the request is currently waiting at
+* Who approved Level 1 (when both levels are configured)
+* Whether the workflow configuration at submission time required one level or two
+
+**Ans:**
+
+Once the request is submitted to Level 1, the status can remain as **Submitted**. After Level 1 approval, if Level 2 approval is required, the status can be updated to **Level 2 Approval Pending** until the Level 2 review is completed.
+
+---
+
+### B. approveChangeRequest() Goes Directly to Approved
+
+Currently, approving any submitted request marks it as approved and triggers the changes. It does not check whether a second approval level is still required.
+
+**Ans:**
+
+At the time the request is raised, the system should verify the configured approval workflow and determine how many approval levels are required. The approval level details and assigned approver information should be stored against the request so that the approval process follows the configured workflow before marking the request as Approved.
+
+---
+
+### C. No Workflow Config Snapshot at Submission Time
+
+If an administrator changes the Level 1/Level 2 configuration after a request has already been submitted, the in-progress request could be routed inconsistently. The workflow configuration should therefore be captured at the time of submission.
+
+**Ans:**
+
+Any request that has already been submitted should continue to follow the approval configuration that was applicable at the time of submission. Any changes made to the Approval Workflow configuration should apply only to newly created requests.
+
+---
+
+### D. Operations Dashboard Pending Approval KPI is Work-Order Only
+
+The current Pending Approval KPI on the Operations Dashboard only displays Work Order approvals. Change Requests are not currently integrated into this KPI.
+
+**Ans:**
+
+In that case, the Change Requests can be displayed under the **Modify PMS Request** KPI/Card on the Operations Dashboard, and only the relevant approvers should be able to view and action the requests.
+
+---
+
+### E. No Per-Level Access Control on Approval Action
+
+Any user with reviewer access can currently approve or reject any submitted Change Request. The proposed workflow requires that a Level 2 approver cannot act until Level 1 approval has been completed, and non-approvers should have Read-Only access.
+
+**Ans:**
+
+Yes, this is required. The system can display a note or status message for the Level 2 approver indicating that the request is **Awaiting Level 1 Approval**. Until Level 1 approval is completed, Level 2 users should not be allowed to approve or reject the request.
+
+---
+
+### F. moc_approvers.approverLevel is Free Text
+
+The column currently stores values such as "Level 1", "Level 2", and "Level 4" without constraints. Routing logic would need to parse and match these values carefully.
+
+**Ans:**
+
+This can be ignored for the current phase. At present, the approval workflow scope is limited to **Level 1** and **Level 2** approvals only. Additional approval levels can be considered in future enhancements if required.

@@ -203,6 +203,28 @@ export async function getMaxPostponementNumber(workOrderId: string): Promise<num
   return Math.max(...rows.map((r: any) => r.postponementNumber || 1));
 }
 
+// ── WO Postponement Approval Steps ──
+
+export async function getWoPostponementApprovalSteps(postponementId: string) {
+  return storage.getWoPostponementApprovalSteps(postponementId);
+}
+
+export async function createWoPostponementApprovalStep(data: any) {
+  return storage.createWoPostponementApprovalStep(data);
+}
+
+export async function updateWoPostponementApprovalStep(id: number, data: any) {
+  return storage.updateWoPostponementApprovalStep(id, data);
+}
+
+export async function getLatestAwaitingPostponement(workOrderId: string) {
+  return storage.getLatestAwaitingPostponement(workOrderId);
+}
+
+export async function verifyApproverForLevel(reviewerId: string, approvalLevel: string) {
+  return storage.verifyApproverForLevel(reviewerId, approvalLevel);
+}
+
 // ── Audit Log ──
 
 export async function createAuditLog(data: any) {

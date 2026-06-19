@@ -925,7 +925,7 @@ export function ProposeChanges({
             <Label>Critical</Label>
           </div>
           <div className="col-span-4">
-            <p className="text-sm">{fields.critical ? 'Yes' : 'No'}</p>
+            <p className="text-sm">{fields.critical === 'Critical' || fields.critical === 'Yes' ? 'Yes' : 'No'}</p>
           </div>
           <div className="col-span-1">
             <Switch
@@ -936,16 +936,16 @@ export function ProposeChanges({
           </div>
           <div className="col-span-4">
             <Select
-              value={fieldValues['critical']?.toString() || fields.critical?.toString() || 'false'}
-              onValueChange={(value) => handleFieldChange('critical', value === 'true')}
+              value={fieldValues['critical'] || fields.critical || 'Non-Critical'}
+              onValueChange={(value) => handleFieldChange('critical', value)}
               disabled={!proposedFields['critical'] || disabled}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="true">Yes</SelectItem>
-                <SelectItem value="false">No</SelectItem>
+                <SelectItem value="Critical">Yes (Critical)</SelectItem>
+                <SelectItem value="Non-Critical">No (Non-Critical)</SelectItem>
               </SelectContent>
             </Select>
           </div>

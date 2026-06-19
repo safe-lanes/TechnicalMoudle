@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface LocationItem {
   id: number;
@@ -23,6 +24,9 @@ interface LocationSearchDropdownProps {
   placeholder?: string;
   disabled?: boolean;
   allowClear?: boolean;
+  allowCreate?: boolean;
+  triggerClassName?: string;
+  onSelectLocation?: (location: LocationItem | null) => void;
   "data-testid"?: string;
 }
 
@@ -33,6 +37,9 @@ export function LocationSearchDropdown({
   placeholder = "Select location...",
   disabled = false,
   allowClear = false,
+  allowCreate = true,
+  triggerClassName,
+  onSelectLocation,
   "data-testid": testId,
 }: LocationSearchDropdownProps) {
   const { toast } = useToast();
@@ -57,8 +64,9 @@ export function LocationSearchDropdown({
     }
   }, [isCreating]);
 
-  const handleSelect = (locationName: string) => {
+  const handleSelect = (locationName: string, location?: LocationItem | null) => {
     onChange(locationName);
+    onSelectLocation?.(location ?? null);
     setOpen(false);
     setIsCreating(false);
     setNewLocationName("");
@@ -83,6 +91,11 @@ export function LocationSearchDropdown({
       });
 
       onChange(canonicalName);
+      onSelectLocation?.(
+        createdLocation && typeof createdLocation.id === "number"
+          ? { ...createdLocation, locationName: canonicalName }
+          : null
+      );
       setIsCreating(false);
       setNewLocationName("");
       setOpen(false);
@@ -117,7 +130,7 @@ export function LocationSearchDropdown({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className="w-full justify-between font-normal h-10 px-3"
+          className={cn("w-full justify-between font-normal h-10 px-3", triggerClassName)}
           data-testid={testId}
         >
           <span className="truncate text-left flex-1">
@@ -141,7 +154,7 @@ export function LocationSearchDropdown({
                   {allowClear && (
                     <CommandItem
                       value="__none__"
-                      onSelect={() => handleSelect("")}
+                      onSelect={() => handleSelect("", null)}
                       data-testid={testId ? `${testId}-option-none` : undefined}
                     >
                       <span className="text-muted-foreground flex-1">None</span>
@@ -152,7 +165,7 @@ export function LocationSearchDropdown({
                     <CommandItem
                       key={loc.id}
                       value={loc.locationName}
-                      onSelect={() => handleSelect(loc.locationName)}
+                      onSelect={() => handleSelect(loc.locationName, loc)}
                       data-testid={testId ? `${testId}-option-${loc.id}` : undefined}
                     >
                       <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
@@ -166,6 +179,8 @@ export function LocationSearchDropdown({
               </>
             )}
           </CommandList>
+          {allowCreate && (
+          <>
           <CommandSeparator />
           <div className="p-1">
             {isCreating ? (
@@ -201,6 +216,8 @@ export function LocationSearchDropdown({
               </button>
             )}
           </div>
+          </>
+          )}
         </Command>
       </PopoverContent>
     </Popover>

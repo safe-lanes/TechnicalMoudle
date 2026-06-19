@@ -3,7 +3,7 @@ import { storage } from '../../../storage';
 import { getDb } from '../../../db';
 import { computeWorkOrderStatus, buildCompanyGraceConfig } from '@shared/workOrders/status';
 import { WORK_ORDER_THRESHOLDS } from '@shared/workOrders/constants';
-import { buildExternalMasterDataUrl } from '../../../config/externalApi';
+import { buildExternalMasterDataUrl, getCrewMasterDataBaseUrl } from '../../../config/externalApi';
 import { logFieldChanges } from '../../sync';
 import { sql, eq, and } from 'drizzle-orm';
 import {
@@ -17,6 +17,7 @@ import {
   jobComponentLinks as jobComponentLinksTable,
   workOrders as workOrdersTable,
   components as componentsTable,
+  mocApprovers,
 } from '@shared/schema';
 
 // ── GET/POST /admin/job-due-scan ──
@@ -333,6 +334,7 @@ export async function syncMasters(req: Request, res: Response) {
     ports: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
     users: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
     fleetGroups: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
+    approvers: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
   };
 
   const fetchExternal = async (endpoint: string, key: string) => {
@@ -573,6 +575,75 @@ export async function syncMasters(req: Request, res: Response) {
       });
       stats.fleetGroups.updated++;
     } catch (e: any) { stats.fleetGroups.errors.push(`FleetGroup ${fg.fleet_group_id}: ${e.message}`); }
+  }
+
+  // 7. Sync Approvers (moc_approvers)
+  // NOTE: mocapprovers lives on the Crew Master service (getCrewMasterDataBaseUrl),
+  // NOT on the PMS master data service (buildExternalMasterDataUrl). Using the wrong
+  // base URL is why fetchExternal('mocapprovers') always returned [].
+  console.log('📦 Syncing Approvers...');
+  let fetchedApprovers: any[] = [];
+  let approverFetchSucceeded = false;
+  try {
+    const crewBaseUrl = getCrewMasterDataBaseUrl().replace(/\/+$/, '');
+    const approversUrl = `${crewBaseUrl}/mocapprovers?domain=${encodeURIComponent(domain)}`;
+    console.log(`[fetchExternal] Fetching mocapprovers from crew master: ${approversUrl}`);
+    const approversResponse = await fetch(approversUrl, { method: 'GET', headers: { accept: '*/*' } });
+    if (!approversResponse.ok) {
+      throw new Error(`Failed to fetch mocapprovers: ${approversResponse.status}`);
+    }
+    const approversData = await approversResponse.json();
+    // API may return a bare array or { mocapprovers: [...] }
+    fetchedApprovers = Array.isArray(approversData) ? approversData : (approversData.mocapprovers || []);
+    approverFetchSucceeded = true;
+    console.log(`[fetchExternal] mocapprovers returned ${fetchedApprovers.length} records`);
+  } catch (e: any) {
+    console.error(`[syncMasters] Failed to fetch approvers: ${e.message}`);
+    stats.approvers.errors.push(`Fetch failed: ${e.message}`);
+  }
+  if (approverFetchSucceeded) {
+    // Soft-delete all previously synced Technical approvers so stale records don't linger.
+    // This runs even when the API returns zero records — an empty result is still a valid
+    // response and should clear out any stale synced data.
+    try {
+      await db.update(mocApprovers)
+        .set({ isDeleted: true, updatedAt: now })
+        .where(and(eq(mocApprovers.isSync, true), eq(mocApprovers.isDeleted, false)));
+    } catch (e: any) {
+      console.error(`[syncMasters] Failed to soft-delete stale approvers: ${e.message}`);
+    }
+    // Filter to Technical module only (matches useLocalApprovers read filter)
+    const technicalApprovers = fetchedApprovers.filter(
+      (a: any) => (a.modulename || a.moduleName || '') === 'Technical'
+    );
+    for (const a of technicalApprovers) {
+      try {
+        const userId = getFieldValue(a, ['userId', 'user_id', 'uid']);
+        if (!userId) { stats.approvers.skipped++; continue; }
+        const name = getFieldValue(a, ['name', 'fullname', 'fullName', 'userName']) || null;
+        const userUuid = getFieldValue(a, ['userUuid', 'user_uuid', 'uuid']) || null;
+        const approverLevel = getFieldValue(a, ['approverLevel', 'approver_level', 'level']) || null;
+        const emailId = getFieldValue(a, ['emailId', 'email_id', 'email']) || null;
+        const modulename = getFieldValue(a, ['modulename', 'moduleName']) || 'Technical';
+        const isActiveRaw = a.isActive ?? a.is_active;
+        const isActive = isActiveRaw === 1 || isActiveRaw === true ? 1 : 0;
+        await db.insert(mocApprovers).values({
+          name,
+          userId,
+          userUuid,
+          approverLevel,
+          emailId,
+          isActive,
+          modulename,
+          isSync: true,
+          isDeleted: false,
+          updatedAt: now,
+        });
+        stats.approvers.inserted++;
+      } catch (e: any) {
+        stats.approvers.errors.push(`Approver ${a.userId || a.user_id}: ${e.message}`);
+      }
+    }
   }
 
   console.log('✅ Master data sync completed:', stats);

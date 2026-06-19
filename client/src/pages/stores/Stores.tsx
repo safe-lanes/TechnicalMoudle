@@ -227,18 +227,11 @@ const Stores: React.FC = () => {
   // Location dialog state
   const [locationDialogItem, setLocationDialogItem] = useState<StoreItem | null>(null);
   const [editingLocations, setEditingLocations] = useState<{[key: number]: {locationA: string, locationB: string, nameA?: string, nameB?: string}}>({});
-  const [invLocAPopoverOpen, setInvLocAPopoverOpen] = useState(false);
-  const [invLocBPopoverOpen, setInvLocBPopoverOpen] = useState(false);
-  const [invLocSearchA, setInvLocSearchA] = useState('');
-  const [invLocSearchB, setInvLocSearchB] = useState('');
 
   // Location tab state
   const [selectedLocationName, setSelectedLocationName] = useState<string | null>(null);
   const [locationTabSearch, setLocationTabSearch] = useState("");
   const [editingLocRobValues, setEditingLocRobValues] = useState<Record<string, string>>({});
-  const [creatingLocationForStoreItem, setCreatingLocationForStoreItem] = useState<StoreItem | null>(null);
-  const [newLocationName, setNewLocationName] = useState("");
-  const [isCreatingLocation, setIsCreatingLocation] = useState(false);
   const [isChangingStoreLocation, setIsChangingStoreLocation] = useState(false);
 
   const getItemLocationSide = (item: StoreItem, locName: string): "A" | "B" | null => {
@@ -318,35 +311,6 @@ const Stores: React.FC = () => {
       toast({ title: "Error", description: e.message || 'Failed to update location', variant: "destructive" });
     } finally {
       setIsChangingStoreLocation(false);
-    }
-  };
-
-  const handleCreateNewStoreLocation = async () => {
-    if (!newLocationName.trim() || !vesselId || !creatingLocationForStoreItem || !canEditStore) return;
-    setIsCreatingLocation(true);
-    try {
-      const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ locationName: newLocationName.trim(), createdBy: 'System' }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to create location');
-      }
-      const result = await res.json();
-      const newLoc = result.data;
-      toast({ title: "Location Created", description: `Location "${newLocationName.trim()}" created successfully.` });
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
-      if (creatingLocationForStoreItem && newLoc?.locationName) {
-        await handleChangeStoreLocation(creatingLocationForStoreItem, newLoc.locationName);
-      }
-      setCreatingLocationForStoreItem(null);
-      setNewLocationName('');
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message || 'Failed to create location', variant: "destructive" });
-    } finally {
-      setIsCreatingLocation(false);
     }
   };
 
@@ -2322,59 +2286,14 @@ const Stores: React.FC = () => {
           const locName = item._locName;
           const inactive = item.isActive === false;
           return (
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  className={`flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left border border-gray-200 rounded-md px-2 py-1 ${isChangingStoreLocation || !canEditStore || inactive ? 'opacity-50 pointer-events-none' : ''}`}
-                  disabled={isChangingStoreLocation || !canEditStore || inactive}
-                  data-testid={`button-change-store-location-${item.id}`}
-                >
-                  <MapPin className="h-3 w-3 flex-shrink-0 text-gray-500" />
-                  <span className="truncate text-xs flex-1">{locName || '-'}</span>
-                  <ChevronsUpDown className="h-3 w-3 flex-shrink-0 text-gray-400" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-56 p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search locations..." data-testid={`input-search-store-location-${item.id}`} />
-                  <CommandList className="max-h-none">
-                    <CommandEmpty>No locations found.</CommandEmpty>
-                    <div className="max-h-[144px] overflow-y-auto">
-                      <CommandGroup heading="Locations">
-                        {allVesselLocations.map((loc: any) => (
-                          <CommandItem
-                            key={loc.id}
-                            value={loc.locationName}
-                            onSelect={() => {
-                              if (loc.locationName !== locName) {
-                                handleChangeStoreLocation(item, loc.locationName);
-                              }
-                            }}
-                            data-testid={`option-store-location-${loc.id}-${item.id}`}
-                          >
-                            <MapPin className="h-3 w-3 mr-2 flex-shrink-0" />
-                            <span className="truncate">{loc.locationName}</span>
-                            {loc.locationName === locName && <Check className="h-3 w-3 ml-auto text-blue-600" />}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </div>
-                    {canEditStore && (
-                      <CommandGroup className="border-t" forceMount>
-                        <CommandItem
-                          onSelect={() => setCreatingLocationForStoreItem(item)}
-                          data-testid={`button-create-store-location-${item.id}`}
-                          forceMount
-                        >
-                          <Plus className="h-3 w-3 mr-2 text-green-600" />
-                          <span className="text-green-600 font-medium">Create New Location</span>
-                        </CommandItem>
-                      </CommandGroup>
-                    )}
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            <LocationSearchDropdown
+              vesselId={vesselId}
+              value={locName}
+              onChange={(name) => { if (name && name !== locName) handleChangeStoreLocation(item, name); }}
+              disabled={isChangingStoreLocation || !canEditStore || inactive}
+              triggerClassName="h-7 px-2 text-xs"
+              data-testid={`store-location-${item.id}`}
+            />
           );
         },
       },
@@ -4843,10 +4762,6 @@ const Stores: React.FC = () => {
         onOpenChange={(open) => { 
           if (!open) { 
             setLocationDialogItem(null);
-            setInvLocAPopoverOpen(false);
-            setInvLocBPopoverOpen(false);
-            setInvLocSearchA('');
-            setInvLocSearchB('');
           } 
         }}
       >
@@ -4875,105 +4790,18 @@ const Stores: React.FC = () => {
               <div className="space-y-3">
                 <div className="border border-gray-200 rounded-md p-3">
                   <Label className="text-xs font-semibold text-blue-600 mb-1 block" data-testid="label-dialog-location-a">Location A</Label>
-                  <Popover open={invLocAPopoverOpen} onOpenChange={setInvLocAPopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={invLocAPopoverOpen}
-                        className="w-full justify-between font-normal mb-2"
-                        data-testid="button-pick-location-a"
-                      >
-                        <span className="truncate">{editingLocations[locationDialogItem.id]?.nameA ?? locationNames.locationA ?? 'Select location...'}</span>
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[280px] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search locations..." value={invLocSearchA} onValueChange={setInvLocSearchA} data-testid="input-location-search-a" />
-                        <CommandList className="max-h-none">
-                          <CommandEmpty>No locations found.</CommandEmpty>
-                          <div className="max-h-[144px] overflow-y-auto">
-                            <CommandGroup heading="Locations" data-testid="list-locations-a">
-                              <CommandItem
-                                value="none"
-                                onSelect={() => {
-                                  setEditingLocations(prev => ({
-                                    ...prev,
-                                    [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameA: '' }
-                                  }));
-                                  setInvLocAPopoverOpen(false);
-                                  setInvLocSearchA('');
-                                }}
-                              >
-                                <span className="text-muted-foreground">None</span>
-                                {!(editingLocations[locationDialogItem.id]?.nameA ?? locationNames.locationA) && (
-                                  <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
-                                )}
-                              </CommandItem>
-                              {allVesselLocations.map((loc: any) => (
-                                <CommandItem
-                                  key={loc.id}
-                                  value={loc.locationName}
-                                  data-testid={`item-location-a-${loc.id}`}
-                                  onSelect={() => {
-                                    setEditingLocations(prev => ({
-                                      ...prev,
-                                      [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameA: loc.locationName }
-                                    }));
-                                    setInvLocAPopoverOpen(false);
-                                    setInvLocSearchA('');
-                                  }}
-                                >
-                                  <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                  <span className="truncate flex-1">{loc.locationName}</span>
-                                  {(editingLocations[locationDialogItem.id]?.nameA ?? locationNames.locationA) === loc.locationName && (
-                                    <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
-                                  )}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </div>
-                          {canEditStore && (
-                          <CommandGroup className="border-t" forceMount>
-                            <CommandItem
-                              onSelect={async () => {
-                                const name = invLocSearchA.trim();
-                                if (!name) return;
-                                try {
-                                  const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ locationName: name, createdBy: 'System' }),
-                                  });
-                                  if (res.ok) {
-                                    queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
-                                    setEditingLocations(prev => ({
-                                      ...prev,
-                                      [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameA: name }
-                                    }));
-                                    toast({ title: "Location Created", description: `"${name}" created.` });
-                                  } else {
-                                    toast({ title: "Failed to create location", description: "Please try again.", variant: "destructive" });
-                                  }
-                                } catch {
-                                  toast({ title: "Failed to create location", description: "Network error. Please try again.", variant: "destructive" });
-                                }
-                                setInvLocAPopoverOpen(false);
-                                setInvLocSearchA('');
-                              }}
-                              data-testid="button-create-new-location-a"
-                              forceMount
-                            >
-                              <Plus className="mr-2 h-4 w-4 text-green-600" />
-                              <span className="text-green-600 font-medium">Create New Location</span>
-                            </CommandItem>
-                          </CommandGroup>
-                          )}
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <LocationSearchDropdown
+                    vesselId={vesselId}
+                    value={editingLocations[locationDialogItem.id]?.nameA ?? locationNames.locationA ?? ''}
+                    onChange={(name) => setEditingLocations(prev => ({
+                      ...prev,
+                      [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameA: name }
+                    }))}
+                    allowClear
+                    allowCreate={canEditStore}
+                    triggerClassName="mb-2"
+                    data-testid="dialog-location-a"
+                  />
                   <div className="flex items-center gap-2">
                     <Label className="text-xs text-gray-500 whitespace-nowrap">ROB:</Label>
                     <Input
@@ -4993,105 +4821,18 @@ const Stores: React.FC = () => {
 
                 <div className="border border-gray-200 rounded-md p-3">
                   <Label className="text-xs font-semibold text-blue-600 mb-1 block" data-testid="label-dialog-location-b">Location B</Label>
-                  <Popover open={invLocBPopoverOpen} onOpenChange={setInvLocBPopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={invLocBPopoverOpen}
-                        className="w-full justify-between font-normal mb-2"
-                        data-testid="button-pick-location-b"
-                      >
-                        <span className="truncate">{editingLocations[locationDialogItem.id]?.nameB ?? locationNames.locationB ?? 'Select location...'}</span>
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[280px] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search locations..." value={invLocSearchB} onValueChange={setInvLocSearchB} data-testid="input-location-search-b" />
-                        <CommandList className="max-h-none">
-                          <CommandEmpty>No locations found.</CommandEmpty>
-                          <div className="max-h-[144px] overflow-y-auto">
-                            <CommandGroup heading="Locations" data-testid="list-locations-b">
-                              <CommandItem
-                                value="none"
-                                onSelect={() => {
-                                  setEditingLocations(prev => ({
-                                    ...prev,
-                                    [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameB: '' }
-                                  }));
-                                  setInvLocBPopoverOpen(false);
-                                  setInvLocSearchB('');
-                                }}
-                              >
-                                <span className="text-muted-foreground">None</span>
-                                {!(editingLocations[locationDialogItem.id]?.nameB ?? locationNames.locationB) && (
-                                  <Check className="ml-auto h-4 w-4 flex-shrink-0 text-green-600" />
-                                )}
-                              </CommandItem>
-                              {allVesselLocations.map((loc: any) => (
-                                <CommandItem
-                                  key={loc.id}
-                                  value={loc.locationName}
-                                  data-testid={`item-location-b-${loc.id}`}
-                                  onSelect={() => {
-                                    setEditingLocations(prev => ({
-                                      ...prev,
-                                      [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameB: loc.locationName }
-                                    }));
-                                    setInvLocBPopoverOpen(false);
-                                    setInvLocSearchB('');
-                                  }}
-                                >
-                                  <MapPin className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                  <span className="truncate flex-1">{loc.locationName}</span>
-                                  {(editingLocations[locationDialogItem.id]?.nameB ?? locationNames.locationB) === loc.locationName && (
-                                    <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
-                                  )}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </div>
-                          {canEditStore && (
-                          <CommandGroup className="border-t" forceMount>
-                            <CommandItem
-                              onSelect={async () => {
-                                const name = invLocSearchB.trim();
-                                if (!name) return;
-                                try {
-                                  const res = await fetch(`/technical/api/inventory/locations/${vesselId}`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ locationName: name, createdBy: 'System' }),
-                                  });
-                                  if (res.ok) {
-                                    queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
-                                    setEditingLocations(prev => ({
-                                      ...prev,
-                                      [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameB: name }
-                                    }));
-                                    toast({ title: "Location Created", description: `"${name}" created.` });
-                                  } else {
-                                    toast({ title: "Failed to create location", description: "Please try again.", variant: "destructive" });
-                                  }
-                                } catch {
-                                  toast({ title: "Failed to create location", description: "Network error. Please try again.", variant: "destructive" });
-                                }
-                                setInvLocBPopoverOpen(false);
-                                setInvLocSearchB('');
-                              }}
-                              data-testid="button-create-new-location-b"
-                              forceMount
-                            >
-                              <Plus className="mr-2 h-4 w-4 text-green-600" />
-                              <span className="text-green-600 font-medium">Create New Location</span>
-                            </CommandItem>
-                          </CommandGroup>
-                          )}
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <LocationSearchDropdown
+                    vesselId={vesselId}
+                    value={editingLocations[locationDialogItem.id]?.nameB ?? locationNames.locationB ?? ''}
+                    onChange={(name) => setEditingLocations(prev => ({
+                      ...prev,
+                      [locationDialogItem.id]: { ...prev[locationDialogItem.id], nameB: name }
+                    }))}
+                    allowClear
+                    allowCreate={canEditStore}
+                    triggerClassName="mb-2"
+                    data-testid="dialog-location-b"
+                  />
                   <div className="flex items-center gap-2">
                     <Label className="text-xs text-gray-500 whitespace-nowrap">ROB:</Label>
                     <Input
@@ -5139,59 +4880,6 @@ const Stores: React.FC = () => {
               </DialogFooter>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Create New Location Dialog (for Stores By Location) */}
-      <Dialog 
-        open={creatingLocationForStoreItem !== null} 
-        onOpenChange={(open) => { 
-          if (!open) { 
-            setCreatingLocationForStoreItem(null); 
-            setNewLocationName(''); 
-          } 
-        }}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <div className="flex items-center gap-2">
-              <div className="bg-green-500 rounded-md p-1.5">
-                <Plus className="h-4 w-4 text-white" />
-              </div>
-              <DialogTitle className="text-base">Create New Location</DialogTitle>
-            </div>
-          </DialogHeader>
-          <div className="space-y-4">
-            {creatingLocationForStoreItem && (
-              <div className="text-xs text-gray-500">
-                Creating a new location for item: <span className="font-medium text-gray-700">{creatingLocationForStoreItem.itemCode}</span>
-              </div>
-            )}
-            <div>
-              <Label htmlFor="new-store-location-name" className="text-sm">Location Name</Label>
-              <Input
-                id="new-store-location-name"
-                value={newLocationName}
-                onChange={(e) => setNewLocationName(e.target.value)}
-                placeholder="Enter location name..."
-                className="mt-1"
-                data-testid="input-new-store-location-name"
-                onKeyDown={(e) => { if (e.key === 'Enter' && newLocationName.trim()) handleCreateNewStoreLocation(); }}
-              />
-            </div>
-            <DialogFooter className="flex gap-2">
-              <Button variant="outline" onClick={() => { setCreatingLocationForStoreItem(null); setNewLocationName(''); }} data-testid="button-cancel-create-store-location">
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleCreateNewStoreLocation}
-                disabled={!canEditStore || !newLocationName.trim() || isCreatingLocation}
-                data-testid="button-confirm-create-store-location"
-              >
-                {isCreatingLocation ? 'Creating...' : 'Create Location'}
-              </Button>
-            </DialogFooter>
-          </div>
         </DialogContent>
       </Dialog>
 

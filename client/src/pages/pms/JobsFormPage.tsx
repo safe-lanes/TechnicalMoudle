@@ -1235,7 +1235,7 @@ const JobsFormPage: React.FC = () => {
                     isModifyMode={isModifyMode}
                     isEditMode={isEditMode}
                     type="select"
-                    options={['Low', 'Medium', 'High', 'Critical']}
+                    options={['Low', 'Medium', 'High']}
                     labelMarker="JF.A1.21"
                     valueMarker="JF.A1.22"
                   />

@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import type { AuthenticatedRequest } from '../../../middleware/auth';
 import * as crService from '../services/changeRequestsService';
 
 // ── GET /change-requests/field-definitions/:targetType ──
@@ -27,7 +28,8 @@ export async function getChangeRequests(req: Request, res: Response) {
     category: req.query.category as string,
     requestedBy: req.query.requestedBy as string,
     periodFrom: req.query.periodFrom as string | undefined,
-    periodTo: req.query.periodTo as string | undefined
+    periodTo: req.query.periodTo as string | undefined,
+    pendingForApprover: req.query.pendingForApprover as string | undefined,
   };
   const requests = await crService.getChangeRequests(query);
   res.json(requests);
@@ -54,6 +56,14 @@ export async function updateStatus(req: Request, res: Response) {
   const id = parseInt(req.params.id);
   const updated = await crService.updateStatus(id, req.body);
   res.json(updated);
+}
+
+// ── GET /change-requests/:id/approval-steps ──
+
+export async function getApprovalSteps(req: Request, res: Response) {
+  const changeRequestId = parseInt(req.params.id);
+  const steps = await crService.getApprovalSteps(changeRequestId);
+  res.json(steps);
 }
 
 // ── GET /change-requests/:id/comments ──
@@ -92,7 +102,14 @@ export async function createAttachment(req: Request, res: Response) {
 
 export async function approveChangeRequest(req: Request, res: Response) {
   const id = parseInt(req.params.id);
-  const updated = await crService.approveChangeRequest(id, req.body);
+  const authReq = req as AuthenticatedRequest;
+  const serverReviewerId = authReq.user?.userUuid || authReq.user?.username || 'system';
+  const userRole = authReq.user?.role || '';
+  const updated = await crService.approveChangeRequest(id, {
+    comment: req.body.comment,
+    reviewerId: serverReviewerId,
+    role: userRole,
+  });
   res.json(updated);
 }
 
@@ -100,7 +117,14 @@ export async function approveChangeRequest(req: Request, res: Response) {
 
 export async function rejectChangeRequest(req: Request, res: Response) {
   const id = parseInt(req.params.id);
-  const updated = await crService.rejectChangeRequest(id, req.body);
+  const authReq = req as AuthenticatedRequest;
+  const serverReviewerId = authReq.user?.userUuid || authReq.user?.username || 'system';
+  const userRole = authReq.user?.role || '';
+  const updated = await crService.rejectChangeRequest(id, {
+    comment: req.body.comment,
+    reviewerId: serverReviewerId,
+    role: userRole,
+  });
   res.json(updated);
 }
 

@@ -1,13 +1,14 @@
 import { storage } from '../../../storage';
 import type {
   ChangeRequest, InsertChangeRequest,
+  ChangeRequestApproval, InsertChangeRequestApproval,
   ChangeRequestComment, InsertChangeRequestComment,
   ChangeRequestAttachment, InsertChangeRequestAttachment
 } from '@shared/schema';
 
 // ── Core Change Requests ──
 
-export async function getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string }): Promise<ChangeRequest[]> {
+export async function getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string; pendingForApprover?: string }): Promise<ChangeRequest[]> {
   return storage.getChangeRequests(filters);
 }
 
@@ -29,16 +30,16 @@ export async function deleteChangeRequest(id: number): Promise<void> {
 
 // ── Workflow Actions ──
 
-export async function approveChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
-  return storage.approveChangeRequest(id, reviewerId, comment);
+export async function approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string): Promise<ChangeRequest> {
+  return storage.approveChangeRequest(id, reviewerId, comment, role);
 }
 
 export async function getAuditLogsByEntity(entityType: string, entityId: string): Promise<any[]> {
   return storage.getAuditLogsByEntity(entityType, entityId);
 }
 
-export async function rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
-  return storage.rejectChangeRequest(id, reviewerId, comment);
+export async function rejectChangeRequest(id: number, reviewerId: string, comment: string, role?: string): Promise<ChangeRequest> {
+  return storage.rejectChangeRequest(id, reviewerId, comment, role);
 }
 
 export async function returnChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
@@ -47,6 +48,26 @@ export async function returnChangeRequest(id: number, reviewerId: string, commen
 
 export async function submitChangeRequest(id: number, userId: string): Promise<ChangeRequest> {
   return storage.submitChangeRequest(id, userId);
+}
+
+// ── Approval Steps ──
+
+export async function getChangeRequestApprovalSteps(changeRequestId: number): Promise<ChangeRequestApproval[]> {
+  return storage.getChangeRequestApprovalSteps(changeRequestId);
+}
+
+export async function createChangeRequestApprovalStep(step: InsertChangeRequestApproval): Promise<ChangeRequestApproval> {
+  return storage.createChangeRequestApprovalStep(step);
+}
+
+export async function updateChangeRequestApprovalStep(id: number, data: Partial<ChangeRequestApproval>): Promise<ChangeRequestApproval> {
+  return storage.updateChangeRequestApprovalStep(id, data);
+}
+
+// ── Approval Workflow Config ──
+
+export async function getApprovalWorkflowConfig() {
+  return storage.getApprovalWorkflowConfig();
 }
 
 // ── Comments ──

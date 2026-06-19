@@ -5,7 +5,6 @@ import {
   getComponentCategory,
   getEffectiveComponentCategories,
   getSubGroupCode,
-  getSubGroupName,
   stripSFISuffix,
   getParentSFICode,
   validateSFICode,
@@ -19,6 +18,106 @@ import {
   INTERVAL_UNITS
 } from './helpers';
 import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from '@shared/dateUtils';
+
+/**
+ * Validate a row's Maker Code / Maker Name reference against the Maker List master.
+ * The Maker Code is the primary reference; the Maker Name is cross-verified against it.
+ * Both fields are trimmed; the name comparison is case-insensitive. Returns a list of
+ * blocking validation errors (empty when the reference is valid or both fields are blank).
+ *
+ * Rules (Task #295):
+ *  - Maker Code present but not in the Maker List -> error.
+ *  - Maker Code present and found, but Maker Name does not match the master name for
+ *    that code -> error.
+ *  - Maker Name present without a (valid) Maker Code -> error.
+ *  - No silent back-fill of the Maker Code from a Maker-Name match.
+ */
+function validateMakerReference(
+  rowMakerCode: string | null | undefined,
+  rowMakerName: string | null | undefined,
+  existingMakersByCode: Map<string, any>,
+  rowNum: number,
+): string[] {
+  const errs: string[] = [];
+  const trimmedCode = rowMakerCode != null ? String(rowMakerCode).trim() : '';
+  const trimmedName = rowMakerName != null ? String(rowMakerName).trim() : '';
+
+  if (trimmedCode) {
+    const master = existingMakersByCode.get(trimmedCode.toLowerCase());
+    if (!master) {
+      errs.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
+    } else if (trimmedName && String(master.makerName ?? '').trim().toLowerCase() !== trimmedName.toLowerCase()) {
+      errs.push(`Row ${rowNum}: Maker Name '${trimmedName}' does not match the Maker List entry for Maker Code '${trimmedCode}' (expected '${master.makerName}').`);
+    }
+  } else if (trimmedName) {
+    errs.push(`Row ${rowNum}: Maker Name '${trimmedName}' was provided without a valid Maker Code. Please specify a Maker Code that exists in the Maker List.`);
+  }
+
+  return errs;
+}
+
+/**
+ * Accepted synonym set for Yes/No reference fields. Kept intentionally lenient
+ * (Yes/No/Y/N/True/False/1/0, case-insensitive) so existing import templates keep
+ * working; values outside this set (and outside blank) are rejected.
+ */
+const YES_NO_SYNONYMS = ['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'];
+
+/**
+ * Validate/normalize a Yes/No reference field for the bulk-import dry run.
+ *  - Blank is allowed unless `required` is set (then it is an error).
+ *  - Accepted synonyms normalize to the canonical 'Yes' / 'No'.
+ *  - Anything else is a blocking error.
+ */
+function validateYesNoField(
+  rawValue: any,
+  fieldLabel: string,
+  rowNum: number,
+  opts: { required?: boolean } = {},
+): { error?: string; normalized?: 'Yes' | 'No' } {
+  const isBlank = rawValue === undefined || rawValue === null || String(rawValue).trim() === '';
+  if (isBlank) {
+    if (opts.required) {
+      return { error: `Row ${rowNum}: ${fieldLabel} is required` };
+    }
+    return {};
+  }
+  const value = String(rawValue).toLowerCase().trim();
+  if (!YES_NO_SYNONYMS.includes(value)) {
+    return { error: `Row ${rowNum}: ${fieldLabel} must be Yes or No` };
+  }
+  return { normalized: ['yes', 'y', 'true', '1'].includes(value) ? 'Yes' : 'No' };
+}
+
+/**
+ * Validate a strict DD-MM-YYYY calendar date for the bulk-import dry run.
+ *  - Blank is allowed (returns nothing).
+ *  - Must match DD-MM-YYYY exactly (no letters, no symbols, no Excel serials).
+ *  - Must be a real calendar date (rejects e.g. 31-02-2025).
+ *  - On success returns the trimmed value unchanged.
+ */
+function validateDateDDMMYYYY(
+  rawValue: any,
+  fieldLabel: string,
+  rowNum: number,
+): { error?: string; normalized?: string } {
+  if (rawValue === undefined || rawValue === null || String(rawValue).trim() === '') {
+    return {};
+  }
+  const value = String(rawValue).trim();
+  const match = value.match(/^([0-9]{2})-([0-9]{2})-([0-9]{4})$/);
+  if (!match) {
+    return { error: `Row ${rowNum}: ${fieldLabel} must be a valid date in DD-MM-YYYY format` };
+  }
+  const day = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const year = parseInt(match[3], 10);
+  const d = new Date(year, month - 1, day);
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
+    return { error: `Row ${rowNum}: ${fieldLabel} must be a valid date in DD-MM-YYYY format` };
+  }
+  return { normalized: value };
+}
 
 export async function validateData(type: string, data: any[], mode: string, vesselId?: string) {
   const results = {
@@ -143,6 +242,13 @@ export async function validateData(type: string, data: any[], mode: string, vess
   // Also fetch existing component codes from database for validation
   const componentCodeOccurrences = new Map<string, number[]>(); // Key: uppercase code, Value: row numbers
   const existingDbComponentCodes = new Set<string>(); // Uppercase codes from database
+
+  // Track duplicate Component Names (case-insensitive, trimmed, per vessel)
+  // Also fetch existing component names from database for validation
+  const componentNameOccurrences = new Map<string, number[]>(); // Key: uppercase trimmed name, Value: row numbers
+  // Key: uppercase trimmed name, Value: set of uppercase Component Codes already using that name in the vessel.
+  // The code set lets update/upsert rows keep their own existing name while still rejecting a name owned by a different component.
+  const existingDbComponentNames = new Map<string, Set<string>>();
   
   // Track duplicate Fleet Equipment Codes (case-insensitive)
   // Also fetch existing fleet equipment codes from database for validation
@@ -273,7 +379,6 @@ export async function validateData(type: string, data: any[], mode: string, vess
   }
 
   let existingMakersByCode = new Map<string, any>();
-  let existingMakersByName = new Map<string, any>();
   let makerListLoaded = false;
 
   if (type === 'components' || type === 'spares' || type === 'fleet-spares') {
@@ -286,8 +391,19 @@ export async function validateData(type: string, data: any[], mode: string, vess
             if (comp.componentCode) {
               existingDbComponentCodes.add(comp.componentCode.toUpperCase());
             }
+            if (comp.name) {
+              const nameKey = String(comp.name).trim().toUpperCase();
+              if (nameKey) {
+                if (!existingDbComponentNames.has(nameKey)) {
+                  existingDbComponentNames.set(nameKey, new Set<string>());
+                }
+                if (comp.componentCode) {
+                  existingDbComponentNames.get(nameKey)!.add(String(comp.componentCode).trim().toUpperCase());
+                }
+              }
+            }
           });
-          console.log(`📋 Loaded ${existingDbComponentCodes.size} existing component codes for vessel '${vesselId}'`);
+          console.log(`📋 Loaded ${existingDbComponentCodes.size} existing component codes and ${existingDbComponentNames.size} existing component names for vessel '${vesselId}'`);
         } catch (err) {
           console.error(`Failed to fetch existing components for vessel ${vesselId}:`, err);
         }
@@ -296,8 +412,10 @@ export async function validateData(type: string, data: any[], mode: string, vess
 
     try {
       const existingMakers = await storage.getMakerList();
-      existingMakersByCode = new Map(existingMakers.map((m: any) => [m.makerCode, m]));
-      existingMakersByName = new Map(existingMakers.map((m: any) => [m.makerName.toLowerCase(), m]));
+      // Key by trimmed+lowercased Maker Code so lookups are case-insensitive and space-tolerant.
+      existingMakersByCode = new Map(
+        existingMakers.map((m: any) => [String(m.makerCode ?? '').trim().toLowerCase(), m]),
+      );
       makerListLoaded = true;
       console.log(`📋 Loaded ${existingMakers.length} existing makers for validation`);
     } catch (err) {
@@ -314,6 +432,17 @@ export async function validateData(type: string, data: any[], mode: string, vess
             componentCodeOccurrences.set(code, []);
           }
           componentCodeOccurrences.get(code)!.push(index + 2); // Row number (Excel is 1-indexed + header)
+        }
+        // Track Component Name occurrences (case-insensitive, trimmed) for in-file duplicate detection
+        const componentName = row['Component Name'];
+        if (componentName !== undefined && componentName !== null) {
+          const name = String(componentName).trim().toUpperCase();
+          if (name !== '') {
+            if (!componentNameOccurrences.has(name)) {
+              componentNameOccurrences.set(name, []);
+            }
+            componentNameOccurrences.get(name)!.push(index + 2); // Row number (Excel is 1-indexed + header)
+          }
         }
       });
     }
@@ -374,36 +503,35 @@ export async function validateData(type: string, data: any[], mode: string, vess
             errors.push(`Row ${rowNum}: Component Code '${codeStr}' already exists in vessel '${vesselId}'. Cannot add duplicate component.`);
           }
           
-          // Check if user explicitly provided a Parent Component Code in the Excel file
-          // Use centralized helper that checks all header variants
+          // Parent Component Code handling — no auto-derivation.
+          // The user must explicitly supply a parent for every non-top-level component.
+          // Use centralized helper that checks all header variants.
           const explicitParent = getExplicitParentFromRow(row);
-          
+          // A single-character (top-level) Component Code does not require a parent.
+          const isTopLevel = stripSFISuffix(codeStr).length === 1;
+
           if (explicitParent) {
-            // User explicitly provided parent - use their value
-            normalized['Parent Component Code'] = explicitParent;
-          } else {
-            // Auto-calculate Parent Component Code from Component Code
-            const parentCode = getParentSFICode(codeStr);
-            if (parentCode) {
-              normalized['Parent Component Code'] = parentCode;
-            }
-          }
-
-          // Validation: Component Code and Parent Component Code must not be identical
-          const resolvedParent = normalized['Parent Component Code'];
-          if (resolvedParent) {
-            const resolvedParentUpper = String(resolvedParent).toUpperCase();
-
-            if (codeUpperCase === resolvedParentUpper) {
-              errors.push(`Row ${rowNum}: Component Code and Parent Component Code are both '${codeStr}'. A component cannot be its own parent.`);
+            // Validate the explicitly-typed parent against the same SFI format as Component Code
+            if (!validateSFICode(explicitParent)) {
+              errors.push(`Row ${rowNum}: Invalid Parent Component Code format '${explicitParent}'. Expected SFI format: 6, 61, 612, 612.005, 601001, 601001001, etc.`);
             } else {
-              // Validation: Parent Component Code must exist in the uploaded file OR in the vessel's database
-              const parentInFile = componentCodeOccurrences.has(resolvedParentUpper);
-              const parentInDb = existingDbComponentCodes.has(resolvedParentUpper);
-              if (!parentInFile && !parentInDb) {
-                errors.push(`Row ${rowNum}: Parent Component Code '${resolvedParent}' does not exist in the uploaded file or in the vessel's component register. Cannot create a component without a valid parent.`);
+              normalized['Parent Component Code'] = explicitParent;
+              const resolvedParentUpper = explicitParent.toUpperCase();
+
+              if (codeUpperCase === resolvedParentUpper) {
+                errors.push(`Row ${rowNum}: Component Code and Parent Component Code are both '${codeStr}'. A component cannot be its own parent.`);
+              } else {
+                // Parent Component Code must exist in the uploaded file OR in the vessel's database
+                const parentInFile = componentCodeOccurrences.has(resolvedParentUpper);
+                const parentInDb = existingDbComponentCodes.has(resolvedParentUpper);
+                if (!parentInFile && !parentInDb) {
+                  errors.push(`Row ${rowNum}: Parent Component Code '${explicitParent}' does not exist in the uploaded file or in the vessel's component register. Cannot create a component without a valid parent.`);
+                }
               }
             }
+          } else if (!isTopLevel) {
+            // No parent supplied and the code is not a single-digit top-level code → required
+            errors.push(`Row ${rowNum}: Parent Component Code is required for '${codeStr}'. Only a single-digit top-level Component Code may omit the parent.`);
           }
 
           // NOTE: __meta is set at the END of the component validation block
@@ -435,55 +563,74 @@ export async function validateData(type: string, data: any[], mode: string, vess
         }
       }
       
-      // Component Name - required, but auto-generate for parent nodes if missing
-      if (!row['Component Name'] || String(row['Component Name']).trim() === '') {
-        // Auto-generate name for parent nodes (codes without detailed hierarchy)
-        const sfiCode = normalized['Component Code'];
-        if (sfiCode) {
-          const firstDigit = parseInt(sfiCode.charAt(0));
-          
-          // Try to generate a sensible name based on the code structure
-          if (sfiCode.length === 1) {
-            // Single digit: use main group category
-            const category = getComponentCategory(firstDigit);
-            normalized['Component Name'] = category ? category.replace(/^\d+\s+/, '') : `SFI ${sfiCode}`;
-            warnings.push(`Row ${rowNum}: Component Name auto-generated from SFI code: "${normalized['Component Name']}"`);
-          } else if (sfiCode.length === 2) {
-            // Two digits: use sub group name
-            normalized['Component Name'] = getSubGroupName(sfiCode);
-            warnings.push(`Row ${rowNum}: Component Name auto-generated from SFI code: "${normalized['Component Name']}"`);
-          } else {
-            // More complex codes should have names - this is likely an error
-            errors.push(`Row ${rowNum}: Component Name is required for detailed component codes`);
-          }
-        } else {
-          errors.push(`Row ${rowNum}: Component Name is required`);
-        }
+      // Component Name validation:
+      // 1. Mandatory — blank (or whitespace-only) is a blocking error; no auto-generation.
+      // 2. Allowed characters: letters, numbers, spaces, period, comma, hyphen, round brackets.
+      // 3. Unique within the import file (case-insensitive, trimmed).
+      // 4. Trimmed before validation; trimmed value is what gets imported.
+      // 5. Unique within the selected vessel (case-insensitive, trimmed).
+      const componentNameTrimmed = row['Component Name'] === undefined || row['Component Name'] === null
+        ? ''
+        : String(row['Component Name']).trim();
+      if (componentNameTrimmed === '') {
+        errors.push(`Row ${rowNum}: Component Name is required and cannot be blank`);
+      } else if (!/^[A-Za-z0-9 .,()\-]+$/.test(componentNameTrimmed)) {
+        errors.push(`Row ${rowNum}: Component Name contains invalid characters. Only letters, numbers, spaces, periods (.), commas (,), hyphens (-), and brackets () are allowed.`);
       } else {
-        normalized['Component Name'] = String(row['Component Name']).trim();
+        normalized['Component Name'] = componentNameTrimmed;
+        const nameUpperCase = componentNameTrimmed.toUpperCase();
+
+        // Duplicate within the uploaded file (case-insensitive). Flag only non-first occurrences.
+        const nameOccurrences = componentNameOccurrences.get(nameUpperCase);
+        if (nameOccurrences && nameOccurrences.length > 1) {
+          const firstOccurrence = nameOccurrences[0];
+          if (rowNum !== firstOccurrence) {
+            errors.push(`Row ${rowNum}: Duplicate Component Name '${componentNameTrimmed}' - this name already appears in row ${firstOccurrence}. Each Component Name must be unique within the import file.`);
+          }
+        }
+
+        // Duplicate against existing components for the vessel (case-insensitive).
+        // In 'add' mode any pre-existing name is a conflict. In 'update'/'upsert' mode a row
+        // may legitimately keep its own existing name, so only flag a name that belongs to a
+        // DIFFERENT component (matched by Component Code).
+        const codesWithName = existingDbComponentNames.get(nameUpperCase);
+        if (codesWithName) {
+          const ownCode = normalized['Component Code']
+            ? String(normalized['Component Code']).trim().toUpperCase()
+            : null;
+          const belongsOnlyToThisRow = ownCode !== null && codesWithName.size === 1 && codesWithName.has(ownCode);
+          if (mode === 'add' || !belongsOnlyToThisRow) {
+            errors.push(`Row ${rowNum}: Component Name '${componentNameTrimmed}' already exists in vessel '${vesselId}'. Component Name must be unique within the vessel.`);
+          }
+        }
       }
 
       // Validate Yes/No fields - Support both template format and legacy format
-      // Template uses: Critical Yes/No, Condition Based Yes/No
-      // Legacy uses: Critical (Yes/No), Condition Based (Yes/No)
+      // Template uses: Critical Yes/No; Legacy uses: Critical (Yes/No)
+      // (Condition Based is validated in the Yes/No reference block below because the
+      //  active template header is the plain 'Condition Based', not 'Condition Based Yes/No'.)
       const yesNoFieldMappings = [
-        { template: 'Critical Yes/No', legacy: 'Critical (Yes/No)' },
-        { template: 'Condition Based Yes/No', legacy: 'Condition Based (Yes/No)' },
-        { template: 'IS Active', legacy: 'IS Active' }
+        { template: 'Critical Yes/No', legacy: 'Critical (Yes/No)', required: false },
+        { template: 'IS Active', legacy: 'IS Active', required: true }
       ];
       
-      yesNoFieldMappings.forEach(({ template, legacy }) => {
+      yesNoFieldMappings.forEach(({ template, legacy, required }) => {
         const fieldValue = row[template] ?? row[legacy];
-        if (fieldValue !== undefined && fieldValue !== null && fieldValue !== '') {
-          const value = String(fieldValue).toLowerCase().trim();
-          if (!['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'].includes(value)) {
-            errors.push(`Row ${rowNum}: ${template} must be Yes or No`);
-          } else {
-            // Normalize to boolean-friendly format - store in both formats
-            const normalizedValue = ['yes', 'y', 'true', '1'].includes(value);
-            normalized[template] = normalizedValue;
-            normalized[legacy] = normalizedValue;
+        const isBlank = fieldValue === undefined || fieldValue === null || String(fieldValue).trim() === '';
+        if (isBlank) {
+          if (required) {
+            errors.push(`Row ${rowNum}: ${template} is required`);
           }
+          return;
+        }
+        const value = String(fieldValue).toLowerCase().trim();
+        if (!YES_NO_SYNONYMS.includes(value)) {
+          errors.push(`Row ${rowNum}: ${template} must be Yes or No`);
+        } else {
+          // Normalize to boolean-friendly format - store in both formats
+          const normalizedValue = ['yes', 'y', 'true', '1'].includes(value);
+          normalized[template] = normalizedValue;
+          normalized[legacy] = normalizedValue;
         }
       });
 
@@ -497,24 +644,45 @@ export async function validateData(type: string, data: any[], mode: string, vess
         }
       }
 
-      // Validate date fields (DD-MM-YYYY format)
-      ['Installation Date', 'Commissioned Date'].forEach(field => {
-        if (row[field]) {
-          const dateStr = String(row[field]).trim();
-          // Accept DD-MM-YYYY or Excel serial date format
-          // Basic validation - just ensure it's not empty
-          normalized[field] = dateStr;
+      // Validate date fields - strict DD-MM-YYYY only (no Excel serials, no letters/symbols)
+      ['Installation Date', 'Commissioned Date', 'Last Updated'].forEach(field => {
+        const { error, normalized: normDate } = validateDateDDMMYYYY(row[field], field, rowNum);
+        if (error) {
+          errors.push(error);
+        } else if (normDate !== undefined) {
+          normalized[field] = normDate;
+        }
+      });
+
+      // Validate Yes/No reference fields that were previously copied as free text.
+      // Criticality is validated here for the plain 'Criticality' template header
+      // (the legacy 'Critical Yes/No' header is handled by the mapping above).
+      // Condition Based is validated here because the active template header is the
+      // plain 'Condition Based' (the 'Condition Based Yes/No' variants are legacy).
+      [
+        { keys: ['Class Item', 'Class item'], label: 'Class Item' },
+        { keys: ['IS Parent', 'Is Parent'], label: 'Is Parent' },
+        { keys: ['Criticality'], label: 'Criticality' },
+        { keys: ['Condition Based', 'Condition Based Yes/No', 'Condition Based (Yes/No)'], label: 'Condition Based' },
+      ].forEach(({ keys, label }) => {
+        const rawValue = keys.map(k => row[k]).find(v => v !== undefined && v !== null && v !== '');
+        const { error, normalized: normYesNo } = validateYesNoField(rawValue, label, rowNum);
+        if (error) {
+          errors.push(error);
+        } else if (normYesNo !== undefined) {
+          keys.forEach(k => { normalized[k] = normYesNo; });
         }
       });
 
       // Copy text fields directly - support both new and legacy header formats
-      // IMPORTANT: Include RH Counter Type, RH Counter Source, and Last Updated for Running Hours tracking
+      // IMPORTANT: Include RH Counter Type and RH Counter Source for Running Hours tracking.
+      // Note: Last Updated is validated as a date above; Class Item / IS Parent /
+      // Criticality / Condition Based are validated as Yes/No in the reference block above.
       const textFields = [
         'Fleet Equipment Code', 'Fleet Equipment Name', 'Maker', 'Maker Code',
         'Model', 'Model Code', 'Model Number', 'Serial No', 'Drawing No', 'Location',
         'Rating', 'Equipment / System Department', 'Eqpt / System Department', 'Notes', 'Vessel Code',
-        'IS Parent', 'Class item', 'Class Item', 'Criticality',
-        'RH Counter Type', 'RH Counter Source', 'Last Updated'
+        'RH Counter Type', 'RH Counter Source'
       ];
       
       textFields.forEach(field => {
@@ -530,33 +698,11 @@ export async function validateData(type: string, data: any[], mode: string, vess
         errors.push(`Row ${rowNum}: Invalid Equipment / System Department '${deptValue}'. Allowed values are: ${DEPARTMENTS.join(', ')}.`);
       }
 
-      // Validate Maker exists in Maker List (only if maker list was loaded successfully)
+      // Validate Maker Code / Maker Name reference (only if maker list was loaded successfully)
       if (makerListLoaded) {
         const rowMakerCode = normalized['Maker Code'] || null;
         const rowMakerName = normalized['Maker'] || normalized['Maker Name'] || null;
-        if (rowMakerCode) {
-          const trimmedCode = String(rowMakerCode).trim();
-          if (!existingMakersByCode.has(trimmedCode)) {
-            if (rowMakerName) {
-              const nameMatch = existingMakersByName.get(String(rowMakerName).trim().toLowerCase());
-              if (nameMatch) {
-                normalized['Maker Code'] = nameMatch.makerCode;
-              } else {
-                errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-              }
-            } else {
-              errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-            }
-          }
-        } else if (rowMakerName) {
-          const trimmedName = String(rowMakerName).trim();
-          const nameMatch = existingMakersByName.get(trimmedName.toLowerCase());
-          if (nameMatch) {
-            normalized['Maker Code'] = nameMatch.makerCode;
-          } else {
-            errors.push(`Row ${rowNum}: Maker '${trimmedName}' not found in Maker List. Please import makers first.`);
-          }
-        }
+        errors.push(...validateMakerReference(rowMakerCode, rowMakerName, existingMakersByCode, rowNum));
       }
 
       // Note: Parent Component Code is now handled by the centralized logic above
@@ -658,25 +804,24 @@ export async function validateData(type: string, data: any[], mode: string, vess
       });
 
       // Validate Criticality - Support new format and legacy formats
-      const criticalField = row['Criticality'] || row['Critical Yes/No'] || row['Criticality (Yes/No)'];
-      if (criticalField) {
-        const value = String(criticalField).toLowerCase().trim();
-        if (!['yes', 'no', 'y', 'n'].includes(value)) {
-          errors.push(`Row ${rowNum}: Criticality must be Yes or No`);
-        } else {
-          const normalizedValue = ['yes', 'y'].includes(value) ? 'Yes' : 'No';
-          normalized['Criticality'] = normalizedValue;
+      const criticalField = row['Criticality'] ?? row['Critical Yes/No'] ?? row['Criticality (Yes/No)'];
+      {
+        const { error, normalized: normCritical } = validateYesNoField(criticalField, 'Criticality', rowNum);
+        if (error) {
+          errors.push(error);
+        } else if (normCritical !== undefined) {
+          normalized['Criticality'] = normCritical;
         }
       }
 
-      // Validate Is Active
-      const isActiveField = row['Is Active'] || row['IS Active'];
-      if (isActiveField) {
-        const value = String(isActiveField).toLowerCase().trim();
-        if (!['yes', 'no', 'y', 'n'].includes(value)) {
-          errors.push(`Row ${rowNum}: Is Active must be Yes or No`);
-        } else {
-          normalized['Is Active'] = ['yes', 'y'].includes(value) ? 'Yes' : 'No';
+      // Validate Is Active - mandatory
+      const isActiveField = row['Is Active'] ?? row['IS Active'];
+      {
+        const { error, normalized: normActive } = validateYesNoField(isActiveField, 'Is Active', rowNum, { required: true });
+        if (error) {
+          errors.push(error);
+        } else if (normActive !== undefined) {
+          normalized['Is Active'] = normActive;
         }
       }
 
@@ -725,29 +870,7 @@ export async function validateData(type: string, data: any[], mode: string, vess
       if (makerListLoaded) {
         const rowMakerCode = normalized['Maker Code'] || null;
         const rowMakerName = normalized['Maker'] || null;
-        if (rowMakerCode) {
-          const trimmedCode = String(rowMakerCode).trim();
-          if (!existingMakersByCode.has(trimmedCode)) {
-            if (rowMakerName) {
-              const nameMatch = existingMakersByName.get(String(rowMakerName).trim().toLowerCase());
-              if (nameMatch) {
-                normalized['Maker Code'] = nameMatch.makerCode;
-              } else {
-                errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-              }
-            } else {
-              errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-            }
-          }
-        } else if (rowMakerName) {
-          const trimmedName = String(rowMakerName).trim();
-          const nameMatch = existingMakersByName.get(trimmedName.toLowerCase());
-          if (nameMatch) {
-            normalized['Maker Code'] = nameMatch.makerCode;
-          } else {
-            errors.push(`Row ${rowNum}: Maker '${trimmedName}' does not exist in Maker List. Please import makers first.`);
-          }
-        }
+        errors.push(...validateMakerReference(rowMakerCode, rowMakerName, existingMakersByCode, rowNum));
       }
     } else if (type === 'stores') {
       // Validate stores (11-column format per user specification)
@@ -1838,15 +1961,12 @@ export async function validateData(type: string, data: any[], mode: string, vess
       }
       
       // Is Active - required
-      const isActiveVal = row['Is Active'];
-      if (isActiveVal === undefined || isActiveVal === null || String(isActiveVal).trim() === '') {
-        errors.push(`Row ${rowNum}: Is Active is required`);
-      } else {
-        const val = String(isActiveVal).trim().toLowerCase();
-        if (!['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'].includes(val)) {
-          errors.push(`Row ${rowNum}: Is Active must be Yes/No`);
-        } else {
-          normalized['Is Active'] = isActiveVal;
+      {
+        const { error, normalized: normActive } = validateYesNoField(row['Is Active'], 'Is Active', rowNum, { required: true });
+        if (error) {
+          errors.push(error);
+        } else if (normActive !== undefined) {
+          normalized['Is Active'] = normActive;
         }
       }
       
@@ -1860,36 +1980,21 @@ export async function validateData(type: string, data: any[], mode: string, vess
       if (row['Maker Code']) normalized['Maker Code'] = String(row['Maker Code']).trim();
       if (row['Manual Name']) normalized['Manual Name'] = String(row['Manual Name']).trim();
       if (row['Page Number']) normalized['Page Number'] = String(row['Page Number']).trim();
-      if (row['Criticality']) normalized['Criticality'] = String(row['Criticality']).trim();
+      {
+        const { error, normalized: normCritical } = validateYesNoField(row['Criticality'], 'Criticality', rowNum);
+        if (error) {
+          errors.push(error);
+        } else if (normCritical !== undefined) {
+          normalized['Criticality'] = normCritical;
+        }
+      }
       if (row['IHM (Inventory of Hazardous Materials)']) normalized['IHM (Inventory of Hazardous Materials)'] = String(row['IHM (Inventory of Hazardous Materials)']).trim();
       if (row['Evidence Type']) normalized['Evidence Type'] = String(row['Evidence Type']).trim();
 
       if (makerListLoaded) {
         const rowMakerCode = normalized['Maker Code'] || null;
         const rowMakerName = normalized['Maker'] || null;
-        if (rowMakerCode) {
-          const trimmedCode = String(rowMakerCode).trim();
-          if (!existingMakersByCode.has(trimmedCode)) {
-            if (rowMakerName) {
-              const nameMatch = existingMakersByName.get(String(rowMakerName).trim().toLowerCase());
-              if (nameMatch) {
-                normalized['Maker Code'] = nameMatch.makerCode;
-              } else {
-                errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-              }
-            } else {
-              errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-            }
-          }
-        } else if (rowMakerName) {
-          const trimmedName = String(rowMakerName).trim();
-          const nameMatch = existingMakersByName.get(trimmedName.toLowerCase());
-          if (nameMatch) {
-            normalized['Maker Code'] = nameMatch.makerCode;
-          } else {
-            errors.push(`Row ${rowNum}: Maker '${trimmedName}' does not exist in Maker List. Please import makers first.`);
-          }
-        }
+        errors.push(...validateMakerReference(rowMakerCode, rowMakerName, existingMakersByCode, rowNum));
       }
     }
 

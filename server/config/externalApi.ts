@@ -43,7 +43,7 @@ export const APP_ENV = resolveAppEnv();
 
 let _cachedBaseUrl: string | null = null;
 
-function getExternalMasterDataBaseUrl(): string {
+export function getExternalMasterDataBaseUrl(): string {
   if (_cachedBaseUrl !== null) return _cachedBaseUrl;
 
   const devUrl = process.env.EXTERNAL_MASTER_DATA_URL_DEV;
@@ -79,4 +79,37 @@ export function buildExternalMasterDataUrl(endpoint: string, domain: string): st
   const baseUrl = getExternalMasterDataBaseUrl();
   const cleanEndpoint = endpoint.replace(/^\/+/, '');
   return `${baseUrl}/${cleanEndpoint}?domain=${encodeURIComponent(domain)}`;
+}
+
+let _cachedCrewMasterUrl: string | null = null;
+
+export function getCrewMasterDataBaseUrl(): string {
+  if (_cachedCrewMasterUrl !== null) return _cachedCrewMasterUrl;
+
+  const devUrl = process.env.EXTERNAL_CREW_MASTER_DATA_URL_DEV;
+  const prodUrl = process.env.EXTERNAL_CREW_MASTER_DATA_URL_PROD;
+
+  let selectedUrl: string | undefined;
+
+  if (APP_ENV === 'local' || APP_ENV === 'dev') {
+    if (!devUrl) {
+      throw new Error(
+        `[ExternalAPI] EXTERNAL_CREW_MASTER_DATA_URL_DEV is not set. Required when APP_ENV="${APP_ENV}". Set this environment variable to the direct crew master data base URL.`
+      );
+    }
+    selectedUrl = devUrl;
+  } else {
+    if (!prodUrl) {
+      throw new Error(
+        `[ExternalAPI] EXTERNAL_CREW_MASTER_DATA_URL_PROD is not set. Required when APP_ENV="production". Set this environment variable to the direct crew master data base URL.`
+      );
+    }
+    selectedUrl = prodUrl;
+  }
+
+  _cachedCrewMasterUrl = selectedUrl.replace(/\/+$/, '');
+
+  console.log(`[ExternalAPI] Using ${APP_ENV === 'production' ? 'PRODUCTION' : 'DEV'} crew master data URL (${maskUrl(_cachedCrewMasterUrl)})`);
+
+  return _cachedCrewMasterUrl;
 }

@@ -290,6 +290,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     briefWorkDescription: "",
     nextDueDate: "",
     nextDueReading: "",
+    lastDoneRH: "",
+    lastCompletedOn: "",
     requiredSpareParts: [] as Array<{partNo: string, partCode?: string, description: string, quantityRequired: string, remarks: string}>,
     requiredTools: [] as Array<{toolName: string, quantity: string, remarks: string}>,
     safetyRequirements: {
@@ -1183,6 +1185,35 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   useEffect(() => {
     if (d3RhCounterType) setComponentRhCounterType(d3RhCounterType);
   }, [d3RhCounterType]);
+
+  // Auto-calculate Next Due Hour = Last Done Hour + Running Hour Interval (Add Job mode only)
+  useEffect(() => {
+    if (!isNewJobCreation) return;
+    const basis = templateData.maintenanceBasis;
+    if (basis !== 'Running Hours' && basis !== 'Dual Frequency') return;
+    const lastDone = parseInt((templateData as any).lastDoneRH || '0', 10);
+    const interval = parseInt(templateData.intervalRunningHour || '0', 10);
+    if (interval > 0) {
+      setTemplateData(prev => ({ ...prev, nextDueReading: String(lastDone + interval) }));
+    } else {
+      setTemplateData(prev => ({ ...prev, nextDueReading: '' }));
+    }
+  }, [(templateData as any).lastDoneRH, templateData.intervalRunningHour, templateData.maintenanceBasis, isNewJobCreation]);
+
+  // Auto-calculate Next Due Date from Last Completed On + frequency (Calendar Add Job mode only)
+  useEffect(() => {
+    if (!isNewJobCreation) return;
+    if (templateData.maintenanceBasis !== 'Calendar') return;
+    const lastDone = (templateData as any).lastCompletedOn || '';
+    const freqVal = templateData.frequencyValue || '';
+    const freqUnit = templateData.frequencyUnit || '';
+    if (lastDone && freqVal && freqUnit) {
+      const calculated = calculateNextDueDate(lastDone, freqVal, freqUnit);
+      setTemplateData(prev => ({ ...prev, nextDueDate: calculated || '' }));
+    } else {
+      setTemplateData(prev => ({ ...prev, nextDueDate: '' }));
+    }
+  }, [(templateData as any).lastCompletedOn, templateData.frequencyValue, templateData.frequencyUnit, templateData.maintenanceBasis, isNewJobCreation]);
 
   // Initialize form for new job creation (Add Job flow)
   const componentNameFromUrl = urlParams.get('componentName') || '';
@@ -3026,6 +3057,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         intervalRunningHour: templateData.maintenanceBasis === 'Dual Frequency'
           ? parseInt(templateData.intervalRunningHour, 10)
           : undefined,
+        level2ReviewerRankId: (templateData as any).level2ReviewerRankId || null,
+        lastDoneRH: (templateData as any).lastDoneRH ? parseInt((templateData as any).lastDoneRH, 10) : null,
+        lastCompletedOn: (templateData as any).lastCompletedOn || null,
         dataScope: 'vessel', // Jobs created from UI are vessel-specific
       };
 
@@ -4387,12 +4421,21 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   )}
                 </div>
 
-                {!isUnplannedCreate && !!(templateData as any).level2ReviewerRankId && (
+                {!isUnplannedCreate && (
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.L2R">Level 2 Reviewer (Rank)</Label>
-                  <div className="flex items-center h-9 px-3 border border-gray-200 rounded-md bg-gray-50 text-sm text-gray-700" data-testid="text-level2-reviewer-rank">
-                    {(templateData as any).level2ReviewerRankId}
-                  </div>
+                  <Select
+                    value={(templateData as any).level2ReviewerRankId || ''}
+                    onValueChange={(value) => handleTemplateChange('level2ReviewerRankId', value || null)}
+                    disabled={isPartAReadOnly}
+                  >
+                    <SelectTrigger className="text-sm" data-testid="select-level2-reviewer-rank">
+                      <SelectValue placeholder="— None —" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Office">Office</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 )}
 
@@ -4411,7 +4454,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <SelectItem value="Low">Low</SelectItem>
                       <SelectItem value="Medium">Medium</SelectItem>
                       <SelectItem value="High">High</SelectItem>
-                      <SelectItem value="Critical">Critical</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -4437,46 +4479,60 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 )}
 
                 {/* Conditional Next Due field based on Maintenance Basis */}
-                {!isUnplannedCreate && (templateData.maintenanceBasis === 'Running Hours' ? (
-                  <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.26"><Marker id="WOF.A1.26" />Next Due RH</Label>
-                    <Input
-                      type="text"
-                      value={templateData.nextDueReading ? `${templateData.nextDueReading} Hours` : '-'}
-                      className="text-sm bg-gray-50"
-                      disabled={true}
-                      data-testid="WOF.A1.27"
-                    />
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.26"><Marker id="WOF.A1.26" />Next Due Date</Label>
-                    <Input
-                      type="date"
-                      value={templateData.nextDueDate}
-                      onChange={(e) => handleTemplateChange('nextDueDate', e.target.value)}
-                      className="text-sm"
-                      disabled={isPartAReadOnly}
-                      data-testid="WOF.A1.27"
-                    />
-                  </div>
-                ))}
+                {!isUnplannedCreate && (
+                  (templateData.maintenanceBasis === 'Running Hours' || (templateData.maintenanceBasis === 'Dual Frequency' && isNewJobCreation)) ? (
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.26"><Marker id="WOF.A1.26" />{isNewJobCreation ? 'Next Due Hour' : 'Next Due RH'}</Label>
+                      <Input
+                        type="text"
+                        value={templateData.nextDueReading ? `${templateData.nextDueReading} Hours` : '-'}
+                        className="text-sm bg-gray-50"
+                        disabled={true}
+                        data-testid="WOF.A1.27"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.26"><Marker id="WOF.A1.26" />Next Due Date</Label>
+                      <Input
+                        type="date"
+                        value={templateData.nextDueDate}
+                        onChange={(e) => handleTemplateChange('nextDueDate', e.target.value)}
+                        className={`text-sm ${isNewJobCreation && templateData.maintenanceBasis === 'Calendar' ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
+                        disabled={isPartAReadOnly || (isNewJobCreation && templateData.maintenanceBasis === 'Calendar')}
+                        data-testid="WOF.A1.27"
+                      />
+                    </div>
+                  )
+                )}
 
-                {!isUnplannedCreate && templateData.maintenanceBasis === 'Running Hours' && (
+                {!isUnplannedCreate && (templateData.maintenanceBasis === 'Running Hours' || templateData.maintenanceBasis === 'Dual Frequency') && (
                   <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad] flex items-center gap-1" data-testid="WOF.A1.lastDoneRHLabel">
                       <Clock className="h-3.5 w-3.5" />
-                      Last Completed At
+                      {isNewJobCreation ? 'Last Done Hour' : 'Last Completed At'}
                     </Label>
-                    <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-rh">
-                      {lastDoneRH !== '' && lastDoneRH != null ? (
-                        <>{formatRHWithSeparators(lastDoneRH)} Hours</>
-                      ) : lastDoneDateForRH ? (
-                        <span className="text-gray-500 italic">RH not recorded</span>
-                      ) : (
-                        <span className="text-gray-400 italic">First maintenance cycle</span>
-                      )}
-                    </div>
+                    {isNewJobCreation ? (
+                      <Input
+                        type="number"
+                        value={(templateData as any).lastDoneRH || ''}
+                        onChange={(e) => handleTemplateChange('lastDoneRH', e.target.value)}
+                        placeholder="e.g., 5000"
+                        className="text-sm"
+                        min={0}
+                        data-testid="input-last-done-rh"
+                      />
+                    ) : (
+                      <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-rh">
+                        {lastDoneRH !== '' && lastDoneRH != null ? (
+                          <>{formatRHWithSeparators(lastDoneRH)} Hours</>
+                        ) : lastDoneDateForRH ? (
+                          <span className="text-gray-500 italic">RH not recorded</span>
+                        ) : (
+                          <span className="text-gray-400 italic">First maintenance cycle</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -4486,18 +4542,28 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       <Clock className="h-3.5 w-3.5" />
                       Last Completed On
                     </Label>
-                    <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-date">
-                      {(lastDoneDate || lastDoneDateForRH) ? (
-                        <>
-                          {normalizeDateToDDMMMYYYY(lastDoneDateForRH || lastDoneDate) || lastDoneDateForRH || lastDoneDate}
-                          {formatRelativeTime(lastDoneDateForRH || lastDoneDate) && (
-                            <span className="text-gray-500"> ({formatRelativeTime(lastDoneDateForRH || lastDoneDate)})</span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-gray-400 italic">First maintenance cycle</span>
-                      )}
-                    </div>
+                    {isNewJobCreation ? (
+                      <Input
+                        type="date"
+                        value={(templateData as any).lastCompletedOn || ''}
+                        onChange={(e) => handleTemplateChange('lastCompletedOn', e.target.value)}
+                        className="text-sm"
+                        data-testid="input-last-completed-on"
+                      />
+                    ) : (
+                      <div className="text-xs p-2 bg-gray-100 rounded border border-gray-200 text-gray-700" data-testid="text-last-completed-date">
+                        {(lastDoneDate || lastDoneDateForRH) ? (
+                          <>
+                            {normalizeDateToDDMMMYYYY(lastDoneDateForRH || lastDoneDate) || lastDoneDateForRH || lastDoneDate}
+                            {formatRelativeTime(lastDoneDateForRH || lastDoneDate) && (
+                              <span className="text-gray-500"> ({formatRelativeTime(lastDoneDateForRH || lastDoneDate)})</span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-gray-400 italic">First maintenance cycle</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -4589,50 +4655,36 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </Button>
               </div>)}
 
-              {/* Editable Spare Parts Table - Updated to show location-wise ROB per spec */}
+              {/* Editable Spare Parts Table - aligned with Edit Form columns (no Location) */}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border border-gray-200">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="WOF.A2.3"><Marker id="WOF.A2.3" />PART NO.</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[25%]" data-testid="WOF.A2.4"><Marker id="WOF.A2.4" />DESCRIPTION</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[8%]" data-testid="WOF.A2.5"><Marker id="WOF.A2.5" />QTY REQ</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[12%]" data-testid="WOF.A2.6"><Marker id="WOF.A2.6" />LOCATION</th>
-                      <th className="text-right p-2 font-medium text-gray-700 w-[8%]" data-testid="WOF.A2.6b">ROB</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[12%]" data-testid="WOF.A2.7"><Marker id="WOF.A2.7" />STATUS</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[30%]" data-testid="WOF.A2.4"><Marker id="WOF.A2.4" />DESCRIPTION</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[10%]" data-testid="WOF.A2.5"><Marker id="WOF.A2.5" />QTY REQ</th>
+                      <th className="text-right p-2 font-medium text-gray-700 w-[10%]" data-testid="WOF.A2.6b">ROB</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="WOF.A2.7"><Marker id="WOF.A2.7" />STATUS</th>
                       {!isPartAReadOnly && <th className="text-center p-2 font-medium text-gray-700 w-[100px]" data-testid="WOF.A2.8"><Marker id="WOF.A2.8" />ACTIONS</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {(templateData.requiredSpareParts || []).length === 0 ? (
                       <tr>
-                        <td colSpan={isPartAReadOnly ? 6 : 7} className="text-center p-4 text-gray-500 italic">
+                        <td colSpan={isPartAReadOnly ? 5 : 6} className="text-center p-4 text-gray-500 italic">
                           No spare parts added yet
                         </td>
                       </tr>
                     ) : (
                       (templateData.requiredSpareParts || []).map((part: any, index) => {
-                        // ROB lookup using Spares table mapping per spec:
-                        // location -> rob_location_a, location_2 -> rob_location_b
                         const lookupKey = part.partCode || '';
                         const spareData = lookupKey ? sparesInventory.find(s => s.partCode === lookupKey) : null;
-                        const locations = lookupKey ? getAvailableLocationsForSpare(lookupKey) : [];
 
-                        // Location-specific ROB values (NO summation per spec)
-                        const robLocationA = spareData?.robLocationA ?? 0;
-                        const robLocationB = spareData?.robLocationB ?? 0;
-
-                        // Stock status based on per-location availability (no summation)
-                        // Available = at least one location can fulfill the required qty
-                        // Insufficient = some stock exists at any location but no single location has enough
-                        // Unavailable = no stock at any location
+                        const robValue = spareData?.rob !== null && spareData?.rob !== undefined ? spareData.rob : null;
                         const qtyRequired = parseInt(part.quantityRequired) || 0;
-                        const locationACanFulfill = robLocationA >= qtyRequired;
-                        const locationBCanFulfill = robLocationB >= qtyRequired;
-                        const hasAnyStock = robLocationA > 0 || robLocationB > 0;
-                        const isAvailable = locationACanFulfill || locationBCanFulfill;
-                        const isInsufficientStock = hasAnyStock && !isAvailable;
-                        const stockStatus = !spareData ? 'unknown' : isAvailable ? 'available' : isInsufficientStock ? 'insufficient' : 'unavailable';
+                        const isAvailable = robValue !== null && robValue >= qtyRequired;
+                        const isLowStock = robValue !== null && robValue > 0 && robValue < qtyRequired;
+                        const stockStatus = robValue === null ? 'unknown' : isAvailable ? 'available' : isLowStock ? 'low' : 'unavailable';
 
                         return (
                           <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
@@ -4665,27 +4717,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                     data-testid={`input-spare-quantity-${index}`}
                                   />
                                 </td>
-                                <td className="p-2 text-xs">
-                                  {locations.length > 0 ? (
-                                    <div className="space-y-1">
-                                      {locations.map((loc, locIdx) => (
-                                        <div key={locIdx}>
-                                          <span className="text-gray-600">{loc.name}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : '-'}
-                                </td>
-                                <td className="p-2 text-xs text-right">
-                                  {locations.length > 0 ? (
-                                    <div className="space-y-1">
-                                      {locations.map((loc, locIdx) => (
-                                        <div key={locIdx}>
-                                          <span className="font-medium">{loc.robValue}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : '-'}
+                                <td className="p-2 text-xs text-right" data-testid={`text-spare-rob-${index}`}>
+                                  <span className="font-medium">{robValue !== null ? robValue : '-'}</span>
                                 </td>
                                 <td className="p-2">
                                   <StatusPill status={stockStatus} />
@@ -4718,27 +4751,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                 <td className="p-2" data-testid={`text-spare-part-no-${index}`}>{part.partNo || '-'}</td>
                                 <td className="p-2" data-testid={`text-spare-description-${index}`}>{part.description || '-'}</td>
                                 <td className="p-2" data-testid={`text-spare-quantity-${index}`}>{part.quantityRequired || '-'}</td>
-                                <td className="p-2 text-xs" data-testid={`text-spare-location-${index}`}>
-                                  {locations.length > 0 ? (
-                                    <div className="space-y-1">
-                                      {locations.map((loc, locIdx) => (
-                                        <div key={locIdx}>
-                                          <span className="text-gray-600">{loc.name}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : '-'}
-                                </td>
                                 <td className="p-2 text-xs text-right" data-testid={`text-spare-rob-${index}`}>
-                                  {locations.length > 0 ? (
-                                    <div className="space-y-1">
-                                      {locations.map((loc, locIdx) => (
-                                        <div key={locIdx}>
-                                          <span className="font-medium">{loc.robValue}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : '-'}
+                                  <span className="font-medium">{robValue !== null ? robValue : '-'}</span>
                                 </td>
                                 <td className="p-2">
                                   <span data-testid={`status-spare-${index}`}>

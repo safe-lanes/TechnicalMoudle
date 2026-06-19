@@ -25,6 +25,8 @@ import {
   useExternalCrewPools,
   useExternalAppraisalTypes,
   useExternalUsers,
+  useExternalApprovers,
+  useLocalApprovers,
   getDomain,
 } from "@/hooks/useExternalMasterData";
 
@@ -141,6 +143,19 @@ const masterTypes: MasterType[] = [
       { header: "Sort Order", fields: ["sortOrder"] },
     ],
     isEditable: true,
+  },
+  {
+    id: "approvers",
+    name: "Approvers",
+    idFields: ["auid", "id"],
+    columns: [
+      { header: "Name", fields: ["name"] },
+      { header: "User ID", fields: ["userId"] },
+      { header: "User UUID", fields: ["userUuid"] },
+      { header: "Approver Level", fields: ["approverLevel"] },
+      { header: "Email", fields: ["emailId"] },
+      { header: "Status", fields: ["isActiveLabel"] },
+    ],
   },
    // {
   //   id: "licenseDce",
@@ -383,7 +398,10 @@ export default function DataMasters() {
         (stats.additionalGroups?.updated || 0) + (stats.additionalGroups?.inserted || 0) +
         (stats.ports?.updated || 0) + (stats.ports?.inserted || 0) +
         (stats.users?.updated || 0) + (stats.users?.inserted || 0) +
-        (stats.fleetGroups?.updated || 0) + (stats.fleetGroups?.inserted || 0);
+        (stats.fleetGroups?.updated || 0) + (stats.fleetGroups?.inserted || 0) +
+        (stats.approvers?.updated || 0) + (stats.approvers?.inserted || 0);
+      
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/local-approvers'] });
       
       toast({
         title: "Master data sync completed successfully",
@@ -427,6 +445,20 @@ export default function DataMasters() {
   const crewPoolsQuery = useExternalCrewPools({ enabled: selectedMaster === "crewPool" });
   const appraisalTypesQuery = useExternalAppraisalTypes({ enabled: selectedMaster === "appraisalType" });
   const usersQuery = useExternalUsers({ enabled: selectedMaster === "users" });
+  // Approvers tab: local-primary, external fallback — same pattern as Vessel Master
+  const localApproversQuery = useLocalApprovers({ enabled: selectedMaster === "approvers" });
+  const localApproversResolved = !localApproversQuery.isLoading;
+  const localApproversHasData = (localApproversQuery.data?.length ?? 0) > 0;
+  const externalApproversEnabled =
+    selectedMaster === "approvers" && localApproversResolved && !localApproversHasData;
+  const externalApproversQuery = useExternalApprovers({ enabled: externalApproversEnabled });
+  const approversQuery = {
+    data: localApproversHasData ? localApproversQuery.data : externalApproversQuery.data,
+    isLoading:
+      localApproversQuery.isLoading ||
+      (externalApproversEnabled && externalApproversQuery.isLoading),
+    error: localApproversHasData ? localApproversQuery.error : externalApproversQuery.error,
+  };
 
   const queryMap: Record<string, { data: any[]; isLoading: boolean; error: Error | null }> = {
     nationality: { data: nationalitiesQuery.data || [], isLoading: nationalitiesQuery.isLoading, error: nationalitiesQuery.error },
@@ -445,6 +477,7 @@ export default function DataMasters() {
     equipmentCategory: { data: equipmentCategoriesQuery.data || [], isLoading: equipmentCategoriesQuery.isLoading, error: equipmentCategoriesQuery.error },
     defectCategory: { data: defectCategoriesQuery.data || [], isLoading: defectCategoriesQuery.isLoading, error: defectCategoriesQuery.error },
     defectType: { data: defectTypesQuery.data || [], isLoading: defectTypesQuery.isLoading, error: defectTypesQuery.error },
+    approvers: { data: approversQuery.data || [], isLoading: approversQuery.isLoading, error: approversQuery.error },
   };
 
   const currentMaster = masterTypes.find(m => m.id === selectedMaster);

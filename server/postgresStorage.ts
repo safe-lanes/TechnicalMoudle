@@ -43,6 +43,7 @@ import {
   formVersions,
   formVersionUsage,
   changeRequest,
+  changeRequestApproval,
   changeRequestAttachment,
   changeRequestComment,
   ihmItems,
@@ -131,6 +132,8 @@ import {
   type InsertFormVersionUsage,
   type ChangeRequest,
   type InsertChangeRequest,
+  type ChangeRequestApproval,
+  type InsertChangeRequestApproval,
   type ChangeRequestAttachment,
   type InsertChangeRequestAttachment,
   type ChangeRequestComment,
@@ -206,6 +209,12 @@ import {
   type AdmnRoleMaster,
   type AdmMenumasterAc,
   type AdmRoleMenuAccess,
+  approvalWorkflowConfig,
+  type ApprovalWorkflowConfig,
+  mocApprovers,
+  woPostponementApprovals,
+  type WoPostponementApproval,
+  type InsertWoPostponementApproval,
 } from '@shared/schema';
 import { logFieldChanges, logSoftDelete, FileSyncProcessor } from './modules/sync';
 import { getAuditActor, getRequestContext } from './middleware/requestContext';
@@ -5167,7 +5176,7 @@ export class PostgresStorage {
 
   // ============= MODULE 12: CHANGE REQUESTS =============
 
-  async getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string }): Promise<ChangeRequest[]> {
+  async getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string; pendingForApprover?: string }): Promise<ChangeRequest[]> {
     const db = await getDb();
     let conditions: any[] = [];
     
@@ -5183,13 +5192,43 @@ export class PostgresStorage {
     if (filters?.q) {
       conditions.push(ilike(changeRequest.title, `%${filters.q}%`));
     }
-    
+
+    let allRequests: ChangeRequest[];
     if (conditions.length > 0) {
-      return await db.select().from(changeRequest)
+      allRequests = await db.select().from(changeRequest)
         .where(and(...conditions))
         .orderBy(desc(changeRequest.createdAt));
+    } else {
+      allRequests = await db.select().from(changeRequest).orderBy(desc(changeRequest.createdAt));
     }
-    return await db.select().from(changeRequest).orderBy(desc(changeRequest.createdAt));
+
+    // Filter to CRs where this user is the active approver at the pending level
+    if (filters?.pendingForApprover) {
+      const userId = filters.pendingForApprover;
+      const submittedRequests = allRequests.filter(cr => cr.status === 'submitted');
+      const filtered: ChangeRequest[] = [];
+      for (const cr of submittedRequests) {
+        const steps = await db.select().from(changeRequestApproval)
+          .where(and(
+            eq(changeRequestApproval.changeRequestId, cr.id),
+            eq(changeRequestApproval.isDeleted, false)
+          ));
+        const activeStep = steps.find(s => s.status === 'Pending');
+        if (!activeStep) continue;
+        const isApprover = await db.select().from(mocApprovers)
+          .where(and(
+            eq(mocApprovers.approverLevel, activeStep.approvalLevel),
+            eq(mocApprovers.isActive, 1),
+            eq(mocApprovers.isDeleted, false),
+            eq(mocApprovers.modulename, 'Technical'),
+            eq(mocApprovers.userId, userId)
+          ));
+        if (isApprover.length > 0) filtered.push(cr);
+      }
+      return filtered;
+    }
+
+    return allRequests;
   }
 
   async getChangeRequest(id: number): Promise<ChangeRequest | undefined> {
@@ -5256,22 +5295,86 @@ export class PostgresStorage {
     });
   }
 
-  async approveChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+  // ── Approval Step CRUD ───────────────────────────────────────────────────
+
+  async getChangeRequestApprovalSteps(changeRequestId: number): Promise<ChangeRequestApproval[]> {
     const db = await getDb();
-    const existing = await this.getChangeRequest(id);
-    if (!existing) throw new Error('Change request not found');
-    
-    const now = new Date();
+    return db.select().from(changeRequestApproval)
+      .where(and(
+        eq(changeRequestApproval.changeRequestId, changeRequestId),
+        eq(changeRequestApproval.isDeleted, false)
+      ))
+      .orderBy(changeRequestApproval.approvalLevel);
+  }
+
+  async createChangeRequestApprovalStep(step: InsertChangeRequestApproval): Promise<ChangeRequestApproval> {
+    const db = await getDb();
+    const result = await db.insert(changeRequestApproval).values(step).returning();
+    return result[0];
+  }
+
+  async updateChangeRequestApprovalStep(id: number, data: Partial<ChangeRequestApproval>): Promise<ChangeRequestApproval> {
+    const db = await getDb();
+    const result = await db.update(changeRequestApproval)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(changeRequestApproval.id, id))
+      .returning();
+    if (!result[0]) throw new Error(`Approval step ${id} not found`);
+    return result[0];
+  }
+
+  // ── Internal: verify a user is an active approver for a given level ──────
+
+  private async verifyApproverForLevel_internal(reviewerId: string, approvalLevel: string): Promise<boolean> {
+    const db = await getDb();
+    const found = await db.select().from(mocApprovers)
+      .where(and(
+        eq(mocApprovers.approverLevel, approvalLevel),
+        eq(mocApprovers.isActive, 1),
+        eq(mocApprovers.isDeleted, false),
+        eq(mocApprovers.modulename, 'Technical'),
+        eq(mocApprovers.userUuid, reviewerId)
+      ));
+    return found.length > 0;
+  }
+
+  // ── Internal: finalise a fully-approved CR (apply changes + mark approved) ──
+
+  private async finaliseApprovedCR(id: number, existing: ChangeRequest, reviewerId: string, comment: string): Promise<ChangeRequest> {
+    return this.finaliseApprovedCRWithStep(id, existing, null, reviewerId, comment, new Date());
+  }
+
+  // ── Internal: atomically mark the final approval step AND finalise the CR ──
+  // stepId: if provided, marks that step as Approved inside the same transaction.
+
+  private async finaliseApprovedCRWithStep(
+    id: number,
+    existing: ChangeRequest,
+    stepId: number | null,
+    reviewerId: string,
+    comment: string,
+    now: Date
+  ): Promise<ChangeRequest> {
+    const db = await getDb();
     const newRevisionNumber = (existing.revisionNumber || 0) + 1;
-    
-    // Execute entire approval workflow within a single transaction
-    // If any step fails, all changes are rolled back automatically
+
     try {
       const result = await db.transaction(async (tx) => {
-        // Apply the proposed changes to the target entity within the transaction
+        // Mark the final approval step as Approved inside the same transaction
+        if (stepId !== null) {
+          await tx.update(changeRequestApproval)
+            .set({
+              status: 'Approved',
+              actionByUserId: reviewerId,
+              actionAt: now,
+              remarks: comment,
+              updatedAt: now
+            })
+            .where(eq(changeRequestApproval.id, stepId));
+        }
+
         const appliedChangesResult = await this.applyApprovedChangesInTx(tx, existing);
-        
-        // Build revision history entry with applied status
+
         const revisionHistoryEntry = {
           revisionNumber: newRevisionNumber,
           approvedBy: reviewerId,
@@ -5283,12 +5386,11 @@ export class PostgresStorage {
           comments: comment
         };
         const updatedHistory = [...(existing.revisionHistory || []), revisionHistoryEntry];
-        
-        // Update the change request status within the same transaction
+
         const updateResult = await tx.update(changeRequest)
-          .set({ 
-            status: 'approved', 
-            reviewedByUserId: reviewerId, 
+          .set({
+            status: 'approved',
+            reviewedByUserId: reviewerId,
             reviewedAt: now,
             revisionNumber: newRevisionNumber,
             revisionHistory: updatedHistory,
@@ -5296,24 +5398,68 @@ export class PostgresStorage {
           })
           .where(eq(changeRequest.id, id))
           .returning();
-        
-        if (!updateResult[0]) {
-          throw new Error('Failed to update change request status');
-        }
-        
+
+        if (!updateResult[0]) throw new Error('Failed to update change request status');
         return updateResult[0];
       });
-      
+
       console.log(`[CR_APPLY] Successfully approved and applied CR ${id}`);
-      // Sync field logging — CR status change (outside tx, best-effort)
       try { await logFieldChanges('change_request', existing.cruuid, (existing as any).vesselId || null, existing, result, reviewerId || 'system'); } catch (e) { console.error('[FieldLogger] CR approve:', e); }
       return result;
     } catch (error: any) {
       console.error(`[CR_APPLY] Transaction failed for CR ${id}, all changes rolled back:`, error);
-      // Transaction failed - all changes are automatically rolled back
-      // Do NOT update the change request status here as that would be outside the transaction
       throw new Error(`Failed to approve change request: ${error.message}`);
     }
+  }
+
+  async approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string): Promise<ChangeRequest> {
+    const existing = await this.getChangeRequest(id);
+    if (!existing) throw new Error('Change request not found');
+
+    // Load approval steps for this CR
+    const steps = await this.getChangeRequestApprovalSteps(id);
+    const now = new Date();
+
+    // No approval steps → legacy single-step approval (backward compat)
+    if (steps.length === 0) {
+      return this.finaliseApprovedCR(id, existing, reviewerId, comment);
+    }
+
+    // Find the current active step (lowest-level still Pending)
+    const activeStep = steps.find(s => s.status === 'Pending');
+    if (!activeStep) {
+      throw new Error('No pending approval step found — this request may have already been fully approved');
+    }
+
+    // Sail Admin is always authorised to approve any level.
+    // Other roles are checked against moc_approvers configuration.
+    const isSailAdmin = role === 'Sail Admin';
+    if (!isSailAdmin) {
+      const isAuthorised = await this.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
+      if (!isAuthorised) {
+        throw new Error(`Not authorised to approve at ${activeStep.approvalLevel}`);
+      }
+    }
+
+    // Check if any further steps are still Pending (excluding the active step)
+    const remainingSteps = steps.filter(s => s.id !== activeStep.id && s.status === 'Pending');
+
+    if (remainingSteps.length > 0) {
+      // More steps remain — mark the active step approved non-atomically is fine here;
+      // CR stays in 'submitted' state awaiting the next level.
+      await this.updateChangeRequestApprovalStep(activeStep.id, {
+        status: 'Approved',
+        actionByUserId: reviewerId,
+        actionAt: now,
+        remarks: comment
+      });
+      console.log(`[CR_WORKFLOW] CR ${id} — ${activeStep.approvalLevel} approved; awaiting ${remainingSteps.length} more level(s)`);
+      return (await this.getChangeRequest(id))!;
+    }
+
+    // All steps approved — mark the final step AND finalise atomically in one transaction.
+    console.log(`[CR_WORKFLOW] CR ${id} — all approval levels satisfied, finalising`);
+    return this.finaliseApprovedCRWithStep(id, existing, activeStep.id, reviewerId, comment, now);
   }
 
   /**
@@ -5710,9 +5856,44 @@ export class PostgresStorage {
     try { await logFieldChanges('stores_items', resolvedStuuid, beforeState.vesselId || null, beforeState, afterState, 'system'); } catch (e) { console.error('[FieldLogger] CR apply store:', e); }
   }
 
-  async rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+  async rejectChangeRequest(id: number, reviewerId: string, comment: string, role?: string): Promise<ChangeRequest> {
     const existing = await this.getChangeRequest(id);
     const now = new Date();
+
+    // Load approval steps
+    const steps = await this.getChangeRequestApprovalSteps(id);
+
+    if (steps.length > 0) {
+      // Level-aware rejection
+      const activeStep = steps.find(s => s.status === 'Pending');
+      if (!activeStep) {
+        throw new Error('No pending approval step found');
+      }
+
+      // Sail Admin is always authorised to reject any level.
+      // Other roles are checked against moc_approvers configuration.
+      const isSailAdmin = role === 'Sail Admin';
+      if (!isSailAdmin) {
+        const isAuthorised = await this.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
+        if (!isAuthorised) {
+          throw new Error(`Not authorised to reject at ${activeStep.approvalLevel}`);
+        }
+      }
+
+      // Mark active step Rejected
+      await this.updateChangeRequestApprovalStep(activeStep.id, {
+        status: 'Rejected',
+        actionByUserId: reviewerId,
+        actionAt: now,
+        remarks: comment
+      });
+
+      // Mark all remaining Pending steps Rejected
+      const remainingPending = steps.filter(s => s.id !== activeStep.id && s.status === 'Pending');
+      for (const step of remainingPending) {
+        await this.updateChangeRequestApprovalStep(step.id, { status: 'Rejected' });
+      }
+    }
 
     const updated = await this.updateChangeRequest(id, {
       status: 'rejected',
@@ -5720,8 +5901,7 @@ export class PostgresStorage {
       reviewedAt: now,
     });
 
-    // Audit log entry so the rejection (with comment + reviewer) can be
-    // surfaced as part of the rejection history on the Modify PMS page.
+    // Audit log entry
     try {
       await this.createAuditLog({
         entityType: 'change_request',
@@ -6905,6 +7085,49 @@ export class PostgresStorage {
     }
 
     return result[0];
+  }
+
+  // ── WO Postponement Approval Steps ──────────────────────
+
+  async getWoPostponementApprovalSteps(postponementId: string): Promise<WoPostponementApproval[]> {
+    const db = await getDb();
+    return db.select().from(woPostponementApprovals)
+      .where(and(
+        eq(woPostponementApprovals.postponementId, postponementId),
+        eq(woPostponementApprovals.isDeleted, false)
+      ))
+      .orderBy(woPostponementApprovals.approvalLevel);
+  }
+
+  async createWoPostponementApprovalStep(step: InsertWoPostponementApproval): Promise<WoPostponementApproval> {
+    const db = await getDb();
+    const result = await db.insert(woPostponementApprovals).values(step).returning();
+    return result[0];
+  }
+
+  async updateWoPostponementApprovalStep(id: number, data: Partial<WoPostponementApproval>): Promise<WoPostponementApproval> {
+    const db = await getDb();
+    const result = await db.update(woPostponementApprovals)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(woPostponementApprovals.id, id))
+      .returning();
+    if (!result[0]) throw new Error(`WO postponement approval step ${id} not found`);
+    return result[0];
+  }
+
+  async getLatestAwaitingPostponement(workOrderId: string): Promise<WorkOrderPostponement | undefined> {
+    const db = await getDb();
+    const rows = await db.select().from(workOrderPostponements)
+      .where(and(
+        eq(workOrderPostponements.workOrderId, workOrderId),
+        eq(workOrderPostponements.status, 'Awaiting Approval')
+      ))
+      .orderBy(desc(workOrderPostponements.postponementNumber));
+    return rows[0];
+  }
+
+  async verifyApproverForLevel(reviewerId: string, approvalLevel: string): Promise<boolean> {
+    return this.verifyApproverForLevel_internal(reviewerId, approvalLevel);
   }
 
   // ============= REMAINING FILE-BOUND METHODS =============
@@ -9364,6 +9587,61 @@ export class PostgresStorage {
       }
     });
     return { count: permissions.length };
+  }
+
+  async getApprovalWorkflowConfig(): Promise<ApprovalWorkflowConfig[]> {
+    const db = await getDb();
+    return db.select()
+      .from(approvalWorkflowConfig)
+      .where(eq(approvalWorkflowConfig.isDeleted, false))
+      .orderBy(approvalWorkflowConfig.functionId, approvalWorkflowConfig.variableName);
+  }
+
+  async getLocalApprovers(): Promise<any[]> {
+    const db = await getDb();
+    return db.select()
+      .from(mocApprovers)
+      .where(and(eq(mocApprovers.isDeleted, false), eq(mocApprovers.modulename, 'Technical')));
+  }
+
+  async upsertApprovalWorkflowConfig(
+    rows: Array<{
+      moduleId: string;
+      subModuleId: string;
+      functionId: string;
+      variableName: string;
+      level1Enabled: boolean;
+      level2Enabled: boolean;
+    }>,
+    updatedByUuid?: string
+  ): Promise<ApprovalWorkflowConfig[]> {
+    const db = await getDb();
+    const results: ApprovalWorkflowConfig[] = [];
+    for (const row of rows) {
+      const [updated] = await db
+        .insert(approvalWorkflowConfig)
+        .values({
+          moduleId: row.moduleId,
+          subModuleId: row.subModuleId,
+          functionId: row.functionId,
+          variableName: row.variableName,
+          level1Enabled: row.level1Enabled,
+          level2Enabled: row.level2Enabled,
+          updatedByUuid,
+        })
+        .onConflictDoUpdate({
+          target: [approvalWorkflowConfig.functionId, approvalWorkflowConfig.variableName],
+          set: {
+            level1Enabled: sql`EXCLUDED.level1_enabled`,
+            level2Enabled: sql`EXCLUDED.level2_enabled`,
+            updatedByUuid: sql`EXCLUDED.updated_by_uuid`,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      results.push(updated);
+    }
+    return results;
   }
 }
 

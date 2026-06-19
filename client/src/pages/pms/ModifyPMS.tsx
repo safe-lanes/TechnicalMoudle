@@ -57,6 +57,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useVessels } from "@/hooks/useVessels";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLocalApprovers } from "@/hooks/useExternalMasterData";
 
 interface RevisionHistoryEntry {
   revisionNumber: number;
@@ -129,6 +131,7 @@ export default function ModifyPMS() {
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
+  const { currentUser } = useAuth();
   const { data: vessels = [] } = useVessels();
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -196,6 +199,47 @@ export default function ModifyPMS() {
       return response.json();
     }
   });
+
+  // Fetch approval steps for the currently viewed CR
+  const { data: approvalSteps = [] } = useQuery<any[]>({
+    queryKey: ['/technical/api/change-requests', viewingRequest?.id, 'approval-steps'],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/change-requests/${viewingRequest!.id}/approval-steps`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!viewingRequest && viewingRequest.status === 'submitted',
+  });
+
+  // Fetch local approvers to determine if the current user can act on a step
+  const { data: localApprovers = [] } = useLocalApprovers();
+
+  // Levels for which the current user is an active, non-deleted approver.
+  // Match by userUuid (moc_approvers.user_uuid vs currentUser.userUuid) —
+  // the stable cross-system UUID identifier synced from Crew Master.
+  const userApproverLevels: string[] = localApprovers
+    .filter((a: any) =>
+      a.userUuid && currentUser?.userUuid && a.userUuid === currentUser.userUuid &&
+      a.isActive === 1 && !a.isDeleted
+    )
+    .map((a: any) => a.approverLevel as string);
+
+  // The first Pending step is the one that needs action right now
+  const activeStep = approvalSteps.find((s: any) => s.status === 'Pending');
+  // True when the active step matches one of the current user's approver levels
+  const userIsApproverForActiveStep = !!activeStep && userApproverLevels.includes(activeStep.approvalLevel);
+  // True when the active step is at an earlier level than the user's level (e.g., L1 pending, user is L2)
+  const awaitingPriorLevel = !!activeStep && !userIsApproverForActiveStep
+    && userApproverLevels.length > 0;
+  // Legacy CRs with no steps yet, or no approvers configured at all: fall back to role-based guard
+  const noStepsYet = viewingRequest?.status === 'submitted' && approvalSteps.length === 0;
+  const noApproversConfigured = !localApprovers.some((a: any) => a.isActive === 1 && !a.isDeleted);
+
+  const currentUserCanAct = !!viewingRequest
+    && viewingRequest.status === 'submitted'
+    && !isVessel
+    && !isHeadOfDept
+    && (noStepsYet || noApproversConfigured || userIsApproverForActiveStep);
 
   // Create mutation
   const createMutation = useMutation({
@@ -1145,17 +1189,53 @@ export default function ModifyPMS() {
             </Tabs>
           )}
 
+          {/* Approval step progress banner */}
+          {viewingRequest && viewingRequest.status === 'submitted' && approvalSteps.length > 0 && (
+            <div className="px-6 pb-2">
+              <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm">
+                <p className="font-medium text-blue-800 mb-2">Approval Workflow</p>
+                <div className="flex flex-wrap gap-3">
+                  {approvalSteps.map((step: any) => {
+                    const color =
+                      step.status === 'Approved' ? 'text-green-700' :
+                      step.status === 'Rejected' ? 'text-red-700' : 'text-blue-700';
+                    const icon =
+                      step.status === 'Approved' ? '✓' :
+                      step.status === 'Rejected' ? '✗' : '⏳';
+                    return (
+                      <span key={step.id} className={`flex items-center gap-1 ${color}`} data-testid={`text-approval-step-${step.approvalLevel?.replace(' ', '-').toLowerCase()}`}>
+                        <span>{icon}</span>
+                        <span>{step.approvalLevel}</span>
+                        {step.status !== 'Pending' && (
+                          <span className="text-xs text-gray-500">({step.status})</span>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+                {activeStep && (
+                  <p className="mt-1 text-xs text-blue-600" data-testid="text-awaiting-level">
+                    Awaiting {activeStep.approvalLevel} approval
+                    {awaitingPriorLevel && (
+                      <span className="ml-1 text-amber-600">(complete prior level first)</span>
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           <DialogFooter className="flex justify-between">
             <div className="flex gap-2">
-              {viewingRequest && viewingRequest.status === 'submitted' && !isVessel && !isHeadOfDept && (
+              {currentUserCanAct && (
                 <>
                   <Button
                     variant="destructive"
                     onClick={() => {
-                      const label = viewingRequest.title
-                        ? `CR-${viewingRequest.id} • ${viewingRequest.title}`
-                        : `CR-${viewingRequest.id}`;
-                      openReviewDialog('reject', viewingRequest.id, label);
+                      const label = viewingRequest!.title
+                        ? `CR-${viewingRequest!.id} • ${viewingRequest!.title}`
+                        : `CR-${viewingRequest!.id}`;
+                      openReviewDialog('reject', viewingRequest!.id, label);
                     }}
                     data-testid="button-cr-reject"
                   >
@@ -1165,10 +1245,10 @@ export default function ModifyPMS() {
                     variant="default"
                     className="bg-green-600 hover:bg-green-700"
                     onClick={() => {
-                      const label = viewingRequest.title
-                        ? `CR-${viewingRequest.id} • ${viewingRequest.title}`
-                        : `CR-${viewingRequest.id}`;
-                      openReviewDialog('approve', viewingRequest.id, label);
+                      const label = viewingRequest!.title
+                        ? `CR-${viewingRequest!.id} • ${viewingRequest!.title}`
+                        : `CR-${viewingRequest!.id}`;
+                      openReviewDialog('approve', viewingRequest!.id, label);
                     }}
                     data-testid="button-cr-approve"
                   >
@@ -1270,7 +1350,7 @@ export default function ModifyPMS() {
                   const response = await fetch(`/technical/api/change-requests/${reviewDialog.requestId}/${endpoint}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ comment, reviewerId: 'current_user' }),
+                    body: JSON.stringify({ comment, reviewerId: currentUser?.username || currentUser?.userUuid || 'current_user' }),
                   });
                   if (!response.ok) throw new Error(`Failed to ${endpoint}`);
                   queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });

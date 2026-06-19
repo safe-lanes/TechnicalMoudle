@@ -820,6 +820,14 @@ export const changeRequest = pgTable("change_request", {
   updatedByUuid: text("updated_by_uuid"),
   isDeleted: boolean("is_deleted").default(false),
   sortOrder: integer("sort_order"),
+  approvalWorkflowSnapshot: json("approval_workflow_snapshot").$type<{
+    level1Enabled: boolean;
+    level2Enabled: boolean;
+    equipmentClassification?: 'normal' | 'critical' | 'unknown';
+    spareClassification?: 'normal' | 'critical' | 'unknown';
+    storeClassification?: 'standard';
+    jobClassification?: 'criticalEquipment' | 'critical' | 'normal';
+  }>(),
 }, (table) => ({
   vesselCategoryIdx: index("idx_vessel_category").on(table.vesselId, table.category),
   statusIdx: index("idx_change_request_status").on(table.status),
@@ -834,6 +842,34 @@ export const insertChangeRequestSchema = createInsertSchema(changeRequest).omit(
 
 export type InsertChangeRequest = z.infer<typeof insertChangeRequestSchema>;
 export type ChangeRequest = typeof changeRequest.$inferSelect;
+
+// Change Request Approval — intermediary table for multi-level approval workflow
+export const changeRequestApproval = pgTable("change_request_approval", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  crauuid: text("crauuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  changeRequestId: integer("change_request_id").notNull().references(() => changeRequest.id),
+  changeRequestUuid: text("change_request_uuid").notNull(),
+  approvalLevel: text("approval_level").notNull(),
+  status: text("status").notNull().default("Pending"),
+  actionByUserId: text("action_by_user_id"),
+  actionAt: timestamp("action_at", { withTimezone: true }),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: updatedAtColumn(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+});
+
+export const insertChangeRequestApprovalSchema = createInsertSchema(changeRequestApproval).omit({
+  id: true,
+  crauuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertChangeRequestApproval = z.infer<typeof insertChangeRequestApprovalSchema>;
+export type ChangeRequestApproval = typeof changeRequestApproval.$inferSelect;
 
 // Change Request Attachments
 export const changeRequestAttachment = pgTable("change_request_attachment", {
@@ -3506,6 +3542,7 @@ export const workOrderPostponements = pgTable("work_order_postponements", {
   postponeDate: text("postpone_date"), // Raw postpone date entered in dialog
   informOffice: boolean("inform_office").notNull().default(false), // Whether office was informed
   attachmentPath: text("attachment_path"), // Path to any attached documents
+  approvalWorkflowSnapshot: jsonb("approval_workflow_snapshot"), // Snapshot of level1/level2 config at submission time
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
   isSync: boolean("is_sync").default(false),
@@ -3528,6 +3565,36 @@ export const insertWorkOrderPostponementSchema = createInsertSchema(workOrderPos
 
 export type InsertWorkOrderPostponement = z.infer<typeof insertWorkOrderPostponementSchema>;
 export type WorkOrderPostponement = typeof workOrderPostponements.$inferSelect;
+
+export const woPostponementApprovals = pgTable("wo_postponement_approvals", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  wpauuid: text("wpauuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  postponementId: text("postponement_id").notNull(), // FK → work_order_postponements.id
+  workOrderId: text("work_order_id").notNull(), // denormalised for convenience
+  approvalLevel: text("approval_level").notNull(), // 'Level 1' | 'Level 2'
+  status: text("status").notNull().default("Pending"), // 'Pending' | 'Approved' | 'Rejected'
+  actionByUserId: text("action_by_user_id"),
+  actionAt: timestamp("action_at", { withTimezone: true }),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: updatedAtColumn(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+}, (table) => ({
+  postponementIdx: index("idx_wpa_postponement_id").on(table.postponementId),
+  workOrderIdx: index("idx_wpa_work_order_id").on(table.workOrderId),
+}));
+
+export const insertWoPostponementApprovalSchema = createInsertSchema(woPostponementApprovals).omit({
+  id: true,
+  wpauuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertWoPostponementApproval = z.infer<typeof insertWoPostponementApprovalSchema>;
+export type WoPostponementApproval = typeof woPostponementApprovals.$inferSelect;
 
 export const reportSnapshots = pgTable("report_snapshots", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -3850,6 +3917,35 @@ export const insertAdmRoleMenuAccessSchema = createInsertSchema(admRoleMenuAcces
 
 export type InsertAdmRoleMenuAccess = z.infer<typeof insertAdmRoleMenuAccessSchema>;
 export type AdmRoleMenuAccess = typeof admRoleMenuAccess.$inferSelect;
+
+// ====== APPROVAL WORKFLOW CONFIG TABLE ======
+export const approvalWorkflowConfig = pgTable("approval_workflow_config", {
+  id: serial("id").primaryKey(),
+  awcuuid: text("awcuuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  moduleId: text("module_id").notNull(),
+  subModuleId: text("sub_module_id").notNull(),
+  functionId: text("function_id").notNull(),
+  variableName: text("variable_name").notNull(),
+  level1Enabled: boolean("level1_enabled").notNull().default(false),
+  level2Enabled: boolean("level2_enabled").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdateFn(() => new Date()),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+}, (table) => [
+  unique().on(table.functionId, table.variableName),
+]);
+
+export const insertApprovalWorkflowConfigSchema = createInsertSchema(approvalWorkflowConfig).omit({
+  id: true,
+  awcuuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertApprovalWorkflowConfig = z.infer<typeof insertApprovalWorkflowConfigSchema>;
+export type ApprovalWorkflowConfig = typeof approvalWorkflowConfig.$inferSelect;
 
 // ====== PLANNER DATES TABLE ======
 export const plannerDates = pgTable("planner_dates", {
@@ -4255,6 +4351,35 @@ export const insertSyncSettingsSchema = createInsertSchema(syncSettings).omit({
 
 export type InsertSyncSettings = z.infer<typeof insertSyncSettingsSchema>;
 export type SyncSettings = typeof syncSettings.$inferSelect;
+
+// ====== MOC APPROVERS TABLE ======
+export const mocApprovers = pgTable("moc_approvers", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  mauuid: text("mauuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  name: text("name"),
+  userId: text("user_id"),
+  userUuid: text("user_uuid"),
+  approverLevel: text("approver_level"),
+  emailId: text("email_id"),
+  isActive: integer("is_active").default(1),
+  modulename: text("modulename"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+});
+
+export const insertMocApproverSchema = createInsertSchema(mocApprovers).omit({
+  id: true,
+  mauuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMocApprover = z.infer<typeof insertMocApproverSchema>;
+export type MocApprover = typeof mocApprovers.$inferSelect;
 
 // ====== NOON REPORT MODULE SCHEMA — remove this line to disable ======
 export * from './schema-noon-report';

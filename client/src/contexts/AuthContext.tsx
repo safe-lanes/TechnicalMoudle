@@ -10,7 +10,11 @@ import type { UIRole } from "@shared/uiRoles";
 import { mapLoggedRoleToUIRole } from "@shared/uiRoles";
 import { secureGetItem, secureClear } from "@/utils/secureStorage";
 import { analyzeLocalStorage } from "@/utils/localStorageAnalyzer";
-import { setActiveRank, setActiveIdentity, type ActiveIdentity } from "@/lib/activeRank";
+import {
+  setActiveRank,
+  setActiveIdentity,
+  type ActiveIdentity,
+} from "@/lib/activeRank";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
 function resolveProfileName(profile: Record<string, any>): {
@@ -72,17 +76,17 @@ function resolveDomain(): string | null {
 
 const DEFAULT_USER: PublicUser = {
   id: 1,
-  username: "munawer.modak",
-  fullName: "Munawer A. Modak",
-  email: "ayush.agrawal@safe-lanes.com",
-  role: "Sail Admin",
+  username: "Jeevan Admin",
+  fullName: "Jeevan SuperAdmin",
+  email: "jeevan.naik@safe-lanes.com",
+  role: "Super Admin",
   userType: "Office",
   vesselId: null,
   department: null,
   isActive: true,
   crewDesignation: "Marine Manager",
   rank_name: "Master",
-  userUuid: "00000000-0000-0000-0000-000000000001",
+  userUuid: "b808b560-26c4-4c4b-8c0f-8c785e49770c",
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -185,7 +189,9 @@ function invalidateRankScopedQueries() {
  * Audit Phase 0 — map the authenticated user to the audit-relevant identity that the fetch
  * interceptor forwards to PMS (x-user-* headers). Returns null when there is no user (logout).
  */
-function toActiveIdentity(user: PublicUser | null | undefined): ActiveIdentity | null {
+function toActiveIdentity(
+  user: PublicUser | null | undefined,
+): ActiveIdentity | null {
   if (!user) return null;
   return {
     userId: user.userUuid ?? null,

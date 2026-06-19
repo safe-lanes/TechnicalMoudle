@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle, Info } from "lucide-react";
+import { useLocalApprovers } from "@/hooks/useExternalMasterData";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface PostponeApprovalDialogProps {
   isOpen: boolean;
@@ -63,6 +66,35 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
   const [approverRemarks, setApproverRemarks] = useState("");
   const [remarksError, setRemarksError] = useState("");
 
+  const { currentUser } = useAuth();
+  const { data: localApprovers = [] } = useLocalApprovers();
+
+  const { data: approvalSteps = [] } = useQuery({
+    queryKey: ['/technical/api/work-orders', workOrder?.id, 'postpone-approval-steps'],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/work-orders/${workOrder!.id}/postpone-approval-steps`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isOpen && !!workOrder?.id,
+  });
+
+  const userApproverLevels: string[] = localApprovers
+    .filter((a: any) =>
+      a.userUuid && currentUser?.userUuid &&
+      a.userUuid === currentUser.userUuid &&
+      a.isActive === 1 && !a.isDeleted
+    )
+    .map((a: any) => a.approverLevel as string);
+
+  const activeStep = approvalSteps.find((s: any) => s.status === 'Pending');
+  const noStepsYet = approvalSteps.length === 0;
+  const noApproversConfigured = !localApprovers.some((a: any) => a.isActive === 1 && !a.isDeleted);
+
+  const userCanAct = (noStepsYet || noApproversConfigured)
+    ? true
+    : !!activeStep && userApproverLevels.includes(activeStep.approvalLevel);
+
   useEffect(() => {
     if (isOpen) {
       setApproverRemarks("");
@@ -89,6 +121,8 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
     if (!workOrder.id) return;
     onReject(workOrder.id, approverRemarks.trim());
   };
+
+  const pendingLevelLabel = activeStep?.approvalLevel === 'Level2' ? 'Level 2' : 'Level 1';
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -122,27 +156,29 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
               </p>
             </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="approver-remarks" className="text-sm">
-                Approver Remarks <span className="text-red-500">*</span> (required for rejection)
-              </Label>
-              <Textarea
-                id="approver-remarks"
-                data-testid="textarea-approver-remarks"
-                className={`text-sm resize-none ${remarksError ? "border-red-400" : ""}`}
-                rows={3}
-                placeholder="Enter your remarks (required if rejecting)..."
-                value={approverRemarks}
-                onChange={(e) => {
-                  setApproverRemarks(e.target.value);
-                  if (remarksError) setRemarksError("");
-                }}
-                disabled={isSubmitting}
-              />
-              {remarksError && (
-                <p className="mt-1 text-xs text-red-500" data-testid="error-approver-remarks">{remarksError}</p>
-              )}
-            </div>
+            {userCanAct && (
+              <div className="space-y-1">
+                <Label htmlFor="approver-remarks" className="text-sm">
+                  Approver Remarks <span className="text-red-500">*</span> (required for rejection)
+                </Label>
+                <Textarea
+                  id="approver-remarks"
+                  data-testid="textarea-approver-remarks"
+                  className={`text-sm resize-none ${remarksError ? "border-red-400" : ""}`}
+                  rows={3}
+                  placeholder="Enter your remarks (required if rejecting)..."
+                  value={approverRemarks}
+                  onChange={(e) => {
+                    setApproverRemarks(e.target.value);
+                    if (remarksError) setRemarksError("");
+                  }}
+                  disabled={isSubmitting}
+                />
+                {remarksError && (
+                  <p className="mt-1 text-xs text-red-500" data-testid="error-approver-remarks">{remarksError}</p>
+                )}
+              </div>
+            )}
 
             <div className="flex justify-end gap-3 pt-4 border-t">
               <Button
@@ -153,25 +189,37 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
               >
                 Cancel
               </Button>
-              <Button
-                variant="outline"
-                className="border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
-                onClick={handleReject}
-                disabled={isSubmitting}
-                data-testid="button-postpone-reject"
-              >
-                <XCircle className="h-4 w-4 mr-1.5" />
-                Reject
-              </Button>
-              <Button
-                className="bg-[#1E5A8E] hover:bg-[#174a78] text-white"
-                onClick={handleApprove}
-                disabled={isSubmitting}
-                data-testid="button-postpone-approve"
-              >
-                <CheckCircle className="h-4 w-4 mr-1.5" />
-                Approve
-              </Button>
+
+              {userCanAct ? (
+                <>
+                  <Button
+                    variant="outline"
+                    className="border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
+                    onClick={handleReject}
+                    disabled={isSubmitting}
+                    data-testid="button-postpone-reject"
+                  >
+                    <XCircle className="h-4 w-4 mr-1.5" />
+                    Reject
+                  </Button>
+                  <Button
+                    className="bg-[#1E5A8E] hover:bg-[#174a78] text-white"
+                    onClick={handleApprove}
+                    disabled={isSubmitting}
+                    data-testid="button-postpone-approve"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-1.5" />
+                    Approve
+                  </Button>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-gray-500 italic" data-testid="text-postpone-not-approver">
+                  <Info className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                  {activeStep
+                    ? `Awaiting ${pendingLevelLabel} approval — you are not the designated approver for this step.`
+                    : 'This postponement is pending approval.'}
+                </div>
+              )}
             </div>
           </div>
         </div>

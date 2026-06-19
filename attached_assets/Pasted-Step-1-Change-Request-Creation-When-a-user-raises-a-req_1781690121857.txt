@@ -1,0 +1,145 @@
+Step 1 – Change Request Creation
+
+When a user raises a request through Modify PMS:
+
+Create the record in change_request.
+Determine the request category.
+For Components:
+If Criticality = No
+And Class Item = No
+Then classify as Normal Equipment.
+Read the Approval Workflow configuration for:
+PMS → Components → Change Request → Normal Equipment.
+
+This part is correct.
+
+Step 2 – Determine Required Approval Levels
+
+The system should identify:
+
+Level 1 only
+Level 2 only
+Both Level 1 and Level 2
+
+at the moment the request is submitted.
+
+This configuration should be stored for the request so future workflow changes do not affect an already submitted request.
+
+This is also correct.
+
+Step 3 – Intermediary Approval Tracking Table
+
+This is the key part of your proposal.
+
+Instead of modifying the change_request table heavily, create an intermediary approval-tracking table.
+
+Example:
+
+Field	Purpose
+id	PK
+uuid	Unique ID
+changeRequestUuid	Link to change_request
+approvalLevel	Level 1 / Level 2
+approverUserId	Assigned approver
+status	Pending / Approved / Rejected
+approvedAt	Timestamp
+remarks	Approval remarks
+createdAt	Timestamp
+
+This table becomes the workflow engine.
+
+For example:
+
+Level 1 + Level 2 Configured
+
+CR	Level	Status
+CR001	Level 1	Pending
+CR001	Level 2	Pending
+
+After Level 1 approval:
+
+CR	Level	Status
+CR001	Level 1	Approved
+CR001	Level 2	Pending
+
+After Level 2 approval:
+
+CR	Level	Status
+CR001	Level 1	Approved
+CR001	Level 2	Approved
+
+This is cleaner than storing multiple approval columns in change_request.
+
+Step 4 – Change Request Status
+
+Your proposal:
+
+Till the moment all required configured stages are completed, the Change Request should show as Pending Stage.
+
+This is correct.
+
+Suggested status flow:
+
+Status	Meaning
+Draft	Created but not submitted
+Submitted	Request submitted
+Pending Approval	Waiting for one or more approval stages
+Approved	All configured stages completed
+Rejected	Rejected at any stage
+Synced	Approved and synchronized
+
+For user visibility:
+
+Level 1 pending → Pending Approval
+Level 2 pending → Pending Approval
+
+The actual stage can be derived from the intermediary table.
+
+Step 5 – Approval Logic
+Only Level 1 Configured
+CR Created
+↓
+Level 1 Pending
+↓
+Level 1 Approved
+↓
+Change Request Approved
+↓
+Sync to Vessel
+Only Level 2 Configured
+CR Created
+↓
+Level 2 Pending
+↓
+Level 2 Approved
+↓
+Change Request Approved
+↓
+Sync to Vessel
+Both Levels Configured
+CR Created
+↓
+Level 1 Pending
+↓
+Level 1 Approved
+↓
+Level 2 Pending
+↓
+Level 2 Approved
+↓
+Change Request Approved
+↓
+Sync to Vessel
+Step 6 – Rejection Logic
+
+If any configured approval stage rejects:
+
+Change Request
+↓
+Rejected
+↓
+No Changes Applied
+↓
+Sync Rejected Status to Vessel
+
+No further stages should be processed.

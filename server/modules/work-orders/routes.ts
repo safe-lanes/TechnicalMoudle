@@ -182,6 +182,9 @@ router.post('/work-orders/:id/postpone-reject',
   asyncHandler(woCtrl.rejectPostponement)
 );
 
+// GET /work-orders/:id/postpone-approval-steps — get approval steps for the active postponement
+router.get('/work-orders/:id/postpone-approval-steps', asyncHandler(woCtrl.getPostponementApprovalSteps));
+
 // ── Work Order Executions ──
 
 // GET  /work-order-executions/:componentId — get executions for component

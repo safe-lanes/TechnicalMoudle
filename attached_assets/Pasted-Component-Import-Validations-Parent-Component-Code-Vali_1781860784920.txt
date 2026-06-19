@@ -1,0 +1,50 @@
+Component Import Validations:
+Parent Component Code Validations
+1.	The Parent Component Code entered must exist either:
+o In the Component Code column within the import file, or
+o In the database for the selected vessel.
+2.	For a single record, the Parent Component Code and Component Code must not be the same.
+3.	A 1-digit Component Code is considered a top-level component and does not require a Parent Component Code. All other Component Codes must have a valid Parent Component Code.
+4.	The Parent Component Code field must contain only numeric values. Alphabetic characters, special characters, and spaces are not allowed. Only Doted SFI Allowed.
+5.	If a Parent Component Code is provided, it must reference an existing component and maintain a valid parent-child hierarchy.
+Component Code Validations
+1.	The Component Code field must contain only numeric values. Alphabetic characters, special characters, and spaces are not allowed. Doted SFI is allowed.
+2.	Duplicate Component Codes are not allowed for the same vessel. The Component Code must be unique within the selected vessel.
+3.	The Component Code field is mandatory and cannot be left blank. If the field is empty, the system should display a validation error and prevent the import.
+4.	The Component Code must be unique within the import file. Duplicate Component Codes in the same import file should trigger a validation error.
+5.	Leading and trailing spaces should be trimmed before validation. After trimming, the Component Code must still satisfy all validation rules.
+Component Name Validations
+1.	The Component Name field is mandatory and cannot be left blank. If the field is empty, the system should display a validation error and prevent the import.
+2.	The Component Name field may contain alphabetic characters, numeric values, spaces, periods (.), commas (,), hyphens (-), and brackets ((, )), if required. Other special characters should not be allowed.
+3.	Duplicate Component Names are not allowed for the same vessel. The Component Name must be unique within the selected vessel.
+4.	Leading and trailing spaces should be trimmed before validation. After trimming, the Component Name must not be blank.
+5.	The Component Name must be unique within the import file. Duplicate Component Names in the same import file should trigger a validation error.
+Component Category:
+1.	The Component Category field is mandatory and cannot be left blank. If the field is empty, the system should display a validation error and prevent the import.
+2.	Leading and trailing spaces should be trimmed before validation.
+Maker Code Validations
+1.	If a Maker Code is provided, it must exist in the Maker List master data. If the Maker Code is not found, the system should display a validation error and prevent the import.
+2.	If a Maker Code is provided, the corresponding Maker Name must match the Maker Name configured in the Maker List for that Maker Code. If the Maker Name does not match, the system should display a validation error.
+3.	Leading and trailing spaces in both the Maker Code and Maker Name fields should be trimmed before validation.
+4.	If a Maker Name is provided without a valid Maker Code, the system should display a validation error.
+5.	Validation should be performed using the Maker Code as the primary reference, and the Maker Name should be cross-verified against the Maker List master data. Any mismatch should result in a validation error.
+Criticality:
+This field should allow only 3 entries: Yes, No, or Blank.
+Condition Based:
+This field should allow only 3 entries: Yes, No, or Blank.
+Installation Date:
+The date format should be DD-MM-YYYY.
+Only valid dates are allowed in this field. Alphabetic characters and special characters are not allowed.
+Commissioned Date:
+The date format should be DD-MM-YYYY.
+Only valid dates are allowed in this field. Alphabetic characters and special characters are not allowed.
+Class Item:
+This field should allow only 3 entries: Yes, No, or Blank.
+Is Active:
+Allowed values: Yes or No.
+Is Parent:
+This field should allow only 3 entries: Yes, No, or Blank.
+Last Updated:
+The date format should be DD-MM-YYYY.
+Only valid dates are allowed in this field. Alphabetic characters and special characters are not allowed.
+

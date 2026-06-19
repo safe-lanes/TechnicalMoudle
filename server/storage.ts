@@ -29,6 +29,8 @@ import {
   changeRequest,
   type ChangeRequest,
   type InsertChangeRequest,
+  type ChangeRequestApproval,
+  type InsertChangeRequestApproval,
   changeRequestAttachment,
   type ChangeRequestAttachment,
   type InsertChangeRequestAttachment,
@@ -178,6 +180,9 @@ import {
   workOrderPostponements,
   type WorkOrderPostponement,
   type InsertWorkOrderPostponement,
+  woPostponementApprovals,
+  type WoPostponementApproval,
+  type InsertWoPostponementApproval,
   superintendentNotifications,
   type SuperintendentNotification,
   type InsertSuperintendentNotification,
@@ -186,6 +191,7 @@ import {
   type AdmnRoleMaster,
   type AdmMenumasterAc,
   type AdmRoleMenuAccess,
+  type ApprovalWorkflowConfig,
 } from "@shared/schema";
 
 export function sortObjectKeys(obj: any): any {
@@ -418,7 +424,7 @@ export interface IStorage {
   createStoresLedgerEntryForImport(values: InsertStoresLedger): Promise<void>;
   
   // Change Request methods
-  getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string }): Promise<ChangeRequest[]>;
+  getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string; pendingForApprover?: string }): Promise<ChangeRequest[]>;
   getChangeRequest(id: number): Promise<ChangeRequest | undefined>;
   createChangeRequest(request: InsertChangeRequest): Promise<ChangeRequest>;
   updateChangeRequest(id: number, data: Partial<ChangeRequest>): Promise<ChangeRequest>;
@@ -426,10 +432,14 @@ export interface IStorage {
   updateChangeRequestProposed(id: number, proposedChangesJson: any, movePreviewJson?: any): Promise<ChangeRequest>;
   deleteChangeRequest(id: number): Promise<void>;
   submitChangeRequest(id: number, userId: string): Promise<ChangeRequest>;
-  approveChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest>;
-  rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest>;
+  approveChangeRequest(id: number, reviewerId: string, comment: string, role?: string): Promise<ChangeRequest>;
+  rejectChangeRequest(id: number, reviewerId: string, comment: string, role?: string): Promise<ChangeRequest>;
   returnChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest>;
   applyApprovedChanges(changeRequest: ChangeRequest): Promise<{ appliedFieldCount: number }>;
+  // Change Request Approval Steps
+  getChangeRequestApprovalSteps(changeRequestId: number): Promise<ChangeRequestApproval[]>;
+  createChangeRequestApprovalStep(step: InsertChangeRequestApproval): Promise<ChangeRequestApproval>;
+  updateChangeRequestApprovalStep(id: number, data: Partial<ChangeRequestApproval>): Promise<ChangeRequestApproval>;
   
   // Change Request Attachments
   getChangeRequestAttachments(changeRequestId: number): Promise<ChangeRequestAttachment[]>;
@@ -1012,6 +1022,30 @@ export interface IStorage {
     canEdit: boolean;
     canDelete: boolean;
   }>): Promise<{ count: number }>;
+
+  // Approval Workflow Config methods
+  getApprovalWorkflowConfig(): Promise<ApprovalWorkflowConfig[]>;
+  upsertApprovalWorkflowConfig(
+    rows: Array<{
+      moduleId: string;
+      subModuleId: string;
+      functionId: string;
+      variableName: string;
+      level1Enabled: boolean;
+      level2Enabled: boolean;
+    }>,
+    updatedByUuid?: string
+  ): Promise<ApprovalWorkflowConfig[]>;
+
+  // MOC Approvers (local table)
+  getLocalApprovers(): Promise<any[]>;
+
+  // WO Postponement Approval Steps
+  getWoPostponementApprovalSteps(postponementId: string): Promise<WoPostponementApproval[]>;
+  createWoPostponementApprovalStep(step: InsertWoPostponementApproval): Promise<WoPostponementApproval>;
+  updateWoPostponementApprovalStep(id: number, data: Partial<WoPostponementApproval>): Promise<WoPostponementApproval>;
+  getLatestAwaitingPostponement(workOrderId: string): Promise<WorkOrderPostponement | undefined>;
+  verifyApproverForLevel(reviewerId: string, approvalLevel: string): Promise<boolean>;
 }
 
 // Helper function to normalize and validate immediateCause structure

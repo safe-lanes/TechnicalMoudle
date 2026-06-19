@@ -41,10 +41,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mount modular architecture router (modules extracted from routes.ts go here)
   app.use('/technical/api', moduleRouter);
 
+  app.get('/technical/api/admin/local-approvers', async (req, res) => {
+    try {
+      const rows = await storage.getLocalApprovers();
+      return res.json(rows);
+    } catch (error: any) {
+      console.error('[LocalApprovers] Failed to fetch:', error.message);
+      return res.status(500).json({ error: 'Failed to fetch local approvers' });
+    }
+  });
+
+  app.get('/technical/api/admin/approvers', async (req, res) => {
+    const domain = req.query.domain as string;
+    if (!domain || domain.trim().length === 0) {
+      return res.status(400).json({ error: 'Missing required "domain" query parameter.' });
+    }
+    try {
+      const { getCrewMasterDataBaseUrl } = await import('./config/externalApi');
+      const baseUrl = getCrewMasterDataBaseUrl();
+      const url = `${baseUrl}/mocapprovers?domain=${encodeURIComponent(domain)}`;
+      const apiResponse = await fetch(url, { method: 'GET', headers: { 'accept': '*/*' } });
+      if (!apiResponse.ok) {
+        return res.status(apiResponse.status).json({ error: `External API returned ${apiResponse.status}` });
+      }
+      const data = await apiResponse.json();
+      const approvers = Array.isArray(data) ? data : (data.mocapprovers || []);
+      return res.json({ mocapprovers: approvers });
+    } catch (error: any) {
+      console.error('[ApproversProxy] Failed to fetch:', error.message);
+      return res.status(502).json({ error: 'Failed to fetch approvers from external API' });
+    }
+  });
+
   const ALLOWED_EXTERNAL_ENDPOINTS = [
     'nationalities', 'vessels', 'vesseltypes', 'licenses',
     'additionalgroups', 'ports', 'languages', 'fleetgroups',
-    'countries', 'manningagents', 'crewpools', 'appraisaltypes', 'users'
+    'countries', 'manningagents', 'crewpools', 'appraisaltypes', 'users',
+    'mocapprovers',
   ];
 
   app.get('/technical/api/external/master-data/:endpoint', async (req, res) => {
@@ -270,6 +303,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
   }
+
+  // ── Approval Workflow Config ──
+  app.get('/technical/api/admin/approval-workflow-config', async (_req, res) => {
+    try {
+      const rows = await storage.getApprovalWorkflowConfig();
+      res.json({ success: true, data: rows });
+    } catch (err) {
+      console.error('[ApprovalWorkflowConfig] GET error:', err);
+      res.status(500).json({ success: false, error: 'Failed to fetch approval workflow config' });
+    }
+  });
+
+  app.put('/technical/api/admin/approval-workflow-config', async (req, res) => {
+    try {
+      const { rows } = req.body;
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ success: false, error: 'rows array required' });
+      }
+      const updated = await storage.upsertApprovalWorkflowConfig(rows);
+      res.json({ success: true, data: updated });
+    } catch (err) {
+      console.error('[ApprovalWorkflowConfig] PUT error:', err);
+      res.status(500).json({ success: false, error: 'Failed to save approval workflow config' });
+    }
+  });
 
   const httpServer = createServer(app);
 

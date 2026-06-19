@@ -4,8 +4,56 @@ import type { Component, InsertComponent } from '@shared/schema';
 import { makerList, masterLists } from '@shared/schema';
 import { eq, and, ilike } from 'drizzle-orm';
 import { db } from '../../../db';
+import { validateSFICode, stripSFISuffix } from '@shared/utils/sfiCode';
 
 const ALLOWED_DEPARTMENTS = ['Engine', 'Deck', 'Electrical', 'Galley', 'LSA', 'FFA'];
+
+const SFI_FORMAT_HINT = 'Expected SFI format: 6, 61, 612, 612.005, 601001, 601001001, etc.';
+
+/**
+ * Enforce Parent Component Code rules identical to the bulk-import dry-run
+ * (server/modules/bulk-upload/services/validationService.ts):
+ *  - A single-digit top-level Component Code may omit the parent.
+ *  - Any non-top-level code requires a parent (mandatory check already covers blank).
+ *  - An explicit parent must be a valid SFI code, must not equal the component's own code,
+ *    and must already exist in the same vessel's component register.
+ * Throws ValidationError on the first violation. No-op when nothing to validate.
+ */
+async function validateParentComponentCode(
+  componentCode: string | undefined | null,
+  parentCode: string | undefined | null,
+  vesselId: string | undefined | null,
+): Promise<void> {
+  const code = typeof componentCode === 'string' ? componentCode.trim() : '';
+  const parent = typeof parentCode === 'string' ? parentCode.trim() : '';
+
+  if (!parent) {
+    // Blank parent is handled by the mandatory-field check (which already exempts
+    // single-digit top-level codes via isParent / form rules). Nothing more to do here.
+    return;
+  }
+
+  if (!validateSFICode(parent)) {
+    throw new ValidationError(
+      `Invalid Parent Component Code format '${parent}'. ${SFI_FORMAT_HINT}`,
+    );
+  }
+
+  if (code && code.toUpperCase() === parent.toUpperCase()) {
+    throw new ValidationError(
+      `Component Code and Parent Component Code are both '${code}'. A component cannot be its own parent.`,
+    );
+  }
+
+  if (vesselId) {
+    const parentExists = await repo.findByCodeAndVessel(parent, vesselId);
+    if (!parentExists) {
+      throw new ValidationError(
+        `Parent Component Code '${parent}' does not exist in the vessel's component register. Cannot create a component without a valid parent.`,
+      );
+    }
+  }
+}
 
 // Audit Phase 1 — equipment/component register audit (entity_type='component').
 // Register fields whose changes we record as old→new. Excludes RH counter fields
@@ -109,7 +157,8 @@ export async function getById(id: string): Promise<Component | undefined> {
 
 export async function create(data: any): Promise<Component> {
   const isParent = data.isParent === true || data.isParent === 'Yes';
-  const parentOptionalKeys = ['eqptSystemDept'];
+  // A single-digit top-level Component Code may omit the parent (mirrors bulk-import dry-run).
+  const isTopLevel = stripSFISuffix(String(data.componentCode ?? '').trim()).length === 1;
 
   const allMandatoryFields: { key: string; label: string; isBoolean?: boolean }[] = [
     { key: 'name', label: 'Component Name' },
@@ -119,9 +168,10 @@ export async function create(data: any): Promise<Component> {
     { key: 'eqptSystemDept', label: 'Equipment / System Department' },
     { key: 'isActive', label: 'Is Active', isBoolean: true },
   ];
-  const mandatoryFields = isParent
-    ? allMandatoryFields.filter(f => !parentOptionalKeys.includes(f.key))
-    : allMandatoryFields;
+  const optionalKeys = new Set<string>();
+  if (isParent) optionalKeys.add('eqptSystemDept');
+  if (isTopLevel) optionalKeys.add('parentId');
+  const mandatoryFields = allMandatoryFields.filter(f => !optionalKeys.has(f.key));
 
   const missing = mandatoryFields.filter(f => {
     const val = data[f.key];
@@ -157,6 +207,10 @@ export async function create(data: any): Promise<Component> {
       );
     }
   }
+
+  // Parent Component Code validation (parity with bulk-import dry-run):
+  // valid SFI format, not self-referencing, and must exist in the same vessel.
+  await validateParentComponentCode(data.componentCode, data.parentId, data.vesselId);
 
   // RH field validation (B7.B rules)
   const effectiveRhType = data.rhCounterType || 'NOT_RH_DRIVEN';
@@ -220,7 +274,11 @@ export async function update(id: string, data: any, userId: string): Promise<Com
   }
 
   const effectiveIsParent = data.isParent !== undefined ? (data.isParent === true || data.isParent === 'Yes') : (existingComponent as any).isParent === true;
-  const parentOptionalKeys = ['eqptSystemDept'];
+  // Effective (post-update) component code drives the single-digit top-level exemption.
+  const effectiveComponentCode = data.componentCode !== undefined && data.componentCode !== null && data.componentCode !== ''
+    ? data.componentCode
+    : existingComponent.componentCode;
+  const isTopLevel = stripSFISuffix(String(effectiveComponentCode ?? '').trim()).length === 1;
 
   const allMandatoryPatchFields: { key: string; label: string; isBoolean?: boolean }[] = [
     { key: 'name', label: 'Component Name' },
@@ -230,9 +288,10 @@ export async function update(id: string, data: any, userId: string): Promise<Com
     { key: 'eqptSystemDept', label: 'Equipment / System Department' },
     { key: 'isActive', label: 'Is Active', isBoolean: true },
   ];
-  const mandatoryPatchFields = effectiveIsParent
-    ? allMandatoryPatchFields.filter(f => !parentOptionalKeys.includes(f.key))
-    : allMandatoryPatchFields;
+  const patchOptionalKeys = new Set<string>();
+  if (effectiveIsParent) patchOptionalKeys.add('eqptSystemDept');
+  if (isTopLevel) patchOptionalKeys.add('parentId');
+  const mandatoryPatchFields = allMandatoryPatchFields.filter(f => !patchOptionalKeys.has(f.key));
 
   const invalidPatch = mandatoryPatchFields.filter(f => {
     if (!(f.key in data)) return false;
@@ -273,6 +332,14 @@ export async function update(id: string, data: any, userId: string): Promise<Com
         );
       }
     }
+  }
+
+  // Parent Component Code validation (parity with bulk-import dry-run). Only validate when
+  // the parent is part of this update; otherwise leave the existing hierarchy untouched.
+  if ('parentId' in data) {
+    const effectiveParent = data.parentId;
+    const effectiveVesselId = existingComponent.vesselId ?? data.vesselId;
+    await validateParentComponentCode(effectiveComponentCode, effectiveParent, effectiveVesselId);
   }
 
   // RH field validation (B7.B rules)
