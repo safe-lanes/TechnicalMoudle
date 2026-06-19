@@ -809,6 +809,18 @@ const Dashboard = () => {
     enabled: !!opDetailChangeRequest && opDetailChangeRequest.status?.toLowerCase() === 'submitted',
   });
 
+  // Approval steps for the postponement decision dialog (gate logic)
+  const postponeWoId = postponeDecisionDialog.wo?.id ? String(postponeDecisionDialog.wo.id) : null;
+  const { data: postponeApprovalSteps = [] } = useQuery({
+    queryKey: ['/technical/api/work-orders', postponeWoId, 'postpone-approval-steps'],
+    queryFn: async () => {
+      const res = await fetch(`/technical/api/work-orders/${postponeWoId}/postpone-approval-steps`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: postponeDecisionDialog.open && !!postponeWoId,
+  });
+
   // Levels for which the current user is an active, non-deleted approver.
   // Match by userUuid (moc_approvers.user_uuid vs currentUser.userUuid) —
   // the stable cross-system UUID identifier synced from Crew Master.
@@ -823,6 +835,19 @@ const Dashboard = () => {
   const crNoStepsYet = opDetailChangeRequest?.status?.toLowerCase() === 'submitted' && opCrApprovalSteps.length === 0;
   const noApproversConfigured = !localApprovers.some((a: any) => a.isActive === 1 && !a.isDeleted);
   const crUserCanAct = (crNoStepsYet || noApproversConfigured) ? (!isVessel && !isHeadOfDept) : crUserIsApproverForActiveStep;
+
+  // Gate logic for the postponement decision dialog
+  const postponeUserApproverLevels: string[] = localApprovers
+    .filter((a: any) =>
+      a.userUuid && currentUser?.userUuid && a.userUuid === currentUser.userUuid &&
+      a.isActive === 1 && !a.isDeleted
+    )
+    .map((a: any) => a.approverLevel as string);
+  const postponeActiveStep = postponeApprovalSteps.find((s: any) => s.status === 'Pending');
+  const postponeNoStepsYet = postponeApprovalSteps.length === 0;
+  const postponeUserCanAct = (postponeNoStepsYet || noApproversConfigured)
+    ? true
+    : !!postponeActiveStep && postponeUserApproverLevels.includes(postponeActiveStep.approvalLevel);
 
   const { data: superintendentSummary } = useQuery<{ pendingCount: number; acknowledgedThisMonthCount: number }>({
     queryKey: ['/technical/api/superintendent/notifications/summary', effectiveVesselId],
@@ -3469,40 +3494,51 @@ const Dashboard = () => {
                           >
                             Cancel
                           </Button>
-                          {(postponeDecisionDialog.action === 'reject' || postponeDecisionDialog.action === 'review') && (
-                            <Button
-                              variant="outline"
-                              className="border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
-                              disabled={postponeDecisionDialog.submitting}
-                              onClick={() => {
-                                if (!postponeDecisionDialog.wo) return;
-                                if (!postponeDecisionDialog.remarks.trim()) {
-                                  setPostponeRemarksError('Approver remarks are required when rejecting a postponement.');
-                                  return;
-                                }
-                                setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
-                                postponeRejectMutation.mutate({ id: String(postponeDecisionDialog.wo!.id), remarks: postponeDecisionDialog.remarks });
-                              }}
-                              data-testid={`button-postpone-decision-confirm-${postponeDecisionDialog.action === 'review' ? 'reject' : postponeDecisionDialog.action}`}
-                            >
-                              <XCircle className="h-4 w-4 mr-1.5" />
-                              {postponeDecisionDialog.submitting ? 'Rejecting...' : 'Reject'}
-                            </Button>
-                          )}
-                          {(postponeDecisionDialog.action === 'approve' || postponeDecisionDialog.action === 'review') && (
-                            <Button
-                              className="bg-[#1E5A8E] hover:bg-[#174a78] text-white"
-                              disabled={postponeDecisionDialog.submitting}
-                              onClick={() => {
-                                if (!postponeDecisionDialog.wo) return;
-                                setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
-                                postponeApproveMutation.mutate({ id: String(postponeDecisionDialog.wo!.id), remarks: postponeDecisionDialog.remarks });
-                              }}
-                              data-testid={`button-postpone-decision-confirm-${postponeDecisionDialog.action === 'review' ? 'approve' : postponeDecisionDialog.action}`}
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1.5" />
-                              {postponeDecisionDialog.submitting ? 'Approving...' : 'Approve'}
-                            </Button>
+                          {postponeUserCanAct ? (
+                            <>
+                              {(postponeDecisionDialog.action === 'reject' || postponeDecisionDialog.action === 'review') && (
+                                <Button
+                                  variant="outline"
+                                  className="border-red-400 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                  disabled={postponeDecisionDialog.submitting}
+                                  onClick={() => {
+                                    if (!postponeDecisionDialog.wo) return;
+                                    if (!postponeDecisionDialog.remarks.trim()) {
+                                      setPostponeRemarksError('Approver remarks are required when rejecting a postponement.');
+                                      return;
+                                    }
+                                    setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
+                                    postponeRejectMutation.mutate({ id: String(postponeDecisionDialog.wo!.id), remarks: postponeDecisionDialog.remarks });
+                                  }}
+                                  data-testid={`button-postpone-decision-confirm-${postponeDecisionDialog.action === 'review' ? 'reject' : postponeDecisionDialog.action}`}
+                                >
+                                  <XCircle className="h-4 w-4 mr-1.5" />
+                                  {postponeDecisionDialog.submitting ? 'Rejecting...' : 'Reject'}
+                                </Button>
+                              )}
+                              {(postponeDecisionDialog.action === 'approve' || postponeDecisionDialog.action === 'review') && (
+                                <Button
+                                  className="bg-[#1E5A8E] hover:bg-[#174a78] text-white"
+                                  disabled={postponeDecisionDialog.submitting}
+                                  onClick={() => {
+                                    if (!postponeDecisionDialog.wo) return;
+                                    setPostponeDecisionDialog(prev => ({ ...prev, submitting: true }));
+                                    postponeApproveMutation.mutate({ id: String(postponeDecisionDialog.wo!.id), remarks: postponeDecisionDialog.remarks });
+                                  }}
+                                  data-testid={`button-postpone-decision-confirm-${postponeDecisionDialog.action === 'review' ? 'approve' : postponeDecisionDialog.action}`}
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-1.5" />
+                                  {postponeDecisionDialog.submitting ? 'Approving...' : 'Approve'}
+                                </Button>
+                              )}
+                            </>
+                          ) : (
+                            <div className="flex items-center gap-2 text-sm text-gray-500 italic" data-testid="text-postpone-dashboard-not-approver">
+                              <Info className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                              {postponeActiveStep
+                                ? `Awaiting ${postponeActiveStep.approvalLevel === 'Level2' ? 'Level 2' : 'Level 1'} approval — you are not the designated approver for this step.`
+                                : 'This postponement is pending approval.'}
+                            </div>
                           )}
                         </div>
                       </div>
