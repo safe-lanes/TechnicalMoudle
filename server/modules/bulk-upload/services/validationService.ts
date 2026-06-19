@@ -374,36 +374,35 @@ export async function validateData(type: string, data: any[], mode: string, vess
             errors.push(`Row ${rowNum}: Component Code '${codeStr}' already exists in vessel '${vesselId}'. Cannot add duplicate component.`);
           }
           
-          // Check if user explicitly provided a Parent Component Code in the Excel file
-          // Use centralized helper that checks all header variants
+          // Parent Component Code handling — no auto-derivation.
+          // The user must explicitly supply a parent for every non-top-level component.
+          // Use centralized helper that checks all header variants.
           const explicitParent = getExplicitParentFromRow(row);
-          
+          // A single-character (top-level) Component Code does not require a parent.
+          const isTopLevel = stripSFISuffix(codeStr).length === 1;
+
           if (explicitParent) {
-            // User explicitly provided parent - use their value
-            normalized['Parent Component Code'] = explicitParent;
-          } else {
-            // Auto-calculate Parent Component Code from Component Code
-            const parentCode = getParentSFICode(codeStr);
-            if (parentCode) {
-              normalized['Parent Component Code'] = parentCode;
-            }
-          }
-
-          // Validation: Component Code and Parent Component Code must not be identical
-          const resolvedParent = normalized['Parent Component Code'];
-          if (resolvedParent) {
-            const resolvedParentUpper = String(resolvedParent).toUpperCase();
-
-            if (codeUpperCase === resolvedParentUpper) {
-              errors.push(`Row ${rowNum}: Component Code and Parent Component Code are both '${codeStr}'. A component cannot be its own parent.`);
+            // Validate the explicitly-typed parent against the same SFI format as Component Code
+            if (!validateSFICode(explicitParent)) {
+              errors.push(`Row ${rowNum}: Invalid Parent Component Code format '${explicitParent}'. Expected SFI format: 6, 61, 612, 612.005, 601001, 601001001, etc.`);
             } else {
-              // Validation: Parent Component Code must exist in the uploaded file OR in the vessel's database
-              const parentInFile = componentCodeOccurrences.has(resolvedParentUpper);
-              const parentInDb = existingDbComponentCodes.has(resolvedParentUpper);
-              if (!parentInFile && !parentInDb) {
-                errors.push(`Row ${rowNum}: Parent Component Code '${resolvedParent}' does not exist in the uploaded file or in the vessel's component register. Cannot create a component without a valid parent.`);
+              normalized['Parent Component Code'] = explicitParent;
+              const resolvedParentUpper = explicitParent.toUpperCase();
+
+              if (codeUpperCase === resolvedParentUpper) {
+                errors.push(`Row ${rowNum}: Component Code and Parent Component Code are both '${codeStr}'. A component cannot be its own parent.`);
+              } else {
+                // Parent Component Code must exist in the uploaded file OR in the vessel's database
+                const parentInFile = componentCodeOccurrences.has(resolvedParentUpper);
+                const parentInDb = existingDbComponentCodes.has(resolvedParentUpper);
+                if (!parentInFile && !parentInDb) {
+                  errors.push(`Row ${rowNum}: Parent Component Code '${explicitParent}' does not exist in the uploaded file or in the vessel's component register. Cannot create a component without a valid parent.`);
+                }
               }
             }
+          } else if (!isTopLevel) {
+            // No parent supplied and the code is not a single-digit top-level code → required
+            errors.push(`Row ${rowNum}: Parent Component Code is required for '${codeStr}'. Only a single-digit top-level Component Code may omit the parent.`);
           }
 
           // NOTE: __meta is set at the END of the component validation block

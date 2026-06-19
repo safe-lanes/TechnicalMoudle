@@ -277,149 +277,20 @@ export async function performImport(
   if (type === 'components') {
     console.log(`🚀 Starting component import: ${data.length} rows, mode: ${mode}`);
     
-    // Step 1: Prefetch all existing components by codes for performance
+    // Step 1: Prefetch all existing components by codes for performance.
+    // Also prefetch any explicitly-referenced parent codes so that parents which already
+    // exist in the vessel DB (but are not themselves rows in this import) are resolvable.
     const allCodes = data.map(row => String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim());
-    const existingComponentsMap = await storage.getComponentsByCodes(allCodes, vesselId);
+    const referencedParentCodes = data
+      .map(row => (row['Parent Component Code'] ? String(row['Parent Component Code']).trim() : ''))
+      .filter(code => code.length > 0);
+    const prefetchCodes = Array.from(new Set([...allCodes, ...referencedParentCodes]));
+    const existingComponentsMap = await storage.getComponentsByCodes(prefetchCodes, vesselId);
     
-    // First, ensure all intermediate parent nodes exist
-    // For each component, create parent hierarchy if missing
-    // BUT: Skip automatic parent inference if an EXPLICIT Parent Component Code is provided
-    // HOWEVER: Still create the explicit parent itself if it's missing from both DB and this upload file
-    const parentsToCreate = new Set<string>();
-    const explicitParentsNeeded = new Set<string>(); // Track explicit parents that need creation
-    const componentCodesInUpload = new Set(data.map(row => 
-      String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim()
-    ));
-    
-    for (const row of data) {
-      const componentCode = String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim();
-      
-      // Check if user explicitly provided Parent Component Code in the Excel file
-      const meta = row['__meta'] || {};
-      const explicitParentProvided = meta.explicitParentProvided === true;
-      const explicitParentCode = meta.originalExplicitParent;
-      
-      if (explicitParentProvided && explicitParentCode) {
-        // User explicitly provided Parent Component Code in the Excel file
-        // Do NOT auto-create intermediate parents from code structure (e.g., don't create 721.801 for 721.801.01)
-        // BUT: Still ensure the explicit parent exists - either in DB, in this upload, or needs creation
-        const parentInDb = existingComponentsMap.get(explicitParentCode);
-        const parentInUpload = componentCodesInUpload.has(explicitParentCode);
-        
-        if (!parentInDb && !parentInUpload) {
-          // Explicit parent is missing from both DB and upload file
-          // We need to create it as a placeholder
-          explicitParentsNeeded.add(explicitParentCode);
-          console.log(`📋 Explicit parent ${explicitParentCode} for ${componentCode} needs creation`);
-        }
-        
-        // Skip the automatic code-based parent inference for this component
-        continue;
-      }
-      
-      // No explicit parent provided - use automatic code-based hierarchy inference
-      // For hierarchy building, use the Original SFI Code (without suffixes like (1), (2), etc.)
-      // Generated Code may have suffixes for uniqueness, but hierarchy is based on the base SFI code
-      const originalSFICode = String(row['Original SFI Code'] || row['Component Code'] || row['Generated Code']).trim();
-      
-      // Walk up the hierarchy by iteratively trimming the SFI code itself
-      // This ensures ALL intermediate nodes are considered, not just those in Parent Code chain
-      // Example: 711.001 → 711 → 71 → 7
-      let currentCode = getParentSFICode(originalSFICode);
-      
-      while (currentCode && currentCode.length > 0) {
-        const parentExists = existingComponentsMap.get(currentCode);
-        if (!parentExists) {
-          parentsToCreate.add(currentCode);
-        }
-        // Move up one level by trimming the current code
-        currentCode = getParentSFICode(currentCode);
-      }
-    }
-    
-    // Also add any explicit parents that need creation to the set
-    // These are parents explicitly referenced by user but not in DB or upload file
-    Array.from(explicitParentsNeeded).forEach(explicitParent => {
-      if (!existingComponentsMap.get(explicitParent)) {
-        parentsToCreate.add(explicitParent);
-      }
-    });
-    
-    // Step 1b: Verify inferred parents against DB before creating
-    // The initial prefetch (Step 1) only contains codes from the Excel file.
-    // Inferred parent codes may already exist in the DB but not in the map.
-    // Fetch them now to avoid duplicate INSERT on unique constraint.
-    const parentCodesToCheck = Array.from(parentsToCreate);
-    if (parentCodesToCheck.length > 0) {
-      const existingParents = await storage.getComponentsByCodes(parentCodesToCheck, vesselId);
-      existingParents.forEach((comp, code) => {
-        existingComponentsMap.set(code, comp);
-        parentsToCreate.delete(code);
-      });
-      if (existingParents.size > 0) {
-        console.log(`📋 Found ${existingParents.size} inferred parents already in DB — skipping creation`);
-      }
-    }
-
-    // Step 2: Create missing parent nodes (sorted by depth, shallowest first) with tracking
-    const sortedParents = Array.from(parentsToCreate).sort((a, b) => {
-      const aDepth = (a.match(/\./g) || []).length;
-      const bDepth = (b.match(/\./g) || []).length;
-      return aDepth - bDepth;
-    });
-    
-    console.log(`📁 Creating ${sortedParents.length} intermediate parent nodes...`);
-    for (const parentCode of sortedParents) {
-      const parentMainGroup = parseInt(parentCode.charAt(0));
-      const parentSubGroup = getSubGroupCode(parentCode);
-      
-      // Use SFI lookup to get proper name from component tree CSV
-      // Falls back to existing logic if not found in lookup
-      let parentName: string = getSFIName(parentCode);
-      
-      // If getSFIName returned the fallback (generic "SFI {code}"), try existing logic
-      if (parentName === `SFI ${parentCode}`) {
-        if (parentCode.length === 1) {
-          // Single digit: use main group name without number prefix
-          const category = getComponentCategory(parentMainGroup);
-          parentName = category ? category.replace(/^\d+\s+/, '') : `SFI ${parentCode}`;
-        } else if (parentCode.length === 2) {
-          // Two digits: use sub group name
-          parentName = getSubGroupName(parentCode);
-        }
-        // else: keep the getSFIName fallback for three or more digits
-      }
-      
-      const parentComponent = await storage.createComponent({
-        componentCode: parentCode,
-        name: parentName,
-        category: getComponentCategory(parentMainGroup) || '',
-        parentId: getParentSFICode(parentCode),
-        vesselId: vesselId || 'V001',
-        currentCumulativeRH: '0',
-        critical: false,
-        classItem: false
-      });
-      
-      // Add to map for subsequent lookups
-      existingComponentsMap.set(parentCode, parentComponent);
-      
-      console.log(`📁 Created parent node: ${parentCode} (${parentName})`);
-      result.created++;
-      
-      // Track parent component creation with authoritative state
-      if (importHistoryId) {
-        await trackChange(importHistoryId, 'created', 'component', parentComponent.cuuid, null, parentComponent);
-      }
-      await auditBulkComponent('create', parentComponent, {
-        componentCode: parentComponent.componentCode,
-        name: parentComponent.name,
-        critical: parentComponent.critical,
-        parentId: parentComponent.parentId,
-        isActive: parentComponent.isActive,
-        autoCreatedParent: true,
-      });
-    }
+    // Parent auto-creation removed (Task #290): the dry-run validator now requires every
+    // non-top-level component to reference an explicitly-supplied parent that already exists
+    // in the upload file or the vessel database. No placeholder/intermediate parent nodes are
+    // created here; children are still ordered after their parents in Step 3 below.
     
     // Step 3: Sort components to ensure parents are created before children
     // Priority: 1) Rows that are referenced as explicit parents by other rows
@@ -435,22 +306,35 @@ export async function performImport(
       }
     }
     
+    // True SFI hierarchy depth: walk up via getParentSFICode until a top-level code is reached.
+    // This correctly orders undotted multi-level codes (e.g. 6 -> 60 -> 601) which a plain
+    // dot-count cannot. The parent-integrity guard below relies on every ancestor being
+    // processed (and created) before its descendants.
+    const sfiDepth = (code: string): number => {
+      let depth = 0;
+      let current = getParentSFICode(code);
+      while (current) {
+        depth++;
+        current = getParentSFICode(current);
+      }
+      return depth;
+    };
+
     const sortedData = [...data].sort((a, b) => {
       const aCode = String(a['Component Code'] || a['Generated Code'] || a['Original SFI Code'] || '').trim();
       const bCode = String(b['Component Code'] || b['Generated Code'] || b['Original SFI Code'] || '').trim();
-      
-      // Prioritize rows whose codes are referenced as explicit parents
+
+      // Primary: lower hierarchy depth first so ancestors precede descendants.
+      const aDepth = sfiDepth(aCode);
+      const bDepth = sfiDepth(bCode);
+      if (aDepth !== bDepth) {
+        return aDepth - bDepth;
+      }
+
+      // Tie-break: rows referenced as explicit parents first.
       const aIsExplicitParent = explicitParentCodes.has(aCode) ? 0 : 1;
       const bIsExplicitParent = explicitParentCodes.has(bCode) ? 0 : 1;
-      
-      if (aIsExplicitParent !== bIsExplicitParent) {
-        return aIsExplicitParent - bIsExplicitParent; // Explicit parents first
-      }
-      
-      // Then sort by hierarchy depth (lower depth = parents first)
-      const aDepth = (aCode.match(/\./g) || []).length;
-      const bDepth = (bCode.match(/\./g) || []).length;
-      return aDepth - bDepth;
+      return aIsExplicitParent - bIsExplicitParent;
     });
 
     // Step 3b: Prefetch maker list for validation
@@ -469,6 +353,18 @@ export async function performImport(
         if (makerValue && !validMakerNames.has(makerValue.toLowerCase())) {
           result.skipped++;
           result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: 'skipped', error: `Maker '${makerValue}' not found in Maker List. Please add the maker first.` });
+          continue;
+        }
+
+        // Parent integrity guard (Task #290): parents are never auto-created, so a child may
+        // only be written once its parent actually exists — either already in the vessel DB or
+        // created earlier in this import (rows are sorted parents-first in Step 3). If the parent
+        // is missing (its row had errors, was excluded from a partial import, or simply absent),
+        // skip the child explicitly rather than persist an orphaned parentId.
+        const childParentCode = row['Parent Component Code'] ? String(row['Parent Component Code']).trim() : null;
+        if (childParentCode && !existingComponentsMap.get(childParentCode)) {
+          result.skipped++;
+          result.rowResults.push({ rowNumber: rowNum, primaryIdentifier: componentCode, action: 'skipped', error: `Parent Component Code '${childParentCode}' was not found in the vessel register or among the imported rows, so '${componentCode}' was skipped to avoid creating an orphaned component.` });
           continue;
         }
         if (mode === 'add') {
