@@ -381,9 +381,11 @@ export async function editPostponeRequest(req: Request, res: Response) {
 export async function approvePostponement(req: Request, res: Response) {
   try {
     const actor = resolveActorIdentity(req);
+    const authReq = req as AuthenticatedRequest;
     const result = await woService.approvePostponement(req.params.id, {
       ...req.body,
       approvedBy: actor || req.body.approvedBy || 'Office',
+      userUuid: authReq.user?.userUuid ?? req.body.userUuid,
     });
     res.json(result);
   } catch (error: any) {
@@ -396,9 +398,11 @@ export async function approvePostponement(req: Request, res: Response) {
 export async function rejectPostponement(req: Request, res: Response) {
   try {
     const actor = resolveActorIdentity(req);
+    const authReq = req as AuthenticatedRequest;
     const result = await woService.rejectPostponement(req.params.id, {
       ...req.body,
       approvedBy: actor || req.body.approvedBy || 'Office',
+      userUuid: authReq.user?.userUuid ?? req.body.userUuid,
     });
     res.json(result);
   } catch (error: any) {

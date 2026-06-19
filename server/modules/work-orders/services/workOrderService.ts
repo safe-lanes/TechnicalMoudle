@@ -2593,7 +2593,8 @@ export async function approvePostponement(id: string, body: any) {
 
       const isSailAdmin = body.role === 'Sail Admin';
       if (!isSailAdmin) {
-        const isAuthorised = await repo.verifyApproverForLevel(body.approvedBy, activeStep.approvalLevel);
+        const reviewerId = body.userUuid || body.approvedBy;
+        const isAuthorised = await repo.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
         if (!isAuthorised) {
           throw new ValidationError(`Not authorised to approve at ${activeStep.approvalLevel}`);
         }
@@ -2694,7 +2695,8 @@ export async function rejectPostponement(id: string, body: any) {
       if (activeStep) {
         const isSailAdmin = body.role === 'Sail Admin';
         if (!isSailAdmin) {
-          const isAuthorised = await repo.verifyApproverForLevel(body.approvedBy, activeStep.approvalLevel);
+          const reviewerId = body.userUuid || body.approvedBy;
+          const isAuthorised = await repo.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
           if (!isAuthorised) {
             throw new ValidationError(`Not authorised to reject at ${activeStep.approvalLevel}`);
           }
