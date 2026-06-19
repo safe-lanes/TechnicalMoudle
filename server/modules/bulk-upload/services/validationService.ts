@@ -57,6 +57,69 @@ function validateMakerReference(
   return errs;
 }
 
+/**
+ * Accepted synonym set for Yes/No reference fields. Kept intentionally lenient
+ * (Yes/No/Y/N/True/False/1/0, case-insensitive) so existing import templates keep
+ * working; values outside this set (and outside blank) are rejected.
+ */
+const YES_NO_SYNONYMS = ['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'];
+
+/**
+ * Validate/normalize a Yes/No reference field for the bulk-import dry run.
+ *  - Blank is allowed unless `required` is set (then it is an error).
+ *  - Accepted synonyms normalize to the canonical 'Yes' / 'No'.
+ *  - Anything else is a blocking error.
+ */
+function validateYesNoField(
+  rawValue: any,
+  fieldLabel: string,
+  rowNum: number,
+  opts: { required?: boolean } = {},
+): { error?: string; normalized?: 'Yes' | 'No' } {
+  const isBlank = rawValue === undefined || rawValue === null || String(rawValue).trim() === '';
+  if (isBlank) {
+    if (opts.required) {
+      return { error: `Row ${rowNum}: ${fieldLabel} is required` };
+    }
+    return {};
+  }
+  const value = String(rawValue).toLowerCase().trim();
+  if (!YES_NO_SYNONYMS.includes(value)) {
+    return { error: `Row ${rowNum}: ${fieldLabel} must be Yes or No` };
+  }
+  return { normalized: ['yes', 'y', 'true', '1'].includes(value) ? 'Yes' : 'No' };
+}
+
+/**
+ * Validate a strict DD-MM-YYYY calendar date for the bulk-import dry run.
+ *  - Blank is allowed (returns nothing).
+ *  - Must match DD-MM-YYYY exactly (no letters, no symbols, no Excel serials).
+ *  - Must be a real calendar date (rejects e.g. 31-02-2025).
+ *  - On success returns the trimmed value unchanged.
+ */
+function validateDateDDMMYYYY(
+  rawValue: any,
+  fieldLabel: string,
+  rowNum: number,
+): { error?: string; normalized?: string } {
+  if (rawValue === undefined || rawValue === null || String(rawValue).trim() === '') {
+    return {};
+  }
+  const value = String(rawValue).trim();
+  const match = value.match(/^([0-9]{2})-([0-9]{2})-([0-9]{4})$/);
+  if (!match) {
+    return { error: `Row ${rowNum}: ${fieldLabel} must be a valid date in DD-MM-YYYY format` };
+  }
+  const day = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const year = parseInt(match[3], 10);
+  const d = new Date(year, month - 1, day);
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
+    return { error: `Row ${rowNum}: ${fieldLabel} must be a valid date in DD-MM-YYYY format` };
+  }
+  return { normalized: value };
+}
+
 export async function validateData(type: string, data: any[], mode: string, vesselId?: string) {
   const results = {
     columns: [] as string[],
@@ -501,26 +564,31 @@ export async function validateData(type: string, data: any[], mode: string, vess
       }
 
       // Validate Yes/No fields - Support both template format and legacy format
-      // Template uses: Critical Yes/No, Condition Based Yes/No
-      // Legacy uses: Critical (Yes/No), Condition Based (Yes/No)
+      // Template uses: Critical Yes/No; Legacy uses: Critical (Yes/No)
+      // (Condition Based is validated in the Yes/No reference block below because the
+      //  active template header is the plain 'Condition Based', not 'Condition Based Yes/No'.)
       const yesNoFieldMappings = [
-        { template: 'Critical Yes/No', legacy: 'Critical (Yes/No)' },
-        { template: 'Condition Based Yes/No', legacy: 'Condition Based (Yes/No)' },
-        { template: 'IS Active', legacy: 'IS Active' }
+        { template: 'Critical Yes/No', legacy: 'Critical (Yes/No)', required: false },
+        { template: 'IS Active', legacy: 'IS Active', required: true }
       ];
       
-      yesNoFieldMappings.forEach(({ template, legacy }) => {
+      yesNoFieldMappings.forEach(({ template, legacy, required }) => {
         const fieldValue = row[template] ?? row[legacy];
-        if (fieldValue !== undefined && fieldValue !== null && fieldValue !== '') {
-          const value = String(fieldValue).toLowerCase().trim();
-          if (!['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'].includes(value)) {
-            errors.push(`Row ${rowNum}: ${template} must be Yes or No`);
-          } else {
-            // Normalize to boolean-friendly format - store in both formats
-            const normalizedValue = ['yes', 'y', 'true', '1'].includes(value);
-            normalized[template] = normalizedValue;
-            normalized[legacy] = normalizedValue;
+        const isBlank = fieldValue === undefined || fieldValue === null || String(fieldValue).trim() === '';
+        if (isBlank) {
+          if (required) {
+            errors.push(`Row ${rowNum}: ${template} is required`);
           }
+          return;
+        }
+        const value = String(fieldValue).toLowerCase().trim();
+        if (!YES_NO_SYNONYMS.includes(value)) {
+          errors.push(`Row ${rowNum}: ${template} must be Yes or No`);
+        } else {
+          // Normalize to boolean-friendly format - store in both formats
+          const normalizedValue = ['yes', 'y', 'true', '1'].includes(value);
+          normalized[template] = normalizedValue;
+          normalized[legacy] = normalizedValue;
         }
       });
 
@@ -534,24 +602,45 @@ export async function validateData(type: string, data: any[], mode: string, vess
         }
       }
 
-      // Validate date fields (DD-MM-YYYY format)
-      ['Installation Date', 'Commissioned Date'].forEach(field => {
-        if (row[field]) {
-          const dateStr = String(row[field]).trim();
-          // Accept DD-MM-YYYY or Excel serial date format
-          // Basic validation - just ensure it's not empty
-          normalized[field] = dateStr;
+      // Validate date fields - strict DD-MM-YYYY only (no Excel serials, no letters/symbols)
+      ['Installation Date', 'Commissioned Date', 'Last Updated'].forEach(field => {
+        const { error, normalized: normDate } = validateDateDDMMYYYY(row[field], field, rowNum);
+        if (error) {
+          errors.push(error);
+        } else if (normDate !== undefined) {
+          normalized[field] = normDate;
+        }
+      });
+
+      // Validate Yes/No reference fields that were previously copied as free text.
+      // Criticality is validated here for the plain 'Criticality' template header
+      // (the legacy 'Critical Yes/No' header is handled by the mapping above).
+      // Condition Based is validated here because the active template header is the
+      // plain 'Condition Based' (the 'Condition Based Yes/No' variants are legacy).
+      [
+        { keys: ['Class Item', 'Class item'], label: 'Class Item' },
+        { keys: ['IS Parent', 'Is Parent'], label: 'Is Parent' },
+        { keys: ['Criticality'], label: 'Criticality' },
+        { keys: ['Condition Based', 'Condition Based Yes/No', 'Condition Based (Yes/No)'], label: 'Condition Based' },
+      ].forEach(({ keys, label }) => {
+        const rawValue = keys.map(k => row[k]).find(v => v !== undefined && v !== null && v !== '');
+        const { error, normalized: normYesNo } = validateYesNoField(rawValue, label, rowNum);
+        if (error) {
+          errors.push(error);
+        } else if (normYesNo !== undefined) {
+          keys.forEach(k => { normalized[k] = normYesNo; });
         }
       });
 
       // Copy text fields directly - support both new and legacy header formats
-      // IMPORTANT: Include RH Counter Type, RH Counter Source, and Last Updated for Running Hours tracking
+      // IMPORTANT: Include RH Counter Type and RH Counter Source for Running Hours tracking.
+      // Note: Last Updated is validated as a date above; Class Item / IS Parent /
+      // Criticality / Condition Based are validated as Yes/No in the reference block above.
       const textFields = [
         'Fleet Equipment Code', 'Fleet Equipment Name', 'Maker', 'Maker Code',
         'Model', 'Model Code', 'Model Number', 'Serial No', 'Drawing No', 'Location',
         'Rating', 'Equipment / System Department', 'Eqpt / System Department', 'Notes', 'Vessel Code',
-        'IS Parent', 'Class item', 'Class Item', 'Criticality',
-        'RH Counter Type', 'RH Counter Source', 'Last Updated'
+        'RH Counter Type', 'RH Counter Source'
       ];
       
       textFields.forEach(field => {
@@ -673,25 +762,24 @@ export async function validateData(type: string, data: any[], mode: string, vess
       });
 
       // Validate Criticality - Support new format and legacy formats
-      const criticalField = row['Criticality'] || row['Critical Yes/No'] || row['Criticality (Yes/No)'];
-      if (criticalField) {
-        const value = String(criticalField).toLowerCase().trim();
-        if (!['yes', 'no', 'y', 'n'].includes(value)) {
-          errors.push(`Row ${rowNum}: Criticality must be Yes or No`);
-        } else {
-          const normalizedValue = ['yes', 'y'].includes(value) ? 'Yes' : 'No';
-          normalized['Criticality'] = normalizedValue;
+      const criticalField = row['Criticality'] ?? row['Critical Yes/No'] ?? row['Criticality (Yes/No)'];
+      {
+        const { error, normalized: normCritical } = validateYesNoField(criticalField, 'Criticality', rowNum);
+        if (error) {
+          errors.push(error);
+        } else if (normCritical !== undefined) {
+          normalized['Criticality'] = normCritical;
         }
       }
 
-      // Validate Is Active
-      const isActiveField = row['Is Active'] || row['IS Active'];
-      if (isActiveField) {
-        const value = String(isActiveField).toLowerCase().trim();
-        if (!['yes', 'no', 'y', 'n'].includes(value)) {
-          errors.push(`Row ${rowNum}: Is Active must be Yes or No`);
-        } else {
-          normalized['Is Active'] = ['yes', 'y'].includes(value) ? 'Yes' : 'No';
+      // Validate Is Active - mandatory
+      const isActiveField = row['Is Active'] ?? row['IS Active'];
+      {
+        const { error, normalized: normActive } = validateYesNoField(isActiveField, 'Is Active', rowNum, { required: true });
+        if (error) {
+          errors.push(error);
+        } else if (normActive !== undefined) {
+          normalized['Is Active'] = normActive;
         }
       }
 
@@ -1831,15 +1919,12 @@ export async function validateData(type: string, data: any[], mode: string, vess
       }
       
       // Is Active - required
-      const isActiveVal = row['Is Active'];
-      if (isActiveVal === undefined || isActiveVal === null || String(isActiveVal).trim() === '') {
-        errors.push(`Row ${rowNum}: Is Active is required`);
-      } else {
-        const val = String(isActiveVal).trim().toLowerCase();
-        if (!['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'].includes(val)) {
-          errors.push(`Row ${rowNum}: Is Active must be Yes/No`);
-        } else {
-          normalized['Is Active'] = isActiveVal;
+      {
+        const { error, normalized: normActive } = validateYesNoField(row['Is Active'], 'Is Active', rowNum, { required: true });
+        if (error) {
+          errors.push(error);
+        } else if (normActive !== undefined) {
+          normalized['Is Active'] = normActive;
         }
       }
       
@@ -1853,7 +1938,14 @@ export async function validateData(type: string, data: any[], mode: string, vess
       if (row['Maker Code']) normalized['Maker Code'] = String(row['Maker Code']).trim();
       if (row['Manual Name']) normalized['Manual Name'] = String(row['Manual Name']).trim();
       if (row['Page Number']) normalized['Page Number'] = String(row['Page Number']).trim();
-      if (row['Criticality']) normalized['Criticality'] = String(row['Criticality']).trim();
+      {
+        const { error, normalized: normCritical } = validateYesNoField(row['Criticality'], 'Criticality', rowNum);
+        if (error) {
+          errors.push(error);
+        } else if (normCritical !== undefined) {
+          normalized['Criticality'] = normCritical;
+        }
+      }
       if (row['IHM (Inventory of Hazardous Materials)']) normalized['IHM (Inventory of Hazardous Materials)'] = String(row['IHM (Inventory of Hazardous Materials)']).trim();
       if (row['Evidence Type']) normalized['Evidence Type'] = String(row['Evidence Type']).trim();
 
