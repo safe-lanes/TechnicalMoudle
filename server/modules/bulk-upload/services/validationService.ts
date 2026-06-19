@@ -44,7 +44,7 @@ function validateMakerReference(
   const trimmedName = rowMakerName != null ? String(rowMakerName).trim() : '';
 
   if (trimmedCode) {
-    const master = existingMakersByCode.get(trimmedCode);
+    const master = existingMakersByCode.get(trimmedCode.toLowerCase());
     if (!master) {
       errs.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
     } else if (trimmedName && String(master.makerName ?? '').trim().toLowerCase() !== trimmedName.toLowerCase()) {
@@ -332,7 +332,10 @@ export async function validateData(type: string, data: any[], mode: string, vess
 
     try {
       const existingMakers = await storage.getMakerList();
-      existingMakersByCode = new Map(existingMakers.map((m: any) => [m.makerCode, m]));
+      // Key by trimmed+lowercased Maker Code so lookups are case-insensitive and space-tolerant.
+      existingMakersByCode = new Map(
+        existingMakers.map((m: any) => [String(m.makerCode ?? '').trim().toLowerCase(), m]),
+      );
       makerListLoaded = true;
       console.log(`📋 Loaded ${existingMakers.length} existing makers for validation`);
     } catch (err) {
