@@ -20,6 +20,43 @@ import {
 } from './helpers';
 import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from '@shared/dateUtils';
 
+/**
+ * Validate a row's Maker Code / Maker Name reference against the Maker List master.
+ * The Maker Code is the primary reference; the Maker Name is cross-verified against it.
+ * Both fields are trimmed; the name comparison is case-insensitive. Returns a list of
+ * blocking validation errors (empty when the reference is valid or both fields are blank).
+ *
+ * Rules (Task #295):
+ *  - Maker Code present but not in the Maker List -> error.
+ *  - Maker Code present and found, but Maker Name does not match the master name for
+ *    that code -> error.
+ *  - Maker Name present without a (valid) Maker Code -> error.
+ *  - No silent back-fill of the Maker Code from a Maker-Name match.
+ */
+function validateMakerReference(
+  rowMakerCode: string | null | undefined,
+  rowMakerName: string | null | undefined,
+  existingMakersByCode: Map<string, any>,
+  rowNum: number,
+): string[] {
+  const errs: string[] = [];
+  const trimmedCode = rowMakerCode != null ? String(rowMakerCode).trim() : '';
+  const trimmedName = rowMakerName != null ? String(rowMakerName).trim() : '';
+
+  if (trimmedCode) {
+    const master = existingMakersByCode.get(trimmedCode);
+    if (!master) {
+      errs.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
+    } else if (trimmedName && String(master.makerName ?? '').trim().toLowerCase() !== trimmedName.toLowerCase()) {
+      errs.push(`Row ${rowNum}: Maker Name '${trimmedName}' does not match the Maker List entry for Maker Code '${trimmedCode}' (expected '${master.makerName}').`);
+    }
+  } else if (trimmedName) {
+    errs.push(`Row ${rowNum}: Maker Name '${trimmedName}' was provided without a valid Maker Code. Please specify a Maker Code that exists in the Maker List.`);
+  }
+
+  return errs;
+}
+
 export async function validateData(type: string, data: any[], mode: string, vesselId?: string) {
   const results = {
     columns: [] as string[],
@@ -273,7 +310,6 @@ export async function validateData(type: string, data: any[], mode: string, vess
   }
 
   let existingMakersByCode = new Map<string, any>();
-  let existingMakersByName = new Map<string, any>();
   let makerListLoaded = false;
 
   if (type === 'components' || type === 'spares' || type === 'fleet-spares') {
@@ -297,7 +333,6 @@ export async function validateData(type: string, data: any[], mode: string, vess
     try {
       const existingMakers = await storage.getMakerList();
       existingMakersByCode = new Map(existingMakers.map((m: any) => [m.makerCode, m]));
-      existingMakersByName = new Map(existingMakers.map((m: any) => [m.makerName.toLowerCase(), m]));
       makerListLoaded = true;
       console.log(`📋 Loaded ${existingMakers.length} existing makers for validation`);
     } catch (err) {
@@ -529,33 +564,11 @@ export async function validateData(type: string, data: any[], mode: string, vess
         errors.push(`Row ${rowNum}: Invalid Equipment / System Department '${deptValue}'. Allowed values are: ${DEPARTMENTS.join(', ')}.`);
       }
 
-      // Validate Maker exists in Maker List (only if maker list was loaded successfully)
+      // Validate Maker Code / Maker Name reference (only if maker list was loaded successfully)
       if (makerListLoaded) {
         const rowMakerCode = normalized['Maker Code'] || null;
         const rowMakerName = normalized['Maker'] || normalized['Maker Name'] || null;
-        if (rowMakerCode) {
-          const trimmedCode = String(rowMakerCode).trim();
-          if (!existingMakersByCode.has(trimmedCode)) {
-            if (rowMakerName) {
-              const nameMatch = existingMakersByName.get(String(rowMakerName).trim().toLowerCase());
-              if (nameMatch) {
-                normalized['Maker Code'] = nameMatch.makerCode;
-              } else {
-                errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-              }
-            } else {
-              errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-            }
-          }
-        } else if (rowMakerName) {
-          const trimmedName = String(rowMakerName).trim();
-          const nameMatch = existingMakersByName.get(trimmedName.toLowerCase());
-          if (nameMatch) {
-            normalized['Maker Code'] = nameMatch.makerCode;
-          } else {
-            errors.push(`Row ${rowNum}: Maker '${trimmedName}' not found in Maker List. Please import makers first.`);
-          }
-        }
+        errors.push(...validateMakerReference(rowMakerCode, rowMakerName, existingMakersByCode, rowNum));
       }
 
       // Note: Parent Component Code is now handled by the centralized logic above
@@ -724,29 +737,7 @@ export async function validateData(type: string, data: any[], mode: string, vess
       if (makerListLoaded) {
         const rowMakerCode = normalized['Maker Code'] || null;
         const rowMakerName = normalized['Maker'] || null;
-        if (rowMakerCode) {
-          const trimmedCode = String(rowMakerCode).trim();
-          if (!existingMakersByCode.has(trimmedCode)) {
-            if (rowMakerName) {
-              const nameMatch = existingMakersByName.get(String(rowMakerName).trim().toLowerCase());
-              if (nameMatch) {
-                normalized['Maker Code'] = nameMatch.makerCode;
-              } else {
-                errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-              }
-            } else {
-              errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-            }
-          }
-        } else if (rowMakerName) {
-          const trimmedName = String(rowMakerName).trim();
-          const nameMatch = existingMakersByName.get(trimmedName.toLowerCase());
-          if (nameMatch) {
-            normalized['Maker Code'] = nameMatch.makerCode;
-          } else {
-            errors.push(`Row ${rowNum}: Maker '${trimmedName}' does not exist in Maker List. Please import makers first.`);
-          }
-        }
+        errors.push(...validateMakerReference(rowMakerCode, rowMakerName, existingMakersByCode, rowNum));
       }
     } else if (type === 'stores') {
       // Validate stores (11-column format per user specification)
@@ -1866,29 +1857,7 @@ export async function validateData(type: string, data: any[], mode: string, vess
       if (makerListLoaded) {
         const rowMakerCode = normalized['Maker Code'] || null;
         const rowMakerName = normalized['Maker'] || null;
-        if (rowMakerCode) {
-          const trimmedCode = String(rowMakerCode).trim();
-          if (!existingMakersByCode.has(trimmedCode)) {
-            if (rowMakerName) {
-              const nameMatch = existingMakersByName.get(String(rowMakerName).trim().toLowerCase());
-              if (nameMatch) {
-                normalized['Maker Code'] = nameMatch.makerCode;
-              } else {
-                errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-              }
-            } else {
-              errors.push(`Row ${rowNum}: Maker Code '${trimmedCode}' not found in Maker List. Please import makers first.`);
-            }
-          }
-        } else if (rowMakerName) {
-          const trimmedName = String(rowMakerName).trim();
-          const nameMatch = existingMakersByName.get(trimmedName.toLowerCase());
-          if (nameMatch) {
-            normalized['Maker Code'] = nameMatch.makerCode;
-          } else {
-            errors.push(`Row ${rowNum}: Maker '${trimmedName}' does not exist in Maker List. Please import makers first.`);
-          }
-        }
+        errors.push(...validateMakerReference(rowMakerCode, rowMakerName, existingMakersByCode, rowNum));
       }
     }
 
