@@ -386,6 +386,7 @@ export async function approvePostponement(req: Request, res: Response) {
       ...req.body,
       approvedBy: actor || req.body.approvedBy || 'Office',
       userUuid: authReq.user?.userUuid ?? req.body.userUuid,
+      sessionRole: authReq.user?.role,
     });
     res.json(result);
   } catch (error: any) {
@@ -403,6 +404,7 @@ export async function rejectPostponement(req: Request, res: Response) {
       ...req.body,
       approvedBy: actor || req.body.approvedBy || 'Office',
       userUuid: authReq.user?.userUuid ?? req.body.userUuid,
+      sessionRole: authReq.user?.role,
     });
     res.json(result);
   } catch (error: any) {

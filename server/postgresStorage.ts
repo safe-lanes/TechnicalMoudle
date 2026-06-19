@@ -5333,7 +5333,7 @@ export class PostgresStorage {
         eq(mocApprovers.isActive, 1),
         eq(mocApprovers.isDeleted, false),
         eq(mocApprovers.modulename, 'Technical'),
-        eq(mocApprovers.userId, reviewerId)
+        eq(mocApprovers.userUuid, reviewerId)
       ));
     return found.length > 0;
   }

@@ -2591,7 +2591,7 @@ export async function approvePostponement(id: string, body: any) {
         throw new ValidationError('No pending approval step found — this request may have already been fully approved');
       }
 
-      const isSailAdmin = body.role === 'Sail Admin';
+      const isSailAdmin = body.sessionRole === 'Sail Admin' || body.role === 'Sail Admin';
       if (!isSailAdmin) {
         const reviewerId = body.userUuid || body.approvedBy;
         const isAuthorised = await repo.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
@@ -2693,7 +2693,7 @@ export async function rejectPostponement(id: string, body: any) {
     if (steps.length > 0) {
       const activeStep = steps.find((s: any) => s.status === 'Pending');
       if (activeStep) {
-        const isSailAdmin = body.role === 'Sail Admin';
+        const isSailAdmin = body.sessionRole === 'Sail Admin' || body.role === 'Sail Admin';
         if (!isSailAdmin) {
           const reviewerId = body.userUuid || body.approvedBy;
           const isAuthorised = await repo.verifyApproverForLevel(reviewerId, activeStep.approvalLevel);
