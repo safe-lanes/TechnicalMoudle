@@ -6,7 +6,7 @@ import { useVessel } from "@/contexts/VesselContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, invalidateByUrlPrefix } from "@/lib/queryClient";
 import {
   CheckCircle,
   XCircle,
@@ -630,6 +630,7 @@ const Dashboard = () => {
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
     queryKey: ['/technical/api/work-orders', effectiveVesselId],
+    refetchOnMount: 'always',  // Always fetch fresh data when navigating to this page
     queryFn: async () => {
       if (isMyVessels) {
         const results = await Promise.allSettled(
@@ -959,7 +960,7 @@ const Dashboard = () => {
     },
     onSuccess: () => {
       toast({ title: 'Postponement Approved', description: 'Work order due date has been updated.' });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       setPostponeDecisionDialog({ open: false, wo: null, action: null, remarks: '', submitting: false });
     },
     onError: (error: any) => {
@@ -977,7 +978,7 @@ const Dashboard = () => {
     },
     onSuccess: () => {
       toast({ title: 'Postponement Rejected', description: 'Work order has been reverted to Due/Overdue.' });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       setPostponeDecisionDialog({ open: false, wo: null, action: null, remarks: '', submitting: false });
     },
     onError: (error: any) => {
@@ -997,7 +998,7 @@ const Dashboard = () => {
     onSuccess: (data) => {
       const count = data?.results?.success?.length ?? 1;
       toast({ title: "Success", description: `${count} work order${count !== 1 ? 's' : ''} approved successfully` });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       setPendingSelectedIds(new Set());
     },
     onError: (error: any) => {
@@ -1018,7 +1019,7 @@ const Dashboard = () => {
     onSuccess: (data) => {
       const count = data?.results?.success?.length ?? 1;
       toast({ title: "Rejected", description: `${count} work order${count !== 1 ? 's' : ''} rejected and sent back to Due` });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       setPendingSelectedIds(new Set());
     },
     onError: (error: any) => {
@@ -1035,7 +1036,7 @@ const Dashboard = () => {
     },
     onSuccess: () => {
       toast({ title: 'Reviewed', description: 'Work order has been marked as reviewed.' });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       setReviewerActionDialog({ open: false, wo: null, comments: '', submitting: false });
     },
     onError: (error: any) => {
@@ -1053,7 +1054,7 @@ const Dashboard = () => {
     },
     onSuccess: () => {
       toast({ title: 'Reopened', description: 'Work order sent back for revision.' });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders', effectiveVesselId] });
+      invalidateByUrlPrefix(['/technical/api/work-orders', '/technical/api/jobs']);
       setReviewerActionDialog({ open: false, wo: null, comments: '', submitting: false });
     },
     onError: (error: any) => {
