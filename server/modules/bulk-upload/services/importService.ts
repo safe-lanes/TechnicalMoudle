@@ -292,50 +292,70 @@ export async function performImport(
     // in the upload file or the vessel database. No placeholder/intermediate parent nodes are
     // created here; children are still ordered after their parents in Step 3 below.
     
-    // Step 3: Sort components to ensure parents are created before children
-    // Priority: 1) Rows that are referenced as explicit parents by other rows
-    //           2) Lower hierarchy depth (parents before children based on code structure)
-    
-    // Build a set of component codes that are referenced as explicit parents
-    const explicitParentCodes = new Set<string>();
-    for (const row of data) {
-      const meta = row['__meta'] || {};
-      // Use the stored original explicit parent from metadata (survives all transformations)
-      if (meta.explicitParentProvided && meta.originalExplicitParent) {
-        explicitParentCodes.add(String(meta.originalExplicitParent).trim());
+    // Step 3: Order components so that an explicitly-referenced parent is always processed
+    // (and therefore created) before any child that references it. We use a stable topological
+    // sort over the explicit Parent Component Code links in THIS upload — NOT structural SFI
+    // depth. Depth ordering is wrong here because the dry-run does not require the parent to be
+    // a structural ancestor: a user may legitimately point a shallow code (e.g. "61") at a
+    // deeper parent (e.g. "612") that exists in the file, and a depth sort would process the
+    // child first and the parent-integrity guard would then wrongly skip it.
+    const rowCodeOf = (row: any): string =>
+      String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code'] || '').trim();
+    // Read the parent from the SAME field that becomes the persisted parentId (createComponentFromRow),
+    // the prefetch, and the integrity guard all use — `Parent Component Code`. Keying the ordering off a
+    // different source (e.g. __meta) could order rows by an edge that does not match what is actually
+    // written, reintroducing skip/orphan drift.
+    const rowParentCodeOf = (row: any): string | null =>
+      row['Parent Component Code'] ? String(row['Parent Component Code']).trim() : null;
+
+    // Map each component code to the row indices that define it (codes can repeat across rows).
+    const codeToIndices = new Map<string, number[]>();
+    data.forEach((row, idx) => {
+      const code = rowCodeOf(row);
+      if (!code) return;
+      if (!codeToIndices.has(code)) codeToIndices.set(code, []);
+      codeToIndices.get(code)!.push(idx);
+    });
+
+    // Build dependency edges: a row depends on the in-file row(s) that define its explicit parent.
+    const dependents: number[][] = data.map(() => []);
+    const inDegree: number[] = data.map(() => 0);
+    data.forEach((row, idx) => {
+      const parentCode = rowParentCodeOf(row);
+      if (!parentCode) return;
+      const parentIndices = codeToIndices.get(parentCode);
+      if (!parentIndices) return; // parent not in this upload (DB-only or absent) — no in-file edge
+      for (const p of parentIndices) {
+        if (p === idx) continue; // ignore self-reference (already rejected by validation)
+        dependents[p].push(idx);
+        inDegree[idx]++;
+      }
+    });
+
+    // Kahn's algorithm with a FIFO queue seeded in original row order (stable).
+    const queue: number[] = [];
+    for (let i = 0; i < data.length; i++) {
+      if (inDegree[i] === 0) queue.push(i);
+    }
+    const orderedIndices: number[] = [];
+    const placed = new Array<boolean>(data.length).fill(false);
+    while (queue.length) {
+      const idx = queue.shift()!;
+      orderedIndices.push(idx);
+      placed[idx] = true;
+      for (const dep of dependents[idx]) {
+        if (--inDegree[dep] === 0) queue.push(dep);
       }
     }
-    
-    // True SFI hierarchy depth: walk up via getParentSFICode until a top-level code is reached.
-    // This correctly orders undotted multi-level codes (e.g. 6 -> 60 -> 601) which a plain
-    // dot-count cannot. The parent-integrity guard below relies on every ancestor being
-    // processed (and created) before its descendants.
-    const sfiDepth = (code: string): number => {
-      let depth = 0;
-      let current = getParentSFICode(code);
-      while (current) {
-        depth++;
-        current = getParentSFICode(current);
+    // Cycle fallback: append any rows left out of a dependency cycle in original order so no
+    // row is silently dropped (the parent-integrity guard will still protect persistence order).
+    if (orderedIndices.length < data.length) {
+      for (let i = 0; i < data.length; i++) {
+        if (!placed[i]) orderedIndices.push(i);
       }
-      return depth;
-    };
+    }
 
-    const sortedData = [...data].sort((a, b) => {
-      const aCode = String(a['Component Code'] || a['Generated Code'] || a['Original SFI Code'] || '').trim();
-      const bCode = String(b['Component Code'] || b['Generated Code'] || b['Original SFI Code'] || '').trim();
-
-      // Primary: lower hierarchy depth first so ancestors precede descendants.
-      const aDepth = sfiDepth(aCode);
-      const bDepth = sfiDepth(bCode);
-      if (aDepth !== bDepth) {
-        return aDepth - bDepth;
-      }
-
-      // Tie-break: rows referenced as explicit parents first.
-      const aIsExplicitParent = explicitParentCodes.has(aCode) ? 0 : 1;
-      const bIsExplicitParent = explicitParentCodes.has(bCode) ? 0 : 1;
-      return aIsExplicitParent - bIsExplicitParent;
-    });
+    const sortedData = orderedIndices.map(i => data[i]);
 
     // Step 3b: Prefetch maker list for validation
     const makerListItems = await storage.getMakerList();
