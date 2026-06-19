@@ -2433,6 +2433,43 @@ export async function rejectCompletedWorkOrder(
  * Ship submits a new postponement request.
  * Sets WO status → "Awaiting Office Approval" and creates a postponements audit row.
  */
+// ── Classify a WO for the postponement approval workflow ─────────────────────
+
+async function classifyWoForPostponement(wo: any): Promise<{
+  variableName: 'Critical Equipment WO' | 'Critical WO' | 'Normal WO';
+  level1Enabled: boolean;
+  level2Enabled: boolean;
+}> {
+  let variableName: 'Critical Equipment WO' | 'Critical WO' | 'Normal WO' = 'Normal WO';
+
+  if (wo.jobId) {
+    const job = await repo.findJob(wo.jobId);
+    if (job) {
+      let isOnCriticalEquipment = false;
+      if ((job as any).componentId) {
+        const comp = await repo.findComponent((job as any).componentId);
+        isOnCriticalEquipment = (comp as any)?.critical === true;
+      }
+      if (isOnCriticalEquipment) {
+        variableName = 'Critical Equipment WO';
+      } else if ((job as any).criticality === 'Yes') {
+        variableName = 'Critical WO';
+      }
+    }
+  }
+
+  const allConfigs = await storage.getApprovalWorkflowConfig();
+  const config = allConfigs.find(
+    (c: any) => c.functionId === 'pms-wo-postponement' && c.variableName === variableName && !c.isDeleted
+  );
+
+  return {
+    variableName,
+    level1Enabled: config?.level1Enabled ?? false,
+    level2Enabled: config?.level2Enabled ?? false,
+  };
+}
+
 export async function submitPostponeRequest(id: string, body: any) {
   let wo = await repo.findById(id);
   if (!wo) wo = await repo.findByCode(id);
@@ -2459,10 +2496,19 @@ export async function submitPostponeRequest(id: string, body: any) {
     await logFieldChanges('work_orders', wo.wouuid, wo.vesselId || null, wo, updatedWO, body.userId || body.performedBy || 'system');
   } catch (err) { console.error('[FieldLogger] WO postpone-request:', err); }
 
-  // Create a new postponement audit row
+  // Classify the WO and build the approval workflow snapshot
+  const classification = await classifyWoForPostponement(wo);
+  const approvalWorkflowSnapshot = {
+    woClassification: classification.variableName,
+    level1Enabled: classification.level1Enabled,
+    level2Enabled: classification.level2Enabled,
+  };
+
+  // Create a new postponement audit row (with snapshot)
   const prevMax = await repo.getMaxPostponementNumber(wo.wouuid);
+  const postponementId = crypto.randomUUID();
   await repo.createPostponement({
-    id: crypto.randomUUID(),
+    id: postponementId,
     workOrderId: wo.wouuid,
     vesselId: wo.vesselId!,
     postponementNumber: prevMax + 1,
@@ -2476,7 +2522,26 @@ export async function submitPostponeRequest(id: string, body: any) {
     submittedDate: today,
     status: 'Awaiting Approval',
     informOffice: true,
+    approvalWorkflowSnapshot,
   });
+
+  // Create level approval step rows
+  if (classification.level1Enabled) {
+    await repo.createWoPostponementApprovalStep({
+      postponementId,
+      workOrderId: wo.wouuid,
+      approvalLevel: 'Level 1',
+      status: 'Pending',
+    });
+  }
+  if (classification.level2Enabled) {
+    await repo.createWoPostponementApprovalStep({
+      postponementId,
+      workOrderId: wo.wouuid,
+      approvalLevel: 'Level 2',
+      status: 'Pending',
+    });
+  }
 
   return updatedWO;
 }
@@ -2493,7 +2558,7 @@ export async function editPostponeRequest(id: string, body: any) {
 
 /**
  * Office approves a postponement request.
- * Updates the WO due date and records the decision.
+ * Gates on multi-level approval steps if configured; finalises when all levels are satisfied.
  */
 export async function approvePostponement(id: string, body: any) {
   let wo = await repo.findById(id);
@@ -2505,6 +2570,42 @@ export async function approvePostponement(id: string, body: any) {
       `Only work orders with status "Awaiting Office Approval" can be approved. Current status: ${wo.status}`
     );
   }
+
+  // ── Multi-level approval gate ────────────────────────────────────────────
+  const awaitingPostponement = await repo.getLatestAwaitingPostponement(wo.wouuid);
+  if (awaitingPostponement) {
+    const steps = await repo.getWoPostponementApprovalSteps(awaitingPostponement.id);
+    if (steps.length > 0) {
+      const now = new Date();
+      const activeStep = steps.find((s: any) => s.status === 'Pending');
+      if (!activeStep) {
+        throw new ValidationError('No pending approval step found — this request may have already been fully approved');
+      }
+
+      const isSailAdmin = body.role === 'Sail Admin';
+      if (!isSailAdmin) {
+        const isAuthorised = await repo.verifyApproverForLevel(body.approvedBy, activeStep.approvalLevel);
+        if (!isAuthorised) {
+          throw new ValidationError(`Not authorised to approve at ${activeStep.approvalLevel}`);
+        }
+      }
+
+      const remaining = steps.filter((s: any) => s.id !== activeStep.id && s.status === 'Pending');
+      await repo.updateWoPostponementApprovalStep(activeStep.id, {
+        status: 'Approved',
+        actionByUserId: body.approvedBy,
+        actionAt: now,
+        remarks: body.approvalRemarks || null,
+      });
+
+      if (remaining.length > 0) {
+        console.log(`[WO_POSTPONE_WORKFLOW] WO ${wo.wouuid} — ${activeStep.approvalLevel} approved; awaiting ${remaining.length} more level(s)`);
+        return (await repo.findById(id)) || wo;
+      }
+      console.log(`[WO_POSTPONE_WORKFLOW] WO ${wo.wouuid} — all approval levels satisfied, finalising`);
+    }
+  }
+  // ── End gate — fall through to finalisation ──────────────────────────────
 
   const today = new Date().toISOString().split('T')[0];
   const newDueDate = wo.postponeRequestedDate || body.newDueDate;
@@ -2561,8 +2662,8 @@ export async function approvePostponement(id: string, body: any) {
 
 /**
  * Office rejects a postponement request.
- * Reverts WO status to Due/Overdue based on the original due date.
- * Inserts a NEW immutable decision row in work_order_postponements.
+ * Records the rejection on the active approval step (if any), reverts WO status to Due/Overdue,
+ * and inserts a NEW immutable decision row in work_order_postponements.
  */
 export async function rejectPostponement(id: string, body: any) {
   let wo = await repo.findById(id);
@@ -2574,6 +2675,31 @@ export async function rejectPostponement(id: string, body: any) {
       `Only work orders with status "Awaiting Office Approval" can be rejected. Current status: ${wo.status}`
     );
   }
+
+  // ── Mark the active approval step as Rejected (if steps exist) ──────────
+  const awaitingPostponement = await repo.getLatestAwaitingPostponement(wo.wouuid);
+  if (awaitingPostponement) {
+    const steps = await repo.getWoPostponementApprovalSteps(awaitingPostponement.id);
+    if (steps.length > 0) {
+      const activeStep = steps.find((s: any) => s.status === 'Pending');
+      if (activeStep) {
+        const isSailAdmin = body.role === 'Sail Admin';
+        if (!isSailAdmin) {
+          const isAuthorised = await repo.verifyApproverForLevel(body.approvedBy, activeStep.approvalLevel);
+          if (!isAuthorised) {
+            throw new ValidationError(`Not authorised to reject at ${activeStep.approvalLevel}`);
+          }
+        }
+        await repo.updateWoPostponementApprovalStep(activeStep.id, {
+          status: 'Rejected',
+          actionByUserId: body.approvedBy,
+          actionAt: new Date(),
+          remarks: body.approvalRemarks || null,
+        });
+      }
+    }
+  }
+  // ── End step rejection — fall through to WO status revert ───────────────
 
   const today = new Date().toISOString().split('T')[0];
 

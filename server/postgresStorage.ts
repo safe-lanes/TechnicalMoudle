@@ -212,6 +212,9 @@ import {
   approvalWorkflowConfig,
   type ApprovalWorkflowConfig,
   mocApprovers,
+  woPostponementApprovals,
+  type WoPostponementApproval,
+  type InsertWoPostponementApproval,
 } from '@shared/schema';
 import { logFieldChanges, logSoftDelete, FileSyncProcessor } from './modules/sync';
 import { getAuditActor, getRequestContext } from './middleware/requestContext';
@@ -5322,7 +5325,7 @@ export class PostgresStorage {
 
   // ── Internal: verify a user is an active approver for a given level ──────
 
-  private async verifyApproverForLevel(reviewerId: string, approvalLevel: string): Promise<boolean> {
+  private async verifyApproverForLevel_internal(reviewerId: string, approvalLevel: string): Promise<boolean> {
     const db = await getDb();
     const found = await db.select().from(mocApprovers)
       .where(and(
@@ -7082,6 +7085,49 @@ export class PostgresStorage {
     }
 
     return result[0];
+  }
+
+  // ── WO Postponement Approval Steps ──────────────────────
+
+  async getWoPostponementApprovalSteps(postponementId: string): Promise<WoPostponementApproval[]> {
+    const db = await getDb();
+    return db.select().from(woPostponementApprovals)
+      .where(and(
+        eq(woPostponementApprovals.postponementId, postponementId),
+        eq(woPostponementApprovals.isDeleted, false)
+      ))
+      .orderBy(woPostponementApprovals.approvalLevel);
+  }
+
+  async createWoPostponementApprovalStep(step: InsertWoPostponementApproval): Promise<WoPostponementApproval> {
+    const db = await getDb();
+    const result = await db.insert(woPostponementApprovals).values(step).returning();
+    return result[0];
+  }
+
+  async updateWoPostponementApprovalStep(id: number, data: Partial<WoPostponementApproval>): Promise<WoPostponementApproval> {
+    const db = await getDb();
+    const result = await db.update(woPostponementApprovals)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(woPostponementApprovals.id, id))
+      .returning();
+    if (!result[0]) throw new Error(`WO postponement approval step ${id} not found`);
+    return result[0];
+  }
+
+  async getLatestAwaitingPostponement(workOrderId: string): Promise<WorkOrderPostponement | undefined> {
+    const db = await getDb();
+    const rows = await db.select().from(workOrderPostponements)
+      .where(and(
+        eq(workOrderPostponements.workOrderId, workOrderId),
+        eq(workOrderPostponements.status, 'Awaiting Approval')
+      ))
+      .orderBy(desc(workOrderPostponements.postponementNumber));
+    return rows[0];
+  }
+
+  async verifyApproverForLevel(reviewerId: string, approvalLevel: string): Promise<boolean> {
+    return this.verifyApproverForLevel_internal(reviewerId, approvalLevel);
   }
 
   // ============= REMAINING FILE-BOUND METHODS =============

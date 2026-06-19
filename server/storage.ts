@@ -180,6 +180,9 @@ import {
   workOrderPostponements,
   type WorkOrderPostponement,
   type InsertWorkOrderPostponement,
+  woPostponementApprovals,
+  type WoPostponementApproval,
+  type InsertWoPostponementApproval,
   superintendentNotifications,
   type SuperintendentNotification,
   type InsertSuperintendentNotification,
@@ -1036,6 +1039,13 @@ export interface IStorage {
 
   // MOC Approvers (local table)
   getLocalApprovers(): Promise<any[]>;
+
+  // WO Postponement Approval Steps
+  getWoPostponementApprovalSteps(postponementId: string): Promise<WoPostponementApproval[]>;
+  createWoPostponementApprovalStep(step: InsertWoPostponementApproval): Promise<WoPostponementApproval>;
+  updateWoPostponementApprovalStep(id: number, data: Partial<WoPostponementApproval>): Promise<WoPostponementApproval>;
+  getLatestAwaitingPostponement(workOrderId: string): Promise<WorkOrderPostponement | undefined>;
+  verifyApproverForLevel(reviewerId: string, approvalLevel: string): Promise<boolean>;
 }
 
 // Helper function to normalize and validate immediateCause structure

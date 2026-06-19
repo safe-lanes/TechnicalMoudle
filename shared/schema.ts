@@ -3542,6 +3542,7 @@ export const workOrderPostponements = pgTable("work_order_postponements", {
   postponeDate: text("postpone_date"), // Raw postpone date entered in dialog
   informOffice: boolean("inform_office").notNull().default(false), // Whether office was informed
   attachmentPath: text("attachment_path"), // Path to any attached documents
+  approvalWorkflowSnapshot: jsonb("approval_workflow_snapshot"), // Snapshot of level1/level2 config at submission time
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: updatedAtColumn(),
   isSync: boolean("is_sync").default(false),
@@ -3564,6 +3565,36 @@ export const insertWorkOrderPostponementSchema = createInsertSchema(workOrderPos
 
 export type InsertWorkOrderPostponement = z.infer<typeof insertWorkOrderPostponementSchema>;
 export type WorkOrderPostponement = typeof workOrderPostponements.$inferSelect;
+
+export const woPostponementApprovals = pgTable("wo_postponement_approvals", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  wpauuid: text("wpauuid").notNull().unique().default(sql`gen_random_uuid()::text`),
+  postponementId: text("postponement_id").notNull(), // FK → work_order_postponements.id
+  workOrderId: text("work_order_id").notNull(), // denormalised for convenience
+  approvalLevel: text("approval_level").notNull(), // 'Level 1' | 'Level 2'
+  status: text("status").notNull().default("Pending"), // 'Pending' | 'Approved' | 'Rejected'
+  actionByUserId: text("action_by_user_id"),
+  actionAt: timestamp("action_at", { withTimezone: true }),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: updatedAtColumn(),
+  createdByUuid: text("created_by_uuid"),
+  updatedByUuid: text("updated_by_uuid"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  isSync: boolean("is_sync").notNull().default(false),
+}, (table) => ({
+  postponementIdx: index("idx_wpa_postponement_id").on(table.postponementId),
+  workOrderIdx: index("idx_wpa_work_order_id").on(table.workOrderId),
+}));
+
+export const insertWoPostponementApprovalSchema = createInsertSchema(woPostponementApprovals).omit({
+  id: true,
+  wpauuid: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertWoPostponementApproval = z.infer<typeof insertWoPostponementApprovalSchema>;
+export type WoPostponementApproval = typeof woPostponementApprovals.$inferSelect;
 
 export const reportSnapshots = pgTable("report_snapshots", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
