@@ -807,56 +807,10 @@ export function getSubGroupName(subGroupCode: string): string {
   return subGroupNames[subGroupCode] || 'UNKNOWN SUB GROUP';
 }
 
-// Helper function to extract parent SFI code
-// Strip suffixes like (1), (2), etc. from SFI codes
-export function stripSFISuffix(sfiCode: string): string {
-  // Remove anything in parentheses at the end: "226.065(1)" → "226.065"
-  return sfiCode.replace(/\([^)]*\)$/, '').trim();
-}
-
-export function getParentSFICode(sfiCode: string): string | null {
-  // Strip any suffix like (1), (2) before calculating parent
-  const cleanCode = stripSFISuffix(sfiCode);
-  
-  const parts = cleanCode.split('.');
-  if (parts.length > 1) {
-    // Has decimal parts (e.g., 711.001 → parent is 711)
-    parts.pop(); // Remove last part
-    return parts.join('.');
-  }
-  // No decimal — undotted or short code
-  const baseCode = cleanCode;
-  if (baseCode.length >= 7) {
-    // 7–9 digit undotted code: strip last 3 digits to get parent
-    // e.g. 601001001 (9) → 601001, 6010010 (7) → 6010
-    return baseCode.substring(0, baseCode.length - 3);
-  } else if (baseCode.length >= 4) {
-    // 4–6 digit undotted code: parent is first 3 digits
-    // e.g. 601001 (6) → 601, 6010 (4) → 601
-    return baseCode.substring(0, 3);
-  } else if (baseCode.length === 3) {
-    // 3-digit code (e.g., 711 → parent is 71)
-    return baseCode.substring(0, 2);
-  } else if (baseCode.length === 2) {
-    // 2-digit code (e.g., 71 → parent is 7)
-    return baseCode.charAt(0);
-  }
-  return null; // Single-digit codes have no parent
-}
-
-// Validate SFI code format
-export function validateSFICode(sfiCode: string): boolean {
-  // SFI codes can be: 6, 61, 612, 612.005, 612.005.001
-  // Also accept undotted formats: 601001, 601001001 (1–9 consecutive digits, no dots)
-  // Also accept codes with suffixes like 226.065(1), 230(2), etc.
-  // Strip the suffix before validation
-  const cleanCode = stripSFISuffix(sfiCode);
-  // Dotted format: each segment is 1–3 digits separated by dots
-  const dottedPattern = /^\d{1,3}(\.\d{1,3})*$/;
-  // Undotted format: 1–9 consecutive digits with no dots
-  const undottedPattern = /^\d{1,9}$/;
-  return dottedPattern.test(cleanCode) || undottedPattern.test(cleanCode);
-}
+// SFI format/parse helpers moved to a shared util so the bulk-import dry-run and the
+// interactive Add/Edit Component forms enforce identical rules. Re-exported here so existing
+// bulk-upload imports of these names keep working.
+export { stripSFISuffix, getParentSFICode, validateSFICode } from '@shared/utils/sfiCode';
 
 // Helper to check if row has explicit parent from any header variant
 // Returns the explicit parent code if provided by user, null if auto-derived should be used

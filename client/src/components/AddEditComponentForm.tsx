@@ -28,6 +28,7 @@ import { ChevronRight, ChevronDown, Plus, Edit2, FileText, FileImage, FileCheck,
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { validateSFICode, stripSFISuffix } from "@shared/utils/sfiCode";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useMasterListOptions } from "@/hooks/useDepartments";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,6 +36,8 @@ import { AdminOnly } from "@/components/RoleGuard";
 import { FEATURES } from '@/config/features';
 import { formatProfessionalDate } from "@/lib/dateUtils";
 import RunningHoursConditionPanel from "@/components/RunningHoursConditionPanel";
+
+const SFI_FORMAT_HINT = "Expected SFI format: 6, 61, 612, 612.005, 601001, 601001001, etc.";
 
 interface JobsSectionCProps {
   isEditMode: boolean;
@@ -560,22 +563,64 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   ] as const;
 
   const isParentComponent = componentData.isParent === "Yes";
+  // A single-digit top-level Component Code may omit the parent (parity with bulk-import & backend).
+  const isTopLevelCode = stripSFISuffix((componentData.componentCode ?? '').trim()).length === 1;
 
-  const MANDATORY_FIELDS = isParentComponent
-    ? ALL_MANDATORY_FIELDS.filter(f => !PARENT_OPTIONAL_FIELDS.includes(f.key))
-    : ALL_MANDATORY_FIELDS;
+  const MANDATORY_FIELDS = ALL_MANDATORY_FIELDS.filter(f => {
+    if (isParentComponent && PARENT_OPTIONAL_FIELDS.includes(f.key)) return false;
+    if (isTopLevelCode && f.key === 'parentComponent') return false;
+    return true;
+  });
 
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
+  const [parentErrorMessage, setParentErrorMessage] = useState<string | null>(null);
+
+  // Parent Component Code rules mirrored from the backend (componentService.validateParentComponentCode)
+  // and the bulk-import dry-run: required for non-top-level codes, valid SFI format, no self-parent,
+  // and must exist in this vessel's component register.
+  const getParentComponentError = (): string | null => {
+    const code = (componentData.componentCode ?? '').trim();
+    const parent = (componentData.parentComponent ?? '').trim();
+    if (!parent) {
+      return isTopLevelCode ? null : 'Parent Component Code is required.';
+    }
+    if (!validateSFICode(parent)) {
+      return `Invalid Parent Component Code format. ${SFI_FORMAT_HINT}`;
+    }
+    if (code && code.toUpperCase() === parent.toUpperCase()) {
+      return 'A component cannot be its own parent.';
+    }
+    // Existence check against the vessel's loaded components (skip if list not yet loaded —
+    // the backend remains the authoritative backstop).
+    if (allComponents.length > 0) {
+      const parentExists = allComponents.some(
+        (c: any) => String(c.componentCode ?? '').trim().toUpperCase() === parent.toUpperCase()
+      );
+      if (!parentExists) {
+        return `Parent Component Code '${parent}' does not exist in this vessel's component register.`;
+      }
+    }
+    return null;
+  };
 
   const validateMandatoryFields = (): boolean => {
     const errors: Record<string, boolean> = {};
     let hasErrors = false;
     for (const field of MANDATORY_FIELDS) {
+      if (field.key === 'parentComponent') continue; // handled by the parent-specific check below
       const value = componentData[field.key as keyof typeof componentData];
       if (!value || value.trim() === '') {
         errors[field.key] = true;
         hasErrors = true;
       }
+    }
+    const parentErr = getParentComponentError();
+    if (parentErr) {
+      errors['parentComponent'] = true;
+      setParentErrorMessage(parentErr);
+      hasErrors = true;
+    } else {
+      setParentErrorMessage(null);
     }
     setValidationErrors(errors);
     return !hasErrors;
@@ -589,6 +634,17 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
         delete next[fieldName];
         return next;
       });
+    }
+    // Parent validity depends on both the parent code and the component code (self-parent / top-level).
+    if (fieldName === 'parentComponent' || fieldName === 'componentCode') {
+      setParentErrorMessage(null);
+      if (validationErrors.parentComponent) {
+        setValidationErrors(prev => {
+          const next = { ...prev };
+          delete next.parentComponent;
+          return next;
+        });
+      }
     }
   };
 
@@ -834,7 +890,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                 data-testid="input-parent-component-code"
                                 disabled={!!parentComponent}
                               />
-                              {validationErrors.parentComponent && <span className="text-xs text-red-500" data-testid="validation-error-parentComponent">This field is required</span>}
+                              {validationErrors.parentComponent && <span className="text-xs text-red-500" data-testid="validation-error-parentComponent">{parentErrorMessage ?? 'This field is required'}</span>}
                             </div>
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Component Code<span className="text-red-500 ml-0.5">*</span></label>
