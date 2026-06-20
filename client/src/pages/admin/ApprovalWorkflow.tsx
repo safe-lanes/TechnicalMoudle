@@ -150,6 +150,8 @@ export default function ApprovalWorkflow() {
     level2Enabled: boolean;
   }> }>({
     queryKey: ['/technical/api/admin/approval-workflow-config'],
+    staleTime: 5 * 1000,
+    retry: 2,
   });
 
   // Seed checkboxState from server data when it arrives

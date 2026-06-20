@@ -577,7 +577,7 @@ const Dashboard = () => {
 
   const { currentUser, myVessels } = useAuth();
   const userRankName = currentUser?.rank_name ?? '';
-  const { data: localApprovers = [] } = useLocalApprovers();
+  const { data: localApprovers = [], isError: approversError, isLoading: approversLoading } = useLocalApprovers();
 
   // Task #224: "My Vessel" scope = the set of vessels assigned to the logged-in
   // user (from AuthContext.myVessels). The 'my' sentinel in mgmtVesselId means
@@ -793,18 +793,18 @@ const Dashboard = () => {
     queryKey: ['/technical/api/change-requests', 'pending-approver', currentUserIdForApprover],
     queryFn: async () => {
       const res = await fetch(`/technical/api/change-requests?pendingForApprover=${encodeURIComponent(currentUserIdForApprover!)}`);
-      if (!res.ok) return [];
+      if (!res.ok) throw new Error(`Failed to fetch pending approver CRs: ${res.status}`);
       return res.json();
     },
     enabled: !!currentUserIdForApprover,
   });
 
   // Approval steps for the CR currently open in the detail dialog (gate logic)
-  const { data: opCrApprovalSteps = [] } = useQuery({
+  const { data: opCrApprovalSteps = [], isError: crStepsError, isLoading: crStepsLoading } = useQuery({
     queryKey: ['/technical/api/change-requests', opDetailChangeRequest?.id, 'approval-steps'],
     queryFn: async () => {
       const res = await fetch(`/technical/api/change-requests/${opDetailChangeRequest!.id}/approval-steps`);
-      if (!res.ok) return [];
+      if (!res.ok) throw new Error(`Failed to fetch approval steps: ${res.status}`);
       return res.json();
     },
     enabled: !!opDetailChangeRequest && opDetailChangeRequest.status?.toLowerCase() === 'submitted',
@@ -812,11 +812,11 @@ const Dashboard = () => {
 
   // Approval steps for the postponement decision dialog (gate logic)
   const postponeWoId = postponeDecisionDialog.wo?.id ? String(postponeDecisionDialog.wo.id) : null;
-  const { data: postponeApprovalSteps = [] } = useQuery({
+  const { data: postponeApprovalSteps = [], isError: postponeStepsError, isLoading: postponeStepsLoading } = useQuery({
     queryKey: ['/technical/api/work-orders', postponeWoId, 'postpone-approval-steps'],
     queryFn: async () => {
       const res = await fetch(`/technical/api/work-orders/${postponeWoId}/postpone-approval-steps`);
-      if (!res.ok) return [];
+      if (!res.ok) throw new Error(`Failed to fetch postpone approval steps: ${res.status}`);
       return res.json();
     },
     enabled: postponeDecisionDialog.open && !!postponeWoId,
@@ -835,7 +835,11 @@ const Dashboard = () => {
   const crUserIsApproverForActiveStep = !!crActiveStep && crUserApproverLevels.includes(crActiveStep.approvalLevel);
   const crNoStepsYet = opDetailChangeRequest?.status?.toLowerCase() === 'submitted' && opCrApprovalSteps.length === 0;
   const noApproversConfigured = !localApprovers.some((a: any) => a.isActive === 1 && !a.isDeleted);
-  const crUserCanAct = (crNoStepsYet || noApproversConfigured) ? (!isVessel && !isHeadOfDept) : crUserIsApproverForActiveStep;
+  const crUserCanAct = (approversLoading || crStepsLoading || approversError || crStepsError)
+    ? false
+    : (crNoStepsYet || noApproversConfigured)
+      ? (!isVessel && !isHeadOfDept)
+      : crUserIsApproverForActiveStep;
 
   // Gate logic for the postponement decision dialog
   const postponeUserApproverLevels: string[] = localApprovers
@@ -846,9 +850,11 @@ const Dashboard = () => {
     .map((a: any) => a.approverLevel as string);
   const postponeActiveStep = postponeApprovalSteps.find((s: any) => s.status === 'Pending');
   const postponeNoStepsYet = postponeApprovalSteps.length === 0;
-  const postponeUserCanAct = (postponeNoStepsYet || noApproversConfigured)
-    ? true
-    : !!postponeActiveStep && postponeUserApproverLevels.includes(postponeActiveStep.approvalLevel);
+  const postponeUserCanAct = (approversLoading || postponeStepsLoading || approversError || postponeStepsError)
+    ? false
+    : (postponeNoStepsYet || noApproversConfigured)
+      ? (!isVessel && !isHeadOfDept)
+      : !!postponeActiveStep && postponeUserApproverLevels.includes(postponeActiveStep.approvalLevel);
 
   const { data: superintendentSummary } = useQuery<{ pendingCount: number; acknowledgedThisMonthCount: number }>({
     queryKey: ['/technical/api/superintendent/notifications/summary', effectiveVesselId],

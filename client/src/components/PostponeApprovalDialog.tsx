@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle, XCircle, Info } from "lucide-react";
 import { useLocalApprovers } from "@/hooks/useExternalMasterData";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUIRole } from "@/contexts/UIRoleContext";
 
 interface PostponeApprovalDialogProps {
   isOpen: boolean;
@@ -67,13 +68,14 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
   const [remarksError, setRemarksError] = useState("");
 
   const { currentUser } = useAuth();
-  const { data: localApprovers = [] } = useLocalApprovers();
+  const { isVessel, isHeadOfDept } = useUIRole();
+  const { data: localApprovers = [], isError: approversError, isLoading: approversLoading } = useLocalApprovers();
 
-  const { data: approvalSteps = [] } = useQuery({
+  const { data: approvalSteps = [], isError: stepsError, isLoading: stepsLoading } = useQuery({
     queryKey: ['/technical/api/work-orders', workOrder?.id, 'postpone-approval-steps'],
     queryFn: async () => {
       const res = await fetch(`/technical/api/work-orders/${workOrder!.id}/postpone-approval-steps`);
-      if (!res.ok) return [];
+      if (!res.ok) throw new Error(`Failed to fetch postpone approval steps: ${res.status}`);
       return res.json();
     },
     enabled: isOpen && !!workOrder?.id,
@@ -91,9 +93,11 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
   const noStepsYet = approvalSteps.length === 0;
   const noApproversConfigured = !localApprovers.some((a: any) => a.isActive === 1 && !a.isDeleted);
 
-  const userCanAct = (noStepsYet || noApproversConfigured)
-    ? true
-    : !!activeStep && userApproverLevels.includes(activeStep.approvalLevel);
+  const userCanAct = (approversLoading || stepsLoading || approversError || stepsError)
+    ? false
+    : (noStepsYet || noApproversConfigured)
+      ? (!isVessel && !isHeadOfDept)
+      : !!activeStep && userApproverLevels.includes(activeStep.approvalLevel);
 
   useEffect(() => {
     if (isOpen) {
