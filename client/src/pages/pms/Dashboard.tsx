@@ -518,7 +518,7 @@ const Dashboard = () => {
     } catch {}
   }, [dashboardPeriod]);
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
-  const { vesselId, setVesselId, assignedVesselIds } = useVessel();
+  const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isTechSuperintendent, isHeadOfDept, isVessel } = useUIRole();
   const { toast } = useToast();
