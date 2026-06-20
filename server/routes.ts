@@ -608,5 +608,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   process.on('SIGTERM', stopAllSchedulers);
   process.on('SIGINT', stopAllSchedulers);
 
+  // API 404 guard — any UNMATCHED /technical/api/* request returns a JSON 404
+  // instead of falling through to the SPA catch-all (setupVite/serveStatic's
+  // app.use("*") → index.html). Registered AFTER every API route (all live in
+  // this function, last at the approval-workflow-config handler above) and BEFORE
+  // the catch-all (registered in index.ts after registerRoutes returns), and
+  // scoped strictly to the /technical/api prefix so it can never shadow a real
+  // API route (those matched and terminated earlier) nor a non-API SPA path
+  // (e.g. /technical/admin/... does not start with /technical/api). This kills
+  // the silent "200 + text/html on a missing API route" failure mode that a
+  // stale / not-yet-deployed process otherwise produces.
+  app.use('/technical/api', (req, res) => {
+    res.status(404).json({ error: 'API route not found', path: req.path });
+  });
+
   return httpServer;
 }
