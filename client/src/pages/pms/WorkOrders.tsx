@@ -255,6 +255,7 @@ const WorkOrders: React.FC = () => {
       return json.data as WorkOrdersPageEnvelope;
     },
     enabled: vesselScopeReady, // Only fetch when a usable vessel scope is available
+    refetchOnMount: 'always',  // Always fetch fresh data when navigating to this page
   });
 
   // On-demand full fetch (no `page` param → raw enriched array). Used by the
@@ -872,17 +873,23 @@ const WorkOrders: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const isAwaitingOfficeApproval = (wo: WorkOrderWithHydratedData): boolean =>
-    wo.computedStatus === 'Awaiting Office Approval' || wo.status === 'Awaiting Office Approval';
-
-  const handlePostponeClick = (workOrder: WorkOrderWithHydratedData) => {
-    if (isOfficeUser && isAwaitingOfficeApproval(workOrder)) {
-      setPostponeApprovalWorkOrder(workOrder);
-      setPostponeApprovalDialogOpen(true);
-    } else {
-      setSelectedWorkOrder(workOrder);
-      setPostponeDialogOpen(true);
+  const handlePostponeClick = async (workOrder: WorkOrderWithHydratedData) => {
+    if (isOfficeUser) {
+      try {
+        const res = await fetch(
+          `/technical/api/work-orders/${workOrder.id}/postpone-approval-steps`,
+          { credentials: 'include' }
+        );
+        const steps: any[] = res.ok ? await res.json() : [];
+        if (steps.some((s: any) => s.status === 'Pending')) {
+          setPostponeApprovalWorkOrder(workOrder);
+          setPostponeApprovalDialogOpen(true);
+          return;
+        }
+      } catch { /* fall through to postpone form on network error */ }
     }
+    setSelectedWorkOrder(workOrder);
+    setPostponeDialogOpen(true);
   };
 
   const handleWorkOrderClick = (workOrder: WorkOrder) => {
@@ -894,14 +901,23 @@ const WorkOrders: React.FC = () => {
     setLocation(`/pms/work-order/${workOrder.id}`);
   };
 
-  const handleTimerClick = (workOrder: WorkOrderWithHydratedData) => {
-    if (isOfficeUser && isAwaitingOfficeApproval(workOrder)) {
-      setPostponeApprovalWorkOrder(workOrder);
-      setPostponeApprovalDialogOpen(true);
-    } else {
-      setSelectedWorkOrder(workOrder);
-      setPostponeDialogOpen(true);
+  const handleTimerClick = async (workOrder: WorkOrderWithHydratedData) => {
+    if (isOfficeUser) {
+      try {
+        const res = await fetch(
+          `/technical/api/work-orders/${workOrder.id}/postpone-approval-steps`,
+          { credentials: 'include' }
+        );
+        const steps: any[] = res.ok ? await res.json() : [];
+        if (steps.some((s: any) => s.status === 'Pending')) {
+          setPostponeApprovalWorkOrder(workOrder);
+          setPostponeApprovalDialogOpen(true);
+          return;
+        }
+      } catch { /* fall through to postpone form on network error */ }
     }
+    setSelectedWorkOrder(workOrder);
+    setPostponeDialogOpen(true);
   };
 
   const postponeApproveMutation = useMutation({

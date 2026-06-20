@@ -115,7 +115,7 @@ export function ModifyPMS() {
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
   const { data: vessels = [] } = useVessels();
   const { currentUser } = useAuth();
-  const { data: localApprovers = [] } = useLocalApprovers();
+  const { data: localApprovers = [], isError: approversError, isLoading: approversLoading } = useLocalApprovers();
 
   const periodDateRange = useMemo(() => periodFilter ? periodFilterToDateRange(periodFilter) : null, [periodFilter]);
 
@@ -155,11 +155,11 @@ export function ModifyPMS() {
   }, [requests, searchQuery, statusFilter]);
 
   // Approval steps for the currently viewed request (gating logic)
-  const { data: approvalSteps = [] } = useQuery({
+  const { data: approvalSteps = [], isError: stepsError, isLoading: stepsLoading } = useQuery({
     queryKey: ['/technical/api/change-requests', viewingRequest?.id, 'approval-steps'],
     queryFn: async () => {
       const res = await fetch(`/technical/api/change-requests/${viewingRequest!.id}/approval-steps`);
-      if (!res.ok) return [];
+      if (!res.ok) throw new Error(`Failed to fetch approval steps: ${res.status}`);
       return res.json();
     },
     enabled: !!viewingRequest && viewingRequest.status === 'submitted',
@@ -179,7 +179,11 @@ export function ModifyPMS() {
   // Legacy CRs with no steps, or no approvers configured at all: fall back to role-based guard
   const noStepsYet = viewingRequest?.status === 'submitted' && approvalSteps.length === 0;
   const noApproversConfigured = !localApprovers.some((a: any) => a.isActive === 1 && !a.isDeleted);
-  const userCanAct = (noStepsYet || noApproversConfigured) ? (!isVessel && !isHeadOfDept) : userIsApproverForActiveStep;
+  const userCanAct = (approversLoading || stepsLoading || approversError || stepsError)
+    ? false
+    : (noStepsYet || noApproversConfigured)
+      ? (!isVessel && !isHeadOfDept)
+      : userIsApproverForActiveStep;
 
   // Approve mutation
   const approveMutation = useMutation({

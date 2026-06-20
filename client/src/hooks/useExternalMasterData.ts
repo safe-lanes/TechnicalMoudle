@@ -309,7 +309,7 @@ export const useLocalApprovers = (options?: UseExternalDataOptions) => {
       const data = await response.json();
       return (data || []).map((a: any) => ({ ...a, isActiveLabel: a.isActive === 1 ? 'Active' : 'Inactive' }));
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 5 * 1000,
     retry: 2,
     enabled: options?.enabled ?? true,
   });
@@ -331,7 +331,7 @@ export const useExternalApprovers = (options?: UseExternalDataOptions) => {
         .filter((a) => a.modulename === 'Technical')
         .map((a) => ({ ...a, isActiveLabel: a.isActive === 1 ? 'Active' : 'Inactive' }));
     },
-    staleTime: 30 * 60 * 1000,
+    staleTime: 5 * 1000,
     retry: 2,
     enabled: options?.enabled ?? true,
   });

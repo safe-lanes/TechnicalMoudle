@@ -57,8 +57,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ error: 'Missing required "domain" query parameter.' });
     }
     try {
-      const { getCrewMasterDataBaseUrl } = await import('./config/externalApi');
-      const baseUrl = getCrewMasterDataBaseUrl();
+      const { getExternalMasterDataBaseUrl } = await import('./config/externalApi');
+      const baseUrl = getExternalMasterDataBaseUrl();
       const url = `${baseUrl}/mocapprovers?domain=${encodeURIComponent(domain)}`;
       const apiResponse = await fetch(url, { method: 'GET', headers: { 'accept': '*/*' } });
       if (!apiResponse.ok) {
