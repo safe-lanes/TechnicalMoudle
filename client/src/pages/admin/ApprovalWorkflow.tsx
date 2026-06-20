@@ -150,7 +150,7 @@ export default function ApprovalWorkflow() {
     level2Enabled: boolean;
   }> }>({
     queryKey: ['/technical/api/admin/approval-workflow-config'],
-    staleTime: 5 * 1000,
+    staleTime: 30 * 60 * 1000,
     retry: 2,
   });
 
