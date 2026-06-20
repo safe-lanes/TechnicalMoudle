@@ -518,7 +518,7 @@ const Dashboard = () => {
     } catch {}
   }, [dashboardPeriod]);
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
-  const { vesselId, setVesselId } = useVessel();
+  const { vesselId, setVesselId, assignedVesselIds: vcAssignedVesselIds } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isTechSuperintendent, isHeadOfDept, isVessel } = useUIRole();
   const { toast } = useToast();
@@ -856,8 +856,8 @@ const Dashboard = () => {
   const postponeWoVesselId = (postponeDecisionDialog.wo as any)?.vesselId ?? null;
   const postponeVesselIsAssigned =
     isSailAdmin
-    || assignedVesselIds.length === 0
-    || (!!postponeWoVesselId && assignedVesselIds.includes(postponeWoVesselId));
+    || vcAssignedVesselIds.length === 0
+    || (!!postponeWoVesselId && vcAssignedVesselIds.includes(postponeWoVesselId));
 
   const postponeUserCanAct = postponeVesselIsAssigned && (
     (approversLoading || postponeStepsLoading || approversError || postponeStepsError)
