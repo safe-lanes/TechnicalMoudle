@@ -102,7 +102,7 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
   const vesselIsAssigned =
     isSailAdmin
     || assignedVesselIds.length === 0
-    || (requestVesselId ? assignedVesselIds.includes(requestVesselId) : true);
+    || (!!requestVesselId && assignedVesselIds.includes(requestVesselId));
 
   const userCanAct = vesselIsAssigned && (
     (approversLoading || stepsLoading || approversError || stepsError)

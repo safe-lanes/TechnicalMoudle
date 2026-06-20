@@ -857,7 +857,7 @@ const Dashboard = () => {
   const postponeVesselIsAssigned =
     isSailAdmin
     || assignedVesselIds.length === 0
-    || (postponeWoVesselId ? assignedVesselIds.includes(postponeWoVesselId) : true);
+    || (!!postponeWoVesselId && assignedVesselIds.includes(postponeWoVesselId));
 
   const postponeUserCanAct = postponeVesselIsAssigned && (
     (approversLoading || postponeStepsLoading || approversError || postponeStepsError)

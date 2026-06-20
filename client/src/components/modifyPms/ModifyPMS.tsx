@@ -186,7 +186,7 @@ export function ModifyPMS() {
   const crVesselIsAssigned =
     isSailAdmin
     || assignedVesselIds.length === 0
-    || (crVesselId ? assignedVesselIds.includes(crVesselId) : true);
+    || (!!crVesselId && assignedVesselIds.includes(crVesselId));
 
   const userCanAct = crVesselIsAssigned && (
     (approversLoading || stepsLoading || approversError || stepsError)
