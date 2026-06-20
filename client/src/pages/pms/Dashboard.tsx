@@ -518,7 +518,7 @@ const Dashboard = () => {
     } catch {}
   }, [dashboardPeriod]);
   const [reasonsToggle, setReasonsToggle] = useState<'overdue' | 'postponement'>('overdue');
-  const { vesselId, setVesselId } = useVessel();
+  const { vesselId, setVesselId, assignedVesselIds } = useVessel();
   const { data: vessels = [] } = useVessels();
   const { isSailAdmin, isClientAdmin, isTechSuperintendent, isHeadOfDept, isVessel } = useUIRole();
   const { toast } = useToast();
@@ -850,11 +850,22 @@ const Dashboard = () => {
     .map((a: any) => a.approverLevel as string);
   const postponeActiveStep = postponeApprovalSteps.find((s: any) => s.status === 'Pending');
   const postponeNoStepsYet = postponeApprovalSteps.length === 0;
-  const postponeUserCanAct = (approversLoading || postponeStepsLoading || approversError || postponeStepsError)
-    ? false
-    : (postponeNoStepsYet || noApproversConfigured)
-      ? (!isVessel && !isHeadOfDept)
-      : !!postponeActiveStep && postponeUserApproverLevels.includes(postponeActiveStep.approvalLevel);
+
+  // Vessel gate: approver must be assigned to the WO's vessel (from profile).
+  // Sail Admin bypasses. Empty assignedVesselIds = no profile assignments = global scope (safe fallback).
+  const postponeWoVesselId = (postponeDecisionDialog.wo as any)?.vesselId ?? null;
+  const postponeVesselIsAssigned =
+    isSailAdmin
+    || assignedVesselIds.length === 0
+    || (postponeWoVesselId ? assignedVesselIds.includes(postponeWoVesselId) : true);
+
+  const postponeUserCanAct = postponeVesselIsAssigned && (
+    (approversLoading || postponeStepsLoading || approversError || postponeStepsError)
+      ? false
+      : (postponeNoStepsYet || noApproversConfigured)
+        ? (!isVessel && !isHeadOfDept)
+        : !!postponeActiveStep && postponeUserApproverLevels.includes(postponeActiveStep.approvalLevel)
+  );
 
   const { data: superintendentSummary } = useQuery<{ pendingCount: number; acknowledgedThisMonthCount: number }>({
     queryKey: ['/technical/api/superintendent/notifications/summary', effectiveVesselId],

@@ -14,6 +14,7 @@ import { CheckCircle, XCircle, Info } from "lucide-react";
 import { useLocalApprovers } from "@/hooks/useExternalMasterData";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUIRole } from "@/contexts/UIRoleContext";
+import { useVessel } from "@/contexts/VesselContext";
 
 interface PostponeApprovalDialogProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ interface PostponeApprovalDialogProps {
     postponeRequestedDate?: string | null;
     postponementReason?: string | null;
     postponementRemarks?: string | null;
+    vesselId?: string | null;
   } | null;
   onApprove: (workOrderId: string, remarks: string) => void;
   onReject: (workOrderId: string, remarks: string) => void;
@@ -68,7 +70,8 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
   const [remarksError, setRemarksError] = useState("");
 
   const { currentUser } = useAuth();
-  const { isVessel, isHeadOfDept } = useUIRole();
+  const { isVessel, isHeadOfDept, isSailAdmin } = useUIRole();
+  const { assignedVesselIds } = useVessel();
   const { data: localApprovers = [], isError: approversError, isLoading: approversLoading } = useLocalApprovers();
 
   const { data: approvalSteps = [], isError: stepsError, isLoading: stepsLoading } = useQuery({
@@ -93,11 +96,21 @@ const PostponeApprovalDialog: React.FC<PostponeApprovalDialogProps> = ({
   const noStepsYet = approvalSteps.length === 0;
   const noApproversConfigured = !localApprovers.some((a: any) => a.isActive === 1 && !a.isDeleted);
 
-  const userCanAct = (approversLoading || stepsLoading || approversError || stepsError)
-    ? false
-    : (noStepsYet || noApproversConfigured)
-      ? (!isVessel && !isHeadOfDept)
-      : !!activeStep && userApproverLevels.includes(activeStep.approvalLevel);
+  // Vessel gate: approver must be assigned to the request's vessel (from profile).
+  // Sail Admin bypasses. Empty assignedVesselIds = no profile assignments = global scope (safe fallback).
+  const requestVesselId = workOrder?.vesselId ?? null;
+  const vesselIsAssigned =
+    isSailAdmin
+    || assignedVesselIds.length === 0
+    || (requestVesselId ? assignedVesselIds.includes(requestVesselId) : true);
+
+  const userCanAct = vesselIsAssigned && (
+    (approversLoading || stepsLoading || approversError || stepsError)
+      ? false
+      : (noStepsYet || noApproversConfigured)
+        ? (!isVessel && !isHeadOfDept)
+        : !!activeStep && userApproverLevels.includes(activeStep.approvalLevel)
+  );
 
   useEffect(() => {
     if (isOpen) {

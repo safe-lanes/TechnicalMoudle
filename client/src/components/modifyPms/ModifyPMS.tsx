@@ -111,7 +111,7 @@ export function ModifyPMS() {
   const [viewingRequest, setViewingRequest] = useState<ChangeRequest | null>(null);
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const { vesselId, setVesselId, applyVesselScope, pickerVessels, myVesselsEmpty } = useVessel();
+  const { vesselId, setVesselId, applyVesselScope, pickerVessels, myVesselsEmpty, assignedVesselIds } = useVessel();
   const { isVessel, isHeadOfDept, isSailAdmin, isClientAdmin } = useUIRole();
   const { data: vessels = [] } = useVessels();
   const { currentUser } = useAuth();
@@ -179,11 +179,22 @@ export function ModifyPMS() {
   // Legacy CRs with no steps, or no approvers configured at all: fall back to role-based guard
   const noStepsYet = viewingRequest?.status === 'submitted' && approvalSteps.length === 0;
   const noApproversConfigured = !localApprovers.some((a: any) => a.isActive === 1 && !a.isDeleted);
-  const userCanAct = (approversLoading || stepsLoading || approversError || stepsError)
-    ? false
-    : (noStepsYet || noApproversConfigured)
-      ? (!isVessel && !isHeadOfDept)
-      : userIsApproverForActiveStep;
+
+  // Vessel gate: approver must be assigned to the request's vessel (from profile).
+  // Sail Admin bypasses. Empty assignedVesselIds = no profile assignments = global scope (safe fallback).
+  const crVesselId = viewingRequest?.vesselId ?? null;
+  const crVesselIsAssigned =
+    isSailAdmin
+    || assignedVesselIds.length === 0
+    || (crVesselId ? assignedVesselIds.includes(crVesselId) : true);
+
+  const userCanAct = crVesselIsAssigned && (
+    (approversLoading || stepsLoading || approversError || stepsError)
+      ? false
+      : (noStepsYet || noApproversConfigured)
+        ? (!isVessel && !isHeadOfDept)
+        : userIsApproverForActiveStep
+  );
 
   // Approve mutation
   const approveMutation = useMutation({
