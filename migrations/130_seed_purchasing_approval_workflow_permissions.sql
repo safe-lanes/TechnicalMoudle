@@ -1,18 +1,37 @@
 -- Migration 130: Register Purchasing and Approval Workflow submodules in RBAC
 --
--- Adds 3 menu items:
---   1. purchasing             — top-level, embeds Shipskart iframe (read-only by design)
---   2. approval-workflow-pms  — child of admin-approval-workflow
---   3. approval-workflow-defects — child of admin-approval-workflow
+-- Adds 4 menu items (idempotent — WHERE NOT EXISTS guards throughout):
+--   1. admin-approval-workflow  — parent menu under 'admin' (guard for envs missing migration 108)
+--   2. purchasing               — top-level leaf, embeds Shipskart iframe (read-only by design)
+--   3. approval-workflow-pms    — child of admin-approval-workflow
+--   4. approval-workflow-defects — child of admin-approval-workflow
 --
--- PORTABLE: All role and parent references use name-based lookups.
--- IDEMPOTENT: Each INSERT uses WHERE NOT EXISTS (name) guard.
+-- Seeds role-menu access rows for ALL roles:
+--   Purchasing      : admin-tier can_view=true; vessel-tier can_view=false; write flags always false
+--   Approval (PMS)  : admin-tier can_view+can_edit; vessel-tier can_view+can_create (submit capability)
+--   Approval (Defects): same pattern as PMS
+--
+-- PORTABLE  : All lookups use name/assigned_role — no hardcoded UUIDs or IDs.
+-- IDEMPOTENT: Menu INSERTs use WHERE NOT EXISTS; permission INSERTs use ON CONFLICT DO NOTHING.
 
 -- ============================================================
--- STEP 1: Insert menu items
+-- STEP 1: Ensure admin-approval-workflow parent exists
+-- Migration 108 should have created this, but we guard here so
+-- child inserts below always have a valid parent to reference.
 -- ============================================================
 
--- 1a. purchasing (top-level, no parent)
+INSERT INTO adm_menumaster_ac (id, muid, name, display_name, route, parent_menu, is_active, sort_order, created_at, updated_at, is_deleted, is_sync)
+SELECT
+  (SELECT COALESCE(MAX(id), 0) + 1 FROM adm_menumaster_ac),
+  gen_random_uuid(), 'admin-approval-workflow', 'Approval Workflow', '/admin/approval-workflow',
+  (SELECT muid FROM adm_menumaster_ac WHERE name = 'admin' LIMIT 1),
+  true, 30, NOW(), NOW(), false, false
+WHERE NOT EXISTS (SELECT 1 FROM adm_menumaster_ac WHERE name = 'admin-approval-workflow');
+
+-- ============================================================
+-- STEP 2: Insert purchasing menu item (top-level leaf, no parent)
+-- ============================================================
+
 INSERT INTO adm_menumaster_ac (id, muid, name, display_name, route, parent_menu, is_active, sort_order, created_at, updated_at, is_deleted, is_sync)
 SELECT
   (SELECT COALESCE(MAX(id), 0) + 1 FROM adm_menumaster_ac),
@@ -20,7 +39,10 @@ SELECT
   NULL, true, 60, NOW(), NOW(), false, false
 WHERE NOT EXISTS (SELECT 1 FROM adm_menumaster_ac WHERE name = 'purchasing');
 
--- 1b. approval-workflow-pms (child of admin-approval-workflow)
+-- ============================================================
+-- STEP 3: Insert approval-workflow-pms (child of admin-approval-workflow)
+-- ============================================================
+
 INSERT INTO adm_menumaster_ac (id, muid, name, display_name, route, parent_menu, is_active, sort_order, created_at, updated_at, is_deleted, is_sync)
 SELECT
   (SELECT COALESCE(MAX(id), 0) + 1 FROM adm_menumaster_ac),
@@ -30,7 +52,10 @@ SELECT
 WHERE NOT EXISTS (SELECT 1 FROM adm_menumaster_ac WHERE name = 'approval-workflow-pms')
   AND EXISTS (SELECT 1 FROM adm_menumaster_ac WHERE name = 'admin-approval-workflow');
 
--- 1c. approval-workflow-defects (child of admin-approval-workflow)
+-- ============================================================
+-- STEP 4: Insert approval-workflow-defects (child of admin-approval-workflow)
+-- ============================================================
+
 INSERT INTO adm_menumaster_ac (id, muid, name, display_name, route, parent_menu, is_active, sort_order, created_at, updated_at, is_deleted, is_sync)
 SELECT
   (SELECT COALESCE(MAX(id), 0) + 1 FROM adm_menumaster_ac),
@@ -41,9 +66,9 @@ WHERE NOT EXISTS (SELECT 1 FROM adm_menumaster_ac WHERE name = 'approval-workflo
   AND EXISTS (SELECT 1 FROM adm_menumaster_ac WHERE name = 'admin-approval-workflow');
 
 -- ============================================================
--- STEP 2: Purchasing permissions
--- Read-only for all office/admin roles (can_view only; write flags always false)
--- Vessel roles get no access (purchasing is an office-only module)
+-- STEP 5: Purchasing permissions — ALL roles, write flags always false
+-- Admin-tier : can_view=true  (office module, visible to admins)
+-- Vessel-tier: can_view=false (office module, hidden from ship by default)
 -- ============================================================
 
 INSERT INTO adm_role_menu_access (role_ruid, menu_muid, can_view, can_create, can_edit, can_delete)
@@ -56,13 +81,22 @@ WHERE m.name = 'purchasing'
   AND r.assigned_role IN ('Sail Admin', 'Super Admin', 'Admin', 'Offline Admin')
 ON CONFLICT (role_ruid, menu_muid) DO NOTHING;
 
+INSERT INTO adm_role_menu_access (role_ruid, menu_muid, can_view, can_create, can_edit, can_delete)
+SELECT r.ruid, m.muid, false, false, false, false
+FROM adm_menumaster_ac m
+CROSS JOIN admn_role_master r
+WHERE m.name = 'purchasing'
+  AND m.is_deleted = false
+  AND r.is_deleted = false
+  AND r.assigned_role IN ('Vessel User', 'Vessel Admin')
+ON CONFLICT (role_ruid, menu_muid) DO NOTHING;
+
 -- ============================================================
--- STEP 3: Approval Workflow › PMS permissions
--- Office/Admin roles: can_view + can_edit (configure approval chains)
--- Vessel roles: can_view only (submit requests, read-only on config)
+-- STEP 6: Approval Workflow › PMS permissions
+-- Admin-tier : can_view + can_edit (configure approval chains)
+-- Vessel-tier: can_view + can_create (submit PMS approval requests)
 -- ============================================================
 
--- Admin-tier: view + edit
 INSERT INTO adm_role_menu_access (role_ruid, menu_muid, can_view, can_create, can_edit, can_delete)
 SELECT r.ruid, m.muid, true, false, true, false
 FROM adm_menumaster_ac m
@@ -73,9 +107,8 @@ WHERE m.name = 'approval-workflow-pms'
   AND r.assigned_role IN ('Sail Admin', 'Super Admin', 'Admin', 'Offline Admin')
 ON CONFLICT (role_ruid, menu_muid) DO NOTHING;
 
--- Vessel-tier: view only
 INSERT INTO adm_role_menu_access (role_ruid, menu_muid, can_view, can_create, can_edit, can_delete)
-SELECT r.ruid, m.muid, true, false, false, false
+SELECT r.ruid, m.muid, true, true, false, false
 FROM adm_menumaster_ac m
 CROSS JOIN admn_role_master r
 WHERE m.name = 'approval-workflow-pms'
@@ -85,11 +118,11 @@ WHERE m.name = 'approval-workflow-pms'
 ON CONFLICT (role_ruid, menu_muid) DO NOTHING;
 
 -- ============================================================
--- STEP 4: Approval Workflow › Defects permissions
--- Same pattern as PMS submodule
+-- STEP 7: Approval Workflow › Defects permissions (same pattern as PMS)
+-- Admin-tier : can_view + can_edit
+-- Vessel-tier: can_view + can_create (submit defect approval requests)
 -- ============================================================
 
--- Admin-tier: view + edit
 INSERT INTO adm_role_menu_access (role_ruid, menu_muid, can_view, can_create, can_edit, can_delete)
 SELECT r.ruid, m.muid, true, false, true, false
 FROM adm_menumaster_ac m
@@ -100,9 +133,8 @@ WHERE m.name = 'approval-workflow-defects'
   AND r.assigned_role IN ('Sail Admin', 'Super Admin', 'Admin', 'Offline Admin')
 ON CONFLICT (role_ruid, menu_muid) DO NOTHING;
 
--- Vessel-tier: view only
 INSERT INTO adm_role_menu_access (role_ruid, menu_muid, can_view, can_create, can_edit, can_delete)
-SELECT r.ruid, m.muid, true, false, false, false
+SELECT r.ruid, m.muid, true, true, false, false
 FROM adm_menumaster_ac m
 CROSS JOIN admn_role_master r
 WHERE m.name = 'approval-workflow-defects'
