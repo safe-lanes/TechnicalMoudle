@@ -1591,13 +1591,13 @@ export async function validateData(type: string, data: any[], mode: string, vess
         }
       }
       
-      // Last Done Date - optional, must be DD-MM-YYYY when provided (spec item 11)
+      // Last Done Date - optional, no format validation.
+      // Excel auto-converts typed dates to serial numbers, so a strict DD-MM-YYYY
+      // text check would reject valid dates. The import step normalizes whatever
+      // value is provided (Excel serials and mixed date strings), so pass it through.
       {
-        const lastDoneResult = validateDateDDMMYYYY(row['Last Done Date'], 'Last Done Date', rowNum);
-        if (lastDoneResult.error) {
-          errors.push(`Row ${rowNum}: Invalid Last Done Date. Expected format: DD-MM-YYYY.`);
-        } else if (lastDoneResult.normalized) {
-          normalized['Last Done Date'] = lastDoneResult.normalized;
+        if (row['Last Done Date'] !== undefined && row['Last Done Date'] !== null && String(row['Last Done Date']).trim() !== '') {
+          normalized['Last Done Date'] = row['Last Done Date'];
         }
       }
       
