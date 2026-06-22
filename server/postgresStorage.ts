@@ -1553,7 +1553,10 @@ export class PostgresStorage {
 
         await tx.update(components)
           .set({
-            rhCurrentInheritedCached: params.newRHValue.toString(), // Cache master's absolute value
+            // Cache the master's TOTAL (meterReplacedLastRh + new reading) so the inherited
+            // display stays correct for masters that have undergone a meter replacement; the
+            // one-time propagate-all fixer reuses this path and must not collapse the cache.
+            rhCurrentInheritedCached: (parseFloat(component.meterReplacedLastRh || '0') + params.newRHValue).toString(),
             currentCumulativeRH: newChildRH.toString(), // Child's actual RH with delta applied
             rhInheritedUpdatedAt: now,
             lastUpdated: now.toISOString(),
@@ -7202,6 +7205,10 @@ export class PostgresStorage {
     let inheritedComponents: any[] = [];
     let inheritedDelta = 0;
     let currentRH = 0;
+    // Master's TOTAL running hours (meterReplacedLastRh + newRH). Hoisted so the inherited
+    // cascade inside the transaction can cache it on each child. For a meter replacement this
+    // is the preserved total; for a normal update it is the master's cumulative reading.
+    let masterTotalRH = 0;
 
     if (parentResult.length > 0) {
       const parent = parentResult[0];
@@ -7283,6 +7290,7 @@ export class PostgresStorage {
       const totalCumulativeRH = meterReplaced
         ? previousTotalForReplacement + newRH
         : (parseFloat(parent.meterReplacedLastRh || '0') + newRH);
+      masterTotalRH = totalCumulativeRH;
 
       parentAuditValues = {
         vesselId: parent.vesselId || 'unknown',
@@ -7329,7 +7337,12 @@ export class PostgresStorage {
                 eq(components.rhCounterSource, masterComponentCode)
               )
             ));
-          inheritedDelta = newRH - currentRH;
+          // Meter replacement: the master's TOTAL increases by the new meter reading (newRH),
+          // because the old reading is preserved in meterReplacedLastRh. The normal-path delta
+          // (newRH - currentRH) would be hugely negative on a meter reset (old large reading ->
+          // fresh ~0 reading) and collapse every inherited component, so use the true Total
+          // change instead. For a normal update both expressions equal the master's RH increase.
+          inheritedDelta = meterReplaced ? newRH : (newRH - currentRH);
         }
       }
     }
@@ -7358,11 +7371,16 @@ export class PostgresStorage {
         // Inherited components cascade (if MASTER)
         for (const inherited of inheritedComponents) {
           const inheritedCurrentRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || '0');
-          const newInheritedRH = inheritedCurrentRH + inheritedDelta;
+          // Inherited components mirror the master's TOTAL running hours. They never carry their
+          // own meterReplacedLastRh, so currentCumulativeRH must accumulate the full total change.
+          // Clamp non-negative for parity with updateMasterRunningHours.
+          const newInheritedRH = Math.max(0, inheritedCurrentRH + inheritedDelta);
 
           await tx.update(components)
             .set({
-              rhCurrentInheritedCached: newRH.toString(),
+              // Cache the master's TOTAL (meterReplacedLastRh + newRH), not the raw new meter
+              // reading, so the inherited display matches the master after a meter replacement.
+              rhCurrentInheritedCached: masterTotalRH.toString(),
               rhInheritedUpdatedAt: now,
               currentCumulativeRH: newInheritedRH.toString(),
               lastUpdated: dateUpdated,
@@ -7393,8 +7411,18 @@ export class PostgresStorage {
         }
       }
 
+      // Skip structural children that were already updated by the inherited RH cascade above.
+      // A component can be BOTH an RH-inherited component and a structural child (parentId).
+      // The structural loop uses structuralDelta (newRH - currentRH), which is strongly negative
+      // on a meter reset and would overwrite the correct inherited values written above (and
+      // re-cache the raw meter reading). Process each overlapping row exactly once via the
+      // meter-replacement-aware inherited cascade.
+      const inheritedCuuidSet = new Set(inheritedComponents.map((i: any) => i.cuuid));
+
       // Update all structural children (by parentId hierarchy)
       for (const child of children) {
+        if (inheritedCuuidSet.has(child.cuuid)) continue;
+
         const childCurrentRH = parseFloat(child.currentCumulativeRH || '0');
         const childNewRH = childCurrentRH + structuralDelta;
 
@@ -7410,7 +7438,10 @@ export class PostgresStorage {
         }
 
         if (child.rhCounterType === 'INHERITED' && child.rhMasterComponentId === parentComponentId) {
-          childUpdateData.rhCurrentInheritedCached = newRH.toString();
+          // Cache the master's TOTAL, not the raw new meter reading, so a meter replacement
+          // does not collapse the inherited display on this path (reached only when the inherited
+          // cascade was bypassed, e.g. master vesselId unresolved).
+          childUpdateData.rhCurrentInheritedCached = masterTotalRH.toString();
           childUpdateData.rhInheritedUpdatedAt = now;
         }
 
