@@ -37,7 +37,7 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
   selectedSubModule, 
   onSubModuleChange 
 }) => {
-  const { hasAnyChildAccess, isLoading: permissionsLoading } = usePermissions();
+  const { hasAnyChildAccess, canViewMenu, isLoading: permissionsLoading } = usePermissions();
   const { isSailAdmin } = useUIRole();
 
   const menuItems = [
@@ -68,15 +68,13 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
       icon: Shield,
     },
     // ====== PURCHASING NAV LINK (Shipskart SSO) — START ======
-    // Clicking opens the Purchasing submodule, which embeds the Shipskart
-    // platform via backend-brokered ticket SSO (see PurchasingPage.tsx).
-    // TODO(UAT): replace bypassPermissionCheck with proper
-    // adm_menumaster_ac row + role grants once UAT user mapping is in place.
+    // Visible only when can_view=true for the "purchasing" RBAC menu entry.
+    // Gated via hasAnyChildAccess("purchasing") like all other top-nav items.
     {
       id: "purchasing",
       label: "Purchasing",
       icon: ShoppingCart,
-      bypassPermissionCheck: true,
+      directMenuName: "purchasing",
     },
     // ====== PURCHASING NAV LINK (Shipskart SSO) — END ======
     // ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
@@ -103,7 +101,7 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
         
         {menuItems.filter((item) => {
           if (item.isModule) return true;
-          if (item.bypassPermissionCheck) return true;
+          if (item.directMenuName) return canViewMenu(item.directMenuName);
           return hasAnyChildAccess(item.id);
         }).map((item) => {
           const Icon = item.icon;
