@@ -19,6 +19,7 @@ import {
   INTERVAL_UNITS
 } from './helpers';
 import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from '@shared/dateUtils';
+import { getAllRanks } from '../../ranks/service';
 
 /**
  * Validate a row's Maker Code / Maker Name reference against the Maker List master.
@@ -367,6 +368,31 @@ export async function validateData(type: string, data: any[], mode: string, vess
   // (non-blank WO Title) participate, so a rejected/blank row never "claims" a composite key.
   const jobCompositeOccurrences = new Map<string, number[]>();
   const existingDbJobCompositeKeys = new Set<string>();
+
+  // Allowed Approver values come from the Rank Master (admAvailableRanks), loaded via the
+  // ranks module service layer. Case-insensitive set keyed on rank name (and label),
+  // mapping to the canonical name for normalization. Null => rank master unavailable.
+  let approverRankMaster: Map<string, string> | null = null;
+  if (type === 'jobs') {
+    try {
+      const ranks = await getAllRanks();
+      if (ranks) {
+        approverRankMaster = new Map<string, string>();
+        for (const r of ranks as any[]) {
+          const canonical = r?.name ? String(r.name).trim() : '';
+          if (canonical) {
+            approverRankMaster.set(canonical.toLowerCase(), canonical);
+            if (r?.label && String(r.label).trim() !== '') {
+              approverRankMaster.set(String(r.label).trim().toLowerCase(), canonical);
+            }
+          }
+        }
+      }
+      console.log(`📋 Loaded ${approverRankMaster?.size ?? 0} Rank Master entries for Approver validation`);
+    } catch (err) {
+      console.error('Failed to fetch Rank Master for Approver validation:', err);
+    }
+  }
 
   if (type === 'jobs') {
     try {
@@ -1526,19 +1552,25 @@ export async function validateData(type: string, data: any[], mode: string, vess
         }
       }
 
-      // Approver - must be the same as Assigned To (spec item 8). The Approver is always
-      // derived from the validated Assigned To. A provided Approver is only accepted when
-      // it matches a valid Assigned To; otherwise (mismatch, or Assigned To blank/invalid)
-      // it is rejected so dry-run acceptance matches the persisted behavior.
-      if (row['Approver'] && String(row['Approver']).trim() !== '') {
+      // Approver - mandatory; allowed values come from the Rank Master (admAvailableRanks).
+      // No longer coupled to Assigned To. Blank -> error; a value not in the Rank Master ->
+      // error; a valid value is normalized to the canonical Rank Master name.
+      if (!row['Approver'] || String(row['Approver']).trim() === '') {
+        errors.push(`Row ${rowNum}: Approver is mandatory.`);
+      } else {
         const approverVal = String(row['Approver']).trim();
-        if (!assignedToNormalized || approverVal.toLowerCase() !== assignedToNormalized.toLowerCase()) {
-          errors.push(`Row ${rowNum}: Approver must be the same as Assigned To.`);
+        if (approverRankMaster) {
+          const canonical = approverRankMaster.get(approverVal.toLowerCase());
+          if (!canonical) {
+            errors.push(`Row ${rowNum}: Invalid Approver value.`);
+          } else {
+            normalized['Approver'] = canonical;
+          }
         } else {
-          normalized['Approver'] = assignedToNormalized;
+          // Rank Master unavailable (DB down) - accept the provided value rather than
+          // blocking the whole import on an infrastructure failure.
+          normalized['Approver'] = approverVal;
         }
-      } else if (assignedToNormalized) {
-        normalized['Approver'] = assignedToNormalized;
       }
 
       // Job Priority - allowed values High/Medium/Low only (spec item 9)

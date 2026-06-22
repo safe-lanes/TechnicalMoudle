@@ -2156,8 +2156,9 @@ export async function performImport(
         jobDescription: row['Brief Work Description'] || null,
         briefWorkDescription: row['Brief Work Description'] || null,  // Store in both fields for compatibility
         assignedTo: row['Assigned To'] || null,
-        // Spec item 8: Approver is always the same as Assigned To.
-        approver: row['Assigned To'] || null,
+        // Approver is validated against the Rank Master (admAvailableRanks); persist the
+        // file's Approver value (no longer copied from Assigned To).
+        approver: row['Approver'] || null,
         level2ReviewerRankId: row['Reviewer Rank'] ? String(row['Reviewer Rank']).trim() || null : null,
         jobPriority: row['Job Priority'] || null,
         lastDoneDate: lastDoneDate,         // Store Last Done date (for Calendar jobs)
