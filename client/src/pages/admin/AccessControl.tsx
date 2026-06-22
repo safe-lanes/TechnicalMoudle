@@ -309,7 +309,7 @@ export default function AccessControl() {
                                   key={field}
                                   className="flex justify-center"
                                   onClick={(e) => e.stopPropagation()}
-                                  title={writeDisabled ? "Purchasing is read-only (third-party embed)" : undefined}
+                                  title={writeDisabled ? "Purchasing is read-only (third-party API)" : undefined}
                                 >
                                   <Checkbox
                                     checked={writeDisabled ? false : getPermission(node.muid)[field]}
