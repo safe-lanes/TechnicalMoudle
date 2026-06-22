@@ -39,6 +39,7 @@ router.get('/admin/access-control/:roleRuid', async (req: Request, res: Response
   try {
     const { roleRuid } = req.params;
     const permissions = await storage.getRoleMenuPermissions(roleRuid);
+
     res.json(permissions);
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to fetch permissions', details: error.message });

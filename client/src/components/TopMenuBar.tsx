@@ -68,15 +68,12 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
       icon: Shield,
     },
     // ====== PURCHASING NAV LINK (Shipskart SSO) — START ======
-    // Clicking opens the Purchasing submodule, which embeds the Shipskart
-    // platform via backend-brokered ticket SSO (see PurchasingPage.tsx).
-    // TODO(UAT): replace bypassPermissionCheck with proper
-    // adm_menumaster_ac row + role grants once UAT user mapping is in place.
+    // Always visible to all logged-in users — not controlled by RBAC.
     {
       id: "purchasing",
       label: "Purchasing",
       icon: ShoppingCart,
-      bypassPermissionCheck: true,
+      alwaysVisible: true,
     },
     // ====== PURCHASING NAV LINK (Shipskart SSO) — END ======
     // ====== NOON REPORT MODULE NAV LINK — START (remove to disable) ======
@@ -103,7 +100,7 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
         
         {menuItems.filter((item) => {
           if (item.isModule) return true;
-          if (item.bypassPermissionCheck) return true;
+          if (item.alwaysVisible) return true;
           return hasAnyChildAccess(item.id);
         }).map((item) => {
           const Icon = item.icon;

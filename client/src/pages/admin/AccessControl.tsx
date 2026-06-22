@@ -117,7 +117,7 @@ export default function AccessControl() {
     };
   };
 
-  const updatePermission = (muid: string, field: keyof Permission, value: boolean) => {
+  const updatePermission = (muid: string, field: keyof Permission, value: boolean, menuName?: string) => {
     const current = getPermission(muid);
     const updated = { ...current, menuMuid: muid, [field]: value };
     const newPerms = { ...effectivePermissions, [muid]: updated };
@@ -125,7 +125,7 @@ export default function AccessControl() {
     setIsDirty(true);
   };
 
-  const toggleSelectAll = (muid: string, checked: boolean) => {
+  const toggleSelectAll = (muid: string, checked: boolean, menuName?: string) => {
     const current = getPermission(muid);
     const updated = {
       ...current,
@@ -292,19 +292,26 @@ export default function AccessControl() {
                             <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
                               <Checkbox
                                 checked={isAllChecked(node.muid) ? true : isSomeChecked(node.muid) ? "indeterminate" : false}
-                                onCheckedChange={(checked) => toggleSelectAll(node.muid, !!checked)}
+                                onCheckedChange={(checked) => toggleSelectAll(node.muid, !!checked, node.name)}
                                 data-testid={`checkbox-selectall-${node.name}`}
                               />
                             </div>
-                            {(["canView", "canCreate", "canEdit", "canDelete"] as const).map((field) => (
-                              <div key={field} className="flex justify-center" onClick={(e) => e.stopPropagation()}>
-                                <Checkbox
-                                  checked={getPermission(node.muid)[field]}
-                                  onCheckedChange={(checked) => updatePermission(node.muid, field, !!checked)}
-                                  data-testid={`checkbox-${field}-${node.name}`}
-                                />
-                              </div>
-                            ))}
+                            {(["canView", "canCreate", "canEdit", "canDelete"] as const).map((field) => {
+                              return (
+                                <div
+                                  key={field}
+                                  className="flex justify-center"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Checkbox
+                                    checked={getPermission(node.muid)[field]}
+                                    onCheckedChange={(checked) => updatePermission(node.muid, field, !!checked, node.name)}
+                                    data-testid={`checkbox-${field}-${node.name}`}
+                                    className=""
+                                  />
+                                </div>
+                              );
+                            })}
                           </div>
                           {hasChildren && isExpanded && node.children.map((child) => renderNode(child, depth + 1))}
                         </div>
